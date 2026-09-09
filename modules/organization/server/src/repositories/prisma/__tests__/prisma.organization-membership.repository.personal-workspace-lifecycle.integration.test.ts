@@ -16,7 +16,6 @@ import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { PersonalWorkspaceIdentityAdapter } from "../../../adapters/resource-identifiers.adapter.ts";
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
-import type { OrganizationSettingsSecretPort } from "../../../ports/organization.port.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -25,10 +24,6 @@ const noopGrantsWriter = {
   revokeBindingsWhere: async () => 0,
 } as unknown as AuthzGrantsService;
 
-const passthroughSecrets: OrganizationSettingsSecretPort = {
-  encrypt: (value) => value,
-  decrypt: (value) => value,
-};
 
 describe.skipIf(!DB_URL)("given a member with a personal workspace in an organization", () => {
   const identities = PersonalWorkspaceIdentityAdapter.create();
@@ -47,7 +42,7 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
     database: prisma,
     grants: noopGrantsWriter,
   });
-  const organizationRepository = PrismaOrganizationRepository.create(prisma, passthroughSecrets);
+  const organizationRepository = PrismaOrganizationRepository.create(prisma);
 
   async function ensureLeaverWorkspace() {
     const resources = identities.create({ userId: leaverUserId, organizationId });

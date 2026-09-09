@@ -17,8 +17,8 @@ import {
   GroupIdentityPort,
   PersonalWorkspaceIdentityPort,
   TeamIdentityPort,
-  type OrganizationRepository,
 } from "../../ports/organization.port.ts";
+import type { OrganizationRepository } from "../organization.repository.ts";
 import { GroupRepository } from "../group.repository.ts";
 import { TeamRepository } from "../team.repository.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
@@ -203,6 +203,7 @@ function buildService(options?: {
     groupIdentities: {} as GroupIdentityPort,
     authz,
     grants,
+    settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
   });
   return { service, teams, calls };
 }

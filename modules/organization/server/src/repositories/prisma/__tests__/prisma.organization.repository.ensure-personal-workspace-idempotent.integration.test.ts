@@ -29,14 +29,9 @@ import { type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { PersonalWorkspaceIdentityAdapter } from "../../../adapters/resource-identifiers.adapter.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
-import type { OrganizationSettingsSecretPort } from "../../../ports/organization.port.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
-const passthroughSecrets: OrganizationSettingsSecretPort = {
-  encrypt: (value) => value,
-  decrypt: (value) => value,
-};
 
 describe.skipIf(!DB_URL)("PrismaOrganizationRepository.ensurePersonalWorkspace", () => {
   const identities = PersonalWorkspaceIdentityAdapter.create();
@@ -46,7 +41,7 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository.ensurePersonalWorkspace",
     guard: PrismaTenancyGuardService.create(),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
-  const organizationRepository = PrismaOrganizationRepository.create(prisma, passthroughSecrets);
+  const organizationRepository = PrismaOrganizationRepository.create(prisma);
 
   let organizationId: string;
   let userId: string;

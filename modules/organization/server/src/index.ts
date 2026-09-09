@@ -73,9 +73,13 @@ export {
   OrganizationSettingsSecretPort,
   GroupIdentityPort,
   TeamIdentityPort,
+} from "./ports/organization.port.ts";
+export {
+  OrganizationRepository,
   type StoredOrganizationSettings,
   type PersonalWorkspaceResourceIds,
-} from "./ports/organization.port.ts";
+  type PersonalWorkspaceFeatureProject,
+} from "./repositories/organization.repository.ts";
 export {
   ServerOrganizationApp,
   type OrganizationInfrastructure,
@@ -85,6 +89,8 @@ export {
   type OrganizationWithMembersAndTheirTeams,
 } from "./app/organization.app.ts";
 export { organizationServer } from "./organization.server.ts";
+export { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
+export type { OrganizationRepositories } from "./repositories/organization.repositories.ts";
 export {
   createOrganizationRestApp,
   type OrganizationRestInviteService,

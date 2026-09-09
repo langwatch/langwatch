@@ -64,8 +64,9 @@ import type {
   UpdateOrganizationTeamWithMembersInput,
 } from "@langwatch/organization-contract";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
-import { PostgresOrganizationAdapter } from "../adapters/postgres.organization.adapter.ts";
+import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
 import { PostgresOrganizationMembershipAdapter } from "../adapters/postgres.organization-membership.adapter.ts";
+import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import type {
   GroupIdentityPort,
   OrganizationSettingsSecretPort,
@@ -181,10 +182,18 @@ export interface ServerOrganizationAppDependencies {
 type OrganizationSetup = FeatureSetup<
   { projects: typeof ProjectApi; permissions: typeof AuthzApi; users: typeof UserApi },
   OrganizationInfrastructure,
-  undefined
+  undefined,
+  OrganizationRepositories
 >;
 
 export type OrganizationInfrastructure = Readonly<{
+  /**
+   * TEMPORARY: only `PostgresOrganizationMembershipAdapter` and
+   * `PostgresPersonalTeamScopeAdapter` still build from this. Membership's
+   * repository conversion is unfinished (tracked in the lane's handover)  - 
+   * every other repository this application builds now comes from
+   * `setup.repositories` instead.
+   */
   database: PrismaClient;
   identities: PersonalWorkspaceIdentityPort;
   teamIdentities: TeamIdentityPort;
@@ -257,8 +266,10 @@ export class ServerOrganizationApp implements OrganizationApi {
   #dependencies: ServerOrganizationAppDependencies;
 
   static create(setup: OrganizationSetup): ServerOrganizationApp {
-    const organizations = PostgresOrganizationAdapter.create({
-      database: setup.infrastructure.database,
+    const organizations = OrganizationEntityService.create({
+      repository: setup.repositories.organization,
+      teams: setup.repositories.team,
+      groups: setup.repositories.group,
       identities: setup.infrastructure.identities,
       teamIdentities: setup.infrastructure.teamIdentities,
       groupIdentities: setup.infrastructure.groupIdentities,
@@ -266,7 +277,7 @@ export class ServerOrganizationApp implements OrganizationApi {
       grants: setup.dependencies.permissions,
       settingsSecrets: setup.infrastructure.settingsSecrets,
       diagnostics: setup.infrastructure.diagnostics,
-    }).build();
+    });
     const membership = PostgresOrganizationMembershipAdapter.create({
       database: setup.infrastructure.database,
       grants: setup.dependencies.permissions,

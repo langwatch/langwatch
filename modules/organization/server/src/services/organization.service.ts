@@ -56,12 +56,13 @@ import {
 } from "@langwatch/organization-contract";
 import type {
   GroupIdentityPort,
-  OrganizationRepository,
+  OrganizationSettingsSecretPort,
   PersonalWorkspaceDiagnosticsPort,
   PersonalWorkspaceIdentityPort,
   TeamIdentityPort,
 } from "../ports/organization.port.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
+import type { OrganizationRepository } from "../repositories/organization.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
 
 const ALL_PERSONAL_FEATURES_DISABLED: PersonalFeatures = {
@@ -93,6 +94,7 @@ export class OrganizationService extends OrganizationServiceContract {
     private readonly authz: AuthzApi,
     private readonly grants: AuthzApi,
     private readonly diagnostics: PersonalWorkspaceDiagnosticsPort | undefined,
+    private readonly settingsSecrets: OrganizationSettingsSecretPort,
   ) {
     super();
     this.groupService = OrganizationGroupService.create({
@@ -165,14 +167,27 @@ export class OrganizationService extends OrganizationServiceContract {
     return this.teams.tryGetOrganizationId(getOrganizationIdByTeamIdInputSchema.parse(input));
   }
 
+  /** The stored row, decrypted: the cipher is this service's dependency, not the repository's. */
+  private decryptSettings(stored: {
+    s3Endpoint: string | null;
+    s3AccessKeyId: string | null;
+  }): { s3Endpoint: string | null; s3AccessKeyId: string | null } {
+    return {
+      s3Endpoint: stored.s3Endpoint ? this.settingsSecrets.decrypt(stored.s3Endpoint) : null,
+      s3AccessKeyId: stored.s3AccessKeyId
+        ? this.settingsSecrets.decrypt(stored.s3AccessKeyId)
+        : null,
+    };
+  }
+
   async getSettings(input: { organizationId: string }): Promise<OrganizationSettings> {
     const parsed = getOrganizationSettingsInputSchema.parse(input);
-    const settings = await this.repository.tryFindSettings(parsed.organizationId);
-    if (!settings) {
+    const stored = await this.repository.findStoredSettings(parsed.organizationId);
+    if (!stored) {
       throw new OrganizationNotFoundError();
     }
 
-    return settings;
+    return { ...stored, ...this.decryptSettings(stored) };
   }
 
   async updateSettings(
@@ -181,12 +196,27 @@ export class OrganizationService extends OrganizationServiceContract {
     const parsed = updateOrganizationSettingsInputSchema.parse(input);
     const wasSharingEnabled =
       parsed.traceSharingEnabled === false
-        ? (await this.repository.tryFindStoredSettings(parsed.organizationId))
+        ? (await this.repository.findStoredSettings(parsed.organizationId))
             ?.traceSharingEnabled === true
         : false;
-    await this.repository.updateSettings(parsed);
+    await this.repository.updateSettings({
+      ...parsed,
+      ...(parsed.s3Endpoint !== undefined
+        ? { s3Endpoint: this.encryptOrNull(parsed.s3Endpoint) }
+        : {}),
+      ...(parsed.s3AccessKeyId !== undefined
+        ? { s3AccessKeyId: this.encryptOrNull(parsed.s3AccessKeyId) }
+        : {}),
+      ...(parsed.s3SecretAccessKey !== undefined
+        ? { s3SecretAccessKey: this.encryptOrNull(parsed.s3SecretAccessKey) }
+        : {}),
+    });
 
     return { traceShareRevocationRequired: wasSharingEnabled };
+  }
+
+  private encryptOrNull(value: string | null): string | null {
+    return value ? this.settingsSecrets.encrypt(value) : null;
   }
 
   static create(options: {
@@ -199,6 +229,7 @@ export class OrganizationService extends OrganizationServiceContract {
     authz: AuthzApi;
     grants: AuthzApi;
     diagnostics?: PersonalWorkspaceDiagnosticsPort;
+    settingsSecrets: OrganizationSettingsSecretPort;
   }): OrganizationService {
     return new OrganizationService(
       options.repository,
@@ -210,6 +241,7 @@ export class OrganizationService extends OrganizationServiceContract {
       options.authz,
       options.grants,
       options.diagnostics,
+      options.settingsSecrets,
     );
   }
 

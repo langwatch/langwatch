@@ -5,8 +5,8 @@ import {
   GroupIdentityPort,
   PersonalWorkspaceIdentityPort,
   TeamIdentityPort,
-  type PersonalWorkspaceResourceIds,
 } from "../ports/organization.port.ts";
+import type { PersonalWorkspaceResourceIds } from "../repositories/organization.repository.ts";
 
 /**
  * The identifiers and slugs organization resources are born with — a persisted format, not a

@@ -10,6 +10,8 @@ import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AuthzApi, AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { organizationRepositories } from "@langwatch/organization-server";
+import { instantiateRepositories } from "@langwatch/runtime-composition";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -25,9 +27,12 @@ const CALLER = { id: "user-1", name: "Sam Rivers", email: "sam@acme.test" };
 const BASE_API_KEY = "test-base-key";
 
 /**
- * The rows this install actually reads, held in memory. Not a database: the
- * organization module's persistence has not moved to repositories yet, so the
- * seam a boot test can stand on is still the Prisma client itself.
+ * The rows this install actually reads, held in memory as a Prisma double.
+ * The organization, team and group repositories are selected through the
+ * "postgres" backend here (this process's real shape), so this is still the
+ * seam the boot proves the install reaches. The "given the memory-backed
+ * repositories" block below proves the OTHER backend, `defineRepositories`
+ * selects for tests and for a memory-only process, reads back its own writes.
  */
 function memoryPrisma() {
   const organization = {
@@ -231,5 +236,33 @@ describe("given the organization module installed on an API process", () => {
         expect.objectContaining({ code: "service_unavailable" }),
       );
     });
+  });
+});
+
+describe("given the memory-backed organization repositories", () => {
+  /**
+   * The organization module's own registry, over no database at all - the
+   * same selection a memory-only test or process makes with
+   * `.withPersistence("memory", {})`. A write followed by a read through the
+   * SAME instances is what proves the memory backend is not a stub: `team`
+   * and `group` share the repository's one in-memory database, the way
+   * Postgres would share one connection.
+   */
+  it("reads back a team it just wrote", async () => {
+    const repositories = instantiateRepositories(organizationRepositories, {
+      backend: "memory",
+      infrastructure: {},
+    });
+
+    const created = await repositories.team.create({
+      teamId: "team-mem-1",
+      name: "Memory Team",
+      slug: "memory-team",
+      organizationId: ORGANIZATION_ID,
+    });
+
+    await expect(
+      repositories.team.get({ teamId: created.id, organizationId: ORGANIZATION_ID }),
+    ).resolves.toMatchObject({ id: "team-mem-1", name: "Memory Team", slug: "memory-team" });
   });
 });

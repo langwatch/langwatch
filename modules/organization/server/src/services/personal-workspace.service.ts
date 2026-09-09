@@ -20,8 +20,10 @@ import {
 } from "@langwatch/organization-contract";
 import type {
   OrganizationRepository,
-  PersonalWorkspaceDiagnosticsPort,
   PersonalWorkspaceFeatureProject,
+} from "../repositories/organization.repository.ts";
+import type {
+  PersonalWorkspaceDiagnosticsPort,
   PersonalWorkspaceIdentityPort,
 } from "../ports/organization.port.ts";
 

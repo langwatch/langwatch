@@ -1,33 +1,23 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
-import { OrganizationSettingsSecretPort } from "../../../ports/organization.port.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 
-class TestSettingsSecrets extends OrganizationSettingsSecretPort {
-  encrypt(value: string): string {
-    return `encrypted:${value}`;
-  }
-
-  decrypt(value: string): string {
-    return value.replace("encrypted:", "");
-  }
-}
-
 describe("PrismaOrganizationRepository settings", () => {
-  it("preserves partial-update semantics and encrypts S3 credentials", async () => {
+  it("preserves partial-update semantics and persists columns as given", async () => {
     const update = vi.fn().mockResolvedValue(void 0);
-    const repository = PrismaOrganizationRepository.create(
-      { organization: { update } } as unknown as PrismaClient,
-      new TestSettingsSecrets(),
-    );
+    const repository = PrismaOrganizationRepository.create({
+      organization: { update },
+    } as unknown as PrismaClient);
 
+    // The service encrypts before calling this: the repository stores
+    // exactly the strings it is handed, never deciding what they mean.
     await repository.updateSettings({
       organizationId: "organization",
       primaryIntent: null,
       supportContact: "  ",
-      s3Endpoint: "https://storage.example.com",
-      s3AccessKeyId: "access-key",
-      s3SecretAccessKey: "secret-key",
+      s3Endpoint: "encrypted:https://storage.example.com",
+      s3AccessKeyId: "encrypted:access-key",
+      s3SecretAccessKey: "encrypted:secret-key",
       s3Bucket: "",
     });
 
@@ -44,7 +34,7 @@ describe("PrismaOrganizationRepository settings", () => {
     });
   });
 
-  it("decrypts only readable S3 settings", async () => {
+  it("reads back the stored row without touching S3 settings", async () => {
     const findUnique = vi.fn().mockResolvedValue({
       id: "organization",
       name: "Acme",
@@ -59,14 +49,13 @@ describe("PrismaOrganizationRepository settings", () => {
       createdAt: new Date(1),
       updatedAt: new Date(2),
     });
-    const repository = PrismaOrganizationRepository.create(
-      { organization: { findUnique } } as unknown as PrismaClient,
-      new TestSettingsSecrets(),
-    );
+    const repository = PrismaOrganizationRepository.create({
+      organization: { findUnique },
+    } as unknown as PrismaClient);
 
-    await expect(repository.tryFindSettings("organization")).resolves.toMatchObject({
-      s3Endpoint: "https://storage.example.com",
-      s3AccessKeyId: "access-key",
+    await expect(repository.findStoredSettings("organization")).resolves.toMatchObject({
+      s3Endpoint: "encrypted:https://storage.example.com",
+      s3AccessKeyId: "encrypted:access-key",
       s3Bucket: "bucket",
     });
   });

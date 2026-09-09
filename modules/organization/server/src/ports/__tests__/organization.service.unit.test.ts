@@ -15,26 +15,23 @@ import {
   TeamMembershipNotFoundError,
   UserNotInOrganizationError,
   type OrganizationBillingProfile,
-  type OrganizationSettings,
   type OrganizationTeam,
   type OrganizationTeamPage,
   type PersonalFeatures,
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
+import { PersonalWorkspaceIdentityPort, TeamIdentityPort } from "../organization.port.ts";
 import {
   OrganizationRepository,
-  PersonalWorkspaceIdentityPort,
-  TeamIdentityPort,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
   type StoredOrganizationSettings,
-} from "../organization.port.ts";
+} from "../../repositories/organization.repository.ts";
 import { TeamRepository } from "../../repositories/team.repository.ts";
 import { OrganizationService } from "../../services/organization.service.ts";
 
 class StubRepository extends OrganizationRepository {
-  settings: OrganizationSettings | null = null;
   storedSettings: StoredOrganizationSettings | null = null;
   settingsUpdate: Record<string, unknown> | null = null;
   constructor(
@@ -53,11 +50,7 @@ class StubRepository extends OrganizationRepository {
     return this.teamId;
   }
 
-  tryFindSettings(): Promise<OrganizationSettings | null> {
-    return Promise.resolve(this.settings);
-  }
-
-  tryFindStoredSettings(): Promise<StoredOrganizationSettings | null> {
+  findStoredSettings(): Promise<StoredOrganizationSettings | null> {
     return Promise.resolve(this.storedSettings);
   }
 
@@ -278,6 +271,7 @@ function createService(
       listScopeBindings: () => Promise.resolve(teamBindings),
     } as unknown as AuthzService,
     grants,
+    settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
   });
 }
 
@@ -386,7 +380,7 @@ describe("OrganizationService", () => {
 
   it("returns management settings through the canonical service", async () => {
     const repository = new StubRepository("team");
-    repository.settings = {
+    repository.storedSettings = {
       id: "org",
       name: "Acme",
       slug: "acme",
@@ -401,8 +395,10 @@ describe("OrganizationService", () => {
       updatedAt: new Date(2),
     };
 
+    // The stub's settingsSecrets is the identity function, so the decrypted
+    // answer equals the stored row byte for byte.
     await expect(createService(repository).getSettings({ organizationId: "org" })).resolves.toEqual(
-      repository.settings,
+      repository.storedSettings,
     );
   });
 

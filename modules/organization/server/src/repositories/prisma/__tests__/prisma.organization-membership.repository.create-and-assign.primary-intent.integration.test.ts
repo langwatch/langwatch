@@ -14,7 +14,6 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
-import type { OrganizationSettingsSecretPort } from "../../../ports/organization.port.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -24,10 +23,6 @@ const noopGrantsWriter = {
 } as unknown as AuthzGrantsService;
 
 /** No secret ever passes through this suite; the identity is enough. */
-const passthroughSecrets: OrganizationSettingsSecretPort = {
-  encrypt: (value) => value,
-  decrypt: (value) => value,
-};
 
 describe.skipIf(!DB_URL)(
   "PrismaOrganizationMembershipRepository.createAndAssign — primaryIntent",
@@ -44,7 +39,7 @@ describe.skipIf(!DB_URL)(
       database: prisma,
       grants: noopGrantsWriter,
     });
-    const organizationRepository = PrismaOrganizationRepository.create(prisma, passthroughSecrets);
+    const organizationRepository = PrismaOrganizationRepository.create(prisma);
 
     async function createUser() {
       const user = await prisma!.user.create({

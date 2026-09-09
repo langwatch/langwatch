@@ -3,7 +3,6 @@ import {
   OrganizationNotFoundError,
   PersonalProjectNotFoundError,
   type OrganizationBillingProfile,
-  type OrganizationSettings,
   type UpdateOrganizationSettingsInput,
   type PersonalFeatures,
   type PersonalWorkspace,
@@ -11,29 +10,23 @@ import {
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
 import {
   OrganizationRepository,
-  OrganizationSettingsSecretPort,
   type PersonalWorkspaceFeatureProject,
   type PersonalWorkspaceResourceIds,
-} from "../../ports/organization.port.ts";
+  type StoredOrganizationSettings,
+} from "../organization.repository.ts";
 
 type Client = Prisma.TransactionClient | PrismaClient;
 
 export class PrismaOrganizationRepository extends OrganizationRepository {
-  private constructor(
-    private readonly database: PrismaClient,
-    private readonly settingsSecrets: OrganizationSettingsSecretPort,
-  ) {
+  private constructor(private readonly database: PrismaClient) {
     super();
   }
 
-  static create(
-    database: PrismaClient,
-    settingsSecrets: OrganizationSettingsSecretPort,
-  ): PrismaOrganizationRepository {
-    return new PrismaOrganizationRepository(database, settingsSecrets);
+  static create(database: PrismaClient): PrismaOrganizationRepository {
+    return new PrismaOrganizationRepository(database);
   }
 
-  async tryFindStoredSettings(organizationId: string): Promise<OrganizationSettings | null> {
+  async findStoredSettings(organizationId: string): Promise<StoredOrganizationSettings | null> {
     return this.database.organization.findUnique({
       where: { id: organizationId },
       select: {
@@ -53,18 +46,11 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     });
   }
 
-  async tryFindSettings(organizationId: string): Promise<OrganizationSettings | null> {
-    const settings = await this.tryFindStoredSettings(organizationId);
-    if (!settings) return null;
-    return {
-      ...settings,
-      s3Endpoint: settings.s3Endpoint ? this.settingsSecrets.decrypt(settings.s3Endpoint) : null,
-      s3AccessKeyId: settings.s3AccessKeyId
-        ? this.settingsSecrets.decrypt(settings.s3AccessKeyId)
-        : null,
-    };
-  }
-
+  /**
+   * `input`'s `s3Endpoint`/`s3AccessKeyId`/`s3SecretAccessKey` already carry
+   * whatever the caller wants stored (the service encrypts before calling):
+   * persistence stores columns, it does not decide what they mean.
+   */
   async updateSettings(input: UpdateOrganizationSettingsInput): Promise<void> {
     await this.database.organization.update({
       where: { id: input.organizationId },
@@ -78,14 +64,10 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
           ? { traceSharingEnabled: input.traceSharingEnabled }
           : {}),
         ...(input.primaryIntent !== undefined ? { primaryIntent: input.primaryIntent } : {}),
-        ...(input.s3Endpoint !== undefined
-          ? { s3Endpoint: this.encryptOrNull(input.s3Endpoint) }
-          : {}),
-        ...(input.s3AccessKeyId !== undefined
-          ? { s3AccessKeyId: this.encryptOrNull(input.s3AccessKeyId) }
-          : {}),
+        ...(input.s3Endpoint !== undefined ? { s3Endpoint: input.s3Endpoint } : {}),
+        ...(input.s3AccessKeyId !== undefined ? { s3AccessKeyId: input.s3AccessKeyId } : {}),
         ...(input.s3SecretAccessKey !== undefined
-          ? { s3SecretAccessKey: this.encryptOrNull(input.s3SecretAccessKey) }
+          ? { s3SecretAccessKey: input.s3SecretAccessKey }
           : {}),
         ...(input.s3Bucket !== undefined ? { s3Bucket: input.s3Bucket || null } : {}),
       },
@@ -233,10 +215,6 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
         },
       });
     });
-  }
-
-  private encryptOrNull(value: string | null): string | null {
-    return value ? this.settingsSecrets.encrypt(value) : null;
   }
 
   private async createPersonalWorkspace(

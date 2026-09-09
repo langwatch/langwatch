@@ -97,7 +97,7 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
   } as unknown as AuthzGrantsService;
 
   const organizations = OrganizationService.create({
-    repository: PrismaOrganizationRepository.create(prisma, passthroughSecrets),
+    repository: PrismaOrganizationRepository.create(prisma),
     teams: PrismaTeamRepository.create(prisma),
     groups: PrismaGroupRepository.create(prisma),
     identities: PersonalWorkspaceIdentityAdapter.create(),
@@ -105,6 +105,7 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
     groupIdentities: GroupIdentityAdapter.create(),
     authz,
     grants,
+    settingsSecrets: passthroughSecrets,
   });
 
   const ns = `team-last-admin-${nanoid(8)}`;

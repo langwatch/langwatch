@@ -52,7 +52,7 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
   const prisma = connection.client as PrismaClient;
 
   const organizations = OrganizationService.create({
-    repository: PrismaOrganizationRepository.create(prisma, passthroughSecrets),
+    repository: PrismaOrganizationRepository.create(prisma),
     teams: PrismaTeamRepository.create(prisma),
     groups: PrismaGroupRepository.create(prisma),
     identities: PersonalWorkspaceIdentityAdapter.create(),
@@ -60,6 +60,7 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
     groupIdentities: GroupIdentityAdapter.create(),
     authz: unusedAuthz,
     grants: noopGrantsWriter,
+    settingsSecrets: passthroughSecrets,
   });
 
   const testNamespace = `pw-protect-${nanoid(8)}`;

@@ -35,10 +35,7 @@ export class PostgresOrganizationAdapter {
 
   build(): OrganizationServiceContract {
     return OrganizationService.create({
-      repository: PrismaOrganizationRepository.create(
-        this.options.database,
-        this.options.settingsSecrets,
-      ),
+      repository: PrismaOrganizationRepository.create(this.options.database),
       teams: PrismaTeamRepository.create(this.options.database),
       groups: PrismaGroupRepository.create(this.options.database),
       identities: this.options.identities,
@@ -47,6 +44,7 @@ export class PostgresOrganizationAdapter {
       authz: this.options.authz,
       grants: this.options.grants,
       diagnostics: this.options.diagnostics,
+      settingsSecrets: this.options.settingsSecrets,
     });
   }
 }
