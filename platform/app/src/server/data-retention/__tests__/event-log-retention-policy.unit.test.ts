@@ -73,6 +73,7 @@ describe("event log retention policy", () => {
     ["suite_run", "lw.suite_run.started", "scenarios"],
     ["experiment_run", "lw.experiment_run.started", "experiments"],
   ])("for %s", (aggregateType, eventType, expectedCategory) => {
+    /** @scenario "Non-security event families remain policy-bound" */
     it("keeps policy-bound rows on their customer retention category", () => {
       expect(
         classifyEventLogRowRetention({
