@@ -303,20 +303,6 @@ def patch_litellm_params(kwargs):
 
     request_env = current_request_env()
 
-    request_credentials(kwargs)
-
-    # The server environment is the fallback for vertex, after the request env
-    # had its turn through the table above and only when the caller named
-    # nothing. Reading it for any other provider would attach credentials that
-    # the call has no use for.
-    if (
-        kwargs.get("vertex_credentials") is None
-        and _model_provider(kwargs.get("model") or "") == "vertex_ai"
-    ):
-        google_credentials = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-        if google_credentials is not None:
-            kwargs["vertex_credentials"] = google_credentials
-
     # X_LITELLM_* variables are litellm call arguments by name. The server's
     # own environment provides the baseline and the request env overrides it,
     # the same precedence get_env gives every other variable.
@@ -333,12 +319,20 @@ def patch_litellm_params(kwargs):
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
 
+    # A caller may name the deployment the litellm-shaped way, as a
+    # `deployment` argument. litellm has no such argument — it takes the
+    # deployment from the model string — so it is read here and dropped
+    # before the call rather than travelling on as dead weight.
+    deployment_argument = kwargs.pop("deployment", None)
+
     # Azure patches. Kept before the rewrite: a deployment name is arbitrary
     # ("prod-judge"), so after this block there is nothing left in the model
     # string to recognise a family by.
     requested_model = kwargs.get("model")
-    deployment_name = request_env.get("AZURE_DEPLOYMENT_NAME") or os.environ.get(
-        "AZURE_DEPLOYMENT_NAME"
+    deployment_name = (
+        request_env.get("AZURE_DEPLOYMENT_NAME")
+        or os.environ.get("AZURE_DEPLOYMENT_NAME")
+        or deployment_argument
     )
     if (
         deployment_name is not None
@@ -346,6 +340,28 @@ def patch_litellm_params(kwargs):
         and kwargs["model"].startswith("azure/")
     ):
         kwargs["model"] = "azure/" + deployment_name
+
+    # Credentials are resolved for the model the request actually names, so
+    # this runs after the model is final rather than before. `X_LITELLM_model`
+    # can name a different provider than the caller's own argument did — that
+    # is how an evaluator's baked-in embeddings default is redirected to the
+    # provider a project configured — and credentials chosen from the model on
+    # the way in would then belong to a provider the call no longer addresses.
+    # Precedence is unchanged: the loop above assigns, and this only fills
+    # arguments still unset.
+    request_credentials(kwargs)
+
+    # The server environment is the fallback for vertex, after the request env
+    # had its turn through the table above and only when the caller named
+    # nothing. Reading it for any other provider would attach credentials that
+    # the call has no use for.
+    if (
+        kwargs.get("vertex_credentials") is None
+        and _model_provider(kwargs.get("model") or "") == "vertex_ai"
+    ):
+        google_credentials = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        if google_credentials is not None:
+            kwargs["vertex_credentials"] = google_credentials
 
     if "use_azure_gateway" in kwargs:
         kwargs["model"] = kwargs["model"].replace("azure/", "")
@@ -386,14 +402,6 @@ def patch_litellm_embedding_params(kwargs):
 
     request_env = current_request_env()
 
-    embeddings_deployment = request_env.get(
-        "AZURE_EMBEDDINGS_DEPLOYMENT_NAME"
-    ) or os.environ.get("AZURE_EMBEDDINGS_DEPLOYMENT_NAME")
-    if embeddings_deployment is not None:
-        kwargs["model"] = "azure/" + embeddings_deployment
-
-    request_credentials(kwargs)
-
     for key, value in {**os.environ, **request_env}.items():
         if key.startswith("X_LITELLM_EMBEDDINGS_"):
             replaced_key = key.replace("X_LITELLM_EMBEDDINGS_", "")
@@ -401,6 +409,30 @@ def patch_litellm_embedding_params(kwargs):
             if replaced_key.isupper():
                 continue
             kwargs[replaced_key] = convert_param_type(replaced_key, value)
+
+    deployment_argument = kwargs.pop("deployment", None)
+
+    # After the loop, not before it, and the same way round as the completion
+    # path: X_LITELLM_EMBEDDINGS_model carries the caller's model and used to
+    # land on top of the rewrite, putting the model id back where the
+    # deployment name belonged. Only an azure model is rewritten — an
+    # embeddings deployment left in the server environment has nothing to say
+    # about a call to any other provider.
+    embeddings_deployment = (
+        request_env.get("AZURE_EMBEDDINGS_DEPLOYMENT_NAME")
+        or os.environ.get("AZURE_EMBEDDINGS_DEPLOYMENT_NAME")
+        or deployment_argument
+    )
+    if embeddings_deployment is not None and str(
+        kwargs.get("model") or ""
+    ).startswith("azure/"):
+        kwargs["model"] = "azure/" + embeddings_deployment
+
+    # After the model is final, for the reason given on the completion path:
+    # an evaluator carrying a baked-in embeddings default is redirected here
+    # by X_LITELLM_EMBEDDINGS_model, so the provider whose credentials the
+    # call needs is only known once that override has landed.
+    request_credentials(kwargs)
 
     if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
         kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])

@@ -252,7 +252,10 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
     return {};
   }
 
-  // TODO: add AZURE_DEPLOYMENT_NAME and AZURE_EMBEDDINGS_DEPLOYMENT_NAME for deployment name mapping
+  // AZURE_DEPLOYMENT_NAME / AZURE_EMBEDDINGS_DEPLOYMENT_NAME are not emitted
+  // here: the deployment is a per-model mapping and this function only sees
+  // the provider. `setupModelEnv` derives them from the resolved litellm
+  // params, where the model is known.
 
   return Object.fromEntries(
     Object.keys(getSchemaShape(providerDefinition.keysSchema))
