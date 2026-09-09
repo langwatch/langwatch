@@ -36,3 +36,5 @@ export { RedisReadinessService } from "./readiness.ts";
 export type { RedisPingOptions, RedisReadinessServiceOptions } from "./readiness.ts";
 export { RedisShutdownService } from "./shutdown.ts";
 export type { RedisConnection, RedisLogger } from "./types.ts";
+export { SessionStateStoreFactory } from "./session-state.factory.ts";
+export type { SessionStateStore, Unsubscribe } from "./session-state.ts";

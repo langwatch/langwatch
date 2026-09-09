@@ -11,6 +11,10 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./session-state": {
+      "types": "./dist/session-state.d.ts",
+      "default": "./src/session-state.ts"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
@@ -22,6 +26,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/time": "workspace:*",
     "ioredis": "5.10.1"
   },
   "devDependencies": {
