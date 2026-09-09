@@ -4,7 +4,11 @@ export {
   KNOWN_FIELDS,
   type KnownField,
 } from "./build-handlers";
-export { evaluateQueryInMemory, queryNeeds } from "./evaluate";
+export {
+  diagnoseFilterQueryReachability,
+  evaluateQueryInMemory,
+  queryNeeds,
+} from "./evaluate";
 export {
   type DerivedSpanRow,
   type FieldDef,
