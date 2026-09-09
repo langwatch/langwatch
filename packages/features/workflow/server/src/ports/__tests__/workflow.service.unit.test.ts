@@ -251,7 +251,7 @@ const service = (
 ) =>
   ServerWorkflowService.create({
     repository,
-    datasets: new TestDatasetService(),
+    datasets: new TestDatasetService().api,
     studioEvents: options.studioEvents ?? new FakeStudioEventPreparer(),
     dslMigration: new FakeWorkflowDslMigrationPort(),
     execution: options.execution ?? new FakeWorkflowExecutionPort(),
@@ -276,7 +276,7 @@ describe("WorkflowService", () => {
   it("creates, versions and publishes through the repository boundary", async () => {
     const workflowService = ServerWorkflowService.create({
       repository: new FakeWorkflowRepository(),
-      datasets: new TestDatasetService(),
+      datasets: new TestDatasetService().api,
       studioEvents: new FakeStudioEventPreparer(),
       dslMigration: new FakeWorkflowDslMigrationPort(),
       execution: new FakeWorkflowExecutionPort(),

@@ -1,4 +1,4 @@
-import type { DatasetService } from "@langwatch/dataset-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { WorkflowService as WorkflowServiceContract } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
@@ -20,7 +20,7 @@ import { WorkflowService } from "../services/workflow.service.ts";
 export type PostgresWorkflowAdapterOptions = {
   /** Generated Prisma client supplied by the application composition root. */
   database: WorkflowDatabase;
-  datasets: DatasetService;
+  datasets: DatasetApi;
   modelProviders: ModelProviderService;
   nlpRuntime: WorkflowNlpRuntimePort;
   projectEnvironment: WorkflowProjectEnvironmentPort;

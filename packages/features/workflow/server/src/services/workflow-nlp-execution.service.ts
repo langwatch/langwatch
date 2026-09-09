@@ -11,10 +11,12 @@ import {
   getEntryInputs,
   llmConfigSchema,
   migrateDSLVersion,
+  workflowRunAnswerSchema,
   type StudioClientEvent,
   type Signature,
   type StudioNode,
   type StudioWorkflow,
+  type WorkflowRunAnswer,
   WorkflowExecutionFailedError,
 } from "@langwatch/workflow-contract";
 import { z } from "zod";
@@ -26,13 +28,6 @@ import type {
 import type { StudioEventPreparer } from "./studio-event-preparer.service.ts";
 
 const logger = createLogger("langwatch:workflows:execution");
-
-const workflowExecutionResponseSchema = z.object({
-  result: z.record(z.string(), z.unknown()).nullable().optional(),
-  status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]),
-});
-
-type WorkflowExecutionResponse = z.infer<typeof workflowExecutionResponseSchema>;
 
 type WorkflowNlpExecutionServiceOptions = {
   ids: WorkflowIdPort;
@@ -65,7 +60,7 @@ export class WorkflowNlpExecutionService {
 
   private constructor(private readonly options: WorkflowNlpExecutionServiceOptions) {}
 
-  async execute(input: WorkflowExecutionInput): Promise<WorkflowExecutionResponse> {
+  async execute(input: WorkflowExecutionInput): Promise<WorkflowRunAnswer> {
     const workflow = migrateDSLVersion(input.version.dsl);
     const providers = await this.options.modelProviders.getForProject({
       projectId: input.projectId,
@@ -123,7 +118,7 @@ export class WorkflowNlpExecutionService {
       throw new WorkflowExecutionFailedError();
     }
 
-    return workflowExecutionResponseSchema.parse(await response.json());
+    return workflowRunAnswerSchema.parse(await response.json());
   }
 
   /** The workflow as the engine wants it: named fields, nothing incidental. */

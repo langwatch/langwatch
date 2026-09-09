@@ -32,6 +32,18 @@ export const workflowRunOriginSchema = z.enum([
 ]);
 export type WorkflowRunOrigin = z.infer<typeof workflowRunOriginSchema>;
 
+/**
+ * What one synchronous workflow run answers with: the execution state the
+ * engine finished in, and the workflow's own output fields, keyed by the names
+ * the workflow gives them.
+ */
+export const workflowRunAnswerSchema = z.object({
+  result: z.record(z.string(), z.unknown()).nullable().optional(),
+  status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]),
+});
+
+export type WorkflowRunAnswer = z.infer<typeof workflowRunAnswerSchema>;
+
 export const workflowSchema = z.object({
   id: z.string(),
   projectId: z.string(),

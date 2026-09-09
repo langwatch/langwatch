@@ -1,5 +1,6 @@
 import type {
   LLMConfig,
+  WorkflowRunAnswer,
   StudioClientEvent,
   StudioWorkflow,
   WorkflowDsl,
@@ -21,7 +22,7 @@ export type WorkflowExecutionInput = {
 
 /** Execution is infrastructure: the feature supplies a dispatch port. */
 export abstract class WorkflowExecutionPort {
-  abstract execute(input: WorkflowExecutionInput): Promise<unknown>;
+  abstract execute(input: WorkflowExecutionInput): Promise<WorkflowRunAnswer>;
 }
 
 export type WorkflowNlpDispatchInput = {

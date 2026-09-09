@@ -10,6 +10,7 @@ import type {
 import type {
   Workflow,
   WorkflowEvaluatorFields,
+  WorkflowRunAnswer,
   WorkflowVersion,
   WorkflowVersionHistoryEntry,
   WorkflowVersionHistoryMode,
@@ -85,5 +86,5 @@ export abstract class WorkflowService {
     copyIds?: string[];
     allowedProjectIds?: string[];
   }): Promise<{ pushedTo: number; selectedCopies: number }>;
-  abstract run(input: RunWorkflowCommand): Promise<unknown>;
+  abstract run(input: RunWorkflowCommand): Promise<WorkflowRunAnswer>;
 }

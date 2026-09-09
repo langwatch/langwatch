@@ -23,7 +23,7 @@ import {
   type WorkflowReference,
 } from "@langwatch/workflow-contract";
 import { nowInstant, toDate } from "@langwatch/time";
-import type { DatasetService } from "@langwatch/dataset-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type {
   WorkflowDslMigrationPort,
   WorkflowExecutionPort,
@@ -40,7 +40,7 @@ import { WorkflowDslService } from "./workflow-dsl.service.ts";
 
 export type WorkflowServiceOptions = {
   repository: WorkflowRepository;
-  datasets: DatasetService;
+  datasets: DatasetApi;
   execution: WorkflowExecutionPort;
   studioEvents: StudioEventPreparer;
   dslMigration: WorkflowDslMigrationPort;
@@ -469,7 +469,7 @@ export class WorkflowService extends WorkflowServiceContract {
     return { pushedTo: selected.length, selectedCopies: selected.length };
   }
 
-  async run(input: RunWorkflowCommand): Promise<unknown> {
+  async run(input: RunWorkflowCommand): Promise<WorkflowRunAnswer> {
     const command = this.parse(runWorkflowCommandSchema, input);
     const version = await this.getPublishedVersion({
       workflowId: command.workflowId,

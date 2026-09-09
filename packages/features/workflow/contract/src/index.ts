@@ -10,6 +10,8 @@ export * from "./studio-entry-input-defaults.ts";
 export * from "./studio-events.ts";
 export * from "./studio-optimization.ts";
 export * from "./workflow.trpc-schemas.ts";
+export * from "./workflow.trpc.ts";
+export * from "./workflow-optimization.trpc.ts";
 export * from "./workflow.commands.ts";
 export * from "./workflow.errors.ts";
 export * from "./workflow.service.ts";

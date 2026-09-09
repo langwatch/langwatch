@@ -23,6 +23,8 @@
   },
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",

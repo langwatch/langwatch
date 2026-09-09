@@ -1,11 +1,11 @@
 import type { Dataset } from "@langwatch/dataset-contract";
-import { WorkflowVersionRequiredError } from "@langwatch/workflow-contract";
+import {
+  WorkflowVersionRequiredError,
+  type WorkflowStudioCopySource,
+} from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 import { WorkflowRowPort, type WorkflowRowDraft } from "../../ports/workflow.port.ts";
-import {
-  WorkflowStudioCopyService,
-  type WorkflowStudioCopySource,
-} from "../workflow-studio-copy.service.ts";
+import { WorkflowStudioCopyService } from "../workflow-studio-copy.service.ts";
 import { TestDatasetService } from "./dataset.service.fake.ts";
 
 class RecordingRowPort extends WorkflowRowPort {
@@ -77,7 +77,7 @@ const source = (dsl: unknown): WorkflowStudioCopySource => ({
 function build() {
   const datasets = new TestDatasetService(undefined, copiedDataset);
   const rows = new RecordingRowPort();
-  return { datasets, rows, service: WorkflowStudioCopyService.create({ datasets, rows }) };
+  return { datasets, rows, service: WorkflowStudioCopyService.create({ datasets: datasets.api, rows }) };
 }
 
 describe("WorkflowStudioCopyService", () => {

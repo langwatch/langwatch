@@ -1,4 +1,4 @@
-import type { Dataset, DatasetService } from "@langwatch/dataset-contract";
+import type { Dataset, DatasetApi } from "@langwatch/dataset-contract";
 import type { WorkflowDsl } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
@@ -19,11 +19,11 @@ const datasetNodeSchema = z.looseObject({
 });
 
 export class WorkflowDatasetCopyService {
-  static create(datasets: DatasetService): WorkflowDatasetCopyService {
+  static create(datasets: DatasetApi): WorkflowDatasetCopyService {
     return new WorkflowDatasetCopyService(datasets);
   }
 
-  private constructor(private readonly datasets: DatasetService) {}
+  private constructor(private readonly datasets: DatasetApi) {}
 
   async copy(input: {
     dsl: WorkflowDsl;

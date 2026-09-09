@@ -225,3 +225,10 @@ export const workflowCascadeArchiveSchema = z.object({
   archivedAgentsCount: z.number(),
   deletedMonitorsCount: z.number(),
 });
+
+export type WorkflowProjectPath = z.infer<typeof workflowProjectPathSchema>;
+export type WorkflowListRow = z.infer<typeof workflowListRowSchema>;
+export type WorkflowCopyRow = z.infer<typeof workflowCopyRowSchema>;
+export type WorkflowRelatedEntities = z.infer<typeof workflowRelatedEntitiesSchema>;
+export type WorkflowCascadeArchive = z.infer<typeof workflowCascadeArchiveSchema>;
+export type WorkflowPushToCopies = z.infer<typeof workflowPushToCopiesSchema>;

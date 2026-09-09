@@ -3,37 +3,19 @@
  * the experiment workbench's workflow copy, and the replication behind a workflow evaluator.
  * Spec: packages/features/workflow/specs/workflow-service.feature.
  */
-import type { DatasetService } from "@langwatch/dataset-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import {
   parseStudioWorkflow,
   WorkflowVersionRequiredError,
+  type CopyStudioWorkflowCommand,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import { nanoid } from "nanoid";
 import type { WorkflowRowPort } from "../ports/workflow.port.ts";
 
 export type WorkflowStudioCopyServiceOptions = {
-  datasets: DatasetService;
+  datasets: DatasetApi;
   rows: WorkflowRowPort;
-};
-
-/** The workflow being copied, as the row its caller already read carries it. */
-export type WorkflowStudioCopySource = {
-  id: string;
-  name: string;
-  icon: string | null;
-  description: string | null;
-  isEvaluator?: boolean;
-  isComponent?: boolean;
-  latestVersion: { dsl: unknown } | null;
-};
-
-export type CopyStudioWorkflowInput = {
-  workflow: WorkflowStudioCopySource;
-  sourceProjectId: string;
-  targetProjectId: string;
-  copyDatasets?: boolean;
-  copiedFromWorkflowId?: string;
 };
 
 /** A dataset reference as a Studio node or parameter carries one. */
@@ -60,7 +42,7 @@ export class WorkflowStudioCopyService {
   private constructor(private readonly options: WorkflowStudioCopyServiceOptions) {}
 
   async copyWithDatasets(
-    input: CopyStudioWorkflowInput,
+    input: CopyStudioWorkflowCommand,
   ): Promise<{ workflowId: string; dsl: StudioWorkflow }> {
     const sourceDsl = input.workflow.latestVersion?.dsl;
     if (!sourceDsl) {

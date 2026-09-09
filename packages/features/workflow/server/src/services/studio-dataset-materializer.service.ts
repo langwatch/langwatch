@@ -1,6 +1,6 @@
 import type {
   DatasetEntrySelection,
-  DatasetService,
+  DatasetApi,
   DatasetWithRecords,
 } from "@langwatch/dataset-contract";
 import {
@@ -14,11 +14,11 @@ import {
 type DatasetRows = Record<string, unknown>[];
 
 export class StudioDatasetMaterializerService {
-  static create(datasets: DatasetService): StudioDatasetMaterializerService {
+  static create(datasets: DatasetApi): StudioDatasetMaterializerService {
     return new StudioDatasetMaterializerService(datasets);
   }
 
-  private constructor(private readonly datasets: DatasetService) {}
+  private constructor(private readonly datasets: DatasetApi) {}
 
   async materialize(input: {
     event: StudioClientEvent;

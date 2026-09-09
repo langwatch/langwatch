@@ -1,4 +1,4 @@
-import type { DatasetService } from "@langwatch/dataset-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import type {
   WorkflowLlmParametersPort,
@@ -21,7 +21,7 @@ export type StudioEventPreparer = {
 };
 
 type StudioEventPreparerOptions = {
-  datasets: DatasetService;
+  datasets: DatasetApi;
   projectEnvironment: WorkflowProjectEnvironmentPort;
   llmParameters: WorkflowLlmParametersPort;
 };

@@ -63,10 +63,28 @@ export {
 } from "./services/workflow-studio-dispatch.service.ts";
 export {
   WorkflowApp,
-  type WorkflowAppDependencies,
-  type WorkflowCaller,
+  type WorkflowCodeCompletions,
+  type WorkflowCommitMessageWriter,
+  type WorkflowEvaluationTrigger,
+  type WorkflowInfrastructure,
+  type WorkflowLineageReads,
+  type WorkflowPermissionProbe,
+  type WorkflowPublicationReads,
+  type WorkflowSignals,
+  type WorkflowStudioRuns,
 } from "./app/workflow.app.ts";
 export { workflowServer } from "./workflow.server.ts";
+
+/** The four declarations the installer carries, and the fifth the process builds. */
+export { workflowTrpcTransport } from "./transport/workflow.trpc.ts";
+export { workflowOptimizationTrpcTransport } from "./transport/workflow-optimization.trpc.ts";
+export { workflowRunContentType, workflowRunRest } from "./transport/workflow-run.rest.ts";
+export { workflowStudioRest, workflowStudioSession } from "./transport/workflow-studio.rest.ts";
+export {
+  createWorkflowRest,
+  workflowEvaluationRunCeiling,
+  type WorkflowRestDeclaration,
+} from "./transport/workflow.rest.ts";
 export {
   WorkflowAgentMappingPort,
   WorkflowDslMigrationPort,
@@ -94,39 +112,18 @@ export { WORKFLOW_COMMIT_MESSAGE_FEATURE_KEY } from "./rules/workflow-commit-mes
 export { WorkflowService, type WorkflowServiceOptions } from "./services/workflow.service.ts";
 export {
   WorkflowStudioCopyService,
-  type CopyStudioWorkflowInput,
   type WorkflowStudioCopyServiceOptions,
-  type WorkflowStudioCopySource,
 } from "./services/workflow-studio-copy.service.ts";
 export {
   WorkflowStudioVersionService,
   type SaveStudioWorkflowVersionInput,
   type WorkflowStudioVersionServiceOptions,
 } from "./services/workflow-studio-version.service.ts";
-// The two tRPC transports are not exported: they still name the deleted legacy
-// builder.
-export {
-  createWorkflowsRestApp,
-  type WorkflowEvaluationOutcome,
-  type WorkflowEvaluationTrigger,
-  type WorkflowRestPorts,
-} from "./transport/api-rest/workflow.api.ts";
-export {
-  createWorkflowStudioRestApp,
-  type WorkflowStudioRestDispatch,
-  type WorkflowStudioRestPorts,
-  type WorkflowStudioRestSession,
-} from "./transport/api-rest/workflow-studio.api.ts";
 export {
   WORKFLOW_CODE_COMPLETION_FEATURE_KEY,
   WorkflowCodeCompletionAdapter,
   type WorkflowModelResolverPort,
 } from "./adapters/workflow-code-completion.adapter.ts";
-export {
-  createWorkflowRunRestApp,
-  type WorkflowRunRestCredential,
-  type WorkflowRunRestPorts,
-} from "./transport/api-rest/workflow-run.api.ts";
 export { NlpLambdaFleetPort, type NlpLambdaFunction } from "./ports/nlp-lambda-fleet.port.ts";
 export { AwsNlpLambdaFleetAdapter } from "./adapters/aws.nlp-lambda-fleet.adapter.ts";
 export {

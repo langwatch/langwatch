@@ -125,7 +125,7 @@ describe("StudioDatasetMaterializerService", () => {
       },
     );
 
-    const enriched = await StudioDatasetMaterializerService.create(datasets).materialize({
+    const enriched = await StudioDatasetMaterializerService.create(datasets.api).materialize({
       event,
       projectId: PROJECT_ID,
     });
@@ -161,7 +161,7 @@ describe("StudioDatasetMaterializerService", () => {
       },
     );
 
-    const enriched = await StudioDatasetMaterializerService.create(datasets).materialize({
+    const enriched = await StudioDatasetMaterializerService.create(datasets.api).materialize({
       event,
       projectId: PROJECT_ID,
     });
@@ -178,7 +178,7 @@ describe("StudioDatasetMaterializerService", () => {
       { node_id: "some_node", inputs: { foo: "bar" } },
     );
 
-    const enriched = await StudioDatasetMaterializerService.create(datasets).materialize({
+    const enriched = await StudioDatasetMaterializerService.create(datasets.api).materialize({
       event,
       projectId: PROJECT_ID,
     });
