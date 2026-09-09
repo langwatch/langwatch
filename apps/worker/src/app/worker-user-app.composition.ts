@@ -20,8 +20,11 @@ import {
   type ApplicationBuilder,
   type FeatureSetup,
 } from "@langwatch/runtime-composition";
-import { userServer } from "@langwatch/user-server";
-import { UserAvatarStoragePort } from "@langwatch/user-server";
+import {
+  userServer,
+  type UserAvatarStorage,
+  type UserInfrastructure,
+} from "@langwatch/user-server";
 import {
   USER_AVATAR_MAX_BYTES,
   USER_AVATAR_OWNER_KIND,
@@ -33,7 +36,7 @@ import {
 import type { StoredObjectsService } from "@langwatch/stored-object-server";
 
 /** A worker does not own the avatar upload transport or object store. */
-export class WorkerUserAvatarStorage extends UserAvatarStoragePort {
+export class WorkerUserAvatarStorage implements UserAvatarStorage {
   static create(
     storedObjects: Pick<StoredObjectsService, "storeFromBytes">,
   ): WorkerUserAvatarStorage {
@@ -42,9 +45,7 @@ export class WorkerUserAvatarStorage extends UserAvatarStoragePort {
 
   private constructor(
     private readonly storedObjects: Pick<StoredObjectsService, "storeFromBytes">,
-  ) {
-    super();
-  }
+  ) {}
 
   store(input: {
     projectId: string;
@@ -116,26 +117,54 @@ export type WorkerUserCompositionOptions = Readonly<{
   connection: PrismaConnection;
   redis?: RedisConnection | null;
   credentialIssuer?: string;
-  avatarStorage: UserAvatarStoragePort;
+  avatarStorage: UserAvatarStorage;
 }>;
+
+/**
+ * A worker composes no browser, no mail and no governance stores, so every
+ * account-facing member of the user record refuses by name; the worker only
+ * creates and reads people.
+ */
+function workerUserInfrastructure(options: WorkerUserCompositionOptions): UserInfrastructure {
+  const refusing = <T>(capability: string): T =>
+    new Proxy(
+      {},
+      {
+        get: () => (): never => {
+          throw new Error(`The worker composed no ${capability}, so it cannot serve this call.`);
+        },
+        has: () => true,
+      },
+    ) as T;
+
+  return {
+    credentialIssuer:
+      options.credentialIssuer ?? BetterAuthAccountQueriesAdapter.issuerForProviderId("credential"),
+    avatarStorage: options.avatarStorage,
+    avatarObjects: refusing("avatar object store"),
+    passwords: refusing("password hasher"),
+    deployment: refusing("deployment facts"),
+    rateLimit: refusing("rate limiter"),
+    analytics: refusing("analytics sink"),
+    federatedPasswords: refusing("federated password store"),
+    cliCredentials: refusing("CLI credential store"),
+    organizations: refusing("organization directory"),
+    projects: refusing("project directory"),
+    gateway: refusing("gateway governance"),
+    budgetRequests: refusing("budget request mailer"),
+    verification: refusing("verification ceremony"),
+    personalUsage: refusing("personal usage reader"),
+  };
+}
 
 /** Declare the cyclic User/Auth pair on the shared runtime builder. */
 export function installWorkerUser<Infrastructure>(
   builder: ApplicationBuilder<Infrastructure>,
   options: WorkerUserCompositionOptions,
 ): ApplicationBuilder<Infrastructure> {
-  const database = options.connection.client;
   return builder
     .withFeature(workerAuthServer, {
       infrastructure: { connection: options.connection, redis: options.redis ?? null },
     })
-    .withFeature(userServer, {
-      infrastructure: {
-        database,
-        credentialIssuer:
-          options.credentialIssuer ??
-          BetterAuthAccountQueriesAdapter.issuerForProviderId("credential"),
-        avatarStorage: options.avatarStorage,
-      },
-    });
+    .withFeature(userServer, { infrastructure: workerUserInfrastructure(options) });
 }
