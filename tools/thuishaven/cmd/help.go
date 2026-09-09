@@ -34,6 +34,8 @@ EXAMPLES
     haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
     haven status                 # every stack + shared-server health, one shot
     haven logs nlp -t            # tail one service live
+    haven errors                 # the last distinct failures, grouped and counted
+    haven traces --json          # this stack's recent root spans, for an agent
     haven db seed demo           # reseed in place, dropping nothing
     haven pr 4913                # try PR #4913 locally in a fresh worktree
     haven down                   # stop the stack, keep the databases

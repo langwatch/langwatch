@@ -28,3 +28,32 @@ Feature: Optional Haven hooks for coding agents
     Then the agent command waits for that same slot
     And an active agent command also blocks a manual check
     And completion releases the slot for the next caller
+
+  # A per-worktree hook only guards the checkouts it was installed in, and an
+  # agent's shell in any other worktree ran unguarded: on 2026-09-09 three lanes
+  # ran vitest at once and put thirty forks on the machine. The hook stays
+  # worktree-local (a machine-wide Claude hook would fire in every repository,
+  # haven or not); what is machine-wide is the queue, which already is, and the
+  # worker cap, one environment knob like the typecheck slot count. Every
+  # worktree haven starts gets the local hook, so "every worktree" no longer
+  # depends on remembering setup.
+
+  Scenario: An ungated command gets no decision at all
+    Given the gate is registered in a worktree
+    When an agent runs a command the gate does not class as heavy
+    Then the hook's answer carries no permission decision, so the agent's normal flow proceeds
+    And a background agent with nobody to ask is never stopped by it
+
+  Scenario: haven up registers the Claude gate in the worktree it starts
+    Given a worktree with no gate registered
+    When the developer runs "haven up"
+    Then the gate is registered in that worktree's .claude/settings.local.json
+    And a later "haven up" adds no duplicate hook
+    And a worktree whose registration was removed by hand with "haven setup gate-hook --off" is left alone
+
+  Scenario: The unit test worker cap is one machine-wide setting
+    Given HAVEN_TEST_WORKERS is set in the shell, the way HAVEN_TYPECHECK_SLOTS is
+    When the gate narrows a vitest or test:unit command in any worktree
+    Then the full width it divides among the runs in flight is that setting
+    And unset, the full width is derived from the machine's memory and cores
+    And "haven slot explain" prints the width and where it came from

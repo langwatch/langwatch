@@ -372,3 +372,86 @@ func TestEnsureHookPreservesEverythingElse(t *testing.T) {
 		})
 	})
 }
+
+// @scenario "haven up registers the Claude gate in the worktree it starts"
+func TestOffRemovesTheGateAndLeavesItOffForLater(t *testing.T) {
+	t.Run("given a worktree with the gate already registered", func(t *testing.T) {
+		root := t.TempDir()
+		if _, err := New().EnsureHook(root, "/opt/haven gate"); err != nil {
+			t.Fatal(err)
+		}
+
+		t.Run("when haven setup gate-hook --off runs", func(t *testing.T) {
+			turnedOff, err := New().Off(root)
+
+			t.Run("it removes the existing registration", func(t *testing.T) {
+				if err != nil || !turnedOff {
+					t.Fatalf("expected a change, got turnedOff=%v err=%v", turnedOff, err)
+				}
+				if got := len(preToolUse(t, readSettings(t, root))); got != 0 {
+					t.Fatalf("expected the entry gone, got %d", got)
+				}
+			})
+
+			t.Run("and a later haven up - the same EnsureHook --off just refused - leaves it alone", func(t *testing.T) {
+				isInstalled, err := New().EnsureHook(root, "/opt/haven gate")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if isInstalled {
+					t.Fatal("an opted-out worktree must not be silently re-enrolled")
+				}
+				if got := len(preToolUse(t, readSettings(t, root))); got != 0 {
+					t.Fatalf("expected the worktree to stay untouched, got %d entries", got)
+				}
+			})
+		})
+	})
+
+	t.Run("given a worktree that shares its gate entry with another hook", func(t *testing.T) {
+		root := t.TempDir()
+		writeSettings(t, root, `{"hooks": {"PreToolUse": [
+			{"matcher": "Bash", "hooks": [
+				{"type": "command", "command": "/opt/haven gate"},
+				{"type": "command", "command": "notify-me"}
+			]}
+		]}}`)
+
+		t.Run("when haven setup gate-hook --off runs", func(t *testing.T) {
+			if _, err := New().Off(root); err != nil {
+				t.Fatal(err)
+			}
+
+			t.Run("only haven's own hook is removed, and the sibling survives", func(t *testing.T) {
+				written := string(mustRead(t, root))
+				if strings.Contains(written, "haven gate") {
+					t.Fatalf("haven's own hook was not removed: %s", written)
+				}
+				if !strings.Contains(written, "notify-me") {
+					t.Fatalf("a sibling hook was deleted: %s", written)
+				}
+			})
+		})
+	})
+
+	t.Run("given a worktree with no gate registered at all", func(t *testing.T) {
+		root := t.TempDir()
+
+		t.Run("when haven setup gate-hook --off runs", func(t *testing.T) {
+			turnedOff, err := New().Off(root)
+
+			t.Run("it still records the opt-out, so haven up never enrolls this worktree", func(t *testing.T) {
+				if err != nil || !turnedOff {
+					t.Fatalf("expected the opt-out itself to count as a change, got turnedOff=%v err=%v", turnedOff, err)
+				}
+				isInstalled, err := New().EnsureHook(root, "/opt/haven gate")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if isInstalled {
+					t.Fatal("an opted-out worktree must not be enrolled by a later haven up")
+				}
+			})
+		})
+	})
+}

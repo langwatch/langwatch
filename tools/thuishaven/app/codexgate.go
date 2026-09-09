@@ -14,9 +14,9 @@ func (o *Orchestrator) GateCodex(stdin io.Reader, stdout io.Writer) {
 	if err := json.Unmarshal(encoded.Bytes(), &reply); err != nil {
 		return
 	}
-	if reply.Specific.PermissionDecision == "defer" {
-		reply.Specific.PermissionDecision = ""
-	}
+	// Gate itself already leaves PermissionDecision unset for a neutral call  - 
+	// there is nothing left here to strip.
+	//
 	// Codex preserves execution options around the rewritten command. Claude's
 	// background/timeout fields are not part of its documented Bash rewrite.
 	if reply.Specific.UpdatedInput["run_in_background"] == true {

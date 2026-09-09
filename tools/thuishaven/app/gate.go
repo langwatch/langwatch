@@ -46,12 +46,18 @@ type hookSpecificOutput struct {
 	UpdatedInput             map[string]any `json:"updatedInput,omitempty"`
 }
 
-// deferReply is the neutral verdict: let the normal permission flow decide.
-// It is what every failure path returns.
+// deferReply is the neutral verdict: no opinion, so the tool call continues
+// through the normal permission flow. It is what every failure path returns.
+//
+// PermissionDecision is left unset on purpose. "defer" reads like a decision
+// but is not a value Claude Code's protocol recognizes - allow, deny and ask
+// are the only ones documented, and omitting the field entirely is what "no
+// decision to report" actually means. A background agent has nobody to ask,
+// so an unrecognized string here has nowhere to resolve to and can stop its
+// turn cold; an absent field cannot, because there is nothing to interpret.
 func deferReply() hookReply {
 	return hookReply{Specific: hookSpecificOutput{
-		HookEventName:      "PreToolUse",
-		PermissionDecision: "defer",
+		HookEventName: "PreToolUse",
 	}}
 }
 
@@ -92,9 +98,11 @@ func (o *Orchestrator) Gate(stdin io.Reader, stdout io.Writer) {
 		return
 	}
 	if warning := o.cacheCostWarning(p); warning != "" {
+		// The price is information, not a veto: this still carries no permission
+		// decision, same as deferReply, because pricing an action must never need
+		// an approval to ride on.
 		reply = hookReply{SystemMessage: warning, Specific: hookSpecificOutput{
-			HookEventName:      "PreToolUse",
-			PermissionDecision: "defer",
+			HookEventName: "PreToolUse",
 		}}
 		return
 	}
@@ -296,10 +304,16 @@ func (o *Orchestrator) slotState() slotState {
 	return slotState{live: o.store.HeavyRuns(), limit: max(1, o.checkSlots())}
 }
 
-// fullWidth is the width a unit run takes when nobody narrows it: half the
-// cores, which is what the repository's vitest configs ask for with
+// fullWidth is the width a unit run takes when nobody narrows it further, and
+// where that number came from - one machine-wide setting (HAVEN_TEST_WORKERS,
+// read the way HAVEN_TYPECHECK_SLOTS is) rather than a per-worktree one, since
+// the runs it divides among (narrowedWidth) are themselves counted
+// machine-wide. Unset, it is derived from the machine's memory and cores, half
+// the cores being what the repository's vitest configs already ask for with
 // `maxWorkers: "50%"`.
-func fullWidth() int { return max(runtime.NumCPU()/2, 1) }
+func (o *Orchestrator) fullWidth() (int, string) {
+	return domain.UnitTestFullWidth(o.sys.TotalMemory(), runtime.NumCPU(), os.Getenv("HAVEN_TEST_WORKERS"))
+}
 
 // narrowedWidth is how many workers a narrowed run actually gets, and the two
 // roads to Narrow want different arithmetic.
@@ -309,10 +323,11 @@ func fullWidth() int { return max(runtime.NumCPU()/2, 1) }
 // already in flight, so it divides by them — sizing against the limit instead
 // would let ten agents each start "narrowed" and rebuild the burst.
 func (o *Orchestrator) narrowedWidth(s slotState) int {
+	full, _ := o.fullWidth()
 	if s.free() {
-		return domain.PressureWidth(fullWidth())
+		return domain.PressureWidth(full)
 	}
-	return domain.NarrowedWorkers(fullWidth(), s.live)
+	return domain.NarrowedWorkers(full, s.live)
 }
 
 // observedDuration is how long this command has taken before. Zero means never

@@ -49,7 +49,7 @@ func (o *Orchestrator) rebuildLangyImage(ctx context.Context, p UpParams, slug s
 	if !st.LangyTier.RunsInContainer() {
 		return fmt.Errorf("langy runs on the host here (no image) — a plain `haven restart langy` picks up source changes")
 	}
-	_, err := o.prepareLangyContainer(ctx, p.WorktreeDir, st.LangyImage, true)
+	_, err := o.prepareLangyContainer(ctx, st, langyImageOptions{RepoRoot: p.WorktreeDir, ForceRebuild: true})
 	return err
 }
 

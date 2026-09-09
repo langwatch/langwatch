@@ -478,6 +478,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	if err := o.prepareWorktree(ctx, p, st); err != nil {
 		return err
 	}
+	o.EnsureGateHookForUp(p.WorktreeDir)
 	langyDockerHost := o.langyContainerHost(ctx, st, &opts)
 	o.sup.Supervise(ctx, o.planChildren(st, opts, p.WorktreeDir, langyDockerHost))
 	return nil
@@ -539,17 +540,23 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
 	// Codegen (prisma/zod/sdk-versions/mcp) then migrations — both finish before
 	// the services boot. Owned here so `pnpm dev` is simply `haven up`.
-	if err := o.sup.RunOnce(ctx, "codegen", p.WorktreeDir, "pnpm -s run start:prepare:files", env); err != nil {
+	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, Name: "codegen", Dir: p.WorktreeDir, Shell: "pnpm -s run start:prepare:files", Env: env}); err != nil {
 		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 	}
 	// Migrations failing on an existing database is the one prep step that must
 	// STOP the up: continuing would boot the app onto a half-migrated schema,
 	// and silently dropping the data to get past it is never haven's call.
-	if err := o.sup.RunOnce(ctx, "prepare", p.WorktreeDir, prepareDBShell, env); err != nil {
+	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, Name: "prepare", Dir: p.WorktreeDir, Shell: prepareDBShell, Env: env}); err != nil {
 		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
-	o.runSeed(ctx, p, env)
+	o.runSeed(ctx, p, seedRun{Slug: st.Slug, Env: env})
 	return nil
+}
+
+// seedRun is which stack is being seeded and with what environment.
+type seedRun struct {
+	Slug string
+	Env  []string
 }
 
 // prepareDBShell prepares both datastores before any service boots.
@@ -574,7 +581,8 @@ const prepareDBShell = "pnpm -s run start:prepare:db"
 // whatever DATABASE_URL is in .env, so guard that inherited URL exactly as
 // `haven seed` does and skip (never seed a non-local database) rather than
 // abort the up.
-func (o *Orchestrator) runSeed(ctx context.Context, p UpParams, env []string) {
+func (o *Orchestrator) runSeed(ctx context.Context, p UpParams, seed seedRun) {
+	slug, env := seed.Slug, seed.Env
 	if !hasEnvKey(env, "DATABASE_URL") {
 		if err := o.guardInheritedSeedEnv(p.WorktreeDir); err != nil {
 			o.log.Warn("skipping seed — inherited database URL is not local", zap.Error(err))
@@ -582,7 +590,7 @@ func (o *Orchestrator) runSeed(ctx context.Context, p UpParams, env []string) {
 			return
 		}
 	}
-	if err := o.sup.RunOnce(ctx, "seed", p.WorktreeDir, seedShell("pnpm -s run prisma:seed", env), env); err != nil {
+	if err := o.runOnceJob(ctx, onceJob{Slug: slug, Name: "seed", Dir: p.WorktreeDir, Shell: seedShell("pnpm -s run prisma:seed", env), Env: env}); err != nil {
 		o.log.Warn("seed failed (continuing)", zap.Error(err))
 	}
 }
@@ -596,7 +604,7 @@ func (o *Orchestrator) langyContainerHost(ctx context.Context, st domain.Stack, 
 	if !opts.Selection.Langy || !st.LangyTier.RunsInContainer() {
 		return ""
 	}
-	dh, err := o.prepareLangyContainer(ctx, opts.RepoRoot, st.LangyImage, opts.ShouldRebuildImages)
+	dh, err := o.prepareLangyContainer(ctx, st, langyImageOptions{RepoRoot: opts.RepoRoot, ForceRebuild: opts.ShouldRebuildImages})
 	if err != nil {
 		o.log.Warn("langyagent container unavailable — skipping it (set LANGY_UNSAFE_HOST_ACCESS=1 to run the worker on the host instead)",
 			zap.String("tier", st.LangyTier.String()), zap.Error(err))
@@ -606,12 +614,20 @@ func (o *Orchestrator) langyContainerHost(ctx context.Context, st domain.Stack, 
 	return dh
 }
 
+// langyImageOptions is where the langy image build runs from, and whether it
+// is rebuilt even when the content hash already has an image.
+type langyImageOptions struct {
+	RepoRoot     string
+	ForceRebuild bool
+}
+
 // prepareLangyContainer brings colima up and ensures the stack's
 // content-addressed langy image exists on it, returning the docker socket the
 // worker container should run against. Unchanged inputs → the tag already
 // exists and this is a sub-second check; a configured registry may satisfy a
 // new tag with a pull; otherwise it builds once, until the inputs change again.
-func (o *Orchestrator) prepareLangyContainer(ctx context.Context, repoRoot, image string, forceRebuild bool) (string, error) {
+func (o *Orchestrator) prepareLangyContainer(ctx context.Context, st domain.Stack, opts langyImageOptions) (string, error) {
+	repoRoot, image, forceRebuild := opts.RepoRoot, st.LangyImage, opts.ForceRebuild
 	if o.container == nil {
 		return "", fmt.Errorf("no container runtime configured")
 	}
@@ -624,7 +640,8 @@ func (o *Orchestrator) prepareLangyContainer(ctx context.Context, repoRoot, imag
 	}
 	shell := langyImageEnsureShell(image, forceRebuild, langyImagePullRef(image))
 	fmt.Printf("  langyagent: ensuring container image %s (a first build can take a few minutes)…\n", image)
-	if err := o.sup.RunOnce(ctx, "langy-image", repoRoot, shell, []string{"DOCKER_HOST=" + dockerHost}); err != nil {
+	job := onceJob{Slug: st.Slug, Name: "langy-image", Dir: repoRoot, Shell: shell, Env: []string{"DOCKER_HOST=" + dockerHost}}
+	if err := o.runOnceJob(ctx, job); err != nil {
 		return "", fmt.Errorf("build %s: %w", image, err)
 	}
 	return dockerHost, nil

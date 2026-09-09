@@ -112,8 +112,13 @@ type AgentHookSettings interface {
 	// EnsureHook registers command as a PreToolUse hook in repoRoot's
 	// local agent configuration — untracked and per worktree. It merges: an
 	// existing hooks block survives and an entry already present is left alone,
-	// so it reports whether anything actually changed.
+	// so it reports whether anything actually changed. A worktree opted out with
+	// Off leaves this a no-op.
 	EnsureHook(repoRoot, command string) (installed bool, err error)
+	// Off opts repoRoot out of the hook: it removes any existing registration
+	// and records the opt-out, so a later EnsureHook here - including the one
+	// `haven up` makes automatically - leaves it alone.
+	Off(repoRoot string) (turnedOff bool, err error)
 }
 
 // Supervisor runs child processes: one-shot prepare/seed steps and the

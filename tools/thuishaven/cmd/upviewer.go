@@ -3,41 +3,28 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer"
+	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
 
 // The attached up viewer: what a human's `haven up` shows. The stack itself
 // runs detached (startDetachedUp), so this is a window onto it — never a leash.
-// Tab one is the session dashboard (live status of every service and shared
-// server, with per-service restart and a jump into any log group); the rest are
-// the combined stream ("all") and each service's own capture, coloured and
-// level-highlighted like `haven logs`. q detaches (up) or destroys (play);
+// The top row is fixed - session, logs, errors, traces, metrics, profiles,
+// stores, jobs - and each tab is one datasource, which is what lets one screen
+// answer the question a person actually arrived with. This file is the model
+// that composes them: the frame, the key routing and the tab bar. What each tab
+// knows how to do lives in cmd/viewer. q detaches (up) or destroys (play);
 // nothing here can stop an `up` stack — that is `haven down`.
-
-// viewerRingCap bounds how many lines each group holds in memory.
-const viewerRingCap = 2000
-
-// viewerAllGroup is the combined launcher stream's tab label.
-const viewerAllGroup = "all"
-
-// mouseWheelScrollLines is how many lines one wheel notch moves a log tab.
-const mouseWheelScrollLines = 3
-
-// sessionGroup is the leading dashboard tab, present only when the viewer is
-// wired to an action surface (the interactive up/play paths, never the tests
-// that only exercise log tabs).
-const sessionGroup = "session"
 
 // sessionActions is the viewer's window onto the live stack: a cheap snapshot
 // it refreshes on a slow tick, and a bounce it fires on `r`/`a`. Kept as plain
@@ -51,9 +38,9 @@ type sessionActions struct {
 	Down func() error
 }
 
-// runUpViewer opens the viewer on a stack's log files until quit or ctx
-// cancel. preferred, when non-empty, names the group to land on as soon as it
-// appears — `haven up +langy` should open looking at langy.
+// runUpViewer opens the viewer on a stack until quit or ctx cancel. preferred,
+// when non-empty, names the application whose log sub-tab to land on - `haven
+// up +langy` should open looking at langy.
 func runUpViewer(ctx context.Context, slug, preferred string, session sessionActions) error {
 	m := newViewerModel(slug, stackLogPath(slug), filepath.Join(havenHome(), "logs", slug))
 	m.preferred = preferred
@@ -106,34 +93,22 @@ type restartDoneMsg struct {
 }
 
 type viewerModel struct {
-	slug     string
-	combined string // the launcher's combined log file (provisioning + all lanes)
-	capDir   string // per-service capture dir (logs/<slug>/)
+	slug string
 
-	groups   []string // tab order: (session) + "all" + captured services (CLI names)
-	selected int      // index into groups
+	// tabs are the seven the viewer package owns, keyed by name. The session
+	// tab is not among them: its datasource is haven itself.
+	tabs     map[string]viewer.Tab
+	logs     *viewer.LogsTab
+	errs     *viewer.ErrorsTab
+	files    sources.Logs
+	selected int // index into viewer.TabNames
 	// banner is the header line; the default is `haven up`'s detach contract,
 	// and `haven play` overrides it with its destroy-on-quit one.
 	banner string
-	// preferred is the group to auto-select the moment it appears (the service a
-	// `+svc` delta just added); cleared once applied or once the user picks a
-	// tab themselves.
+	// preferred is the log sub-tab to land on the moment it has output (the
+	// application a `+svc` delta just added); cleared once applied or once the
+	// user picks a tab themselves.
 	preferred string
-	lines     map[string][]string // rendered lines per group, ring-capped
-	offsets   map[string]int64    // read offset per file key ("all" or file service name)
-	// scroll holds, per group, how many lines the view is pulled back from the
-	// live bottom (0 = following: new output stays on screen as it arrives).
-	// push() advances it in lockstep with new lines so a scrolled-back view
-	// keeps showing the same content instead of drifting as output streams in.
-	scroll map[string]int
-	// searchQuery is the committed, case-insensitive substring search, shared
-	// across every log tab. searchPrompt/searchInput hold an in-progress "/"
-	// entry before Enter commits it. matchIdx is the current tab's position
-	// within its own match list, reset whenever the tab changes.
-	searchQuery  string
-	searchPrompt bool
-	searchInput  string
-	matchIdx     int
 
 	// session, when set, drives the leading dashboard tab.
 	session       *sessionActions
@@ -146,35 +121,115 @@ type viewerModel struct {
 	// key that stops the stack always takes two deliberate presses.
 	confirmStop bool
 	tickN       int // refresh counter, so the snapshot polls on a slow beat
-	// startedAt gates which captures become tabs: a file last written before
-	// this viewer opened belongs to a lane that no longer runs (a retired lane
-	// name, an earlier selection) and stays reachable through `haven logs`.
-	startedAt time.Time
+	// expandedRows are the body rows a click has opened on the tab currently on
+	// screen, by their position in the frame. Position, not line identity: a
+	// click means "that row, there", and on a following log tab the row under
+	// the pointer is the one the reader is looking at. Switching tabs clears it.
+	expandedRows map[int]bool
+	// expandAll opens every row of a tab, per tab, for a terminal that forwards
+	// no clicks.
+	expandAll map[string]bool
 
 	width, height int
 }
 
 func newViewerModel(slug, combined, capDir string) *viewerModel {
-	return &viewerModel{
-		slug:      slug,
-		combined:  combined,
-		capDir:    capDir,
-		groups:    []string{viewerAllGroup},
-		lines:     map[string][]string{},
-		offsets:   map[string]int64{},
-		scroll:    map[string]int{},
-		matchIdx:  -1,
-		startedAt: time.Now(),
-		banner:    fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m· %s · running in the background · q detaches (stack keeps running) · X stops it\x1b[0m\n", slug),
+	m := &viewerModel{
+		slug:         slug,
+		expandedRows: map[int]bool{},
+		expandAll:    map[string]bool{},
+		banner:       fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m· %s · running in the background · q detaches (stack keeps running) · X stops it\x1b[0m\n", slug),
+	}
+	m.install(m.sources(combined, capDir))
+	return m
+}
+
+// install builds the tab set over one set of datasources. It is where the model
+// and the viewer package meet, and the seam a test hands memory doubles to.
+func (m *viewerModel) install(src viewer.Sources) {
+	m.files = src.Files
+	m.tabs = map[string]viewer.Tab{}
+	for _, tab := range viewer.New(src) {
+		m.tabs[tab.Name()] = tab
+	}
+	m.logs, _ = m.tabs["logs"].(*viewer.LogsTab)
+	m.errs, _ = m.tabs["errors"].(*viewer.ErrorsTab)
+}
+
+// sources wires every datasource the tabs read. The Grafana-backed ones are
+// pointed at the bundle's fixed loopback ports - fixed on purpose, so agents
+// and gcx find the stack without asking haven first.
+func (m *viewerModel) sources(combined, capDir string) viewer.Sources {
+	obs := observabilityEndpoints()
+	loki := sources.NewLoki(obs.GrafanaPort, m.slug, time.Now())
+	return viewer.Sources{
+		Files:   sources.NewFileLogs(capDir, time.Now()),
+		Loki:    loki,
+		LokiUp:  loki.Up,
+		Traces:  sources.NewTempo(obs.GrafanaPort, m.slug),
+		Metrics: sources.NewPrometheus(obs.GrafanaPort, m.slug),
+		Profiles: sources.NewPyroscope(sources.PyroscopeConfig{
+			PyroscopePort: obs.PyroscopePort, GrafanaPort: obs.GrafanaPort,
+			Worktree: m.slug, Services: profiledServices(),
+		}),
+		Stores: sessionStores{model: m},
+		Jobs:   sources.NewFileJobs(capDir, combined),
+		Render: renderCapturedLine,
+		Open:   openInBrowser,
+		Now:    time.Now,
 	}
 }
 
-// enableDashboard prepends the session tab and wires the action surface. It
-// loads a first snapshot up front so tab one paints something real on frame one.
+// profiledServices are the services whose flame graphs the profiles tab shows,
+// with the runtime each one profiles as - the Go services sample CPU where the
+// Node applications sample wall time, so asking either for the other's profile
+// type shows an empty list rather than a missing one.
+func profiledServices() []sources.ProfiledService {
+	return []sources.ProfiledService{
+		{Name: "langwatch-app"},
+		{Name: "langwatch-worker"},
+		{Name: "langwatch-service-aigateway", Go: true},
+		{Name: "langwatch-service-nlpgo", Go: true},
+		{Name: "langwatch-service-langyagent", Go: true},
+	}
+}
+
+// renderCapturedLine is how a captured line reads on the log tab: the same
+// domain/logfmt rendering `haven logs` prints, so a line looks identical
+// wherever it is read.
+func renderCapturedLine(line sources.LogLine) string {
+	lane := fileToCLIService(line.Lane)
+	return logfmt.Render(line.Text, logfmt.Options{
+		Lane: line.App, LaneColor: logServiceColors[lane], Time: line.At, Color: true,
+	})
+}
+
+// sessionStores reports the managed database servers from whatever the live
+// session snapshot last saw. The ports are not known when the viewer is built  - 
+// a stack still provisioning has none - so the source resolves them on every
+// poll rather than being handed a set that would be stale by the first frame.
+type sessionStores struct{ model *viewerModel }
+
+// Stats probes each managed server the snapshot names.
+func (s sessionStores) Stats() ([]sources.StoreStat, error) {
+	ports := map[string]int{}
+	for _, server := range s.model.snap.Servers {
+		ports[server.Name] = server.Port
+	}
+	return sources.LocalStores{
+		ClickHouseHTTPPort:   ports["clickhouse"],
+		PostgresPort:         ports["postgres"],
+		RedisPort:            ports["redis"],
+		RedisCapBytes:        float64(envInt("HAVEN_REDIS_MAXMEMORY_MB", domain.DefaultRedisMaxMemoryMB)) * (1 << 20),
+		ClickHouseLimitBytes: float64(clickHouseLimits().MaxServerMemory),
+	}.Stats()
+}
+
+// enableDashboard wires the action surface behind the session tab. It loads a
+// first snapshot up front so tab one paints something real on frame one.
 func (m *viewerModel) enableDashboard(session sessionActions, destroyOnQuit bool) {
 	m.session = &session
 	m.destroyOnQuit = destroyOnQuit
-	m.groups = append([]string{sessionGroup}, m.groups...)
 	if session.Snapshot != nil {
 		m.snap = session.Snapshot()
 	}
@@ -196,21 +251,9 @@ func (m *viewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refreshDashboard()
 		return m, viewerTick()
 	case stopDoneMsg:
-		if msg.err != nil {
-			m.setToast("stop failed: " + msg.err.Error())
-			return m, nil
-		}
-		return m, tea.Quit
+		return m.stopped(msg)
 	case restartDoneMsg:
-		if msg.err != nil {
-			m.setToast("restart failed: " + msg.err.Error())
-		} else if msg.summary != "" {
-			m.setToast(msg.summary)
-		}
-		if m.session != nil && m.session.Snapshot != nil {
-			m.snap = m.session.Snapshot()
-		}
-		return m, nil
+		return m.restarted(msg)
 	case tea.KeyMsg:
 		return m.handleKey(msg.String())
 	case tea.MouseMsg:
@@ -219,53 +262,132 @@ func (m *viewerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleMouse scrolls the current log tab on a wheel notch. Inert on the
-// dashboard tab, which has no scrollable buffer.
-func (m *viewerModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	if m.onDashboard() {
+func (m *viewerModel) stopped(msg stopDoneMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.setToast("stop failed: " + msg.err.Error())
 		return m, nil
 	}
+	return m, tea.Quit
+}
+
+func (m *viewerModel) restarted(msg restartDoneMsg) (tea.Model, tea.Cmd) {
+	if msg.err != nil {
+		m.setToast("restart failed: " + msg.err.Error())
+	} else if msg.summary != "" {
+		m.setToast(msg.summary)
+	}
+	if m.session != nil && m.session.Snapshot != nil {
+		m.snap = m.session.Snapshot()
+	}
+	return m, nil
+}
+
+// ingest tails the capture files and polls the tab on screen - and only that
+// one. The capture tail is not a poll: it is a local read both the log tab and
+// the errors tab depend on, and an error that fired while you were reading
+// traces is exactly the one the errors tab exists to have caught.
+func (m *viewerModel) ingest() {
+	for _, line := range m.freshLines() {
+		m.logs.Observe(line)
+		m.errs.Observe(line)
+	}
+	m.applyPreferred()
+	if tab, ok := m.tabs[m.currentTab()]; ok {
+		tab.Poll()
+	}
+}
+
+// freshLines is whatever the capture tail has appended, or nothing at all on a
+// model whose sources were never installed.
+func (m *viewerModel) freshLines() []sources.LogLine {
+	if m.files == nil {
+		return nil
+	}
+	return m.files.Fresh()
+}
+
+// applyPreferred lands on the log sub-tab a `+svc` delta asked for, the moment
+// that application has written something.
+func (m *viewerModel) applyPreferred() {
+	if m.preferred == "" {
+		return
+	}
+	for _, app := range m.logs.SubTabs() {
+		if app != m.preferred {
+			continue
+		}
+		m.logs.SelectSubTab(app)
+		m.selectTab("logs")
+		m.preferred = ""
+		return
+	}
+}
+
+// handleMouse scrolls the current tab on a wheel notch, as a key would, and
+// opens the row under a click.
+func (m *viewerModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
-		m.scrollBy(m.currentGroup(), mouseWheelScrollLines)
+		m.offerKey("wheelup")
 	case tea.MouseButtonWheelDown:
-		m.scrollBy(m.currentGroup(), -mouseWheelScrollLines)
+		m.offerKey("wheeldown")
+	case tea.MouseButtonLeft:
+		if msg.Action == tea.MouseActionPress {
+			m.toggleRow(msg.Y - bodyTopRow)
+		}
 	default:
 		// Every other button/gesture is outside this viewer's scope.
 	}
 	return m, nil
 }
 
-// handleKey routes a keypress: dashboard row actions first when the session tab
-// is showing, then the tab-navigation and quit bindings shared by every tab.
-func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
-	if m.searchPrompt {
-		return m.handleSearchInput(s)
+// toggleRow opens the clicked body row in full, or closes it again. A click
+// above the body is the banner or the tab bar and opens nothing.
+func (m *viewerModel) toggleRow(row int) {
+	if row < 0 {
+		return
 	}
-	if m.onDashboard() {
+	if m.expandedRows[row] {
+		delete(m.expandedRows, row)
+		return
+	}
+	m.expandedRows[row] = true
+}
+
+// handleKey routes a keypress: the tab on screen is offered it first, and
+// whatever it does not claim falls through to the bindings every tab shares.
+func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
+	if m.onSessionTab() {
 		if model, cmd, handled := m.handleDashboardKey(s); handled {
 			return model, cmd
 		}
-	} else if m.handleLogTabKey(s) {
+		return m.handleCommonKey(s)
+	}
+	if m.offerKey(s) {
 		return m, nil
 	}
 	return m.handleCommonKey(s)
+}
+
+// offerKey hands one key to the tab on screen, reporting whether it took it.
+func (m *viewerModel) offerKey(s string) bool {
+	tab, ok := m.tabs[m.currentTab()]
+	return ok && tab.Key(s)
 }
 
 // handleDashboardKey is tab one's own row navigation and actions. handled is
 // false for every key the dashboard does not claim, so those fall through to
 // handleCommonKey (tab switching, quit, stop) unchanged.
 func (m *viewerModel) handleDashboardKey(s string) (tea.Model, tea.Cmd, bool) {
+	if m.session == nil {
+		return m, nil, false
+	}
 	switch s {
 	case "up", "k":
-		if m.cursor > 0 {
-			m.cursor--
-		}
+		m.cursor = maxInt(m.cursor-1, 0)
 		return m, nil, true
 	case "down", "j":
-		if m.cursor < len(m.snap.Services)-1 {
-			m.cursor++
-		}
+		m.cursor = minInt(m.cursor+1, maxInt(len(m.snap.Services)-1, 0))
 		return m, nil, true
 	case "enter":
 		m.openSelectedLogs()
@@ -279,39 +401,8 @@ func (m *viewerModel) handleDashboardKey(s string) (tea.Model, tea.Cmd, bool) {
 	}
 }
 
-// handleLogTabKey is scrolling and search-entry for a log tab. handled is
-// false for every key it does not own, so tab-switching, quit and stop still
-// reach handleCommonKey.
-func (m *viewerModel) handleLogTabKey(s string) bool {
-	group := m.currentGroup()
-	switch s {
-	case "/":
-		m.searchPrompt = true
-		m.searchInput = ""
-	case "n":
-		m.stepMatch(1)
-	case "N":
-		m.stepMatch(-1)
-	case "f", "end":
-		m.scroll[group] = 0
-	case "pgup":
-		m.scrollBy(group, m.bodyHeight())
-	case "pgdown":
-		m.scrollBy(group, -m.bodyHeight())
-	case "up", "k":
-		m.scrollBy(group, 1)
-	case "down", "j":
-		m.scrollBy(group, -1)
-	case "home":
-		m.scroll[group] = len(m.lines[group])
-	default:
-		return false
-	}
-	return true
-}
-
-// handleCommonKey is every binding shared by the dashboard and every log tab:
-// stop, quit/detach, and tab switching.
+// handleCommonKey is every binding shared by every tab: stop, quit/detach, and
+// tab switching.
 func (m *viewerModel) handleCommonKey(s string) (tea.Model, tea.Cmd) {
 	if s != "X" {
 		m.confirmStop = false
@@ -320,64 +411,53 @@ func (m *viewerModel) handleCommonKey(s string) (tea.Model, tea.Cmd) {
 	case "X":
 		return m.handleStopKey()
 	case "esc":
-		// esc is the universal "back out of this screen" key. A live search
-		// clears first — the play viewer's destroy contract still wins below
-		// once there is nothing left to back out of. Only the keys the banner
-		// actually names (q, and ctrl+c as the usual interrupt) may destroy.
-		if m.searchQuery != "" {
-			m.clearSearch()
-			return m, nil
-		}
-		if m.destroyOnQuit {
-			m.setToast("press q to quit — it DESTROYS this sandbox")
-			return m, nil
-		}
-		return m, tea.Quit
+		return m.handleEscape()
 	case "q", "ctrl+c":
 		return m, tea.Quit
+	case "x":
+		tab := m.currentTab()
+		m.expandAll[tab] = !m.expandAll[tab]
 	case "right", "l", "tab":
-		m.preferred = ""
-		m.selected = (m.selected + 1) % len(m.groups)
-		m.matchIdx = -1
+		m.moveTab(1)
 	case "left", "h", "shift+tab":
-		m.preferred = ""
-		m.selected = (m.selected - 1 + len(m.groups)) % len(m.groups)
-		m.matchIdx = -1
+		m.moveTab(-1)
 	default:
-		// A digit jumps straight to that tab (1 = the first tab).
-		if n := digitKey(s); n > 0 && n <= len(m.groups) {
+		if n := digitKey(s); n > 0 && n <= len(viewer.TabNames) {
 			m.preferred = ""
 			m.selected = n - 1
-			m.matchIdx = -1
+			m.expandedRows = map[int]bool{}
 		}
 	}
 	return m, nil
 }
 
-// handleSearchInput captures keystrokes while the "/" prompt is open: Enter
-// commits the query and jumps to the nearest match, Esc cancels without
-// touching any search already committed, Backspace edits, everything else
-// (a single rune) is appended.
-func (m *viewerModel) handleSearchInput(s string) (tea.Model, tea.Cmd) {
-	switch s {
-	case "enter":
-		m.commitSearch()
-	case "esc":
-		m.searchPrompt = false
-		m.searchInput = ""
-	case "backspace":
-		if m.searchInput != "" {
-			_, size := utf8.DecodeLastRuneInString(m.searchInput)
-			m.searchInput = m.searchInput[:len(m.searchInput)-size]
-		}
-	case "ctrl+c":
-		return m, tea.Quit
-	default:
-		if r := []rune(s); len(r) == 1 {
-			m.searchInput += s
+// handleEscape is the universal "back out of this screen" key, once the tab on
+// screen has had its own chance at it. Only the keys the banner actually names
+// (q, and ctrl+c as the usual interrupt) may destroy a play sandbox.
+func (m *viewerModel) handleEscape() (tea.Model, tea.Cmd) {
+	if m.destroyOnQuit {
+		m.setToast("press q to quit - it DESTROYS this sandbox")
+		return m, nil
+	}
+	return m, tea.Quit
+}
+
+func (m *viewerModel) moveTab(delta int) {
+	m.preferred = ""
+	count := len(viewer.TabNames)
+	m.selected = ((m.selected+delta)%count + count) % count
+	m.expandedRows = map[int]bool{}
+}
+
+// selectTab moves to one tab by name.
+func (m *viewerModel) selectTab(name string) {
+	for i, tab := range viewer.TabNames {
+		if tab == name {
+			m.selected = i
+			m.expandedRows = map[int]bool{}
+			return
 		}
 	}
-	return m, nil
 }
 
 // handleStopKey is the two-press stop. `haven up` runs the stack in the
@@ -400,13 +480,20 @@ func (m *viewerModel) handleStopKey() (tea.Model, tea.Cmd) {
 	return m, func() tea.Msg { return stopDoneMsg{err: down()} }
 }
 
-func (m *viewerModel) onDashboard() bool {
-	return m.session != nil && m.groups[m.selected] == sessionGroup
-}
+// currentTab is the name of the tab on screen.
+func (m *viewerModel) currentTab() string { return viewer.TabNames[m.selected] }
+
+// onSessionTab is whether the session screen is the one being rendered.
+func (m *viewerModel) onSessionTab() bool { return m.currentTab() == viewer.SessionTab }
+
+// onDashboard is whether the session screen is showing AND has an action
+// surface behind it. A viewer with no session still opens on the session tab  - 
+// it says the stack is provisioning - but has no rows to move a cursor over.
+func (m *viewerModel) onDashboard() bool { return m.session != nil && m.onSessionTab() }
 
 // refreshDashboard re-probes the live snapshot on a slow beat (every ~1.2s, not
 // every 300ms tick) and expires the toast. Cheap as the probes are, there is no
-// reason to hammer them; the log tabs update on the fast tick regardless.
+// reason to hammer them; the tabs update on the fast tick regardless.
 func (m *viewerModel) refreshDashboard() {
 	if m.session == nil {
 		return
@@ -421,9 +508,7 @@ func (m *viewerModel) refreshDashboard() {
 	if m.session.Snapshot != nil && m.tickN%4 == 0 {
 		m.snap = m.session.Snapshot()
 	}
-	if m.cursor >= len(m.snap.Services) {
-		m.cursor = maxInt(0, len(m.snap.Services)-1)
-	}
+	m.cursor = minInt(m.cursor, maxInt(len(m.snap.Services)-1, 0))
 }
 
 func (m *viewerModel) selectedService() (app.SessionServiceStatus, bool) {
@@ -433,19 +518,13 @@ func (m *viewerModel) selectedService() (app.SessionServiceStatus, bool) {
 	return m.snap.Services[m.cursor], true
 }
 
-// openSelectedLogs jumps from the highlighted service to its own log tab, or to
-// the combined stream when that service has no capture of its own yet.
+// openSelectedLogs jumps from the highlighted service to the log tab, on that
+// application's own sub-tab when it has written anything yet.
 func (m *viewerModel) openSelectedLogs() {
-	target := viewerAllGroup
-	if svc, ok := m.selectedService(); ok && m.hasGroup(svc.Name) {
-		target = svc.Name
-	}
-	for i, g := range m.groups {
-		if g == target {
-			m.selected = i
-			m.preferred = ""
-			return
-		}
+	m.selectTab("logs")
+	m.preferred = ""
+	if svc, ok := m.selectedService(); ok {
+		m.logs.SelectSubTab(svc.Name)
 	}
 }
 
@@ -502,366 +581,101 @@ func maxInt(a, b int) int {
 	return b
 }
 
-// ingest pulls appended bytes from every log file into the group rings, and
-// discovers services whose capture appeared since the last pass (a later
-// `up +svc` joins the tabs live). Keyed by the group's CURRENT name, so a
-// selection index stays valid as groups only ever append.
-func (m *viewerModel) ingest() {
-	m.ingestCombined()
-	for _, svc := range capturedServices(m.capDir) {
-		cli := fileToCLIService(svc)
-		if !m.hasGroup(cli) {
-			if !m.captureWrittenSinceStart(svc) {
-				continue
-			}
-			m.groups = append(m.groups, cli)
-			if cli == m.preferred {
-				m.selected = len(m.groups) - 1
-				m.preferred = ""
-			}
-		}
-		m.ingestCapture(svc, cli)
+func minInt(a, b int) int {
+	if a < b {
+		return a
 	}
-}
-
-func (m *viewerModel) hasGroup(name string) bool {
-	for _, g := range m.groups {
-		if g == name {
-			return true
-		}
-	}
-	return false
-}
-
-// ingestCombined tails the launcher's combined file: lines already carry the
-// supervisor's "name     | text" prefix, so colour is re-derived from it.
-func (m *viewerModel) ingestCombined() {
-	for _, raw := range m.readFresh(viewerAllGroup, m.combined) {
-		m.push(viewerAllGroup, formatCombinedLine(raw))
-	}
-}
-
-// ingestCapture tails one service's timestamped capture file.
-func (m *viewerModel) ingestCapture(fileSvc, cli string) {
-	for _, raw := range m.readFresh(fileSvc, filepath.Join(m.capDir, fileSvc+".log")) {
-		if l, ok := parseLogLine(fileSvc, raw); ok {
-			m.push(cli, formatLogLine(l, renderHuman, false))
-		}
-	}
-}
-
-// readFreshTailWindow bounds the FIRST read of any capture file. The viewer only
-// ever renders the last few hundred lines, but the combined per-stack log
-// (logs/<slug>.log) is append-only and uncapped — long-lived worktrees reach
-// hundreds of megabytes. Starting a fresh model at offset 0 therefore allocated
-// the whole file, then copied it again through strings.Split, to show a screenful.
-// 256 KiB is far more than the ring can hold and is read in one syscall.
-const readFreshTailWindow = 256 << 10
-
-// readFresh returns the whole lines appended to path since the last pass,
-// starting over when the file rotated (shrank) underneath us.
-//
-// The first read of a key opens at a bounded tail window rather than at the
-// start of the file, so attaching to a stack with a large existing log costs a
-// fixed amount of memory. Subsequent reads are true incremental tails.
-func (m *viewerModel) readFresh(key, path string) []string {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil
-	}
-	offset, seen := m.offsets[key]
-	// A partial first line is expected when we seek into the middle of the file;
-	// drop it rather than render a fragment.
-	dropFirstPartialLine := false
-	if !seen {
-		if info.Size() > readFreshTailWindow {
-			offset = info.Size() - readFreshTailWindow
-			dropFirstPartialLine = true
-		} else {
-			offset = 0
-		}
-	}
-	if info.Size() < offset {
-		offset = 0
-	}
-	if info.Size() == offset {
-		m.offsets[key] = offset
-		return nil
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return nil
-	}
-	defer func() { _ = f.Close() }()
-	buf := make([]byte, info.Size()-offset)
-	if _, err := f.ReadAt(buf, offset); err != nil {
-		return nil
-	}
-	m.offsets[key] = info.Size()
-	text := string(buf)
-	if dropFirstPartialLine {
-		if nl := strings.IndexByte(text, '\n'); nl >= 0 {
-			text = text[nl+1:]
-		} else {
-			text = ""
-		}
-	}
-	var out []string
-	for _, raw := range strings.Split(text, "\n") {
-		if raw != "" {
-			out = append(out, raw)
-		}
-	}
-	return out
-}
-
-// push appends one line to a group's ring. When the group is scrolled back
-// (scroll[group] > 0), the offset advances in lockstep so the window keeps
-// showing the same content instead of the new line silently shifting it —
-// "following" only resumes when the viewer (or the user, via f/End) sets the
-// offset back to 0.
-func (m *viewerModel) push(group, line string) {
-	ring := append(m.lines[group], line)
-	if len(ring) > viewerRingCap {
-		ring = ring[len(ring)-viewerRingCap:]
-	}
-	m.lines[group] = ring
-	if m.scroll[group] > 0 {
-		m.scroll[group]++
-		if m.scroll[group] > len(ring) {
-			m.scroll[group] = len(ring)
-		}
-	}
-}
-
-// currentGroup is the tab currently on screen.
-func (m *viewerModel) currentGroup() string { return m.groups[m.selected] }
-
-// bodyHeight is how many log lines fit between the tab bar and the footer.
-func (m *viewerModel) bodyHeight() int {
-	body := m.height - 6
-	if body < 1 {
-		body = 20
-	}
-	return body
-}
-
-// scrollBy moves a group's scroll-back offset, clamped to [0, len(lines)].
-// Positive delta scrolls up (toward older lines); negative scrolls down.
-func (m *viewerModel) scrollBy(group string, delta int) {
-	n := m.scroll[group] + delta
-	if n < 0 {
-		n = 0
-	}
-	if top := len(m.lines[group]); n > top {
-		n = top
-	}
-	m.scroll[group] = n
-}
-
-// visibleLines slices a group's ring to the window the current scroll offset
-// selects, at most `body` lines.
-func (m *viewerModel) visibleLines(group string, body int) []string {
-	lines := m.lines[group]
-	scroll := m.scroll[group]
-	if scroll > len(lines) {
-		scroll = len(lines)
-	}
-	end := len(lines) - scroll
-	start := end - body
-	if start < 0 {
-		start = 0
-	}
-	return lines[start:end]
-}
-
-// searchMatches finds every line in a group containing the committed query,
-// case-insensitive. Returns nil when there is no active search.
-func (m *viewerModel) searchMatches(group string) []int {
-	if m.searchQuery == "" {
-		return nil
-	}
-	q := strings.ToLower(m.searchQuery)
-	var idx []int
-	for i, l := range m.lines[group] {
-		if strings.Contains(strings.ToLower(l), q) {
-			idx = append(idx, i)
-		}
-	}
-	return idx
-}
-
-// commitSearch closes the prompt, adopts its text as the active query (which
-// then applies across every tab), and jumps to the nearest match in this one.
-func (m *viewerModel) commitSearch() {
-	m.searchPrompt = false
-	m.searchQuery = m.searchInput
-	m.searchInput = ""
-	m.jumpToNearestMatch()
-}
-
-// clearSearch drops the active query and its highlighting, leaving scroll
-// position where it is.
-func (m *viewerModel) clearSearch() {
-	m.searchQuery = ""
-	m.matchIdx = -1
-}
-
-// jumpToNearestMatch lands on the first match at or after the line currently
-// at the bottom of the view, wrapping to the last match if the view is
-// already scrolled past every match.
-func (m *viewerModel) jumpToNearestMatch() {
-	group := m.currentGroup()
-	matches := m.searchMatches(group)
-	if len(matches) == 0 {
-		m.matchIdx = -1
-		return
-	}
-	end := len(m.lines[group]) - m.scroll[group]
-	best := len(matches) - 1
-	for i, idx := range matches {
-		if idx >= end-1 {
-			best = i
-			break
-		}
-	}
-	m.matchIdx = best
-	m.revealMatch(group, matches[best])
-}
-
-// stepMatch moves forward (dir=1) or back (dir=-1) across the current tab's
-// whole match buffer, wrapping at either end.
-func (m *viewerModel) stepMatch(dir int) {
-	group := m.currentGroup()
-	matches := m.searchMatches(group)
-	if len(matches) == 0 {
-		return
-	}
-	if m.matchIdx < 0 {
-		m.jumpToNearestMatch()
-		return
-	}
-	m.matchIdx = ((m.matchIdx+dir)%len(matches) + len(matches)) % len(matches)
-	m.revealMatch(group, matches[m.matchIdx])
-}
-
-// revealMatch scrolls a group so the given absolute line index sits at the
-// bottom of the visible window.
-func (m *viewerModel) revealMatch(group string, lineIdx int) {
-	lines := m.lines[group]
-	scroll := len(lines) - lineIdx - 1
-	if scroll < 0 {
-		scroll = 0
-	}
-	if scroll > len(lines) {
-		scroll = len(lines)
-	}
-	m.scroll[group] = scroll
-}
-
-// highlightMatches wraps every case-insensitive occurrence of query in line
-// with reverse video, leaving any pre-existing ANSI color codes intact.
-func highlightMatches(line, query string) string {
-	if query == "" {
-		return line
-	}
-	lower := strings.ToLower(line)
-	q := strings.ToLower(query)
-	var b strings.Builder
-	i := 0
-	for {
-		j := strings.Index(lower[i:], q)
-		if j < 0 {
-			b.WriteString(line[i:])
-			break
-		}
-		start := i + j
-		end := start + len(q)
-		b.WriteString(line[i:start])
-		b.WriteString("\x1b[7m")
-		b.WriteString(line[start:end])
-		b.WriteString("\x1b[27m")
-		i = end
-	}
-	return b.String()
-}
-
-// logFooter is the help/status line under a log tab: key bindings normally,
-// the live "/" prompt while typing one, and a scroll-position indicator once
-// the view has left the following bottom.
-func (m *viewerModel) logFooter(group string) string {
-	if m.searchPrompt {
-		return "\x1b[2m/\x1b[0m" + m.searchInput + "\x1b[7m \x1b[0m\x1b[2m  enter searches · esc cancels\x1b[0m"
-	}
-	help := "\x1b[2m↑↓/jk scroll · pgup/pgdn page · home/end · / search"
-	if m.searchQuery != "" {
-		matches := m.searchMatches(group)
-		help += fmt.Sprintf(" · %q: %d match(es) · n/N step · esc clears", m.searchQuery, len(matches))
-	}
-	if scroll := m.scroll[group]; scroll > 0 {
-		help += fmt.Sprintf(" · ↑ %d lines above · f to follow", scroll)
-	}
-	help += "\x1b[0m"
-	return help
-}
-
-// formatCombinedLine renders a combined-stream line, whose lane comes from the
-// supervisor's own label prefix ("api      | {…}") rather than from the file it
-// was read out of. A label-less line is already in its final shape — the
-// supervisor's rendered echo, haven's own console line, a provisioning
-// banner — so it passes through untouched; rendering it again would put an
-// empty time and lane column in front of the columns it already carries.
-func formatCombinedLine(raw string) string {
-	label, rest, ok := strings.Cut(raw, "|")
-	name := strings.TrimSpace(label)
-	if !ok || name == "" || strings.ContainsRune(name, ' ') {
-		return raw
-	}
-	lane := fileToCLIService(name)
-	color := logServiceColors[lane]
-	if color == "" {
-		color = "90" // one-shot prep lanes (codegen, prepare, seed, deps, langy-image)
-	}
-	return logfmt.Render(strings.TrimPrefix(rest, " "), logfmt.Options{
-		Lane: lane, LaneColor: color, Color: true,
-	})
+	return b
 }
 
 func (m *viewerModel) View() string {
 	var b strings.Builder
 	b.WriteString(m.banner)
 	b.WriteString(" " + m.tabsLine() + "\n\n")
-	if m.onDashboard() {
+	if m.onSessionTab() {
 		b.WriteString(m.dashboardBody())
 		return b.String()
 	}
-	group := m.currentGroup()
-	lines := m.visibleLines(group, m.bodyHeight())
-	if len(lines) == 0 {
-		b.WriteString(" \x1b[2mwaiting for output…\x1b[0m\n")
+	tab := m.tabs[m.currentTab()]
+	frame := viewer.Frame{Width: m.width, Height: m.bodyHeight()}
+	for _, row := range m.fitRows(tab.Body(frame), frame.Height) {
+		b.WriteString(row + "\n")
 	}
-	for _, l := range wrapVisibleLines(lines, m.width-1, m.bodyHeight()) {
-		b.WriteString(" " + highlightMatches(l, m.searchQuery) + "\n")
-	}
-	b.WriteString("\n " + m.logFooter(group) + "\n")
+	b.WriteString("\n " + tab.Footer() + "\n")
 	return b.String()
 }
 
-// wrapVisibleLines wraps every line wider than width and keeps the last
-// `body` rows, so the newest output stays on screen rather than the top of a
-// long line pushing it off. width of zero or less (no size yet) wraps nothing.
-func wrapVisibleLines(lines []string, width, body int) []string {
-	rows := make([]string, 0, len(lines))
-	for _, l := range lines {
-		rows = append(rows, wrapLogLine(l, width)...)
+// bodyHeight is how many rows fit between the tab bar and the footer.
+func (m *viewerModel) bodyHeight() int {
+	if body := m.height - 6; body > 0 {
+		return body
 	}
-	if len(rows) > body {
-		rows = rows[len(rows)-body:]
+	return 20
+}
+
+// bodyTopRow is how many rows the banner and the tab bar occupy above the body,
+// which is what turns a click's Y coordinate into a body row.
+const bodyTopRow = 3
+
+// cutMarker is the one dim character that says a row was cut. A row silently
+// ending at the terminal's edge and a row that happens to be exactly that wide
+// look identical, and only one of them is hiding something.
+const cutMarker = "\x1b[2m…\x1b[0m"
+
+// fitRows lays the tab's body out at this terminal's width. Every row is cut to
+// the width with a marker at the cut rather than wrapped: a screen of wrapped
+// lines is a screen where nothing lines up, and the columns are the whole point
+// of rendering centrally. A row the reader asks for is shown in full instead,
+// wrapped under the message column so the continuation reads as more of the
+// same message.
+func fitRows(lines []string, opts fitOptions) []string {
+	rows := make([]string, 0, len(lines))
+	for i, line := range lines {
+		if opts.expandAll || opts.expanded[i] {
+			rows = append(rows, wrapLogLine(line, opts.width)...)
+			continue
+		}
+		rows = append(rows, cutRow(line, opts.width))
+	}
+	if len(rows) > opts.body {
+		rows = rows[len(rows)-opts.body:]
 	}
 	return rows
 }
 
-// wrapLogLine breaks one rendered line to width cells. The continuation rows
+// fitOptions is the terminal's shape and which rows the reader has opened.
+type fitOptions struct {
+	width int
+	body  int
+	// expanded is the body rows a click has opened, by their position on screen.
+	expanded map[int]bool
+	// expandAll opens every row on this tab, for a terminal that forwards no
+	// clicks at all.
+	expandAll bool
+}
+
+// cutRow truncates one row to the width, leaving room for the marker. A width
+// of zero or less is a terminal that has not reported its size yet, and cutting
+// against a guess would hide more than it showed.
+func cutRow(line string, width int) string {
+	if width <= 0 || ansi.StringWidth(line) <= width {
+		return line
+	}
+	return ansi.Cut(line, 0, maxInt(width-1, 0)) + cutMarker
+}
+
+// fitRows lays out one frame with whatever this viewer's reader has opened.
+func (m *viewerModel) fitRows(lines []string, body int) []string {
+	return fitRows(lines, fitOptions{
+		width:     m.width - 1,
+		body:      body,
+		expanded:  m.expandedRows,
+		expandAll: m.expandAll[m.currentTab()],
+	})
+}
+
+// wrapLogLine breaks one rendered line to width cells, for a row the reader
+// asked to see in full. The continuation rows
 // are indented to the message column so they read as more of the same message
 // under the same time and lane, the way a stack trace already is. A terminal
 // too narrow to leave room for a message after that column hard-wraps instead.
@@ -888,12 +702,12 @@ func wrapLogLine(line string, width int) []string {
 	return out
 }
 
-// tabsLine renders the group tabs, the selected one inverted, each numbered
+// tabsLine renders the fixed top row, the selected one inverted, each numbered
 // for direct jumps.
 func (m *viewerModel) tabsLine() string {
-	parts := make([]string, len(m.groups))
-	for i, g := range m.groups {
-		label := fmt.Sprintf(" %d %s ", i+1, g)
+	parts := make([]string, len(viewer.TabNames))
+	for i, name := range viewer.TabNames {
+		label := fmt.Sprintf(" %d %s ", i+1, name)
 		if i == m.selected {
 			parts[i] = "\x1b[7m" + label + "\x1b[0m"
 			continue
@@ -901,141 +715,4 @@ func (m *viewerModel) tabsLine() string {
 		parts[i] = "\x1b[2m" + label + "\x1b[0m"
 	}
 	return strings.Join(parts, " ")
-}
-
-// dashboardBody renders tab one: the ASCII harbour, the stack summary, the live
-// service and server rows, and the action hint.
-func (m *viewerModel) dashboardBody() string {
-	var b strings.Builder
-	b.WriteString(m.headerBlock())
-	b.WriteString("\n")
-
-	if !m.snap.Found {
-		b.WriteString(" \x1b[2mthe stack is still provisioning; its services appear here as they register…\x1b[0m\n")
-		return b.String()
-	}
-
-	b.WriteString(" " + m.stackLine() + "\n\n")
-
-	b.WriteString(" \x1b[1mSERVICES\x1b[0m  \x1b[2m↑↓ move · enter opens its logs · r restart · a restart all\x1b[0m\n")
-	for i, svc := range m.snap.Services {
-		b.WriteString(m.serviceRow(i, svc) + "\n")
-	}
-
-	b.WriteString("\n \x1b[1mSHARED\x1b[0m\n")
-	b.WriteString(" " + m.serversLine() + "\n")
-
-	if m.toast != "" {
-		b.WriteString("\n \x1b[7m " + m.toast + " \x1b[0m\n")
-	}
-
-	b.WriteString("\n " + m.footerHint() + "\n")
-	return b.String()
-}
-
-// stackLine is the one-line summary: slug, branch, liveness, and the RAM the
-// whole process group is costing this machine.
-func (m *viewerModel) stackLine() string {
-	live := "\x1b[31m● stale\x1b[0m"
-	if m.snap.Live {
-		live = "\x1b[32m● live\x1b[0m"
-	}
-	branch := m.snap.Branch
-	if branch == "" {
-		branch = "no branch"
-	}
-	ram := ""
-	if m.snap.RSS > 0 {
-		ram = "  \x1b[2m~" + domain.HumanBytes(int64(m.snap.RSS)) + " RAM\x1b[0m"
-	}
-	return fmt.Sprintf("\x1b[1m%s\x1b[0m  %s  \x1b[2m%s\x1b[0m%s", m.snap.Slug, live, branch, ram)
-}
-
-// serviceRow renders one service: a status dot, its name, and where it is
-// reached — highlighted when the cursor sits on it, dimmed when it is a shared
-// baseline's copy this worktree merely routes to.
-func (m *viewerModel) serviceRow(i int, svc app.SessionServiceStatus) string {
-	dot := "\x1b[2m○\x1b[0m"
-	if svc.Up {
-		dot = "\x1b[32m●\x1b[0m"
-	}
-	name := svc.Name
-	tag := ""
-	if svc.Fallback {
-		tag = " \x1b[2m(shared)\x1b[0m"
-	} else if !svc.Restartable {
-		tag = " \x1b[2m(managed)\x1b[0m"
-	}
-	dest := svc.URL
-	if dest == "" && svc.Port != 0 {
-		dest = fmt.Sprintf(":%d", svc.Port)
-	}
-	row := fmt.Sprintf(" %s  %-9s %s\x1b[2m%s\x1b[0m", dot, name, dest, tag)
-	if m.onDashboard() && i == m.cursor {
-		return "\x1b[7m›" + row + "\x1b[0m"
-	}
-	return " " + row
-}
-
-// serversLine renders the shared machinery as compact dot+name pills on one
-// line — the proxy, the daemon, and whichever database servers this stack uses.
-func (m *viewerModel) serversLine() string {
-	parts := make([]string, 0, len(m.snap.Servers))
-	for _, s := range m.snap.Servers {
-		dot := "\x1b[31m○\x1b[0m"
-		if s.Up {
-			dot = "\x1b[32m●\x1b[0m"
-		}
-		parts = append(parts, fmt.Sprintf("%s %s", dot, s.Name))
-	}
-	if len(parts) == 0 {
-		return "\x1b[2mnone\x1b[0m"
-	}
-	return strings.Join(parts, "   ")
-}
-
-func (m *viewerModel) footerHint() string {
-	quit := "q detaches (stack keeps running) · X stops it"
-	if m.destroyOnQuit {
-		quit = "\x1b[31mq quits and DESTROYS the sandbox\x1b[0m"
-	}
-	return "\x1b[2m→/tab logs · 1-9 jump · " + quit + "\x1b[0m"
-}
-
-// headerBlock is the wordmark and ASCII harbour at the top of tab one: a
-// dockside crane stacking containers (the stack) in a safe local port.
-func (m *viewerModel) headerBlock() string {
-	yellow := func(s string) string { return "\x1b[33m" + s + "\x1b[0m" }
-	dim := func(s string) string { return "\x1b[90m" + s + "\x1b[0m" }
-	water := func(s string) string { return "\x1b[34m" + s + "\x1b[0m" }
-	cellColors := []string{"96", "94", "92", "95"}
-	cell := func(i int) string { return "\x1b[1;" + cellColors[i%len(cellColors)] + "m[##]\x1b[0m" }
-	containers := func(base int) string {
-		return dim(" |") + "  " + cell(base) + " " + cell(base+1) + " " + cell(base+2) + "  " + dim("|")
-	}
-
-	rows := []string{
-		"  " + yellow(`     __`) + "        \x1b[1;96mh a v e n\x1b[0m",
-		"  " + yellow(`    |  |___`) + "     \x1b[2ma safe harbour for your\x1b[0m",
-		"  " + yellow(`    |  |   |___`) + " \x1b[2mlocal stack: every service\x1b[0m",
-		"  " + yellow(`  __|__|___|___|__`) + " \x1b[2min one place\x1b[0m",
-		"  " + containers(0),
-		"  " + containers(1),
-		"  " + dim(` |________________|`),
-		"  " + water(`  ~~~~~~~~~~~~~~~~`),
-	}
-	return strings.Join(rows, "\n") + "\n"
-}
-
-// captureLivenessGrace covers lanes that wrote before the viewer finished opening.
-const captureLivenessGrace = 10 * time.Second
-
-// captureWrittenSinceStart reports whether a service's capture file has been
-// written since this viewer opened. Older captures are stale lanes, not tabs.
-func (m *viewerModel) captureWrittenSinceStart(fileSvc string) bool {
-	info, err := os.Stat(filepath.Join(m.capDir, fileSvc+".log"))
-	if err != nil {
-		return false
-	}
-	return !info.ModTime().Before(m.startedAt.Add(-captureLivenessGrace))
 }

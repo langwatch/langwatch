@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +13,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer"
+	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
 
@@ -49,36 +51,27 @@ func key(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyUp}
 	case "down":
 		return tea.KeyMsg{Type: tea.KeyDown}
-	case "pgup":
-		return tea.KeyMsg{Type: tea.KeyPgUp}
-	case "pgdown":
-		return tea.KeyMsg{Type: tea.KeyPgDown}
-	case "home":
-		return tea.KeyMsg{Type: tea.KeyHome}
-	case "end":
-		return tea.KeyMsg{Type: tea.KeyEnd}
 	case "enter":
 		return tea.KeyMsg{Type: tea.KeyEnter}
-	case "backspace":
-		return tea.KeyMsg{Type: tea.KeyBackspace}
 	default:
 		return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
 	}
 }
 
-// pushLines writes n lines of the form "<label> N" straight into a group's
-// ring, bypassing file ingestion — the scroll/search tests only care about
-// buffer content and position, not the file-tailing path.
-func pushLines(m *viewerModel, group, label string, n int) {
-	for i := 0; i < n; i++ {
-		m.push(group, fmt.Sprintf("%s %d", label, i))
+// writeCapture writes one capture file, stamped now so the viewer counts the
+// lane as live.
+func writeCapture(t *testing.T, dir, lane, payload string) {
+	t.Helper()
+	line := time.Now().UTC().Format(time.RFC3339Nano) + " " + payload + "\n"
+	if err := os.WriteFile(filepath.Join(dir, lane+".log"), []byte(line), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 
 // @scenario "Up in a terminal never holds the stack hostage"
 func TestViewerQuitDetachesInsteadOfKilling(t *testing.T) {
-	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
 	for _, k := range []string{"q", "esc", "ctrl+c"} {
+		m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
 		_, cmd := m.Update(key(k))
 		if cmd == nil {
 			t.Fatalf("%q must quit the viewer", k)
@@ -89,94 +82,144 @@ func TestViewerQuitDetachesInsteadOfKilling(t *testing.T) {
 	}
 }
 
-// @scenario "Switching between service log groups is a keypress"
-func TestViewerGroupSwitching(t *testing.T) {
-	dir := t.TempDir()
-	base := time.Now().UTC()
-	for _, svc := range []string{"app", "nlp"} {
-		line := base.Format(time.RFC3339Nano) + " hello from " + svc + "\n"
-		if err := os.WriteFile(filepath.Join(dir, svc+".log"), []byte(line), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
-	m.ingest()
-
-	if len(m.groups) != 3 || m.groups[0] != "all" {
-		t.Fatalf("groups = %v, want [all app nlp]", m.groups)
-	}
-	m.Update(key("tab"))
-	if m.groups[m.selected] != "app" {
-		t.Errorf("tab from all lands on %q, want app", m.groups[m.selected])
-	}
-	m.Update(key("right"))
-	if m.groups[m.selected] != "nlp" {
-		t.Errorf("right lands on %q, want nlp", m.groups[m.selected])
-	}
-	m.Update(key("right"))
-	if m.groups[m.selected] != "all" {
-		t.Errorf("cycling wraps to %q, want all", m.groups[m.selected])
-	}
-	m.Update(key("3"))
-	if m.groups[m.selected] != "nlp" {
-		t.Errorf("digit 3 lands on %q, want nlp", m.groups[m.selected])
-	}
-	m.Update(key("left"))
-	if m.groups[m.selected] != "app" {
-		t.Errorf("left lands on %q, want app", m.groups[m.selected])
+// @scenario "The tabs are session, logs, errors, traces, metrics, profiles, stores, jobs"
+func TestViewerTopRowIsFixed(t *testing.T) {
+	m := dashModel(t, []app.SessionServiceStatus{{Name: "app"}}, nil)
+	want := []string{"session", "logs", "errors", "traces", "metrics", "profiles", "stores", "jobs"}
+	if strings.Join(viewer.TabNames, ",") != strings.Join(want, ",") {
+		t.Fatalf("top row = %v, want %v", viewer.TabNames, want)
 	}
 
-	view := m.View()
-	if !strings.Contains(view, "hello from app") {
-		t.Errorf("selected app group must render app's lines, got: %q", view)
-	}
-	if strings.Contains(view, "hello from nlp") {
-		t.Errorf("selected app group must not render nlp's lines")
-	}
-}
-
-// A service that joins later (up +svc) appears as a tab without restarting.
-// @scenario "Switching between service log groups is a keypress"
-func TestViewerDiscoversNewServicesLive(t *testing.T) {
-	dir := t.TempDir()
-	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
-	m.ingest()
-	if len(m.groups) != 1 {
-		t.Fatalf("groups = %v, want just all before any capture exists", m.groups)
-	}
-	line := time.Now().UTC().Format(time.RFC3339Nano) + " langy is here\n"
-	if err := os.WriteFile(filepath.Join(dir, "langyagent.log"), []byte(line), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	m.ingest()
-	if !m.hasGroup("langy") {
-		t.Errorf("groups = %v, want langy discovered (CLI spelling)", m.groups)
-	}
-}
-
-func TestFormatCombinedLine(t *testing.T) {
-	t.Run("a labelled supervisor line gets its lane colour and CLI spelling", func(t *testing.T) {
-		got := formatCombinedLine(`langyagent | {"level":"error","msg":"exploded"}`)
-		if !strings.Contains(got, "langy") || strings.Contains(got, "langyagent") {
-			t.Errorf("got %q, want the langy CLI spelling", got)
-		}
-		if !strings.Contains(got, "\x1b[31merror") {
-			t.Errorf("got %q, want the error level painted red", got)
-		}
-		if !strings.Contains(got, "exploded") {
-			t.Errorf("got %q, want the message rendered", got)
-		}
-	})
-	t.Run("a label-less line passes through untouched", func(t *testing.T) {
-		for _, raw := range []string{
-			"  thuishaven: stack \"x\"",
-			"12:16:42.370  codegen           Loaded Prisma config from prisma.config.ts.",
-		} {
-			if got := formatCombinedLine(raw); got != raw {
-				t.Errorf("formatCombinedLine(%q) = %q, want the line kept as is", raw, got)
+	t.Run("the row is numbered for direct jumps", func(t *testing.T) {
+		line := m.tabsLine()
+		for i, name := range want {
+			if !strings.Contains(line, strconv.Itoa(i+1)+" "+name) {
+				t.Errorf("tab bar %q is missing %q numbered %d", line, name, i+1)
 			}
 		}
 	})
+
+	t.Run("when the developer moves between tabs", func(t *testing.T) {
+		cases := []struct {
+			keys []string
+			want string
+		}{
+			{keys: []string{"right"}, want: "logs"},
+			{keys: []string{"tab", "tab"}, want: "errors"},
+			{keys: []string{"left"}, want: "jobs"},
+			{keys: []string{"4"}, want: "traces"},
+			{keys: []string{"8"}, want: "jobs"},
+			{keys: []string{"1"}, want: "session"},
+		}
+		for _, tc := range cases {
+			m.selected = 0
+			for _, k := range tc.keys {
+				m.handleKey(k)
+			}
+			if got := m.currentTab(); got != tc.want {
+				t.Errorf("%v landed on %q, want %q", tc.keys, got, tc.want)
+			}
+		}
+	})
+}
+
+// @scenario "Only the visible tab polls"
+func TestOnlyTheVisibleTabPolls(t *testing.T) {
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	traces := &sources.MemoryTraces{}
+	files := &sources.MemoryLogs{}
+	m.install(viewer.Sources{
+		Files: files, Traces: traces, LokiUp: func() bool { return false }, Now: time.Now,
+	})
+
+	m.selectTab("traces")
+	m.ingest()
+	polled := traces.Queries
+	if polled == 0 {
+		t.Fatal("the visible traces tab did not poll at all")
+	}
+
+	m.selectTab("logs")
+	for i := 0; i < 5; i++ {
+		m.ingest()
+	}
+	if traces.Queries != polled {
+		t.Errorf("traces was polled %d more times while another tab was on screen", traces.Queries-polled)
+	}
+
+	t.Run("the capture tail keeps running whichever tab is visible", func(t *testing.T) {
+		if files.Calls == 0 {
+			t.Error("the local capture tail stopped - the errors tab depends on it")
+		}
+	})
+}
+
+// @scenario "Switching between service log groups is a keypress"
+func TestLogSubTabsAreReachedByKeypress(t *testing.T) {
+	dir := t.TempDir()
+	writeCapture(t, dir, "ui", "vite ready")
+	writeCapture(t, dir, "go", `{"service":"langwatch-service-nlpgo","level":"info","msg":"ready"}`)
+
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
+	m.ingest()
+	m.selectTab("logs")
+
+	if got := m.logs.SubTabs(); strings.Join(got, ",") != "all,ui,nlp" {
+		t.Fatalf("sub-tabs = %v, want all,ui,nlp", got)
+	}
+	m.handleKey("]")
+	if m.logs.Selected() != "ui" {
+		t.Errorf("] landed on %q, want ui", m.logs.Selected())
+	}
+	m.handleKey("]")
+	if m.logs.Selected() != "nlp" {
+		t.Errorf("] landed on %q, want nlp", m.logs.Selected())
+	}
+	m.handleKey("[")
+	if m.logs.Selected() != "ui" {
+		t.Errorf("[ landed on %q, want ui", m.logs.Selected())
+	}
+
+	t.Run("the lines are colored by application with errors highlighted", func(t *testing.T) {
+		writeCapture(t, dir, "backend", `{"name":"langwatch:api","level":"error","msg":"exploded"}`)
+		m.ingest()
+		body := strings.Join(m.logs.Lines("api"), "\n")
+		if !strings.Contains(body, "\x1b[31merror") {
+			t.Errorf("api lines = %q, want the error level painted red", body)
+		}
+	})
+}
+
+// @scenario "Switching between service log groups is a keypress"
+func TestViewerDiscoversNewApplicationsLive(t *testing.T) {
+	dir := t.TempDir()
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
+	m.ingest()
+	if got := m.logs.SubTabs(); len(got) != 1 {
+		t.Fatalf("sub-tabs = %v, want just all before any capture exists", got)
+	}
+	writeCapture(t, dir, "langyagent", "langy is here")
+	m.ingest()
+	if got := strings.Join(m.logs.SubTabs(), ","); !strings.Contains(got, "langy") {
+		t.Errorf("sub-tabs = %v, want langy discovered (CLI spelling)", got)
+	}
+}
+
+// A `+svc` delta opens the viewer already looking at that application.
+// @scenario "Switching between service log groups is a keypress"
+func TestViewerLandsOnThePreferredApplication(t *testing.T) {
+	dir := t.TempDir()
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
+	m.preferred = "langy"
+	m.ingest()
+	if m.currentTab() != "session" {
+		t.Fatalf("moved to %q before the preferred application wrote anything", m.currentTab())
+	}
+	writeCapture(t, dir, "langyagent", "langy is here")
+	m.ingest()
+	if m.currentTab() != "logs" || m.logs.Selected() != "langy" {
+		t.Errorf("landed on %s/%s, want logs/langy", m.currentTab(), m.logs.Selected())
+	}
 }
 
 // @scenario "The session dashboard is the first thing haven up shows"
@@ -186,8 +229,8 @@ func TestSessionDashboardIsTabOne(t *testing.T) {
 		{Name: "nlp", Restartable: true},
 	}, nil)
 
-	if m.groups[0] != sessionGroup {
-		t.Fatalf("first tab = %q, want the session dashboard", m.groups[0])
+	if viewer.TabNames[0] != viewer.SessionTab {
+		t.Fatalf("first tab = %q, want the session dashboard", viewer.TabNames[0])
 	}
 	if !m.onDashboard() {
 		t.Fatal("haven up must open on the dashboard, not straight into a log tab")
@@ -198,35 +241,31 @@ func TestSessionDashboardIsTabOne(t *testing.T) {
 			t.Errorf("dashboard is missing %q\n%s", want, view)
 		}
 	}
-	t.Logf("\n%s", view) // eyeball the harbour + layout
 }
 
-// A viewer built without a session (the log-only paths, and every existing
-// test) has no dashboard tab and behaves exactly as before.
+// A viewer built without a session still opens on the session tab; it says the
+// stack is provisioning rather than pretending there is nothing to show.
 // @scenario "The session dashboard is the first thing haven up shows"
-func TestNoDashboardWithoutASession(t *testing.T) {
+func TestNoSessionStillOpensOnTheSessionTab(t *testing.T) {
 	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
-	if m.onDashboard() {
-		t.Error("a session-less viewer must not present a dashboard")
+	if m.currentTab() != viewer.SessionTab {
+		t.Errorf("first tab = %q, want the session tab", m.currentTab())
 	}
-	if m.groups[0] != viewerAllGroup {
-		t.Errorf("first tab = %q, want the combined log stream", m.groups[0])
+	if m.onDashboard() {
+		t.Error("a session-less viewer has no dashboard to drive")
 	}
 }
 
 // @scenario "Arrow keys move the cursor and open a service's logs"
 func TestDashboardOpensServiceLogs(t *testing.T) {
 	dir := t.TempDir()
-	line := time.Now().UTC().Format(time.RFC3339Nano) + " hi from app\n"
-	if err := os.WriteFile(filepath.Join(dir, "app.log"), []byte(line), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeCapture(t, dir, "ui", "hi from the ui")
 	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
 	snap := app.SessionReport{Found: true, Services: []app.SessionServiceStatus{
-		{Name: "app", Restartable: true}, {Name: "nlp", Restartable: true},
+		{Name: "ui", Restartable: true}, {Name: "nlp", Restartable: true},
 	}}
 	m.enableDashboard(sessionActions{Snapshot: func() app.SessionReport { return snap }}, false)
-	m.ingest() // discovers app's log group -> groups = [session all app]
+	m.ingest()
 
 	m.handleKey("down")
 	if m.cursor != 1 {
@@ -234,21 +273,22 @@ func TestDashboardOpensServiceLogs(t *testing.T) {
 	}
 	m.handleKey("up")
 	if m.cursor != 0 {
-		t.Fatalf("up should return to the app row, cursor=%d", m.cursor)
+		t.Fatalf("up should return to the ui row, cursor=%d", m.cursor)
 	}
 	m.handleKey("enter")
-	if m.groups[m.selected] != "app" {
-		t.Errorf("enter on app should open its log tab, landed on %q", m.groups[m.selected])
+	if m.currentTab() != "logs" || m.logs.Selected() != "ui" {
+		t.Errorf("enter on ui should open its log sub-tab, landed on %s/%s", m.currentTab(), m.logs.Selected())
 	}
 }
 
-// enter on a service with no capture of its own falls back to the combined stream.
+// enter on a service with no output of its own opens the combined stream.
 // @scenario "Arrow keys move the cursor and open a service's logs"
 func TestDashboardEnterFallsBackToCombined(t *testing.T) {
 	m := dashModel(t, []app.SessionServiceStatus{{Name: "gateway", Restartable: true}}, nil)
 	m.handleKey("enter")
-	if m.groups[m.selected] != viewerAllGroup {
-		t.Errorf("enter on a captureless service should open the combined stream, landed on %q", m.groups[m.selected])
+	if m.currentTab() != "logs" || m.logs.Selected() != viewer.AllApps {
+		t.Errorf("enter on a silent service should open the combined stream, landed on %s/%s",
+			m.currentTab(), m.logs.Selected())
 	}
 }
 
@@ -301,66 +341,6 @@ func TestDashboardRestartDispatch(t *testing.T) {
 		if len(got) != 1 || got[0] != "" {
 			t.Errorf(`restart-all must pass the empty "all" name, got %v`, got)
 		}
-	})
-}
-
-func TestViewerRingIsCapped(t *testing.T) {
-	m := newViewerModel("feat-x", "", "")
-	for i := 0; i < viewerRingCap+50; i++ {
-		m.push("all", "line")
-	}
-	if len(m.lines["all"]) != viewerRingCap {
-		t.Errorf("ring = %d lines, want capped at %d", len(m.lines["all"]), viewerRingCap)
-	}
-}
-
-// The combined per-stack log is append-only and uncapped, so attaching to a
-// long-lived worktree must not read it whole just to render a screenful.
-func TestViewerFirstReadIsBoundedToATailWindow(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "combined.log")
-
-	ts := time.Now().UTC().Format(time.RFC3339Nano)
-	var big strings.Builder
-	for big.Len() < readFreshTailWindow*3 {
-		big.WriteString(ts + " an old line nobody will ever scroll back to\n")
-	}
-	if err := os.WriteFile(path, []byte(big.String()), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	m := newViewerModel("feat-x", path, t.TempDir())
-
-	t.Run("given a capture file far larger than the window", func(t *testing.T) {
-		t.Run("when the viewer first reads it, it consumes only the tail", func(t *testing.T) {
-			lines := m.readFresh("all", path)
-			consumed := 0
-			for _, l := range lines {
-				consumed += len(l) + 1
-			}
-			if consumed > readFreshTailWindow {
-				t.Errorf("first read consumed %d bytes, want at most the %d-byte window", consumed, readFreshTailWindow)
-			}
-			if len(lines) == 0 {
-				t.Error("first read should still return the tail, got nothing")
-			}
-		})
-
-		t.Run("when more is appended, the next read returns exactly the new lines", func(t *testing.T) {
-			f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o600)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := f.WriteString(ts + " a brand new line\n"); err != nil {
-				t.Fatal(err)
-			}
-			_ = f.Close()
-
-			lines := m.readFresh("all", path)
-			if len(lines) != 1 || !strings.Contains(lines[0], "a brand new line") {
-				t.Errorf("incremental read = %v, want just the appended line", lines)
-			}
-		})
 	})
 }
 
@@ -417,9 +397,7 @@ func TestStopKeyStopsTheStack(t *testing.T) {
 		t.Run("when X is pressed once", func(t *testing.T) {
 			stops := 0
 			m := newStopViewer(t, &stops, nil)
-
 			_, cmd := m.handleKey("X")
-
 			if cmd != nil {
 				t.Fatal("one press must not stop the stack")
 			}
@@ -434,7 +412,6 @@ func TestStopKeyStopsTheStack(t *testing.T) {
 		t.Run("when X is pressed twice", func(t *testing.T) {
 			stops := 0
 			m := newStopViewer(t, &stops, nil)
-
 			m.handleKey("X")
 			_, cmd := m.handleKey("X")
 			if cmd == nil {
@@ -452,11 +429,9 @@ func TestStopKeyStopsTheStack(t *testing.T) {
 		t.Run("when another key comes between the two presses", func(t *testing.T) {
 			stops := 0
 			m := newStopViewer(t, &stops, nil)
-
 			m.handleKey("X")
 			m.handleKey("tab")
 			_, cmd := m.handleKey("X")
-
 			if cmd != nil {
 				t.Fatal("an intervening key must cancel the confirmation, not arm it")
 			}
@@ -474,10 +449,8 @@ func TestStopKeyStopsTheStack(t *testing.T) {
 				Snapshot: func() app.SessionReport { return app.SessionReport{} },
 				Down:     func() error { stops++; return nil },
 			}, true)
-
 			m.handleKey("X")
 			m.handleKey("X")
-
 			if stops != 0 {
 				t.Fatalf("the play viewer has one quit contract; X stopped it %d times", stops)
 			}
@@ -498,287 +471,26 @@ func TestFailedStopKeepsTheViewerOpen(t *testing.T) {
 	}
 }
 
-var errStopFailed = errors.New("no registered stack \"feat-x\"")
-
-// @scenario "Scrolling back leaves following mode"
-func TestViewerScrollLeavesFollowing(t *testing.T) {
-	newModel := func() *viewerModel {
-		m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
-		pushLines(m, viewerAllGroup, "line", 30)
-		return m
-	}
-
-	t.Run("given a fresh viewer at the bottom", func(t *testing.T) {
-		t.Run("when the developer presses up", func(t *testing.T) {
-			m := newModel()
-			m.handleKey("up")
-			if m.scroll[viewerAllGroup] != 1 {
-				t.Fatalf("scroll = %d, want 1", m.scroll[viewerAllGroup])
-			}
-			if !strings.Contains(m.logFooter(viewerAllGroup), "1 lines above") {
-				t.Error("footer must show the scroll-back count")
-			}
-			if !strings.Contains(m.logFooter(viewerAllGroup), "f to follow") {
-				t.Error("footer must name f as the way back to following")
-			}
-		})
-
-		t.Run("when the developer presses PgUp", func(t *testing.T) {
-			m := newModel()
-			m.handleKey("pgup")
-			if m.scroll[viewerAllGroup] != m.bodyHeight() {
-				t.Fatalf("scroll = %d, want a full page (%d)", m.scroll[viewerAllGroup], m.bodyHeight())
-			}
-		})
-
-		t.Run("when the developer scrolls the mouse wheel up", func(t *testing.T) {
-			m := newModel()
-			m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
-			if m.scroll[viewerAllGroup] != mouseWheelScrollLines {
-				t.Fatalf("scroll = %d, want %d", m.scroll[viewerAllGroup], mouseWheelScrollLines)
-			}
-		})
-
-		t.Run("when the developer presses Home", func(t *testing.T) {
-			m := newModel()
-			m.handleKey("home")
-			if m.scroll[viewerAllGroup] != len(m.lines[viewerAllGroup]) {
-				t.Fatalf("Home should scroll to the very top, scroll=%d", m.scroll[viewerAllGroup])
-			}
-		})
-	})
-}
-
-// @scenario "New output does not yank a scrolled-back view"
-func TestViewerScrollPinnedAgainstNewOutput(t *testing.T) {
-	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
-	m.height = 10 // a small terminal, so the body holds only a few lines
-	pushLines(m, viewerAllGroup, "line", 30)
-	m.scrollBy(viewerAllGroup, 15)
-
-	before := m.visibleLines(viewerAllGroup, m.bodyHeight())
-	pushLines(m, viewerAllGroup, "new", 5)
-	after := m.visibleLines(viewerAllGroup, m.bodyHeight())
-
-	if strings.Join(before, "|") != strings.Join(after, "|") {
-		t.Errorf("scrolled-back view moved: before=%v after=%v", before, after)
-	}
-	if m.scroll[viewerAllGroup] != 20 {
-		t.Errorf("scroll offset = %d, want 20 (15 + 5 new lines)", m.scroll[viewerAllGroup])
-	}
-}
-
-// @scenario "Returning to the bottom resumes following"
-func TestViewerFollowResumes(t *testing.T) {
-	newScrolledModel := func() *viewerModel {
-		m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
-		pushLines(m, viewerAllGroup, "line", 30)
-		m.scrollBy(viewerAllGroup, 10)
-		return m
-	}
-
-	t.Run("given a scrolled-back view", func(t *testing.T) {
-		t.Run("when f is pressed", func(t *testing.T) {
-			m := newScrolledModel()
-			m.handleKey("f")
-			if m.scroll[viewerAllGroup] != 0 {
-				t.Fatalf("scroll = %d, want 0", m.scroll[viewerAllGroup])
-			}
-			if strings.Contains(m.logFooter(viewerAllGroup), "lines above") {
-				t.Error("the scroll-back indicator must be gone once following resumes")
-			}
-		})
-
-		t.Run("when End is pressed", func(t *testing.T) {
-			m := newScrolledModel()
-			m.handleKey("end")
-			if m.scroll[viewerAllGroup] != 0 {
-				t.Fatalf("scroll = %d, want 0", m.scroll[viewerAllGroup])
-			}
-		})
-
-		t.Run("when scrolling all the way down", func(t *testing.T) {
-			m := newScrolledModel()
-			for i := 0; i < 20; i++ {
-				m.handleKey("down")
-			}
-			if m.scroll[viewerAllGroup] != 0 {
-				t.Fatalf("scroll = %d, want 0 after scrolling past the bottom", m.scroll[viewerAllGroup])
-			}
-		})
-	})
-}
-
-// @scenario "Slash opens a search prompt in the footer"
-func TestViewerSearchPromptCapturesInput(t *testing.T) {
-	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
-	pushLines(m, viewerAllGroup, "line", 5)
-
-	m.handleKey("/")
-	if !m.searchPrompt {
-		t.Fatal("/ must open the search prompt")
-	}
-	if !strings.Contains(m.logFooter(viewerAllGroup), "enter searches") {
-		t.Error("the footer must show the live search prompt")
-	}
-
-	// While the prompt is open, a normally-scrolling key is captured as text
-	// instead of scrolling — only single runes are typed; multi-rune key
-	// names like "down" are silently ignored rather than leaking into the query.
-	m.handleKey("down")
-	if m.scroll[viewerAllGroup] != 0 {
-		t.Error("scrolling keys must not scroll while the search prompt is open")
-	}
-
-	m.handleKey("h")
-	m.handleKey("i")
-	if m.searchInput != "hi" {
-		t.Fatalf("searchInput = %q, want %q", m.searchInput, "hi")
-	}
-	m.handleKey("backspace")
-	if m.searchInput != "h" {
-		t.Fatalf("searchInput after backspace = %q, want %q", m.searchInput, "h")
-	}
-}
-
-// @scenario "Enter jumps to the nearest match and highlights every match on screen"
-func TestViewerSearchJumpsAndHighlights(t *testing.T) {
-	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
-	for i := 0; i < 10; i++ {
-		m.push(viewerAllGroup, fmt.Sprintf("plain line %d", i))
-	}
-	m.push(viewerAllGroup, "an ERROR occurred here")
-
-	m.handleKey("/")
-	for _, r := range "error" { // lower-case query against an upper-case match
-		m.handleKey(string(r))
-	}
-	m.handleKey("enter")
-
-	if m.searchQuery != "error" {
-		t.Fatalf("searchQuery = %q, want %q", m.searchQuery, "error")
-	}
-	if m.matchIdx < 0 {
-		t.Fatal("Enter must land on a match")
-	}
-	view := m.View()
-	if !strings.Contains(view, "\x1b[7mERROR\x1b[27m") {
-		t.Errorf("view must highlight the match in its original case, got: %q", view)
-	}
-}
-
-// @scenario "n and N step across the whole buffer of the current tab"
-func TestViewerSearchStepWraps(t *testing.T) {
-	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
-	for i := 0; i < 3; i++ {
-		m.push(viewerAllGroup, fmt.Sprintf("needle %d", i))
-		m.push(viewerAllGroup, "filler")
-	}
-	m.searchQuery = "needle"
-	m.jumpToNearestMatch()
-
-	matches := m.searchMatches(viewerAllGroup)
-	if len(matches) != 3 {
-		t.Fatalf("matches = %v, want 3 needles", matches)
-	}
-
-	seen := []int{m.matchIdx}
-	for i := 0; i < 3; i++ {
-		m.stepMatch(1)
-		seen = append(seen, m.matchIdx)
-	}
-	if seen[3] != seen[0] {
-		t.Errorf("stepping forward 3 times over 3 matches should wrap back, seen=%v", seen)
-	}
-
-	m.stepMatch(-1)
-	if m.matchIdx != seen[2] {
-		t.Errorf("N should step backward, matchIdx=%d want %d", m.matchIdx, seen[2])
-	}
-}
-
-// @scenario "Escape clears the search"
-func TestViewerEscapeClearsSearch(t *testing.T) {
-	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
-	pushLines(m, viewerAllGroup, "needle", 3)
-	m.searchQuery = "needle"
-
-	m.handleKey("esc")
-	if m.searchQuery != "" {
-		t.Fatalf("esc must clear the query, still %q", m.searchQuery)
-	}
-	// \x1b[27m only ever appears as the closing half of a search highlight
-	// (the tab bar's own reverse-video uses \x1b[0m to reset), so its absence
-	// proves the highlighting is gone rather than merely the tab styling.
-	if strings.Contains(m.View(), "\x1b[27m") {
-		t.Error("highlighting must disappear once the query is cleared")
-	}
-
-	// A second esc, with no search left to clear, falls through to the
-	// ordinary detach behavior.
-	_, cmd := m.handleKey("esc")
-	if cmd == nil {
-		t.Fatal("esc must still detach the viewer once there is no search to clear")
-	}
-}
-
-// @scenario "A search persists across tabs"
-func TestViewerSearchPersistsAcrossTabs(t *testing.T) {
-	dir := t.TempDir()
-	base := time.Now().UTC()
-	for _, svc := range []string{"app", "nlp"} {
-		line := base.Format(time.RFC3339Nano) + " a restart happened in " + svc + "\n"
-		if err := os.WriteFile(filepath.Join(dir, svc+".log"), []byte(line), 0o600); err != nil {
-			t.Fatal(err)
-		}
-	}
-	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
-	m.ingest() // groups = [all app nlp]
-
-	m.handleKey("2") // land on "app"
-	m.handleKey("/")
-	for _, r := range "restart" {
-		m.handleKey(string(r))
-	}
-	m.handleKey("enter")
-	if len(m.searchMatches("app")) == 0 {
-		t.Fatal("expected a match on the app tab")
-	}
-
-	m.handleKey("3") // switch to "nlp"
-	if m.searchQuery != "restart" {
-		t.Fatalf("query must survive the tab switch, got %q", m.searchQuery)
-	}
-	if len(m.searchMatches("nlp")) == 0 {
-		t.Fatal("the same query must also match nlp's own buffer")
-	}
-	m.handleKey("n")
-	if m.matchIdx < 0 {
-		t.Fatal("n on the new tab must search that tab's own matches, not the old tab's")
-	}
-}
+var errStopFailed = errors.New(`no registered stack "feat-x"`)
 
 // @scenario "Existing bindings keep working"
-func TestViewerExistingBindingsUnaffectedBySearchAndScroll(t *testing.T) {
+func TestViewerExistingBindingsUnaffectedByTheTabs(t *testing.T) {
 	dir := t.TempDir()
-	line := time.Now().UTC().Format(time.RFC3339Nano) + " hi\n"
-	if err := os.WriteFile(filepath.Join(dir, "app.log"), []byte(line), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeCapture(t, dir, "ui", "hi")
 	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
-	m.ingest() // groups = [all app]
+	m.ingest()
 
 	m.handleKey("2")
-	if m.groups[m.selected] != "app" {
-		t.Fatalf("digit jump broken, landed on %q", m.groups[m.selected])
+	if m.currentTab() != "logs" {
+		t.Fatalf("digit jump broken, landed on %q", m.currentTab())
 	}
 	m.handleKey("left")
-	if m.groups[m.selected] != viewerAllGroup {
-		t.Fatalf("left-cycle broken, landed on %q", m.groups[m.selected])
+	if m.currentTab() != "session" {
+		t.Fatalf("left-cycle broken, landed on %q", m.currentTab())
 	}
 	m.handleKey("tab")
-	if m.groups[m.selected] != "app" {
-		t.Fatalf("tab-cycle broken, landed on %q", m.groups[m.selected])
+	if m.currentTab() != "logs" {
+		t.Fatalf("tab-cycle broken, landed on %q", m.currentTab())
 	}
 
 	if _, cmd := m.handleKey("q"); cmd == nil {
@@ -793,13 +505,13 @@ func TestViewerExistingBindingsUnaffectedBySearchAndScroll(t *testing.T) {
 	m3 := dashModel(t, []app.SessionServiceStatus{{Name: "app", Restartable: true}}, nil)
 	m3.session.Down = func() error { stops++; return nil }
 	m3.handleKey("X")
-	if _, cmd := m3.handleKey("X"); cmd == nil || stops != 0 {
+	_, cmd := m3.handleKey("X")
+	if cmd == nil || stops != 0 {
 		t.Fatal("X twice must dispatch a stop")
-	} else {
-		cmd()
-		if stops != 1 {
-			t.Fatalf("stops = %d, want 1 after the confirmed X", stops)
-		}
+	}
+	cmd()
+	if stops != 1 {
+		t.Fatalf("stops = %d, want 1 after the confirmed X", stops)
 	}
 
 	m3.handleKey("down")
@@ -809,32 +521,143 @@ func TestViewerExistingBindingsUnaffectedBySearchAndScroll(t *testing.T) {
 }
 
 // A capture left behind by a lane that no longer runs (a retired lane name,
-// an earlier selection) is not a tab; `haven logs` still reads it.
+// an earlier selection) is not a sub-tab; `haven logs` still reads it.
 // @scenario "Captures from lanes that no longer run are not tabs"
 func TestViewerHidesStaleCaptures(t *testing.T) {
 	dir := t.TempDir()
 	stale := time.Now().Add(-2 * time.Hour)
-	for _, svc := range []string{"api", "workers"} {
-		p := filepath.Join(dir, svc+".log")
-		if err := os.WriteFile(p, []byte(stale.UTC().Format(time.RFC3339Nano)+" old\n"), 0o600); err != nil {
+	for _, lane := range []string{"api", "workers"} {
+		path := filepath.Join(dir, lane+".log")
+		if err := os.WriteFile(path, []byte(stale.UTC().Format(time.RFC3339Nano)+" old\n"), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.Chtimes(p, stale, stale); err != nil {
+		if err := os.Chtimes(path, stale, stale); err != nil {
 			t.Fatal(err)
 		}
 	}
-	live := time.Now().UTC().Format(time.RFC3339Nano) + " hello from backend\n"
-	if err := os.WriteFile(filepath.Join(dir, "backend.log"), []byte(live), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	writeCapture(t, dir, "backend", `{"name":"langwatch:api","level":"info","msg":"hello from backend"}`)
+
 	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
 	m.ingest()
-	if m.hasGroup("api") || m.hasGroup("workers") {
-		t.Fatalf("groups = %v, want no tab for a capture written hours before the viewer opened", m.groups)
+	if got := strings.Join(m.logs.Lines("api"), "\n"); strings.Contains(got, "old") {
+		t.Fatalf("api lines = %q, want nothing from a capture written hours before the viewer opened", got)
 	}
-	if !m.hasGroup("backend") {
-		t.Fatalf("groups = %v, want backend", m.groups)
+	if got := strings.Join(m.logs.Lines("api"), "\n"); !strings.Contains(got, "hello from backend") {
+		t.Fatalf("api lines = %q, want the live backend lane's line", got)
 	}
+	if got := m.logs.SubTabs(); strings.Join(got, ",") != "all,api" {
+		t.Fatalf("sub-tabs = %v, want the stale lanes absent", got)
+	}
+}
+
+// @scenario "A line wider than the terminal is cut, not wrapped"
+func TestWideRowsAreCutNotWrapped(t *testing.T) {
+	wide := "22:30:00.000  backend    info   " + strings.Repeat("word ", 40)
+	rows := fitRows([]string{wide, "22:30:01.000  backend    info   last"},
+		fitOptions{width: 60, body: 10, expanded: map[int]bool{}})
+
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d, want one row per line - a wide line must not become several", len(rows))
+	}
+	for i, row := range rows {
+		if ansi.StringWidth(row) > 60 {
+			t.Errorf("row %d is %d cells wide: %q", i, ansi.StringWidth(row), row)
+		}
+	}
+	if !strings.HasSuffix(rows[0], cutMarker) {
+		t.Errorf("cut row = %q, want a marker where it was cut", rows[0])
+	}
+	if strings.HasSuffix(rows[1], cutMarker) {
+		t.Errorf("row %q fits and must carry no marker", rows[1])
+	}
+
+	t.Run("when the terminal has not reported its size", func(t *testing.T) {
+		rows := fitRows([]string{wide}, fitOptions{width: 0, body: 10, expanded: map[int]bool{}})
+		if len(rows) != 1 || rows[0] != wide {
+			t.Errorf("rows = %q, want the line untouched until the width is known", rows)
+		}
+	})
+
+	t.Run("the newest rows are the ones kept", func(t *testing.T) {
+		lines := []string{"one", "two", "three", "four"}
+		rows := fitRows(lines, fitOptions{width: 60, body: 2, expanded: map[int]bool{}})
+		if len(rows) != 2 || rows[1] != "four" {
+			t.Errorf("rows = %q, want the last two", rows)
+		}
+	})
+}
+
+// @scenario "Clicking a row opens it in full, and clicking again closes it"
+func TestClickingARowExpandsIt(t *testing.T) {
+	wide := logfmt.Render(
+		`{"level":"info","msg":"`+strings.Repeat("word ", 40)+`"}`,
+		logfmt.Options{Lane: "backend", Time: time.Date(2026, 9, 9, 22, 30, 0, 0, time.UTC)},
+	)
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	m.width, m.height = 61, 30
+
+	if got := len(m.fitRows([]string{wide}, 20)); got != 1 {
+		t.Fatalf("rows = %d before any click, want the line cut to one row", got)
+	}
+
+	t.Run("when the developer clicks that row", func(t *testing.T) {
+		m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: bodyTopRow})
+		rows := m.fitRows([]string{wide}, 20)
+		if len(rows) < 2 {
+			t.Fatalf("rows = %d after the click, want the row opened in full", len(rows))
+		}
+		indent := strings.Repeat(" ", logfmt.MessageColumn)
+		if !strings.HasPrefix(rows[1], indent) {
+			t.Errorf("continuation row %q is not indented to the message column", rows[1])
+		}
+		for i, row := range rows {
+			if ansi.StringWidth(row) > 60 {
+				t.Errorf("expanded row %d is %d cells wide: %q", i, ansi.StringWidth(row), row)
+			}
+		}
+	})
+
+	t.Run("when the developer clicks it again", func(t *testing.T) {
+		m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: bodyTopRow})
+		if got := len(m.fitRows([]string{wide}, 20)); got != 1 {
+			t.Errorf("rows = %d after the second click, want the row closed again", got)
+		}
+	})
+
+	t.Run("a click above the body opens nothing", func(t *testing.T) {
+		m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: 0})
+		if got := len(m.fitRows([]string{wide}, 20)); got != 1 {
+			t.Errorf("rows = %d, want a click on the tab bar to open nothing", got)
+		}
+	})
+}
+
+// @scenario "x opens every row on the tab, for a terminal that forwards no clicks"
+func TestXExpandsEveryRowOnTheTab(t *testing.T) {
+	wide := "22:30:00.000  backend    info   " + strings.Repeat("word ", 40)
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
+	m.width, m.height = 61, 30
+	m.selectTab("logs")
+
+	m.handleKey("x")
+	if got := len(m.fitRows([]string{wide}, 20)); got < 2 {
+		t.Fatalf("rows = %d after x, want every row opened in full", got)
+	}
+
+	t.Run("when the developer moves to another tab", func(t *testing.T) {
+		m.selectTab("traces")
+		if got := len(m.fitRows([]string{wide}, 20)); got != 1 {
+			t.Errorf("rows = %d, want the setting to belong to the tab it was made on", got)
+		}
+	})
+
+	t.Run("when x is pressed again on the original tab", func(t *testing.T) {
+		m.selectTab("logs")
+		m.handleKey("x")
+		if got := len(m.fitRows([]string{wide}, 20)); got != 1 {
+			t.Errorf("rows = %d after the second x, want the rows cut again", got)
+		}
+	})
 }
 
 func TestWrapLogLineIndentsContinuationToTheMessageColumn(t *testing.T) {
@@ -851,7 +674,7 @@ func TestWrapLogLineIndentsContinuationToTheMessageColumn(t *testing.T) {
 		if ansi.StringWidth(row) > 60 {
 			t.Fatalf("row %d is %d cells wide: %q", i, ansi.StringWidth(row), row)
 		}
-		if i > 0 && !strings.HasPrefix(row, indent+"") {
+		if i > 0 && !strings.HasPrefix(row, indent) {
 			t.Fatalf("row %d is not indented to the message column: %q", i, row)
 		}
 		if i > 0 && strings.HasPrefix(strings.TrimPrefix(row, indent), " ") {
@@ -870,16 +693,5 @@ func TestWrapLogLineLeavesNarrowLinesAlone(t *testing.T) {
 	}
 	if rows := wrapLogLine(line, 0); len(rows) != 1 || rows[0] != line {
 		t.Fatalf("unsized terminal changed the line: %q", rows)
-	}
-}
-
-func TestWrapVisibleLinesKeepsTheNewestRows(t *testing.T) {
-	wide := "22:30:00.000  backend    info   " + strings.Repeat("word ", 40)
-	rows := wrapVisibleLines([]string{wide, "22:30:01.000  backend    info   last"}, 60, 3)
-	if len(rows) != 3 {
-		t.Fatalf("expected 3 rows, got %d", len(rows))
-	}
-	if !strings.HasSuffix(rows[2], "last") {
-		t.Fatalf("the newest line fell off the screen: %q", rows)
 	}
 }

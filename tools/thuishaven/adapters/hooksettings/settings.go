@@ -13,26 +13,24 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
+// offKey marks a settings file as opted out of the gate hook, so a later
+// EnsureHook for the same path - including the automatic one `haven up` makes
+// on every start - is a no-op until a developer runs `haven setup <feature>`
+// again without --off. It lives beside "hooks" rather than in a second file:
+// one file to read, one place the opt-out can be found.
+const offKey = "havenGateHookOff"
+
 // EnsureHook merges one gate command into an agent's local hook configuration.
 func EnsureHook(path, command, matcher string) (bool, error) {
-	settings := map[string]any{}
-	existing, readErr := os.ReadFile(path) // #nosec G304 -- repoRoot is git's own toplevel
-	switch {
-	case readErr == nil:
-		if err := json.Unmarshal(existing, &settings); err != nil {
-			// Someone else's file that we cannot parse is someone else's file.
-			// Refusing beats overwriting it with our own idea of its contents.
-			return false, fmt.Errorf("%s is not valid JSON; leaving it alone: %w", path, err)
-		}
-	case !errors.Is(readErr, fs.ErrNotExist):
-		// Absent is the only read failure that means "nothing to preserve".
-		// EACCES, EISDIR, a symlink loop or a transient I/O error all mean a file
-		// IS there and we cannot see it — and writing our own would replace the
-		// developer's agent settings with a file built from an empty map.
-		return false, fmt.Errorf("cannot read %s; leaving it alone: %w", path, readErr)
+	settings, err := readSettings(path)
+	if err != nil {
+		return false, err
 	}
-	if settings == nil {
-		return false, fmt.Errorf("%s is not a JSON object; leaving it alone", path)
+	if settings[offKey] == true {
+		// Turned off on purpose (`haven setup <feature> --off`). Both a manual
+		// install and haven up's automatic one must honor it, or the opt-out
+		// would not survive the next `haven up`.
+		return false, nil
 	}
 
 	isChanged, err := mergeHook(settings, command, matcher)
@@ -42,18 +40,69 @@ func EnsureHook(path, command, matcher string) (bool, error) {
 	if !isChanged {
 		return false, nil
 	}
-
-	body, marshalErr := json.MarshalIndent(settings, "", "  ")
-	if marshalErr != nil {
-		return false, marshalErr
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		return false, err
-	}
-	if err := atomicfile.Write(path, append(body, '\n'), 0o600); err != nil {
+	if err := writeSettings(path, settings); err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+// Off opts path out of the gate hook: it removes any existing registration and
+// records the opt-out, so a later EnsureHook for the same path is a no-op.
+func Off(path string) (bool, error) {
+	settings, err := readSettings(path)
+	if err != nil {
+		return false, err
+	}
+	changed := removeGateHook(settings)
+	if settings[offKey] != true {
+		settings[offKey] = true
+		changed = true
+	}
+	if !changed {
+		return false, nil
+	}
+	if err := writeSettings(path, settings); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// readSettings reads and parses the JSON object at path, or reports why it
+// refuses to: an unparseable file, an unreadable one, or one that is valid
+// JSON but not an object are all someone else's file, not ours to replace.
+func readSettings(path string) (map[string]any, error) {
+	settings := map[string]any{}
+	existing, readErr := os.ReadFile(path) // #nosec G304 -- repoRoot is git's own toplevel
+	switch {
+	case readErr == nil:
+		if err := json.Unmarshal(existing, &settings); err != nil {
+			// Someone else's file that we cannot parse is someone else's file.
+			// Refusing beats overwriting it with our own idea of its contents.
+			return nil, fmt.Errorf("%s is not valid JSON; leaving it alone: %w", path, err)
+		}
+	case !errors.Is(readErr, fs.ErrNotExist):
+		// Absent is the only read failure that means "nothing to preserve".
+		// EACCES, EISDIR, a symlink loop or a transient I/O error all mean a file
+		// IS there and we cannot see it — and writing our own would replace the
+		// developer's agent settings with a file built from an empty map.
+		return nil, fmt.Errorf("cannot read %s; leaving it alone: %w", path, readErr)
+	}
+	if settings == nil {
+		return nil, fmt.Errorf("%s is not a JSON object; leaving it alone", path)
+	}
+	return settings, nil
+}
+
+// writeSettings atomically replaces path with settings.
+func writeSettings(path string, settings map[string]any) error {
+	body, marshalErr := json.MarshalIndent(settings, "", "  ")
+	if marshalErr != nil {
+		return marshalErr
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return err
+	}
+	return atomicfile.Write(path, append(body, '\n'), 0o600)
 }
 
 // mergeHook adds the entry unless one already runs this exact command,
@@ -141,6 +190,74 @@ func reconcileMatcher(entry any, matcher string) bool {
 	}
 	block["matcher"] = matcher
 	return true
+}
+
+// removeGateHook strips haven's own hook out of the PreToolUse list, reporting
+// whether it found one to remove. An entry that existed only to carry haven's
+// hook is dropped entirely; an entry shared with another hook keeps its
+// siblings and loses only haven's own - the same distinction updateGateHook
+// draws going the other way.
+func removeGateHook(settings map[string]any) bool {
+	hooks, isObject := settings["hooks"].(map[string]any)
+	if !isObject {
+		return false
+	}
+	entries, isArray := hooks["PreToolUse"].([]any)
+	if !isArray {
+		return false
+	}
+	kept := make([]any, 0, len(entries))
+	changed := false
+	for _, entry := range entries {
+		survivor, wasChanged := entryWithoutGateHook(entry)
+		changed = changed || wasChanged
+		if survivor != nil {
+			kept = append(kept, survivor)
+		}
+	}
+	if !changed {
+		return false
+	}
+	hooks["PreToolUse"] = kept
+	settings["hooks"] = hooks
+	return true
+}
+
+// entryWithoutGateHook strips haven's own hook out of one PreToolUse entry,
+// reporting the entry to keep (nil when it existed only to carry haven's own
+// hook, so it is dropped entirely) and whether anything changed.
+func entryWithoutGateHook(entry any) (survivor any, changed bool) {
+	block, isObject := entry.(map[string]any)
+	if !isObject {
+		return entry, false
+	}
+	inner, isArray := block["hooks"].([]any)
+	if !isArray {
+		return entry, false
+	}
+	remaining := make([]any, 0, len(inner))
+	for _, h := range inner {
+		if isHavenGateHook(h) {
+			changed = true
+			continue
+		}
+		remaining = append(remaining, h)
+	}
+	if len(remaining) == 0 {
+		return nil, changed
+	}
+	block["hooks"] = remaining
+	return entry, changed
+}
+
+// isHavenGateHook reports whether one nested hook entry is haven's own gate.
+func isHavenGateHook(h any) bool {
+	hook, isObject := h.(map[string]any)
+	if !isObject {
+		return false
+	}
+	command, isString := hook["command"].(string)
+	return isString && isHavenGate(command)
 }
 
 // findGateHook returns the nested hook inside one PreToolUse entry that runs

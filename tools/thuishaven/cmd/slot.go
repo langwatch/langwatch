@@ -61,6 +61,8 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		if procs := domain.CheckGoMaxProcs(runtime.NumCPU(), os.Getenv("GOMAXPROCS"), pressure); procs != "" {
 			fmt.Printf("gomaxprocs=%s\n", procs)
 		}
+		width, widthSource := domain.UnitTestFullWidth(system.New().TotalMemory(), runtime.NumCPU(), os.Getenv("HAVEN_TEST_WORKERS"))
+		fmt.Printf("unit_test_full_width=%d source=%s\n", width, widthSource)
 		return nil
 	case "run":
 		label, argv, err := parseSlotRun(inv.raw[1:])

@@ -279,6 +279,67 @@ func captureStderr(t *testing.T, body func()) string {
 	return buf.String()
 }
 
+// captureStdout runs body with os.Stdout swapped for a pipe and returns what
+// was written - `haven slot explain` prints its answer there, the same place a
+// person reads it.
+func captureStdout(t *testing.T, body func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	orig := os.Stdout
+	os.Stdout = w
+	defer func() { os.Stdout = orig }()
+	body()
+	_ = w.Close()
+	os.Stdout = orig
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("reading captured stdout: %v", err)
+	}
+	return buf.String()
+}
+
+// @scenario "The unit test worker cap is one machine-wide setting"
+func TestSlotExplainPrintsTheUnitTestWidthAndItsSource(t *testing.T) {
+	t.Run("given HAVEN_TEST_WORKERS is set, the way HAVEN_TYPECHECK_SLOTS is", func(t *testing.T) {
+		t.Setenv("HAVEN_TEST_WORKERS", "6")
+
+		t.Run("when haven slot explain runs", func(t *testing.T) {
+			out := captureStdout(t, func() {
+				if err := runSlot(context.Background(), deps{}, invocation{raw: []string{"explain"}}); err != nil {
+					t.Fatal(err)
+				}
+			})
+
+			t.Run("it prints the width and names the setting as its source", func(t *testing.T) {
+				if !strings.Contains(out, "unit_test_full_width=6 source=HAVEN_TEST_WORKERS") {
+					t.Fatalf("expected the configured width and its source, got %q", out)
+				}
+			})
+		})
+	})
+
+	t.Run("given HAVEN_TEST_WORKERS is unset", func(t *testing.T) {
+		t.Setenv("HAVEN_TEST_WORKERS", "")
+
+		t.Run("when haven slot explain runs", func(t *testing.T) {
+			out := captureStdout(t, func() {
+				if err := runSlot(context.Background(), deps{}, invocation{raw: []string{"explain"}}); err != nil {
+					t.Fatal(err)
+				}
+			})
+
+			t.Run("it derives the width from the machine instead", func(t *testing.T) {
+				if !strings.Contains(out, "unit_test_full_width=") || !strings.Contains(out, "source=machine") {
+					t.Fatalf("expected a machine-derived width, got %q", out)
+				}
+			})
+		})
+	})
+}
+
 // @scenario "A run queued inside haven says so"
 func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 	sem := semaphore.New(t.TempDir())

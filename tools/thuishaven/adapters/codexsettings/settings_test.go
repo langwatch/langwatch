@@ -135,3 +135,24 @@ func TestCodexSetupDoesNotMistakeAnotherGateForHaven(t *testing.T) {
 		t.Fatalf("unrelated gate overwritten: %+v", entries)
 	}
 }
+
+func TestCodexOffRemovesTheGateAndLeavesItOffForLater(t *testing.T) {
+	root := t.TempDir()
+	if _, err := New().EnsureHook(root, "/opt/haven gate --client codex"); err != nil {
+		t.Fatal(err)
+	}
+	turnedOff, err := New().Off(root)
+	if err != nil || !turnedOff {
+		t.Fatalf("expected a change, got turnedOff=%v err=%v", turnedOff, err)
+	}
+	if entries := readHooks(t, root).Hooks["PreToolUse"]; len(entries) != 0 {
+		t.Fatalf("expected the entry gone, got %+v", entries)
+	}
+	isInstalled, err := New().EnsureHook(root, "/opt/haven gate --client codex")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if isInstalled {
+		t.Fatal("an opted-out worktree must not be silently re-enrolled")
+	}
+}

@@ -92,8 +92,8 @@ func TestGateRewriteCarriesWhatItDecided(t *testing.T) {
 
 		t.Run("nothing is rewritten, because rewriting needs an approval to ride on", func(t *testing.T) {
 			reply := ask(t, gateOrch(store, sys), payload)
-			if reply.Specific.PermissionDecision != "defer" || reply.Specific.UpdatedInput != nil {
-				t.Fatalf("expected an untouched defer, got %+v", reply.Specific)
+			if reply.Specific.PermissionDecision != "" || reply.Specific.UpdatedInput != nil {
+				t.Fatalf("expected an untouched, neutral answer, got %+v", reply.Specific)
 			}
 		})
 	})
@@ -104,11 +104,59 @@ func TestGateRewriteCarriesWhatItDecided(t *testing.T) {
 
 		t.Run("it is waved through untouched", func(t *testing.T) {
 			reply := ask(t, gateOrch(store, sys), bashPayload("git status"))
-			if reply.Specific.PermissionDecision != "defer" || reply.Specific.UpdatedInput != nil {
+			if reply.Specific.PermissionDecision != "" || reply.Specific.UpdatedInput != nil {
 				t.Fatalf("gating `git status` is its own outage; got %+v", reply.Specific)
 			}
 		})
 	})
+}
+
+// @scenario "An ungated command gets no decision at all"
+func TestUngatedCommandGetsNoDecisionAtAll(t *testing.T) {
+	store := &fakeStore{}
+	sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: time.Now()}
+
+	t.Run("given a command the gate does not class as heavy", func(t *testing.T) {
+		t.Run("when a background sub-agent with nobody to ask runs it", func(t *testing.T) {
+			// No permission_mode at all: the case with the least to fall back on,
+			// since there is no auto-approving mode and no human to prompt either.
+			payload := bashPayload("ls")
+			delete(payload, "permission_mode")
+
+			var out bytes.Buffer
+			gateOrch(store, sys).Gate(bytes.NewReader(mustJSON(t, payload)), &out)
+
+			t.Run("the wire answer carries no permissionDecision key at all", func(t *testing.T) {
+				// Not merely an empty string: "defer" was never a value Claude Code's
+				// protocol recognizes, so the field must be ABSENT, which is what lets
+				// the agent's normal flow proceed with nobody to ask.
+				if strings.Contains(out.String(), "permissionDecision") {
+					t.Fatalf("an ungated command must carry no permission decision at all: %s", out.String())
+				}
+			})
+
+			t.Run("and the decoded reply is a bare, unopinionated answer", func(t *testing.T) {
+				var reply hookReply
+				if err := json.Unmarshal(out.Bytes(), &reply); err != nil {
+					t.Fatalf("the gate wrote something undecodable: %q", out.String())
+				}
+				if !isBareDefer(reply) {
+					t.Fatalf("expected a bare, neutral answer, got %+v", reply)
+				}
+			})
+		})
+	})
+}
+
+// mustJSON marshals a payload for a test that needs the raw bytes rather than
+// the map, so a key can be genuinely absent instead of present with a zero value.
+func mustJSON(t *testing.T, payload map[string]any) []byte {
+	t.Helper()
+	b, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }
 
 // hugeTranscript writes a transcript whose SIZE is above the warning threshold
@@ -148,7 +196,7 @@ func editPayload(t *testing.T, tool string) map[string]any {
 // isBareDefer reports that the gate said nothing at all — no decision, no
 // warning, no rewrite.
 func isBareDefer(reply hookReply) bool {
-	return reply.Specific.PermissionDecision == "defer" &&
+	return reply.Specific.PermissionDecision == "" &&
 		reply.SystemMessage == "" &&
 		reply.Specific.UpdatedInput == nil
 }
@@ -221,7 +269,7 @@ func TestGateWarnsOnAnInstructionsEdit(t *testing.T) {
 			// Pricing an action must never block it, and must never need an
 			// approval to ride on: a deliberate cache-busting edit is the normal
 			// case, not the exception.
-			if reply.Specific.PermissionDecision != "defer" {
+			if reply.Specific.PermissionDecision != "" {
 				t.Fatalf("the price is information, not a veto: %+v", reply.Specific)
 			}
 		})
@@ -255,8 +303,8 @@ func TestGateAlwaysAnswers(t *testing.T) {
 			if err := json.Unmarshal(out.Bytes(), &reply); err != nil {
 				t.Fatalf("a hook that writes nothing usable is a blocked tool call: %q", out.String())
 			}
-			if reply.Specific.PermissionDecision != "defer" {
-				t.Fatalf("expected defer, got %q", reply.Specific.PermissionDecision)
+			if reply.Specific.PermissionDecision != "" {
+				t.Fatalf("expected no permission decision, got %q", reply.Specific.PermissionDecision)
 			}
 		})
 	})

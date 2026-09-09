@@ -192,8 +192,13 @@ var removed = map[string]string{
 	"moron":         "haven git",
 }
 
-// table is the whole CLI surface, in help order.
-var table = []commandSpec{
+// table is the whole CLI surface, in help order. The viewer's own tabs are
+// appended to it: every tab of the up viewer is a command too, so a stack is
+// as readable from a pipe as it is from a keyboard.
+var table = append(baseTable, tabSpecs()...)
+
+// baseTable is the surface that is not derived from the viewer's tabs.
+var baseTable = []commandSpec{
 	{
 		name:      "up",
 		summary:   "start or reconcile this worktree's stack; +svc/-svc picks services and sticks",
@@ -462,6 +467,7 @@ var table = []commandSpec{
 		maxArgs: -1,
 		flags: []flagSpec{
 			{long: "--list", summary: "what can be installed, and what each one does"},
+			{long: "--off", summary: "turn a feature back off here, so haven up stops reinstalling it (e.g. gate-hook)"},
 		},
 		run: runSetup,
 	},
