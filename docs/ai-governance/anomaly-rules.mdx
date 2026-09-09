@@ -42,7 +42,7 @@ These are the fields a rule carries and the detector reads. No screen collects t
 | Field | Typical value | What it does |
 |-------|---------------|---------------|
 | **Name** | `Spend spike on production gateway` | Free-text label; identifies the rule on the alert it raises, and travels in the webhook payload. |
-| **Severity** | `warning`, `critical` | Recorded on the alert and carried in the webhook payload. It does not route: every destination on the rule receives every alert the rule raises. |
+| **Severity** | `warning`, `critical` | Recorded on the alert and carried in the webhook payload. It does not route: when the rule's destination configuration passes validation, every destination on it receives every alert the rule raises. A configuration that fails validation is quarantined and no request is sent to any of its destinations. |
 | **Rule type** | `spend_spike` | Pick exactly this, see coverage table above. |
 | **Scope** | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
 | **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID is in the URL of the per-source detail page under the inventory. |
@@ -147,7 +147,7 @@ Delivery is **best-effort, and the alert row is the authoritative signal**. Each
 
 A destination that never succeeds is logged and recorded on the alert. It does not fail the detector, and it does not block the other destinations.
 
-Requests go out through the same server-side-request-forgery guard the ingestion pullers use: the destination is resolved and its address pinned. On LangWatch Cloud a URL resolving to a private or link-local address is refused and recorded as a failed delivery.
+Requests go out through the same server-side-request-forgery guard the ingestion pullers use: the destination is resolved and its address pinned. A URL resolving to a private or link-local address is refused and recorded as a failed delivery when `BLOCK_LOCAL_HTTP_CALLS` is on, which it is on LangWatch Cloud. Self-hosted, that refusal only applies if you set the flag, and a host listed in `ALLOWED_PROXY_HOSTS` is allowed either way.
 
 ## Where an existing rule's alerts go
 

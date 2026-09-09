@@ -48,7 +48,7 @@ deployment plan.
 | Billing spend ledger, fixed 13-month retention (with ClickHouse) | ✅ | ✅ |
 | Webhook endpoints platform (signed event delivery, retries, replay) | ❌ | ✅ |
 | Billing events APIs (spend-events pull, summaries, replay) | ❌ | ✅ |
-| Anomaly Rules, admin-curated detection + signed webhook dispatch | ❌ | ✅ |
+| Anomaly Rules, admin-curated detection + webhook dispatch (HMAC-signed when a shared secret is set) | ❌ | ✅ |
 | OCSF/SIEM export (Splunk, Datadog, Sentinel pull API) | ❌ | ✅ |
 | Audit log, org-wide cross-team | ❌ | ✅ |
 | SCIM provisioning | ❌ | ✅ |
@@ -99,7 +99,7 @@ require Enterprise.
 | Art. 32(1)(d), restoration | Backups (env-configured), trace store replay | Apache 2.0 |
 | Art. 30, record of processing | event_log @ 49d retention | Apache 2.0 |
 | Art. 30, record of processing (extended) | event_log under extended per-scope retention policies | **Enterprise** |
-| Art. 33, breach notification | Anomaly rule dispatch, a signed webhook POST to the rule's destination URL (rules cannot be created in the app today) | **Enterprise** |
+| Art. 33, breach notification | Anomaly rule dispatch, a webhook POST to the rule's destination URL, HMAC-signed when the destination has a shared secret (rules cannot be created in the app today) | **Enterprise** |
 | Art. 35, DPIA evidence | OCSF/SIEM export bundle | **Enterprise** |
 
 If your processor agreement requires retention longer than the 49-day
@@ -155,7 +155,7 @@ provider/deployer record-keeping (Art. 18) map onto:
 - **Art. 12(2)(a) period of operation**: Apache 2.0 (trace timestamps in event_log)
 - **Art. 12(2)(b) reference DB used**: Apache 2.0 (`gen_ai.system` + `gen_ai.request.model` attrs on each span)
 - **Art. 12(2)(c) input data check**: Apache 2.0 (prompt + tool-call payloads on traces, redacted via Presidio)
-- **Art. 12(2)(d) human oversight**: **Enterprise** anomaly-rule webhook dispatch (so a person reviews flagged events), with OCSF/SIEM forwarding of governance events alongside it. The two are separate paths: anomaly alerts arrive over the webhook, never as a record in the OCSF export
+- **Art. 12(2)(d) human oversight**: **Enterprise** anomaly-rule webhook dispatch (it delivers the flagged event to a URL you control; the human review of what arrives there is your receiving process, not something LangWatch performs or records), with OCSF/SIEM forwarding of governance events alongside it. The two are separate paths: anomaly alerts arrive over the webhook, never as a record in the OCSF export
 - **Art. 18(1) record-keeping ≥10y**: Enterprise extended retention policies, with windows set in years to match the record-keeping clause your assessment requires.
 
 Most enterprise-deploying-an-LLM-agent uses fall under Art. 12 (1-3
