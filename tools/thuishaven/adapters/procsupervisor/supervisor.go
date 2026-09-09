@@ -26,6 +26,8 @@ import (
 type Supervisor struct {
 	isPlain bool
 	recent  *recentLogs
+	// startedAt is when this up began; captures older than it are rotated out.
+	startedAt time.Time
 }
 
 type recentLogs struct {
@@ -35,7 +37,7 @@ type recentLogs struct {
 
 // New returns a Supervisor. isAgent=true suppresses color for token-free output.
 func New(isAgent bool) Supervisor {
-	return Supervisor{isPlain: isAgent, recent: &recentLogs{}}
+	return Supervisor{isPlain: isAgent, recent: &recentLogs{}, startedAt: time.Now()}
 }
 
 // RunOnce runs a command to completion, streaming its output.
@@ -242,7 +244,7 @@ func containsAny(value string, needles []string) bool {
 // superviseChild runs one child, restarting it (1s backoff) on exit until ctx
 // is cancelled, then SIGTERMs the process group and SIGKILLs after 5s.
 func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
-	c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain, preview: s.recent, sink: newLogSink(ac.LogPath)}
+	c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain, preview: s.recent, sink: newLogSinkSince(ac.LogPath, s.startedAt)}
 	// Gate the start on a dependency being ready (e.g. the web lane on the API),
 	// so this process — and the hostname routed to it — never comes up before what
 	// it needs is serving.

@@ -83,3 +83,11 @@ Feature: haven up terminal viewer — scroll and search
     Then the old capture is not a tab
     And the running lane's capture is a tab
     And the old capture stays readable through haven logs
+
+
+  Scenario: A log tab shows this up's output, not the last one's
+    Given a lane's capture file was last written by an earlier up
+    When the stack comes up again and the lane writes its first line
+    Then the earlier capture moves to its kept generation
+    And the tab and haven logs read only this up's lines
+    And a lane restarted within the same up keeps appending to the same capture
