@@ -17,6 +17,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { TraceService } from "@langwatch/trace-contract";
@@ -185,13 +186,13 @@ function composeApplication(
   const authz = testAuthz();
   const { broadcast, emitterFor } = testBroadcast();
 
-  const projects = {
+  const projects = new TestProjectApi({
     getOrganizationId: vi.fn(async () => ORGANIZATION_ID),
     tryGetWithTeam: vi.fn(async () => null),
     // Preparing a run reads the project's own ingestion key, which is what a
     // prepared child reports its scenario events with.
     tryGetById: vi.fn(async () => ({ id: PROJECT_ID, apiKey: "project-api-key" })),
-  } as unknown as ProjectApi;
+  });
 
   // Registered once, as the process registers them, and shared by the scenario
   // half and the Langy feature below.

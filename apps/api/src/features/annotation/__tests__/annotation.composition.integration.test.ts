@@ -7,6 +7,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import { TraceEditOverlayService } from "@langwatch/trace-server";
 import { PrismaTraceEditOverlayRepository } from "@langwatch/trace-server/composition/trace-edit-overlay";
 import {
@@ -244,7 +245,7 @@ function composeAnnotation(prisma: PrismaClient, clickHouse: ReturnType<typeof t
       audit: undefined,
     },
     peers: {
-      projects: {
+      projects: new TestProjectApi({
         getWithTeam: async () => ({
           id: PROJECT_ID,
           teamId: TEAM_ID,
@@ -253,7 +254,7 @@ function composeAnnotation(prisma: PrismaClient, clickHouse: ReturnType<typeof t
           team: { organizationId: ORGANIZATION_ID },
         }),
         getOrganizationId: async () => ORGANIZATION_ID,
-      } as unknown as ProjectApi,
+      }),
       organizations: createApiFixture<OrganizationApi>({
         getOrganizationMembers: async () => [],
         getAllMembers: async () => [],

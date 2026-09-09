@@ -6,10 +6,11 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { AuthService } from "@langwatch/auth-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -68,8 +69,8 @@ async function compose(options: { prisma: PrismaClient; redis?: RedisConnection 
     },
     peers: {
       users: {} as UserApi,
-      auth: {} as unknown as AuthService,
-      projects: {} as unknown as ProjectApi,
+      auth: {} as unknown as AuthApi,
+      projects: new TestProjectApi(),
       apiKeys: createApiFixture<ApiKeyApi>(),
     },
     adminEmails: ["operator@acme.test"],

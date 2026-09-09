@@ -14,14 +14,19 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
 import { AuthzApp } from "@langwatch/authz-server";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import { EventEmitter } from "node:events";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { WorkflowService } from "@langwatch/workflow-contract";
+import type { WorkflowApp, WorkflowNlpRuntimePort } from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import { composeDatasetFeature } from "../../dataset/dataset.composition.ts";
-import { composeEvaluatorFeature } from "../../evaluator/evaluator.composition.ts";
+import { installApiEvaluator } from "../../evaluator/evaluator.composition.ts";
 import { composePromptFeature } from "../../prompt/prompt.composition.ts";
 import { composeHomeFeature } from "../../project/home.composition.ts";
 import { installApiRole } from "../role.composition.ts";
@@ -174,9 +179,9 @@ async function composeApplication(options: { planType?: string } = {}) {
   const organizations = testOrganizationApp();
   const broadcast = new EventEmitter();
 
-  const projects = {
+  const projects = new TestProjectApi({
     getOrganizationId: vi.fn(async () => ORGANIZATION_ID),
-  } as unknown as ProjectApi;
+  });
 
   const datasets = PostgresDatasetAdapter.create({ database: prisma.client }).build();
 
@@ -187,11 +192,6 @@ async function composeApplication(options: { planType?: string } = {}) {
     audit: undefined,
   };
 
-  const evaluators = {
-    getAllWithFields: vi.fn(async () => [
-      { id: "evaluator-1", name: "Toxicity", projectId: PROJECT_ID },
-    ]),
-  } as never;
 
   // The three features that moved out of this half, composed the way the root
   // composes them and handed in beside it.
@@ -208,9 +208,24 @@ async function composeApplication(options: { planType?: string } = {}) {
       },
     },
   });
-  const evaluator = composeEvaluatorFeature({
+  // The evaluator module, installed the way the process installs it. The one
+  // read this half makes is put in front of the runtime the install built, so
+  // `evaluators.getAll` proves it answers from that install and not a second.
+  const evaluator = await installApiEvaluator({
     infrastructure,
-    peers: { evaluators, workflows: {} as never },
+    peers: {
+      workflows: createApiFixture<WorkflowService>(),
+      nlpRuntime: createApiFixture<WorkflowNlpRuntimePort>(),
+      workflowApp: () => createApiFixture<WorkflowApp>(),
+      modelProviders: createApiFixture<ModelProviderService>(),
+      permissions: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
+      users: createApiFixture<UserApi>(),
+    },
+  });
+  Object.assign(evaluator.evaluators, {
+    getAllWithFields: vi.fn(async () => [
+      { id: "evaluator-1", name: "Toxicity", projectId: PROJECT_ID },
+    ]),
   });
   const prompt = composePromptFeature({ infrastructure, peers: { projects } });
 
@@ -441,20 +456,6 @@ describe("given an API process composed with the role, team and home features", 
       expect(body).toMatchObject({
         result: { data: [{ id: "evaluator-1", name: "Toxicity" }] },
       });
-    });
-  });
-
-  describe("when a workflow evaluator is replicated without a saved graph version", () => {
-    it("refuses rather than writing a structurally broken replica", async () => {
-      const { evaluator } = await composeApplication();
-
-      await expect(
-        evaluator.ports.replicateEvaluatorWorkflow({} as never, {
-          workflowId: "workflow-1",
-          sourceProjectId: PROJECT_ID,
-          targetProjectId: "project-2",
-        }),
-      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
   });
 

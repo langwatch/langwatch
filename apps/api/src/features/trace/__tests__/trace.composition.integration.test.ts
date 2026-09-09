@@ -7,6 +7,7 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
 import { SHARE_MAX_FULL_SPANS, type Span, type TraceSummaryData } from "@langwatch/trace-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -642,10 +643,10 @@ describe("given an API process that composed the real observability collaborator
     return composeTraceFeature({
       prisma,
       authz: testAuthz(),
-      projects: {
+      projects: new TestProjectApi({
         tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
         tryGetById: async () => ({ id: "project-1" }),
-      } as unknown as ProjectApi,
+      }),
       broadcast,
       peers: { share: stub("share"), topics: stub("topics") },
       resolveClickHouseClient: clickHouse.resolveClient,
@@ -659,10 +660,10 @@ describe("given an API process that composed the real observability collaborator
           resolveClickHouseClient: clickHouse.resolveClient,
           defaultRetentionDays: 90,
           authz: testAuthz(),
-          projects: {
+          projects: new TestProjectApi({
             tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
             tryGetById: async () => ({ id: "project-1" }),
-          } as unknown as ProjectApi,
+          }),
           // The PLATFORM's own default policy, resolved by the real resolver
           // against an empty rule set: a hand-written policy shape here would
           // be a second declaration of Data Privacy's own contract.
@@ -1162,10 +1163,10 @@ function realTraceReadMappers() {
     resolveClickHouseClient: testClickHouse([]).resolveClient,
     defaultRetentionDays: 90,
     authz: testAuthz(),
-    projects: {
+    projects: new TestProjectApi({
       tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
       tryGetById: async () => ({ id: "project-1" }),
-    } as unknown as ProjectApi,
+    }),
     dataPrivacy: testDataPrivacyApi(
       resolveDataPrivacy({
         rows: [],
