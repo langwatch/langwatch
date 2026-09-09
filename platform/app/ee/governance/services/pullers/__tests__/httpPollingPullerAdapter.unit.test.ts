@@ -137,7 +137,6 @@ describe("HttpPollingPullerAdapter", () => {
      * Asserted on the call rather than through a redirecting fixture on
      * purpose: the inherited default is to follow, so the only thing that
      * proves this adapter opted out is the option itself being passed.
-     *
      */
     /** @scenario "A redirect never carries the credentials onward" */
     it("tells the fetch helper not to follow redirects", async () => {
@@ -165,7 +164,6 @@ describe("HttpPollingPullerAdapter", () => {
     /**
      * A configured endpoint that redirects is a permanent property of that
      * endpoint, so retrying it only delays the error the admin needs to read.
-     *
      */
     /** @scenario "A redirect never carries the credentials onward" */
     it("fails immediately on a refused redirect instead of retrying it", async () => {
