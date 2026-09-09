@@ -1852,6 +1852,11 @@ const presentations = {
     describe: () =>
       "It may have been archived or removed. Reload, then pick a test suite again.",
   },
+  scenario_not_found: {
+    title: "That scenario isn't available",
+    describe: () =>
+      "It may have been archived or removed. Reload, then pick a scenario again.",
+  },
   scenario_parameter_missing: {
     title: "This run is missing a parameter value",
     describe: (error) => {

@@ -29,6 +29,7 @@ import { RunCriteriaChip } from "./RunCriteriaChip";
 import { RunDetailSection } from "./RunDetailSection";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
+import { CutAtLimitBadge } from "./ScenarioRunHeader";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
 import { hasNoResults } from "./scenario-run-status.utils";
 import { SimulationConsole } from "./simulation-console/SimulationConsole";
@@ -318,6 +319,9 @@ function ClassicScenarioRunDetailDrawer({
                     <Heading size="md" truncate title={displayTitle}>
                       {displayTitle}
                     </Heading>
+                    {scenarioState.metadata?.langwatch?.isCutAtLimit ? (
+                      <CutAtLimitBadge />
+                    ) : null}
                   </HStack>
                   <HStack gap={1} flexShrink={0}>
                     <ScenarioRunActions

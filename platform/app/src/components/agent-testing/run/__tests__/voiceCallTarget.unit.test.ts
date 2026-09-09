@@ -52,6 +52,16 @@ const PLAN_SUBJECT: RunDialogSubject = {
   initialTarget: null,
 };
 
+function suiteSubject(scenarioIds: string[]): RunDialogSubject {
+  return {
+    kind: "suite",
+    suiteId: "suite_1",
+    name: "Support suite",
+    scenarioIds,
+    initialTarget: null,
+  };
+}
+
 describe("voiceCallTargetOf", () => {
   describe("given the selected target is a saved voice agent", () => {
     it("resolves the transport, the agent id and the saved row id", () => {
@@ -79,13 +89,48 @@ describe("voiceCallTargetOf", () => {
     });
   });
 
-  describe("given the scope is not a single scenario", () => {
-    it("resolves the call but names no scenario to score under", () => {
+  describe("given the scope is a plan of many scenarios", () => {
+    /** @scenario "Call it myself is offered only when one scenario is in scope" */
+    it("names no scenario, so Call it myself is not offered for a plan", () => {
       const result = voiceCallTargetOf({
         form: form({ target: { type: "voice", id: "agent_voice" } }),
         subject: PLAN_SUBJECT,
       });
       expect(result).not.toBeNull();
+      expect(result?.scenarioId).toBeUndefined();
+    });
+  });
+
+  describe("given the run dialog runs a suite that holds exactly one scenario", () => {
+    /** @scenario "A single-scenario suite scores a Call it myself run under that scenario" */
+    it("carries that one scenario id so the call is scored under it", () => {
+      const result = voiceCallTargetOf({
+        form: form({ target: { type: "voice", id: "agent_voice" } }),
+        subject: suiteSubject(["scenario_only"]),
+      });
+      expect(result?.scenarioId).toBe("scenario_only");
+    });
+  });
+
+  describe("given the run dialog runs a suite that holds several scenarios", () => {
+    /** @scenario "Call it myself is offered only when one scenario is in scope" */
+    it("names no scenario, so Call it myself is not offered", () => {
+      const result = voiceCallTargetOf({
+        form: form({ target: { type: "voice", id: "agent_voice" } }),
+        subject: suiteSubject(["scenario_a", "scenario_b"]),
+      });
+      expect(result).not.toBeNull();
+      expect(result?.scenarioId).toBeUndefined();
+    });
+  });
+
+  describe("given the run dialog runs a suite that holds no scenarios", () => {
+    /** @scenario "Call it myself is offered only when one scenario is in scope" */
+    it("names no scenario, so Call it myself is not offered", () => {
+      const result = voiceCallTargetOf({
+        form: form({ target: { type: "voice", id: "agent_voice" } }),
+        subject: suiteSubject([]),
+      });
       expect(result?.scenarioId).toBeUndefined();
     });
   });

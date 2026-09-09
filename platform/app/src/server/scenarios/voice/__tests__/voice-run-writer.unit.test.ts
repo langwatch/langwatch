@@ -50,6 +50,12 @@ function fakeRecord(overrides: Partial<CallRecord> = {}): CallRecord {
 }
 
 describe("writeVoiceCallRun", () => {
+  beforeEach(() => {
+    // Per test: the command dispatch counts (finishRun especially) must not
+    // carry across tests. Only call counts reset — implementations stay.
+    vi.clearAllMocks();
+  });
+
   describe("given the agent row exists", () => {
     beforeEach(() => {
       mockFindById.mockResolvedValue({ id: "agent_1" });
@@ -73,6 +79,61 @@ describe("writeVoiceCallRun", () => {
         };
         expect(metadata.langwatch.isCutAtLimit).toBe(true);
         expect(metadata.isCutAtLimit).toBeUndefined();
+      });
+    });
+
+    describe("when a snapshot fails after startRun and the finish is retried", () => {
+      /** @scenario "A retried hang-up completes a half-written run" */
+      it("completes on retry and emits finishRun exactly once", async () => {
+        mockMessageSnapshot
+          .mockRejectedValueOnce(new Error("snapshot write failed"))
+          .mockResolvedValue(undefined);
+        const record = fakeRecord({
+          turns: [{ role: "caller", text: "hi" }],
+        });
+        const args = {
+          projectId: "project_1",
+          scenarioRunId: "run_1",
+          agentRowId: "agent_1",
+          agentDisplayName: "Support Bot",
+          record,
+        };
+
+        await expect(writeVoiceCallRun(args)).rejects.toThrow();
+        await writeVoiceCallRun(args);
+
+        expect(mockFinishRun).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the same record is written twice", () => {
+      /** @scenario "A retried hang-up completes a half-written run" */
+      it("derives identical message ids from the run id and turn index", async () => {
+        const record = fakeRecord({
+          turns: [
+            { role: "caller", text: "hi" },
+            { role: "agent", text: "hello" },
+          ],
+        });
+        const args = {
+          projectId: "project_1",
+          scenarioRunId: "run_1",
+          agentRowId: "agent_1",
+          agentDisplayName: "Support Bot",
+          record,
+        };
+
+        await writeVoiceCallRun(args);
+        await writeVoiceCallRun(args);
+
+        const idsOf = (call: number) =>
+          (
+            mockMessageSnapshot.mock.calls[call]?.[0] as {
+              messages: { id: string }[];
+            }
+          ).messages.map((m) => m.id);
+        expect(idsOf(0)).toEqual(["run_1-0", "run_1-1"]);
+        expect(idsOf(0)).toEqual(idsOf(1));
       });
     });
   });

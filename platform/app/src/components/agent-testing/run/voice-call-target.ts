@@ -2,9 +2,15 @@
  * Resolving the voice-call the run dialog's "Call it myself" action opens.
  *
  * A pure module so the detection — voice target alone, transport from the
- * agent's config, scenario id only when the dialog runs one scenario — is
+ * agent's config, scenario id only when exactly one scenario is in scope — is
  * unit-tested without mounting the dialog or pulling the call panel's transport
  * clients into the test.
+ *
+ * A voice call is offered only when exactly one scenario is in scope: a single
+ * case, or a suite holding exactly one scenario. A `plan` subject (many
+ * scenarios) has no single scenario to score the call under, so the resolved
+ * target carries no `scenarioId` and the dialog gates the action off (#8019
+ * AC9) — it is not an unscored voice-call target.
  *
  * @see specs/features/agents/voice-agents-v1.feature
  */
@@ -48,12 +54,24 @@ export function voiceCallTargetOf({
   if (!agent) return null;
   const parsed = voiceAgentConfigSchema.safeParse(agent.config);
   if (!parsed.success) return null;
+  // A call is scored against a scenario only when exactly one scenario is in
+  // scope: a single case, or a suite that holds exactly one scenario. Every
+  // other scope has no single scenario to write the run under.
+  const scenarioId = scenarioIdInScope(subject);
   return {
     transport: parsed.data.transport,
     agentId: parsed.data.agentId,
     agentRowId: agent.id,
-    // A call is scored against a scenario only when the dialog runs exactly
-    // one; every other scope has no single scenario to write the run under.
-    ...(subject.kind === "case" ? { scenarioId: subject.scenarioId } : {}),
+    ...(scenarioId ? { scenarioId } : {}),
   };
+}
+
+/** The one scenario a run covers, or undefined when the scope is not a single
+ *  scenario: a case names its own; a suite with exactly one scenario names it. */
+function scenarioIdInScope(subject: RunDialogSubject): string | undefined {
+  if (subject.kind === "case") return subject.scenarioId;
+  if (subject.kind === "suite" && subject.scenarioIds.length === 1) {
+    return subject.scenarioIds[0];
+  }
+  return undefined;
 }

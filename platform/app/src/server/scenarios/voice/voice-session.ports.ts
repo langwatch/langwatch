@@ -93,7 +93,12 @@ export function createVoiceSessionPortsFromServices({
       if (!run) return null;
       const agentId = (run.metadata as { agentId?: unknown } | undefined)
         ?.agentId;
-      return { agentId: typeof agentId === "string" ? agentId : null };
+      // The status decides whether a retried finish short-circuits (terminal)
+      // or re-drives a half-written run (non-terminal, #7973).
+      return {
+        agentId: typeof agentId === "string" ? agentId : null,
+        status: run.status,
+      };
     },
 
     async createVoiceAgent({ projectId, name, transport, agentId }) {

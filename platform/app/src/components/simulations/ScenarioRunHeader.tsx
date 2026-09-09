@@ -9,6 +9,28 @@ interface CopyableId {
   value: string;
 }
 
+/**
+ * The "Cut at the call limit" marker (AC28). A single presentational badge so
+ * every run header — this component and the run detail drawer's own inline
+ * header — reads the same and stays in one place.
+ */
+export function CutAtLimitBadge() {
+  return (
+    <Text
+      fontSize="xs"
+      fontWeight="medium"
+      color="fg.muted"
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      px={2}
+      py={0.5}
+    >
+      Cut at the call limit
+    </Text>
+  );
+}
+
 interface ScenarioRunHeaderProps {
   status?: ScenarioRunStatus;
   name?: string | null;
@@ -36,20 +58,7 @@ export function ScenarioRunHeader({
               <Text fontSize="lg" fontWeight="semibold">
                 {name}
               </Text>
-              {isCutAtLimit ? (
-                <Text
-                  fontSize="xs"
-                  fontWeight="medium"
-                  color="fg.muted"
-                  borderWidth="1px"
-                  borderColor="border"
-                  borderRadius="md"
-                  px={2}
-                  py={0.5}
-                >
-                  Cut at the call limit
-                </Text>
-              ) : null}
+              {isCutAtLimit ? <CutAtLimitBadge /> : null}
             </HStack>
             {caller ? (
               <Text fontSize="xs" color="fg.muted" mb={1}>

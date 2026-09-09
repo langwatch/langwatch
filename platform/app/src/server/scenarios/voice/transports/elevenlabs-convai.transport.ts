@@ -278,6 +278,13 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
       );
     }
     const body = (await response.json()) as ElevenLabsConversationResponse;
+    // Right after hang-up ElevenLabs answers 200 with an unfinished status
+    // (`initiated`/`in-progress`/`processing`) or `failed`, and the transcript
+    // in that body can still be empty. Only a `done` record may replace the
+    // live transcript, so anything else reads as not-ready: return null and let
+    // the caller keep the browser transcript. A missing status keeps today's
+    // behaviour for older payloads (#8019).
+    if (typeof body.status === "string" && body.status !== "done") return null;
     const startedAt = body.metadata?.start_time_unix_secs
       ? body.metadata.start_time_unix_secs * 1000
       : Date.now();

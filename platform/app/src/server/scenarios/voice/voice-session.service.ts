@@ -14,6 +14,10 @@ import { HandledError } from "@langwatch/handled-error";
 import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
 import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
 import {
+  isTerminalStatus,
+  type ScenarioRunStatus,
+} from "~/server/scenarios/scenario-event.enums";
+import {
   type BrowserTranscriptTurn,
   browserTranscriptToCallRecord,
   type CallRecord,
@@ -85,6 +89,22 @@ export class VoiceAgentRowNotFoundError extends HandledError {
       httpStatus: 404,
     });
     this.name = "VoiceAgentRowNotFoundError";
+  }
+}
+
+/**
+ * A "Call it myself" finish named a scenario that no longer resolves to a set:
+ * archived, removed, or from another project. A human call can only be scored
+ * against a real scenario, so nothing is written rather than silently
+ * downgrading the run to an unjudged drawer call (#8019).
+ */
+export class VoiceScenarioNotFoundError extends HandledError {
+  declare readonly code: "scenario_not_found";
+  constructor() {
+    super("scenario_not_found", "The scenario was not found in this project", {
+      httpStatus: 404,
+    });
+    this.name = "VoiceScenarioNotFoundError";
   }
 }
 
@@ -170,11 +190,13 @@ export interface VoiceSessionPorts {
     agentRowId: string;
   }): Promise<{ id: string; agentExternalId: string } | null>;
   /** The run already written for this id, or null. Returns the agent id it
-   *  attached so a duplicate finish can answer with it. */
+   *  attached so a duplicate finish can answer with it, and the run status so a
+   *  finish short-circuits on a terminal run but re-drives a half-written,
+   *  non-terminal one (#7973). */
   findExistingRun(input: {
     projectId: string;
     scenarioRunId: string;
-  }): Promise<{ agentId: string | null } | null>;
+  }): Promise<{ agentId: string | null; status: ScenarioRunStatus } | null>;
   /** Create the voice agent row on hang-up when the drawer had none yet. */
   createVoiceAgent(input: {
     projectId: string;
@@ -359,17 +381,27 @@ async function resolveAgentRow(
     projectId,
     transport,
     name,
+    existingAgentId,
   }: {
     token: VoiceSessionTokenPayload;
     projectId: string;
     transport: VoiceTransport;
     name?: string;
+    /** The agent id a half-written run already attached: reused on a re-drive
+     *  so a retried drawer finish does not create a second agent (#7973). */
+    existingAgentId?: string;
   },
 ): Promise<{ agentRowId: string; agentDisplayName: string }> {
   const trimmedName = name?.trim() ?? "";
   if (token.agentId) {
     return {
       agentRowId: token.agentId,
+      agentDisplayName: trimmedName || token.agentExternalId,
+    };
+  }
+  if (existingAgentId) {
+    return {
+      agentRowId: existingAgentId,
       agentDisplayName: trimmedName || token.agentExternalId,
     };
   }
@@ -385,8 +417,10 @@ async function resolveAgentRow(
 
 /**
  * Resolve the scenario a "Call it myself" run is written under and the set it
- * shares with that scenario's simulated runs (AC23). Undefined for a drawer
- * call, or when the named scenario is gone.
+ * shares with that scenario's simulated runs (AC23). Undefined only for a
+ * drawer call (no scenario id). A named scenario that cannot be resolved throws
+ * {@link VoiceScenarioNotFoundError}: writing it as an unscored drawer call
+ * would lose the verdict the caller asked for (#8019).
  */
 async function resolveScenarioContext(
   ports: VoiceSessionPorts,
@@ -394,7 +428,7 @@ async function resolveScenarioContext(
 ): Promise<{ scenarioId: string; scenarioSetId: string } | undefined> {
   if (!scenarioId) return undefined;
   const scenario = await ports.resolveScenarioSet?.({ projectId, scenarioId });
-  if (!scenario) return undefined;
+  if (!scenario) throw new VoiceScenarioNotFoundError();
   return { scenarioId, scenarioSetId: scenario.scenarioSetId };
 }
 
@@ -428,25 +462,33 @@ export async function finishVoiceSession(input: {
   const conversationId = input.conversationId?.trim() || token.sessionId;
   const scenarioRunId = scenarioRunIdForConversation(conversationId);
 
-  const scenarioContext = await resolveScenarioContext(ports, {
-    projectId: input.projectId,
-    scenarioId: input.scenarioId,
-  });
-
+  // A terminal run is complete: a duplicate finish returns it untouched (AC14,
+  // #7973 AC1). A non-terminal run is half-written — startRun landed but a
+  // snapshot or the finish write failed — so the retry re-drives writeCallRun
+  // with the same scenarioRunId to complete it exactly once (#7973 AC2).
+  //
+  // Checked BEFORE resolving the scenario: a run that already finished must be
+  // returned untouched even when its scenario has since been archived, so a
+  // scenario lookup that would now throw scenario_not_found is never reached
+  // (#7973 AC1).
   const existing = await ports.findExistingRun({
     projectId: input.projectId,
     scenarioRunId,
   });
-  if (existing) {
+  if (existing && isTerminalStatus(existing.status)) {
     return {
       runId: scenarioRunId,
       agentId: token.agentId ?? existing.agentId ?? "",
       source: "provider",
       hasFetchFailed: false,
       hasAudio: false,
-      scenarioSetId: scenarioContext?.scenarioSetId,
     };
   }
+
+  const scenarioContext = await resolveScenarioContext(ports, {
+    projectId: input.projectId,
+    scenarioId: input.scenarioId,
+  });
 
   // Prefer the provider's record; fall back to the live transcript when it is
   // not ready or the fetch fails. Fetched BEFORE the agent row is created so a
@@ -471,18 +513,29 @@ export async function finishVoiceSession(input: {
     projectId: input.projectId,
     transport,
     name: input.name,
+    existingAgentId: existing?.agentId ?? undefined,
   });
 
-  const record = providerRecord
-    ? { ...providerRecord, isCutAtLimit: input.isCutAtLimit }
-    : browserTranscriptToCallRecord({
-        conversationId,
-        transport,
-        transcript: input.transcript,
-        startedAt: input.startedAt,
-        endedAt: input.endedAt,
-        isCutAtLimit: input.isCutAtLimit,
-      });
+  // A provider record with no turns loses the conversation: right after
+  // hang-up ElevenLabs can answer with a finished-looking record whose
+  // transcript is still empty. When the browser captured turns, keep them
+  // rather than write an empty run the reader sees as "no response" (#8019).
+  const providerRecordHasTurns =
+    providerRecord !== null && providerRecord.turns.length > 0;
+  const useBrowserTranscript =
+    (!providerRecord || !providerRecordHasTurns) && input.transcript.length > 0;
+
+  const record =
+    providerRecord && !useBrowserTranscript
+      ? { ...providerRecord, isCutAtLimit: input.isCutAtLimit }
+      : browserTranscriptToCallRecord({
+          conversationId,
+          transport,
+          transcript: input.transcript,
+          startedAt: input.startedAt,
+          endedAt: input.endedAt,
+          isCutAtLimit: input.isCutAtLimit,
+        });
 
   await ports.writeCallRun({
     projectId: input.projectId,

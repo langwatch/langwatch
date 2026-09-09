@@ -318,6 +318,31 @@ export type SimulationRunAgentInstanceRecordedEvent = z.infer<
 >;
 
 /**
+ * CutAtLimitRecorded event — emitted after a simulated voice run ended
+ * because LangWatch cut it at the maximum call duration (AC28, #8021). The
+ * fold sets `metadata.langwatch.isCutAtLimit = true` so the run header shows
+ * "Cut at the call limit". It arrives after the run finished: the child learns
+ * of the cut from its call-limit timer and the parent records it on exit, the
+ * same post-exit path the served instance takes. The flag is implicit — the
+ * event's existence is the fact — so the payload carries only the run id.
+ */
+export const simulationRunCutAtLimitRecordedEventDataSchema = z.object({
+  scenarioRunId: z.string(),
+});
+export type SimulationRunCutAtLimitRecordedEventData = z.infer<
+  typeof simulationRunCutAtLimitRecordedEventDataSchema
+>;
+
+export const SimulationRunCutAtLimitRecordedEventSchema = EventSchema.extend({
+  type: z.literal(SIMULATION_RUN_EVENT_TYPES.CUT_AT_LIMIT_RECORDED),
+  version: z.literal(SIMULATION_EVENT_VERSIONS.CUT_AT_LIMIT_RECORDED),
+  data: simulationRunCutAtLimitRecordedEventDataSchema,
+});
+export type SimulationRunCutAtLimitRecordedEvent = z.infer<
+  typeof SimulationRunCutAtLimitRecordedEventSchema
+>;
+
+/**
  * RunDeleted event - emitted when a simulation run is soft-deleted.
  */
 export const simulationRunDeletedEventDataSchema = z.object({
@@ -384,6 +409,7 @@ export type SimulationProcessingEvent =
   | SimulationRunMetricsComputedEvent
   | SimulationRunCancelRequestedEvent
   | SimulationRunAgentInstanceRecordedEvent
+  | SimulationRunCutAtLimitRecordedEvent
   | SimulationRunDeletedEvent
   | SimulationSetArchivedEvent;
 
@@ -391,6 +417,7 @@ export {
   isSimulationMessageSnapshotEvent,
   isSimulationRunAgentInstanceRecordedEvent,
   isSimulationRunCancelRequestedEvent,
+  isSimulationRunCutAtLimitRecordedEvent,
   isSimulationRunDeletedEvent,
   isSimulationRunEvaluatedEvent,
   isSimulationRunFinishedEvent,

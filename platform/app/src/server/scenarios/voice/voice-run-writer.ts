@@ -45,9 +45,18 @@ export class VoiceAgentNotFoundError extends HandledError {
   }
 }
 
-function toMessages(record: CallRecord): SimulationMessage[] {
+/**
+ * Message ids derive from the run id and the turn index, not from anything
+ * random, so a re-driven snapshot (a retried hang-up completing a half-written
+ * run — #7973) carries the identical ids and overwrites the same messages
+ * rather than duplicating them.
+ */
+function toMessages(
+  record: CallRecord,
+  scenarioRunId: string,
+): SimulationMessage[] {
   return record.turns.map((turn, index) => ({
-    id: `${record.conversationId}-${index}`,
+    id: `${scenarioRunId}-${index}`,
     role: turn.role === "agent" ? "assistant" : "user",
     content: turn.text,
     ...(turn.audioUrl ? { audioUrl: turn.audioUrl } : {}),
@@ -125,7 +134,7 @@ export async function writeVoiceCallRun({
   await getApp().simulations.messageSnapshot({
     tenantId: projectId,
     scenarioRunId,
-    messages: toMessages(record),
+    messages: toMessages(record, scenarioRunId),
     traceIds: [],
     occurredAt: record.endedAt,
   });

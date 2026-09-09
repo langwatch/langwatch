@@ -310,7 +310,7 @@ function RunDialogContent({
               blockedReason={runBlockedReason({ subject, form, controller })}
               warning={offender ? RUN_MISSING_MAPPINGS_TOOLTIP : null}
               onRun={onRun}
-              {...(voiceCall
+              {...(voiceCall?.scenarioId
                 ? { onCallItMyself: () => setIsCalling(true) }
                 : {})}
               caseCount={form.caseCount}

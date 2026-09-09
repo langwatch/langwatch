@@ -55,34 +55,82 @@ const transportSchema = z.enum(
   VOICE_TRANSPORTS as unknown as [VoiceTransport, ...VoiceTransport[]],
 );
 
+/** The permissions the voice door probes. Creating an agent through "Talk to
+ *  it" (a mint with no saved row, or a finish whose token carries no agent id)
+ *  needs `evaluations:manage` on top of `scenarios:create`, the same right the
+ *  ordinary `agents.create` procedure requires (#8021). */
+type VoicePermission =
+  | "scenarios:create"
+  | "scenarios:view"
+  | "evaluations:manage";
+
+/** The proof a request cleared the voice door's session auth and feature gate,
+ *  carried to {@link requirePermissions} so the permission probe reuses the
+ *  same session. */
+type VoiceAuthWitness = { session: NonNullable<VoiceSession> };
+type VoiceSession = Awaited<ReturnType<typeof getServerAuthSession>>;
+
 /**
- * Session auth, project permission and the product feature flag — everything
- * a request must clear before the service is asked to do anything. Throws
- * rather than returning a body: {@link VoiceUnauthenticatedError} (401),
- * {@link ProjectPermissionDeniedError} (403), or
- * {@link VoiceAgentsGateDisabledError} (404, so a project without the flag
- * reads exactly like the drawer and run dialog do — never a 403 that would
- * leak that the door exists at all, AC29).
+ * The first gate every voice request clears: a signed-in session and the
+ * product feature flag — before any token is trusted or permission probed.
+ * Authenticate-first so a logged-out caller is refused with a flat 401 and
+ * never learns, from the shape of the error, whether a token was valid or a
+ * project exists. Throws {@link VoiceUnauthenticatedError} (401) with no
+ * session, or {@link VoiceAgentsGateDisabledError} (404) when the flag is off,
+ * so a project without it reads exactly like the drawer and run dialog do —
+ * never a 403 that would leak that the door exists at all (AC29).
+ */
+async function authenticateVoiceRequest({
+  req,
+  projectId,
+}: {
+  req: Request;
+  projectId: string;
+}): Promise<VoiceAuthWitness> {
+  const session = await getServerAuthSession({ req });
+  if (!session) throw new VoiceUnauthenticatedError();
+  const voiceEnabled = await isVoiceAgentsEnabledForProject({ projectId });
+  if (!voiceEnabled) throw new VoiceAgentsGateDisabledError();
+  return { session };
+}
+
+/**
+ * Every named project permission must be granted to the authenticated session,
+ * or {@link ProjectPermissionDeniedError} (403) names the first one that was
+ * denied. Split from {@link authenticateVoiceRequest} so the finish route can
+ * verify its token between the two — the token says whether an agent will be
+ * created, and so which permissions this request needs (#8021 AC2).
+ */
+async function requirePermissions(
+  witness: VoiceAuthWitness,
+  projectId: string,
+  permissions: readonly VoicePermission[],
+): Promise<void> {
+  for (const permission of permissions) {
+    const allowed = await probeProjectPermission(
+      { session: witness.session },
+      projectId,
+      permission,
+    );
+    if (!allowed) throw new ProjectPermissionDeniedError(permission);
+  }
+}
+
+/**
+ * Session auth, feature gate and project permissions in one step, for routes
+ * whose required permissions are known before any token is read (mint, audio).
  */
 async function requireProject({
   req,
   projectId,
-  permission,
+  permissions,
 }: {
   req: Request;
   projectId: string;
-  permission: "scenarios:create" | "scenarios:view";
+  permissions: readonly VoicePermission[];
 }): Promise<void> {
-  const session = await getServerAuthSession({ req });
-  if (!session) throw new VoiceUnauthenticatedError();
-  const allowed = await probeProjectPermission(
-    { session },
-    projectId,
-    permission,
-  );
-  if (!allowed) throw new ProjectPermissionDeniedError(permission);
-  const voiceEnabled = await isVoiceAgentsEnabledForProject({ projectId });
-  if (!voiceEnabled) throw new VoiceAgentsGateDisabledError();
+  const witness = await authenticateVoiceRequest({ req, projectId });
+  await requirePermissions(witness, projectId, permissions);
 }
 
 // POST /api/voice/session — mint a signed-URL session from the form values.
@@ -107,10 +155,15 @@ secured
     ),
     async (c) => {
       const { projectId, transport, agentId, agentRowId } = c.req.valid("json");
+      // Minting without a saved row will create an agent on finish, so it
+      // needs agent-management rights up front (#8021 AC1); minting against a
+      // saved row does not.
       await requireProject({
         req: c.req.raw,
         projectId,
-        permission: "scenarios:create",
+        permissions: agentRowId
+          ? ["scenarios:create"]
+          : ["scenarios:create", "evaluations:manage"],
       });
 
       const result = await mintVoiceSession({
@@ -163,13 +216,17 @@ secured
     ),
     async (c) => {
       const body = c.req.valid("json");
-      await requireProject({
+
+      // Auth first: a signed-in session and the feature gate before the token
+      // is trusted, so a logged-out caller is refused 401 and can never probe
+      // token validity through the finish route (a garbage token then reads as
+      // 401, not 400).
+      const witness = await authenticateVoiceRequest({
         req: c.req.raw,
         projectId: body.projectId,
-        permission: "scenarios:create",
       });
 
-      // The token must verify, and its project must be the authorised one, or
+      // Then the token must verify, and its project be the authorised one, or
       // the finish is refused before anything is read or written.
       const token = verifyVoiceSessionToken({
         token: body.sessionToken,
@@ -178,6 +235,18 @@ secured
       if (!token || token.projectId !== body.projectId) {
         throw new VoiceSessionInvalidError();
       }
+
+      // Only then the permission probe, sized by the token: a finish whose
+      // token names no saved agent will create one on the way in, so it needs
+      // agent-management rights up front; a finish against a saved agent does
+      // not (#8021 AC2).
+      await requirePermissions(
+        witness,
+        body.projectId,
+        token.agentId
+          ? ["scenarios:create"]
+          : ["scenarios:create", "evaluations:manage"],
+      );
 
       const result = await finishVoiceSession({
         ports,
@@ -218,7 +287,7 @@ export const route = secured
       await requireProject({
         req: c.req.raw,
         projectId,
-        permission: "scenarios:view",
+        permissions: ["scenarios:view"],
       });
 
       // Only proxy when a run for this conversation exists in the authorised
