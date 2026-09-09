@@ -488,11 +488,40 @@ export class DiscoveredPersonRepository {
  * invite the next author to reach for a person's guard here and find it
  * missing.
  */
+/**
+ * One agent row as a screen needs it.
+ *
+ * Named rather than inferred so the columns this read hands out are a decision
+ * recorded in one place. An inferred row grows silently with the table.
+ */
+export interface DiscoveredAgentRow {
+  id: string;
+  provider: string;
+  displayText: string;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+}
+
 export class DiscoveredAgentRepository {
   /** The agents screen's read: an organization's agents, newest-seen first. */
-  listByOrganization(client: Client, params: { organizationId: string }) {
+  listByOrganization(
+    client: Client,
+    params: { organizationId: string },
+  ): Promise<DiscoveredAgentRow[]> {
     return client.discoveredAgent.findMany({
       where: { organizationId: params.organizationId },
+      // The select is the point, not a micro-optimisation. Without it this
+      // read hands its caller `rawAgentId`, the provider's own identifier
+      // verbatim, and `metadata`, a provider-shaped blob whose contents no
+      // reader here controls. Neither is needed to draw a row, and a field a
+      // screen never asked for is a field nobody notices arriving.
+      select: {
+        id: true,
+        provider: true,
+        displayText: true,
+        firstSeenAt: true,
+        lastSeenAt: true,
+      },
       orderBy: { lastSeenAt: "desc" },
     });
   }

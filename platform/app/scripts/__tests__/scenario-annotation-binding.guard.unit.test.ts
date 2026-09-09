@@ -161,12 +161,18 @@ function scannedTestFiles(): string[] {
   const out: string[] = [];
 
   function walk(dir: string): void {
-    // A tree that does not exist is not a failure of this guard.
+    // A tree that does not exist is not a failure of this guard. Anything
+    // else is: a directory this walk could not read is a directory whose
+    // annotations went unchecked, and swallowing it would leave the file count
+    // above its floor while the guard silently stopped looking. The floor
+    // catches a walk that found nothing, not one that skipped a subtree.
     let entries;
     try {
       entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code === "ENOENT" || code === "ENOTDIR") return;
+      throw error;
     }
     for (const entry of entries) {
       const name = String(entry.name);
