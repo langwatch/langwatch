@@ -3,12 +3,12 @@
  * license.* / licenseEnforcement.*   what this instance is licensed for
  * scimToken.*                        the directory-sync credentials
  */
-import type { LimitCheckResult, LimitType } from "@langwatch/enterprise-licensing-contract";
-import {
-  LicensingApp,
-  type LicensingCaller,
-  type LicenseStoragePort,
-} from "@langwatch/enterprise-licensing-server";
+import type {
+  LicensingCaller,
+  LimitCheckResult,
+  LimitType,
+} from "@langwatch/enterprise-licensing-contract";
+import { LicensingApp, type LicenseStoragePort } from "@langwatch/enterprise-licensing-server";
 import {
   ENTERPRISE_FEATURE_ERRORS,
   assertEnterprisePlanType,
@@ -141,12 +141,18 @@ function enterpriseApplication(
     );
   }
 
+  // Composed before the licence half below reads it: an alert is raised by the
+  // same deployment that answered the check, so the enforcement surface is
+  // given this notifier rather than reaching for a second one per request.
+  const notifier = usageLimits ?? unreportableUsageLimits();
+
   return {
     licensing: (licensing ??
       (seats
         ? unlicensedLicensing({
             seats,
             logger,
+            notifier,
             repository: options.licensingStore,
             publicKey: options.licensePublicKey,
           })
@@ -158,7 +164,7 @@ function enterpriseApplication(
       refusingApplicationSlice(
         "Enterprise SCIM application, so it can neither list nor mint a token",
       ),
-    usageLimits: usageLimits ?? unreportableUsageLimits(),
+    usageLimits: notifier,
   } as Pick<ApiTrpcFeatureApplication, "licensing" | "scimApp" | "usageLimits">;
 }
 
@@ -192,6 +198,8 @@ function unreportableUsageLimits(): ApiTrpcFeatureApplication["usageLimits"] {
 function unlicensedLicensing(options: {
   seats: ApiSeatAllowancePort;
   logger: Logger;
+  /** Where a reached ceiling is reported, as this deployment composed it. */
+  notifier: ApiTrpcFeatureApplication["usageLimits"];
   repository: LicenseStoragePort | undefined;
   publicKey: string | undefined;
 }): LicensingApp {
@@ -214,6 +222,7 @@ function unlicensedLicensing(options: {
       authProviderIsMounted: () => false,
       reportSigningFailure: () => {},
       checkLimit: (input) => options.seats.checkLimit(input),
+      notifyLimitReached: (input) => options.notifier.notifyResourceLimitReached(input),
       reportError: (error) => {
         options.logger.error({ error }, "a licence-enforcement side effect failed");
       },

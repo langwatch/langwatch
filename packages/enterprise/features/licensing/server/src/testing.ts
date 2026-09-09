@@ -162,6 +162,7 @@ export function createTestLicensingApp(
     limitType: "members",
   }),
   reportError: LicensingInfrastructure["reportError"] = () => {},
+  notifyLimitReached: LicensingInfrastructure["notifyLimitReached"] = async () => {},
 ): LicensingApp {
   return LicensingApp.create({
     dependencies: {},
@@ -172,6 +173,7 @@ export function createTestLicensingApp(
       authProviderIsMounted: () => true,
       reportSigningFailure: () => {},
       checkLimit,
+      notifyLimitReached,
       reportError,
     },
     config: { publicKey: TEST_PUBLIC_KEY },

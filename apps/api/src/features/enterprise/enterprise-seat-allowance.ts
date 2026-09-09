@@ -6,8 +6,11 @@
  * members page must be shown. Two readings would let the page offer an invitation the invite
  * itself then refuses.
  */
-import type { LimitCheckResult, LimitType } from "@langwatch/enterprise-licensing-contract";
-import type { LicensingCaller } from "@langwatch/enterprise-licensing-server";
+import type {
+  LicensingCaller,
+  LimitCheckResult,
+  LimitType,
+} from "@langwatch/enterprise-licensing-contract";
 import { ApiSeatAllowancePort } from "./enterprise.composition.ts";
 
 /** The one decision this adapter takes off the organization half's seat gate. */

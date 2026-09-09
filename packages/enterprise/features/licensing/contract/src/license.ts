@@ -238,6 +238,13 @@ export const ssoGateStatusSchema = z
   })
   .strict();
 
+/**
+ * `mounted` is reported apart from `licensed` because the two are fixed in
+ * different places: one by activating a license, the other by correcting the
+ * provider name or its client credentials.
+ */
+export type SsoGateStatus = z.infer<typeof ssoGateStatusSchema>;
+
 /** A pasted key was accepted, with the plan it resolved to. */
 export const licenseUploadedSchema = z
   .object({ success: z.literal(true), planInfo: planSchema })

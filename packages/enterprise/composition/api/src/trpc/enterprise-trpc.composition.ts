@@ -2,14 +2,14 @@
  * The Enterprise tRPC surfaces, composed for the legacy web application's
  * router root.
  *
- * Four transports live here: licensing (`license`, `licenseEnforcement`), SCIM
- * tokens (`scimToken`) and billing's two — the paid subscription
- * (`subscription`) and the currency a visitor is quoted in (`currency`). The
- * back office's `ssoConnections` is mounted by the process itself. Each
- * router's behaviour — procedure names, input and output shapes, refusals —
- * belongs to its Enterprise feature package. What this composition owns is the
- * wiring: which policy wraps which permission, and which process capability
- * answers each port.
+ * Three transports live here: SCIM tokens (`scimToken`) and billing's two —
+ * the paid subscription (`subscription`) and the currency a visitor is quoted
+ * in (`currency`). The back office's `ssoConnections` and the two licensing
+ * namespaces are mounted by the process itself, off their features' own
+ * declared contracts. Each router's behaviour — procedure names, input and
+ * output shapes, refusals — belongs to its Enterprise feature package. What
+ * this composition owns is the wiring: which policy wraps which permission,
+ * and which process capability answers each port.
  *
  * It sits in the Enterprise API composition rather than in `apps/api` because a
  * core package may not depend on an Enterprise one. Everything the process must
@@ -27,12 +27,6 @@ import {
   type SubscriptionTrpcContext,
 } from "@langwatch/enterprise-billing-server";
 import {
-  LicenseEnforcementTrpcApi,
-  LicenseTrpcApi,
-  type LicenseEnforcementTrpcContext,
-  type LicenseTrpcContext,
-} from "@langwatch/enterprise-licensing-server";
-import {
   ScimTokenTrpcApi,
   type ScimTokenTrpcContext,
   type ScimPlanProvider,
@@ -42,21 +36,11 @@ import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from 
 
 /** Every context requirement these surfaces place on the process. */
 export type EnterpriseTrpcContext = CurrencyTrpcContext &
-  LicenseTrpcContext &
-  LicenseEnforcementTrpcContext &
   ScimTokenTrpcContext &
   SubscriptionTrpcContext;
 
 /** One already-composed process policy, applied after a feature's input parser. */
 type EnterpriseTrpcPolicy = <TProcedure>(procedure: TProcedure) => TProcedure;
-
-/**
- * Why the instance's single sign-on gate status has no organization to check
- * against: it is deployment-wide and read-only for any signed-in user.
- */
-export const INSTANCE_LICENSE_NO_PERMISSION = {
-  reason: "instance license status is deployment-wide and read-only for any signed-in user",
-} as const;
 
 /**
  * Why the quoted currency has nothing to check: the answer is read from the
@@ -81,8 +65,6 @@ export class EnterpriseTrpcComposition {
     protectedProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
     /** The process's full policy chain for one declared permission. */
     policy(permission: "organization:view" | "organization:manage"): EnterpriseTrpcPolicy;
-    /** The chain declaring `INSTANCE_LICENSE_NO_PERMISSION`. */
-    instanceLicensePolicy: EnterpriseTrpcPolicy;
     /** The chain declaring `CURRENCY_NO_PERMISSION`. */
     currencyPolicy: EnterpriseTrpcPolicy;
     /** Whether this installation bills through Stripe. */
@@ -98,19 +80,6 @@ export class EnterpriseTrpcComposition {
     };
   }) {
     const { root, protectedProcedure, policy, ports, validateOutput } = options;
-
-    const license = LicenseTrpcApi.create(root, {
-      protected: protectedProcedure,
-      policy,
-      unscopedPolicy: options.instanceLicensePolicy,
-      validateOutput,
-    });
-
-    const licenseEnforcement = LicenseEnforcementTrpcApi.create(root, {
-      protected: protectedProcedure,
-      policy,
-      validateOutput,
-    });
 
     // The one place SCIM's plan gate becomes a decorator. The refusal reads
     // the SCIM application's own plan provider rather than the process-wide
@@ -172,8 +141,6 @@ export class EnterpriseTrpcComposition {
 
     return {
       currency,
-      license,
-      licenseEnforcement,
       scimToken,
       subscription,
     };

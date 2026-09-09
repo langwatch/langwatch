@@ -1,52 +1,70 @@
 /**
- * The plan-limit surface: what it asks the enforcement service, and when it
- * tells operations that a customer hit a ceiling.
- *
- * The report is the interesting one — the client's pre-check is advisory, so
- * the server re-verifies before raising an alert nobody can retract.
+ * @vitest-environment node
+ * The plan-limit surface. The client's pre-check is advisory, so the server
+ * re-verifies before raising an alert nobody can retract.
  */
+import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  LicenseEnforcementTrpcApi,
-  type LicenseEnforcementTrpcContext,
-} from "../license-enforcement.api.ts";
-import { createTestLicensingApp } from "../../../testing.ts";
 
-const checkLimit = vi.fn();
-const notifyResourceLimitReached = vi.fn();
-const reportError = vi.fn();
-
-const trpc = initTRPC.context<LicenseEnforcementTrpcContext>().create();
-
-/** The process's chain is exercised in the app; here it is the identity. */
-const identityPolicy = <TProcedure>(procedure: TProcedure): TProcedure => procedure;
-
-const router = LicenseEnforcementTrpcApi.create(trpc, {
-  protected: trpc.procedure,
-  policy: () => identityPolicy,
-  validateOutput: true,
-});
-
-/**
- * The whole application, with everything the limit surface does not reach left
- * as a refusal rather than a stub: if this surface ever starts asking one of
- * them, the test says so out loud instead of quietly answering.
- */
-const licensing = createTestLicensingApp(checkLimit, reportError);
-
-const caller = router.createCaller({
-  app: { licensing, usageLimits: { notifyResourceLimitReached } },
-  actor: () => ({ id: "user_ana" }),
-  session: { user: { id: "user_ana", email: "ana@acme.com" } },
-});
+import { createTestLicensingApp } from "../../testing.ts";
+import { callerEmailFact, licenseEnforcementTrpcTransport } from "../license-enforcement.trpc.ts";
+import { licensingTrpcTestPorts, type LicensingTrpcTestContext } from "./licensing.trpc.harness.ts";
 
 const ORGANIZATION = "org_acme";
+
+const checkLimit = vi.fn();
+const notifyLimitReached = vi.fn();
+const reportError = vi.fn();
+
+// The whole application, with everything the limit surface does not reach left
+// to the real implementation rather than a stub.
+const licensing = createTestLicensingApp(checkLimit, reportError, notifyLimitReached);
+
+const trpc = initTRPC.context<LicensingTrpcTestContext>().create();
+const router = createTrpcRuntime<LicensingTrpcTestContext>({
+  root: trpc,
+  procedure: trpc.procedure,
+  ports: licensingTrpcTestPorts(),
+}).mount(licenseEnforcementTrpcTransport, () => licensing, {
+  // The address is the PROCESS's to resolve, off the session it authenticated.
+  facts: [bindTrpcFact(callerEmailFact, (ctx) => ctx.email ?? null)],
+});
+
+const caller = router.createCaller({
+  actor: { id: "user_ana" },
+  email: "ana@acme.com",
+});
 
 describe("the plan-limit surface", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    notifyResourceLimitReached.mockResolvedValue(undefined);
+    notifyLimitReached.mockResolvedValue(undefined);
+  });
+
+  describe("given the mounted router", () => {
+    it("exposes exactly the procedure names the clients call", () => {
+      expect(Object.keys(router._def.procedures).sort()).toEqual([
+        "checkAllLimits",
+        "checkLimit",
+        "reportLimitBlocked",
+      ]);
+    });
+
+    it("reads with a query and reports with a mutation", () => {
+      const kinds = Object.fromEntries(
+        Object.entries(router._def.procedures).map(([name, procedure]) => [
+          name,
+          (procedure as { _def: { type: string } })._def.type,
+        ]),
+      );
+
+      expect(kinds).toEqual({
+        checkLimit: "query",
+        checkAllLimits: "query",
+        reportLimitBlocked: "mutation",
+      });
+    });
   });
 
   describe("when a limit is checked", () => {
@@ -83,8 +101,8 @@ describe("the plan-limit surface", () => {
       const limits = await caller.checkAllLimits({ organizationId: ORGANIZATION });
 
       expect(Object.keys(limits).sort()).toEqual(["members", "membersLite"]);
-      expect(limits.members.allowed).toBe(true);
-      expect(limits.membersLite.allowed).toBe(false);
+      expect(limits.members?.allowed).toBe(true);
+      expect(limits.membersLite?.allowed).toBe(false);
     });
   });
 
@@ -102,7 +120,7 @@ describe("the plan-limit surface", () => {
         limitType: "members",
       });
 
-      expect(notifyResourceLimitReached).toHaveBeenCalledWith({
+      expect(notifyLimitReached).toHaveBeenCalledWith({
         organizationId: ORGANIZATION,
         limitType: "members",
         current: 5,
@@ -125,7 +143,7 @@ describe("the plan-limit surface", () => {
         limitType: "members",
       });
 
-      expect(notifyResourceLimitReached).not.toHaveBeenCalled();
+      expect(notifyLimitReached).not.toHaveBeenCalled();
     });
 
     it("reports a failed notification instead of failing the mutation", async () => {
@@ -136,7 +154,7 @@ describe("the plan-limit surface", () => {
         limitType: "members",
       });
       const failure = new Error("notification transport unavailable");
-      notifyResourceLimitReached.mockRejectedValue(failure);
+      notifyLimitReached.mockRejectedValue(failure);
 
       // The upgrade modal is already on screen; a notification that could not
       // be sent is an operations problem, not the customer's.

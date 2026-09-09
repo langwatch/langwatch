@@ -6,12 +6,17 @@ import {
   LicensingApi,
   type LicensingApi as LicensingApiContract,
   buildMintedPlan,
+  LicenseExpiryNotInFutureError,
   licenseValidationError,
   limitTypes,
   type LicenseData,
+  type LicenseLimitCheck,
+  type LicensingCaller,
   type LimitCheckResult,
   type LimitType,
   type LicensingServerConfig,
+  type MintLicenseKeyInput,
+  type SsoGateStatus,
   licensingServerConfigSchema,
 } from "@langwatch/enterprise-licensing-contract";
 import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
@@ -23,38 +28,7 @@ import type { LicenseStoragePort } from "../ports/license-storage.port.ts";
 import type { LicenseUsagePort } from "../ports/license-usage.port.ts";
 import { NodeLicenseCryptographyAdapter } from "../adapters/node.license-cryptography.adapter.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
-import { nowInstant, type Instant } from "@langwatch/time";
-
-/**
- * The caller, as the enforcement service classifies them: a lite member is
- * counted differently from a full one, so an id alone cannot answer a limit.
- */
-export type LicensingCaller = Readonly<{ id: string; email?: string | null }>;
-
-/** Why a deployment configured for single sign-on is not using it. */
-export type SsoGateStatus = Readonly<{
-  configuredProvider: string | null;
-  licensed: boolean;
-  mounted: boolean;
-}>;
-
-/** Everything a minted key encodes beyond the organization it is minted for. */
-export type MintLicenseInput = Readonly<{
-  organizationId: string;
-  privateKey: string;
-  organizationName: string;
-  email: string;
-  expiresAt: Instant;
-  planType: "PRO" | "ENTERPRISE" | "CUSTOM";
-  plan: Readonly<{
-    maxMembers: number;
-    maxMembersLite: number;
-    maxMessagesPerMonth: number;
-    canPublish: boolean;
-    webhookEndpointsEnabled?: boolean | undefined;
-    usageUnit: "traces" | "events";
-  }>;
-}>;
+import { fromDate, nowInstant, Temporal } from "@langwatch/time";
 
 /** What the process composes this feature's application from. */
 export type LicensingInfrastructure = Readonly<{
@@ -75,13 +49,20 @@ export type LicensingInfrastructure = Readonly<{
   /** Records a signing failure; the customer never sees the diagnostic. */
   reportSigningFailure: (entry: Readonly<{ organizationId: string; error: Error }>) => void;
   /** Whether one limit still admits another resource, for this caller. */
-  checkLimit: (
+  checkLimit: (input: LicenseLimitCheck) => Promise<LimitCheckResult>;
+  /**
+   * Tells operations a customer reached a ceiling. A second feature's
+   * capability, composed in rather than reached through a request: an alert is
+   * raised by the same deployment that answered the check.
+   */
+  notifyLimitReached: (
     input: Readonly<{
       organizationId: string;
       limitType: LimitType;
-      user: LicensingCaller;
+      current: number;
+      max: number;
     }>,
-  ) => Promise<LimitCheckResult>;
+  ) => Promise<void>;
   /** Swallows a notification failure into the process's error channel. */
   reportError: (error: Error) => void;
 }>;
@@ -180,7 +161,11 @@ export class LicensingApp implements LicensingApiContract {
    * is decided here: which template the plan type resolves to, what the minted plan carries,
    * and when the key was issued.
    */
-  mintLicenseKey(input: MintLicenseInput): string {
+  mintLicenseKey(input: MintLicenseKeyInput): string {
+    const expiresAt = fromDate(input.expiresAt);
+    const termAlreadyElapsed = Temporal.Instant.compare(expiresAt, nowInstant()) <= 0;
+    if (termAlreadyElapsed) throw new LicenseExpiryNotInFutureError();
+
     const template = getPlanTemplate(input.planType);
     const cryptography = this.#cryptography;
 
@@ -190,7 +175,7 @@ export class LicensingApp implements LicensingApiContract {
       organizationName: input.organizationName,
       email: input.email,
       issuedAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
-      expiresAt: input.expiresAt.toString({ fractionalSecondDigits: 3 }),
+      expiresAt: expiresAt.toString({ fractionalSecondDigits: 3 }),
       plan: buildMintedPlan({
         type: template?.type ?? input.planType,
         name: template?.name ?? input.planType,
@@ -214,10 +199,28 @@ export class LicensingApp implements LicensingApiContract {
   }
 
   /** Whether one limit still admits another resource, for this caller. */
-  checkLimit(
-    input: Readonly<{ organizationId: string; limitType: LimitType; user: LicensingCaller }>,
-  ): Promise<LimitCheckResult> {
+  checkLimit(input: LicenseLimitCheck): Promise<LimitCheckResult> {
     return this.#runtime.checkLimit(input);
+  }
+
+  /**
+   * A client pre-check refused somebody. The limit is re-checked here, so a
+   * fabricated report raises nothing, and the notification is neither awaited
+   * nor allowed to fail the call: an unsent alert is operations' problem.
+   */
+  async reportLimitBlocked(input: LicenseLimitCheck): Promise<void> {
+    const result = await this.#runtime.checkLimit(input);
+
+    if (result.allowed) return;
+
+    void this.#runtime
+      .notifyLimitReached({
+        organizationId: input.organizationId,
+        limitType: input.limitType,
+        current: result.current,
+        max: result.max,
+      })
+      .catch((error: unknown) => this.reportError(error));
   }
 
   /**

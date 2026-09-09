@@ -3,12 +3,17 @@ export {
   LicensingApp,
   type LicensingInfrastructure,
   type LicensingRuntime,
-  type LicensingCaller,
-  type MintLicenseInput,
-  type SsoGateStatus,
 } from "./app/licensing.app.ts";
-// The two tRPC transports are not exported: they still name the deleted legacy
-// builder.
+export { licensingServer } from "./licensing.server.ts";
+/**
+ * The two declared tRPC surfaces, and the one fact the enforcement half asks
+ * the process to resolve. A mount binds the fact; nothing else may.
+ */
+export {
+  callerEmailFact,
+  licenseEnforcementTrpcTransport,
+} from "./transport/license-enforcement.trpc.ts";
+export { licenseTrpcTransport } from "./transport/licensing.trpc.ts";
 export {
   LicensingEntitlementSourceAdapter,
   type LicensePlanReader,

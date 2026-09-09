@@ -9,7 +9,7 @@
  * `httpStatus` and keeps the error as the `cause`.
  */
 
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, ValidationError } from "@langwatch/handled-error";
 
 import { LICENSE_ERRORS, type LicenseError } from "./license-constants.ts";
 
@@ -132,6 +132,21 @@ export class LicenseSigningFailedError extends HandledError {
       ...options,
     });
     this.name = "LicenseSigningFailedError";
+  }
+}
+
+/**
+ * The term an operator typed for a key they are minting has already elapsed.
+ * A FIELD refusal: the generator form has the control on screen, so the
+ * rejection appears where the operator is looking rather than in a toast.
+ */
+export class LicenseExpiryNotInFutureError extends ValidationError {
+  constructor() {
+    super("A license term must end in the future", {
+      meta: { fieldErrors: { expiresAt: ["Expiration date must be in the future"] } },
+      fault: "customer",
+    });
+    this.name = "LicenseExpiryNotInFutureError";
   }
 }
 
