@@ -183,14 +183,6 @@ func (s Stack) OverlayEnv() []string {
 	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" {
 		env = append(env, fmt.Sprintf("CLICKHOUSE_URL=http://%s:%s@127.0.0.1:%d/%s",
 			ClickHouseUser, ClickHousePassword, s.ClickHouseHTTPPort, s.ClickHouseDatabase))
-		// The production fallback is 64 statements per process, but the shared
-		// local server admits only 32. Keep each API/worker process small enough
-		// that concurrent backfills leave room for other stacks and local reads.
-		// This is a conservative local default, not a fleet-wide reservation.
-		env = append(env,
-			"CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES=32",
-			"CLICKHOUSE_MAX_OPEN_CONNECTIONS=4",
-		)
 		// Backup-status gauges query system.backup_log, which only exists once
 		// backups are configured, a production concern. The app collects them by
 		// default (unset must not disarm the production alerts that read them), so
