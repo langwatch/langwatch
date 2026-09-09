@@ -248,61 +248,20 @@ export class PersonListingService {
   }
 }
 
-/** Dispatches to the provider that owns this source type. */
+/**
+ * Turns any failure of the dispatch below into a refusal.
+ *
+ * Split from the dispatch so that adding a provider changes only which
+ * credentials are needed, and never what a failure means to the caller. The
+ * two answer different questions and are the two things most likely to be
+ * edited by different people for unrelated reasons.
+ */
 async function listPeopleForSource(params: {
   context: SourceCredentialContext;
   signal?: AbortSignal;
 }): Promise<PeopleListing> {
-  const { context, signal } = params;
-
   try {
-    // Neither admin API has a sign-in step: the admin key IS the credential,
-    // and neither needs a field from the source's config, so neither config is
-    // parsed. A source with an odd config that still holds a working key can
-    // still answer.
-    if (context.sourceType === ANTHROPIC_ADMIN_ADAPTER_ID) {
-      const apiKey = context.credentials.token;
-      if (!apiKey) return peopleRefused(NOT_CONFIGURED);
-      return await listAnthropicPeople({ apiKey, signal });
-    }
-
-    if (context.sourceType === OPENAI_ADMIN_ADAPTER_ID) {
-      const apiKey = context.credentials.token;
-      if (!apiKey) return peopleRefused(NOT_CONFIGURED);
-      return await listOpenAiPeople({ apiKey, signal });
-    }
-
-    if (context.sourceType === COPILOT_STUDIO_DATAVERSE_ADAPTER_ID) {
-      const config: CopilotStudioDataverseConfig =
-        copilotStudioDataversePullConfigSchema.parse(context.config);
-      const token = await resolveEnvironmentToken({
-        credentials: context.credentials,
-        environmentUrl: config.environmentUrl,
-        // The directory lives on Graph, not on the environment. A token minted
-        // for Dataverse is refused by Graph, so this is a second sign-in
-        // rather than a reuse of the one the transcript read makes.
-        scope: MICROSOFT_GRAPH_SCOPE,
-        signal,
-      });
-      return await listMicrosoftPeople({ token, signal });
-    }
-
-    if (context.sourceType === DATABRICKS_GENIE_ADAPTER_ID) {
-      const config: DatabricksGeniePullConfig =
-        databricksGeniePullConfigSchema.parse(context.config);
-      const token = await resolveWorkspaceToken({
-        credentials: context.credentials,
-        workspaceUrl: config.workspaceUrl,
-        signal,
-      });
-      return await listDatabricksPeople({
-        workspaceUrl: config.workspaceUrl,
-        token,
-        signal,
-      });
-    }
-
-    return peopleRefused(NOT_CONFIGURED);
+    return await listPeopleFromProvider(params);
   } catch (error) {
     if (error instanceof ProviderSignInError) {
       return peopleRefused(refusalFromSignIn(error));
@@ -313,6 +272,67 @@ async function listPeopleForSource(params: {
     // fail the whole sync.
     return peopleRefused(NOT_CONFIGURED);
   }
+}
+
+/**
+ * Dispatches to the provider that owns this source type.
+ *
+ * Throws on a failed sign-in or an unparseable config; the caller above turns
+ * both into refusals.
+ */
+async function listPeopleFromProvider(params: {
+  context: SourceCredentialContext;
+  signal?: AbortSignal;
+}): Promise<PeopleListing> {
+  const { context, signal } = params;
+
+  // Neither admin API has a sign-in step: the admin key IS the credential,
+  // and neither needs a field from the source's config, so neither config is
+  // parsed. A source with an odd config that still holds a working key can
+  // still answer.
+  if (context.sourceType === ANTHROPIC_ADMIN_ADAPTER_ID) {
+    const apiKey = context.credentials.token;
+    if (!apiKey) return peopleRefused(NOT_CONFIGURED);
+    return await listAnthropicPeople({ apiKey, signal });
+  }
+
+  if (context.sourceType === OPENAI_ADMIN_ADAPTER_ID) {
+    const apiKey = context.credentials.token;
+    if (!apiKey) return peopleRefused(NOT_CONFIGURED);
+    return await listOpenAiPeople({ apiKey, signal });
+  }
+
+  if (context.sourceType === COPILOT_STUDIO_DATAVERSE_ADAPTER_ID) {
+    const config: CopilotStudioDataverseConfig =
+      copilotStudioDataversePullConfigSchema.parse(context.config);
+    const token = await resolveEnvironmentToken({
+      credentials: context.credentials,
+      environmentUrl: config.environmentUrl,
+      // The directory lives on Graph, not on the environment. A token minted
+      // for Dataverse is refused by Graph, so this is a second sign-in
+      // rather than a reuse of the one the transcript read makes.
+      scope: MICROSOFT_GRAPH_SCOPE,
+      signal,
+    });
+    return await listMicrosoftPeople({ token, signal });
+  }
+
+  if (context.sourceType === DATABRICKS_GENIE_ADAPTER_ID) {
+    const config: DatabricksGeniePullConfig =
+      databricksGeniePullConfigSchema.parse(context.config);
+    const token = await resolveWorkspaceToken({
+      credentials: context.credentials,
+      workspaceUrl: config.workspaceUrl,
+      signal,
+    });
+    return await listDatabricksPeople({
+      workspaceUrl: config.workspaceUrl,
+      token,
+      signal,
+    });
+  }
+
+  return peopleRefused(NOT_CONFIGURED);
 }
 
 const NOT_CONFIGURED: PeopleListingRefusal = {
