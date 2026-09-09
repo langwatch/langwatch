@@ -215,6 +215,35 @@ describe("readCopilotBots", () => {
     });
   });
 
+  describe("given an environment address the adapter would have rejected", () => {
+    // The listing path safeParses the config schema and calls straight through,
+    // so validateConfig never runs and the schema accepts any URL. Without the
+    // check at this boundary a plain http address puts the bearer token on the
+    // wire in clear.
+    it("sends no request to a plain http environment", async () => {
+      const read = await readCopilotBots({
+        environmentUrl: "http://org1.crm.dynamics.com",
+        token: "t",
+      });
+
+      expect(read).toEqual({
+        ok: false,
+        refusal: { reason: "not_configured", status: null },
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("sends no request to a host outside Power Platform", async () => {
+      const read = await readCopilotBots({
+        environmentUrl: "https://evildynamics.com",
+        token: "t",
+      });
+
+      expect(read.ok).toBe(false);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given the environment has more than one page of bots", () => {
     it("walks to the end when the caller asked for every page", async () => {
       fetchMock
@@ -239,7 +268,7 @@ describe("readCopilotBots", () => {
       const read = await readCopilotBots({
         environmentUrl,
         token: "t",
-        followPages: true,
+        shouldFollowPages: true,
       });
 
       expect(read.ok).toBe(true);
@@ -289,7 +318,7 @@ describe("readCopilotBots", () => {
       const read = await readCopilotBots({
         environmentUrl,
         token: "t",
-        followPages: true,
+        shouldFollowPages: true,
       });
 
       expect(read).toEqual({

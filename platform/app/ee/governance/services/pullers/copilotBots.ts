@@ -32,6 +32,7 @@ import {
 import {
   DATAVERSE_API_VERSION,
   dataverseHeaders,
+  isDataverseEnvironmentOrigin,
 } from "./dataverseEnvironment";
 
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -149,9 +150,23 @@ export async function readCopilotBots(params: {
    * inventory needs every page, and asking for it explicitly is what keeps
    * that difference visible at both call sites rather than hidden in here.
    */
-  followPages?: boolean;
+  shouldFollowPages?: boolean;
 }): Promise<CopilotBotsRead> {
-  const { environmentUrl, token, signal, followPages = false } = params;
+  const { environmentUrl, token, signal, shouldFollowPages = false } = params;
+
+  // The same rule the adapter's validateConfig runs, applied here because this
+  // read is reached without it: the listing path safeParses the config schema,
+  // and that schema accepts any URL. A plain http address would put the bearer
+  // token on the wire in clear, and a host outside Power Platform would put it
+  // somewhere Microsoft does not serve. Checked before the URL is built rather
+  // than after, so no request is ever assembled around it.
+  if (!isDataverseEnvironmentOrigin(environmentUrl)) {
+    return {
+      ok: false,
+      refusal: { reason: "not_configured", status: null },
+    };
+  }
+
   const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${DATAVERSE_API_VERSION}/bots`;
   const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
 
@@ -165,7 +180,7 @@ export async function readCopilotBots(params: {
 
     const next = read.next;
     if (!next) return { ok: true, rows, hasMorePages: false };
-    if (!followPages) return { ok: true, rows, hasMorePages: true };
+    if (!shouldFollowPages) return { ok: true, rows, hasMorePages: true };
 
     // The continuation URL comes from the response body, and the next request
     // carries the token. A link pointing anywhere but this environment would
@@ -267,7 +282,7 @@ export async function listCopilotAgents(params: {
   token: string;
   signal?: AbortSignal;
 }): Promise<AgentListing> {
-  const read = await readCopilotBots({ ...params, followPages: true });
+  const read = await readCopilotBots({ ...params, shouldFollowPages: true });
   if (!read.ok) return agentsRefused(read.refusal);
 
   // An inventory that is missing agents must not read as the inventory. Every
