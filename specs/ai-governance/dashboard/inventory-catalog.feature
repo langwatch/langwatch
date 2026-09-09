@@ -287,6 +287,21 @@ Feature: The Inventory catalog is the tools the organization runs
     # would let a retired connector come back on one screen after being pulled
     # from the other.
 
+  @unit
+  Scenario: A type held back from the sample is still offered in the Add source menu
+    Given the Anthropic Claude Cowork source type is held back from the sample
+    When the sample sources are worked out
+    Then no sample row is on that type
+    And the Add source menu still offers it
+    And it is not marked retired
+    # The sample and the menu answer different questions, so they are allowed
+    # to differ in one direction only: the sample is a subset. The menu says
+    # what a customer can connect and must stay complete; the sample says what
+    # a connected fleet looks like, and a row there reads as a claim about
+    # THIS deployment. Cowork is held back on that ground alone. It is current,
+    # pickable and fully configurable — anyone reading the flag as a wind-down
+    # and finishing the job by retiring the type would break a live connector.
+
   @integration
   Scenario: A source named after its own type does not say so twice
     Given a source whose name is the name of its type

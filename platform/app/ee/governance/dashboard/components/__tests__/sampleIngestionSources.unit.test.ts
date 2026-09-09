@@ -9,33 +9,55 @@
  * sample's names come out of the same list the menu reads, and nothing else is
  * allowed to name a connector.
  *
+ * The sample is a strict SUBSET of that list, not a copy of it: a type may be
+ * held back from the mock-up while staying on offer. Both directions are
+ * pinned below, because each fails a different way — a sample wider than the
+ * menu previews a connector nobody can create, and a sample that silently
+ * re-widens puts back a row the product owner asked to have removed.
+ *
  * Spec: specs/ai-governance/dashboard/inventory-catalog.feature
  */
 import { describe, expect, it } from "vitest";
-
+import { sourceBadge } from "../../logic/sourceHealthDisplay";
 import {
   modeForSourceType,
   offeredSourceTypeOptions,
   SOURCE_TYPE_OPTIONS,
   type SourceType,
+  sampleSourceTypeOptions,
 } from "../ingestionSourceCatalog";
 import { SAMPLE_INGESTION_SOURCES } from "../sampleIngestionSources";
 
 describe("given the Sources tab in sample mode", () => {
   describe("when the sample rows are worked out", () => {
     /** @scenario "Sample sources are the connectors the product offers, named as the menu names them" */
-    it("shows one row per offered source type, under that type's catalog name", () => {
-      const offered = offeredSourceTypeOptions();
+    it("shows one row per sampled source type, under that type's catalog name", () => {
+      const sampled = sampleSourceTypeOptions();
       // Guards the assertion below against passing vacuously: an empty
       // catalog would satisfy "every name is a catalog name" trivially.
-      expect(offered.length).toBeGreaterThan(0);
+      expect(sampled.length).toBeGreaterThan(0);
 
       expect(
         SAMPLE_INGESTION_SOURCES.map((source) => source.sourceType),
-      ).toEqual(offered.map((option) => option.value));
+      ).toEqual(sampled.map((option) => option.value));
       expect(SAMPLE_INGESTION_SOURCES.map((source) => source.name)).toEqual(
-        offered.map((option) => option.label),
+        sampled.map((option) => option.label),
       );
+    });
+
+    /** @scenario "Sample sources are the connectors the product offers, named as the menu names them" */
+    it("shows only types the Add source menu offers", () => {
+      // The one direction the two lists may differ in. The sample may be
+      // narrower than the menu; it may never be wider, or it would preview a
+      // connector nobody can go on to create.
+      const offered = new Set(
+        offeredSourceTypeOptions().map((option) => option.value),
+      );
+      expect(SAMPLE_INGESTION_SOURCES.length).toBeGreaterThan(0);
+
+      for (const source of SAMPLE_INGESTION_SOURCES) {
+        expect(offered).toContain(source.sourceType);
+      }
     });
 
     /** @scenario "Sample sources are the connectors the product offers, named as the menu names them" */
@@ -71,20 +93,69 @@ describe("given the Sources tab in sample mode", () => {
       }
     });
 
+    /** @scenario "A type held back from the sample is still offered in the Add source menu" */
+    it("holds Cowork back from the sample without withdrawing it from the menu", () => {
+      const cowork = SOURCE_TYPE_OPTIONS.find(
+        (option) => option.value === "claude_cowork",
+      );
+      // If the entry is gone entirely this test must fail loudly rather than
+      // pass over an undefined: the product decision was to keep the type.
+      expect(cowork).toBeDefined();
+
+      // Held back from the mock-up...
+      expect(cowork?.omitFromSample).toBe(true);
+      expect(
+        SAMPLE_INGESTION_SOURCES.some(
+          (source) => source.sourceType === "claude_cowork",
+        ),
+      ).toBe(false);
+
+      // ...and still a live, pickable connector. The owner asked for it out of
+      // the sample, explicitly NOT deleted or retired, so dropping the flag or
+      // adding `deprecated` both have to break something.
+      expect(cowork?.deprecated).toBeUndefined();
+      expect(
+        offeredSourceTypeOptions().some(
+          (option) => option.value === "claude_cowork",
+        ),
+      ).toBe(true);
+    });
+
     /** @scenario "Sample sources are the connectors the product offers, named as the menu names them" */
-    it("still invents the instance: health, arrival times and cadence vary across the fleet", () => {
-      // The part sample data is allowed to make up. A fleet where every row
-      // read the same would be a repeat of the menu rather than a preview of
-      // a populated table.
+    it("still invents the instance: every badge the table can draw is on screen", () => {
+      // The part sample data is allowed to make up, and the reason the cycle
+      // exists at all: a fleet where every row read the same would be a repeat
+      // of the menu rather than a preview of a populated table.
+      //
+      // Asserted through `sourceBadge` rather than over raw statuses because
+      // the states are cycled BY POSITION over the catalog. Holding a type
+      // back shifts every row after it, and the shift is silent — the badge
+      // that would go missing is "Not pulling", which needs its state to land
+      // on a PULL source, since a push row has its error count zeroed. This
+      // fails loudly if the next held-back type costs the table a badge.
+      const drawn = new Set(
+        SAMPLE_INGESTION_SOURCES.map(
+          (source) =>
+            sourceBadge({
+              status: source.status,
+              errorCount: source.errorCount,
+            }).label,
+        ),
+      );
+
+      expect(drawn).toEqual(
+        new Set(["Active", "Not pulling", "Awaiting first event", "Disabled"]),
+      );
+      // Arrival times spread rather than clustering on one timestamp. Not
+      // asserted as all-distinct: there are more rows than states, so the
+      // cycle wraps and the last rows legitimately repeat the first few.
+      const arrivals = SAMPLE_INGESTION_SOURCES.map(
+        (source) => source.lastEventAt?.getTime() ?? null,
+      );
       expect(
-        new Set(SAMPLE_INGESTION_SOURCES.map((source) => source.status)).size,
+        new Set(arrivals.filter((time) => time !== null)).size,
       ).toBeGreaterThan(1);
-      expect(
-        SAMPLE_INGESTION_SOURCES.some((source) => source.errorCount > 0),
-      ).toBe(true);
-      expect(
-        SAMPLE_INGESTION_SOURCES.some((source) => source.lastEventAt === null),
-      ).toBe(true);
+      expect(arrivals.some((time) => time === null)).toBe(true);
     });
 
     /** @scenario "Sample sources are the connectors the product offers, named as the menu names them" */

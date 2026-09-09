@@ -2,12 +2,12 @@
 import type { Source } from "../pages/ingestionSourceForms";
 import {
   modeForSourceType,
-  offeredSourceTypeOptions,
+  sampleSourceTypeOptions,
 } from "./ingestionSourceCatalog";
 
 /**
- * The Sources tab in sample mode: one row per source type the product offers,
- * carrying the name the Add source menu gives that type.
+ * The Sources tab in sample mode: one row per source type the catalog offers
+ * for illustration, carrying the name the Add source menu gives that type.
  *
  * DERIVED, NEVER RETYPED. These rows used to be built from the sample TOOL
  * cards, so the table named connectors the product does not sell — a "ChatGPT
@@ -17,6 +17,14 @@ import {
  * the delivery badge now all resolve out of `ingestionSourceCatalog`, the same
  * list the menu reads, so the sample cannot name a source type that is not on
  * offer, cannot rename one that is, and cannot keep showing a retired one.
+ *
+ * THE MENU AND THIS TABLE ARE NOT THE SAME LIST, and the difference is
+ * deliberate. `sampleSourceTypeOptions` is the menu's list minus the types
+ * flagged `omitFromSample` — held back from the mock-up while staying fully on
+ * offer. That flag lives on the catalog entry rather than in an exclusion list
+ * here, so the reason travels with the type; a bare list of keys in this file
+ * would be a second place the two lists could drift apart, which is the exact
+ * failure this module was rewritten to close.
  *
  * WHAT IS STILL INVENTED IS THE INSTANCE, not the type: whether this
  * organization's connection is healthy, when data last arrived through it, how
@@ -45,6 +53,13 @@ const HOUR_MS = 60 * MINUTE_MS;
  * The one exception the cycle cannot state is below: `errorCount` counts
  * consecutive PULL failures and nothing else writes it, so a push source
  * carrying one would be a state the product cannot produce.
+ *
+ * INDEXED BY POSITION, so the cycle is coupled to the sampled list: holding a
+ * type back or adding one shifts every state after it, and the shift is
+ * silent. The badge it can cost is "Not pulling", whose state has to land on a
+ * PULL source or the exception above zeroes it away. Reorder or hold back
+ * freely — a test asserts all four badges still reach the screen, and if one
+ * goes missing the fix belongs in this cycle rather than in the catalog order.
  */
 const SAMPLE_INSTANCE_STATES = [
   { status: "active", errorCount: 0, lastEventAgoMs: 3 * MINUTE_MS },
@@ -75,8 +90,8 @@ const SAMPLE_CONNECTED_AT = new Date("2026-06-01T00:00:00Z");
 
 const NOW_MS = Date.now();
 
-export const SAMPLE_INGESTION_SOURCES: Source[] =
-  offeredSourceTypeOptions().map((option, index) => {
+export const SAMPLE_INGESTION_SOURCES: Source[] = sampleSourceTypeOptions().map(
+  (option, index) => {
     const mode = modeForSourceType({ sourceType: option.value });
     const state =
       SAMPLE_INSTANCE_STATES[index % SAMPLE_INSTANCE_STATES.length]!;
@@ -122,4 +137,5 @@ export const SAMPLE_INGESTION_SOURCES: Source[] =
       hasPollerCursor: false,
       pullSchedule: samplePullSchedule(mode),
     };
-  });
+  },
+);
