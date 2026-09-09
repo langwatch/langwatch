@@ -1430,7 +1430,7 @@ secured.access(triggersManageAuth).post(
     try {
       const validatedData = slackTriggerBodySchema.parse(body);
 
-      await prisma.trigger.create({
+      await getApp().triggers.create({
         data: {
           projectId: project.id,
           action: TriggerAction.SEND_SLACK_MESSAGE,
