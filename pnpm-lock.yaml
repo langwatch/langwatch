@@ -2889,12 +2889,18 @@ importers:
 
   packages/enterprise/features/scim/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../config
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../handled-error
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../../runtime-composition
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../time
@@ -2950,6 +2956,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../prisma-client
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../../runtime-composition
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../time
@@ -4595,6 +4604,9 @@ importers:
 
   packages/features/coding-agent/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../runtime-composition
@@ -8477,6 +8489,9 @@ importers:
 
   packages/features/project/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
