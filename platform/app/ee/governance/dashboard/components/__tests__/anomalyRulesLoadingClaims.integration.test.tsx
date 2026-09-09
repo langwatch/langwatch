@@ -143,4 +143,47 @@ describe("given a manager opening the anomaly rules pane", () => {
       expect(screen.queryAllByText("0")).toHaveLength(3);
     });
   });
+
+  /*
+   * The error path is the other half of the condition this file is about, and
+   * it has two shapes. The gate moved from `!error` to `data !== undefined`,
+   * which keeps the first shape identical and deliberately changes the second:
+   * a refetch that fails after a good load has a fleet to report, and hiding
+   * the counts a reader was already looking at tells them less than leaving
+   * them up beside the failure.
+   */
+  describe("when the first load fails", () => {
+    beforeEach(() => {
+      harness.rulesQuery = {
+        data: undefined,
+        isLoading: false,
+        error: new Error("nope"),
+      };
+    });
+
+    it("claims no count, because none ever arrived", async () => {
+      mount();
+
+      expect(await screen.findByText("Critical")).toBeInTheDocument();
+      expect(screen.queryByText("No critical rules.")).not.toBeInTheDocument();
+      expect(screen.queryAllByText("0")).toHaveLength(0);
+    });
+  });
+
+  describe("when a refetch fails after the list already arrived", () => {
+    beforeEach(() => {
+      harness.rulesQuery = {
+        data: [],
+        isLoading: false,
+        error: new Error("nope"),
+      };
+    });
+
+    it("keeps the counts it already had", async () => {
+      mount();
+
+      expect(await screen.findByText("No critical rules.")).toBeInTheDocument();
+      expect(screen.queryAllByText("0")).toHaveLength(3);
+    });
+  });
 });
