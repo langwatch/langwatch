@@ -1,30 +1,25 @@
 /**
  * @vitest-environment node
- *
- * The `webhookEndpoints` transport: the declared scope per procedure, the
- * enterprise plan gate, and the secret-once contract — the signing secret
- * appears only in the create and rollSecret responses and never on a read.
- *
- * Moved here with the surface. The endpoint service under test is the real one,
- * over a stubbed Prisma client and an identity cipher: what the secret-once
- * contract needs is that the plaintext reaches create and rollSecret and no read
- * path, which holds anywhere. The refusal case stands on the policy the process
- * hands in rather than on the app's RBAC middleware; the transport's side of
- * that contract is that the handler never runs when the policy refuses.
- *
- * @see specs/webhooks/webhook-endpoints.feature
+ * The `webhookEndpoints` transport over the real runtime and a real endpoint
+ * store: the scope per procedure, the plan gate, and the secret-once contract.
  */
-import { initTRPC, TRPCError } from "@trpc/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { WebhookEndpointsNotEntitledError } from "@langwatch/webhook-contract";
+import { initTRPC } from "@trpc/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import {
   WebhookEndpointAdapter,
   type WebhookEndpointServiceOptions,
 } from "../../adapters/webhook-endpoint.webhook-endpoint.adapter.ts";
-import { WebhookIdPort } from "../webhook-id.port.ts";
-import { WebhookSecretPort } from "../webhook-secret.port.ts";
 import { WebhookApp } from "../../app/webhook.app.ts";
-import { WebhookEndpointTrpcApi } from "../../transport/api-trpc/webhook-endpoint.api.ts";
+import { WebhookIdPort } from "../../ports/webhook-id.port.ts";
+import { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
+import { webhookEndpointTrpcTransport } from "../webhook-endpoint.trpc.ts";
+import {
+  webhookEndpointTrpcTestPorts,
+  type WebhookEndpointTrpcTestContext,
+} from "./webhook-endpoint.trpc.harness.ts";
 
 const ORG_ID = "org_1";
 
@@ -71,33 +66,32 @@ class TestSecretPort extends WebhookSecretPort {
   }
 }
 
-const seenPermissions: string[] = [];
-const denied = new Set<string>();
 let entitled = true;
 
 function buildMockPrisma() {
   return {
     webhookEndpoint: {
-      findMany: vi.fn().mockResolvedValue([ENDPOINT_ROW]),
-      findFirst: vi.fn().mockResolvedValue(ENDPOINT_ROW),
-      create: vi.fn().mockResolvedValue(ENDPOINT_ROW),
-      update: vi.fn().mockResolvedValue(ENDPOINT_ROW),
+      findMany: vi.fn<() => Promise<unknown>>().mockResolvedValue([ENDPOINT_ROW]),
+      findFirst: vi.fn<() => Promise<unknown>>().mockResolvedValue(ENDPOINT_ROW),
+      create: vi.fn<() => Promise<unknown>>().mockResolvedValue(ENDPOINT_ROW),
+      update: vi.fn<() => Promise<unknown>>().mockResolvedValue(ENDPOINT_ROW),
     },
   };
 }
 
-function buildCaller(prisma: ReturnType<typeof buildMockPrisma>) {
+function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: string[] } = {}) {
+  const prisma = options.prisma ?? buildMockPrisma();
   const endpoints = WebhookEndpointAdapter.create({
     prisma: prisma as unknown as WebhookEndpointServiceOptions["prisma"],
     ids: new TestIdPort(),
     secrets: new TestSecretPort(),
   });
 
-  // The three capabilities below belong to the REST door — the health report,
-  // the test fire's delivery hop and the `Idempotency-Key` ledger — and no
-  // procedure on this surface that the tests below call reaches them. They
-  // throw rather than answering so a future procedure that does reach one
-  // fails loudly here instead of passing against a silent stub.
+  // The two capabilities below belong to the REST door — the delivery health
+  // report and the test fire's delivery hop — and no procedure on this surface
+  // that the tests below call reaches them. They throw rather than answering so
+  // a future procedure that does reach one fails loudly here instead of passing
+  // against a silent stub.
   const app = WebhookApp.create({
     endpoints,
     health: {
@@ -114,62 +108,74 @@ function buildCaller(prisma: ReturnType<typeof buildMockPrisma>) {
     },
   });
 
-  const trpc = initTRPC
-    .context<{ app: { webhooks: WebhookApp }; actor(): { id: string } }>()
-    .create();
+  const trpc = initTRPC.context<WebhookEndpointTrpcTestContext>().create();
+  const { ports, seenPermissions } = webhookEndpointTrpcTestPorts(new Set(options.denied ?? []));
+  const router = createTrpcRuntime<WebhookEndpointTrpcTestContext>({
+    root: trpc,
+    procedure: trpc.procedure,
+    ports,
+  }).mount(webhookEndpointTrpcTransport, () => app);
 
-  const router = WebhookEndpointTrpcApi.create(trpc, {
-    protected: trpc.procedure,
-    policy: (permission) => (procedure) =>
-      (procedure as { use(m: unknown): unknown }).use(({ next }: { next: () => unknown }) => {
-        seenPermissions.push(permission);
-        if (denied.has(permission)) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "You do not have permission" });
-        }
-        return next();
-      }) as typeof procedure,
-    // The process builds this from the webhook application's own entitlement
-    // check; this is that same check, so the refusal below is the real one.
-    entitlementGate: (procedure) =>
-      (
-        procedure as {
-          use(m: unknown): typeof procedure;
-        }
-      ).use(
-        async ({
-          ctx,
-          input,
-          next,
-        }: {
-          ctx: { app: { webhooks: WebhookApp } };
-          input: { organizationId: string };
-          next: () => Promise<unknown>;
-        }) => {
-          await ctx.app.webhooks.assertEntitled(input.organizationId);
-          return next();
-        },
-      ),
-    validateOutput: true,
-  });
-
-  return router.createCaller({
-    app: { webhooks: app },
-    actor: () => ({ id: "user_1" }),
-  } as never);
+  return {
+    prisma,
+    router,
+    seenPermissions,
+    caller: router.createCaller({ actor: { id: "user_1" } }),
+  };
 }
 
-describe("WebhookEndpointTrpcApi", () => {
+describe("the webhookEndpoints tRPC namespace", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    seenPermissions.length = 0;
-    denied.clear();
     entitled = true;
+  });
+
+  describe("given the mounted router", () => {
+    it("exposes exactly the procedure names the clients call", () => {
+      const { router } = mount();
+
+      expect(Object.keys(router._def.procedures).sort()).toEqual([
+        "archive",
+        "create",
+        "deliveries",
+        "disable",
+        "enable",
+        "eventTypes",
+        "health",
+        "list",
+        "rollSecret",
+        "update",
+      ]);
+    });
+
+    it("reads with a query and changes with a mutation", () => {
+      const { router } = mount();
+      const kinds = Object.fromEntries(
+        Object.entries(router._def.procedures).map(([name, procedure]) => [
+          name,
+          (procedure as { _def: { type: string } })._def.type,
+        ]),
+      );
+
+      expect(kinds).toEqual({
+        eventTypes: "query",
+        list: "query",
+        deliveries: "query",
+        create: "mutation",
+        health: "query",
+        update: "mutation",
+        rollSecret: "mutation",
+        enable: "mutation",
+        disable: "mutation",
+        archive: "mutation",
+      });
+    });
   });
 
   describe("given reads and mutations across the surface", () => {
     /** @scenario Read procedures require the view scope and mutations the manage scope */
     it("maps view scopes to reads and manage scopes to mutations", async () => {
-      const caller = buildCaller(buildMockPrisma());
+      const { caller, seenPermissions } = mount();
 
       await caller.list({ organizationId: ORG_ID });
       await caller.eventTypes({ organizationId: ORG_ID });
@@ -183,14 +189,13 @@ describe("WebhookEndpointTrpcApi", () => {
     });
   });
 
-  describe("when the policy refuses the declared scope", () => {
+  describe("when the check refuses the declared scope", () => {
     /** @scenario A denied scope rejects before any service call */
     it("rejects before any service call", async () => {
-      denied.add("webhookEndpoints:manage");
-      const prisma = buildMockPrisma();
+      const { caller, prisma } = mount({ denied: ["webhookEndpoints:manage"] });
 
       await expect(
-        buildCaller(prisma).create({
+        caller.create({
           organizationId: ORG_ID,
           url: "https://example.com/hook",
           enabledEvents: ["gateway.request.completed"],
@@ -205,7 +210,7 @@ describe("WebhookEndpointTrpcApi", () => {
     it("refuses the procedure", async () => {
       entitled = false;
 
-      await expect(buildCaller(buildMockPrisma()).list({ organizationId: ORG_ID })).rejects.toThrow(
+      await expect(mount().caller.list({ organizationId: ORG_ID })).rejects.toThrow(
         /enterprise feature/i,
       );
     });
@@ -214,7 +219,7 @@ describe("WebhookEndpointTrpcApi", () => {
   describe("given a minted and a rolled signing secret", () => {
     /** @scenario The session surface returns the secret only from create and roll mutations */
     it("returns the secret from create and roll but never from list", async () => {
-      const caller = buildCaller(buildMockPrisma());
+      const { caller } = mount();
 
       const created = await caller.create({
         organizationId: ORG_ID,
@@ -241,29 +246,21 @@ describe("WebhookEndpointTrpcApi", () => {
     /**
      * @scenario Unknown event selectors surface as a bad request in the session surface
      *
-     * Asserted on the handled `code` rather than on `BAD_REQUEST`. The refusal
-     * is a `webhook_endpoint_invalid` carrying a 400, and the process's tRPC
-     * policy is what turns that status into the transport's `BAD_REQUEST` —
-     * this transport no longer builds one. The root here is a bare
-     * `initTRPC` with a stub policy, so what reaches the caller is the
-     * refusal itself, which is the thing this surface is responsible for.
+     * Asserted on the handled `code` as well as on `BAD_REQUEST`. The refusal is
+     * a `webhook_endpoint_invalid` carrying a 400, and the runtime is what turns
+     * that status into the transport's code — this transport builds no
+     * `TRPCError` of its own, and the domain error reaches the boundary intact
+     * on the `cause`.
      */
     it("refuses with the endpoint's own validation code", async () => {
       await expect(
-        buildCaller(buildMockPrisma()).create({
+        mount().caller.create({
           organizationId: ORG_ID,
           url: "https://example.com/hook",
           enabledEvents: ["nonsense.event"],
         }),
-        // On the `cause`, not on the TRPCError itself. tRPC wraps whatever a
-        // procedure throws, and turning that wrapper into a 400 carrying the
-        // code is `createTrpcErrorFormatter`'s job — it reads exactly this
-        // `cause` through `HandledError.isHandled`. What this surface is
-        // responsible for is that the domain error REACHES the boundary
-        // intact, which is what is asserted here; the bare `initTRPC` above
-        // has no formatter, so asserting the client shape here would be
-        // asserting a collaborator this test does not build.
       ).rejects.toMatchObject({
+        code: "BAD_REQUEST",
         cause: { code: "webhook_endpoint_invalid", httpStatus: 400 },
       });
     });

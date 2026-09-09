@@ -22,6 +22,9 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../../../api/tsconfig.build.json"
+    },
+    {
       "path": "../../../config/tsconfig.build.json"
     },
     {
@@ -29,6 +32,9 @@
     },
     {
       "path": "../../../runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../../../time/tsconfig.build.json"
     }
   ]
 }

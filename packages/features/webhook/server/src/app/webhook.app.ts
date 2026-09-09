@@ -81,7 +81,7 @@ export class WebhookApp implements WebhookApiContract {
   archive: WebhookApiContract["archive"] = (input) => this.#dependencies.endpoints.archive(input);
   tryGetDeliverable: WebhookApiContract["tryGetDeliverable"] = (input) =>
     this.#dependencies.endpoints.tryGetDeliverable(input);
-  getDeliveries: WebhookEndpointRuntime["getDeliveries"] = (input) =>
+  getDeliveries: WebhookApiContract["getDeliveries"] = (input) =>
     this.#dependencies.endpoints.getDeliveries(input);
   getHealth: WebhookApiContract["getHealth"] = (input) => this.#dependencies.health.health(input);
   assertEndpointsEntitled: WebhookApiContract["assertEndpointsEntitled"] = (organizationId) =>

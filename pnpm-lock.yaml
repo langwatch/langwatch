@@ -3385,6 +3385,9 @@ importers:
 
   packages/features/analytics/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
@@ -10671,6 +10674,9 @@ importers:
 
   packages/features/webhook/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
@@ -10680,6 +10686,9 @@ importers:
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../runtime-composition
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../time
       zod:
         specifier: ^4.4.3
         version: 4.4.3

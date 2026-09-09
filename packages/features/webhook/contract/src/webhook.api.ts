@@ -5,6 +5,8 @@ import type {
 } from "./webhook.commands.ts";
 import type { ListWebhookEventsQuery, ListWebhookEventsResult } from "./webhook.queries.ts";
 import type {
+  WebhookDeliveryLog,
+  WebhookDeliveryPosition,
   WebhookEndpointHealth,
   WebhookEndpointView,
   WebhookEnvelope,
@@ -33,6 +35,13 @@ export interface WebhookApi {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointView | null>;
+  /** One endpoint's delivery log, newest first, one page at a time. */
+  getDeliveries(input: {
+    organizationId: string;
+    endpointId: string;
+    limit?: number;
+    cursor?: WebhookDeliveryPosition;
+  }): Promise<WebhookDeliveryLog>;
   getHealth(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointHealth>;
   getEmittedEvents(input: ListWebhookEventsQuery): Promise<ListWebhookEventsResult>;
   tryGetEmittedEventById(input: {

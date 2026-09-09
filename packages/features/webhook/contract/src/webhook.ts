@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 export const WEBHOOK_FEATURE_ID = "webhook" as const;
@@ -114,3 +115,28 @@ export const webhookDeliveryPageSchema = z
     nextCursor: z.object({ firedAt: z.date(), id: z.string() }).strict().nullable(),
   })
   .strict();
+
+/**
+ * The same page as the application holds it: an instant, not the wire date the
+ * schema above publishes. A door converts at its own edge, so a second door
+ * cannot inherit the first one's calendar.
+ */
+export type WebhookDeliveryAttemptRecord = {
+  id: string;
+  dispatchId: string;
+  attempt: number;
+  eventCount: number;
+  outcome: WebhookDeliveryOutcome;
+  responseStatus: number | null;
+  latencyMs: number | null;
+  error: string | null;
+  firedAt: Instant;
+};
+
+/** Where a delivery walk resumes: the attempt it last answered. */
+export type WebhookDeliveryPosition = { firedAt: Instant; id: string };
+
+export type WebhookDeliveryLog = {
+  deliveries: WebhookDeliveryAttemptRecord[];
+  nextCursor: WebhookDeliveryPosition | null;
+};

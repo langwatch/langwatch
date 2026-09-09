@@ -115,8 +115,10 @@ export {
 } from "./app/webhook.app.ts";
 export { webhookServer } from "./webhook.server.ts";
 
-// The tRPC transport this feature owns is not exported: it still names the
-// deleted legacy builder.
+/**
+ * The session-authenticated tRPC namespace this feature owns, `webhookEndpoints`.
+ */
+export { webhookEndpointTrpcTransport } from "./transport/webhook-endpoint.trpc.ts";
 
 /**
  * The organization-key REST family this feature owns, `/api/webhooks/v1`.
