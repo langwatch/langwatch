@@ -71,6 +71,9 @@ outputs:
   codeql-python:
     description: "'true' if code CodeQL analyses as python changed. See codeql-javascript."
     value: ${{ steps.filter.outputs.codeql-python || steps.force.outputs.codeql-python }}
+  codegen:
+    description: "'true' if the OpenAPI document or a generated client tree changed. Used by sdk-go-ci's codegen-fresh job. Separate from `relevant` because the spec lives OUTSIDE sdks/go, so a spec-only change leaves `relevant` false and every Go job skipped — which is how the committed client drifted eight spec commits behind unnoticed."
+    value: ${{ steps.filter.outputs.codegen || steps.force.outputs.codegen }}
   heavy:
     description: >-
       "'true' unless this is a draft pull request. Gate expensive jobs on
@@ -143,3 +146,4 @@ runs:
         echo "ingest=true" >> "$GITHUB_OUTPUT"
         echo "codeql-javascript=true" >> "$GITHUB_OUTPUT"
         echo "codeql-python=true" >> "$GITHUB_OUTPUT"
+        echo "codegen=true" >> "$GITHUB_OUTPUT"
