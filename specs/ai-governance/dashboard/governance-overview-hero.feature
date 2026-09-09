@@ -108,6 +108,10 @@ Feature: The governance overview opens with a hero and nothing else
     Then every shortcut carrying a tab in its address names a tab that page has
     And a shortcut naming a tab that no longer exists is a broken shortcut,
       because the page degrades it to the default pane rather than refusing it
+    But a page with no tabs at all is held to more than that
+    And no shortcut carries a tab to a page that has none,
+      because a tab nothing reads outlives whoever added it
+      and reads as deliberate to the next person who opens the file
 
   @integration
   Scenario: The field offers Langy to whoever may ask

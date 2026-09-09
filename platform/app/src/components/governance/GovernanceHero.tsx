@@ -55,7 +55,11 @@ export const HOME_MEASURE = "900px";
 
 export const INVENTORY_SOURCES_HREF = "/governance/inventory?tab=sources";
 export const ADD_DEPARTMENT_HREF = "/governance/people?tab=departments&add=1";
-export const ADD_AGENT_HREF = "/governance/agents?tab=agents&add=1";
+/**
+ * No `tab` alongside the `add`, unlike the two either side of it: the agents
+ * page carries no tab bar, so a tab here would be a parameter nothing reads.
+ */
+export const ADD_AGENT_HREF = "/governance/agents?add=1";
 export const ADD_TOOL_HREF = "/governance/inventory?tab=catalog&add=1";
 
 /**

@@ -228,11 +228,15 @@ const PACKAGE_ROOT = process.cwd();
  * `X_TABS = [...] as const` tuple — the single list its `isXTab` guard tests
  * against, so what this returns is what that page will actually accept.
  *
+ * `null` for a page carrying no such tuple. That is a page with no tab bar,
+ * not a page this failed to read, and the caller holds it to a stricter rule
+ * than a page with tabs, so the two cases have to be told apart.
+ *
  * Read from source rather than imported because these tuples are private to
  * their pages, and exporting three of them so a chip test can see them would
  * widen three modules' surface to serve one assertion.
  */
-async function tabsOfPage(path: string): Promise<string[]> {
+async function tabsOfPage(path: string): Promise<string[] | null> {
   const name = path.replace("/governance/", "");
   const candidates = [
     `src/pages/governance/${name}.tsx`,
@@ -250,8 +254,10 @@ async function tabsOfPage(path: string): Promise<string[]> {
 
   const source = await readFile(found, "utf8");
   const tuple = /const \w*TABS = \[([^\]]*)\] as const;/.exec(source);
-  if (tuple?.[1] === undefined)
-    throw new Error(`no \`X_TABS = [...] as const\` tuple in ${found}`);
+  // Returned rather than thrown: a page may legitimately have no tabs, and a
+  // throw here would make dropping a page's tab bar look like a fault in this
+  // hero. What the absence costs is charged by the caller instead.
+  if (tuple?.[1] === undefined) return null;
 
   return [...tuple[1].matchAll(/"([^"]+)"/g)].map(
     (match) => match[1] as string,
@@ -384,9 +390,11 @@ describe("governance overview", () => {
       expect(
         screen.getByRole("link", { name: "Add department" }),
       ).toHaveAttribute("href", "/governance/people?tab=departments&add=1");
+      // Alone among the three in carrying no tab, because the agents page has
+      // no tab bar to name.
       expect(screen.getByRole("link", { name: "Add agent" })).toHaveAttribute(
         "href",
-        "/governance/agents?tab=agents&add=1",
+        "/governance/agents?add=1",
       );
       expect(screen.getByRole("link", { name: "Add tool" })).toHaveAttribute(
         "href",
@@ -436,10 +444,12 @@ describe("governance overview", () => {
     it("names only tabs the destination page actually has", async () => {
       renderPage();
 
-      const carried = wayInHrefs().flatMap((href) => {
+      const destinations = wayInHrefs().map((href) => {
         const [path, query] = href.split("?");
-        const tab = new URLSearchParams(query ?? "").get("tab");
-        return tab === null ? [] : [{ path: path ?? "", tab }];
+        return {
+          path: path ?? "",
+          tab: new URLSearchParams(query ?? "").get("tab"),
+        };
       });
 
       // The chips are worth this only because a wrong tab is invisible: the
@@ -447,9 +457,20 @@ describe("governance overview", () => {
       // opens a real screen — just not the one its label promised. Asserting
       // the href alone is what let "Add anomaly rule" keep pointing at a tab
       // the inventory had already dropped.
-      expect(carried.length).toBeGreaterThan(0);
-      for (const { path, tab } of carried) {
-        expect(await tabsOfPage(path)).toContain(tab);
+      expect(destinations.length).toBeGreaterThan(0);
+      for (const { path, tab } of destinations) {
+        const tabs = await tabsOfPage(path);
+        if (tabs === null) {
+          // A page with no tab bar is held to more than a page with one: it
+          // must not be addressed with a tab at all. A tab a page cannot read
+          // is dead weight in the address that outlives whoever put it there,
+          // and it reads as deliberate to the next person to open the file.
+          // Compared as a pair so a failure names the page rather than only
+          // reporting that some string was not null.
+          expect({ path, tab }).toEqual({ path, tab: null });
+          continue;
+        }
+        if (tab !== null) expect(tabs).toContain(tab);
       }
     });
   });
