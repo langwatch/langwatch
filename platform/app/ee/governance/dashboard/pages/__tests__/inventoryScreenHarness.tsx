@@ -255,12 +255,15 @@ afterEach(() => {
 });
 
 /**
- * An organization with no tools AND the samples turned off.
+ * An organization with no tools, with the sample choice pinned off.
  *
- * Both halves are needed to see a real empty pane: with nothing connected the
- * page offers sample data by itself, so an empty source list alone renders
- * eight invented cards rather than the empty state. This is the reader who
- * pressed "Hide sample data" and is looking at their actual, empty catalog.
+ * The pin is belt-and-braces, not a correction: `useSampleMode` reads
+ * `optIn ?? false`, so an unset choice already means the reader's own data,
+ * empty included. Setting it outright says which of the two states a test
+ * meant, and keeps the empty-pane suites standing if that default is ever
+ * flipped to offer samples to an empty org.
+ *
+ * This is the reader looking at their actual, empty catalog.
  */
 export function emptyWithSamplesOff() {
   hoistedHarness.sources = { data: [], isLoading: false, error: null };

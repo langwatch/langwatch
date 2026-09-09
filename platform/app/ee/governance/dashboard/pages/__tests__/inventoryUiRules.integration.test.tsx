@@ -237,11 +237,21 @@ describe("given an admin on the Inventory page", () => {
      */
     /** @scenario "No governance page renders a native select" */
     it("renders no native select on any tab, empty or full", async () => {
+      // Say which state this half is in rather than inheriting it. The unset
+      // sample choice already resolves to the reader's own data, so this half
+      // was empty as written; pinning it means the sweep keeps sweeping an
+      // empty page if that default is ever flipped to offer samples to an
+      // empty org, instead of quietly becoming a second populated sweep.
+      emptyWithSamplesOff();
       const { unmount } = renderScreen();
       for (const tab of [/Environments/, /Sources/, /Catalog/]) {
         await openTab(tab);
         expect(findNativeSelects(document.body)).toHaveLength(0);
       }
+      // Proof this half is actually empty, so a future change to the default
+      // sample choice cannot quietly turn it back into a second full sweep
+      // while every assertion above still passes.
+      expect(screen.getByTestId("tool-catalog-empty")).toBeInTheDocument();
       unmount();
 
       connectTools();
@@ -254,6 +264,10 @@ describe("given an admin on the Inventory page", () => {
         await openTab(tab);
         expect(findNativeSelects(document.body)).toHaveLength(0);
       }
+      // And the matching proof for this half: connected tools really did put
+      // cards on the catalog. Without it a sweep over two empty pages would
+      // satisfy every assertion above and still test nothing.
+      expect(screen.queryByTestId("tool-catalog-empty")).toBeNull();
     });
 
     /*
