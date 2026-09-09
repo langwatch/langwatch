@@ -440,6 +440,88 @@ func TestHavenPathDoesNotGateOnLayout(t *testing.T) {
 	}
 }
 
+// @scenario "A monolith base is ready when its app lane is healthy"
+func TestVisualdiffMonolithStackIsReadyWhenItsAppLaneIsHealthy(t *testing.T) {
+	const slug = "visualdiff-20260909t2230-base"
+	appURL := "https://app." + slug + ".langwatch.localhost"
+
+	t.Run("given haven status reports the stack as the monolith layout", func(t *testing.T) {
+		report := havenrun.Status{Stacks: []havenrun.StackStatus{{
+			Slug: slug, Live: true, Layout: domain.LayoutMonolith,
+			Lanes:    []havenrun.LaneStatus{{Name: havenrun.AppService, Listening: true}},
+			Services: []havenrun.ServiceItem{{Name: havenrun.AppService, URL: appURL}},
+		}}}
+
+		t.Run("when the stack is addressed, it is ready at the app hostname", func(t *testing.T) {
+			url, ready := havenStackURL(report, slug)
+			if !ready {
+				t.Fatal("a monolith stack whose app lane is listening must be ready")
+			}
+			if url != appURL {
+				t.Errorf("url = %q, want the routed app hostname %q", url, appURL)
+			}
+		})
+	})
+
+	t.Run("given the app lane is not listening", func(t *testing.T) {
+		report := havenrun.Status{Stacks: []havenrun.StackStatus{{
+			Slug: slug, Live: true, Layout: domain.LayoutMonolith,
+			Lanes: []havenrun.LaneStatus{{Name: havenrun.AppService, Listening: false}},
+		}}}
+		t.Run("when the stack is addressed, it is not ready", func(t *testing.T) {
+			if _, ready := havenStackURL(report, slug); ready {
+				t.Error("a monolith stack whose app lane is down must not be ready")
+			}
+		})
+	})
+}
+
+// @scenario "A monolith base's failure tail reads the app lane"
+func TestVisualdiffMonolithBasesFailureTailReadsTheAppLane(t *testing.T) {
+	t.Run("given the base stack is the monolith layout", func(t *testing.T) {
+		fake := &fakeHavenRunner{backendLog: "line one\nEACCES: permission denied, open '/repos/.../server.mts'\n"}
+		run := havenTestSession(fake, time.Minute)
+		stack := run.plan.Base
+		stack.Layout = LayoutMonolith
+
+		t.Run("when the run gives up, the tail comes from the app lane's own log", func(t *testing.T) {
+			got := run.havenBackendLog(context.Background(), stack)
+			if !strings.Contains(got, "EACCES: permission denied") {
+				t.Errorf("log tail = %q, want the fake log content", got)
+			}
+			var logCmd commandSpec
+			for _, spec := range fake.commands {
+				if len(spec.args) > 0 && spec.args[0] == "logs" {
+					logCmd = spec
+				}
+			}
+			if got := haventArgv(logCmd); got != "haven logs app --agent --stack "+stack.HavenSlug {
+				t.Errorf("logs command = %q, want the app lane", got)
+			}
+		})
+	})
+
+	t.Run("given the stack is the modular layout", func(t *testing.T) {
+		fake := &fakeHavenRunner{backendLog: "modular log"}
+		run := havenTestSession(fake, time.Minute)
+		stack := run.plan.Base
+		stack.Layout = LayoutModular
+
+		t.Run("when the run gives up, the tail still comes from the backend lane", func(t *testing.T) {
+			run.havenBackendLog(context.Background(), stack)
+			var logCmd commandSpec
+			for _, spec := range fake.commands {
+				if len(spec.args) > 0 && spec.args[0] == "logs" {
+					logCmd = spec
+				}
+			}
+			if got := haventArgv(logCmd); got != "haven logs backend --agent --stack "+stack.HavenSlug {
+				t.Errorf("logs command = %q, want the backend lane", got)
+			}
+		})
+	})
+}
+
 // @scenario "haven is the default when present"
 // @scenario "-no-haven keeps the port-based path"
 func TestHavenIsTheDefaultAndNoHavenOptsOut(t *testing.T) {

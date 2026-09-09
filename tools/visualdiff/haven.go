@@ -17,10 +17,10 @@ import (
 // already isolates one stack per slug, so each ref becomes a haven stack.
 
 // Unlike apidiff, this path is not gated on layout: it runs `haven up` for
-// whatever the checkout defines and waits on the same two lanes either way.
-// Only the modular layout becomes ready today - haven's lanes are hardcoded
-// pnpm filters absent from the monolith layout, tools/thuishaven/app/plan.go
-// - but that failure is haven's own, not a refusal visualdiff makes up front.
+// whatever the checkout defines. haven now boots a monolith checkout as one
+// "app" lane instead of "ui" plus "backend" and reports which layout a stack
+// is on (StackStatus.Layout); havenStackURL and havenWaitReady read that
+// report, so readiness is still entirely haven's own answer, not a refusal.
 
 // havenSlugPrefix opens every slug a run allocates. It is what makes
 // teardown provably narrow: a stack visualdiff may destroy is one it named
@@ -120,8 +120,10 @@ func (run *session) havenUp(ctx context.Context, stack Stack) error {
 	return nil
 }
 
-// havenWaitReady polls haven until the stack's ui and backend lanes are both
-// listening, then adopts the app hostname haven allocated for it.
+// havenWaitReady polls haven until the stack's required lanes are listening
+// (the ui and backend lanes on a modular checkout, the one app lane on a
+// monolith one - see havenStackURL), then adopts the app hostname haven
+// allocated for it.
 func (run *session) havenWaitReady(ctx context.Context, stack *Stack) error {
 	timeout := run.request.Options.BootTimeout
 	deadline := time.Now().Add(timeout)
@@ -147,9 +149,11 @@ func (run *session) havenWaitReady(ctx context.Context, stack *Stack) error {
 	}
 }
 
-// havenStackURL reports the app hostname to drive once the named stack's ui
-// and backend lanes are both listening. Ready is haven's own answer, never a
-// guess from elapsed time.
+// havenStackURL reports the app hostname to drive once the named stack's
+// required lanes are all listening: the ui and backend lanes on a modular
+// checkout, the one app lane on a monolith checkout (havenrun.StackReady
+// resolves that translation from the stack's own reported layout). Ready is
+// haven's own answer, never a guess from elapsed time.
 func havenStackURL(status havenrun.Status, slug string) (string, bool) {
 	stack, ready := havenrun.StackReady(status, slug, havenReadyLanes...)
 	if !ready {
@@ -168,13 +172,19 @@ func (run *session) havenStatus(ctx context.Context, stack Stack) (havenrun.Stat
 	return havenrun.ParseStatus(out.Bytes())
 }
 
-// havenBackendLog is the tail of a stack's backend lane, for the failure
-// message of a boot that never became ready.
+// havenBackendLog is the tail of a stack's Node lane log, for the failure
+// message of a boot that never became ready: the single app lane on a
+// monolith checkout (stack.Layout, set at checkout - see checkoutForHaven),
+// the backend lane everywhere else.
 func (run *session) havenBackendLog(ctx context.Context, stack Stack) string {
+	lane := havenrun.BackendLane
+	if stack.Layout == LayoutMonolith {
+		lane = havenrun.AppService
+	}
 	var out bytes.Buffer
-	spec := commandSpec{name: havenrun.Command, args: havenrun.BackendLogArgs(stack.HavenSlug), dir: stack.Dir, env: havenEnv(run.request.Deps.Environ(), stack.HavenSlug)}
+	spec := commandSpec{name: havenrun.Command, args: havenrun.LogArgs(lane, stack.HavenSlug), dir: stack.Dir, env: havenEnv(run.request.Deps.Environ(), stack.HavenSlug)}
 	if err := run.request.Deps.Run(ctx, spec, &out); err != nil {
-		return fmt.Sprintf("(backend log for %s unavailable: %v)", stack.HavenSlug, err)
+		return fmt.Sprintf("(%s log for %s unavailable: %v)", lane, stack.HavenSlug, err)
 	}
 	return havenrun.LastLines(out.String(), havenrun.DefaultFailureLogLines)
 }

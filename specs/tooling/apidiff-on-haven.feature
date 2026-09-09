@@ -69,6 +69,19 @@ Feature: apidiff boots its instances through haven
       Then it polls haven status --json until the backend lane is healthy or the boot timeout passes
       And the seeded credentials it probes with are the ones haven's seed wrote
 
+    @unit
+    Scenario: A monolith base is ready when its app lane is healthy
+      Given haven status reports a stack whose layout is monolith and whose one app lane is listening
+      When the instance is addressed
+      Then it is ready
+      And its base URL is the app hostname haven allocated for that stack, the same address visualdiff uses
+
+    @unit
+    Scenario: A monolith base's failure tail reads the app lane
+      Given the main instance is the monolith layout and its stack never becomes ready
+      When the run gives up
+      Then the failure tail comes from haven logs app for that stack, not haven logs backend
+
   Rule: The compose path remains for machines without haven
 
     @unit

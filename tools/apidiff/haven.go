@@ -96,10 +96,10 @@ func havenDestroyArgs(slug string) []string {
 	return havenrun.DestroyArgs(slug)
 }
 
-// havenBackendLogArgs reads one stack's backend lane log, for a boot that
-// never became ready.
-func havenBackendLogArgs(slug string) []string {
-	return havenrun.BackendLogArgs(slug)
+// havenLogArgs reads one stack's named lane log, for a boot that never
+// became ready.
+func havenLogArgs(lane, slug string) []string {
+	return havenrun.LogArgs(lane, slug)
 }
 
 // havenStatus is the slice of `haven status --json` this tool reads.
@@ -113,17 +113,20 @@ type havenLaneStatus = havenrun.LaneStatus
 // serving": the api and worker applications in one local process.
 const havenBackendLane = havenrun.BackendLane
 
-// havenStackReady reports the base URL to probe once the named stack's backend
-// lane is up. Ready is haven's own answer - the stack live and its backend
-// lane listening - never a guess from elapsed time.
-//
-// The address is the backend lane's own loopback port, which is where the API
-// serves the /api prefix every probed operation path already carries. The
-// routed app.<slug> hostname reaches the same application, but only over the
-// proxy's own TLS, which this tool's HTTP client has no reason to trust.
+// havenStackReady reports the base URL to probe once the named stack's
+// required lane is up (haven's own answer, never a guess from elapsed time).
+// A modular stack's address is the backend lane's own loopback port, where
+// the API serves /api; a monolith stack has no separate one, so its address
+// is the routed app hostname visualdiff also uses (StackStatus.IsMonolith).
 func havenStackReady(report havenStatus, slug string) (string, bool) {
 	stack, ready := havenrun.StackReady(report, slug, havenBackendLane)
-	if !ready || stack.APIPort == 0 {
+	if !ready {
+		return "", false
+	}
+	if stack.IsMonolith() {
+		return stack.ServiceURL(havenrun.AppService)
+	}
+	if stack.APIPort == 0 {
 		return "", false
 	}
 	return fmt.Sprintf("http://127.0.0.1:%d", stack.APIPort), true
@@ -173,18 +176,16 @@ func (state *bootState) bootThroughHaven(ctx context.Context, booted *Booted) er
 	return nil
 }
 
-// prepareHavenInstances detects each side's layout. haven supervises the
-// modular layout's lanes and nothing else, so a monolith checkout is refused
-// here - with the flag that boots it the old way - rather than left to fail
-// eight minutes in as a stack that never became ready.
+// prepareHavenInstances detects each side's layout, for logging and for
+// naming the right lane on a failed boot's log tail (havenBackendLog). haven
+// boots a monolith checkout itself now, so neither layout is refused here -
+// a checkout this tool cannot recognize at all still fails on detectProfile's
+// own error, same as the compose path.
 func (state *bootState) prepareHavenInstances(booted *Booted) error {
 	for _, instance := range []*Instance{&booted.A, &booted.B} {
 		profile, err := detectProfile(instance.Dir)
 		if err != nil {
 			return err
-		}
-		if profile.name != profileModular {
-			return fmt.Errorf("%s is the %s layout, which haven does not supervise - boot it with -no-haven", instance.Dir, profile.name)
 		}
 		instance.Profile = profile
 		state.logf("%s: %s profile as haven stack %q (%s)", instance.Name, profile.name, HavenSlug(state.runID, instance.Name), instance.Dir)
@@ -223,7 +224,7 @@ func (state *bootState) havenWaitReady(ctx context.Context, instance *Instance) 
 		}
 		if time.Now().After(deadline) {
 			return fmt.Errorf("haven %s: stack %q had no healthy backend lane within %s\n%s",
-				instance.Name, plan.slug, timeout, state.havenBackendLog(ctx, plan))
+				instance.Name, plan.slug, timeout, state.havenBackendLog(ctx, plan, *instance))
 		}
 		select {
 		case <-ctx.Done():
@@ -250,13 +251,18 @@ func (state *bootState) havenStatus(ctx context.Context, plan havenPlan) (havenS
 	return parseHavenStatus(out.Bytes())
 }
 
-// havenBackendLog is the tail of a stack's backend lane, for the failure
-// message of a boot that never became ready.
-func (state *bootState) havenBackendLog(ctx context.Context, plan havenPlan) string {
+// havenBackendLog is the tail of a stack's Node lane log, for the failure
+// message of a boot that never became ready: the single app lane on a
+// monolith checkout, the backend lane everywhere else (see profile.go).
+func (state *bootState) havenBackendLog(ctx context.Context, plan havenPlan, instance Instance) string {
+	lane := havenBackendLane
+	if instance.Profile.name == profileMonolith {
+		lane = havenrun.AppService
+	}
 	var out bytes.Buffer
-	spec := commandSpec{name: havenCommand, args: havenBackendLogArgs(plan.slug), dir: plan.dir, env: havenEnv(state.environ(), plan.slug)}
+	spec := commandSpec{name: havenCommand, args: havenLogArgs(lane, plan.slug), dir: plan.dir, env: havenEnv(state.environ(), plan.slug)}
 	if err := state.run(ctx, spec, &out); err != nil {
-		return fmt.Sprintf("(backend log for %s unavailable: %v)", plan.slug, err)
+		return fmt.Sprintf("(%s log for %s unavailable: %v)", lane, plan.slug, err)
 	}
 	return lastLines(out.String(), havenFailureLogLines)
 }

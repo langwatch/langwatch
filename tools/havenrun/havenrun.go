@@ -143,10 +143,18 @@ func DestroyArgs(slug string) []string {
 	return []string{"destroy", slug, "--agent", "--yes"}
 }
 
+// LogArgs reads one stack's named lane log, for a boot that never became
+// ready. A monolith stack has no "backend" lane to read - AppService names
+// its one Node lane instead, so a caller picks the lane the stack actually
+// runs (see StackStatus.IsMonolith).
+func LogArgs(lane, slug string) []string {
+	return []string{"logs", lane, "--agent", "--stack", slug}
+}
+
 // BackendLogArgs reads one stack's backend lane log, for a boot that never
 // became ready.
 func BackendLogArgs(slug string) []string {
-	return []string{"logs", "backend", "--agent", "--stack", slug}
+	return LogArgs(BackendLane, slug)
 }
 
 // Status is the slice of `haven status --json` this package reads.
@@ -161,6 +169,16 @@ type StackStatus struct {
 	Live     bool          `json:"live"`
 	Lanes    []LaneStatus  `json:"lanes"`
 	Services []ServiceItem `json:"services"`
+	// Layout is the checkout shape the stack was brought up from (see
+	// tools/thuishaven/domain/layout.go). Empty reads as modular, same as a
+	// stack recorded before the field existed.
+	Layout domain.Layout `json:"layout,omitempty"`
+}
+
+// IsMonolith reports whether this stack runs the monolith checkout's single
+// app lane instead of the modular checkout's ui and backend lanes.
+func (stack StackStatus) IsMonolith() bool {
+	return stack.Layout.IsMonolith()
 }
 
 // LaneStatus is one supervised Node lane plus whether it is listening.
@@ -197,17 +215,42 @@ func ParseStatus(output []byte) (Status, error) {
 
 // StackReady finds the named, live stack whose every required lane is
 // listening. Ready is haven's own answer, never a guess from elapsed time: a
-// stack that is not live, or missing any required lane, is not ready.
+// stack that is not live, or missing any required lane, is not ready. A
+// monolith stack runs one lane, AppService, so a caller asking for UILane or
+// BackendLane is answered by that lane instead (see resolveRequiredLanes).
 func StackReady(status Status, slug string, requiredLanes ...string) (StackStatus, bool) {
 	for _, stack := range status.Stacks {
 		if stack.Slug != slug || !stack.Live {
 			continue
 		}
-		if lanesListening(stack.Lanes, requiredLanes) {
+		if lanesListening(stack.Lanes, resolveRequiredLanes(stack.IsMonolith(), requiredLanes)) {
 			return stack, true
 		}
 	}
 	return StackStatus{}, false
+}
+
+// resolveRequiredLanes translates UILane and BackendLane into AppService for
+// a monolith stack, deduplicating so two required lanes collapsing into one
+// name are asked about once.
+func resolveRequiredLanes(monolith bool, requiredLanes []string) []string {
+	if !monolith {
+		return requiredLanes
+	}
+	resolved := make([]string, 0, len(requiredLanes))
+	seen := map[string]bool{}
+	for _, lane := range requiredLanes {
+		name := lane
+		if lane == UILane || lane == BackendLane {
+			name = AppService
+		}
+		if seen[name] {
+			continue
+		}
+		seen[name] = true
+		resolved = append(resolved, name)
+	}
+	return resolved
 }
 
 func lanesListening(lanes []LaneStatus, required []string) bool {

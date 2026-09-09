@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/havenrun"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
@@ -423,6 +424,88 @@ func TestReadyMeansTheBackendLaneIsHealthy(t *testing.T) {
 		if DefaultOrgKey != domain.DefaultPrivateAccessToken {
 			t.Errorf("org key %q, want haven's seeded %q", DefaultOrgKey, domain.DefaultPrivateAccessToken)
 		}
+	})
+}
+
+// @scenario "A monolith base is ready when its app lane is healthy"
+func TestAMonolithStackIsReadyWhenItsAppLaneIsHealthy(t *testing.T) {
+	const slug = "apidiff-20260909t2230-main"
+	appURL := "https://app." + slug + ".langwatch.localhost"
+
+	t.Run("given haven status reports the stack as the monolith layout", func(t *testing.T) {
+		report := havenStatus{Stacks: []havenStackStatus{{
+			Slug: slug, Live: true, Layout: domain.LayoutMonolith,
+			Lanes:    []havenLaneStatus{{Name: havenrun.AppService, Listening: true}},
+			Services: []havenrun.ServiceItem{{Name: havenrun.AppService, URL: appURL}},
+		}}}
+
+		t.Run("when the instance is addressed, it is ready at the app hostname", func(t *testing.T) {
+			url, ready := havenStackReady(report, slug)
+			if !ready {
+				t.Fatal("a monolith stack whose app lane is listening must be ready")
+			}
+			if url != appURL {
+				t.Errorf("url = %q, want the routed app hostname %q", url, appURL)
+			}
+		})
+	})
+
+	t.Run("given the app lane is not listening", func(t *testing.T) {
+		report := havenStatus{Stacks: []havenStackStatus{{
+			Slug: slug, Live: true, Layout: domain.LayoutMonolith,
+			Lanes: []havenLaneStatus{{Name: havenrun.AppService, Listening: false}},
+		}}}
+		t.Run("when the instance is addressed, it is not ready", func(t *testing.T) {
+			if _, ready := havenStackReady(report, slug); ready {
+				t.Error("a monolith stack whose app lane is down must not be ready")
+			}
+		})
+	})
+}
+
+// @scenario "A monolith base's failure tail reads the app lane"
+func TestAMonolithBasesFailureTailReadsTheAppLane(t *testing.T) {
+	t.Run("given the main instance is the monolith layout", func(t *testing.T) {
+		fake := &fakeHaven{backendLog: "line one\nEACCES: permission denied, open '/repos/.../server.mts'\n"}
+		state := havenState(fake, time.Minute)
+		plan := havenPlan{instance: "main", slug: "apidiff-20260909t2230-main", dir: "/repos/langwatch/.apidiff/run/main"}
+		instance := Instance{Name: "main", Dir: plan.dir, Profile: bootProfile{name: profileMonolith}}
+
+		t.Run("when the run gives up, the tail comes from the app lane's own log", func(t *testing.T) {
+			got := state.havenBackendLog(context.Background(), plan, instance)
+			if !strings.Contains(got, "EACCES: permission denied") {
+				t.Errorf("log tail = %q, want the fake log content", got)
+			}
+			var logCmd commandSpec
+			for _, spec := range fake.commands {
+				if len(spec.args) > 0 && spec.args[0] == "logs" {
+					logCmd = spec
+				}
+			}
+			if got := argv(logCmd); got != "haven logs app --agent --stack apidiff-20260909t2230-main" {
+				t.Errorf("logs command = %q, want the app lane", got)
+			}
+		})
+	})
+
+	t.Run("given the instance is the modular layout", func(t *testing.T) {
+		fake := &fakeHaven{backendLog: "modular log"}
+		state := havenState(fake, time.Minute)
+		plan := havenPlan{instance: "branch", slug: "apidiff-20260909t2230-branch", dir: "/repos/langwatch"}
+		instance := Instance{Name: "branch", Dir: plan.dir, Profile: bootProfile{name: profileModular}}
+
+		t.Run("when the run gives up, the tail still comes from the backend lane", func(t *testing.T) {
+			state.havenBackendLog(context.Background(), plan, instance)
+			var logCmd commandSpec
+			for _, spec := range fake.commands {
+				if len(spec.args) > 0 && spec.args[0] == "logs" {
+					logCmd = spec
+				}
+			}
+			if got := argv(logCmd); got != "haven logs backend --agent --stack apidiff-20260909t2230-branch" {
+				t.Errorf("logs command = %q, want the backend lane", got)
+			}
+		})
 	})
 }
 

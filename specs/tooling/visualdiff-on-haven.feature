@@ -68,6 +68,19 @@ Feature: visualdiff boots its stacks through haven
       When the run waits for a stack
       Then it polls haven status --json until both the ui lane and the backend lane are listening or the boot timeout passes
 
+    @unit
+    Scenario: A monolith base is ready when its app lane is healthy
+      Given haven status reports a stack whose layout is monolith and whose one app lane is listening
+      When the stack is addressed
+      Then it is ready
+      And its URL is the app hostname haven allocated for that stack
+
+    @unit
+    Scenario: A monolith base's failure tail reads the app lane
+      Given the base stack is the monolith layout and never becomes ready
+      When the run gives up
+      Then the failure tail comes from haven logs app for that stack, not haven logs backend
+
   Rule: A monolith ref is not refused up front - haven's own answer decides
 
     @unit

@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 func TestSlugIsPrefixedAndSanitized(t *testing.T) {
@@ -133,6 +135,49 @@ func TestStackReadyRequiresEveryNamedLaneListening(t *testing.T) {
 	dead := Status{Stacks: []StackStatus{{Slug: "s1", Live: false, Lanes: []LaneStatus{{Name: "ui", Listening: true}}}}}
 	if _, ready := StackReady(dead, "s1", "ui"); ready {
 		t.Fatal("a stack whose launcher is dead was reported ready")
+	}
+}
+
+func TestStackReadyResolvesUIAndBackendToTheAppLaneOnAMonolithStack(t *testing.T) {
+	status := Status{Stacks: []StackStatus{{
+		Slug: "s1", Live: true, Layout: domain.LayoutMonolith,
+		Lanes:    []LaneStatus{{Name: AppService, Listening: true}},
+		Services: []ServiceItem{{Name: AppService, URL: "https://app.s1.langwatch.localhost"}},
+	}}}
+	stack, ready := StackReady(status, "s1", UILane, BackendLane)
+	if !ready {
+		t.Fatal("a monolith stack whose app lane is listening must be ready for a caller asking about ui+backend")
+	}
+	if !stack.IsMonolith() {
+		t.Error("IsMonolith must report true for a stack whose layout is monolith")
+	}
+	if url, ok := stack.ServiceURL(AppService); !ok || url != "https://app.s1.langwatch.localhost" {
+		t.Errorf("ServiceURL(AppService) = %q, %v", url, ok)
+	}
+
+	down := Status{Stacks: []StackStatus{{
+		Slug: "s1", Live: true, Layout: domain.LayoutMonolith,
+		Lanes: []LaneStatus{{Name: AppService, Listening: false}},
+	}}}
+	if _, ready := StackReady(down, "s1", BackendLane); ready {
+		t.Fatal("a monolith stack whose app lane is down must not be ready")
+	}
+
+	modular := Status{Stacks: []StackStatus{{
+		Slug: "s2", Live: true,
+		Lanes: []LaneStatus{{Name: UILane, Listening: true}, {Name: BackendLane, Listening: true}},
+	}}}
+	if stack, _ := StackReady(modular, "s2", UILane, BackendLane); stack.IsMonolith() {
+		t.Error("a stack with no layout recorded must read as modular, not monolith")
+	}
+}
+
+func TestLogArgsAndBackendLogArgs(t *testing.T) {
+	if got := strings.Join(LogArgs(AppService, "slug-1"), " "); got != "logs app --agent --stack slug-1" {
+		t.Errorf("LogArgs = %q", got)
+	}
+	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs backend --agent --stack slug-1" {
+		t.Errorf("BackendLogArgs = %q", got)
 	}
 }
 
