@@ -98,8 +98,8 @@ function renderAgentsAt(initialEntries: string[] = ["/governance/agents"]) {
  * Whether `first` is painted before `second`.
  *
  * `compareDocumentPosition` answers document order, which is what "above the
- * tabs" means in a column layout and what a screenshot would otherwise have to
- * be trusted for.
+ * agents" means in a column layout and what a screenshot would otherwise have
+ * to be trusted for.
  */
 function comesBefore(first: Element, second: Element): boolean {
   return Boolean(
@@ -117,9 +117,9 @@ afterEach(() => {
 });
 
 describe("the agents fleet summary strip", () => {
-  describe("when the sample agent cards are on screen", () => {
-    /** @scenario "The fleet summary strip sits above the tabs and above the filter chips" */
-    it("puts four named cards above the tab bar", () => {
+  describe("when the sample agents are on screen", () => {
+    /** @scenario "The fleet summary strip sits above the filter chips and the agents" */
+    it("puts four named cards above the agents", () => {
       renderAgentsAt();
 
       const strip = screen.getByTestId("agents-summary-strip");
@@ -128,11 +128,14 @@ describe("the agents fleet summary strip", () => {
         expect(within(strip).getByText(eyebrow)).toBeVisible();
       }
 
-      const tabBar = screen.getByRole("tab", { name: "Agents" });
-      expect(comesBefore(strip, tabBar)).toBe(true);
+      // The tab bar used to be the landmark here. With the tabs gone the
+      // landmark is the agents themselves, which is what the strip actually
+      // summarizes and therefore the stricter subject.
+      const list = screen.getByTestId("governance-agents-table");
+      expect(comesBefore(strip, list)).toBe(true);
     });
 
-    /** @scenario "The fleet summary strip sits above the tabs and above the filter chips" */
+    /** @scenario "The fleet summary strip sits above the filter chips and the agents" */
     it("sits below the banner that says nothing on the page is real", () => {
       renderAgentsAt();
 
@@ -143,7 +146,7 @@ describe("the agents fleet summary strip", () => {
       expect(comesBefore(banner, strip)).toBe(true);
     });
 
-    /** @scenario "The fleet summary strip sits above the tabs and above the filter chips" */
+    /** @scenario "The fleet summary strip sits above the filter chips and the agents" */
     it("carries no filter chip above it", () => {
       renderAgentsAt();
 
@@ -160,11 +163,20 @@ describe("the agents fleet summary strip", () => {
       for (const chip of chips) expect(comesBefore(chip, strip)).toBe(false);
     });
 
-    /** @scenario "The fleet summary strip sits above the tabs and above the filter chips" */
-    it("stays put when the reader opens the Applications tab", () => {
-      renderAgentsAt(["/governance/agents?tab=applications"]);
+    /**
+     * The strip resumes the fleet, not one layout of it, so switching how the
+     * agents are drawn must not move or remove it. This replaced an assertion
+     * that it survived opening the Applications tab, which is the same claim
+     * about the control the page had at the time.
+     */
+    /** @scenario "The fleet summary strip sits above the filter chips and the agents" */
+    it("stays put, and above them, when the reader switches to the cards", () => {
+      renderAgentsAt(["/governance/agents?view=grid"]);
 
-      expect(screen.getByTestId("agents-summary-strip")).toBeVisible();
+      const strip = screen.getByTestId("agents-summary-strip");
+      expect(strip).toBeVisible();
+      const cards = screen.getAllByTestId("governance-agent-card");
+      expect(comesBefore(strip, cards[0] as HTMLElement)).toBe(true);
     });
   });
 

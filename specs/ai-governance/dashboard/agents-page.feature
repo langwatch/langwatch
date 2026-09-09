@@ -4,10 +4,24 @@ Feature: The AI Governance Agents page
   So that I can find the unclaimed and the expensive ones without asking around
 
   # ---------------------------------------------------------------------------
-  # The Agents page is a tabbed surface — Agents and Applications — whose tab
-  # contract lives in specs/ai-gateway/governance/governance-home-routing.feature.
-  # This file covers what the Agents tab holds: the sample-data toggle, the
-  # register action, the filter chips and the agent cards.
+  # The Agents page is one surface: the agents, and the controls above them.
+  # Its address contract lives in
+  # specs/ai-gateway/governance/governance-home-routing.feature. This file
+  # covers what the page holds: the sample-data toggle, the register action,
+  # the filter chips, the layout switch, and the two layouts themselves.
+  #
+  # IT WAS TABBED AND IS NOT ANY MORE. An Applications tab sat beside the
+  # agents, and the pane behind it read nothing and listed nothing — a fixed
+  # empty state waiting for a concept the platform does not model. The product
+  # owner asked for it gone. With one pane left there was nothing to switch
+  # between, so the tab strip went too.
+  #
+  # THE LIST IS THE DEFAULT AND THE CARDS ARE THE OPTION. The question this
+  # page is opened with — what is running across this organization — is a
+  # comparison across agents, and a grid of cards answers it a panel at a
+  # time. The switch between the two is the inventory catalog's control, down
+  # to its words, so a reader who learned it on one governance screen finds it
+  # here.
   #
   # WHAT IS REAL HERE. Nothing on this page is measured yet. Every agents
   # procedure the platform has is project-scoped (`agents.getAll`, permission
@@ -39,21 +53,22 @@ Feature: The AI Governance Agents page
     Given no organization-wide agent read exists
     And the viewer has enabled sample data
     When a governance viewer opens the Agents page
-    Then sample agent cards are on screen
+    Then the sample agents are listed
+    And each listed row says it is a sample
     And the banner says nothing on the page is real
 
   @integration
   Scenario: Turning sample data off leaves the honest empty pane
-    Given the sample agent cards are on screen
+    Given the sample agents are on screen
     When the reader turns sample data off
-    Then no agent card remains
+    Then no agent remains listed
     And the pane renders the page's own empty state, headed
       "No agents registered yet"
     And that empty state offers a way to register one
     And the banner is gone
 
   # ---------------------------------------------------------------------------
-  # Empty states. One shared shape (~/components/governance/empty), three
+  # Empty states. One shared shape (~/components/governance/empty), two
   # different sets of words, because a page that has nothing to show still has
   # something to say and it is never the same sentence twice.
   #
@@ -70,20 +85,19 @@ Feature: The AI Governance Agents page
     Given no organization-wide agent read exists
     And the reader has turned sample data off
     When a governance viewer opens the Agents page
-    And they open the Applications tab
-    Then each pane renders an empty state with a glyph, a headline, a sentence
+    Then the page renders an empty state with a glyph, a headline, a sentence
       and a button
-    And neither pane is a bare sentence in a dashed box
+    And it is not a bare sentence in a dashed box
 
   @integration
   # Title kept on one line: the parity checker's title group cannot cross a
   # newline, so a wrapped title binds a phantom that matches no scenario.
   Scenario: Filtering everything out offers the filters back, not a registration
-    Given the sample agent cards are on screen
+    Given the sample agents are on screen
     When the reader picks a source and an ownership that no agent satisfies
     Then the pane says no agent matches these filters
     And the way out is clearing the filters, not registering an agent
-    And clearing them brings the cards back
+    And clearing them brings the agents back
 
   @integration
   Scenario: The sample toggle and the register action sit in the page header
@@ -129,20 +143,20 @@ Feature: The AI Governance Agents page
   @integration
   Scenario: The filter row sits outside the content it narrows
     When the Agents page renders
-    Then no filter chip is inside the tab content region
-    And the Applications tab, which has nothing to filter, renders no chips
+    Then no filter chip is inside the region holding the agents
+    And with nothing registered the page offers no chips at all
 
   @integration
   Scenario: Filtering by source leaves only that source's agents
     Given sample agents from several sources
     When the reader picks a single source
-    Then only that source's cards remain
+    Then only that source's agents remain
 
   @integration
   Scenario: Ownership filters down to the agents nobody has claimed
     Given some sample agents carry an owner and some do not
     When the reader picks Unclaimed only
-    Then only the cards with no owner remain
+    Then only the agents with no owner remain
     And each of them carries the Unclaimed badge
 
   @integration
@@ -152,10 +166,62 @@ Feature: The AI Governance Agents page
     And opening that address again applies all three
 
   @integration
-  Scenario: Sorting reorders the cards
+  Scenario: Sorting reorders the agents
     Given sample agents with different spend
     When the reader sorts by requests instead
-    Then the card order follows the request counts
+    Then their order follows the request counts
+
+  # ===========================================================================
+  # The two layouts
+  # ===========================================================================
+  #
+  # The list is what the page opens on, because the question it answers is a
+  # comparison across agents and a card grid answers that a panel at a time.
+  # The cards stay for reading one agent closely.
+  #
+  # THE LIST CARRIES EVERY ATTRIBUTE AN AGENT ROW HAS, which is ten columns.
+  # Two of them — how the agent is doing and how long ago it registered — are
+  # nowhere else on the page per agent: the card has no room for them and the
+  # summary strip only counts them across the whole fleet. Surfacing those two
+  # is a large part of what the list is for.
+  #
+  # Both layouts draw a figure through the same component, so a value the
+  # platform does not have is the same em dash carrying the same sentence in
+  # either one, and neither can quietly render a zero instead.
+
+  @integration
+  Scenario: The agents page opens on the list rather than the cards
+    Given the sample agents are on screen
+    When a governance viewer opens the Agents page
+    Then the agents are listed one per row
+    And no agent card is on screen
+    And a layout switch offers List and Grid, with List chosen
+
+  @integration
+  Scenario: The list carries every attribute an agent row holds
+    Given the sample agents are on screen
+    When the list renders
+    Then it has a column for the agent, its environment, its owner, its
+      source, its models, its health, its spend, its request count, when it
+      was last active and how long ago it registered
+    And no column header is abbreviated
+
+  @integration
+  Scenario: Choosing Grid draws the cards and writes the choice to the address
+    Given the sample agents are on screen
+    When the reader chooses Grid
+    Then the agent cards render instead of the list
+    And the address carries "view=grid"
+    And choosing List again takes it back out
+
+  @integration
+  Scenario: A value the list does not have reads as a dash, never a zero
+    Given a sample agent that has never been called
+    When its row renders
+    Then its spend, its request count, its health and its last active read as
+      a dash
+    And each dash explains itself
+    And the row still names the agent and the environment it runs in
 
   # ===========================================================================
   # What a card says
@@ -187,11 +253,12 @@ Feature: The AI Governance Agents page
   # the top of this file — so the strip is not a second, quieter place where
   # invented figures could pass as measured ones. Two rules keep it that way.
   #
-  # First, every figure is derived from the same rows the cards below are drawn
-  # from. Nothing in the strip is a separately invented number, so a reader who
-  # adds up the cards gets the strip, and when an organization-wide read lands
-  # and fills `GovernanceAgentRow` the strip lights up from the same code path
-  # with no second set of figures to go and change.
+  # First, every figure is derived from the same rows the agents below are
+  # drawn from, in either layout. Nothing in the strip is a separately invented
+  # number, so a reader who adds up what is listed gets the strip, and when an
+  # organization-wide read lands and fills `GovernanceAgentRow` the strip
+  # lights up from the same code path with no second set of figures to go and
+  # change.
   #
   # Second, the strip renders only when there are rows to summarize. It is
   # gated on having rows, not on sample mode, which is the same gate the filter
@@ -204,10 +271,10 @@ Feature: The AI Governance Agents page
   # built once for the pages that all needed a resume in the same round.
 
   @integration
-  Scenario: The fleet summary strip sits above the tabs and above the filter chips
-    Given the sample agent cards are on screen
+  Scenario: The fleet summary strip sits above the filter chips and the agents
+    Given the sample agents are on screen
     When a governance viewer opens the Agents page
-    Then a strip of four cards is above the tab bar
+    Then a strip of four cards is above the agents
     And the cards are headed Fleet, Health, Ownership and Top spenders
     And the strip sits below the banner that says nothing on the page is real
     And no filter chip is above it

@@ -1,9 +1,16 @@
 /**
  * @vitest-environment jsdom
  *
- * What the Agents tab holds: the sample cards that fill an empty page, the
- * register action that opens the connect-from-code flow rather than a form,
- * and the three chips that filter and sort the cards through the address.
+ * What the Agents page holds: the sample agents that fill an empty page, the
+ * two layouts they can be drawn in and the switch between them, the register
+ * action that opens the connect-from-code flow rather than a form, and the
+ * three chips that filter and sort through the address.
+ *
+ * THE LIST IS THE DEFAULT, so `renderAgentsAt` lands on it and the tests about
+ * the CARD ask for the grid by address (`renderAgentsInGrid`). Naming the
+ * layout at each render is deliberate: a test that asserted on cards without
+ * saying which layout it wanted would start passing or failing for a reason
+ * it never stated.
  *
  * The page issues no query — there is no organization-wide agent read — so
  * everything here is driven from the address and from session storage, which
@@ -28,8 +35,8 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  AGENT_TABLE_COLUMNS,
   AGENTS_EMPTY_COPY,
-  APPLICATIONS_EMPTY_COPY,
   NO_MATCHING_AGENTS_COPY,
 } from "~/components/governance/agents";
 import { findNativeSelects } from "~/components/governance/filters";
@@ -104,6 +111,15 @@ function renderAgentsAt(initialEntries: string[] = ["/governance/agents"]) {
 }
 
 /**
+ * The page on its optional layout, asked for the way a reader asks: through
+ * the address. The cards are one press from the default, and `?view=grid` is
+ * what that press writes.
+ */
+function renderAgentsInGrid(entry = "/governance/agents?view=grid") {
+  return renderAgentsAt([entry]);
+}
+
+/**
  * Buttons of known variant and size, rendered beside the page so a header
  * action can be compared against the real class Chakra emits for that recipe.
  */
@@ -152,10 +168,11 @@ function renderAgentsWithReferences(entry = "/governance/agents") {
  * Opens a filter chip by its label and picks one of its options.
  *
  * The chip is found among the page's buttons rather than by its text alone.
- * "Ownership" now names two things on this page — the chip that narrows the
- * cards, and the summary card above the tabs that counts owned against
- * unclaimed — and a bare text query cannot tell a control from a heading. Only
- * one of the two is pressable, which is the distinction the reader makes too.
+ * "Ownership" names two things on this page — the chip that narrows the agents,
+ * and the summary card above them that counts owned against unclaimed — and a
+ * bare text query cannot tell a control from a heading. Only one of the two is
+ * pressable, which is the distinction the reader makes too. "Source" is now a
+ * third: the list heads a column with it.
  */
 async function pickFilter(chipLabel: string, option: string) {
   const user = userEvent.setup();
@@ -182,10 +199,25 @@ function cardNamed(name: string): HTMLElement {
   return card;
 }
 
-const cardNames = () =>
+/**
+ * One agent row of the list, by the name printed on it. The name is on the
+ * row as a data attribute as well as in its first cell, because the row also
+ * carries model names and an owner and a text search would find whichever
+ * came first.
+ */
+function rowNamed(name: string): HTMLElement {
+  const row = screen
+    .getAllByTestId("governance-agent-row")
+    .find((candidate) => candidate.dataset.agent === name);
+  if (!row) throw new Error(`No agent row named ${name}`);
+  return row;
+}
+
+/** The listed agents, in the order the list draws them. */
+const rowNames = () =>
   screen
-    .getAllByTestId("governance-agent-card")
-    .map((card) => card.querySelector("p")?.textContent ?? "");
+    .getAllByTestId("governance-agent-row")
+    .map((row) => row.dataset.agent ?? "");
 
 beforeEach(() => {
   window.sessionStorage.clear();
@@ -196,29 +228,21 @@ afterEach(() => {
   window.sessionStorage.clear();
 });
 
-/** @scenario "Switching governance tabs unmounts the inactive content" */
-it("unmounts the agent cards when switching to Applications", async () => {
-  renderAgentsAt();
-  const card = screen.getAllByTestId("governance-agent-card")[0]!;
-  await userEvent
-    .setup()
-    .click(screen.getByRole("tab", { name: "Applications" }));
-  await waitFor(() => expect(card).not.toBeInTheDocument());
-});
-
-describe("the agents page sample cards", () => {
+describe("the agents page sample rows", () => {
   describe("when a governance viewer opens a page with nothing measured on it", () => {
     /** @scenario "The empty agents page shows samples when requested" */
-    it("fills it with sample agent cards under a banner that says so", () => {
+    it("fills it with sample agents under a banner that says so", () => {
       renderAgentsAt();
 
       expect(
-        screen.getAllByTestId("governance-agent-card").length,
+        screen.getAllByTestId("governance-agent-row").length,
       ).toBeGreaterThan(0);
       expect(screen.getByRole("status").textContent).toContain(
         "nothing here is real",
       );
-      expect(screen.getAllByText("sample").length).toBeGreaterThan(0);
+      // On the row, not on the panel: the row is what a reader quotes, so the
+      // claim that it is invented has to travel with it.
+      expect(screen.getAllByText("sample").length).toBe(rowNames().length);
     });
 
     /** @scenario "The sample toggle and the register action sit in the page header" */
@@ -320,14 +344,14 @@ describe("the agents page sample cards", () => {
 
   describe("when the filter row is placed", () => {
     /**
-     * The chips narrow the cards, so they sit above the cards rather than
-     * among them. `role="tabpanel"` is the content region itself, which makes
-     * "outside the content" something the DOM can answer rather than
-     * something a screenshot has to be trusted for.
+     * The chips narrow the agents, so they sit above them rather than among
+     * them. The tab panel used to be what "the content" meant here; with the
+     * tabs gone the content is the list itself, which is a stricter subject
+     * anyway — a chip rendered inside the table would now be caught, and a
+     * chip inside the old panel but outside the cards would not have been.
      */
     /** @scenario "The filter row sits outside the content it narrows" */
-    it("keeps every chip out of the tab panel and off the Applications tab", async () => {
-      const user = userEvent.setup();
+    it("keeps every chip out of the agents themselves, and offers none when there are no agents", async () => {
       renderAgentsAt();
 
       const chips = await screen.findAllByRole("button", {
@@ -335,23 +359,27 @@ describe("the agents page sample cards", () => {
         name: /Source|Ownership|Sort/,
       });
       expect(chips).toHaveLength(3);
+      const list = screen.getByTestId("governance-agents-table");
       for (const chip of chips) {
-        expect(chip.closest('[role="tabpanel"]')).toBeNull();
+        expect(list.contains(chip)).toBe(false);
       }
 
-      await user.click(screen.getByRole("tab", { name: "Applications" }));
+      // With nothing registered there is nothing to narrow, so the row is
+      // gone rather than offering chips over an empty state.
+      cleanup();
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
+      renderAgentsAt();
 
-      await waitFor(() =>
-        expect(
-          document.body.querySelectorAll('[aria-haspopup="menu"]'),
-        ).toHaveLength(0),
-      );
+      expect(screen.getByTestId("agents-empty")).toBeVisible();
+      expect(
+        document.body.querySelectorAll('[aria-haspopup="menu"]'),
+      ).toHaveLength(0);
     });
   });
 
   describe("when the reader turns sample data off", () => {
     /** @scenario "Turning sample data off leaves the honest empty pane" */
-    it("removes every card and leaves the page's own empty state", async () => {
+    it("removes every agent and leaves the page's own empty state", async () => {
       const user = userEvent.setup();
       renderAgentsAt();
 
@@ -360,10 +388,9 @@ describe("the agents page sample cards", () => {
       );
 
       await waitFor(() =>
-        expect(screen.queryAllByTestId("governance-agent-card")).toHaveLength(
-          0,
-        ),
+        expect(screen.queryAllByTestId("governance-agent-row")).toHaveLength(0),
       );
+      expect(screen.queryByTestId("governance-agents-table")).toBeNull();
       const empty = screen.getByTestId("agents-empty");
       expect(empty).toBeVisible();
       expect(within(empty).getByText(AGENTS_EMPTY_COPY.headline)).toBeVisible();
@@ -401,7 +428,7 @@ describe("registering an agent", () => {
   describe("when the address asks for the register dialog", () => {
     /** @scenario "An address asking for the register dialog opens it on arrival" */
     it("opens it without a click", async () => {
-      renderAgentsAt(["/governance/agents?tab=agents&add=1"]);
+      renderAgentsAt(["/governance/agents?add=1"]);
 
       expect(
         await screen.findByText(/An agent registers itself from the process/),
@@ -411,9 +438,7 @@ describe("registering an agent", () => {
     /** @scenario "Closing the register dialog takes the request out of the address" */
     it("takes add out of the address when the reader closes it", async () => {
       const user = userEvent.setup();
-      const { router } = renderAgentsAt([
-        "/governance/agents?tab=agents&add=1",
-      ]);
+      const { router } = renderAgentsAt(["/governance/agents?add=1"]);
       await screen.findByText(/An agent registers itself from the process/);
 
       await user.click(screen.getByRole("button", { name: /close/i }));
@@ -440,8 +465,15 @@ describe("the whole agents page", () => {
       renderAgentsAt();
       expect(findNativeSelects(document.body)).toHaveLength(0);
 
+      // The chip among the buttons, not the word anywhere on the page: the
+      // list now heads a column "Source" too, and a bare text query would
+      // find whichever came first.
       await user.click(
-        screen.getByText("Source").closest("button") as HTMLButtonElement,
+        screen
+          .getAllByRole("button")
+          .find((button) =>
+            button.textContent?.startsWith("Source"),
+          ) as HTMLButtonElement,
       );
       expect(
         await screen.findByRole("menuitem", { name: "Databricks" }),
@@ -489,16 +521,16 @@ describe("the agents filter chips", () => {
     /**
      * The old wording of this scenario said the row sits DIRECTLY under the
      * page header, and this test never checked what preceded the row, so the
-     * clause was asserted by the spec and verified by nothing. It also stopped
-     * being true here: the tab list intervenes, deliberately, because a filter
-     * that narrows one pane belongs below the control that chooses the pane.
+     * clause was asserted by the spec and verified by nothing. A tab list used
+     * to intervene; with the tabs gone the only thing between the header and
+     * the chips is the summary strip, which reports the whole fleet and is
+     * deliberately not narrowed by them.
      *
-     * The clause now says the row sits above the content it narrows and that
-     * nothing between it and the header is filtered by it, and this test
+     * The clause says the row sits above the content it narrows, and this test
      * checks the position rather than only the grouping.
      */
     /** @scenario "Every filter and sort control sits in one row above the content it narrows" */
-    it("keeps every chip in one row above the pane, with only the tab list between", () => {
+    it("keeps every chip in one row above the agents, with only the fleet strip between", () => {
       const { container } = renderAgentsAt();
 
       const chips = [...container.querySelectorAll('[aria-haspopup="menu"]')];
@@ -507,20 +539,20 @@ describe("the agents filter chips", () => {
       expect(rows.size).toBe(1);
 
       // Above the content, never inside it.
-      const panel = container.querySelector('[role="tabpanel"]') as HTMLElement;
+      const list = screen.getByTestId("governance-agents-table");
       const row = chips[0]?.parentElement as HTMLElement;
-      expect(panel.contains(row)).toBe(false);
+      expect(list.contains(row)).toBe(false);
       expect(
-        row.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING,
+        row.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
 
-      // And what does intervene is the tab list, which the chips do not filter.
-      const tabs = screen.getByRole("tablist");
+      // And what does intervene reports the whole fleet, which the chips do
+      // not narrow — see `summarizeAgentFleet`.
+      const strip = screen.getByTestId("agents-summary-strip");
       expect(
-        tabs.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING,
+        strip.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
-      expect(tabs.contains(row)).toBe(false);
-      expect(row.querySelectorAll('[role="tab"]')).toHaveLength(0);
+      expect(strip.contains(row)).toBe(false);
     });
 
     /** @scenario "The sample toggle sits top-right and the banner directly under the header" */
@@ -544,7 +576,7 @@ describe("the agents filter chips", () => {
 
     /** @scenario "A card names the agent, where it runs, who owns it and what it costs" */
     it("names the agent, its environment, its owner, its models and its figures", () => {
-      renderAgentsAt();
+      renderAgentsInGrid();
 
       const card = cardNamed("support-copilot");
 
@@ -559,7 +591,7 @@ describe("the agents filter chips", () => {
 
     /** @scenario "A figure the platform does not have reads as a dash, never a zero" */
     it("renders a dash with its reason for an agent that has never run", () => {
-      renderAgentsAt();
+      renderAgentsInGrid();
 
       const card = cardNamed("contract-review");
 
@@ -580,13 +612,13 @@ describe("the agents filter chips", () => {
 
   describe("when the reader picks a single source", () => {
     /** @scenario "Filtering by source leaves only that source's agents" */
-    it("leaves only that source's cards", async () => {
+    it("leaves only that source's agents", async () => {
       renderAgentsAt();
 
       await pickFilter("Source", "Databricks");
 
       await waitFor(() =>
-        expect(cardNames()).toEqual([
+        expect(rowNames()).toEqual([
           "genie-revenue-analyst",
           "genie-supply-planner",
         ]),
@@ -596,13 +628,13 @@ describe("the agents filter chips", () => {
 
   describe("when the reader picks Unclaimed only", () => {
     /** @scenario "Ownership filters down to the agents nobody has claimed" */
-    it("leaves only the cards carrying the Unclaimed badge", async () => {
+    it("leaves only the agents carrying the Unclaimed badge", async () => {
       renderAgentsAt();
 
       await pickFilter("Ownership", "Unclaimed only");
 
       await waitFor(() =>
-        expect(cardNames()).toEqual([
+        expect(rowNames()).toEqual([
           "genie-revenue-analyst",
           "churn-predictor",
           "contract-review",
@@ -675,7 +707,7 @@ describe("the agents filter chips", () => {
       );
 
       await waitFor(() =>
-        expect(screen.getAllByTestId("governance-agent-card")).toHaveLength(10),
+        expect(screen.getAllByTestId("governance-agent-row")).toHaveLength(10),
       );
     });
 
@@ -735,10 +767,15 @@ describe("the agents filter chips", () => {
     });
   });
 
-  describe("when a pane has nothing to show", () => {
+  describe("when the page has nothing to show", () => {
+    /**
+     * Both of them, in one pass: nothing registered, and everything filtered
+     * out of view. They are the page's two emptinesses and the rule is about
+     * every one of them, so checking only the first would leave the branch
+     * this page exists to get right unasserted here.
+     */
     /** @scenario "Every empty state on the page carries a way out" */
-    it("gives each pane a glyph, a headline, a sentence and a button", async () => {
-      const user = userEvent.setup();
+    it("gives each empty state a glyph, a headline, a sentence and a button", async () => {
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
       renderAgentsAt();
 
@@ -753,18 +790,21 @@ describe("the agents filter chips", () => {
       // A hairline card, never the dashed box this replaced.
       expect(agentsEmpty).not.toHaveStyle({ borderStyle: "dashed" });
 
-      await user.click(screen.getByRole("tab", { name: "Applications" }));
+      cleanup();
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
+      renderAgentsAt([
+        "/governance/agents?source=copilot_studio&ownership=unclaimed",
+      ]);
 
-      const applicationsEmpty = await screen.findByTestId("applications-empty");
+      const noMatch = await screen.findByTestId("agents-no-match");
       expect(
-        within(applicationsEmpty).getByText(APPLICATIONS_EMPTY_COPY.headline),
+        within(noMatch).getByText(NO_MATCHING_AGENTS_COPY.headline),
       ).toBeVisible();
       expect(
-        within(applicationsEmpty).getByText(
-          APPLICATIONS_EMPTY_COPY.description,
-        ),
+        within(noMatch).getByText(NO_MATCHING_AGENTS_COPY.description),
       ).toBeVisible();
-      expect(within(applicationsEmpty).getByRole("button")).toBeVisible();
+      expect(within(noMatch).getByRole("button")).toBeVisible();
+      expect(noMatch).not.toHaveStyle({ borderStyle: "dashed" });
     });
 
     /**
@@ -774,8 +814,7 @@ describe("the agents filter chips", () => {
      * of the rule — but it may not invent a second name for it.
      */
     /** @scenario "An empty pane explains itself rather than sitting blank" */
-    it("offers the header's own create action rather than a new one", async () => {
-      const user = userEvent.setup();
+    it("offers the header's own create action rather than a new one", () => {
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
       renderAgentsAt();
 
@@ -785,20 +824,14 @@ describe("the agents filter chips", () => {
         .getByRole("button", { name: /Register agent/ })
         .textContent?.trim();
 
-      for (const testId of ["agents-empty", "applications-empty"]) {
-        if (testId === "applications-empty") {
-          await user.click(screen.getByRole("tab", { name: "Applications" }));
-          await screen.findByTestId(testId);
-        }
-        const pane = screen.getByTestId(testId);
-        expect(within(pane).getByRole("button").textContent?.trim()).toBe(
-          headerLabel,
-        );
-      }
+      const pane = screen.getByTestId("agents-empty");
+      expect(within(pane).getByRole("button").textContent?.trim()).toBe(
+        headerLabel,
+      );
 
-      // Its own words, not the other pane's: a shared empty state that also
+      // Its own words, not the other state's: a shared empty state that also
       // shared its sentences is the failure this rule names.
-      expect(APPLICATIONS_EMPTY_COPY.description).not.toBe(
+      expect(NO_MATCHING_AGENTS_COPY.description).not.toBe(
         AGENTS_EMPTY_COPY.description,
       );
     });
@@ -847,17 +880,17 @@ describe("the agents filter chips", () => {
   });
 
   describe("when the reader sorts by requests", () => {
-    /** @scenario "Sorting reorders the cards" */
-    it("orders the cards by request count instead of spend", async () => {
+    /** @scenario "Sorting reorders the agents" */
+    it("orders them by request count instead of spend", async () => {
       renderAgentsAt();
-      expect(cardNames()[2]).toBe("genie-revenue-analyst");
+      expect(rowNames()[2]).toBe("genie-revenue-analyst");
 
       await pickFilter("Sort", "Requests");
 
-      await waitFor(() => expect(cardNames()[2]).toBe("fraud-triage"));
+      await waitFor(() => expect(rowNames()[2]).toBe("fraud-triage"));
       // The agent that never ran sorts last on every ordering: no figure is
       // not the same as the smallest figure.
-      expect(cardNames().at(-1)).toBe("contract-review");
+      expect(rowNames().at(-1)).toBe("contract-review");
     });
   });
 
@@ -882,12 +915,161 @@ describe("the agents filter chips", () => {
         "/governance/agents?source=databricks&ownership=unclaimed&sort=requests",
       ]);
 
-      // The source badge on the surviving card carries the same word, so the
-      // chip is one of two — which is the point: the chip and the cards agree.
+      // The source badge on the surviving row carries the same word, so the
+      // chip is one of two — which is the point: the chip and the list agree.
       expect(screen.getAllByText("Databricks").length).toBe(2);
       expect(screen.getByText("Unclaimed only")).toBeVisible();
       expect(screen.getByText("Requests")).toBeVisible();
-      expect(cardNames()).toEqual(["genie-revenue-analyst"]);
+      expect(rowNames()).toEqual(["genie-revenue-analyst"]);
+    });
+  });
+});
+
+/**
+ * The two layouts.
+ *
+ * The list is what the page opens on and the cards are the option, which is
+ * the shape of every test here: the default is asserted without asking for it,
+ * and the grid is asked for by address.
+ */
+describe("the agents layouts", () => {
+  describe("when a governance viewer opens the page", () => {
+    /** @scenario "The agents page opens on the list rather than the cards" */
+    it("draws the agents as a list, with List chosen on the switch", () => {
+      renderAgentsAt();
+
+      expect(screen.getByTestId("governance-agents-table")).toBeVisible();
+      expect(rowNames()).toHaveLength(10);
+      // Not merely "the table is present": the cards must be absent, or a
+      // page rendering both would pass.
+      expect(screen.queryAllByTestId("governance-agent-card")).toHaveLength(0);
+
+      const list = screen.getByRole("radio", { name: "List" });
+      const grid = screen.getByRole("radio", { name: "Grid" });
+      expect(list).toBeChecked();
+      expect(grid).not.toBeChecked();
+    });
+
+    /**
+     * Every column the row type carries, by header text.
+     *
+     * Asserted against `AGENT_TABLE_COLUMNS` rather than a list retyped here,
+     * so a column added to the table without a header — or a header whose
+     * words drift from the constant — is caught. The count is pinned too:
+     * without it a table that dropped a column would still satisfy a loop
+     * over the ones that remain.
+     */
+    /** @scenario "The list carries every attribute an agent row holds" */
+    it("gives each agent attribute its own column, spelled out", () => {
+      renderAgentsAt();
+
+      const headers = screen
+        .getAllByRole("columnheader")
+        .map((header) => header.textContent?.trim() ?? "");
+
+      expect(headers).toEqual(["Agent", ...AGENT_TABLE_COLUMNS]);
+      // The two the card has no room for, and which nothing else on the page
+      // shows per agent: the summary strip only counts them across the fleet.
+      expect(headers).toContain("Health");
+      expect(headers).toContain("Registered");
+      // Spelled out, never shortened — the section's copy rule. "30d", "Reqs"
+      // and "Env" are the three this table would plausibly have grown.
+      for (const header of headers) {
+        expect(header).not.toMatch(/\b(30d|Reqs?|Env|Mo|Usd)\b/);
+      }
+    });
+
+    /** @scenario "A value the list does not have reads as a dash, never a zero" */
+    it("draws an unmeasured value as a dash carrying its reason", () => {
+      renderAgentsAt();
+
+      const row = rowNamed("contract-review");
+
+      expect(row.textContent).toContain("—");
+      expect(row.textContent).not.toContain("$0.00");
+      expect(
+        row.querySelectorAll(
+          '[aria-label="The platform has not measured this yet."]',
+        ).length,
+      ).toBeGreaterThan(0);
+      expect(
+        row.querySelector(
+          '[aria-label="This agent has registered but has never run."]',
+        ),
+      ).not.toBeNull();
+      // Still a row about a real agent, not four dashes in a line.
+      expect(row.textContent).toContain("contract-review");
+      expect(row.textContent).toContain("development");
+    });
+  });
+
+  describe("when the reader chooses Grid", () => {
+    /** @scenario "Choosing Grid draws the cards and writes the choice to the address" */
+    it("swaps the list for the cards and puts the choice in the address", async () => {
+      const user = userEvent.setup();
+      const { router } = renderAgentsAt();
+
+      await user.click(screen.getByRole("radio", { name: "Grid" }));
+
+      await waitFor(() =>
+        expect(screen.getAllByTestId("governance-agent-card")).toHaveLength(10),
+      );
+      expect(screen.queryByTestId("governance-agents-table")).toBeNull();
+      expect(router.state.location.search).toContain("view=grid");
+
+      // And back, which is the half that proves the default stays out of the
+      // address rather than merely being what an empty address renders.
+      await user.click(screen.getByRole("radio", { name: "List" }));
+
+      await waitFor(() =>
+        expect(router.state.location.search).not.toContain("view"),
+      );
+      // Awaited rather than read straight after the address: the router's own
+      // state settles before React has committed the layout it implies, so a
+      // synchronous read here passes or fails on timing rather than on
+      // behaviour.
+      expect(
+        await screen.findByTestId("governance-agents-table"),
+      ).toBeVisible();
+    });
+
+    /**
+     * A figure absent in one layout is absent in the other, wearing the same
+     * sentence. Both draw it through `AgentValue`, and this is what would
+     * catch the two drifting apart — a second formatter in the table quietly
+     * rendering `$0.00` where the card renders a dash.
+     */
+    /** @scenario "A value the list does not have reads as a dash, never a zero" */
+    it("gives the same missing figure the same reason in both layouts", () => {
+      renderAgentsAt();
+      const reasonInList = rowNamed("contract-review").querySelector(
+        '[aria-label="This agent has registered but has never run."]',
+      )?.textContent;
+
+      cleanup();
+      renderAgentsInGrid();
+      const reasonOnCard = cardNamed("contract-review").querySelector(
+        '[aria-label="This agent has registered but has never run."]',
+      )?.textContent;
+
+      expect(reasonInList).toBe("—");
+      expect(reasonOnCard).toBe(reasonInList);
+    });
+  });
+
+  describe("when there are no agents to lay out", () => {
+    /**
+     * The switch takes the same gate as the filter chips. Offering a choice
+     * of layout over an empty state would be a control that changes nothing,
+     * which is the shape of affordance this section keeps removing.
+     */
+    /** @scenario "The agents page opens on the list rather than the cards" */
+    it("offers no layout switch at all", () => {
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
+      renderAgentsAt();
+
+      expect(screen.getByTestId("agents-empty")).toBeVisible();
+      expect(screen.queryAllByRole("radio")).toHaveLength(0);
     });
   });
 });

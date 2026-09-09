@@ -267,3 +267,25 @@ export function formatLastActive(minutesAgo: number | null): string | null {
   const days = Math.floor(hours / 24);
   return `${days} ${days === 1 ? "day" : "days"} ago`;
 }
+
+/**
+ * How long the agent has been registered, in the words a reader would use.
+ *
+ * Coarser than `formatLastActive` on purpose, and it climbs to months and
+ * years. "Last active" is how a reader decides whether an agent is alive, so
+ * minutes matter there; how long ago it registered is context, and "320 days
+ * ago" makes a reader do arithmetic that "10 months ago" does not.
+ *
+ * The list view draws its Registered column from this. The card has no room
+ * for the column and does not show it, which is one of the two facts the list
+ * exists to surface.
+ */
+export function formatRegistered(daysAgo: number | null): string | null {
+  if (daysAgo === null) return null;
+  if (daysAgo < 1) return "today";
+  if (daysAgo < 30) return `${daysAgo} ${daysAgo === 1 ? "day" : "days"} ago`;
+  const months = Math.floor(daysAgo / 30);
+  if (months < 12) return `${months} ${months === 1 ? "month" : "months"} ago`;
+  const years = Math.floor(daysAgo / 365);
+  return `${years} ${years === 1 ? "year" : "years"} ago`;
+}
