@@ -53,10 +53,14 @@ export class PromptTagProtectedError extends Error {
  * for. Raised by persistence, where the uniqueness actually lives; the door
  * that took the write names the scope in the message a caller reads.
  */
-export class PromptHandleTakenError extends Error {
-  readonly code = "prompt_handle_taken";
-  constructor() {
-    super("Prompt handle already exists");
+export class PromptHandleTakenError extends HandledError {
+  declare readonly code: "prompt_handle_taken";
+
+  constructor(message = "Prompt handle already exists") {
+    super("prompt_handle_taken", message, {
+      httpStatus: 409,
+      fault: "customer",
+    });
     this.name = "PromptHandleTakenError";
   }
 }

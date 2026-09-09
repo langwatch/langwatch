@@ -868,6 +868,10 @@ const presentations = {
     describe: () =>
       "This deployment doesn't run the chat playground. You can still edit, save and deploy this prompt, and test it from your own application.",
   },
+  prompt_handle_taken: {
+    title: "That handle is already in use",
+    describe: () => "Pick a different handle, or open the prompt that already has it.",
+  },
   system_prompt_required: {
     title: "A system prompt is required",
     describe: () => "Add one before running this.",

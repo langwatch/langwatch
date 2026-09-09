@@ -29,7 +29,6 @@ import {
   parsePromptShorthand,
   PromptApi,
   promptSyncResultSchema,
-  PromptHandleTakenError,
   PromptTagConflictError,
   PromptTagNotFoundError,
   PromptTagProtectedError,
@@ -210,16 +209,13 @@ export const buildStandardSuccessResponse = (zodSchema: ZodSchema): RouteRespons
 };
 
 /**
- * Maps the taken-handle refusal persistence raises onto the 409 this family has
+ * Maps other conflict refusals, if any, onto the 409 this family has
  * always answered, naming the scope the write asked for.
+ * PromptHandleTakenError is now a handled error and reaches the boundary itself.
  */
 export const handlePossibleConflictError = (error: unknown, scope: PromptScope = "PROJECT") => {
-  if (error instanceof PromptHandleTakenError) {
-    throw new HTTPException(409, {
-      message: `Prompt handle already exists for scope ${scope}`,
-      cause: error,
-    });
-  }
+  // Reserved for other conflict handlers; currently all are handled errors.
+  void scope;
 };
 
 /**

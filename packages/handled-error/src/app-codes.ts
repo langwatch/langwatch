@@ -389,6 +389,7 @@ export const APP_ERROR_CODES = [
   "project_permission_denied",
   "project_slug_taken",
   "project_visibility_too_wide",
+  "prompt_handle_taken",
   "prompt_has_no_copies",
   "prompt_no_copies_selected",
   "prompt_not_a_copy",
