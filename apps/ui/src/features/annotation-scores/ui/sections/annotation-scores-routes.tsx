@@ -4,7 +4,7 @@
  * member reads definitions but gets no switch, menu or add button.
  */
 
-import { annotationScoresScreens } from "@langwatch/annotation-web/screens/annotation-scores";
+import { annotationScoresScreens } from "@langwatch/annotation-web/annotation-scores";
 import type { ComponentType } from "react";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

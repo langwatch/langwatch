@@ -5,7 +5,7 @@
  */
 
 import { toaster } from "@langwatch/design-system/toaster";
-import type { AnnotationSuccessNotice } from "@langwatch/annotation-web/screens/annotations";
+import type { AnnotationSuccessNotice } from "@langwatch/annotation-web/annotations";
 
 export function presentAnnotationSuccess({
   notice,
@@ -16,8 +16,10 @@ export function presentAnnotationSuccess({
 }): void {
   if (!notice.action) {
     succeeded(notice);
+
     return;
   }
+
   toaster.create({
     ...(notice.id ? { id: notice.id } : {}),
     title: notice.title,

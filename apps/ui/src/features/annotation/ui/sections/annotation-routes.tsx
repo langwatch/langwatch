@@ -4,15 +4,9 @@
  * every procedure behind all five keys enforces the grant on its own.
  */
 
-import {
-  annotationScreens,
-  myQueueScreens,
-  type AnnotationView,
-} from "@langwatch/annotation-web/screens/annotations";
-import type { ComponentType } from "react";
+import { annotationScreens, type AnnotationView } from "@langwatch/annotation-web/annotations";
 import type { UiPageLoader } from "../../../../behavior/ui-page-loaders";
 import { lazyRoute } from "../../../../behavior/lazy-route";
-import type { RouteObject } from "react-router";
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { AnnotationHost } from "./annotation-host";
 
@@ -25,14 +19,15 @@ function annotationPage(view: AnnotationView, permission?: string): UiPageLoader
       const Screen = (await annotationScreens.annotations()).default;
       const OnView = () => <Screen view={view} />;
       OnView.displayName = `AnnotationsPage(${view})`;
-      return { default: OnView as ComponentType };
+
+      return { default: OnView };
     },
     host: AnnotationHost,
     ...(permission ? { permission } : {}),
   });
 }
 
-const annotationRoute = (path: string, page: string, loader: UiPageLoader): RouteObject => ({
+const annotationRoute = (path: string, page: string, loader: UiPageLoader) => ({
   path,
   ...lazyRoute(loader),
   handle: { page },
@@ -43,13 +38,13 @@ export const annotationPageLoaders: Readonly<Record<string, UiPageLoader>> = {
   "pages/[project]/annotations/all": annotationPage("all"),
   "pages/[project]/annotations/me": annotationPage("mine"),
   "pages/[project]/annotations/my-queue": uiPage({
-    screen: async () => ({ default: (await myQueueScreens.myQueue()).default }),
+    screen: async () => ({ default: (await import("./annotation-queue-walker")).default }),
     host: AnnotationHost,
   }),
   "pages/[project]/annotations/[slug]": annotationPage("queue"),
 };
 
-export const annotationRoutes: readonly RouteObject[] = [
+export const annotationRoutes = [
   annotationRoute(
     "/:project/annotations",
     "pages/[project]/annotations",

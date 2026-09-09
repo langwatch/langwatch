@@ -1,8 +1,4 @@
-/**
- * `AnnotationHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the annotations screen with no project and no error — same gap `TraceHost` and `OrganizationHost` had.
- * @vitest-environment jsdom
- * Spec: specs/auth/session-failure.feature
- */
+/** @vitest-environment jsdom */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -11,10 +7,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const graph = vi.hoisted(() => ({ error: null as unknown }));
 const departures = vi.hoisted(() => [] as string[]);
 
-vi.mock("@langwatch/annotation-web/screens/annotations", async () => {
-  const actual = await vi.importActual<
-    typeof import("@langwatch/annotation-web/screens/annotations")
-  >("@langwatch/annotation-web/screens/annotations");
+vi.mock("@langwatch/annotation-web/annotations", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/annotation-web/annotations")>(
+    "@langwatch/annotation-web/annotations",
+  );
+
   return {
     ...actual,
     annotationApi: {
@@ -104,6 +101,7 @@ function mountAnnotations() {
     route: new SilentRoute(),
     session: new SignedInSession(),
   };
+
   render(
     <ChakraProvider value={defaultSystem}>
       <MemoryRouter initialEntries={["/project-1/annotations"]}>

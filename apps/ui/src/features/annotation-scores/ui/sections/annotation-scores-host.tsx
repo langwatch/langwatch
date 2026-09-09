@@ -8,7 +8,7 @@ import {
   AnnotationScoresHostProvider,
   type AnnotationScoreEditorAddress,
   type AnnotationScoresHostPort,
-} from "@langwatch/annotation-web/screens/annotation-scores";
+} from "@langwatch/annotation-web/annotation-scores";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useMemo, type ReactNode } from "react";
 

@@ -8,13 +8,37 @@ import {
   annotationApi,
   AnnotationHostProvider,
   type AnnotationHostPort,
-} from "@langwatch/annotation-web/screens/annotations";
+  type RouterOutputs,
+} from "@langwatch/annotation-web/annotations";
 import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { presentAnnotationSuccess } from "../../behavior/annotation-success-notice";
+
+type Organizations = RouterOutputs["organization"]["getAll"];
+
+/** The project the address is about, and the team it sits on — resolved from
+ *  the one organizations graph read. */
+function findPlacement(organizations: Organizations, projectId: string | undefined) {
+  if (!projectId) return void 0;
+
+  for (const organization of organizations ?? []) {
+    for (const team of organization.teams) {
+      const found = team.projects.find((candidate) => candidate.id === projectId);
+
+      if (found) {
+        return {
+          project: { id: found.id, slug: found.slug, name: found.name },
+          team,
+        };
+      }
+    }
+  }
+
+  return void 0;
+}
 
 export function AnnotationHost({ children }: { children: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
@@ -32,22 +56,10 @@ export function AnnotationHost({ children }: { children: ReactNode }) {
 
   const actor = session.currentUser();
 
-  /** The project the address is about, and the team it sits on — resolved from the one graph read. */
-  const placement = useMemo(() => {
-    if (!scope.projectId) return void 0;
-    for (const organization of organizations.data ?? []) {
-      for (const team of organization.teams) {
-        const found = team.projects.find((candidate) => candidate.id === scope.projectId);
-        if (found) {
-          return {
-            project: { id: found.id, slug: found.slug, name: found.name },
-            team,
-          };
-        }
-      }
-    }
-    return void 0;
-  }, [organizations.data, scope.projectId]);
+  const placement = useMemo(
+    () => findPlacement(organizations.data ?? [], scope.projectId ?? void 0),
+    [organizations.data, scope.projectId],
+  );
 
   // The advanced-features bundle exists only on a reviewer's OWN personal
   // workspace, and `personalWorkspaceFeatures.get` answers NOT_FOUND for
@@ -58,6 +70,7 @@ export function AnnotationHost({ children }: { children: ReactNode }) {
     !!placement?.team.isPersonal && placement.team.ownerUserId === actor?.id;
 
   const reading = route.reading();
+
   const host = useMemo<AnnotationHostPort>(
     () => ({
       project: () => placement?.project,
@@ -88,6 +101,7 @@ export function AnnotationHost({ children }: { children: ReactNode }) {
   );
 
   if (failure.departing) return <UiPageLoading />;
+
   if (failure.copy) return <UiPageFailure copy={failure.copy} />;
 
   return <AnnotationHostProvider value={host}>{children}</AnnotationHostProvider>;
