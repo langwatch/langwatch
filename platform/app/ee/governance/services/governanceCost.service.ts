@@ -46,6 +46,7 @@ import {
   GOVERNANCE_COST_SOURCE,
   GOVERNANCE_SETTLING_WINDOW_DAYS,
 } from "../projections/governanceCostRollup.constants";
+import { azureBillSourceId } from "./activity-monitor/azureBillIdentity";
 import {
   readClaimedSubscription,
   readPrepaidDeclared,
@@ -662,7 +663,7 @@ export class GovernanceCostService {
         fromDay,
         toDay,
         costSource: GOVERNANCE_COST_SOURCE.PULLED,
-        ingestionSourceId: claiming.id,
+        ingestionSourceId: azureBillSourceId(claiming),
       }),
       costPricedThroughDay: cursor.costPricedThroughDay,
       costHeldSinceMs: cursor.costHeldSinceMs,

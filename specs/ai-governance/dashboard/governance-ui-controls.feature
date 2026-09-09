@@ -3,6 +3,12 @@ Feature: The controls every AI Governance page renders the same way
   I want each page's filters, actions and sample data to look and behave alike
   So that a control I learned on one page is the same control on the next
 
+  @integration @regression
+  Scenario: Switching governance tabs unmounts the inactive content
+    Given a governance page with a populated tab
+    When the reader switches to another tab
+    Then the previous tab's content is removed from the document
+
   # ---------------------------------------------------------------------------
   # This file is the section's UI rulebook. It exists because the Costs page
   # got two things right that nothing wrote down, and five more pages were

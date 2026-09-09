@@ -187,6 +187,15 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("the inventory tab shell", () => {
+  /** @scenario "Switching governance tabs unmounts the inactive content" */
+  it("unmounts the catalog content when switching to Sources", async () => {
+    renderInventoryAt(["/governance/inventory"]);
+    const content = screen.getByRole("tabpanel").firstElementChild;
+    expect(content).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /^Sources/ }));
+    await waitFor(() => expect(content).not.toBeInTheDocument());
+  });
+
   describe("when an admin opens the bare address", () => {
     /** @scenario "The inventory default tab stays out of the address" */
     it("selects Catalog, mounts the tools catalog, and writes no tab parameter", () => {

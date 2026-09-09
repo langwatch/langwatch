@@ -10,6 +10,12 @@ Feature: A cost day says how much to trust its own figure
   Background:
     Given an organization with recorded cost events
 
+  @unit @regression
+  Scenario: One pull revising several items preserves the previous whole-cell total
+    Given two items in one daily cell previously cost 10 and 20 dollars
+    When one pull restates them to 15 and 30 dollars
+    Then the previous cell total is 30 dollars regardless of delivery order
+
   @unit
   Scenario: A restated day shows what it was before
     Given a day was reported at one amount

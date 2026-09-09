@@ -828,6 +828,7 @@ function InventoryTabs({
       onValueChange={({ value }) => selectInventoryTab(value)}
       variant="line"
       lazyMount
+      unmountOnExit
     >
       <Tabs.List>
         <Tabs.Trigger

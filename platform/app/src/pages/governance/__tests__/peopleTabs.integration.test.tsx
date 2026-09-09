@@ -235,6 +235,17 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("the People page tab shell", () => {
+  /** @scenario "Switching governance tabs unmounts the inactive content" */
+  it("removes the People table when switching to Departments", async () => {
+    harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
+    renderPeopleAt(["/governance/people"]);
+    const table = screen.getByRole("table");
+    await userEvent
+      .setup()
+      .click(screen.getByRole("tab", { name: "Departments" }));
+    await waitFor(() => expect(table).not.toBeInTheDocument());
+  });
+
   describe("when a viewer opens the bare address", () => {
     /** @scenario "The default tab is People" */
     it("selects People, requests the table, and writes no tab parameter", () => {

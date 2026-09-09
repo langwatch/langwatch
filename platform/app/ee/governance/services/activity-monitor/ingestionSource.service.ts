@@ -41,6 +41,7 @@ import {
 } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
+import { withAzureBillIdentity } from "./azureBillIdentity";
 import {
   type AzureBillReader,
   assertAzureBillHasItsOwnCredential,
@@ -674,6 +675,15 @@ export class IngestionSourceService {
     });
   }
 
+  /** Seal credentials after resolving the server-owned billing identity. */
+  private async prepareParserConfig(
+    params: Omit<Parameters<typeof withAzureBillIdentity>[0], "prisma">,
+  ): Promise<Prisma.InputJsonValue> {
+    return encryptParserConfigCredentials(
+      await withAzureBillIdentity({ ...params, prisma: this.prisma }),
+    ) as Prisma.InputJsonValue;
+  }
+
   /**
    * Every live source in the org that already reads an Azure bill.
    *
@@ -780,9 +790,10 @@ export class IngestionSourceService {
       organizationId: input.organizationId,
       traceProjectId: input.traceProjectId,
     });
-    const mergedParserConfig = encryptParserConfigCredentials(
-      requestedParserConfig,
-    )!;
+    const mergedParserConfig = await this.prepareParserConfig({
+      organizationId: input.organizationId,
+      parserConfig: requestedParserConfig,
+    });
 
     // The @@unique([organizationId, name]) constraint spans all rows
     // including archived ones. If an archived source holds the name,
@@ -882,9 +893,12 @@ export class IngestionSourceService {
         incoming,
         existing,
       });
-      data.parserConfig = encryptParserConfigCredentials(
-        incoming,
-      ) as Prisma.InputJsonValue;
+      data.parserConfig = await this.prepareParserConfig({
+        organizationId: input.organizationId,
+        parserConfig: incoming,
+        sourceId: existing.id,
+        storedConfig: stored,
+      });
     }
     if (input.status !== undefined) data.status = input.status;
     if (input.pullSchedule !== undefined)

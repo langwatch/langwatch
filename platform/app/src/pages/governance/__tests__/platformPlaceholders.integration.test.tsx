@@ -168,6 +168,22 @@ afterEach(() => {
   cleanup();
 });
 
+/** @scenario "Switching governance tabs unmounts the inactive content" */
+it("unmounts Explore when switching to Dashboards", async () => {
+  renderPage(AnalyticsPage);
+  fireEvent.click(screen.getByRole("button", { name: "Requests by model" }));
+  const content = screen.getByRole("tabpanel", {
+    name: "Explore",
+  }).firstElementChild;
+  expect(content).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: /Dashboards/ }));
+  await waitFor(() => expect(content).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole("tab", { name: "Explore" }));
+  expect(
+    await screen.findByText("usage | summarize count() by model, bin(1d)"),
+  ).toBeInTheDocument();
+});
+
 describe("given the billed-cost flag is off for a permitted viewer", () => {
   /** @scenario "The Platform screens are unreachable with the billed-cost flag off" */
   it("shows the not-found scene on every Platform screen", () => {

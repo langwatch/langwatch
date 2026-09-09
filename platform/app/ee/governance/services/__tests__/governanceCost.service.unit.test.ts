@@ -716,6 +716,35 @@ describe("GovernanceCostService.summary", () => {
   });
 
   describe("given every source is still pulling", () => {
+    /** @scenario "A replacement Azure source restates the original bill" */
+    it("recognizes bill rows stored under the original source after replacement", async () => {
+      const rollup = rollupReturning();
+      vi.mocked(rollup.hasRowsForSource).mockImplementation(
+        async ({ ingestionSourceId }) => ingestionSourceId === "original",
+      );
+      const service = createService({
+        prisma: prismaWithGovProject("gov-1", [
+          {
+            id: "replacement",
+            parserConfig: {
+              azureSubscriptionId: "subscription",
+              _azureBillSourceId: "original",
+            },
+            pollerCursor: JSON.stringify({
+              costPricedThroughDay: "2026-09-08",
+              costHeldSinceMs: null,
+            }),
+          },
+        ]),
+        costRollup: rollup,
+      });
+      const result = await service.summary({
+        organizationId: "org-1",
+        windowDays: 30,
+      });
+      expect(result.azureBilling).toBeNull();
+    });
+
     describe("when requesting the summary", () => {
       const healthy = {
         name: "Azure Billing",

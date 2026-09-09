@@ -736,47 +736,40 @@ export class GovernanceCostRollupFoldProjection
   private withDerivedRevisionMarkers(
     state: GovernanceCostRollupState,
   ): GovernanceCostRollupState {
-    let newestKey: string | null = null;
     let revisedAt: number | null = null;
 
-    for (const [key, item] of Object.entries(state.pulledItems)) {
+    for (const item of Object.values(state.pulledItems)) {
       // A revision is a CHANGE to the figure, not merely a second look at it.
       // The provider re-reporting the same amount is the confirming
       // observation §15 relies on, and treating it as a revision would put
       // "revised, was $X" on a cell whose X never moved. Items that never
       // moved carry no `revisedAtMs` at all.
       if (item.revisedAtMs === undefined) continue;
-      // Ties broken by key so two items revised in the same pull still name
-      // one winner, whichever order they arrived in.
-      if (
-        revisedAt === null ||
-        item.revisedAtMs > revisedAt ||
-        (item.revisedAtMs === revisedAt && key < newestKey!)
-      ) {
+      if (revisedAt === null || item.revisedAtMs > revisedAt) {
         revisedAt = item.revisedAtMs;
-        newestKey = key;
       }
     }
 
-    if (newestKey === null) {
+    if (revisedAt === null) {
       return { ...state, revisedAt: null, previousAmountNanoUsd: null };
     }
 
-    // "was $X" is the whole cell as it stood immediately before its newest
-    // revision: that one item at its prior figure, every other item where it
-    // stands now. Totalled through the same helper the live figure uses, so
-    // the two cannot drift on currency handling.
-    const newest = state.pulledItems[newestKey]!;
+    // Every item revised by the same pull shares its observation time. Rewind
+    // all of them so the prior total describes the cell before that pull.
     const before = governanceCostRollupTotals({
       ...state,
-      pulledItems: {
-        ...state.pulledItems,
-        [newestKey]: {
-          ...newest,
-          amountNanoMinor: newest.priorAmountNanoMinor!,
-          amountNanoUsd: newest.priorAmountNanoUsd,
-        },
-      },
+      pulledItems: Object.fromEntries(
+        Object.entries(state.pulledItems).map(([key, item]) => [
+          key,
+          item.revisedAtMs === revisedAt
+            ? {
+                ...item,
+                amountNanoMinor: item.priorAmountNanoMinor!,
+                amountNanoUsd: item.priorAmountNanoUsd,
+              }
+            : item,
+        ]),
+      ),
     }).amountNanoUsd;
 
     return { ...state, revisedAt, previousAmountNanoUsd: before };

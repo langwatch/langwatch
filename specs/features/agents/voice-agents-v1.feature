@@ -163,6 +163,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And the panel does not stay on "Connecting"
     And no run is created for that attempt
 
+  @integration
   Scenario: A page-level microphone block is named, not reported as a denial
     Given "Talk to it" was pressed
     And the page's Permissions-Policy does not allow the microphone
@@ -171,6 +172,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And the browser is never asked for the microphone
     And no run is created for that attempt
 
+  @unit
   Scenario: The app's own headers allow the microphone and the ElevenLabs socket
     Given a production response from the LangWatch app
     Then its Permissions-Policy allows the microphone for the app's own origin

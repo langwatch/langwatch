@@ -51,7 +51,10 @@ const rowWith = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const fakePrisma = (row: ReturnType<typeof rowWith>) => {
+const fakePrisma = (
+  row: ReturnType<typeof rowWith>,
+  history: ReturnType<typeof rowWith>[] = [],
+) => {
   const update = vi
     .fn()
     .mockImplementation(({ data }: { data: Record<string, unknown> }) =>
@@ -62,7 +65,16 @@ const fakePrisma = (row: ReturnType<typeof rowWith>) => {
       findUnique: vi.fn().mockResolvedValue(row),
       // The bill-ownership listing. The row itself is the only source, and it
       // is excluded from its own check by id.
-      findMany: vi.fn().mockResolvedValue([row]),
+      findMany: vi
+        .fn()
+        .mockImplementation(({ where }) =>
+          Promise.resolve(
+            [row, ...history].filter(
+              (candidate) =>
+                where.archivedAt !== null || candidate.archivedAt === null,
+            ),
+          ),
+        ),
       update,
     },
   };
@@ -72,6 +84,31 @@ const fakePrisma = (row: ReturnType<typeof rowWith>) => {
 describe("updateSource, when the edit touches the Azure bill claim", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  /** @scenario "A replacement Azure source restates the original bill" */
+  it("inherits the archived source's billing identity when adding its subscription", async () => {
+    const old = rowWith({
+      id: "src_original",
+      archivedAt: new Date(),
+      parserConfig: { azureSubscriptionId: SUBSCRIPTION },
+    });
+    const { client, update } = fakePrisma(rowWith(), [old]);
+    await IngestionSourceService.create(client).updateSource({
+      id: SOURCE_ID,
+      organizationId: ORG,
+      parserConfig: {
+        environmentUrl: "https://orgacme01.crm4.dynamics.com",
+        azureSubscriptionId: SUBSCRIPTION,
+        credentials: {
+          billingClientId: "billing-id",
+          billingClientSecret: "billing-secret",
+        },
+      },
+    });
+    expect(update.mock.calls[0]![0].data.parserConfig).toMatchObject({
+      _azureBillSourceId: "src_original",
+    });
   });
 
   describe("given a source whose stored config claims no subscription", () => {

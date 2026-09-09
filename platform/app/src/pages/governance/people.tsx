@@ -275,6 +275,7 @@ function PeoplePage() {
           onValueChange={({ value }) => selectTab(value)}
           variant="line"
           lazyMount
+          unmountOnExit
         >
           <PeopleTabsList />
           <Tabs.Content value="people" paddingTop={4}>
