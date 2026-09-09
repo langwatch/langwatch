@@ -31,7 +31,11 @@ describe("provider data boundaries", () => {
       const card = sampleTool("sample-copilot-studio");
       renderCard(
         <ToolCatalogCard
-          card={{ ...card, isSample: sample, values: sample ? card.values : {} }}
+          card={{
+            ...card,
+            isSample: sample,
+            values: sample ? card.values : {},
+          }}
         />,
       );
       expect(
@@ -46,7 +50,11 @@ describe("provider data boundaries", () => {
       const card = sampleTool("sample-databricks-genie");
       renderCard(
         <ToolCatalogCard
-          card={{ ...card, isSample: sample, values: sample ? card.values : {} }}
+          card={{
+            ...card,
+            isSample: sample,
+            values: sample ? card.values : {},
+          }}
         />,
       );
       expect(
