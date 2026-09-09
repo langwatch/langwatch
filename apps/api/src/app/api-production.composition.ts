@@ -21,7 +21,6 @@ import type { AuthzGrantsService, AuthzPermission, AuthzService } from "@langwat
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApiKeysRestApp } from "@langwatch/api-key-server";
 import { PostgresTenantDirectoryAdapter } from "@langwatch/organization-server";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
@@ -208,21 +207,11 @@ import {
   unavailableIdempotentRunner,
   type ApiIdempotencyComposition,
 } from "./api-idempotency.composition.ts";
-import { createGatewayPlatformRestApp } from "@langwatch/gateway-server/api-rest/gateway-platform";
-import { createGatewaySpendRestApp } from "@langwatch/gateway-server/api-rest/gateway-spend";
-import { settlementGraceMs } from "@langwatch/gateway-server";
-import { composeApiGatewaySpendRest } from "./api-gateway-spend-rest.composition.ts";
-import { composeApiGatewayWebhooks } from "./api-gateway-webhooks.composition.ts";
-import {
-  composeApiElevenLabsWebhookRest,
-  composeApiGatewayInternalRest,
-} from "./api-gateway-internal-rest.composition.ts";
 import {
   ApiGatewaySpendPipelineAbsenceReport,
   composeApiGatewaySpendPipeline,
   type ApiGatewaySpendPipeline,
 } from "./api-gateway-spend-pipeline.composition.ts";
-import { canonicalErrorFor } from "./api-canonical-error.ts";
 import { PostgresGithubAdapter } from "@langwatch/github-server";
 import type { GithubService } from "@langwatch/github-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
@@ -240,7 +229,7 @@ import {
   type ApiModelProviderHostPort,
 } from "../features/model-provider/model-provider.composition.ts";
 import { installApiDashboard } from "../features/dashboard/dashboard.composition.ts";
-import type { HealthProbeRestPorts } from "../features/health/health-probe-rest.ts";
+import type { HealthProbeRestPorts } from "../features/health/health-probe-rest.mount.ts";
 import {
   installApiPlatformHealth,
   type ComposedPlatformHealthFeature,
@@ -304,7 +293,6 @@ import {
 import { installApiSecret } from "../features/secret/secret.composition.ts";
 import type { ComposedSecretFeature } from "../features/secret/secret.composition.types.ts";
 import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security.ts";
-import { requestTraceIds } from "@langwatch/api/rest";
 import type {
   AppRestManagementAuditPort,
   AppRestSecurityPorts,
@@ -325,10 +313,11 @@ import {
   composeApiBillingWebhook,
   type ApiBillingWebhookComposition,
 } from "./api-billing-webhook.composition.ts";
-import type { ApiSubscriptionMount } from "../api.application.ts";
-import { createSseSubscriptionApp } from "../app-trpc/app-trpc.sse.ts";
 import { ApiHandlerManagedSession } from "./api-handler-managed-session.ts";
-import { createApiProcessRestFeatures } from "../app-rest/app-rest.process-features.ts";
+import {
+  createApiProcessRestFeatures,
+  LoggedApiProcessRestAbsence,
+} from "../app-rest/app-rest.process-features.ts";
 import type { CronRestPorts } from "../features/cron/cron-rest.ts";
 import type { NlpLambdaCleanupService } from "@langwatch/workflow-server";
 import { composeNlpLambdaCleanup } from "../features/cron/cron.composition.ts";
@@ -1435,9 +1424,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         options.config.serviceName,
         options.config.infrastructure.execution.publicBaseUrl,
         options.config.infrastructure.execution.nlpServiceUrl,
-        options.config.spendSettlementGraceMs,
-        options.config.gatewayInternalSecret,
-        options.config.gatewayJwtSecret,
       ),
       observability: options.observability,
       graph: options.graph,
@@ -1715,14 +1701,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     serviceName: string,
     publicBaseUrl: string | undefined,
     nlpServiceUrl: string | undefined,
-    /** The operator's settlement-grace override, still unparsed. */
-    spendSettlementGrace: string | undefined,
-    /** The HMAC secret the Go data plane signs its control-plane calls with. */
-    gatewayInternalSecret: string | undefined,
-    /** The key the credentials handed to that data plane are signed under. */
-    gatewayJwtSecret: string | undefined,
-  ): { rest: Hono; subscriptions: ApiSubscriptionMount } {
-    const gatewayApp = this.composedGateway.app;
+  ): { rest: Hono } {
+    // The one report that names every family this process leaves off because
+    // its transport is still written against the deleted REST builders.
+    const restAbsence = LoggedApiProcessRestAbsence.create(createLogger(serviceName));
     // One credential resolution for both doors: the enforcement port record
     // every packaged REST family is built from, and the four-callable
     // projection the additive public-REST builder takes. Both wrap the same
@@ -1791,27 +1773,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ...(payloads ? { payloads } : {}),
       report: LoggedApiTraceIngestAbsence.create(createLogger(serviceName)),
     });
-    // The gateway's public family, over the SAME application the six gateway
-    // tRPC namespaces read, so the SDK's door and the browser's door cannot
-    // enforce different rules. Absent where this process composed no gateway
-    // group: the family is left off rather than mounted over an application
-    // that is not there, which is the rule the secret family follows too.
-    const gatewayRest = gatewayApp
-      ? // The family declares its own project-scoped `Variables`, and a Hono
-        // env parameter is contravariant in its handlers, so the narrower app
-        // is not assignable to the bare `Hono` this router mounts. The
-        // variables are the SECURITY chain's, set before any handler here
-        // runs; nothing on this side reads them.
-        (createGatewayPlatformRestApp({
-          security: restSecurity,
-          gateway: () => gatewayApp,
-        }) as unknown as Hono)
-      : undefined;
-    // The billing reconciliation family, over the SAME spend ledger the gateway
-    // application prices a budget against. Mounted beside the platform family
-    // because they share `/api/gateway/v1`, and absent for the same reason:
-    // without a gateway group there is no ledger to reconcile against.
-    const gatewaySpendRest = this.composeGatewaySpendRest(spendSettlementGrace, restSecurity);
+    // The gateway's public family and the billing reconciliation family beside
+    // it. Both are built by transports still written against the deleted REST
+    // builders, so neither is mounted; the gateway application itself is
+    // composed and the browser's own namespaces read it unchanged.
+    restAbsence.unconverted("gateway-platform");
+    restAbsence.unconverted("gateway-spend");
     // The spend pipeline, registered producer-only. Registered BEFORE the
     // internal family is composed because that family's `/spend-commands`
     // route is the only reason a producer exists on this tier, and the voice
@@ -1821,28 +1788,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       processName: serviceName,
       report: LoggedApiGatewaySpendPipelineAbsence.create(createLogger(serviceName)),
     });
-    // The Go data plane's control-plane calls, over the SAME gateway graph the
-    // console and the public REST door read. `/api/internal/gateway` is a
-    // literal first segment nothing else claims, so its position among the
-    // families is free.
-    const gatewayInternalRest = this.composeGatewayInternalRest(
-      restSecurity,
-      gatewayInternalSecret,
-      gatewayJwtSecret,
-    );
-    // The other half of a brokered voice call: the vendor's post-call delivery,
-    // which is the only path by which one reaches billing. Composed AFTER the
-    // internal family for the same reason it is composed beside it — both
-    // settle the SAME session row through the same confirmation — and its own
-    // family because it is public by protocol where that one is ingress-blocked.
-    const elevenLabsWebhookRest = this.composedDatabase?.connection
-      ? (composeApiElevenLabsWebhookRest({
-          security: restSecurity,
-          prisma: this.composedDatabase.connection.client,
-          encryption: this.composedEncryption,
-          spendConfirmation: this.composedGatewaySpendPipeline?.confirmation,
-        }) as Hono | undefined)
-      : undefined;
+    // The Go data plane's control-plane calls, and the other half of a brokered
+    // voice call: the vendor's post-call delivery. Both are unconverted, so
+    // neither is mounted — a settlement this process cannot receive is a call
+    // nothing bills, which the spend pipeline above reports on its own.
+    restAbsence.unconverted("gateway-internal");
+    restAbsence.unconverted("elevenlabs-webhook");
     const bugReports = this.composeBugReports(tenancy);
     const unsubscribe = this.composeUnsubscribe();
     const cron = this.composeCron();
@@ -2280,6 +2231,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     for (const processRestApp of createApiProcessRestFeatures({
       security: restSecurity,
       packagedAbsence: LoggedApiPackagedRestAbsence.create(createLogger(serviceName)),
+      processAbsence: restAbsence,
       services: {
         packaged,
         ...this.composedAnnotation.restServices,
@@ -2358,48 +2310,17 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     for (const suiteRestApp of this.composedScenario.suiteRest) {
       rest.route("/", suiteRestApp);
     }
-    return {
-      rest: rest
-        .route(
-          "/",
-          createApiKeysRestApp({
-            security: restSecurity,
-            apiKeys: () => tenancy.apiKeys,
-            permissions: () => authz,
-            audit: this.composeManagementAudit(),
-          }),
-        )
-        // The gateway's public family, mounted AFTER the process-owned
-        // families because one of those owns a literal path inside
-        // `/api/gateway/v1` — the spec document — and these routes claim
-        // parameterised segments at the root of that namespace.
-        .route("/", gatewayRest ?? new Hono())
-        // The billing reconciliation family shares that namespace, in the same
-        // relative order the retired router's enumeration gave the two: its
-        // paths are literal (`/spend-events`, `/spend-summaries`) and the
-        // platform family's are parameterised, and a literal segment wins over
-        // a parameter at the same position.
-        .route("/", gatewaySpendRest ?? new Hono())
-        // The internal control plane. Its own namespace, blocked at the
-        // ingress by the chart, and reached in-cluster through this process's
-        // internal Service rather than through the public host.
-        .route("/", gatewayInternalRest ?? new Hono())
-        // The ElevenLabs post-call webhook. A literal first segment nothing
-        // else claims, so its position here is free; it is last because it is
-        // the only public gateway door that is not on `/api/gateway/v1`.
-        .route("/", elevenLabsWebhookRest ?? new Hono())
-        // The payment provider's callback. A literal path nothing else claims,
-        // and mounted unconditionally so the boot-time route declaration walk
-        // records one endpoint whether or not this deployment holds a Stripe
-        // credential; without one it answers 404 rather than disappearing.
-        .route("/", this.composedBillingWebhook.rest(restSecurity)),
-      // The subscription lane declares its access policy on the same security
-      // every REST family does, so the one streaming route on this process is
-      // a registry entry rather than an unaccounted-for endpoint. It is a
-      // function because only the application holds the caller a path is
-      // resolved on; see `ApiSubscriptionMount`.
-      subscriptions: (ports) => createSseSubscriptionApp({ security: restSecurity, ports }).hono,
-    };
+    // The API-key management family and the payment provider's callback: both
+    // unconverted, and both left off rather than mounted over a builder that
+    // is gone. A missing Stripe callback means an unacknowledged webhook the
+    // provider retries, which is recoverable; a half-built one is not.
+    restAbsence.unconverted("api-keys");
+    restAbsence.unconverted("billing-webhook");
+    // The one streaming route this process serves is declared on the same
+    // deleted builder, so the process names no subscription mount at all.
+    restAbsence.unconverted("sse-subscriptions");
+
+    return { rest };
   }
 
   /**
@@ -2550,95 +2471,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       killSwitch: EventingKillSwitchAdapter.create(this.composedFeatureFlagApi),
       report: LoggedApiEventingAbsence.create(logger),
     });
-  }
-
-  /**
-   * The Go data plane's internal control plane, or none. Composed only where this process holds
-   * the gateway group, a database, the stored-secret cipher and a JWT signing key.
-   */
-  private composeGatewayInternalRest(
-    security: AppRestSecurityPorts,
-    internalSecret: string | undefined,
-    jwtSecret: string | undefined,
-  ): Hono | undefined {
-    const composition = this.composedGateway.composition;
-    const database = this.composedDatabase?.connection;
-    const projects = this.composedTenancy?.projects;
-    if (!composition || !database || !projects) return undefined;
-
-    const modelProviders = this.composedModelProviders;
-    const monitors = this.composedMonitor?.app;
-    const spend = this.composedGatewaySpendPipeline;
-    // The SAME runtime the legacy evaluate doors and the studio's re-score run
-    // on. A guardrail and a monitor scoring the same evaluator two ways is
-    // exactly what one runtime prevents; where this process composed none the
-    // check keeps refusing by name rather than answering `allow`.
-    const evaluatorExecution = this.resolveEvaluatorExecution();
-    return composeApiGatewayInternalRest({
-      security,
-      prisma: database.client,
-      gateway: composition,
-      projects,
-      internalSecret,
-      jwtSecret,
-      encryption: this.composedEncryption,
-      // The process's ONE producer registration, so the drained batch and the
-      // voice settlement write onto one stream with one set of dispatchers.
-      ...(spend ? { spendCommands: spend.commands, spendConfirmation: spend.confirmation } : {}),
-      ...(monitors ? { monitors } : {}),
-      ...(evaluatorExecution
-        ? { runEvaluator: (input) => evaluatorExecution.runEvaluation(input) }
-        : {}),
-      ...(modelProviders
-        ? {
-            refreshCodex: (input: { providerRowId: string }) =>
-              modelProviders.refreshCodexForGateway(input),
-          }
-        : {}),
-    }) as Hono | undefined;
-  }
-
-  private composeGatewaySpendRest(
-    spendSettlementGrace: string | undefined,
-    security: AppRestSecurityPorts,
-  ): Hono | undefined {
-    const composition = this.composedGateway.composition;
-    const database = this.composedDatabase?.connection;
-    const plans = this.composedPlanProvider;
-    if (!composition || !database || !plans) return undefined;
-
-    // The Enterprise webhook platform, where this deployment has one. The
-    // replay route is the only one of the four that reads it, so its absence
-    // is that route refusing by name rather than the family being left off.
-    const webhooks = composeApiGatewayWebhooks({
-      database: database.client,
-      encryption: this.composedEncryption,
-      // The SAME ClickHouse the spend ledger itself is projected into: the
-      // emitted envelopes and the rows they were rendered from are two tables
-      // in one instance, and a second connection would be a second pool.
-      resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
-    });
-    const spend = composeApiGatewaySpendRest({
-      prisma: database.client,
-      gateway: composition,
-      // The SAME plan lookup every allowance banner on this process reads, so
-      // one organization cannot be entitled on one surface and refused here.
-      plans,
-      settlementGraceMs: settlementGraceMs(spendSettlementGrace),
-      ...(webhooks ? { webhooks } : {}),
-    });
-    return createGatewaySpendRestApp({
-      // The SAME credential resolution every other family on this process is
-      // built from; the family declares its own organization-scoped
-      // `Variables`, which the security chain sets before any handler runs.
-      security,
-      billingPlanGate: spend.billingPlanGate,
-      // The process's one canonical mapping. The family installs its own
-      // `onError` to log what the caller actually received and delegates the
-      // rendering here rather than keeping a second taxonomy.
-      canonicalError: (error, c) => canonicalErrorFor(error, requestTraceIds(c)),
-      spend: () => spend.ports,
-    }) as unknown as Hono;
   }
 
   private composeBugReports(tenancy: ApiResolvedTenancy): BugReportRestPorts | undefined {
@@ -4008,6 +3840,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // Without it the /ops dashboards read a snapshot nothing wrote and report an empty
       // fleet, which is a wrong answer rather than a missing one.
       redis: this.composedQueueRedis ?? null,
+      // The snapshot reader polls on an interval; this is what releases it.
+      resources: options.resources,
       report: LoggedApiOpsAbsence.create(createLogger(options.config.serviceName)),
     });
   }

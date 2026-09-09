@@ -9,7 +9,7 @@ import { platformHealthServer } from "@langwatch/platform-health-server";
 import { createApp } from "@langwatch/runtime-composition";
 import { fromDate } from "@langwatch/time";
 
-import type { HealthProbeRestPorts } from "../health/health-probe-rest.ts";
+import type { HealthProbeRestPorts } from "../health/health-probe-rest.mount.ts";
 import { mountPlatformHealthRest } from "./platform-health-rest.mount.ts";
 
 /** What this process brings to the platform-health family. */

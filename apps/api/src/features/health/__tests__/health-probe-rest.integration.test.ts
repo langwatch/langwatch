@@ -1,11 +1,13 @@
 /**
  * The subsystem health probes, driven through the real Hono app the API process mounts.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createHealthProbeRestApp, type HealthProbeRestPorts } from "../health-probe-rest.ts";
+import {
+  mountHealthProbeRest,
+  type HealthProbeRestPorts,
+} from "../health-probe-rest.mount.ts";
 
 describe("given a subsystem health probe", () => {
   describe("when the request carries no credential", () => {
@@ -77,6 +79,23 @@ describe("given the trigger probe", () => {
       });
     });
   });
+
+  describe("when the caller presents the same key as a bearer", () => {
+    it("accepts the Authorization header the family has always read", async () => {
+      const api = mount({
+        automation: () => ({
+          tryGetById: async () => ({ id: "trigger-1" }),
+          getRecentFires: async () => [{ createdAt: new Date() }],
+        }),
+      });
+
+      const response = await api.fetch("/api/health/triggers?triggerId=trigger-1", {
+        headers: { authorization: "Bearer project-key" },
+      });
+
+      expect(response.status).toBe(200);
+    });
+  });
 });
 
 describe("given the workflow probe", () => {
@@ -110,8 +129,7 @@ describe("given a deployment that declared no public origin", () => {
 function mount(overrides: Partial<HealthProbeRestPorts> = {}) {
   const hono = new Hono().route(
     "/",
-    createHealthProbeRestApp({
-      security: passThroughSecurity(),
+    mountHealthProbeRest({
       ports: {
         resolveProjectByApiKey: async () => ({ id: "project-1" }),
         publicBaseUrl: "https://app.langwatch.test",
@@ -130,36 +148,3 @@ function mount(overrides: Partial<HealthProbeRestPorts> = {}) {
       hono.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A public probe must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}
-
-const renderHandled: ErrorHandler = (error, c) => {
-  const handled = error as { httpStatus?: number; code?: string; message?: string };
-  if (typeof handled.httpStatus === "number") {
-    return c.json({ error: handled.code ?? "error" }, handled.httpStatus as never);
-  }
-  return c.json({ error: String(error) }, 500);
-};

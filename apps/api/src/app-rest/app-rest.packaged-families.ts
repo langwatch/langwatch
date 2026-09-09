@@ -14,48 +14,23 @@ import type {
   PlatformUrlBuilder,
   RestErrorHandler,
 } from "@langwatch/api/rest";
-import { bodyLimit } from "@langwatch/api/rest";
-import {
-  AutomationApp,
-  createSlackTriggerRestApp,
-  createTriggerRestApp,
-} from "@langwatch/automation-server";
+import type { AutomationApp } from "@langwatch/automation-server";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import type { CodingAgentApp, CodingAgentRestAuditPort } from "@langwatch/coding-agent-server";
-import {
-  createCodingAgentRestApp,
-  createCodingAgentV1RestApp,
-} from "@langwatch/coding-agent-server";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApp, DatasetDirectUploadAuthorizer } from "@langwatch/dataset-server";
 import type { GovernanceApp, ScimApp, WebhookApp } from "@langwatch/enterprise-api";
-import {
-  createGovernanceRestApp,
-  createScimTokensRestApp,
-  createWebhookRestApp,
-} from "@langwatch/enterprise-api";
 import type { EnterpriseFeature } from "@langwatch/enterprise-plan-gate";
 import type { EvaluatorApp } from "@langwatch/evaluator-server";
 import type { ExperimentApp } from "@langwatch/experiment-server";
-import { createExperimentsRestApp } from "@langwatch/experiment-server";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import {
-  createModelDefaultsRestApp,
-  createModelProvidersRestApp,
-} from "@langwatch/model-provider-server";
 import type {
   OrganizationLedgerActor,
   OrganizationService,
 } from "@langwatch/organization-contract";
 import type { OrganizationProvisioningPort } from "@langwatch/organization-server";
-import {
-  createGroupRestApp,
-  createOrganizationsRestApp,
-  createTeamsRestApp,
-} from "@langwatch/organization-server";
 import type { ProjectService } from "@langwatch/project-contract";
-import { createProjectRestApp } from "@langwatch/project-server";
 import type {
   ScenarioService,
   ScenarioTabRegistry,
@@ -63,27 +38,15 @@ import type {
 } from "@langwatch/scenario-contract";
 import type { InlineMediaExtraction } from "@langwatch/scenario-server/api-rest/scenario-event";
 import type { ScenarioRunPlatformUrlBuilder } from "@langwatch/scenario-server/api-rest/simulation-run";
-import { createScenarioEventsRestApp } from "@langwatch/scenario-server/api-rest/scenario-event";
-import { createScenariosRestApp } from "@langwatch/scenario-server/api-rest/scenario";
-import { createSimulationRunsRestApp } from "@langwatch/scenario-server/api-rest/simulation-run";
 import type {
   FilesProjectPermissionCheck,
   FilesRateLimiter,
   StoredObjectApp,
 } from "@langwatch/stored-object-server";
-import { createFilesRestApp } from "@langwatch/stored-object-server";
-import {
-  createEventsRestApp,
-  type TrackedEventPorts,
-} from "@langwatch/trace-server/api-rest/tracked-event";
-import {
-  createMeRestApp,
-  createUserAvatarRestApp,
-  type UserAvatarObjectReader,
-} from "@langwatch/user-server";
+import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
+import type { UserAvatarObjectReader } from "@langwatch/user-server";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { WorkflowEvaluationTrigger } from "@langwatch/workflow-server";
-import { createWorkflowsRestApp } from "@langwatch/workflow-server";
 import type { Context, MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ApiErrorBody } from "@langwatch/api/rest";
@@ -93,11 +56,7 @@ import { mountEvaluatorRest } from "../features/evaluator/evaluator-rest.mount.t
 import { mountMonitorRest } from "../features/monitor/monitor-rest.mount.ts";
 import type { ApiHandlerManagedCredentialPort } from "./app-rest.process-features.ts";
 
-import {
-  type AgentCacheStore,
-  createAgentCacheRestApp,
-} from "../features/agent-cache/agent-cache-rest.ts";
-import { mountTrackedEventLegacyPathRest } from "../features/trace/tracked-event-rest.mount.ts";
+import type { AgentCacheStore } from "../features/agent-cache/agent-cache-rest.ts";
 
 /**
  * The product services this process may or may not have composed.
@@ -304,11 +263,17 @@ export type ApiPackagedRestFamilyName =
  * `/api/files`, …) that no sibling here claims.
  */
 export function mountApiPackagedRestFamilies(options: {
+  /**
+   * The process's REST security seam. Read by no family here today: the three
+   * that mount are declared families, which bind a credential instead. It stays
+   * on the signature because it is what a hand-written family took, and the
+   * ones still to convert are all hand-written.
+   */
   security: AppRestSecurity;
   collaborators: ApiPackagedRestCollaborators;
   report?: ApiPackagedRestAbsenceReport | undefined;
 }): MountableRestApp[] {
-  const { security, report } = options;
+  const { report } = options;
   const { services, ports } = options.collaborators;
   const features: MountableRestApp[] = [];
 
@@ -325,11 +290,10 @@ export function mountApiPackagedRestFamilies(options: {
     features.push(...(Array.isArray(built) ? built : [built]));
   };
 
-  const agentCache = services.agentCache;
-  mount(
-    "agent-cache",
-    agentCache ? () => createAgentCacheRestApp({ security, agentCache }).mountable : null,
-  );
+  // Every family below whose transport still names a deleted REST builder is
+  // left off and named once at boot, whatever service this process composed
+  // for it. Each returns when its own flat declaration lands.
+  mount("agent-cache", null);
 
   // The agent REST families are unconverted: mounted nothing until their
   // flat declarations exist (plan section 4).
@@ -340,36 +304,14 @@ export function mountApiPackagedRestFamilies(options: {
   // transport (`agentsV1`, absent leaves `/connect/*` and `/:id/call` off).
   mount("agents-v1", null);
 
-  const codingAgents = services.codingAgents;
-  const codingAgentAudit = services.codingAgentAudit;
-  mount(
-    "coding-agent",
-    codingAgents && codingAgentAudit
-      ? () =>
-          createCodingAgentRestApp({
-            security,
-            app: codingAgents,
-            audit: codingAgentAudit,
-          })
-      : null,
-  );
+  mount("coding-agent", null);
 
   // The same rollup asked at the ORGANIZATION: one route, its own base path,
   // and an organization credential instead of a project one. A separate family
   // because the scope a family authenticates at is the family's, not a route's
   // — mounting an organization-keyed route inside the project family would
   // make every route in it answer to two different credentials.
-  mount(
-    "coding-agent-v1",
-    codingAgents && codingAgentAudit
-      ? () =>
-          createCodingAgentV1RestApp({
-            security,
-            app: codingAgents,
-            audit: codingAgentAudit,
-          })
-      : null,
-  );
+  mount("coding-agent-v1", null);
 
   // `/api/dashboards` and `/api/graphs` are one application seen twice, so
   // they travel together: a process holding the dashboards but not the graphs
@@ -400,74 +342,17 @@ export function mountApiPackagedRestFamilies(options: {
       : null,
   );
 
-  const experiments = services.experiments;
-  mount(
-    "experiments",
-    experiments ? () => createExperimentsRestApp({ security, app: experiments }) : null,
-  );
+  mount("experiments", null);
 
-  const storedObjects = services.storedObjects;
-  const dualAuth = ports.dualAuth;
-  const requireProjectPermission = ports.requireProjectPermission;
-  mount(
-    "files",
-    storedObjects && dualAuth && requireProjectPermission
-      ? () =>
-          createFilesRestApp({
-            security,
-            app: storedObjects,
-            dualAuth,
-            requireProjectPermission,
-            rateLimit: ports.rateLimit,
-          }).mountable
-      : null,
-  );
+  mount("files", null);
 
-  const governance = services.governance;
-  mount(
-    "governance",
-    governance ? () => createGovernanceRestApp({ security, app: governance }) : null,
-  );
+  mount("governance", null);
 
-  const organizations = services.organizations;
-  const enterpriseGate = ports.enterpriseGate;
-  mount(
-    "groups",
-    organizations && enterpriseGate
-      ? () =>
-          createGroupRestApp({
-            security,
-            organizations,
-            enterpriseGate: enterpriseGate("GROUPS"),
-            ledgerActor: ports.organizationLedgerActor,
-          })
-      : null,
-  );
+  mount("groups", null);
 
-  const projects = services.projects;
-  mount(
-    "me",
-    governance && organizations && projects
-      ? () =>
-          createMeRestApp({
-            security,
-            personalUsage: governance,
-            organizations,
-            projects,
-          })
-      : null,
-  );
+  mount("me", null);
 
-  const modelProviders = services.modelProviders;
-  mount(
-    "model-providers",
-    modelProviders && organizations
-      ? () => [
-          createModelDefaultsRestApp({ security, modelProviders }),
-          createModelProvidersRestApp({ security, modelProviders, organizations }),
-        ]
-      : null,
-  );
+  mount("model-providers", null);
 
   const monitors = services.monitors;
   mount(
@@ -483,177 +368,38 @@ export function mountApiPackagedRestFamilies(options: {
       : null,
   );
 
-  const organizationProvisioning = services.organizationProvisioning;
-  const apiKeys = services.apiKeys;
-  mount(
-    "organizations",
-    organizationProvisioning && apiKeys
-      ? () =>
-          createOrganizationsRestApp({
-            security,
-            organizations: organizationProvisioning,
-            apiKeys,
-            instanceAdminKey: ports.instanceAdminKey,
-            isSaas: ports.isSaas,
-            audit: ports.managementAudit,
-            reportError: ports.reportError,
-          })
-      : null,
-  );
+  mount("organizations", null);
 
-  mount(
-    "projects",
-    projects && apiKeys ? () => createProjectRestApp({ security, projects, apiKeys }) : null,
-  );
+  mount("projects", null);
 
-  const permissions = services.permissions;
+  mount("scenario-events", null);
 
-  const simulations = services.simulations;
-  const scenarioTabs = services.scenarioTabs;
-  const broadcast = services.broadcast;
-  const extractInlineMedia = ports.extractInlineMedia;
-  mount(
-    "scenario-events",
-    simulations && scenarioTabs && broadcast && extractInlineMedia
-      ? () =>
-          createScenarioEventsRestApp({
-            security,
-            simulations,
-            scenarioTabs,
-            broadcast,
-            extractInlineMedia,
-            traceUsageGuard: ports.traceUsageGuard,
-            bodyLimit,
-            platformUrl: ports.platformUrl,
-          })
-      : null,
-  );
+  mount("scenarios", null);
 
-  const scenarios = services.scenarios;
-  mount(
-    "scenarios",
-    scenarios
-      ? () => createScenariosRestApp({ security, scenarios, platformUrl: ports.platformUrl })
-      : null,
-  );
+  mount("scim-tokens", null);
 
-  const scim = services.scim;
-  mount(
-    "scim-tokens",
-    scim && enterpriseGate
-      ? () =>
-          createScimTokensRestApp({
-            security,
-            enterpriseGate: enterpriseGate("SCIM"),
-            app: scim,
-            audit: ports.managementAudit,
-          })
-      : null,
-  );
+  mount("simulation-runs", null);
 
-  mount(
-    "simulation-runs",
-    simulations
-      ? () =>
-          createSimulationRunsRestApp({
-            security,
-            simulations,
-            scenarioRunPlatformUrl: ports.scenarioRunPlatformUrl,
-          })
-      : null,
-  );
+  mount("user-avatar", null);
 
-  const userAvatarObjects = services.userAvatarObjects;
-  mount(
-    "user-avatar",
-    userAvatarObjects && dualAuth
-      ? () =>
-          createUserAvatarRestApp({
-            security,
-            dualAuth,
-            userAvatarObjects,
-            rateLimit: ports.rateLimit,
-          }).mountable
-      : null,
-  );
-
-  mount(
-    "teams",
-    organizations && permissions && projects
-      ? () =>
-          createTeamsRestApp({
-            security,
-            organizations,
-            permissions,
-            projects,
-            ledgerActor: ports.organizationLedgerActor,
-          })
-      : null,
-  );
+  mount("teams", null);
 
   // Both tracked-event doors, mounted together over the SAME ports. `/api/track_event` is
   // the URL every pre-rename SDK release posts to and `/api/events/track` is the
   // canonical one; the legacy app replays the request against the canonical route rather
   // than handling it, so the two cannot answer differently. The alias takes the canonical
-  // app as an argument, so a process that composed no tracked-event ports mounts neither.
-  const trackedEvents = services.trackedEvents;
-  mount(
-    "tracked-events",
-    trackedEvents
-      ? () => {
-          const canonical = createEventsRestApp({
-            security,
-            ports: trackedEvents(),
-          });
-          return [canonical, mountTrackedEventLegacyPathRest({ canonical })];
-        }
-      : null,
-  );
+  // app as an argument, so neither is mounted while the canonical one is unconverted.
+  mount("tracked-events", null);
 
   // Both automation doors, mounted together over the SAME application. The
   // narrow `/api/trigger/slack` predates `/api/triggers` and keeps its own
   // path, body spelling and refusal bodies; a process holding one and not the
   // other would let two doors disagree about what a trigger is.
-  const automation = services.automation;
-  mount(
-    "triggers",
-    automation
-      ? () => [
-          createTriggerRestApp({ security, automation, platformUrl: ports.platformUrl }),
-          createSlackTriggerRestApp({ security, automation }),
-        ]
-      : null,
-  );
+  mount("triggers", null);
 
-  const webhooks = services.webhooks;
-  mount(
-    "webhooks",
-    webhooks
-      ? () =>
-          createWebhookRestApp({
-            security,
-            webhooks,
-            canonicalError: ports.canonicalError,
-          })
-      : null,
-  );
+  mount("webhooks", null);
 
-  const workflows = services.workflows;
-  mount(
-    "workflows",
-    workflows
-      ? () =>
-          createWorkflowsRestApp({
-            security,
-            workflows,
-            ports: {
-              platformUrl: ports.platformUrl,
-              requireApiKeyPermission: ports.requireApiKeyPermission,
-              triggerEvaluation: ports.triggerWorkflowEvaluation,
-            },
-          })
-      : null,
-  );
+  mount("workflows", null);
 
   return features;
 }

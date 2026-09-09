@@ -111,6 +111,12 @@ export function composeOpsFeature(options: {
   eventing: EventSourcing | undefined;
   /** The connection the worker publishes the ops snapshot on, where one exists. */
   redis?: RedisConnection | null;
+  /**
+   * The process's own scope, which the snapshot reader's poll is registered on.
+   * Without it the interval outlives a failed boot and keeps reading a Redis
+   * the composition already closed, so the process never exits.
+   */
+  resources?: ResourceScope;
   report?: ApiOpsAbsenceReport;
 }): ComposedOpsFeature {
   const collaborators: OpsFeatureCollaborators = {
@@ -131,7 +137,7 @@ export function composeOpsFeature(options: {
   // compose, whatever this one is configured with.
   options.report?.absent("replay-runtime");
   if (!collaborators.redis) options.report?.absent("ops-snapshot");
-  const app = composeOps(collaborators, collaborators.logger);
+  const app = composeOps(collaborators, collaborators.logger, options.resources);
 
   return { app };
 }
@@ -165,7 +171,11 @@ function refusingOps<T>(): T {
 /**
  * The operator application, over this process's own connections.
  */
-function composeOps(options: OpsFeatureCollaborators, logger: Logger): OpsApp {
+function composeOps(
+  options: OpsFeatureCollaborators,
+  logger: Logger,
+  resources: ResourceScope | undefined,
+): OpsApp {
   const snapshots = options.redis
     ? RedisOpsSnapshotAdapter.create({ redis: ApiOpsSnapshotRedis.create(options.redis) })
     : null;
@@ -175,6 +185,9 @@ function composeOps(options: OpsFeatureCollaborators, logger: Logger): OpsApp {
   snapshots?.start().catch((error) => {
     logger.error({ error }, "failed to start the ops snapshot reader");
   });
+  // Registered in the same breath as the start, so the poll is released whether
+  // this process drains or its composition fails half-built.
+  if (snapshots) resources?.own("api ops snapshot reader", () => snapshots.stop());
 
   return OpsApp.create({
     dependencies: {

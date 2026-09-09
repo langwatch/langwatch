@@ -5,7 +5,7 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import type { HealthProbeRestPorts } from "../../health/health-probe-rest.ts";
+import type { HealthProbeRestPorts } from "../../health/health-probe-rest.mount.ts";
 import { installApiPlatformHealth } from "../platform-health.composition.ts";
 
 const MONITORING_KEY = "monitoring-key";

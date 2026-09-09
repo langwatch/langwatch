@@ -33,6 +33,8 @@ const EMPTY_PHASE = {
 export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
   private latest: DashboardData | null = null;
   private readInterval: ReturnType<typeof setInterval> | null = null;
+  /** Set by `stop`, and read by a `start` whose first read is still in flight. */
+  private stopped = false;
   private readonly subscribers = new Set<(data: DashboardData) => void>();
   private badgeCache: {
     blockedCount: number;
@@ -79,11 +81,21 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
       return;
     }
 
+    this.stopped = false;
     await this.read();
+    // A caller that starts the reader without awaiting it can be stopped while
+    // that first read is in flight. Installing the interval then would outlive
+    // whatever released the reader, and poll a connection already closed.
+    if (this.stopped) {
+      return;
+    }
+
     this.readInterval = setInterval(() => void this.read(), READ_INTERVAL_MS);
   }
 
   stop(): void {
+    this.stopped = true;
+
     if (this.readInterval) {
       clearInterval(this.readInterval);
       this.readInterval = null;

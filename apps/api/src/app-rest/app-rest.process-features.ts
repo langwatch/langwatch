@@ -9,43 +9,23 @@ import type {
   MountableRestApp,
 } from "@langwatch/api/rest";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import type { Logger } from "@langwatch/observability";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import {
-  createAdminRestApp,
-  createBugReportsRestApp,
-  type AdminRestPorts,
-  type BugReportRestPorts,
-} from "@langwatch/ops-server";
-import { createUnsubscribeRestApp, type UnsubscribeRestPorts } from "@langwatch/automation-server";
-import {
-  createLangyInternalRestApp,
-  createLangyRelayRestApp,
-  createLangyTurnsRestApp,
-  createLangyUiActionsRestApp,
-  createLangyLocalControlRestApp,
-  createLangyLocalRestApp,
-} from "@langwatch/langy-server";
-import { createGithubRestApp, type GithubRestPorts } from "@langwatch/github-server";
-import {
-  createAuthCliDeviceFlowRestApp,
-  createAuthRestApp,
-  type AuthCliDeviceFlowRestPorts,
-  type AuthRestPorts,
-} from "@langwatch/auth-server";
-import {
-  createGovernanceCliRestApp,
-  createGovernanceIngestRestApp,
-  type GovernanceCliRestPorts,
-  type GovernanceIngestRestPorts,
+import type { AdminRestPorts, BugReportRestPorts } from "@langwatch/ops-server";
+import type { UnsubscribeRestPorts } from "@langwatch/automation-server";
+import type { GithubRestPorts } from "@langwatch/github-server";
+import type { AuthCliDeviceFlowRestPorts, AuthRestPorts } from "@langwatch/auth-server";
+import type {
+  GovernanceCliRestPorts,
+  GovernanceIngestRestPorts,
 } from "@langwatch/enterprise-governance-server";
-import { createScimProtocolRestApp, createScimWebhookRestApp } from "@langwatch/enterprise-api";
 
 import type { ApiScimRestPorts } from "../app/api-scim.composition.ts";
 
 import type { ApiLangyRestComposition } from "../features/langy/langy-rest.mount.ts";
 
-import { createCronRestApp, type CronRestPorts } from "../features/cron/cron-rest.ts";
+import type { CronRestPorts } from "../features/cron/cron-rest.ts";
 
 import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -67,77 +47,33 @@ import type { AppRestBroadcast } from "@langwatch/api/rest";
 import type { SimulationService } from "@langwatch/scenario-contract";
 
 import type { ApiHandlerManagedSessionPort } from "../app/api-handler-managed-session.ts";
-import {
-  mountScenarioRunExportRest,
-  type ScenarioRunExportAudit,
-} from "../features/export/scenario-run-export-rest.mount.ts";
-import {
-  mountApiTraceExportRest,
-  type ApiTraceExportRestOptions,
-} from "../features/export/trace-export-rest.mount.ts";
-import { mountAnalyticsRest } from "../features/analytics/analytics-rest.mount.ts";
-import {
-  type ApiLangWatchQLRestCollaborators,
-  mountLangWatchQLRest,
-} from "../features/analytics/langwatch-ql-rest.mount.ts";
-import { mountQueryRest } from "../features/analytics/query-rest.mount.ts";
-import { mountOrganizationRest } from "../features/organization/organization-rest.mount.ts";
-import { mountPromptsRest } from "../features/prompt/prompt-rest.mount.ts";
+import type { ScenarioRunExportAudit } from "../features/export/scenario-run-export-rest.mount.ts";
+import type { ApiTraceExportRestOptions } from "../features/export/trace-export-rest.mount.ts";
+import type { ApiLangWatchQLRestCollaborators } from "../features/analytics/langwatch-ql-rest.mount.ts";
 import type { ApiAuthoringRestComposition } from "../app/api-authoring-rest.composition.ts";
-import { mountPlaygroundRest } from "../features/model-provider/playground-rest.mount.ts";
-import { mountScenarioGenerateRest } from "../features/scenario/scenario-generate-rest.mount.ts";
-import { mountWorkflowStudioRest } from "../features/workflow/workflow-studio-rest.mount.ts";
-import {
-  mountExperimentV3Rest,
-  type ApiExperimentV3RestCollaborators,
-} from "../features/experiment/experiment-v3-rest.mount.ts";
-import {
-  mountExperimentInitRest,
-  type ApiExperimentInitRestCollaborators,
-} from "../features/experiment/experiment-init-rest.mount.ts";
-import {
-  mountWorkflowRunRest,
-  type ApiWorkflowRunRestCollaborators,
-} from "../features/workflow/workflow-run-rest.mount.ts";
+import type { ApiExperimentV3RestCollaborators } from "../features/experiment/experiment-v3-rest.mount.ts";
+import type { ApiExperimentInitRestCollaborators } from "../features/experiment/experiment-init-rest.mount.ts";
+import type { ApiWorkflowRunRestCollaborators } from "../features/workflow/workflow-run-rest.mount.ts";
 import { mountAnnotationRest } from "../features/annotation/annotation-rest.mount.ts";
 import { mountStoredObjectRest } from "../features/stored-object/stored-object-rest.mount.ts";
-import { createApiDiscoveryRestApp } from "../features/discovery/api-discovery-rest.ts";
-import { createGatewayOpenApiRestApp } from "../features/discovery/gateway-openapi-rest.ts";
-import { createRootDiscoveryRestApp } from "../features/discovery/root-discovery-rest.ts";
 import {
-  createHealthProbeRestApp,
+  mountHealthProbeRest,
   type HealthProbeRestPorts,
-} from "../features/health/health-probe-rest.ts";
+} from "../features/health/health-probe-rest.mount.ts";
 import type { RumRateLimiter } from "../features/rum/rum-ingest.service.ts";
-import { createRumRestApp } from "../features/rum/rum-rest.ts";
-import {
-  createOtlpIngestRestApp,
-  type OtlpIngestRestPorts,
-} from "@langwatch/trace-server/api-rest/otlp-ingest";
-import { createOtlpPathAliasRestApp } from "@langwatch/trace-server/api-rest/otlp-path-alias";
+import type { OtlpIngestRestPorts } from "@langwatch/trace-server/api-rest/otlp-ingest";
 import type { CollectorRestPorts } from "@langwatch/trace-server/api-rest/collector";
-import {
-  mountEvaluationsLegacyRest,
-  type ApiEvaluationBatchRestCollaborators,
-  type ApiEvaluationRunRestCollaborators,
+import type {
+  ApiEvaluationBatchRestCollaborators,
+  ApiEvaluationRunRestCollaborators,
 } from "../features/evaluation/evaluations-legacy-rest.mount.ts";
-import {
-  mountCollectorRest,
-  mountTraceLegacyRest,
-  mountTracesRest,
-  type ApiTraceLegacyRestCollaborators,
-  type ApiTracesRestCollaborators,
+import type {
+  ApiTraceLegacyRestCollaborators,
+  ApiTracesRestCollaborators,
 } from "../features/trace/trace-rest.mount.ts";
-import {
-  createOpsClickHouseExplainRestApp,
-  type OpsClickHouseExplainRestPorts,
-} from "@langwatch/ops-server";
-import { createDspyStepsRestApp, type DspyStepsRestPorts } from "@langwatch/experiment-server";
-import {
-  createMcpAuthorizeRestApp,
-  type McpAuthorizeRestPorts,
-} from "@langwatch/hosted-mcp-server";
-import { createImageProxyRestApp } from "../features/image-proxy/image-proxy-rest.ts";
+import type { OpsClickHouseExplainRestPorts } from "@langwatch/ops-server";
+import type { DspyStepsRestPorts } from "@langwatch/experiment-server";
+import type { McpAuthorizeRestPorts } from "@langwatch/hosted-mcp-server";
 import {
   mountApiPackagedRestFamilies,
   type ApiPackagedRestAbsenceReport,
@@ -405,9 +341,63 @@ export type ApiProcessRestPorts = Readonly<{
 }>;
 
 /**
+ * Which process-owned families this process left out because their transport is
+ * still written against the deleted REST builders, and so cannot be built.
+ */
+export abstract class ApiProcessRestAbsenceReport {
+  abstract unconverted(family: ApiProcessRestFamilyName): void;
+}
+
+/** Every process-owned family that is named when it is not mounted. */
+export type ApiProcessRestFamilyName =
+  | "admin"
+  | "analytics"
+  | "api-discovery"
+  | "api-keys"
+  | "auth"
+  | "auth-cli-device-flow"
+  | "billing-webhook"
+  | "bug-reports"
+  | "collector"
+  | "cron"
+  | "dspy-steps"
+  | "elevenlabs-webhook"
+  | "evaluations-legacy"
+  | "experiment-init"
+  | "experiment-workbench"
+  | "gateway-internal"
+  | "gateway-openapi"
+  | "gateway-platform"
+  | "gateway-spend"
+  | "github"
+  | "governance-cli"
+  | "governance-ingest"
+  | "image-proxy"
+  | "langwatch-ql"
+  | "langy"
+  | "mcp-authorize"
+  | "ops-clickhouse-explain"
+  | "organization-management"
+  | "otlp-ingest"
+  | "playground"
+  | "prompts"
+  | "query"
+  | "root-discovery"
+  | "rum"
+  | "scenario-generate"
+  | "scenario-run-export"
+  | "scim"
+  | "sse-subscriptions"
+  | "trace-export"
+  | "trace-legacy"
+  | "traces"
+  | "unsubscribe"
+  | "workflow-run"
+  | "workflow-studio";
+
+/**
  * Every REST family this process builds for itself, in mount order. ORDERING is
- * load-bearing and is the order of this array: 1. `gateway-openapi` before anything else
- * under `/api/gateway/v1`.
+ * load-bearing and is the order of this array.
  */
 export function createApiProcessRestFeatures(options: {
   security: AppRestSecurity;
@@ -415,135 +405,60 @@ export function createApiProcessRestFeatures(options: {
   ports: ApiProcessRestPorts;
   /** Names the packaged families this process left out, once, at boot. */
   packagedAbsence?: ApiPackagedRestAbsenceReport | undefined;
+  /** Names the process-owned families whose transport is unconverted. */
+  processAbsence?: ApiProcessRestAbsenceReport | undefined;
 }): MountableRestApp[] {
-  const { security, ports } = options;
+  const { ports } = options;
   const services = options.services ?? {};
-  const features: MountableRestApp[] = [
-    createGatewayOpenApiRestApp({ security }),
-    createApiDiscoveryRestApp({ security }),
-    createRootDiscoveryRestApp({ security }),
-    createRumRestApp({ security, rateLimit: ports.rateLimit }),
-  ];
+  const features: MountableRestApp[] = [];
+  const report = options.processAbsence;
+
+  /** Pushes the family, or names it in the boot report and leaves it off. */
+  const mount = (
+    family: ApiProcessRestFamilyName,
+    build: (() => MountableRestApp | MountableRestApp[]) | null,
+  ): void => {
+    if (!build) {
+      report?.unconverted(family);
+      return;
+    }
+    const built = build();
+    features.push(...(Array.isArray(built) ? built : [built]));
+  };
+
+  // The discovery doors and the browser's own telemetry intake. Each is built
+  // by a transport still written against the deleted REST builders, so none is
+  // mounted and each is named once at boot.
+  mount("gateway-openapi", null);
+  mount("api-discovery", null);
+  mount("root-discovery", null);
+  mount("rum", null);
 
   // The subsystem probes. `/api/health` is claimed by the process's lifecycle
   // surface at exactly that path and by nothing deeper, so the five
   // sub-paths neither shadow it nor are shadowed by it.
   const healthProbes = ports.healthProbes;
   if (healthProbes) {
-    features.push(createHealthProbeRestApp({ security, ports: healthProbes }));
+    features.push(mountHealthProbeRest({ ports: healthProbes }));
   }
 
   // The deployment's own report on itself, beside the five probes: the same
   // subsystems asked at once, for an operator rather than for a load balancer.
   if (services.platformHealth) features.push(services.platformHealth);
 
-  // The charted reads' public door, over the SAME application the browser's
-  // `analytics.getTimeseries` procedure resolves on, so a rule added on one
-  // door cannot leave the other answering the old way.
-  const analytics = services.analytics;
-  if (analytics) {
-    features.push(...mountAnalyticsRest({ security, analytics }));
-  }
-
-  // The governed-SQL family, over the SAME LangWatchQL service the workbench's
-  // own procedures validate against.
-  const langWatchQL = services.langWatchQL;
-  if (langWatchQL) {
-    features.push(
-      mountLangWatchQLRest({
-        security,
-        collaborators: langWatchQL.collaborators,
-        dashboard: langWatchQL.dashboard,
-        publicBaseUrl: ports.publicBaseUrl,
-      }),
-      // The one door for raw LangWatchQL, off the same collaborators: the
-      // two cannot be composed apart, because a process serving saved charts
-      // against a runner this door does not reach would answer the same
-      // statement two ways.
-      mountQueryRest({ security, collaborators: langWatchQL.collaborators }),
-    );
-  }
-
-  // The prompt library. Mounted only where BOTH the prompt service and the
-  // organization directory are composed: every route on the family resolves
-  // the project's organization before it reads anything, so a family holding
-  // one and not the other would answer 500 on every request.
-  const prompts = services.prompts;
-  const organizations = services.organizations;
-  if (prompts && organizations) {
-    features.push(
-      mountPromptsRest({
-        security,
-        prompts: prompts.service,
-        tagCatalog: prompts.tagCatalog,
-        permissions: prompts.permissions,
-        organizations,
-        publicBaseUrl: ports.publicBaseUrl,
-      }),
-    );
-  }
-
-  // The organization management family. Mounted only where every one of its
-  // five collaborators is composed, for the reason its type gives.
-  const organizationManagement = services.organizationManagement;
-  if (organizationManagement) {
-    features.push(mountOrganizationRest({ security, ...organizationManagement }));
-  }
-
-  // The two bulk exports. They share `/api/export` and claim disjoint literal
-  // second segments, so their order is free; traces is registered first, which
-  // is the order the platform router gave the same pair.
-  const traceExport = services.traceExport;
-  if (traceExport) {
-    features.push(mountApiTraceExportRest({ security, ...traceExport }));
-  }
-
-  const scenarioRunExport = services.scenarioRunExport;
-  if (scenarioRunExport) {
-    features.push(mountScenarioRunExportRest({ security, ...scenarioRunExport }));
-  }
-
-  // The AUTHORING doors. Each owns a literal path inside a namespace nothing above
-  // claims, and each is registered ahead of any parameterised sibling that could swallow
-  // it: `/api/workflows/{code-completion,post_event}` before a workflow family's
-  // `/:workflowId/run`. `/api/dataset/generate` is not among them: its transport is
-  // unconverted, and the authoring composition reports the absence.
-  const authoring = services.authoring;
-  if (authoring?.workflowStudio) {
-    features.push(mountWorkflowStudioRest({ security, collaborators: authoring.workflowStudio }));
-  }
-  if (authoring?.scenarioGenerate) {
-    features.push(mountScenarioGenerateRest({ security, ...authoring.scenarioGenerate }));
-  }
-  if (authoring?.playground) {
-    features.push(mountPlaygroundRest({ security, ...authoring.playground }));
-  }
-
-  // The experiment workbench, and — LAST among the families sharing
-  // `/api/experiments` — its `/api/evaluations/v3` alias, which forwards into
-  // it. The mount returns both in registration order, and the workbench must
-  // come before any packaged experiment family so its literal `/runs`
-  // siblings are not swallowed by that family's `:slug`.
-  const experimentWorkbench = services.experimentWorkbench;
-  if (experimentWorkbench) {
-    features.push(...mountExperimentV3Rest({ security, collaborators: experimentWorkbench }));
-  }
-
-  // The SDK's create-or-take door. `/api/experiment/init` is a literal path in
-  // the SINGULAR namespace, which nothing above claims — the workbench owns
-  // `/api/experiments` — so it neither shadows nor is shadowed by them.
-  const experimentInit = services.experimentInit;
-  if (experimentInit) {
-    features.push(mountExperimentInitRest({ security, collaborators: experimentInit }));
-  }
-
-  // The synchronous run URLs. AFTER the Studio's two literal doors above,
-  // because `/api/workflows/:workflowId/run` would otherwise read
-  // `code-completion` as a workflow id.
-  const workflowRun = services.workflowRun;
-  if (workflowRun) {
-    features.push(mountWorkflowRunRest({ security, collaborators: workflowRun }));
-  }
+  mount("analytics", null);
+  mount("langwatch-ql", null);
+  mount("query", null);
+  mount("prompts", null);
+  mount("organization-management", null);
+  mount("trace-export", null);
+  mount("scenario-run-export", null);
+  mount("workflow-studio", null);
+  mount("scenario-generate", null);
+  mount("playground", null);
+  mount("experiment-workbench", null);
+  mount("experiment-init", null);
+  mount("workflow-run", null);
 
   const annotations = services.annotations;
   if (annotations) {
@@ -559,193 +474,66 @@ export function createApiProcessRestFeatures(options: {
     );
   }
 
-  // Impersonation and the back-office resource CRUD. `/api/admin` is a literal
-  // first segment nothing else claims, and it is registered here — ahead of the
-  // issue-report intake and the two authentication families — in the order the
-  // platform router gave the same three.
-  const admin = ports.admin;
-  if (admin) {
-    features.push(createAdminRestApp({ security, ports: admin }));
-  }
+  mount("admin", null);
+  mount("bug-reports", null);
+  mount("unsubscribe", null);
+  // The internal cron family. Its gate is a builder-level shared-secret
+  // middleware rather than a declared route access, so it converts with the
+  // `internalSecret` door rather than with the probes; until then a
+  // destructive door stays shut.
+  mount("cron", null);
+  mount("github", null);
+  mount("langy", null);
+  mount("auth-cli-device-flow", null);
+  mount("governance-cli", null);
+  mount("auth", null);
+  mount("governance-ingest", null);
+  mount("scim", null);
+  mount("traces", null);
+  mount("trace-legacy", null);
+  mount("evaluations-legacy", null);
 
-  const bugReports = ports.bugReports;
-  if (bugReports) {
-    features.push(createBugReportsRestApp({ security, ports: bugReports }));
-  }
-
-  const unsubscribe = ports.unsubscribe;
-  if (unsubscribe) {
-    features.push(createUnsubscribeRestApp({ security, ports: unsubscribe }));
-  }
-
-  // The internal cron family. `/api/cron` is a literal first segment nothing above
-  // claims, and every route on it is gated by the shared secret at the builder level.
-  const cron = ports.cron;
-  if (cron) {
-    features.push(createCronRestApp({ security, ports: cron }));
-  }
-
-  // The Langy doors. `/api/langy` and `/api/internal/langy` are literal first segments
-  // nothing else claims, so their order relative to the families above is free; the relay
-  // is registered after the internal family it shares a basePath and a bearer with,
-  // matching the order the platform router used. `/api/github` and its two `github-langy`
-  // aliases: literal first segments nothing above claims.
-  const github = ports.github;
-  if (github) {
-    features.push(createGithubRestApp({ security, ports: github }));
-  }
-
-  const langy = ports.langy;
-  if (langy) {
-    features.push(createLangyTurnsRestApp({ security, ports: langy.turns }));
-    if (langy.uiActions) {
-      features.push(createLangyUiActionsRestApp({ security, ports: langy.uiActions }));
-    }
-    if (langy.local) {
-      features.push(createLangyLocalRestApp({ security, ports: langy.local }));
-    }
-    if (langy.localControl) {
-      features.push(createLangyLocalControlRestApp({ security, ports: langy.localControl }));
-    }
-    features.push(createLangyInternalRestApp({ security, ports: langy.internal }));
-    if (langy.relay) {
-      features.push(createLangyRelayRestApp({ security, ports: langy.relay }));
-    }
-  }
-
-  // The two halves of `/api/auth/cli`, whose path sets are disjoint: the
-  // device grant owns the RFC 8628 lifecycle, the governance plane owns the
-  // reads and mints a device session authorizes. Both are registered BEFORE
-  // the `/api/auth` family below, whose `/auth/*` catch-all swallows every
-  // sibling after it — that order is what keeps these two reachable.
-  const authCliDeviceFlow = ports.authCliDeviceFlow;
-  if (authCliDeviceFlow) {
-    features.push(createAuthCliDeviceFlowRestApp({ security, ports: authCliDeviceFlow }));
-  }
-
-  const governanceCli = ports.governanceCli;
-  if (governanceCli) {
-    features.push(createGovernanceCliRestApp({ security, ports: governanceCli }));
-  }
-
-  // The Better Auth door, and everything a browser reaches to sign in, read
-  // its own session or sign out. Registered after the two CLI halves and
-  // before every family that reads a session, for the ordering above.
-  const auth = ports.auth;
-  if (auth) {
-    features.push(createAuthRestApp({ security, ports: auth }));
-  }
-
-  // `/api/ingest` is a literal first segment nothing else claims, so it is
-  // order-free among the families above — and it is registered before the OTLP
-  // alias below for the same reason the governed-SQL family is: that alias
-  // claims broad wildcards and everything with its own routing goes first.
-  const governanceIngest = ports.governanceIngest;
-  if (governanceIngest) {
-    features.push(createGovernanceIngestRestApp({ security, ports: governanceIngest }));
-  }
-
-  // The SCIM 2.0 provisioning family and the Auth0 intake beside it. `/api/scim/v2` is a
-  // literal namespace nothing else claims, and `/api/webhooks/auth0-scim` is a literal
-  // path under a namespace whose only other claimant is the packaged webhook family's
-  // `/api/webhooks/v1/*` — a disjoint set — so both are order-free among the families
-  // here.
-  const scim = ports.scim;
-  if (scim) {
-    features.push(createScimProtocolRestApp({ security, scim: scim.scim }));
-    features.push(createScimWebhookRestApp({ security, ports: scim }));
-  }
-
-  // The v1 trace reads. `/api/traces` is a literal first segment nothing above
-  // claims, and it must be registered before the OTLP path alias below, whose
-  // `/api/v1/*` wildcard is broad on purpose.
-  const traceReads = services.traceReads;
-  if (traceReads) {
-    features.push(mountTracesRest({ security, collaborators: traceReads }));
-  }
-
-  // The deprecated trace family: `/api/trace/*` and `/api/thread/:id`. Literal
-  // first segments, and deliberately NOT under `/api/traces` — the two are
-  // different surfaces with different refusal bodies, and the deprecated one
-  // stamps `Deprecation` and a successor `Link` on every read.
-  const traceLegacy = services.traceLegacy;
-  if (traceLegacy) {
-    features.push(mountTraceLegacyRest({ security, collaborators: traceLegacy }));
-  }
-
-  // The legacy evaluation family. Its catalogue route needs nothing, so the
-  // family is mounted unconditionally; its batch and evaluate halves register
-  // only where their port groups are supplied — the batch log where this
-  // process registered the run writer, the four evaluate doors where it
-  // composed an evaluator runtime. See the mount.
-  features.push(
-    mountEvaluationsLegacyRest({
-      security,
-      credential: ports.handlerManagedCredential,
-      ...(services.evaluationBatch ? { batch: services.evaluationBatch } : {}),
-      ...(services.evaluationRun ? { evaluationRun: services.evaluationRun } : {}),
-    }),
-  );
-
-  // The packaged families, each conditional on the service this process composed for it.
-  // HERE and not earlier: `/api/dataset/generate` above, `/api/dataset/evaluate`
-  // immediately above, the workbench's literal `/api/experiments/runs` and the Studio's
-  // `/api/workflows/code-completion` all have to be registered before the packaged family
-  // whose parameterised segment would otherwise swallow them.
+  // The packaged families, each conditional on the service this process composed for it
+  // and on its own transport having been converted.
   const packaged = services.packaged;
   if (packaged) {
     features.push(
       ...mountApiPackagedRestFamilies({
-        security,
+        security: options.security,
         collaborators: packaged,
         ...(options.packagedAbsence ? { report: options.packagedAbsence } : {}),
       }),
     );
   }
 
-  // The operator EXPLAIN endpoint. `/api/ops` is a literal first segment
-  // nothing else claims, so its position among the families is free.
-  const opsClickHouseExplain = ports.opsClickHouseExplain;
-  if (opsClickHouseExplain) {
-    features.push(createOpsClickHouseExplainRestApp({ security, ports: opsClickHouseExplain }));
-  }
-
-  // The three doors the retired `misc.ts` still held that this process can
-  // serve. Each owns a literal first segment nothing above claims —
-  // `/api/dspy`, `/api/mcp`, `/api/image-proxy` — so their order is free, and
-  // all three are registered before the OTLP alias below for the same reason
-  // everything with its own routing is.
-  const dspySteps = ports.dspySteps;
-  if (dspySteps) {
-    features.push(createDspyStepsRestApp({ security, ports: dspySteps }));
-  }
-
-  const mcpAuthorize = ports.mcpAuthorize;
-  if (mcpAuthorize) {
-    features.push(createMcpAuthorizeRestApp({ security, ports: mcpAuthorize }));
-  }
-
-  const imageProxy = ports.imageProxy;
-  if (imageProxy) {
-    features.push(createImageProxyRestApp({ security, ...imageProxy }));
-  }
-
-  // The SDK collector, before the OTLP alias that claims `/api/collector/*`.
-  const collector = ports.collector;
-  if (collector) {
-    features.push(mountCollectorRest({ security, ports: collector }));
-  }
-
-  const otlpIngest = ports.otlpIngest;
-  if (otlpIngest) {
-    const receiver = createOtlpIngestRestApp({ security, ports: otlpIngest });
-    features.push(receiver);
-    // Last, and forwarding into the app immediately above it. An exporter that
-    // posts to a path nobody serves gets one silent, unretryable data loss per
-    // batch, so the aliases exist wherever the receiver does — never on their
-    // own, which is why they take the receiver rather than importing it.
-    features.push(createOtlpPathAliasRestApp({ security, canonical: receiver }));
-  }
+  mount("ops-clickhouse-explain", null);
+  mount("dspy-steps", null);
+  mount("mcp-authorize", null);
+  mount("image-proxy", null);
+  mount("collector", null);
+  // The OTLP receiver and the two aliases that forward into it. They travel
+  // together: an alias mounted without the receiver would answer a path that
+  // leads nowhere, which is one silent, unretryable data loss per batch.
+  mount("otlp-ingest", null);
 
   return features;
+}
+
+/** Writes each unconverted family to the process log, once, by name. */
+export class LoggedApiProcessRestAbsence extends ApiProcessRestAbsenceReport {
+  static create(logger: Pick<Logger, "warn">): LoggedApiProcessRestAbsence {
+    return new LoggedApiProcessRestAbsence(logger);
+  }
+
+  private constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  unconverted(family: ApiProcessRestFamilyName): void {
+    this.logger.warn(
+      { family },
+      `API process serves no ${family} REST family: its transport is still written against ` +
+        "the deleted REST builders, so the family is not mounted at all.",
+    );
+  }
 }

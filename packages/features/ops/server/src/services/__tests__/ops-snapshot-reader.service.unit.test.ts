@@ -259,4 +259,23 @@ describe("snapshot merging", () => {
     await stream.return?.();
     service.stop();
   });
+
+  describe("given a reader stopped while its first read is still in flight", () => {
+    it("installs no poll, so a released reader stops touching its connection", async () => {
+      vi.useFakeTimers();
+      const repository = new SnapshotRepositoryStub(live(), detail());
+      const reads = vi.spyOn(repository, "tryReadLive");
+      const service = DefaultOpsSnapshotService.create(repository);
+
+      // Started without awaiting, the way a composition root starts it.
+      const started = service.start();
+      service.stop();
+      await started;
+
+      const readsBeforePolling = reads.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      expect(reads.mock.calls.length).toBe(readsBeforePolling);
+    });
+  });
 });
