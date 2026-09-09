@@ -23,11 +23,11 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
-    "@langwatch/time": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
