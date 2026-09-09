@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Event } from "~/server/event-sourcing/domain/types";
 
 import {
   ConfigureIngestionPullCommand,
@@ -94,14 +95,15 @@ describe("agent listing commands", () => {
   };
 
   /** Runs the command the way the runtime does, and returns its one event. */
-  const emit = (
-    command: { new (): { handle(c: unknown): { [k: string]: unknown }[] } },
-    data: Record<string, unknown>,
-  ) =>
-    new command().handle({
-      tenantId: "gov-project",
-      data,
-    })[0];
+  const emit = (command: unknown, data: Record<string, unknown>): Event => {
+    // Each defined command is generic over its own data shape, and this
+    // helper needs only the event they all return. One cast here beats
+    // repeating the generic dance at every call.
+    const Command = command as new () => {
+      handle(c: { tenantId: string; data: Record<string, unknown> }): Event[];
+    };
+    return new Command().handle({ tenantId: "gov-project", data })[0] as Event;
+  };
 
   describe("the request that starts a listing", () => {
     it("commits to the pull aggregate, so one source is one ordered stream", () => {
