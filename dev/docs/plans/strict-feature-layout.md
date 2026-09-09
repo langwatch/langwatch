@@ -342,6 +342,11 @@ lane report and the wiring note under `$CLAUDE_JOB_DIR/tmp/wiring/`:
 - scim: the Enterprise plan gate is unattached until the entitlement seam (Part D) lands; role and role-binding share the gap. OPEN, security.
 - The management audit rows on api-key read and update are re-established at the mount (wave 1); the Codex connect audit row on model-provider is OPEN (`TARGET_KIND_BY_ROUTER`).
 - Every converted family carries `X-API-Version` headers; description-only OpenAPI answers publish `"content": {}`.
+- auth: a wrong method on `/api/auth/cli/*` answers 405 with `Allow` instead of falling through to the Better Auth catch-all; the unreachable 405 branch in logout is gone; `tryFindProjectSlugByToken` is `findProjectSlugByToken` on the door api; tRPC output validation is unconditional.
+- user: `/api/me`'s legacy error envelope has no runtime equivalent, so a request-schema failure renders the canonical envelope; `/api/me/project` costs one project read; `isAdmin`, `setAvatar` and `changePassword` read the person from the user row, not the session; the tRPC refusals are `HandledError`s with ten new codes and customer copy.
+- scim (wave 2): `GET /api/scim/v2/Users` records as `handlerManaged`, not `internal`, because the bearer is the whole gate; `scim-tokens` does not mount where no `enterpriseGate` is composed. The plan gate stays OPEN (security), now that `.withEntitlement` exists (Part D) it is the next wiring item.
+- project (wave 2): the `/api/v1` twin of `/api/projects` is dropped (`dated, { v1Twin: false }`); the organization door's by-id routes ask the permission at the organization and at the project, stricter than main for a narrowly bound key. OPEN in `packages/api` (`callerOf` should `identify` when a route carries a `permissionTarget`).
+- coding-agent (wave 2): the rollup family `/api/coding-agent/pull-request-usage` is registered; the api supplies `visibility` and `audit` at the app, the worker refusing twins.
 
 ## 9. Decisions open for Alex
 
