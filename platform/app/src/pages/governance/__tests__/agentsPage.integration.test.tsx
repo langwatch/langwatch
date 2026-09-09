@@ -8,9 +8,10 @@
  * (?view=), under the contract the tab parameter had. These tests mount the
  * real page inside a memory router so the assertions run against the address
  * the user sees: the default is never written to the URL, and an unknown
- * value degrades to the default instead of a blank pane. No organization
- * wide agents list exists yet, so the page is an honest empty state and
- * issues no query at all.
+ * value degrades to the default instead of a blank pane. The page reads the
+ * organization's agents through `governanceAgents.list`, and this file also
+ * holds what it does with the three answers that are not a list: none, not
+ * yet, and a failure.
  *
  * Most of these run with sample mode turned off, because the empty pane is
  * what the page shows without it. Sample mode now fills an empty governance
@@ -40,6 +41,12 @@ const harness = vi.hoisted(() => ({
   requested: [] as string[],
   /** The persona under test; beforeEach resets to the delegated viewer. */
   permissions: [] as string[],
+  /**
+   * Per-procedure overrides on the default query result, so a test can say
+   * "this read has not answered yet" or "this read failed" without teaching
+   * the proxy about any particular page.
+   */
+  queryResults: {} as Record<string, Record<string, unknown>>,
 }));
 
 /** The org-member floor plus the governance product grant. */
@@ -100,9 +107,12 @@ vi.mock("~/utils/api", () => {
           if (typeof property !== "string") return undefined;
           if (property === "useQuery") {
             return (_input: unknown, options?: { enabled?: boolean }) => {
-              if (options?.enabled !== false)
-                harness.requested.push(path.join("."));
-              return queryResult();
+              const procedure = path.join(".");
+              if (options?.enabled !== false) harness.requested.push(procedure);
+              return {
+                ...queryResult(),
+                ...(harness.queryResults[procedure] ?? {}),
+              };
             };
           }
           if (property === "useUtils") return () => node([]);
@@ -134,6 +144,7 @@ function renderAgentsAt(initialEntries: string[]) {
 beforeEach(() => {
   harness.requested = [];
   harness.permissions = VIEWER_PERMISSIONS;
+  harness.queryResults = {};
   // The reader has said no to the sample cards, which is what puts each
   // pane's own empty-state sentence on screen.
   window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
@@ -177,11 +188,56 @@ describe("the agents page address contract", () => {
       expect(screen.queryByText(/application/i)).toBeNull();
     });
 
-    /** @scenario "The agents page issues no query while no organization list exists" */
-    it("issues no query", () => {
+    /** @scenario "The agents page reads the organization's own agents" */
+    it("queries the organization's agents", () => {
       renderAgentsAt(["/governance/agents"]);
 
-      expect(harness.requested).toEqual([]);
+      expect(harness.requested).toEqual(["governanceAgents.list"]);
+    });
+  });
+
+  describe("when the organization's agents read comes back with none", () => {
+    /** @scenario "An organization with no agents stays empty rather than filling with samples" */
+    it("shows the page's own empty state rather than the sample rows", () => {
+      harness.queryResults["governanceAgents.list"] = { data: [] };
+      renderAgentsAt(["/governance/agents"]);
+
+      expect(screen.getByTestId("agents-empty")).toBeVisible();
+      expect(screen.queryByTestId("governance-agents-table")).toBeNull();
+      // By a name only the invented set carries: an empty real answer that
+      // quietly filled with samples would still render the table above, but
+      // this is the assertion that says WHICH rows would have appeared.
+      expect(screen.queryByText("support-copilot")).toBeNull();
+    });
+  });
+
+  describe("when the organization's agents read has not answered yet", () => {
+    /** @scenario "A read still in flight shows neither agents nor an empty state" */
+    it("shows a spinner instead of claiming no agent has registered", () => {
+      harness.queryResults["governanceAgents.list"] = {
+        data: undefined,
+        isLoading: true,
+      };
+      renderAgentsAt(["/governance/agents"]);
+
+      expect(screen.queryByTestId("agents-empty")).toBeNull();
+      expect(screen.getByRole("heading", { name: "Agents" })).toBeVisible();
+    });
+  });
+
+  describe("when the organization's agents read fails", () => {
+    /** @scenario "A failed agents read says so instead of claiming there are no agents" */
+    it("says the agents could not be loaded", () => {
+      harness.queryResults["governanceAgents.list"] = {
+        data: undefined,
+        isError: true,
+        error: new Error("boom"),
+      };
+      renderAgentsAt(["/governance/agents"]);
+
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        /couldn't load agents/i,
+      );
     });
   });
 
