@@ -46,3 +46,29 @@ ALTER TABLE "IngestionPullRunProjection" ADD COLUMN "lastPeopleDirectoryCount" I
 ALTER TABLE "IngestionPullRunProjection" ADD COLUMN "lastPeopleWithheldCount" INTEGER;
 ALTER TABLE "IngestionPullRunProjection" ADD COLUMN "lastPeopleListingReason" TEXT;
 ALTER TABLE "IngestionPullRunProjection" ADD COLUMN "lastPeopleListingStatus" INTEGER;
+
+-- Down
+--
+-- The up step is purely additive: eleven nullable columns on one projection
+-- table, no backfill, no constraint, no index. So the reversal is the drops
+-- below and nothing else, and it loses only the last listing outcome each
+-- source recorded. Nothing is derived from these columns that cannot be
+-- rebuilt, because the projection is folded from the event log: replaying it
+-- after a re-apply restores every value.
+--
+-- Left commented, like the sibling migrations that carry a Down block. Prisma
+-- runs no down step, so an executable one here would be a statement nobody
+-- calls; this is the script an operator runs by hand, kept next to the up it
+-- undoes.
+--
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastAgentsListingAt";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastAgentsListingOutcome";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastAgentsListingCount";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastAgentsListingReason";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastAgentsListingStatus";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastPeopleListingAt";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastPeopleListingOutcome";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastPeopleDirectoryCount";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastPeopleWithheldCount";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastPeopleListingReason";
+-- ALTER TABLE "IngestionPullRunProjection" DROP COLUMN "lastPeopleListingStatus";
