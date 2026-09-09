@@ -347,6 +347,7 @@ lane report and the wiring note under `$CLAUDE_JOB_DIR/tmp/wiring/`:
 - scim (wave 2): `GET /api/scim/v2/Users` records as `handlerManaged`, not `internal`, because the bearer is the whole gate; `scim-tokens` does not mount where no `enterpriseGate` is composed. The plan gate stays OPEN (security), now that `.withEntitlement` exists (Part D) it is the next wiring item.
 - project (wave 2): the `/api/v1` twin of `/api/projects` is dropped (`dated, { v1Twin: false }`); the organization door's by-id routes ask the permission at the organization and at the project, stricter than main for a narrowly bound key. OPEN in `packages/api` (`callerOf` should `identify` when a route carries a `permissionTarget`).
 - coding-agent (wave 2): the rollup family `/api/coding-agent/pull-request-usage` is registered; the api supplies `visibility` and `audit` at the app, the worker refusing twins.
+- automation: `/api/trigger/slack` answers its literal address and the v1 twin only (the `/api/2026-08-07/` and `/api/latest/` aliases were an artefact of the base path); REST-created trigger ids are ksuids like the tRPC door's (were nanoid); `emailSuppression.remove` records the whole input as audit args; the missing-trigger 404 is a declared answer. Persistence stays on the postgres adapters until the worker wiring pass.
 
 ## 9. Decisions open for Alex
 
