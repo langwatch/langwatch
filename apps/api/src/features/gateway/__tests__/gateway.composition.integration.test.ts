@@ -14,6 +14,8 @@ import type { GithubService } from "@langwatch/github-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { testProject } from "../../../app/__tests__/support/project-fixtures.ts";
+import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication } from "../../../api.application.ts";
@@ -168,14 +170,13 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
   const authz = testAuthz();
   const github = testGithub();
 
-  const projects = {
+  const projects: ProjectApi = new TestProjectApi({
     getOrganizationId: vi.fn(async () => ORGANIZATION_ID),
-    tryGetById: vi.fn(async () => ({ id: PROJECT_ID, teamId: TEAM_ID })),
-    getByIds: vi.fn(async () => []),
+    tryGetById: vi.fn(async () => testProject({ id: PROJECT_ID, teamId: TEAM_ID })),
     listTraceDestinations: vi.fn(async () => []),
     listIdsByOrganization: vi.fn(async () => [PROJECT_ID]),
     listNamesByIds: vi.fn(async () => []),
-  } as unknown as ProjectApi;
+  });
 
   const infrastructure = {
     ...stubInfrastructureEntitlements(),

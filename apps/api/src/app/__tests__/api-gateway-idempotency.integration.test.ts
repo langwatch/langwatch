@@ -24,6 +24,7 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "./support/test-project-api.ts";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -90,7 +91,7 @@ function composeGatewayWith(idempotency: ReturnType<typeof composeApiIdempotency
     gateway: composeApiGateway({
       prisma: receipts as unknown as PrismaClient,
       authz: { hasPermission: async () => true } as unknown as AuthzService,
-      projects: {} as unknown as ProjectApi,
+      projects: new TestProjectApi(),
       evaluators: {} as unknown as EvaluatorService,
       monitors: {} as unknown as MonitorService,
       clickhouse: null,

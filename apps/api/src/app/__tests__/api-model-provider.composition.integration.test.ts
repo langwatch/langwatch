@@ -31,7 +31,9 @@ import {
 } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "./support/test-project-api.ts";
+import { testProjectWithTeam } from "./support/project-fixtures.ts";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
@@ -85,21 +87,23 @@ function testCipher(): SecretEncryptionPort {
 }
 
 function testProjects(): ProjectApi {
-  const project = {
-    id: "project-1",
-    name: "Support",
-    slug: "support",
-    teamId: "team-1",
-    team: { id: "team-1", name: "Core", organizationId: "org-1" },
-    // The date a system provider's availability is judged against: a provider
-    // is offered to projects created after LangWatch started credentialing it.
-    createdAt: new Date("2026-09-01T00:00:00.000Z"),
-  } as unknown as ProjectWithTeam;
+  const project = testProjectWithTeam(
+    {
+      id: "project-1",
+      name: "Support",
+      slug: "support",
+      teamId: "team-1",
+      // The date a system provider's availability is judged against: a provider
+      // is offered to projects created after LangWatch started credentialing it.
+      createdAt: new Date("2026-09-01T00:00:00.000Z"),
+    },
+    { name: "Core", organizationId: "org-1" },
+  );
 
-  return {
+  return new TestProjectApi({
     getWithTeam: async () => project,
     tryGetWithTeam: async () => project,
-  } as unknown as ProjectApi;
+  });
 }
 
 function testOrganizations(): OrganizationService {

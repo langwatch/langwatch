@@ -57,6 +57,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -218,13 +219,18 @@ const world = RestAuthWorld.create({
   ],
 });
 
+/** The one project read the governed-SQL gate makes: whose tenant this is. */
 function projects(): ProjectApi {
-  return {
-    getById: async (projectId: string) => ({ id: projectId, lwqlKey: `lwql-${projectId}` }),
-    getOrganizationId: async (projectId: string) =>
-      [openProject, gatedProject, otherProject].find((project) => project.id === projectId)
-        ?.organizationId ?? null,
-  } as unknown as ProjectApi;
+  return new TestProjectApi({
+    getOrganizationId: async (projectId: string) => {
+      const project = [openProject, gatedProject, otherProject].find(
+        (candidate) => candidate.id === projectId,
+      );
+      if (!project) throw new Error(`no seeded project ${projectId}`);
+
+      return project.organizationId;
+    },
+  });
 }
 
 function dashboardApp(): DashboardApp {

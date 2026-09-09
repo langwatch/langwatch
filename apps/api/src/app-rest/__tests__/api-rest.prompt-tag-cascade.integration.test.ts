@@ -6,7 +6,7 @@
  * application about every project the catalog reaches — driven here through
  * the process's real credential chain.
  */
-import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "../../app/__tests__/support/test-project-api.ts";
 import { PromptApp } from "@langwatch/prompt-server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -104,10 +104,10 @@ function mountPrompts(key: RestAuthKey): {
 
   const promptApp = PromptApp.create({
     prompts: { renameTag } as never,
-    projects: {
+    projects: new TestProjectApi({
       getOrganizationId: async () => REST_AUTH_ORGANIZATION,
       listIdsByOrganization: async () => PROJECTS.map((project) => project.id),
-    } as unknown as ProjectApi,
+    }),
   });
 
   const api = mountRestFamily({

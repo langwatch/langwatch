@@ -23,6 +23,7 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "./support/test-project-api.ts";
 import { describe, expect, it, vi } from "vitest";
 import { composeApiGateway } from "../api-gateway.composition.ts";
 
@@ -70,7 +71,7 @@ function composeGateway() {
   const composition = composeApiGateway({
     prisma,
     authz: { hasPermission: async () => true } as unknown as AuthzService,
-    projects: {} as unknown as ProjectApi,
+    projects: new TestProjectApi(),
     evaluators: {} as unknown as EvaluatorService,
     monitors: {} as unknown as MonitorService,
     clickhouse: null,

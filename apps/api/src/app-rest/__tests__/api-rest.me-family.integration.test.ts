@@ -4,7 +4,7 @@
  * personal-project key resolves to its own workspace, or it does not.
  */
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "../../app/__tests__/support/test-project-api.ts";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -132,7 +132,7 @@ function mountMe(personalUsage: () => Promise<typeof USAGE>): MountedRestFamily 
         ({
           tryGetOrganizationIdByTeamId: async () => REST_AUTH_ORGANIZATION,
         }) as unknown as OrganizationService,
-      projects: () => ({ findInternal: async () => null }) as unknown as ProjectApi,
+      projects: () => new TestProjectApi({ findInternal: async () => null }),
     } as never,
   });
 }

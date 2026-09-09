@@ -3,7 +3,9 @@
  * ADR-092 §9 caps a CLI key at what its owner may still do, read at request
  * time: the project door refuses, the listing narrows instead of refusing.
  */
-import type { ProjectApi } from "@langwatch/project-contract";
+import type { Project, ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "../../app/__tests__/support/test-project-api.ts";
+import { testProject } from "../../app/__tests__/support/project-fixtures.ts";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiTracesRestCollaborators } from "../../features/trace/trace-rest.mount.ts";
@@ -33,14 +35,15 @@ const OTHER_TEAM_PROJECT: RestAuthProject = {
  * listing publishes the setup fields and both timestamps, so a stub that omits
  * them describes a response the door never sends.
  */
-function listedProject(project: RestAuthProject) {
-  return {
-    ...project,
-    language: "python",
-    framework: "openai",
-    createdAt: new Date("2026-01-01T00:00:00.000Z"),
-    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
-  };
+function listedProject(project: RestAuthProject): Project {
+  return testProject({
+    id: project.id,
+    name: project.name,
+    slug: project.slug,
+    teamId: project.teamId,
+    isPersonal: project.isPersonal,
+    ownerUserId: project.ownerUserId,
+  });
 }
 
 const CLI_KEY = "sk-lw-cli-login";
@@ -157,15 +160,12 @@ function mountTraces(options: {
 
 function mountProjects(options: {
   world: RestAuthWorld;
-  listByOrganization: (input: { projectIds?: string[] }) => Promise<unknown>;
+  listByOrganization: ProjectApi["listByOrganization"];
 }): MountedRestFamily {
   return mountRestFamily({
     security: options.world.security(),
     packaged: {
-      projects: () =>
-        ({
-          listByOrganization: options.listByOrganization,
-        }) as unknown as ProjectApi,
+      projects: () => new TestProjectApi({ listByOrganization: options.listByOrganization }),
       apiKeys: () => options.world.apiKeys(),
     } as never,
   });
