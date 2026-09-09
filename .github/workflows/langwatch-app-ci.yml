@@ -229,8 +229,8 @@ jobs:
               # edit to that action will silently not re-run the suite it
               # feeds. These entries cover every action this file uses
               # (`grep -o "uses: \./\.github/actions/[a-z-]*"`).
-              - '.github/actions/declaration-cache/**'
               - '.github/actions/detect-changes/**'
+              - '.github/actions/declaration-cache/**'
               - '.github/actions/prepare-generated-files/**'
               - '.github/actions/setup-pnpm-node/**'
             # The parity scanner binds @scenario annotations from test files
@@ -283,8 +283,8 @@ jobs:
           install: "@langwatch/platform-api... @langwatch/worker... @langwatch/ui..."
 
       - uses: ./.github/actions/prepare-generated-files
-      - uses: ./.github/actions/declaration-cache
 
+      - uses: ./.github/actions/declaration-cache
 
       # tsc writes incremental .tsbuildinfo caches to explicit paths under each
       # application's node_modules/.cache/tsbuildinfo (see their tsconfig.json).
@@ -359,8 +359,8 @@ jobs:
           install: all
 
       - uses: ./.github/actions/prepare-generated-files
-      - uses: ./.github/actions/declaration-cache
 
+      - uses: ./.github/actions/declaration-cache
 
       # Each package writes its own .tsbuildinfo to
       # node_modules/.cache/tsbuildinfo/<pkg>.tsbuildinfo, per the repo rule
@@ -550,16 +550,20 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/system-migrations run typecheck
 
-      # @langwatch/api/web owns `trpcQueryKey`, which re-derives tRPC's React
-      # Query cache-key encoding from a procedure path. Every feature web
-      # package invalidating a procedure its own map does not declare goes
-      # through it, so if the encoding drifts from `@trpc/react-query`'s the
-      # failure is silent — an invalidation that matches nothing. Its suite runs
-      # with the @langwatch/api unit tests above; this compiles the package's
-      # own TypeScript, browser half included, which `pnpm typecheck` does not.
-      - name: Typecheck @langwatch/api
+      # @langwatch/platform-api-client owns `trpcQueryKey`, which re-derives
+      # tRPC's React Query cache-key encoding from a procedure path. Every
+      # feature web package invalidating a procedure its own map does not
+      # declare goes through it, so if the encoding drifts from
+      # `@trpc/react-query`'s the failure is silent — an invalidation that
+      # matches nothing, and stale UI nobody can trace back here. Its suite is
+      # the only thing that pins the encoding, and it ran nowhere.
+      - name: Run @langwatch/platform-api-client unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/api run typecheck
+        run: pnpm --filter @langwatch/platform-api-client run test:unit
+
+      - name: Typecheck @langwatch/platform-api-client
+        if: matrix.app == 'platform-api'
+        run: pnpm --filter @langwatch/platform-api-client run typecheck
 
       # @langwatch/trace-web is the first feature web package, and the largest
       # body of browser code that left the monolith — 406 tests over 42 files,
@@ -621,9 +625,9 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/enterprise-licensing-web run test
       # endpoint validation and delivery.
-      - name: Run @langwatch/enterprise-webhook-server tests
+      - name: Run @langwatch/webhook-server tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/enterprise-webhook-server run test
+        run: pnpm --filter @langwatch/webhook-server run test
 
       # The six enterprise contract packages whose suites `vitest` could not
       # even discover until `packages/enterprise/vitest.config.ts` learned the

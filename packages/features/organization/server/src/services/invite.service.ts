@@ -1,4 +1,4 @@
-import { type AuthzGrantsService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { type OrganizationInvite, OrganizationUserRole } from "@langwatch/organization-contract";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
@@ -218,7 +218,7 @@ export class InviteService {
     return this.deps.mail;
   }
 
-  private get writer(): AuthzGrantsService {
+  private get writer(): AuthzApi {
     return this.deps.grants;
   }
 

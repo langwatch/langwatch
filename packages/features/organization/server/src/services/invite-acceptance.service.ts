@@ -3,7 +3,7 @@
  * idempotent so a retry repairs rather than duplicates.
  */
 import { ledgerActorFor } from "@langwatch/actor";
-import { type AuthzGrantsService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -40,7 +40,7 @@ export class InviteAcceptanceService {
     return this.deps.roles;
   }
 
-  private get writer(): AuthzGrantsService {
+  private get writer(): AuthzApi {
     return this.deps.grants;
   }
 
