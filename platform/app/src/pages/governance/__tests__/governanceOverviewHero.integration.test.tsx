@@ -378,9 +378,7 @@ describe("governance overview", () => {
       // The fourth way in sits at the foot of the source menu. A chip here as
       // well would be the same destination offered twice, one of them under a
       // pill the reader has to open to find it.
-      expect(
-        screen.queryByText("Configure sources"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Configure sources")).not.toBeInTheDocument();
     });
 
     /** @scenario "Each add shortcut opens the flow that adds the thing it names" */
