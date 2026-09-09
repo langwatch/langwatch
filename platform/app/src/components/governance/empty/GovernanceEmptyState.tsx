@@ -8,6 +8,7 @@ import {
 } from "@chakra-ui/react";
 import type { ComponentType, PropsWithChildren, ReactNode } from "react";
 
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { CARD, SERIF } from "~/features/asaplangy/tokens";
 
 /**
@@ -48,6 +49,10 @@ import { CARD, SERIF } from "~/features/asaplangy/tokens";
  * one create flow, under one label, from its header" and "An empty pane
  * explains itself rather than sitting blank" in
  * specs/ai-governance/dashboard/governance-ui-controls.feature.
+ *
+ * How heavily that action is drawn is a separate rule, and it moved: see
+ * specs/ai-governance/dashboard/governance-summary-strip.feature and the note
+ * on `GovernanceEmptyStateAction` below.
  */
 
 /** Structural, so a lucide glyph and any other icon library both satisfy it. */
@@ -64,9 +69,22 @@ export type GovernanceEmptyStateIcon = ComponentType<{
  * lets a menu, a dialog trigger or a plain handler all supply one without this
  * component knowing which.
  *
- * The variants are fixed rather than open. Solid is for the action that
- * creates something of the organization's own, which is the same rule the page
- * headers follow, and everything else is quieter than it.
+ * THE TWO WEIGHTS, AND WHY NEITHER IS SOLID ANY MORE. This used to draw
+ * `primary` as a solid orange fill. The product owner rejected that treatment
+ * across the whole governance section, so the loudest thing an empty pane may
+ * offer is now the house button — `PageLayout.HeaderButton`, the small outline
+ * button every page header already uses (see /settings/model-providers, which
+ * pairs exactly this button in its header with the same outline treatment in
+ * its empty state). It is imported rather than re-expressed here, so a change
+ * to the house button reaches this pane too.
+ *
+ * The DISTINCTION the old solid carried is the part that had to survive, and
+ * it does. `primary` is still for an action that creates something of the
+ * organization's own; `secondary` is for one that only changes what is shown,
+ * such as clearing a filter, and is drawn ghost — the same weight the section
+ * gives its sample-data toggle at rest, for the same reason. Losing that
+ * distinction is what left "Clear filters" and "Register agent" looking
+ * identical the first time a page passed no emphasis at all.
  */
 export function GovernanceEmptyStateAction({
   children,
@@ -77,14 +95,14 @@ export function GovernanceEmptyStateAction({
     emphasis?: "primary" | "secondary";
   }
 >) {
+  if (emphasis === "primary") {
+    return (
+      <PageLayout.HeaderButton {...props}>{children}</PageLayout.HeaderButton>
+    );
+  }
+
   return (
-    <Button
-      size="sm"
-      {...(emphasis === "primary"
-        ? { colorPalette: "orange" }
-        : { variant: "outline" })}
-      {...props}
-    >
+    <Button size="sm" variant="ghost" {...props}>
       {children}
     </Button>
   );

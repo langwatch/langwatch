@@ -1,18 +1,25 @@
 import { Badge, Box, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
-import numeral from "numeral";
-
-import { Tooltip } from "~/components/ui/tooltip";
 
 import {
-  AGENT_SOURCE_LABELS,
-  formatLastActive,
-  type GovernanceAgentRow,
-} from "./agentRows";
+  AGENT_NEVER_RUN,
+  AgentFigure,
+  agentCostMissingReason,
+  formatAgentCost,
+  formatAgentLastActive,
+  formatAgentRequests,
+} from "./AgentFigure";
+import { AGENT_SOURCE_LABELS, type GovernanceAgentRow } from "./agentRows";
 
 /**
  * One agent, as a card: what it is called, where it runs, who owns it, what it
  * runs on, where we found it, and the three figures an admin came to the page
  * for.
+ *
+ * This is the page's optional layout; the list is the default. A card spends a
+ * lot of width on one agent, which is the right trade when the reader is
+ * looking at one and the wrong one when they are comparing ten. Both layouts
+ * draw their figures through `AgentFigure`, so neither can format a number or
+ * word a dash differently from the other.
  *
  * A figure we do not have renders as a dash with a reason on hover, never as
  * zero. `$0.00` is a measurement — it says the agent ran and spent nothing —
@@ -78,64 +85,19 @@ export function AgentCard({
       <SimpleGrid columns={3} gap={3}>
         <AgentFigure
           label="Cost · 30 days"
-          missingReason={
-            agent.source === "copilot_studio"
-              ? "Dollar cost per agent needs billing data and a supported calculation."
-              : "The platform has not measured this yet."
-          }
-          value={
-            agent.costUsd30d === null
-              ? null
-              : numeral(agent.costUsd30d).format("$0,0.00")
-          }
+          missingReason={agentCostMissingReason(agent)}
+          value={formatAgentCost(agent)}
         />
         <AgentFigure
           label="Requests · 30 days"
-          value={
-            agent.requests30d === null
-              ? null
-              : numeral(agent.requests30d).format("0,0")
-          }
+          value={formatAgentRequests(agent)}
         />
         <AgentFigure
           label="Last active"
-          value={formatLastActive(agent.lastActiveMinutesAgo)}
-          missingReason="This agent has registered but has never run."
+          value={formatAgentLastActive(agent)}
+          missingReason={AGENT_NEVER_RUN}
         />
       </SimpleGrid>
-    </VStack>
-  );
-}
-
-/**
- * One figure and its label. `null` is the only way a figure goes missing, and
- * it always renders the same way, so a reader learns the dash once.
- */
-function AgentFigure({
-  label,
-  value,
-  missingReason = "The platform has not measured this yet.",
-}: {
-  label: string;
-  value: string | null;
-  missingReason?: string;
-}) {
-  return (
-    <VStack align="start" gap={0.5}>
-      <Text textStyle="xs" color="fg.muted">
-        {label}
-      </Text>
-      {value === null ? (
-        <Tooltip content={missingReason}>
-          <Text textStyle="sm" color="fg.muted" aria-label={missingReason}>
-            —
-          </Text>
-        </Tooltip>
-      ) : (
-        <Text textStyle="sm" fontWeight="medium">
-          {value}
-        </Text>
-      )}
     </VStack>
   );
 }

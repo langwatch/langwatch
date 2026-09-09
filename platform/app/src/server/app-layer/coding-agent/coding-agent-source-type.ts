@@ -10,8 +10,10 @@
  * `gemini`, and `copilot` where the tile says `github_copilot`.
  *
  * `claude_cowork` is deliberately mapped to itself rather than folded into
- * `claude_code`: it is its own ingestion source type, and there is no tile to
- * untick for it, so it resolves to the bundled default on its own name.
+ * `claude_code`: it is its own ingestion source type, and a Cowork tile is
+ * keyed on that same name, so the policy finds the right tile by passing the
+ * agent through unchanged. Folding it into `claude_code` would make unticking
+ * bundled subscription on the Claude Code tile silently rebill Cowork too.
  *
  * An agent with no entry passes through unchanged. That is the honest answer
  * for an agent this build's registry does not know: the policy either finds a

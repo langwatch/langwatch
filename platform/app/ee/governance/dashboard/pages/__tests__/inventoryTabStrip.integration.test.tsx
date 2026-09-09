@@ -35,10 +35,13 @@ describe("given an admin on the Inventory page", () => {
     });
 
     /** @scenario "The tab says how many tools are in the catalog" */
-    it("carries the catalog count on the Catalog tab", () => {
+    it("counts registered tools on the Catalog tab, not connected sources", () => {
       connectTools();
       renderScreen();
-      expect(screen.getAllByRole("tab")[0]?.textContent).toContain("2");
+      // Three tools registered against two sources connected, so a count read
+      // off the wrong list is visible here rather than being a coincidence.
+      expect(screen.getAllByRole("tab")[0]?.textContent).toContain("3");
+      expect(screen.getAllByRole("tab")[2]?.textContent).toContain("2");
     });
   });
 });

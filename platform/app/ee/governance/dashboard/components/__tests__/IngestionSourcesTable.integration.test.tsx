@@ -19,7 +19,6 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Source } from "../../pages/ingestionSourceForms";
 import {
-  ConnectorsHeader,
   IngestionSourcesTable,
   sortSourcesForTable,
 } from "../IngestionSourcesTable";
@@ -80,7 +79,6 @@ function renderTable({
   };
   render(
     <Providers>
-      <ConnectorsHeader sources={sources} />
       <IngestionSourcesTable
         sources={sources}
         canManage={canManage}
@@ -140,14 +138,6 @@ describe("given the ingestion sources table", () => {
         within(pushRow).queryByText(/Hourly|Every/),
       ).not.toBeInTheDocument();
     });
-
-    /** @scenario "The sources table shows delivery as a column" */
-    it("counts the fleet in the header from the loaded list", () => {
-      renderTable();
-
-      expect(screen.getByText("Connectors")).toBeVisible();
-      expect(screen.getByText("3 sources · 1 active")).toBeVisible();
-    });
   });
 
   describe("when an admin opens a row's actions", () => {
@@ -187,6 +177,40 @@ describe("given the ingestion sources table", () => {
       expect(
         screen.queryByRole("menuitem", { name: /Rotate secret/ }),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when a source is named after its own type", () => {
+    /**
+     * The sample rows are exactly this shape — they carry the catalog's label
+     * as the name — so without the guard the Sources tab printed every
+     * connector's name twice, one line above the other.
+     *
+     * Spec: specs/ai-governance/dashboard/inventory-catalog.feature
+     */
+    /** @scenario "A source named after its own type does not say so twice" */
+    it("writes the type once", () => {
+      renderTable({
+        sources: [
+          makeSource({
+            id: "src-named-after-type",
+            name: "Workato",
+            sourceType: "workato",
+          }),
+        ],
+      });
+
+      const row = screen.getByTestId("source-row-src-named-after-type");
+      expect(within(row).getAllByText("Workato")).toHaveLength(1);
+    });
+
+    /** @scenario "A source named after its own type does not say so twice" */
+    it("still writes the type under a name of the admin's own", () => {
+      renderTable({ sources: [WORKATO] });
+
+      const row = screen.getByTestId("source-row-src-workato");
+      expect(within(row).getByText("Workato prod")).toBeVisible();
+      expect(within(row).getByText("Workato")).toBeVisible();
     });
   });
 

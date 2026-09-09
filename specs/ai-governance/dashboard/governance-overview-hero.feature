@@ -23,39 +23,88 @@ Feature: The governance overview opens with a hero and nothing else
   Scenario: The hero leads with adding a source
     Given I also hold `ingestionSources:manage`
     When the overview renders
-    Then an "Add Source" control is offered above the shortcuts
+    Then an "Add source" control is offered above the shortcuts
     And it opens a menu rather than firing straight away
     And it carries the mark of each vendor the menu offers
+
+  # Everything in this section that creates something is an outline control,
+  # so the one on the overview cannot be the exception. The filled treatment
+  # stays available to the project home, which is not part of this section.
+
+  @integration
+  Scenario: The lead action is an outline control rather than a filled one
+    Given I also hold `ingestionSources:manage`
+    When the overview renders
+    Then the "Add source" control carries no accent fill, border or text
+    And nothing drawn inside it carries one either
+    But it still reads as heavier than the shortcuts beside it
+    And it is heavier by surface, mark and caret rather than by colour
 
   @integration
   Scenario: The source menu names the three vendors an admin arrives with
     Given I also hold `ingestionSources:manage`
-    When I open the "Add Source" menu
+    When I open the "Add source" menu
     Then it offers "Anthropic", "OpenAI" and "Microsoft Copilot", in that order
-    And nothing else, because the sources tab holds the full catalog
+    And no other vendor, because the sources tab holds the full catalog
     And picking one opens the sources tab on that vendor's add flow
 
   @integration
   Scenario: Adding a source is offered only to whoever may add one
     Given I do not hold `ingestionSources:manage`
     When the overview renders
-    Then no "Add Source" control is offered, because the add flow would refuse me
+    Then no "Add source" control is offered, because the add flow would refuse me
     And the three shortcuts are offered just the same
 
-  # The third shortcut used to read "Add anomaly rule" and point at
+  # A shortcut used to read "Add anomaly rule" and point at
   # /governance/inventory?tab=anomaly-rules. Anomaly rules stopped being an
   # inventory tab, so that address degraded to the inventory's default pane
   # and the shortcut quietly delivered the catalog under a rule's name. The
-  # test asserted the href and so never saw it. The shortcut now says what it
-  # actually opens.
+  # test asserted the href and so never saw it. Every shortcut now says what
+  # it actually opens.
   @integration
-  Scenario: The hero offers three ways in, in the order a surface is set up
+  Scenario: The hero offers four ways in, three to add and one to configure
+    # The fourth way in is a row of the "Add source" menu, and that menu is
+    # only drawn for a holder of this grant. Without it here the scenario asked
+    # for a menu row that cannot exist for the Background's reader.
+    Given I also hold `ingestionSources:manage`
     When the overview renders
-    Then the hero offers "Add people", "Add agent" and "Add tool", in that order
-    And "Add people" leads to the people page
-    And "Add agent" leads to the agents page ready to add one
-    And "Add tool" leads to the inventory, which opens on its catalog
+    Then the shortcut row offers "Add department", "Add agent" and "Add tool", in that order
     And no other shortcut is offered beside them
+    And they read in the order a surface is set up:
+      the group people belong to, the agents it runs, the tools those reach
+    And the fourth way in configures rather than adds, so it is not a chip at all:
+      it is the last row of the "Add source" menu, the way the model picker keeps
+      "Configure available models" at the foot of its own list
+
+  # Landing on the right page is not the same as arriving somewhere useful.
+  # Two of these shortcuts used to land on the correct page and open nothing,
+  # leaving the reader to find the add button themselves, which is the work
+  # the shortcut existed to save.
+
+  @integration
+  Scenario: Each add shortcut opens the flow that adds the thing it names
+    When the overview renders
+    Then "Add department" leads to the departments tab of the people page, asking it to open its add flow
+    And "Add agent" leads to the agents page ready to add one
+    And "Add tool" leads to the catalog tab of the inventory, asking it to open its add flow
+    And a shortcut that lands on the right page and opens nothing is a broken shortcut
+
+  # It used to be a fourth chip, offered to every reader. Moving it into the
+  # menu ties it to `ingestionSources:manage`, since that grant is what draws
+  # the pill: a reader without it now has no shortcut to the sources tab from
+  # this page. That is the cost of the move and it is stated rather than left
+  # to be discovered.
+
+  @integration
+  Scenario: A shortcut leads through to every source the product can pull from
+    Given I also hold `ingestionSources:manage`
+    When I open the "Add source" menu
+    Then a "Configure sources" row sits at the foot of the menu, under a rule
+    And it leads to the sources tab of the inventory
+    And it carries a settings mark and plain muted text, not a bold or accented label
+    And it is how a reader whose vendor is not one of the three above it reaches the rest
+    But when I do not hold `ingestionSources:manage` there is no menu to open
+    And no "Configure sources" row is offered anywhere on the page
 
   @integration
   Scenario: No shortcut points at a tab the page would not honour
@@ -63,6 +112,10 @@ Feature: The governance overview opens with a hero and nothing else
     Then every shortcut carrying a tab in its address names a tab that page has
     And a shortcut naming a tab that no longer exists is a broken shortcut,
       because the page degrades it to the default pane rather than refusing it
+    But a page with no tabs at all is held to more than that
+    And no shortcut carries a tab to a page that has none,
+      because a tab nothing reads outlives whoever added it
+      and reads as deliberate to the next person who opens the file
 
   @integration
   Scenario: The field offers Langy to whoever may ask
@@ -71,7 +124,7 @@ Feature: The governance overview opens with a hero and nothing else
     Then the field offers to ask Langy
     But when I cannot ask Langy
     Then the field offers search without Langy
-    And the same three ways in are offered
+    And the same three shortcuts are offered
 
   @integration
   Scenario: Insights and recent activity wait under the hero
@@ -140,6 +193,20 @@ Feature: The governance overview opens with a hero and nothing else
     Then the hero sits on the moving ground the project home's field sits on
     And that ground is hidden from assistive technology
     And it takes no clicks, so the field and the pill above it stay reachable
+
+  # The two screens sit one click apart in the rail and ask for the same thing
+  # in the same words. The governance field was set wider than the project
+  # home one, so moving between them resized the field under the reader, which
+  # read as two different controls rather than one.
+
+  @integration
+  Scenario: The field is the width the project home sets its own field to
+    When the overview renders
+    Then the ask field is no wider than the project home ask field
+    And the pill and the shortcuts under it keep to that same width
+    But the two lists below stay wider than the field
+    And they stay wider because their rows carry a badge, a headline and a date
+      across two columns, which the field width would leave unscannable
 
   @integration
   Scenario: The overview renders no error alert and issues no spend read

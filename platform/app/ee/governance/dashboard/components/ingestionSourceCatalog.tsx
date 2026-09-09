@@ -85,6 +85,24 @@ export interface SourceTypeOption {
    * would turn an existing source's name into a blank.
    */
   deprecated?: boolean;
+  /**
+   * True when this type is left out of the sample Sources table, while
+   * staying fully on offer everywhere else.
+   *
+   * NOT A DEPRECATION, and the distinction matters to whoever reads this
+   * next: a type flagged here is current, is pickable in the Add source
+   * menu, and keeps its icon, its blurb and its configuration path. The
+   * only thing it loses is a row in a mock-up. Do not "finish the job" by
+   * adding `deprecated` alongside it.
+   *
+   * The reason is that the sample table and the menu answer different
+   * questions. The menu answers "what can I connect", and should be
+   * complete. The sample answers "what does a connected fleet look like",
+   * and is illustrative — so a type whose presence there reads as a claim
+   * about this deployment rather than as an example can be held back
+   * without being withdrawn from the product.
+   */
+  shouldOmitFromSample?: boolean;
 }
 
 // `satisfies` (not a type annotation) so each entry's `value` keeps its
@@ -113,6 +131,13 @@ export const SOURCE_TYPE_OPTIONS = [
     blurb:
       "Claude Cowork pushes telemetry via OTLP. Configure under Anthropic Admin Console → Cowork → Telemetry.",
     icon: <Anthropic />,
+    // Held out of the sample table by product decision, not retired: the
+    // type is live and stays in the Add source menu. The sample previously
+    // carried a row invented from a tool card and called it "Claude Cowork",
+    // a name the product uses nowhere, and the owner read the mock-up as a
+    // claim that this deployment had such a connection. Keeping it off the
+    // sample settles that without touching what customers can configure.
+    shouldOmitFromSample: true,
   },
   {
     value: "workato",
@@ -285,6 +310,36 @@ export function routesConversations(sourceType: SourceType): boolean {
   return option?.routesConversations === true;
 }
 
+/**
+ * The source types the product actually offers today, in catalog order.
+ *
+ * The one place a retired type is filtered out, so every surface asking "what
+ * can a customer have" gets the same answer: the Add source menu through
+ * `gatedSourceTypeOptions`, and the Sources tab's sample rows through
+ * {@link sampleSourceTypeOptions}, which narrows this list further rather
+ * than re-deriving it. A second filter written at a callsite is how a retired
+ * type reappears on one screen after being pulled from another.
+ */
+export function offeredSourceTypeOptions(): SourceTypeOption[] {
+  return SOURCE_TYPE_OPTIONS.filter((option) => !option.deprecated);
+}
+
+/**
+ * The source types the sample Sources table shows, in catalog order.
+ *
+ * A strict subset of {@link offeredSourceTypeOptions}: derived from it, so a
+ * type can never reach the sample without being on offer, and narrowed by
+ * `shouldOmitFromSample` so a type can be held back from the mock-up while staying
+ * in the Add source menu. Read this from the sample and the wider helper from
+ * the menu — the gap between the two is the point, and collapsing them would
+ * put a held-back type back on screen.
+ */
+export function sampleSourceTypeOptions(): SourceTypeOption[] {
+  return offeredSourceTypeOptions().filter(
+    (option) => !option.shouldOmitFromSample,
+  );
+}
+
 export interface GatedSourceTypeOption extends SourceTypeOption {
   /** Locked types render in the menu but cannot be picked. */
   locked: boolean;
@@ -303,12 +358,10 @@ export function gatedSourceTypeOptions({
 }: {
   isEnterprise: boolean;
 }): GatedSourceTypeOption[] {
-  return SOURCE_TYPE_OPTIONS.filter((option) => !option.deprecated).map(
-    (option) => ({
-      ...option,
-      locked: !isEnterprise && option.value !== "otel_generic",
-    }),
-  );
+  return offeredSourceTypeOptions().map((option) => ({
+    ...option,
+    locked: !isEnterprise && option.value !== "otel_generic",
+  }));
 }
 
 /**

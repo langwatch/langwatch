@@ -28,7 +28,7 @@ describe("sourceBadge", () => {
   describe("given a source an admin disabled", () => {
     describe("when its last runs all failed", () => {
       it("says disabled", () => {
-        // A disabled source is not expected to be pulling, so "Not pulling" is
+        // A disabled source is not expected to be pulling, so "Pulls failing" is
         // not news about it — it is the configured state, restated in red.
         expect(
           sourceBadge({ status: "disabled", errorCount: FAILING }),

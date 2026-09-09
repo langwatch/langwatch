@@ -1,7 +1,8 @@
 import { Badge, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { BellPlus, Target } from "lucide-react";
+import { BellPlus, Plus } from "lucide-react";
 
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -36,14 +37,30 @@ function SignalsPage() {
             </Text>
           </VStack>
           <HStack gap={2} flexShrink={0}>
-            <Button variant="outline">
-              <BellPlus size={16} />
+            {/* Neither of these buttons has a handler. As the file comment
+                above says, they draw the shape of the screen and do nothing
+                when pressed, so this page creates no rules at all yet.
+                They are weighted anyway, by the page-header rule: one
+                outlined, the rest ghost. New signal takes the outline
+                because the screen is named for signals and that is the
+                control that would become the create action once one exists,
+                not because it does more than its neighbour today. Both were
+                solid orange before the sweep, which read as two competing
+                create actions on a page that has none.
+
+                A parallel copy change on this page says rule creation is
+                still coming. That is consistent with these buttons rather
+                than contradicted by them: they are placeholders. If you do
+                not find such a sentence, it has not landed yet or has been
+                reworded, which changes nothing here. */}
+            <Button size="sm" variant="ghost">
+              <BellPlus size={14} />
               New alert
             </Button>
-            <Button colorPalette="orange">
-              <Target size={16} />
+            <PageLayout.HeaderButton>
+              <Plus size={14} />
               New signal
-            </Button>
+            </PageLayout.HeaderButton>
           </HStack>
         </HStack>
 

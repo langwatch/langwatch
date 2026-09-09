@@ -73,8 +73,8 @@ Feature: Governance home — route, nav promotion, persona detection
       (Catalog + Environments + Sources)
     And "/governance/inventory/<id>" is the per-source
       detail page
-    And "/governance/agents" is the tabbed agents surface
-      (Agents + Applications)
+    And "/governance/agents" is the agents surface, listing the agents
+      detected through the organization's connected sources
     # The daily-use dashboard at /governance links into them, and into the
     # routing-policy surface the gateway owns at /gateway/routing-policies.
 
@@ -178,10 +178,12 @@ Feature: Governance home — route, nav promotion, persona detection
   # The default is Catalog for every reader. It used to be
   # permission-sensitive — Catalog for aiTools:manage holders, Sources for
   # everyone else — because Catalog was then the tool-tiles editor, which
-  # only those holders could use. The tiles left this page, and the pane
-  # that replaced them is built from the same source list the Sources tab
-  # reads, so there is no longer a reason for one bare link to open two
-  # different panes for two recipients.
+  # only those holders could use. The pane that replaced them still reads
+  # the tool registry and is still gated on aiTools:manage, so what changed
+  # is not the grant but what a reader without it meets: the pane names the
+  # grant instead of silently sending them somewhere else. Routing one bare
+  # link to two different panes for two recipients hid the grant behind a
+  # redirect, which is the thing that was wrong with it.
   # ---------------------------------------------------------------------------
 
   @bdd @ui @governance-home @inventory-tabs @integration
@@ -203,15 +205,19 @@ Feature: Governance home — route, nav promotion, persona detection
     When they open "/governance/inventory"
     Then the Catalog tab is selected, the same pane the admin lands on
     And the address carries no "tab" parameter
-    And the sources list is read, since the catalog is built from it
 
   @bdd @ui @governance-home @inventory-tabs @integration
-  Scenario: A reader without ingestionSources:view meets the grant, not an empty catalog
-    Given a reader holding governance:view but NOT ingestionSources:view
+  Scenario: A reader without the registry grant meets the grant, not an empty catalog
+    Given a reader holding governance:view but NOT aiTools:manage
     When they open "/governance/inventory"
     Then the Catalog tab is still selected and still listed
-    And the pane names ingestionSources:view rather than reporting that
+    And the pane names aiTools:manage rather than reporting that
       no tools are registered
+    # The catalog reads the tool registry, not the ingestion sources, so
+    # aiTools:manage is the grant that genuinely gates it. Naming the source
+    # grant would name one that would not unblock this reader if granted.
+    And the Catalog tab carries no count, because a count of zero would be
+      the same wrong answer said in a badge
 
   @bdd @ui @governance-home @inventory-tabs @integration
   Scenario: An unknown tab value falls back to the default
@@ -285,67 +291,64 @@ Feature: Governance home — route, nav promotion, persona detection
     # bypassOnboardingRedirect as a third layer; the catalog page keeps it.
 
   # ---------------------------------------------------------------------------
-  # Agents tab shell — the agents page is a tabbed surface: Agents (the
-  # agents detected through the organization's connected sources) and
-  # Applications (the applications they belong to). Same address contract
-  # as the inventory: a selected non-default tab is part of the address
-  # (?tab=), the default (Agents) stays out of it. No organization-wide
-  # list exists yet, so the page issues no query — the rail shape ships
-  # ahead of the data, as Costs did.
+  # Agents address contract — the agents page is one surface listing the
+  # agents detected through the organization's connected sources. It carried
+  # an Applications tab beside them until the product owner asked for it
+  # gone: the pane behind it read nothing and listed nothing, so it was a tab
+  # a reader could press and learn nothing from. With one pane left there was
+  # nothing to switch between and the tab strip went too, taking "?tab=" off
+  # this page with it.
   #
-  # Sample mode now fills the Agents pane on arrival, because the section
-  # rule fills any governance page with nothing measured on it
-  # (specs/ai-governance/dashboard/agents-page.feature). The two scenarios
-  # below that read a pane's own sentence therefore say in their Given that
-  # the reader has turned sample data off. The other three do not depend on
-  # it: no query is issued either way, the Applications pane has no sample
-  # cards to show, and the guard refuses before any of it renders.
+  # What is in the address instead is how the fleet is drawn. The same
+  # contract the tab had: the default (the list) stays out of the address, a
+  # non-default choice is written to it as "?view=", and an unknown value
+  # degrades to the default rather than to a blank pane. No organization-wide
+  # list exists yet, so the page issues no query — the shape ships ahead of
+  # the data, as Costs did.
   #
-  # These scenarios no longer quote the panes' sentences. They used to, and it
+  # Sample mode fills the pane on arrival, because the section rule fills any
+  # governance page with nothing measured on it
+  # (specs/ai-governance/dashboard/agents-page.feature). The scenarios below
+  # that read the pane's own sentence therefore say in their Given that the
+  # reader has turned sample data off. The other two do not depend on it: no
+  # query is issued either way, and the guard refuses before any of it
+  # renders.
+  #
+  # These scenarios do not quote the pane's sentences. They used to, and it
   # made a routing feature break every time the copy changed — twice now. What
   # a pane SAYS belongs to the page's own feature file; what routing owns is
-  # that the right pane arrives and is not blank. The exact words, and the
-  # rule that every empty state carries an action, live in
+  # that the right thing arrives and is not blank. The exact words, the two
+  # layouts, and the rule that every empty state carries an action live in
   # specs/ai-governance/dashboard/agents-page.feature.
   # ---------------------------------------------------------------------------
 
   @bdd @ui @governance-home @agents-tabs @integration
-  Scenario: The agents page default tab stays out of the address
+  Scenario: The agents page default layout stays out of the address
     Given the reader has turned sample data off
     When a governance viewer opens "/governance/agents"
-    Then the heading "Agents" renders and the Agents tab is selected
-    And the Agents pane renders its own empty state, offering a way to
-      register an agent
-    And the address carries no "tab" parameter
+    Then the heading "Agents" renders
+    And the page renders its own empty state, offering a way to register an
+      agent
+    And the address carries no "view" parameter
 
   @bdd @ui @governance-home @agents-tabs @integration
   Scenario: The agents page issues no query while no organization list exists
     When a governance viewer opens "/governance/agents"
     Then no procedure is queried
-    # Honest empty state: nothing org-scoped lists agents or applications
-    # yet (every agents procedure is project-scoped), so nothing is fetched
-    # and no rows are invented.
+    # Honest empty state: nothing org-scoped lists agents yet (every agents
+    # procedure is project-scoped), so nothing is fetched and no rows are
+    # invented.
 
   @bdd @ui @governance-home @agents-tabs @integration
-  Scenario: The Applications tab is addressable
-    When a governance viewer opens "/governance/agents?tab=applications"
-    Then the Applications tab is selected
-    And the Applications pane renders its own empty state, offering a way to
-      register an agent
-    And selecting Applications from the Agents tab writes "?tab=applications"
-      to the address, replacing the history entry
-
-  @bdd @ui @governance-home @agents-tabs @integration
-  Scenario: An unknown agents tab value falls back to the default
-    Given the reader has turned sample data off
-    When a governance viewer opens "/governance/agents?tab=nonsense"
-    Then the Agents tab is selected and its empty state renders
+  Scenario: An unknown agents layout value falls back to the list
+    When a governance viewer opens "/governance/agents?view=nonsense"
+    Then the agents list renders rather than a blank pane
 
   @bdd @ui @governance-home @agents-tabs @integration
   Scenario: The agents page is guarded on governance:view
     Given a member holding only "organization:view"
     When they open "/governance/agents"
-    Then no tab shell renders
+    Then the page does not render
     # Same guard composition as every governance page: the section flag
     # release_ui_ai_governance_enabled and then governance:view.
 

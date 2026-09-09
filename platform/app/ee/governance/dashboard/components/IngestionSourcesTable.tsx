@@ -11,7 +11,6 @@ import {
 } from "@chakra-ui/react";
 import type { Source } from "@ee/governance/dashboard/pages/ingestionSourceForms";
 import { MoreVertical, Pencil, RotateCw, Trash2 } from "lucide-react";
-import type { ReactNode } from "react";
 import { ListTable } from "~/components/ui/ListTable";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
@@ -95,36 +94,14 @@ export function sortSourcesForTable(sources: readonly Source[]): Source[] {
 }
 
 /**
- * The row above the table: what this list is, how many there are and how
- * many are live, and the add control on the right. Counts come from the
- * loaded list only; while the list is unknown the subline stays quiet.
+ * The fleet itself.
+ *
+ * A "Connectors · N sources · N active" heading used to sit above it. Both of
+ * its figures moved into the Inventory page's resume strip, above the tab
+ * strip, where they sit beside the other two panes' counts and a reader gets
+ * them without opening this pane. Saying them twice on one screen is what the
+ * strip was added to stop.
  */
-export function ConnectorsHeader({
-  sources,
-  action,
-}: {
-  sources: readonly Source[] | undefined;
-  action?: ReactNode;
-}) {
-  const total = sources?.length;
-  const active = sources?.filter((s) => s.status === "active").length;
-  return (
-    <HStack alignItems="start">
-      <VStack align="start" gap={0}>
-        <Text fontSize="md" fontWeight="semibold">
-          Connectors
-        </Text>
-        {total !== undefined && active !== undefined && (
-          <Text fontSize="sm" color="fg.muted">
-            {total} {total === 1 ? "source" : "sources"} · {active} active
-          </Text>
-        )}
-      </VStack>
-      <Box marginLeft="auto">{action}</Box>
-    </HStack>
-  );
-}
-
 export function IngestionSourcesTable({
   isSample = false,
   sources,
@@ -235,9 +212,15 @@ function SourceTableRow({
                 </Text>
               </Link>
             )}
-            <Text fontSize="xs" color="fg.muted">
-              {typeLabel}
-            </Text>
+            {/* The type sits under the name to say what a source the admin
+                named "Anthropic spend" actually is. A source named after its
+                own type has nothing left to explain, so the line is dropped
+                rather than printed twice. */}
+            {typeLabel !== source.name && (
+              <Text fontSize="xs" color="fg.muted">
+                {typeLabel}
+              </Text>
+            )}
           </VStack>
         </HStack>
       </Table.Cell>

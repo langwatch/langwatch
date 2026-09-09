@@ -22,9 +22,14 @@ import { NOT_TARGETED } from "~/server/featureFlag/targeting";
  * the ways in, and the two lists that will fill once there is something in
  * them.
  *
- * Everything sits in ONE centred column of `HOME_MEASURE`, so the two lists
- * begin and end on the ask field's own edges rather than running out to the
- * window. A full-bleed row under a centred field reads as two pages stacked.
+ * Everything sits in ONE centred column of `HOME_MEASURE` rather than running
+ * out to the window: a full-bleed row under a centred field reads as two
+ * pages stacked. The ask field itself is narrower than that column, centred
+ * inside it, because it is the same field the project home opens with and is
+ * set to the same width there (see `ASK_MEASURE` in `GovernanceHero`). The
+ * column stays wider than the field for the two lists' sake, whose rows carry
+ * a badge, a headline and a date across two grid columns.
+ *
  * The hero stands on the same lit ground as the project home's ask field
  * (`GovernanceHeroGround`), because the two screens ask for the same thing in
  * the same words and only one of them was lit.

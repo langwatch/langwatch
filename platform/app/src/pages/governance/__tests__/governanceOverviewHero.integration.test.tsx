@@ -194,8 +194,15 @@ function renderPage() {
 const A_SAMPLE_INSIGHT =
   "Three registered agents have run without a named owner since May.";
 
-/** The hero's ways in, by label, in the order they are drawn. */
-const WAY_IN_LABELS = ["Add people", "Add agent", "Add tool"] as const;
+/**
+ * The hero's shortcut row, by label, in the order it is drawn. All three add
+ * something; the fourth way in configures, and lives at the foot of the
+ * source menu rather than in this row.
+ */
+const WAY_IN_LABELS = ["Add department", "Add agent", "Add tool"] as const;
+
+/** The same three, read as the adds they are. */
+const ADD_LABELS = WAY_IN_LABELS;
 
 const wayInLinks = () =>
   screen
@@ -221,11 +228,15 @@ const PACKAGE_ROOT = process.cwd();
  * `X_TABS = [...] as const` tuple — the single list its `isXTab` guard tests
  * against, so what this returns is what that page will actually accept.
  *
+ * `null` for a page carrying no such tuple. That is a page with no tab bar,
+ * not a page this failed to read, and the caller holds it to a stricter rule
+ * than a page with tabs, so the two cases have to be told apart.
+ *
  * Read from source rather than imported because these tuples are private to
  * their pages, and exporting three of them so a chip test can see them would
  * widen three modules' surface to serve one assertion.
  */
-async function tabsOfPage(path: string): Promise<string[]> {
+async function tabsOfPage(path: string): Promise<string[] | null> {
   const name = path.replace("/governance/", "");
   const candidates = [
     `src/pages/governance/${name}.tsx`,
@@ -243,12 +254,79 @@ async function tabsOfPage(path: string): Promise<string[]> {
 
   const source = await readFile(found, "utf8");
   const tuple = /const \w*TABS = \[([^\]]*)\] as const;/.exec(source);
-  if (tuple?.[1] === undefined)
-    throw new Error(`no \`X_TABS = [...] as const\` tuple in ${found}`);
+  // Returned rather than thrown: a page may legitimately have no tabs, and a
+  // throw here would make dropping a page's tab bar look like a fault in this
+  // hero. What the absence costs is charged by the caller instead.
+  if (tuple?.[1] === undefined) return null;
 
   return [...tuple[1].matchAll(/"([^"]+)"/g)].map(
     (match) => match[1] as string,
   );
+}
+
+/**
+ * The measure the project home sets its own ask field to, read out of that
+ * hero's source.
+ *
+ * Read rather than imported because the constant is private to that module,
+ * and the governance hero restates the value rather than importing the hero
+ * behind it. Restating it is what this reads for: if either side moves, the
+ * two fields stop matching and the reader meets a field that resizes as they
+ * cross between the two screens.
+ */
+async function projectHomeAskMeasure(): Promise<string> {
+  const path = join(PACKAGE_ROOT, "src/components/home/LangyHomeHero.tsx");
+  const source = await readFile(path, "utf8");
+  const measure = /const ASK_MEASURE = "([^"]+)";/.exec(source);
+  // Thrown rather than asserted: an `expect` out here is counted against
+  // whichever test happens to be running, and a missing constant is a fact
+  // about that file rather than a failure of this page.
+  if (measure?.[1] === undefined)
+    throw new Error(`no \`const ASK_MEASURE = "..."\` in ${path}`);
+  return measure[1];
+}
+
+/**
+ * The width the nearest ancestor bounds `node` to, as the browser computed
+ * it. Walked upwards because the measure is set on a wrapper several levels
+ * above whatever the test found by role, and which level that is belongs to
+ * the layout rather than to this assertion.
+ */
+function boxedAncestorWidth(
+  node: HTMLElement,
+  property: "maxWidth" | "width",
+): string {
+  let current: HTMLElement | null = node;
+  while (current) {
+    const value = getComputedStyle(current)[property];
+    if (value && value !== "none" && value !== "auto" && value !== "")
+      return value;
+    current = current.parentElement;
+  }
+  throw new Error(`nothing above this element sets a ${property}`);
+}
+
+/**
+ * Every accent-coloured value this element resolves to, across the properties
+ * a filled treatment reaches for.
+ *
+ * The design tokens do not resolve to a colour under jsdom, which computes
+ * them to their own variable names ("var(--chakra-colors-orange-subtle)").
+ * That is enough, and it is the right thing to read: the rule is about which
+ * TOKEN a control is dressed in, not which pixels a theme happens to give
+ * that token, and the token name is what changes when the treatment does.
+ */
+function accentTokens(node: HTMLElement): string[] {
+  const style = getComputedStyle(node);
+  return (
+    [
+      style.background,
+      style.backgroundColor,
+      style.borderColor,
+      style.color,
+      style.boxShadow,
+    ] as const
+  ).filter((value) => value.includes("orange"));
 }
 
 /** The pill, found by what it does rather than by how it is drawn. */
@@ -292,33 +370,84 @@ afterEach(() => cleanup());
 
 describe("governance overview", () => {
   describe("when the overview renders", () => {
-    /** @scenario "The hero offers three ways in, in the order a surface is set up" */
-    it("offers add people, add agent and add tool, in that order", () => {
+    /** @scenario "The hero offers four ways in, three to add and one to configure" */
+    it("offers three add shortcuts in the row and no configure chip beside them", () => {
       renderPage();
 
-      expect(wayInLabels()).toEqual(["Add people", "Add agent", "Add tool"]);
-      expect(screen.getByRole("link", { name: "Add people" })).toHaveAttribute(
-        "href",
-        "/governance/people?tab=people",
-      );
+      expect(wayInLabels()).toEqual([...WAY_IN_LABELS]);
+      // The fourth way in sits at the foot of the source menu. A chip here as
+      // well would be the same destination offered twice, one of them under a
+      // pill the reader has to open to find it.
+      expect(screen.queryByText("Configure sources")).not.toBeInTheDocument();
+    });
+
+    /** @scenario "Each add shortcut opens the flow that adds the thing it names" */
+    it("sends each add shortcut to the pane that opens its own add flow", () => {
+      renderPage();
+
+      expect(
+        screen.getByRole("link", { name: "Add department" }),
+      ).toHaveAttribute("href", "/governance/people?tab=departments&add=1");
+      // Alone among the three in carrying no tab, because the agents page has
+      // no tab bar to name.
       expect(screen.getByRole("link", { name: "Add agent" })).toHaveAttribute(
         "href",
-        "/governance/agents?tab=agents&add=1",
+        "/governance/agents?add=1",
       );
       expect(screen.getByRole("link", { name: "Add tool" })).toHaveAttribute(
         "href",
-        "/governance/inventory",
+        "/governance/inventory?tab=catalog&add=1",
       );
+
+      // The path alone is what two of these already had while opening
+      // nothing: they landed on the right page and left the reader to find
+      // the add button, which is the work the shortcut exists to save. So the
+      // ask to open is asserted as well as where it is asked of.
+      for (const label of ADD_LABELS) {
+        const href =
+          screen.getByRole("link", { name: label }).getAttribute("href") ?? "";
+        const query = new URLSearchParams(href.split("?")[1] ?? "");
+        expect(query.get("add")).toBe("1");
+      }
+    });
+
+    /** @scenario "A shortcut leads through to every source the product can pull from" */
+    it("puts configure sources at the foot of the source menu and nowhere else", async () => {
+      harness.permissions = [...VIEWER, "ingestionSources:manage"];
+      renderPage();
+      await openSourceMenu();
+
+      // Last row of the menu, under the three vendors, still carrying the
+      // address the chip carried.
+      const configure = screen.getAllByRole("menuitem").at(-1);
+      if (!configure) throw new Error("the source menu drew no items");
+      expect(configure).toHaveTextContent("Configure sources");
+      expect(configure).toHaveAttribute(
+        "href",
+        "/governance/inventory?tab=sources",
+      );
+
+      cleanup();
+
+      // And the cost of the move, asserted rather than left to be found: the
+      // row rides the grant that draws the pill, so a viewer who may not add a
+      // source now has no way to the sources tab from this page at all.
+      harness.permissions = [...VIEWER];
+      renderPage();
+      expect(sourcePill()).toBeUndefined();
+      expect(screen.queryByText("Configure sources")).not.toBeInTheDocument();
     });
 
     /** @scenario "No shortcut points at a tab the page would not honour" */
     it("names only tabs the destination page actually has", async () => {
       renderPage();
 
-      const carried = wayInHrefs().flatMap((href) => {
+      const destinations = wayInHrefs().map((href) => {
         const [path, query] = href.split("?");
-        const tab = new URLSearchParams(query ?? "").get("tab");
-        return tab === null ? [] : [{ path: path ?? "", tab }];
+        return {
+          path: path ?? "",
+          tab: new URLSearchParams(query ?? "").get("tab"),
+        };
       });
 
       // The chips are worth this only because a wrong tab is invisible: the
@@ -326,24 +455,60 @@ describe("governance overview", () => {
       // opens a real screen — just not the one its label promised. Asserting
       // the href alone is what let "Add anomaly rule" keep pointing at a tab
       // the inventory had already dropped.
-      expect(carried.length).toBeGreaterThan(0);
-      for (const { path, tab } of carried) {
-        expect(await tabsOfPage(path)).toContain(tab);
+      expect(destinations.length).toBeGreaterThan(0);
+      for (const { path, tab } of destinations) {
+        const tabs = await tabsOfPage(path);
+        if (tabs === null) {
+          // A page with no tab bar is held to more than a page with one: it
+          // must not be addressed with a tab at all. A tab a page cannot read
+          // is dead weight in the address that outlives whoever put it there,
+          // and it reads as deliberate to the next person to open the file.
+          // Compared as a pair so a failure names the page rather than only
+          // reporting that some string was not null.
+          expect({ path, tab }).toEqual({ path, tab: null });
+          continue;
+        }
+        if (tab !== null) expect(tabs).toContain(tab);
       }
     });
   });
 
   describe("when the viewer can manage ingestion sources", () => {
     /** @scenario "The hero leads with adding a source" */
-    it("leads with an Add Source control that opens rather than fires", () => {
+    it("leads with an Add source control that opens rather than fires", () => {
       harness.permissions = [...VIEWER, "ingestionSources:manage"];
       renderPage();
 
       const pill = sourcePill();
       expect(pill).toBeDefined();
-      expect(pill).toHaveTextContent("Add Source");
+      expect(pill).toHaveTextContent("Add source");
       // It opens a menu; nothing is navigated by touching the pill itself.
       expect(harness.push).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The lead action is an outline control rather than a filled one" */
+    it("draws the control with no accent anywhere on it, still heavier than the chips", () => {
+      harness.permissions = [...VIEWER, "ingestionSources:manage"];
+      renderPage();
+
+      const pill = sourcePill();
+      if (!pill) throw new Error("no vendor pill to check the treatment of");
+
+      // Read on the control AND everything inside it: the label, the vendor
+      // tiles and the caret are separate elements, and the filled treatment
+      // accents the label rather than the button.
+      for (const node of [pill, ...pill.querySelectorAll("*")]) {
+        expect(accentTokens(node as HTMLElement)).toEqual([]);
+      }
+
+      // Heavier than the chips, by surface rather than by colour: it does not
+      // sit on the chips' own ground. Without this the rule above is met by
+      // flattening the pill into the row, which loses the one control the
+      // page is built around.
+      const chip = screen.getByRole("link", { name: "Add department" });
+      expect(getComputedStyle(pill).background).not.toBe(
+        getComputedStyle(chip).background,
+      );
     });
 
     /** @scenario "The source menu names the three vendors an admin arrives with" */
@@ -352,9 +517,16 @@ describe("governance overview", () => {
       renderPage();
       const user = await openSourceMenu();
 
+      // The three vendors and nothing else that names one. The trailing row
+      // is the way through to the full catalog, not a fourth vendor.
       expect(
         screen.getAllByRole("menuitem").map((item) => item.textContent),
-      ).toEqual(["Anthropic", "OpenAI", "Microsoft Copilot"]);
+      ).toEqual([
+        "Anthropic",
+        "OpenAI",
+        "Microsoft Copilot",
+        "Configure sources",
+      ]);
 
       await user.click(screen.getByRole("menuitem", { name: "OpenAI" }));
       expect(harness.push).toHaveBeenCalledWith(
@@ -377,11 +549,11 @@ describe("governance overview", () => {
 
   describe("when the viewer cannot manage ingestion sources", () => {
     /** @scenario "Adding a source is offered only to whoever may add one" */
-    it("offers no Add Source control and the same three ways in", () => {
+    it("offers no Add source control and the same three shortcuts", () => {
       renderPage();
 
       expect(sourcePill()).toBeUndefined();
-      expect(screen.queryByText("Add Source")).not.toBeInTheDocument();
+      expect(screen.queryByText("Add source")).not.toBeInTheDocument();
       expect(wayInLabels()).toEqual([...WAY_IN_LABELS]);
     });
   });
@@ -395,13 +567,13 @@ describe("governance overview", () => {
       expect(harness.placeholder).toBe(
         "Ask Langy, search, or jump to anything",
       );
-      expect(wayInLabels()).toHaveLength(3);
+      expect(wayInLabels()).toEqual([...WAY_IN_LABELS]);
     });
   });
 
   describe("when the viewer cannot ask Langy", () => {
     /** @scenario "The field offers Langy to whoever may ask" */
-    it("offers search without Langy and the same three ways in", () => {
+    it("offers search without Langy and the same three shortcuts", () => {
       renderPage();
 
       expect(harness.placeholder).toBe("Search, or jump to anything");
@@ -524,7 +696,35 @@ describe("governance overview", () => {
     });
   });
 
-  describe("the ground the hero stands on", () => {
+  describe("when the ask field renders", () => {
+    /** @scenario "The field is the width the project home sets its own field to" */
+    it("matches the project home field, and stays inside the wider page column", async () => {
+      const { container } = renderPage();
+
+      const field = screen.getByPlaceholderText(/jump to anything/);
+      const fieldColumn = boxedAncestorWidth(field, "maxWidth");
+      expect(fieldColumn).toBe(await projectHomeAskMeasure());
+
+      // The shortcuts hang off the field, so they take its measure too: the
+      // chip row shares that same bounded ancestor.
+      const chip = screen.getByRole("link", { name: "Add department" });
+      expect(boxedAncestorWidth(chip, "maxWidth")).toBe(fieldColumn);
+
+      // The page column stays wider. Narrowing it to the field would take the
+      // two lists below down with it, and their rows are a badge, a headline
+      // and a date across two columns.
+      const pageColumn = boxedAncestorWidth(
+        screen.getByRole("heading", { name: "AI Governance" }),
+        "maxWidth",
+      );
+      expect(parseInt(pageColumn, 10)).toBeGreaterThan(
+        parseInt(fieldColumn, 10),
+      );
+      expect(container).toBeTruthy();
+    });
+  });
+
+  describe("when the hero renders its lit ground", () => {
     /** @scenario "The hero stands on the same lit ground as the project home" */
     it("is decoration: hidden from assistive technology and untouchable", () => {
       const { container } = renderPage();
@@ -576,7 +776,9 @@ describe("governance overview", () => {
         ),
       ).toEqual([]);
       expect(screen.getByText("Good morning")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Add people" })).toBeVisible();
+      expect(
+        screen.getByRole("link", { name: "Add department" }),
+      ).toBeVisible();
     });
   });
 

@@ -232,6 +232,14 @@ const RoutingPolicyDrawer = lazyDefault({
     import("./settings/governance/routingPolicies/RoutingPolicyDrawer"),
   key: "RoutingPolicyDrawer",
 });
+const AddDepartmentDrawer = lazyDefault({
+  factory: () => import("./governance/people/AddDepartmentDrawer"),
+  key: "AddDepartmentDrawer",
+});
+const RegisterAgentDrawer = lazyDefault({
+  factory: () => import("./governance/agents/RegisterAgentDrawer"),
+  key: "RegisterAgentDrawer",
+});
 const DefaultModelOverrideDrawer = lazyDefault({
   factory: () => import("./settings/DefaultModelOverrideDrawer"),
   key: "DefaultModelOverrideDrawer",
@@ -353,6 +361,11 @@ export const drawers = {
   dataPrivacyRule: DataPrivacyRuleDrawer,
   // AI governance
   routingPolicy: RoutingPolicyDrawer,
+  addDepartment: AddDepartmentDrawer,
+  // Instructions rather than a form: an agent registers itself from the
+  // process that runs it (ADR-128), so this drawer shows the snippet that
+  // does it and collects nothing.
+  addAgent: RegisterAgentDrawer,
   // Project management
   createProject: CreateProjectDrawer,
   editProject: EditProjectDrawer,

@@ -1,9 +1,11 @@
-import { Bot, Boxes, SearchX } from "lucide-react";
+import { Bot, SearchX } from "lucide-react";
 import type { ComponentType } from "react";
 
 /**
  * The words this page shows when it has nothing to show, held apart from the
- * thing that renders them.
+ * thing that renders them. Two states, because there are two ways for this
+ * page to be empty and they must never borrow each other's sentences: nothing
+ * has registered, and everything is filtered out of view.
  *
  * The shared governance empty state that renders them lives at
  * ~/components/governance/empty. It was built once, by the inventory page,
@@ -66,25 +68,9 @@ export const AGENTS_EMPTY_COPY: GovernanceEmptyStateCopy = {
 };
 
 /**
- * The tab the owner named as the live example of a weak empty state.
- *
- * An application is not a thing anyone creates on this page — it is the group
- * an agent already belongs to — so the action is still registering an agent.
- * Offering "Create application" would be a button that cannot work.
- */
-export const APPLICATIONS_EMPTY_COPY: GovernanceEmptyStateCopy = {
-  icon: Boxes,
-  headline: "No applications yet",
-  description:
-    "An application is the set of agents one team ships together. Register an agent and the application it belongs to appears here.",
-  actionLabel: "Register agent",
-  emphasis: "primary",
-};
-
-/**
  * Agents exist; the reader has filtered them all out of view.
  *
- * A different nothing from the two above, and it must not borrow their copy:
+ * A different nothing from the one above, and it must not borrow its copy:
  * telling someone to register an agent when they have ten and a narrow filter
  * is the page failing to understand its own state.
  */

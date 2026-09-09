@@ -1,28 +1,25 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  SimpleGrid,
-  Tabs,
-  VStack,
-} from "@chakra-ui/react";
+import { Heading, HStack, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router";
 
 import {
   AGENTS_EMPTY_COPY,
-  AgentCard,
   AgentFilterBar,
   type AgentFilters,
-  APPLICATIONS_EMPTY_COPY,
+  AgentFleetSummaryStrip,
+  type AgentsLayout,
+  AgentsLayoutControl,
+  AgentsList,
   applyAgentFilters,
+  DEFAULT_AGENTS_LAYOUT,
   type GovernanceAgentRow,
   type GovernanceEmptyStateCopy,
+  isAgentsLayout,
   NO_MATCHING_AGENTS_COPY,
-  RegisterAgentDialog,
   SAMPLE_AGENT_ROWS,
   sourcesPresentIn,
+  summarizeAgentFleet,
   useAgentFilters,
 } from "~/components/governance/agents";
 import {
@@ -35,85 +32,138 @@ import {
   SampleDataToggle,
   useSampleMode,
 } from "~/components/governance/sample";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useDrawer } from "~/hooks/useDrawer";
 
 /**
- * The Agents page: what runs against the organization, as two tabs —
- * Agents (the agents detected through the connected sources) and
- * Applications (the applications those agents belong to).
+ * The Agents page: what runs against the organization, as one list.
+ *
+ * ONE SURFACE, NOT TWO. It carried an Applications tab beside the agents until
+ * the product owner asked for it gone. The pane behind it read nothing and
+ * listed nothing — it was a fixed empty state waiting for a concept the
+ * platform does not model yet — so it was a second tab a reader could press
+ * and learn nothing from. With one pane left there is nothing to switch
+ * between, so the tab strip went with it and the agents are the page.
  *
  * No organization-wide list exists yet. Every agents procedure the platform
  * has is project-scoped (`agents.getAll`, permission `evaluations:view`), and
  * the governance section is organization-scoped, so reading one project's
  * agents here and labelling them as the organization's would be a lie told in
  * the house typeface. The page therefore issues no query at all: with sample
- * mode off each pane is an honest empty state, and with it on the cards are
- * invented and say so, per card. When an organization-wide read lands it fills
- * `GovernanceAgentRow` and the cards stop caring where the rows came from.
+ * mode off it is an honest empty state, and with it on the rows are invented
+ * and say so, per row. When an organization-wide read lands it fills
+ * `GovernanceAgentRow` and the list stops caring where the rows came from.
+ *
+ * THE LIST IS THE DEFAULT AND THE CARDS ARE THE OPTION. An admin arrives
+ * asking what is running across the organization, which is a comparison; the
+ * card grid answered it a panel at a time. The switch between them is the
+ * inventory catalog's control, down to its words — see `AgentsList`.
  *
  * Registering is not a form. ADR-128 makes a connected agent register itself
  * from the process that runs it, and the platform refuses to create one any
  * other way (`agent_register_only`), so the action opens the snippet that
  * actually works rather than fields nothing could persist.
  *
+ * The summary strip obeys the same constraint as everything else here. It
+ * measures nothing of its own: every figure on it is a fold over the rows
+ * below it (`summarizeAgentFleet`), so it cannot become a second, quieter
+ * place where invented numbers pass as measured ones, and it cannot drift from
+ * the list it summarizes. It is gated on having rows rather than on sample
+ * mode — the same gate the filter chips and the layout switch use — so with
+ * nothing to summarize it is absent rather than showing four em dashes, and
+ * when an organization-wide read lands it lights up unchanged. Absent rather
+ * than dashed because the pane below already says in a full sentence that no
+ * agent has registered; four empty boxes above that sentence would repeat it
+ * without adding to it.
+ *
  * Specs: specs/ai-governance/dashboard/agents-page.feature,
- * specs/ai-gateway/governance/governance-home-routing.feature (the tab shell),
+ * specs/ai-gateway/governance/governance-home-routing.feature (the address),
  * specs/ai-governance/dashboard/governance-ui-controls.feature (the rulebook)
  */
 
-const AGENTS_TABS = ["agents", "applications"] as const;
-type AgentsTab = (typeof AGENTS_TABS)[number];
-const DEFAULT_TAB: AgentsTab = "agents";
-
-const isAgentsTab = (value: string | null): value is AgentsTab =>
-  AGENTS_TABS.some((tab) => tab === value);
-
 /**
- * A selected non-default tab is part of the address (?tab=); the default
- * stays out of it, and an unknown or stale value degrades to the default
- * instead of a blank pane. Same contract as the inventory tabs.
+ * Which layout the reader chose, as part of the address (`?view=`).
+ *
+ * The default stays out of the address and an unknown value degrades to it
+ * rather than to a blank pane — the contract the tab parameter had before the
+ * tabs were removed, and the one every other control on this page already
+ * follows. The filters, the sort and the register dialog are all in the
+ * address here, so leaving the one remaining control in component state would
+ * make it the single choice on the page a reader could not share or reload
+ * into.
  */
-function useAgentsTab() {
+function useAgentsLayout() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const requestedTab = searchParams.get("tab");
-  const agentsTab = isAgentsTab(requestedTab) ? requestedTab : DEFAULT_TAB;
-  const selectAgentsTab = (tab: string) =>
+  const requested = searchParams.get("view");
+  const layout = isAgentsLayout(requested) ? requested : DEFAULT_AGENTS_LAYOUT;
+  const selectLayout = (next: AgentsLayout) =>
     setSearchParams(
       (prev) => {
-        const next = new URLSearchParams(prev);
-        if (tab === DEFAULT_TAB) next.delete("tab");
-        else next.set("tab", tab);
-        return next;
+        const params = new URLSearchParams(prev);
+        if (next === DEFAULT_AGENTS_LAYOUT) params.delete("view");
+        else params.set("view", next);
+        return params;
       },
       { replace: true },
     );
-  return { agentsTab, selectAgentsTab };
+  return { layout, selectLayout };
 }
 
+/** The address that opens the register-agent drawer on arrival. */
+const ADD_AGENT_PARAM = "add";
+
 /**
- * Whether the register dialog is open, as part of the address.
+ * The deep link that arrives asking to register an agent:
+ * `/governance/agents?add=1`, which is how the governance home page's "Add
+ * agent" pill sends a reader here. A pill that dropped the reader on the page
+ * and left them to find the button again would be a worse version of no pill
+ * at all.
  *
- * The governance home page offers an "Add agent" pill that lands here, and a
- * pill that dropped the reader on the page and left them to find the button
- * again would be a worse version of no pill at all. `?add=1` is the whole
- * contract: present means open, and closing takes it back out so a refresh or
- * a shared link does not reopen a dialog the reader already dismissed.
+ * The parameter is a request, not state. It is honoured once, and then cleared
+ * from the address on the render after the drawer has landed in it — reading
+ * `drawer.open` rather than latching a flag, so the clear cannot run before the
+ * open it is waiting for. Same contract, same parameter name and the same
+ * shape as the people page's `useAddDepartmentDeepLink`, because it is the
+ * same problem: a short href another screen can hold, translated into the
+ * drawer address the registry actually routes on.
+ *
+ * Unlike that one this has no permission gate. The department deep link checks
+ * `governance:manage` because the mutation behind its drawer would refuse the
+ * reader anyway; there is no mutation behind this one. It shows the snippet a
+ * reader runs in their own process, so anyone who can see this page can read
+ * it.
  */
-function useRegisterDialog() {
+function useAddAgentDeepLink() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const open = searchParams.get("add") === "1";
-  const setOpen = (nowOpen: boolean) =>
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (nowOpen) next.set("add", "1");
-        else next.delete("add");
-        return next;
-      },
-      { replace: true },
-    );
-  return { open, setOpen };
+  const { openDrawer } = useDrawer();
+
+  const requested = searchParams.get(ADD_AGENT_PARAM) === "1";
+  const drawerOpen = searchParams.get("drawer.open");
+  const opened = useRef(false);
+
+  useEffect(() => {
+    if (!requested) {
+      opened.current = false;
+      return;
+    }
+
+    if (drawerOpen === "addAgent") {
+      setSearchParams(
+        (previous) => {
+          const params = new URLSearchParams(previous);
+          params.delete(ADD_AGENT_PARAM);
+          return params;
+        },
+        { replace: true },
+      );
+      return;
+    }
+    if (opened.current) return;
+    opened.current = true;
+    openDrawer("addAgent");
+  }, [requested, drawerOpen, openDrawer, setSearchParams]);
 }
 
 /**
@@ -152,7 +202,7 @@ function AgentsEmptyState({
 }
 
 /**
- * The Agents tab: the cards, and whatever stands in for them.
+ * The agents, and whatever stands in for them.
  *
  * The filter row is deliberately NOT here. It belongs to the page header, one
  * row under the title, so the controls that narrow the content sit outside the
@@ -163,12 +213,14 @@ function AgentsEmptyState({
 function AgentsPane({
   rows,
   filters,
+  layout,
   sample,
   onRegister,
   onClearFilters,
 }: {
   rows: readonly GovernanceAgentRow[];
   filters: AgentFilters;
+  layout: AgentsLayout;
   sample: boolean;
   onRegister: () => void;
   onClearFilters: () => void;
@@ -176,13 +228,7 @@ function AgentsPane({
   const visible = applyAgentFilters(rows, filters);
 
   if (visible.length > 0) {
-    return (
-      <SimpleGrid columns={{ base: 1, xl: 2 }} gap={3}>
-        {visible.map((agent) => (
-          <AgentCard key={agent.id} agent={agent} sample={sample} />
-        ))}
-      </SimpleGrid>
-    );
+    return <AgentsList agents={visible} layout={layout} sample={sample} />;
   }
 
   // Two different nothings, and they must never borrow each other's words.
@@ -205,15 +251,20 @@ function AgentsPane({
 }
 
 function AgentsPage() {
-  const { agentsTab, selectAgentsTab } = useAgentsTab();
-  const { open: registerOpen, setOpen: setRegisterOpen } = useRegisterDialog();
+  const { layout, selectLayout } = useAgentsLayout();
+  const { openDrawer } = useDrawer();
+  const openRegister = () => openDrawer("addAgent");
+  useAddAgentDeepLink();
   const sample = useSampleMode();
   const { filters, setFilter, clearFilters } = useAgentFilters();
   const rows = sample.active ? SAMPLE_AGENT_ROWS : [];
   // Gated on the unfiltered set, never the visible one: a reader who filters
-  // down to nothing must still have the chip that gets them back. The
-  // Applications tab has nothing to filter, so the row is the Agents tab's.
-  const showFilters = agentsTab === "agents" && rows.length > 0;
+  // down to nothing must still have the chip that gets them back. The layout
+  // switch takes the same gate, because there is nothing to lay out either
+  // way until a row exists.
+  const showControls = rows.length > 0;
+  // Over the whole fleet, not the filtered view — see `summarizeAgentFleet`.
+  const summary = rows.length > 0 ? summarizeAgentFleet({ rows }) : null;
 
   return (
     <GovernanceLayout pageTitle="Agents · AI Governance · LangWatch">
@@ -221,26 +272,29 @@ function AgentsPage() {
         <HStack justify="space-between" align="center">
           <Heading size="md">Agents</Heading>
           <HStack gap={2}>
+            {/* Same corner and same order as the inventory's header: how the
+                content is drawn, then whether it is invented, then the one
+                thing this page is for adding. */}
+            {showControls && (
+              <AgentsLayoutControl layout={layout} onChange={selectLayout} />
+            )}
             <SampleDataToggle
               active={sample.active}
               onToggle={sample.toggle}
               size="sm"
             />
-            {/* The action that creates this page's own thing, so it is the
-                solid one, in the brand palette — the same treatment the
-                inventory gives "Add tool". Solid is stated rather than left
-                to the default so the rule is legible here, not only in the
-                test that pins it.
+            {/* The action that creates this page's own thing, drawn as the
+                house header button — outline, small, leading plus glyph, the
+                same control /settings/model-providers uses for "Add Model
+                Provider". It was a solid orange button until the section-wide
+                pass that took solid orange off these pages; the brand accent
+                now marks only the sample affordances, which is the one thing
+                on the screen it needs to distinguish.
                 Rule: specs/ai-governance/dashboard/governance-ui-controls.feature */}
-            <Button
-              size="sm"
-              variant="solid"
-              colorPalette="orange"
-              onClick={() => setRegisterOpen(true)}
-            >
+            <PageLayout.HeaderButton onClick={openRegister}>
               <Plus size={14} />
               Register agent
-            </Button>
+            </PageLayout.HeaderButton>
           </HStack>
         </HStack>
         {sample.active && (
@@ -249,69 +303,37 @@ function AgentsPage() {
             nothing here is real.
           </SampleDataBanner>
         )}
-        <Tabs.Root
-          value={agentsTab}
-          onValueChange={({ value }) => selectAgentsTab(value)}
-          variant="line"
-          lazyMount
-          unmountOnExit
-        >
-          <Tabs.List>
-            <Tabs.Trigger
-              value="agents"
-              color="fg.muted"
-              _selected={{ color: "fg", fontWeight: "semibold" }}
-            >
-              Agents
-            </Tabs.Trigger>
-            <Tabs.Trigger
-              value="applications"
-              color="fg.muted"
-              _selected={{ color: "fg", fontWeight: "semibold" }}
-            >
-              Applications
-            </Tabs.Trigger>
-          </Tabs.List>
-          {/* Out of the content and into the header, one row under the tabs.
-              Controls that narrow what is below should not live inside the
-              thing they narrow — the api keys page pairs its scope filter with
-              its create action above a table for the same reason. */}
-          {showFilters && (
-            <Box paddingTop={4}>
-              <AgentFilterBar
-                filters={filters}
-                sources={sourcesPresentIn(rows)}
-                onSourceChange={(value) => setFilter("source", value)}
-                onOwnershipChange={(value) => setFilter("ownership", value)}
-                onSortChange={(value) => setFilter("sort", value)}
-              />
-            </Box>
-          )}
-          <Tabs.Content value="agents" paddingTop={4}>
-            <AgentsPane
-              rows={rows}
-              filters={filters}
-              sample={sample.active}
-              onRegister={() => setRegisterOpen(true)}
-              onClearFilters={clearFilters}
-            />
-          </Tabs.Content>
-          <Tabs.Content value="applications" paddingTop={4}>
-            {/* Registering an agent, not creating an application: an
-                application is the group an agent already belongs to, so a
-                "Create application" button here could not work. */}
-            <AgentsEmptyState
-              copy={APPLICATIONS_EMPTY_COPY}
-              onAct={() => setRegisterOpen(true)}
-              testId="applications-empty"
-            />
-          </Tabs.Content>
-        </Tabs.Root>
+        {/* Under the banner, above the chips. Under the banner because every
+            figure on it is invented while sample mode is on, and the banner is
+            the page's one claim about the whole screen; above the chips
+            because the strip summarizes the fleet rather than whatever the
+            chips have left of it. */}
+        {summary && <AgentFleetSummaryStrip summary={summary} />}
+        {/* Out of the content and into the header. Controls that narrow what
+            is below should not live inside the thing they narrow — the api
+            keys page pairs its scope filter with its create action above a
+            table for the same reason. */}
+        {showControls && (
+          <AgentFilterBar
+            filters={filters}
+            sources={sourcesPresentIn(rows)}
+            onSourceChange={(value) => setFilter("source", value)}
+            onOwnershipChange={(value) => setFilter("ownership", value)}
+            onSortChange={(value) => setFilter("sort", value)}
+          />
+        )}
+        <AgentsPane
+          rows={rows}
+          filters={filters}
+          layout={layout}
+          sample={sample.active}
+          onRegister={openRegister}
+          onClearFilters={clearFilters}
+        />
       </VStack>
-      <RegisterAgentDialog
-        open={registerOpen}
-        onClose={() => setRegisterOpen(false)}
-      />
+      {/* No drawer is mounted here. `CurrentDrawer` at the app root owns the
+          mount and the address owns which one is open, so this page only ever
+          asks. */}
     </GovernanceLayout>
   );
 }

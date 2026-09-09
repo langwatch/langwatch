@@ -4,10 +4,12 @@
  * The inventory page is a tabbed shell whose selected tab is part of the
  * address (?tab=), defaulting to Catalog — the catalog of connected tools —
  * for every reader. The default used to depend on the reader's grants,
- * because Catalog was then the tool-tiles editor and only aiTools:manage
- * holders could use it; the tiles left the page and the pane that replaced
- * them reads the same source list the Sources tab does, so one bare link no
- * longer opens two panes. These tests mount the real page inside a memory
+ * because Catalog was then the tool-tiles editor; the tiles left the page and
+ * the pane that replaced them lists the registered tools for every reader who
+ * may see them, so one bare link no longer opens two panes. The pane still
+ * reads the registry behind `aiTools:manage`, but a reader without that grant
+ * lands on the same tab and is told which grant they are missing rather than
+ * being sent somewhere else. These tests mount the real page inside a memory
  * router —
  * the tab value is read from the router's search params, so the assertions
  * run against the same address the user sees: the default is never written
@@ -50,10 +52,10 @@ const VIEWER_PERMISSIONS = [
   "ingestionSources:view",
 ];
 
-/** The org-member floor with no sources read: the catalog's gate is closed. */
+/** The org-member floor alone: neither the registry nor the source read. */
 const NO_SOURCES_READ_PERMISSIONS = ["organization:view", "governance:view"];
 
-/** The viewer set plus the retired tiles grant, which now changes nothing. */
+/** The viewer set plus `aiTools:manage`, which is the Catalog pane's gate. */
 const CATALOG_ADMIN_PERMISSIONS = [...VIEWER_PERMISSIONS, "aiTools:manage"];
 
 /** The catalog admin plus the sources write grant. */
@@ -208,12 +210,22 @@ describe("the inventory tab shell", () => {
         "aria-selected",
         "true",
       );
-      // The pane is the catalog of connected tools. This mock answers every
+      // The pane is the catalog of registered tools. This mock answers every
       // read with undefined, so the catalog is genuinely empty and says so —
       // the point of the assertion is which pane mounted, not how full it is.
       expect(screen.getByTestId("tool-catalog-empty")).toBeVisible();
-      // The retired tile editor and its inner tab strip are off this page.
+      // THE ONE PLACE the retired tile editor is guarded against, now that the
+      // duplicates in delegatedViewer and the sidebar suite have been reduced
+      // to this. It cannot fail against today's tree: `ToolCatalogPanel` is
+      // mounted nowhere and no test renders it. It is kept as a mounting
+      // guard, because that component still exists, still has no home, and now
+      // reads the same registry this pane does — so re-mounting it here is the
+      // shortcut someone reaches for, and this is what would catch it.
+      //
+      // Both spellings: the inner tab strip by role, and the bare label, so it
+      // catches the panel however it arrives.
       expect(screen.queryByRole("tab", { name: "Tool Tiles" })).toBeNull();
+      expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
       expect(router.state.location.search).not.toContain("tab");
     });
   });
@@ -263,12 +275,13 @@ describe("the inventory tab shell", () => {
     });
   });
 
-  describe("when the reader holds no ingestionSources:view", () => {
-    // The catalog reads the source list, so with the read refused there is
-    // nothing to draw. What must NOT happen is the empty state: it would tell
-    // this reader their organization has registered no AI tools, which is a
-    // confident wrong answer where the honest one is "you cannot see".
-    /** @scenario "A reader without ingestionSources:view meets the grant, not an empty catalog" */
+  describe("when the reader holds neither the registry nor the source grant", () => {
+    // The catalog reads the TOOL REGISTRY (`aiTools.adminList`), not the source
+    // list, so `aiTools:manage` is the grant it names. What must NOT happen is
+    // the empty state: it would tell this reader their organization has
+    // registered no AI tools, which is a confident wrong answer where the
+    // honest one is "you cannot see".
+    /** @scenario "A reader without the registry grant meets the grant, not an empty catalog" */
     it("still selects Catalog, and names the grant instead of reporting no tools", () => {
       harness.permissions = NO_SOURCES_READ_PERMISSIONS;
       renderInventoryAt(["/governance/inventory"]);
@@ -277,9 +290,19 @@ describe("the inventory tab shell", () => {
         "aria-selected",
         "true",
       );
-      expect(screen.getByText(/ingestionSources:view/)).toBeVisible();
+      expect(screen.getByText(/aiTools:manage/)).toBeVisible();
       expect(screen.queryByTestId("tool-catalog-empty")).toBeNull();
+      // Neither read is issued for a reader who may not have it. The registry
+      // read is the one that matters now; the source read is kept in the
+      // assertion because this reader lacks that grant too, and a page that
+      // fired it anyway would be leaking a request behind a closed gate.
+      expect(harness.requested).not.toContain("aiTools.adminList");
       expect(harness.requested).not.toContain("ingestionSources.list");
+      // The tab carries NO count. A "0" here would be the same wrong answer
+      // as the empty state, said in a badge instead of a sentence.
+      expect(screen.getByRole("tab", { name: "Catalog" }).textContent).toBe(
+        "Catalog",
+      );
     });
   });
 

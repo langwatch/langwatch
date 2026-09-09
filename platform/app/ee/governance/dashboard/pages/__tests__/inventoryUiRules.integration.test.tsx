@@ -33,7 +33,7 @@ describe("given an admin on the Inventory page", () => {
      * end under `justify="space-between"`, and jsdom lays nothing out.
      */
     /** @scenario "Primary page actions sit top-right in the page header" */
-    it("puts the page actions at the right of the header, small, one solid", async () => {
+    it("puts the page actions at the right of the header, small, none solid", async () => {
       connectTools();
       renderScreenWithReferences();
       const heading = screen.getByRole("heading", { name: "Inventory" });
@@ -47,6 +47,9 @@ describe("given an admin on the Inventory page", () => {
       expect(actions?.contains(sampleToggle)).toBe(true);
       expect(actions?.contains(addTool)).toBe(true);
 
+      const outlineSmall = screen.getByText(
+        "reference outline small",
+      ).className;
       const ghostSmall = screen.getByText("reference ghost small").className;
       const subtleSmall = screen.getByText("reference subtle small").className;
       const solidSmall = screen.getByText("reference solid small").className;
@@ -57,27 +60,34 @@ describe("given an admin on the Inventory page", () => {
       // The old assertion here was `addTool.className !== sampleToggle.className`,
       // which is satisfied by any two buttons that differ at all. A grey Add
       // tool passed it exactly as happily as the solid orange one the page
-      // actually renders, so it could not catch the drift it was written for.
+      // then rendered, so it could not catch the drift it was written for.
       //
-      // Adding a tool is the only action here that registers something of the
-      // organization's own, so it is the solid one.
-      expect(addTool.className).toBe(solidSmallTrigger);
+      // The create action is now the house header button — outline, small,
+      // with a leading plus — and solid orange is gone from the section.
+      expect(addTool.className).toBe(outlineSmall);
       // Ghost rather than outline: the toggle changes what the page shows
-      // rather than anything about the organization.
+      // rather than anything about the organization, and outline is what marks
+      // the create action out now that nothing in the row is filled.
       expect(sampleToggle.className).toBe(ghostSmall);
 
-      // Exactly one solid, not "at most one". A header where nothing is solid
-      // reads as a header with no primary action.
+      // Exactly one OUTLINE, which is what carries the weight solid used to.
+      // Asserted as a count for the same reason it always was: a row where
+      // nothing stands out reads as a row with no primary action.
       const headerButtons = actions
         ? Array.from(actions.querySelectorAll("button"))
         : [];
+      expect(
+        headerButtons.filter((button) => button.className === outlineSmall),
+      ).toHaveLength(1);
+      // And nothing in the row is solid, in either the branded or the plain
+      // form. This is the half that fails if solid orange creeps back.
       expect(
         headerButtons.filter(
           (button) =>
             button.className === solidSmall ||
             button.className === solidSmallTrigger,
         ),
-      ).toHaveLength(1);
+      ).toHaveLength(0);
 
       // Pressed, the kit draws the toggle subtle rather than ghost, so that a
       // page showing invented figures says so in the control that caused it.
@@ -150,7 +160,9 @@ describe("given an admin on the Inventory page", () => {
       ).toBeInTheDocument();
       // The sentence says what fills the catalog. Asserted because a headline
       // alone is the old grey-box empty state wearing a bigger font.
-      expect(within(empty).getByText(/joins the catalog/)).toBeInTheDocument();
+      expect(
+        within(empty).getByText(/Register the AI tools this organization runs/),
+      ).toBeInTheDocument();
       // The glyph. The scenario names it, and a shared empty state that
       // silently dropped it would still pass on headline and sentence alone.
       expect(empty.querySelector("svg")).not.toBeNull();
@@ -175,32 +187,18 @@ describe("given an admin on the Inventory page", () => {
       // And same FLOW, which label and weight alone do not prove: two
       // identically-drawn buttons can still lead to different places, and that
       // would be the original defect wearing a matching coat. Followed all the
-      // way to the composer, because both controls own a menu and asserting
-      // only that a menu opened would accept two menus onto two flows.
-      //
-      // Scoped to the menu that this press opened, not to the screen: both
-      // triggers mount their own menu content, so a page-level query for a
-      // menu item finds two and cannot say which trigger opened one. The
-      // trigger reporting itself expanded is what ties the open menu to it.
+      // way to the drawer the header's own button opens.
       await userEvent.click(inside);
-      expect(inside).toHaveAttribute("aria-expanded", "true");
-      expect(inHeader).toHaveAttribute("aria-expanded", "false");
-      const menus = await screen.findAllByRole("menu");
-      const open = menus.filter((m) => m.dataset.state === "open");
-      expect(open).toHaveLength(1);
-      await userEvent.click(
-        within(open[0] as HTMLElement).getByRole("menuitem", {
-          name: /Anthropic Admin API/,
-        }),
-      );
-      expect(await screen.findByRole("dialog")).toBeInTheDocument();
+      expect(
+        await screen.findByRole("heading", { name: /Add tool/ }),
+      ).toBeInTheDocument();
     });
 
-    // A reader who cannot create must not be told to press a button that is
-    // not on their screen. The sentence changes with the grant, which is the
-    // only part of the empty state that may.
-    /** @scenario "An empty pane explains itself rather than sitting blank" */
-    it("does not point a read-only viewer at a create control they cannot see", () => {
+    // A reader without the registry grant must not be shown an empty catalog
+    // and told their organization runs nothing. The pane says which grant it
+    // needs instead, with the tab strip still in place.
+    /** @scenario "The catalog stays hidden from a reader without the registry grant" */
+    it("tells a reader without the registry grant which grant the catalog needs", () => {
       harness.permissions = [
         "organization:view",
         "governance:view",
@@ -209,15 +207,15 @@ describe("given an admin on the Inventory page", () => {
       emptyWithSamplesOff();
       renderScreen();
 
-      const empty = screen.getByTestId("tool-catalog-empty");
-      expect(
-        within(empty).getByText(/someone connects it/),
-      ).toBeInTheDocument();
-      // Neither the sentence nor the action offers a create. The empty state
-      // drops its action with the grant, so a viewer gets an explanation and
-      // no button, rather than a button that would fail on press.
-      expect(within(empty).queryByRole("button")).toBeNull();
+      // Not the empty state: "no tools registered yet" would be a confident
+      // wrong answer where the honest one is that they cannot see.
+      expect(screen.queryByTestId("tool-catalog-empty")).toBeNull();
+      expect(screen.getByText(/aiTools:manage/)).toBeInTheDocument();
+      // And no create control they could press and be refused.
       expect(screen.queryByRole("button", { name: /Add tool/ })).toBeNull();
+      // The tab strip survives, so the reader can still reach the panes they
+      // do hold a grant for.
+      expect(screen.getByRole("tab", { name: /Sources/ })).toBeInTheDocument();
     });
 
     /*
@@ -280,7 +278,7 @@ describe("given an admin on the Inventory page", () => {
       // yet is also missing its empty state, and the pair would pass on a
       // catalog that never arrived.
       expect(
-        await screen.findByTestId("tool-card-src-genie"),
+        await screen.findByTestId("tool-card-tool-claude-code"),
       ).toBeInTheDocument();
       expect(screen.queryByTestId("tool-catalog-empty")).toBeNull();
     });
@@ -294,8 +292,12 @@ describe("given an admin on the Inventory page", () => {
     it("renders no native select in the source drawer, cadence field and all", async () => {
       connectTools();
       renderScreen();
+      // The source composer is reached from the Sources pane now. Adding a
+      // TOOL registers a registry entry and opens a different drawer, so
+      // pressing it here would sweep the wrong one.
+      await openTab(/Sources/);
       await userEvent.click(
-        screen.getAllByRole("button", { name: /Add tool/ })[0]!,
+        screen.getAllByRole("button", { name: /Add source/ })[0]!,
       );
       await userEvent.click(
         await screen.findByRole("menuitem", { name: /Anthropic Admin API/ }),

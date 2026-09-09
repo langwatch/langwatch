@@ -82,15 +82,22 @@ function CatalogTabs({
  * catalog, gating on the catalog's own grant, owning the tile drawer's state,
  * and delegating the tab strip to `CatalogTabs`.
  *
- * NOT MOUNTED ANYWHERE TODAY. It was the Inventory page's Catalog pane, which
- * is now the registered-tools catalog instead: tiles say what a person may
- * click, not what the organization runs and pays for, so they are not an
- * inventory. Tiles themselves are untouched and still have two consumers — the
- * personal AI-tools portal renders them as its launcher, and the command line
- * reads the coding-assistant tiles for each tool's path policy — so this
- * composition is kept, not deleted, until it is given a home of its own
- * (Settings, or the AI Gateway, where the tile's gateway-versus-direct choice
- * actually bites). See specs/ai-governance/dashboard/inventory-catalog.feature.
+ * NOT MOUNTED ANYWHERE TODAY, and what is left for it to own has narrowed.
+ * The Inventory page's Catalog pane lists the same registry again and opens
+ * the same `AiToolEntryDrawer` to register and edit an entry, so this
+ * composition is no longer the only way to reach a tile.
+ *
+ * This file itself owns the read-only ingestion-template catalog, the grant
+ * check and the tab strip, and nothing else. The two ARRANGING jobs the
+ * Inventory pane deliberately does not offer — drag-to-reorder, which sets the
+ * order the personal portal renders in, and the starter-pack import — are
+ * wired in `ToolCatalogEditor`, which this panel mounts and which is where
+ * every `aiTools` mutation on this route lives. An inventory is read, not
+ * arranged, which is why that composition stayed here.
+ *
+ * Kept rather than deleted until it is given a home of its own (Settings, or
+ * the AI Gateway, where the tile's gateway-versus-direct choice actually
+ * bites). See specs/ai-governance/dashboard/inventory-catalog.feature.
  *
  * Both tabs read through `aiTools:manage`, the catalog's own grant. The
  * hosting page opens on `governance:view`, so a delegated viewer reaches

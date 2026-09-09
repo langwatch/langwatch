@@ -1,97 +1,59 @@
 /**
- * The People page's filter state, and the one translation it has to make.
+ * The People page's filter state, and the one window it does not offer.
  *
- * Every choice lives in the address so a view is deep-linkable, and the default
- * of each stays out of it — the same rule the sort already followed
+ * The department choice lives in the address so a view is deep-linkable, and
+ * its default stays out of it — the same rule the sort already followed
  * (`useSpendSortParam`).
  *
- * THE TRANSLATION. The section's time chips are named spans (`last_12_months`),
- * but the per-person spend read takes a window in days and refuses more than a
- * year. `spendWindowDays` maps the frame through the kit's own `frameSpanDays`
- * and clamps it at the read's ceiling, so picking "Last 2 years" reads a year
- * rather than failing validation. The clamp is visible rather than hidden: the
- * page says which window it actually read.
+ * THE WINDOW. The page used to carry a time-frame chip, and it did not
+ * correlate to what the table shows: half the rows come from the identity feed,
+ * which has no window at all, so narrowing the frame moved some rows and left
+ * others exactly where they were. The chip is gone. The spend read still takes
+ * a window in days — it has no unbounded mode — so it is asked for
+ * `SPEND_WINDOW_DAYS`, a fixed year, and the page states that window in words
+ * rather than implying the reader chose it.
  *
  * Spec: specs/ai-governance/dashboard/people-tabs.feature
  */
 
 import { useSearchParams } from "react-router";
 
-import {
-  DEFAULT_TIME_FRAME,
-  frameSpanDays,
-  TIME_FRAMES,
-  type TimeFrame,
-} from "~/components/governance/filters";
-
-/** The longest window `activityMonitor.spendByUser` accepts, in days. */
-export const SPEND_WINDOW_MAX_DAYS = 365;
-
-const isTimeFrame = (value: unknown): value is TimeFrame =>
-  TIME_FRAMES.some((option) => option.value === value);
-
 /**
- * The window the spend read is asked for, given the frame in view. Never wider
- * than the read accepts, and never narrower than a day.
+ * The window `activityMonitor.spendByUser` is asked for. A year, which is also
+ * the longest that read accepts: governance is read at a governance cadence,
+ * and the read refuses anything wider.
  */
-export function spendWindowDays({
-  frame,
-  now = new Date(),
-}: {
-  frame: TimeFrame;
-  now?: Date;
-}): number {
-  const span = frameSpanDays({ frame, now });
-  return Math.max(1, Math.min(SPEND_WINDOW_MAX_DAYS, span));
-}
+export const SPEND_WINDOW_DAYS = 365;
 
-/** Whether the frame in view is longer than the spend read could answer. */
-export function isFrameClamped({
-  frame,
-  now = new Date(),
-}: {
-  frame: TimeFrame;
-  now?: Date;
-}): boolean {
-  return frameSpanDays({ frame, now }) > SPEND_WINDOW_MAX_DAYS;
-}
+/** How the page names that window to a reader. */
+export const SPEND_WINDOW_LABEL = "last 12 months";
 
 export interface PeopleFilters {
-  frame: TimeFrame;
   /** `null` is every department, including the people who have none. */
   department: string | null;
-  setFrame: (next: TimeFrame) => void;
   setDepartment: (next: string | null) => void;
 }
 
 /**
- * Frame and department, read from and written to the address. The sort keeps
+ * The department choice, read from and written to the address. The sort keeps
  * its own hook because the detail listing page shares it.
  */
 export function usePeopleFilters(): PeopleFilters {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const requestedFrame = searchParams.get("frame");
-  const frame: TimeFrame = isTimeFrame(requestedFrame)
-    ? requestedFrame
-    : DEFAULT_TIME_FRAME;
   const department = searchParams.get("department");
 
-  const write = (key: string, value: string | null, fallback: string) =>
-    setSearchParams(
-      (previous) => {
-        const params = new URLSearchParams(previous);
-        if (value === null || value === fallback) params.delete(key);
-        else params.set(key, value);
-        return params;
-      },
-      { replace: true },
-    );
-
   return {
-    frame,
     department,
-    setFrame: (next) => write("frame", next, DEFAULT_TIME_FRAME),
-    setDepartment: (next) => write("department", next, ""),
+    setDepartment: (next) =>
+      setSearchParams(
+        (previous) => {
+          const params = new URLSearchParams(previous);
+          if (next === null || next === "") params.delete("department");
+          else params.set("department", next);
+          return params;
+        },
+        { replace: true },
+      ),
   };
 }

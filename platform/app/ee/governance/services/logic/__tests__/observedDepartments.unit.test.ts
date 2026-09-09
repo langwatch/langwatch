@@ -2,7 +2,9 @@
 
 /**
  * The two department questions the People screen keeps apart: which one a row
- * shows, and which one the "departments the providers see" panel counts.
+ * shows, and which one the Departments tab counts as discovered — plus which
+ * providers a discovered department names, which is what puts the badge on its
+ * row now that the tab is one table.
  *
  * Spec: specs/governance/governance-people-screen.feature
  */
@@ -17,6 +19,7 @@ import {
 const person = (
   over: Partial<PersonDepartmentFacts>,
 ): PersonDepartmentFacts => ({
+  provider: "openai_admin",
   directoryDepartment: null,
   erasedAt: null,
   link: null,
@@ -93,8 +96,12 @@ describe("given the people a set of providers named", () => {
       ]);
 
       expect(grouped).toEqual([
-        { name: "Engineering", peopleCount: 2 },
-        { name: "Product", peopleCount: 1 },
+        {
+          name: "Engineering",
+          peopleCount: 2,
+          providers: ["openai_admin"],
+        },
+        { name: "Product", peopleCount: 1, providers: ["openai_admin"] },
       ]);
     });
 
@@ -109,6 +116,28 @@ describe("given the people a set of providers named", () => {
         "Executive",
         "GTM",
         "Product",
+      ]);
+    });
+
+    it("names every provider whose directory used the same department", () => {
+      // What the row's badge reads. Two directories can file people under one
+      // word, and a row naming only the first would be a claim about where the
+      // department came from that is half true.
+      const grouped = groupObservedDepartments([
+        person({ provider: "openai_admin", directoryDepartment: "Finance" }),
+        person({
+          provider: "copilot_studio_dataverse",
+          directoryDepartment: "Finance",
+        }),
+        person({ provider: "openai_admin", directoryDepartment: "Finance" }),
+      ]);
+
+      expect(grouped).toEqual([
+        {
+          name: "Finance",
+          peopleCount: 3,
+          providers: ["copilot_studio_dataverse", "openai_admin"],
+        },
       ]);
     });
 
