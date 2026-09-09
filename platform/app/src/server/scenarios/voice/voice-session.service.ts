@@ -432,6 +432,87 @@ async function resolveScenarioContext(
   return { scenarioId, scenarioSetId: scenario.scenarioSetId };
 }
 
+type ExistingRun = { agentId: string | null; status: ScenarioRunStatus };
+
+/**
+ * The result for a terminal run returned untouched: a duplicate finish writes
+ * nothing (AC14, #7973 AC1). The agent id comes from the token when it names
+ * one, else from the run that already landed.
+ */
+function terminalRunResult(
+  scenarioRunId: string,
+  token: VoiceSessionTokenPayload,
+  existing: ExistingRun,
+): FinishResult {
+  return {
+    runId: scenarioRunId,
+    agentId: token.agentId ?? existing.agentId ?? "",
+    source: "provider",
+    hasFetchFailed: false,
+    hasAudio: false,
+  };
+}
+
+/**
+ * A provider record must have run against the very agent the token was minted
+ * for. Anything else — including a record with no agent id at all — is a
+ * conversation this session has no claim to, and nothing is written (AC13).
+ */
+function assertProviderRecordMatchesToken(
+  providerRecord: CallRecord | null,
+  token: VoiceSessionTokenPayload,
+): void {
+  if (
+    providerRecord &&
+    providerRecord.agentExternalId !== token.agentExternalId
+  ) {
+    throw new VoiceConversationMismatchError();
+  }
+}
+
+/**
+ * The record the run is written from: the provider's when it holds turns, else
+ * the browser transcript.
+ *
+ * A provider record with no turns loses the conversation: right after hang-up
+ * ElevenLabs can answer with a finished-looking record whose transcript is
+ * still empty. When the browser captured turns, keep them rather than write an
+ * empty run the reader sees as "no response" (#8019).
+ */
+function selectCallRecord({
+  providerRecord,
+  transcript,
+  conversationId,
+  transport,
+  startedAt,
+  endedAt,
+  isCutAtLimit,
+}: {
+  providerRecord: CallRecord | null;
+  transcript: BrowserTranscriptTurn[];
+  conversationId: string;
+  transport: VoiceTransport;
+  startedAt: number;
+  endedAt: number;
+  isCutAtLimit: boolean;
+}): CallRecord {
+  const providerRecordHasTurns =
+    providerRecord !== null && providerRecord.turns.length > 0;
+  const useBrowserTranscript =
+    (!providerRecord || !providerRecordHasTurns) && transcript.length > 0;
+  if (providerRecord && !useBrowserTranscript) {
+    return { ...providerRecord, isCutAtLimit };
+  }
+  return browserTranscriptToCallRecord({
+    conversationId,
+    transport,
+    transcript,
+    startedAt,
+    endedAt,
+    isCutAtLimit,
+  });
+}
+
 /**
  * Ingest a finished call as a run, exactly once per conversation.
  *
@@ -476,13 +557,7 @@ export async function finishVoiceSession(input: {
     scenarioRunId,
   });
   if (existing && isTerminalStatus(existing.status)) {
-    return {
-      runId: scenarioRunId,
-      agentId: token.agentId ?? existing.agentId ?? "",
-      source: "provider",
-      hasFetchFailed: false,
-      hasAudio: false,
-    };
+    return terminalRunResult(scenarioRunId, token, existing);
   }
 
   const scenarioContext = await resolveScenarioContext(ports, {
@@ -498,15 +573,7 @@ export async function finishVoiceSession(input: {
     { transport, conversationId, projectId: input.projectId },
   );
 
-  // A provider record must have run against the very agent the token was minted
-  // for. Anything else — including a record with no agent id at all — is a
-  // conversation this session has no claim to, and nothing is written (AC13).
-  if (
-    providerRecord &&
-    providerRecord.agentExternalId !== token.agentExternalId
-  ) {
-    throw new VoiceConversationMismatchError();
-  }
+  assertProviderRecordMatchesToken(providerRecord, token);
 
   const { agentRowId, agentDisplayName } = await resolveAgentRow(ports, {
     token,
@@ -516,26 +583,15 @@ export async function finishVoiceSession(input: {
     existingAgentId: existing?.agentId ?? undefined,
   });
 
-  // A provider record with no turns loses the conversation: right after
-  // hang-up ElevenLabs can answer with a finished-looking record whose
-  // transcript is still empty. When the browser captured turns, keep them
-  // rather than write an empty run the reader sees as "no response" (#8019).
-  const providerRecordHasTurns =
-    providerRecord !== null && providerRecord.turns.length > 0;
-  const useBrowserTranscript =
-    (!providerRecord || !providerRecordHasTurns) && input.transcript.length > 0;
-
-  const record =
-    providerRecord && !useBrowserTranscript
-      ? { ...providerRecord, isCutAtLimit: input.isCutAtLimit }
-      : browserTranscriptToCallRecord({
-          conversationId,
-          transport,
-          transcript: input.transcript,
-          startedAt: input.startedAt,
-          endedAt: input.endedAt,
-          isCutAtLimit: input.isCutAtLimit,
-        });
+  const record = selectCallRecord({
+    providerRecord,
+    transcript: input.transcript,
+    conversationId,
+    transport,
+    startedAt: input.startedAt,
+    endedAt: input.endedAt,
+    isCutAtLimit: input.isCutAtLimit,
+  });
 
   await ports.writeCallRun({
     projectId: input.projectId,
