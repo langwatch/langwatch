@@ -73,17 +73,28 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		return append(append([]string{}, base...),
 			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane))
 	}
-	out = append(out, Child{
-		Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath("ui"),
-		Shell: "pnpm -s --filter " + UIPackage + " dev",
-		Env:   nodeEnv("ui"),
-		// Hold the browser application (vite) until the API answers /api/health.
-		// It proxies /api to the API lane, which is a much bigger process and
-		// boots slower; a browser that loads the SPA before the API is up gets
-		// stuck in an auth redirect loop. Gating the lane means the hostname
-		// simply isn't served until the stack can actually handle a request.
-		ReadyProbeURL: fmt.Sprintf("http://127.0.0.1:%d/api/health", st.APIPort),
-	})
+	// A monolith checkout has neither Node package: one process serves the
+	// browser application and its API, so the ui lane below and the backend
+	// lane at the end are replaced by the single app lane. See plan_monolith.go.
+	mono := monolithPlan{
+		Stack: st, Opts: opts, RepoDir: repoDir, Base: base,
+		NodeEnv: nodeEnv, LogPath: logPath, Port: port,
+	}
+	if st.Layout.IsMonolith() {
+		out = append(out, mono.appChild())
+	} else {
+		out = append(out, Child{
+			Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath("ui"),
+			Shell: "pnpm -s --filter " + UIPackage + " dev",
+			Env:   nodeEnv("ui"),
+			// Hold the browser application (vite) until the API answers /api/health.
+			// It proxies /api to the API lane, which is a much bigger process and
+			// boots slower; a browser that loads the SPA before the API is up gets
+			// stuck in an auth redirect loop. Gating the lane means the hostname
+			// simply isn't served until the stack can actually handle a request.
+			ReadyProbeURL: st.HealthProbeURL(),
+		})
+	}
 	// One Go lane, hosting whichever data-plane services this stack selected.
 	// Each still binds the port haven allocated for its hostname: SERVER_ADDR
 	// cannot answer for two listeners in one process, so each has its own
@@ -98,7 +109,9 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		goServices = append(goServices, "nlpgo")
 		goEnv = append(goEnv, fmt.Sprintf("%s=:%d", NLPAddrEnv, port("nlp")))
 	}
-	if len(goServices) > 0 {
+	if st.Layout.IsMonolith() {
+		out = append(out, mono.goChildren()...)
+	} else if len(goServices) > 0 {
 		out = append(out, Child{
 			Name: GoLane, Dir: opts.RepoRoot, Color: palette[2], LogPath: logPath(GoLane),
 			Shell: goCombinedShell(opts.RepoRoot, goServices, opts.ShouldGoWatch),
@@ -160,6 +173,9 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		langy := o.langyChild(st, opts, base, port("langyagent"), langyDockerHost)
 		langy.LogPath = logPath("langyagent")
 		out = append(out, langy)
+	}
+	if st.Layout.IsMonolith() {
+		return out
 	}
 	out = append(out, Child{
 		// green, not red: the backend is a healthy lane, and a red prefix reads

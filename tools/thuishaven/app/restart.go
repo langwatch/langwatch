@@ -132,24 +132,29 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 func restartTargets(st domain.Stack, name string) []restartTarget {
 	var all []restartTarget
 	var goPort int
+	// A monolith checkout runs each Go service in its own process (its
+	// mono-binary hosts no combined one) and serves the browser application and
+	// the API from one lane, so there is no `go` lane to collapse into and no
+	// `backend` lane to offer.
+	mono := st.Layout.IsMonolith()
 	for _, r := range domain.PerWorktreeServices {
 		for _, svc := range st.Services {
 			if svc.Name != r.Name || svc.IsFallback || svc.Port == 0 {
 				continue
 			}
-			if svc.Name == "gateway" || svc.Name == "nlp" {
+			if !mono && (svc.Name == "gateway" || svc.Name == "nlp") {
 				if goPort == 0 {
 					goPort = svc.Port
 				}
 				continue
 			}
-			all = append(all, restartTarget{Name: domain.CLIServiceName(svc.Name), Port: svc.Port})
+			all = append(all, restartTarget{Name: domain.CLIServiceNameForLayout(svc.Name, st.Layout), Port: svc.Port})
 		}
 	}
 	if goPort != 0 {
 		all = append(all, restartTarget{Name: GoLane, Port: goPort})
 	}
-	if st.APIPort != 0 {
+	if st.APIPort != 0 && !mono {
 		all = append(all, restartTarget{Name: BackendLane, Port: st.APIPort})
 	}
 	if name == "" {
@@ -185,7 +190,7 @@ func (o *Orchestrator) ResolveSelection(worktreeDir string, deltas []string) (do
 	if !found {
 		sel = domain.DefaultSelection()
 	}
-	sel, err := domain.ApplySelectionDeltas(sel, deltas)
+	sel, err := domain.ApplySelectionDeltasForLayout(sel, deltas, detectLayout(worktreeDir))
 	if err != nil {
 		return sel, err
 	}

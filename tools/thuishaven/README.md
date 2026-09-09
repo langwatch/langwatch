@@ -327,6 +327,52 @@ cluster with per-worktree Helm value overlays: standard services off `main`,
 worktrees overriding select ones) is a change _behind_ haven — the routing,
 registry, and dashboard stay the same.
 
+### Two checkout layouts
+
+haven starts whatever the checkout defines, not what this worktree happens to
+be. The layout is detected once, at `up`, from the directories on disk, and
+recorded on the stack, so `haven status --json` carries it and everything
+downstream reads that one answer:
+
+| Layout     | Detected by             | Node lanes                     |
+| ---------- | ----------------------- | ------------------------------ |
+| `modular`  | `apps/ui` + `apps/api`  | `ui` + `backend`               |
+| `monolith` | `platform/app`          | `app`, one process for both    |
+
+A checkout with neither shape is planned as modular and fails on its own lane's
+error rather than on a guess.
+
+The monolith layout is `origin/main`, and it exists here so `apidiff` and
+`visualdiff` can boot their base ref as its own haven stack (`tools/havenrun`,
+`specs/tooling/visualdiff-on-haven.feature`). On such a stack:
+
+- The one Node lane is `app`: `pnpm --filter @langwatch/web run dev:app`, handed
+  `PORT` as the app port haven allocated and reached at the routed `app.<slug>`
+  hostname, with its API under `/api` on the same origin. `haven logs app`,
+  `haven restart app` and `haven status --json`'s `lanes` all name it.
+- `haven up +ui` / `+backend` are refused by name, the way `+api` already is:
+  neither package exists there.
+- The Go data-plane services get one process each, through `make service`. That
+  checkout's mono-binary has no `combined` subcommand, so the single `go` lane a
+  modular stack runs cannot exist; `service-watch` is not used either, because
+  its target refuses to start without a dotenv file inside `platform/app`. Both
+  wait for the health path first, since the control plane they call is the `app`
+  lane.
+- Migrations run `start:prepare:db` through `@langwatch/web`, which is where that
+  checkout defines it. Codegen gets no job of its own: `dev:app` runs the same
+  codegen on its way up, and haven says so in one line instead of paying for it
+  twice.
+- Two things that checkout does for itself are worth knowing. Its start script
+  re-derives `BASE_HOST` and `NEXTAUTH_URL` from `PORT`, so those point at
+  `http://localhost:<app port>` rather than the routed hostname - both addresses
+  reach the same listener, but a browser signing in through the hostname can hit
+  an origin mismatch (`PORTLESS=0` makes the two agree). And its port pre-flight
+  checks `PORT + 1000` even though the API binds the port haven allocated, so a
+  busy `PORT + 1000` refuses a boot that would have worked.
+- The two developer-tool lanes (`design-system`, `mail-room`) have no packages
+  there. They are off by default; selecting one on a monolith stack starts a lane
+  that fails.
+
 ## More of what haven does
 
 - **Managed ClickHouse.** haven runs one shared native `clickhouse-server` and

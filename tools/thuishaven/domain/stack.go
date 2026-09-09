@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Service is one routed process within a stack.
 type Service struct {
@@ -112,8 +115,13 @@ type Stack struct {
 	// always behaved. `up` compares it against the requested run so flipping
 	// PORTLESS between runs restarts the stack onto the requested mode instead of
 	// silently keeping the old one (see reconcileRunningStack).
-	PortlessDisabled bool      `json:"portlessDisabled,omitempty"`
-	Services         []Service `json:"services"`
+	PortlessDisabled bool `json:"portlessDisabled,omitempty"`
+	// Layout is the source shape of the checkout this stack was brought up
+	// from, detected once at `up` (see DetectLayout). It decides which lanes
+	// the stack is made of. The zero value reads as modular, which is what
+	// every stack recorded before layouts existed was.
+	Layout   Layout    `json:"layout,omitempty"`
+	Services []Service `json:"services"`
 	// UpdatedAt is refreshed by the launcher's heartbeat; the daemon reaps a
 	// stack whose launcher has died or whose heartbeat has gone stale.
 	UpdatedAt time.Time `json:"updatedAt"`
@@ -206,8 +214,22 @@ type Lane struct {
 // The Go services are omitted because they are one-to-one with their routed
 // services, which the same report already lists.
 func (s Stack) Lanes() []Lane {
+	// A monolith checkout has neither package: one process serves the browser
+	// application and its API, so there is one lane, and it is named after the
+	// hostname that reaches it.
+	if s.Layout.IsMonolith() {
+		return []Lane{{Name: MonolithAppLane, Port: s.svc("app").Port}}
+	}
 	return []Lane{
 		{Name: "ui", Port: s.svc("app").Port},
 		{Name: "backend", Port: s.APIPort},
 	}
+}
+
+// HealthProbeURL is the loopback address that answers once this stack is
+// serving: the health path, on the API port haven allocated. It is what the ui
+// lane waits for on a modular stack and what the Go services wait for on a
+// monolith, where the app lane is the API.
+func (s Stack) HealthProbeURL() string {
+	return fmt.Sprintf("http://127.0.0.1:%d/api/health", s.APIPort)
 }

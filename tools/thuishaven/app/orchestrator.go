@@ -182,6 +182,9 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 
 	st := domain.Stack{
 		Slug: slug, WorktreeDir: p.WorktreeDir, Branch: p.Branch,
+		// Detected once, here, and read by everything downstream: the plan, the
+		// one-shot jobs, the lanes status reports and the names restart accepts.
+		Layout:      detectLayout(p.WorktreeDir),
 		LauncherPID: o.sys.Getpid(), RedisDB: redisDB,
 		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
 		LangyTier:        opts.LangyTier,
@@ -473,7 +476,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	}
 	defer cleanup()
 	endRegistration()
-	fmt.Printf("  %s\n\n", opts.Selection.Describe())
+	fmt.Printf("  %s\n\n", opts.Selection.DescribeForLayout(st.Layout))
 
 	if err := o.prepareWorktree(ctx, p, st); err != nil {
 		return err
@@ -538,25 +541,54 @@ func (o *Orchestrator) prepareWorktree(ctx context.Context, p UpParams, st domai
 	// that loads it via `import "dotenv/config"`; `pnpm -s` drops the lifecycle
 	// banner. Keeps the codegen/prepare/seed lanes as quiet as the services.
 	env := append(st.OverlayEnv(), "DOTENV_CONFIG_QUIET=true")
+	jobs := prepShellsFor(st.Layout)
 	// Codegen (prisma/zod/sdk-versions/mcp) then migrations — both finish before
 	// the services boot. Owned here so `pnpm dev` is simply `haven up`.
-	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, Name: "codegen", Dir: p.WorktreeDir, Shell: "pnpm -s run start:prepare:files", Env: env}); err != nil {
+	if jobs.Codegen == "" {
+		fmt.Println("  codegen: left to the app lane, which runs it on its way up")
+	} else if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, Name: "codegen", Dir: p.WorktreeDir, Shell: jobs.Codegen, Env: env}); err != nil {
 		o.log.Warn("codegen (start:prepare:files) failed (continuing)", zap.Error(err))
 	}
 	// Migrations failing on an existing database is the one prep step that must
 	// STOP the up: continuing would boot the app onto a half-migrated schema,
 	// and silently dropping the data to get past it is never haven's call.
-	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, Name: "prepare", Dir: p.WorktreeDir, Shell: prepareDBShell, Env: env}); err != nil {
+	if err := o.runOnceJob(ctx, onceJob{Slug: st.Slug, Name: "prepare", Dir: p.WorktreeDir, Shell: jobs.Prepare, Env: env}); err != nil {
 		return fmt.Errorf("migrations failed — nothing was dropped; fix the migration, or run `haven db reset` for a fresh database: %w", err)
 	}
-	o.runSeed(ctx, p, seedRun{Slug: st.Slug, Env: env})
+	o.runSeed(ctx, p, seedRun{Slug: st.Slug, Env: env, Shell: jobs.Seed})
 	return nil
 }
 
-// seedRun is which stack is being seeded and with what environment.
+// prepShells is which one-shot job an up runs for a layout, by script.
+type prepShells struct{ Codegen, Prepare, Seed string }
+
+// prepShellsFor resolves the one-shot jobs from the checkout's layout.
+//
+// A monolith checkout defines the codegen and seed scripts at its workspace
+// root, the same names, so those are unchanged. Its database preparation is
+// defined by the monolith package alone - the workspace root has no
+// start:prepare:db - so that one runs through the package. Codegen is dropped
+// entirely: that checkout's dev:app script runs the same codegen itself, and
+// running it twice is minutes of a boot for nothing.
+func prepShellsFor(layout domain.Layout) prepShells {
+	jobs := prepShells{
+		Codegen: "pnpm -s run start:prepare:files",
+		Prepare: prepareDBShell,
+		Seed:    "pnpm -s run prisma:seed",
+	}
+	if layout.IsMonolith() {
+		jobs.Codegen = ""
+		jobs.Prepare = monolithScript("start:prepare:db")
+	}
+	return jobs
+}
+
+// seedRun is which stack is being seeded, with what environment, and which of
+// the checkout's own seed scripts runs it.
 type seedRun struct {
-	Slug string
-	Env  []string
+	Slug  string
+	Env   []string
+	Shell string
 }
 
 // prepareDBShell prepares both datastores before any service boots.
@@ -590,7 +622,7 @@ func (o *Orchestrator) runSeed(ctx context.Context, p UpParams, seed seedRun) {
 			return
 		}
 	}
-	if err := o.runOnceJob(ctx, onceJob{Slug: slug, Name: "seed", Dir: p.WorktreeDir, Shell: seedShell("pnpm -s run prisma:seed", env), Env: env}); err != nil {
+	if err := o.runOnceJob(ctx, onceJob{Slug: slug, Name: "seed", Dir: p.WorktreeDir, Shell: seedShell(seed.Shell, env), Env: env}); err != nil {
 		o.log.Warn("seed failed (continuing)", zap.Error(err))
 	}
 }

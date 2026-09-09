@@ -63,32 +63,70 @@ var RetiredSelectionServices = map[string]string{
 	"mail":      "was renamed — use +mail-room / -mail-room",
 }
 
+// MonolithRetiredSelectionServices are the ±names refused on a monolith
+// checkout, on top of the ones refused everywhere: it has neither application
+// package, so `ui` and `backend` name nothing there. Refused by name, like
+// `api`, rather than as a typo, because it is the layout that decides.
+var MonolithRetiredSelectionServices = map[string]string{
+	"ui":      "is not a lane of this checkout - it runs one app lane, which serves the browser application and its API together",
+	"backend": "is not a lane of this checkout - it runs one app lane, which serves the browser application and its API together",
+}
+
 // ApplySelectionDeltas folds `+svc` / `-svc` arguments into a selection.
 func ApplySelectionDeltas(sel Selection, deltas []string) (Selection, error) {
+	return ApplySelectionDeltasForLayout(sel, deltas, LayoutModular)
+}
+
+// ApplySelectionDeltasForLayout is ApplySelectionDeltas against a known
+// layout, so a lane name that does not exist in this checkout is refused by
+// name rather than accepted and then silently not planned.
+func ApplySelectionDeltasForLayout(sel Selection, deltas []string, layout Layout) (Selection, error) {
 	for _, d := range deltas {
 		if len(d) < 2 || (d[0] != '+' && d[0] != '-') {
 			return sel, fmt.Errorf("unrecognised argument %q — services are picked with +service or -service (services: %s)", d, strings.Join(SelectableServices, ", "))
 		}
-		on := d[0] == '+'
-		if note, retired := RetiredSelectionServices[d[1:]]; retired {
-			return sel, fmt.Errorf("%q %s", d[1:], note)
+		name := d[1:]
+		if note := refusedSelectionName(name, layout); note != "" {
+			return sel, fmt.Errorf("%q %s", name, note)
 		}
-		switch d[1:] {
-		case "gateway":
-			sel.Gateway = on
-		case "nlp":
-			sel.NLP = on
-		case "langy":
-			sel.Langy = on
-		case "idp":
-			sel.IDP = on
-		case "design-system":
-			sel.DesignSystem = on
-		case "mail-room":
-			sel.MailRoom = on
-		default:
-			return sel, fmt.Errorf("unknown service %q — services: %s", d[1:], strings.Join(SelectableServices, ", "))
+		next, err := applySelectionDelta(sel, name, d[0] == '+')
+		if err != nil {
+			return sel, err
 		}
+		sel = next
+	}
+	return sel, nil
+}
+
+// refusedSelectionName is why a ±name is refused by name rather than applied,
+// or "" when it names something this checkout can actually select. The
+// layout's own refusals come first: they are the more specific answer.
+func refusedSelectionName(name string, layout Layout) string {
+	if layout.IsMonolith() {
+		if note, refused := MonolithRetiredSelectionServices[name]; refused {
+			return note
+		}
+	}
+	return RetiredSelectionServices[name]
+}
+
+// applySelectionDelta turns one accepted ±name into the selection it makes.
+func applySelectionDelta(sel Selection, name string, on bool) (Selection, error) {
+	switch name {
+	case "gateway":
+		sel.Gateway = on
+	case "nlp":
+		sel.NLP = on
+	case "langy":
+		sel.Langy = on
+	case "idp":
+		sel.IDP = on
+	case "design-system":
+		sel.DesignSystem = on
+	case "mail-room":
+		sel.MailRoom = on
+	default:
+		return sel, fmt.Errorf("unknown service %q — services: %s", name, strings.Join(SelectableServices, ", "))
 	}
 	return sel, nil
 }
@@ -126,10 +164,21 @@ func SelectionFromStack(st Stack) Selection {
 // no entry here: their hostnames (design-system, mail-room) are already their
 // CLI spelling.
 func CLIServiceName(internal string) string {
+	return CLIServiceNameForLayout(internal, LayoutModular)
+}
+
+// CLIServiceNameForLayout is CLIServiceName against a known layout. Only the
+// routed `app` hostname differs: a monolith checkout runs ONE process behind
+// it, and that lane is called app, so calling it ui would name a lane this
+// stack does not have.
+func CLIServiceNameForLayout(internal string, layout Layout) string {
 	switch internal {
 	case "langyagent":
 		return "langy"
 	case "app":
+		if layout.IsMonolith() {
+			return MonolithAppLane
+		}
 		return "ui"
 	default:
 		return internal
@@ -138,8 +187,15 @@ func CLIServiceName(internal string) string {
 
 // Describe renders the selection for humans: what runs, what is off, and the
 // exact delta that adds it.
-func (s Selection) Describe() string {
+func (s Selection) Describe() string { return s.DescribeForLayout(LayoutModular) }
+
+// DescribeForLayout is Describe for a known layout: a monolith checkout runs
+// one Node lane, so naming two would describe a stack that is not there.
+func (s Selection) DescribeForLayout(layout Layout) string {
 	on := []string{"ui", "backend"}
+	if layout.IsMonolith() {
+		on = []string{MonolithAppLane}
+	}
 	var off []string
 	add := func(enabled bool, name string) {
 		if enabled {

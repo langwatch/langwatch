@@ -79,7 +79,7 @@ func (o *Orchestrator) SessionSnapshot(slug string) SessionReport {
 		restartable[t.Name] = true
 	}
 	for _, svc := range st.Services {
-		cli := domain.CLIServiceName(svc.Name)
+		cli := domain.CLIServiceNameForLayout(svc.Name, st.Layout)
 		r.Services = append(r.Services, SessionServiceStatus{
 			Name:        cli,
 			Role:        svc.Role,
@@ -92,7 +92,9 @@ func (o *Orchestrator) SessionSnapshot(slug string) SessionReport {
 		// The backend lane shares the app's hostname under /api, so the routed
 		// list has no row of its own for it. It is the process that decides
 		// whether the stack works at all, so it gets one right under the ui.
-		if svc.Name == "app" && st.APIPort != 0 {
+		// A monolith checkout serves the API from the same lane as the browser
+		// application, so its app row already IS this one.
+		if svc.Name == "app" && st.APIPort != 0 && !st.Layout.IsMonolith() {
 			r.Services = append(r.Services, SessionServiceStatus{
 				Name:        BackendLane,
 				Role:        svc.Role,

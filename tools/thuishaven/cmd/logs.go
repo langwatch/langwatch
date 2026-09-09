@@ -54,6 +54,9 @@ func fileToCLIService(name string) string {
 // the same in `haven logs` as it did live.
 var logServiceColors = map[string]string{
 	"ui": "34", "backend": "32", "go": "33", "langy": "92",
+	// The single Node lane of a monolith checkout, in the ui lane's color:
+	// it is the same half of the stack, in one process instead of two.
+	"app":           "34",
 	"design-system": "96", "mail-room": "95", "idp": "92",
 	// Pre-2026-09-07 lane names. A log file written before the local topology
 	// changed still reads in its own colour rather than falling to plain text.
