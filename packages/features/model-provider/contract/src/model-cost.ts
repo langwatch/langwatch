@@ -323,3 +323,10 @@ export const estimateModelCost = (
 
   return 0;
 };
+
+/**
+ * Whether a customer-written cost-rule pattern is safe to run: it compiles and
+ * is free of catastrophic backtracking. The tRPC shapes carrying a
+ * caller-supplied `regex` refuse one that is not.
+ */
+export const isSafeCostRegex = (pattern: string): boolean => tryRegex(pattern) !== null;

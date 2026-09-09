@@ -7234,6 +7234,9 @@ importers:
 
   packages/features/model-provider/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config

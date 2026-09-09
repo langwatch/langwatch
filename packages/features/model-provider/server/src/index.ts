@@ -102,15 +102,22 @@ export {
   type ModelProviderCaller,
   type SpanReader,
 } from "./app/model-provider.app.ts";
-export { createModelProvidersRestApp } from "./transport/api-rest/model-provider.api.ts";
-export { createModelDefaultsRestApp } from "./transport/api-rest/model-defaults.api.ts";
-// The three tRPC transports are not exported: they still name the deleted
-// legacy builder.
+export { modelProviderRest } from "./transport/model-provider.rest.ts";
 export {
-  createPlaygroundRestApp,
-  type PlaygroundRestPorts,
-  type PlaygroundRestSession,
-} from "./transport/api-rest/playground.api.ts";
+  modelDefaultsRest,
+  modelDefaultsRestCredential,
+} from "./transport/model-defaults.rest.ts";
+export {
+  playgroundRest,
+  playgroundRestCaller,
+  playgroundRestExecutionProxy,
+  playgroundRestModel,
+  playgroundRestProject,
+  playgroundRestSystemPrompt,
+} from "./transport/playground.rest.ts";
+export { modelProviderTrpcTransport } from "./transport/model-provider.trpc.ts";
+export { llmModelCostTrpcTransport } from "./transport/llm-model-cost.trpc.ts";
+export { translateTrpcTransport } from "./transport/translate.trpc.ts";
 
 export { ModelProviderLegacyMigrationService } from "./services/model-provider-legacy-migration.service.ts";
 

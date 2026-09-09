@@ -1029,11 +1029,20 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
 
   static create(input: {
     egress: ModelProviderEgressPort;
+    /**
+     * The process environment a system provider's fallback credential is read
+     * from. Passed rather than read here: a package has no environment of its
+     * own, and the caller that has one is the composition root.
+     */
+    environment?: Readonly<Record<string, string | undefined>>;
   }): HttpModelProviderCredentialProbeAdapter {
-    return new HttpModelProviderCredentialProbeAdapter(input.egress);
+    return new HttpModelProviderCredentialProbeAdapter(input.egress, input.environment ?? {});
   }
 
-  private constructor(private readonly egress: ModelProviderEgressPort) {
+  private constructor(
+    private readonly egress: ModelProviderEgressPort,
+    private readonly environment: Readonly<Record<string, string | undefined>>,
+  ) {
     super();
   }
 
@@ -1046,6 +1055,19 @@ export class HttpModelProviderCredentialProbeAdapter extends ModelProviderCreden
       input.customKeys,
       this.egress,
     );
+  }
+
+  probeStored(input: {
+    projectId: string;
+    provider: string;
+    customBaseUrl: string | undefined;
+    modelProviders: ModelProviderService;
+  }): Promise<ModelProviderCredentialVerdict> {
+    return HttpModelProviderCredentialProbeAdapter.validateKeyWithCustomUrl({
+      ...input,
+      environment: this.environment,
+      egress: this.egress,
+    });
   }
 }
 
@@ -1061,6 +1083,19 @@ export class UnavailableModelProviderCredentialProbeAdapter extends ModelProvide
     provider: string;
     customKeys: Record<string, string>;
   }): Promise<ModelProviderCredentialVerdict> {
+    return this.unchecked();
+  }
+
+  probeStored(_input: {
+    projectId: string;
+    provider: string;
+    customBaseUrl: string | undefined;
+    modelProviders: ModelProviderService;
+  }): Promise<ModelProviderCredentialVerdict> {
+    return this.unchecked();
+  }
+
+  private unchecked(): Promise<ModelProviderCredentialVerdict> {
     return Promise.resolve({
       outcome: "unchecked",
       valid: true,

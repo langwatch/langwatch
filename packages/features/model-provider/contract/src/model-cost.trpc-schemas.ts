@@ -1,13 +1,13 @@
 /**
  * The input shapes the custom model-cost tRPC surface parses.
  *
- * Two of them are built rather than declared: the regex field is only
- * accepted when a caller-supplied pattern is free of catastrophic
- * backtracking, and the predicate that decides that is a process capability
- * the transport injects. A factory keeps the shape here, next to the rest of
- * the contract, without this package having to own the predicate.
+ * Two of them carry a caller-supplied `regex`, accepted only when the pattern
+ * compiles and is free of catastrophic backtracking. The factories stay
+ * parameterized so a caller with its own predicate can still build the shape;
+ * the declared schemas below run the contract's own check.
  */
 import { z } from "zod";
+import { isSafeCostRegex } from "./model-cost.ts";
 import { modelProviderScopeTypeSchema } from "./model-provider.ts";
 
 export const MODEL_COST_UNSAFE_REGEX_MESSAGE =
@@ -73,3 +73,16 @@ export function createModelCostPreviewTrpcInputSchema({ isSafeRegex }: ModelCost
     cacheCreation1hCostPerToken: z.number().nonnegative().optional(),
   });
 }
+
+/**
+ * The two regex-bearing shapes, built once against the contract's own safety
+ * check — the same compile-and-check the pricing path runs, so the verdict a
+ * caller reads is unchanged by the predicate no longer being a process port.
+ */
+export const modelCostWriteTrpcInputSchema = createModelCostWriteTrpcInputSchema({
+  isSafeRegex: isSafeCostRegex,
+});
+
+export const modelCostPreviewTrpcInputSchema = createModelCostPreviewTrpcInputSchema({
+  isSafeRegex: isSafeCostRegex,
+});

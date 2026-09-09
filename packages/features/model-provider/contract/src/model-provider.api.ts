@@ -1,4 +1,6 @@
 import { featureApi } from "@langwatch/runtime-composition";
+import type { CodexTokenKeys } from "./codex-account.ts";
+import type { CostRuleMatchingSpansPreview, ModelLimits } from "./model-cost-preview.ts";
 import type {
   Model,
   ModelCost,
@@ -13,8 +15,6 @@ import type {
   ModelDefaultSnapshot,
   ModelProvider,
   ModelProviderAlternateResolution,
-  ModelProviderApiKeyValidation,
-  ModelProviderApiKeyValidationInput,
   ModelProviderCodexGatewayRefresh,
   ModelProviderCodexGatewayRefreshInput,
   ModelProviderCodexStatus,
@@ -103,6 +103,45 @@ export interface ModelCostDeleteRequest {
   readonly projectId: string;
   readonly id: string;
 }
+/**
+ * A credential the caller has just typed, probed before anything stores it.
+ * The tenant is what the probe is authorized against: the project when one is
+ * named, the organization otherwise.
+ */
+export interface ModelProviderCredentialProbeRequest {
+  readonly projectId?: string;
+  readonly organizationId?: string;
+  readonly provider: string;
+  readonly customKeys: Record<string, string>;
+}
+/** A credential that is already stored, probed against a base URL. */
+export interface ModelProviderStoredCredentialProbeRequest {
+  readonly projectId: string;
+  readonly provider: string;
+  readonly customBaseUrl?: string;
+}
+/** Codex step 1: the device code the browser shows, and how often to poll. */
+export interface ModelProviderCodexDeviceSignIn {
+  readonly userCode: string;
+  readonly deviceAuthId: string;
+  readonly verificationUrl: string;
+  readonly intervalSeconds: number;
+}
+/** Codex step 2..n: one poll of the pending device authorization. */
+export type ModelProviderCodexDeviceApproval =
+  | Readonly<{ status: "pending" }>
+  | Readonly<{ status: "complete"; keys: CodexTokenKeys }>;
+/** The rule a customer is still typing, priced against the spans it matches. */
+export interface ModelCostPreviewRequest {
+  readonly projectId: string;
+  readonly regex: string;
+  readonly model?: string;
+  readonly inputCostPerToken?: number;
+  readonly outputCostPerToken?: number;
+  readonly cacheReadCostPerToken?: number;
+  readonly cacheCreationCostPerToken?: number;
+  readonly cacheCreation1hCostPerToken?: number;
+}
 /** Callable model-provider operations shared by process peers after composition. */
 export interface ModelProviderApi {
   estimateCost(input: ModelCostEstimateInput): number;
@@ -127,8 +166,32 @@ export interface ModelProviderApi {
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters>;
   upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider>;
+  /**
+   * The write a project credential makes, which names no person to attribute
+   * it to and no person to authorize it against: the key's own project
+   * permission is the whole gate, as this door has always worked.
+   */
+  upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider>;
   delete(input: ModelProviderDeleteRequest, by: ModelProviderCaller): Promise<void>;
-  validateApiKey(input: ModelProviderApiKeyValidationInput): Promise<ModelProviderApiKeyValidation>;
+  /**
+   * Probes a credential the caller supplied, after checking they may write
+   * the tenant they named. Nothing downstream re-authorizes this: the probe
+   * goes straight out to the provider with those keys, so the check here IS
+   * the authorization.
+   */
+  validateApiKey(
+    input: ModelProviderCredentialProbeRequest,
+    by: ModelProviderCaller,
+  ): Promise<ModelProviderCredentialVerdict>;
+  /** Probes the stored (or environment-fed) credential against a base URL. */
+  validateStoredKey(
+    input: ModelProviderStoredCredentialProbeRequest,
+  ): Promise<ModelProviderCredentialVerdict>;
+  startCodexDeviceSignIn(): Promise<ModelProviderCodexDeviceSignIn>;
+  pollCodexDeviceSignIn(input: {
+    deviceAuthId: string;
+    userCode: string;
+  }): Promise<ModelProviderCodexDeviceApproval>;
   testConnection(
     input: ModelProviderTestConnectionRequest,
     by: ModelProviderCaller,
@@ -141,6 +204,14 @@ export interface ModelProviderApi {
   getDefaultSnapshot(
     input: ModelDefaultSnapshotRequest,
     by: ModelProviderCaller,
+  ): Promise<ModelDefaultSnapshot>;
+  /**
+   * The same snapshot read as nobody, for a project credential that names no
+   * person. What a snapshot shows is filtered by what its reader may see, and
+   * there is no reader here.
+   */
+  getDefaultSnapshotUnattributed(
+    input: ModelDefaultSnapshotRequest,
   ): Promise<ModelDefaultSnapshot>;
   getInheritedValues(input: {
     projectId: string;
@@ -163,6 +234,12 @@ export interface ModelProviderApi {
   tryGetDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null>;
   deleteDefaultConfig(input: ModelDefaultDeleteRequest, by: ModelProviderCaller): Promise<void>;
   listCosts(input: ModelCostListInput): Promise<ModelCost[]>;
+  /** The registry's context-window and output ceilings, or null when it names no such model. */
+  findModelLimits(input: { model: string }): ModelLimits | null;
+  /** What a cost rule the caller is still typing would match, over the recent window. */
+  previewCostRuleMatchingSpans(
+    input: ModelCostPreviewRequest,
+  ): Promise<CostRuleMatchingSpansPreview>;
   upsertCost(input: ModelCostWriteRequest, by: ModelProviderCaller): Promise<ModelCost>;
   deleteCost(input: ModelCostDeleteRequest, by: ModelProviderCaller): Promise<void>;
   translate(input: TranslateInput): Promise<TranslateOutput>;

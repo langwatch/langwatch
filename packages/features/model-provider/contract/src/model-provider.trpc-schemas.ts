@@ -18,7 +18,10 @@ import {
   ROUTING_HANDLE_RULE,
 } from "./model-provider.ts";
 import type { ModelDefaultEffective } from "./model-provider.ts";
-import type { ModelProviderListEntry } from "./model-provider-list-entry.ts";
+import {
+  modelProviderListEntrySchema,
+  type ModelProviderListEntry,
+} from "./model-provider-list-entry.ts";
 
 /**
  * The scope-assignment shape the clients send. Deliberately not the
@@ -240,3 +243,53 @@ export const modelDefaultInheritedValuesTrpcInputSchema = z.object({
  */
 export type ModelProviderListAllForProjectTrpcOutput = ModelProviderListEntry[];
 export type ModelDefaultResolvedTrpcOutput = ModelDefaultEffective | null;
+
+/**
+ * The list projection, keyed by provider, that the three provider reads
+ * answer with. Every row is the same {@link ModelProviderListEntry} the
+ * uncollapsed listings return, so a surface reading either shape reads one.
+ */
+export const modelProviderListEntryMapTrpcSchema = z.record(
+  z.string(),
+  modelProviderListEntrySchema,
+);
+
+/** Codex step 1: the device code the browser shows, and how often to poll. */
+export const modelProviderCodexSignInStartSchema = z
+  .object({
+    userCode: z.string(),
+    deviceAuthId: z.string(),
+    verificationUrl: z.string(),
+    intervalSeconds: z.number(),
+  })
+  .strict();
+
+/**
+ * Codex step 2..n. The complete answer hands the connector their own account
+ * email, which is why the poll is a mutation rather than a query.
+ */
+export const modelProviderCodexSignInPollSchema = z.union([
+  z.object({ status: z.literal("pending") }).strict(),
+  z
+    .object({
+      status: z.literal("complete"),
+      providerId: z.string().optional(),
+      email: z.string(),
+      plan: z.string(),
+    })
+    .strict(),
+]);
+
+/** What a write that answers nothing but "it happened" returns. */
+export const modelProviderOkAckSchema = z.object({ ok: z.literal(true) }).strict();
+
+/** The acknowledgement the Codex coding-defaults write answers with. */
+export const modelProviderCodexDefaultsAppliedSchema = z
+  .object({ applied: z.literal(true) })
+  .strict();
+
+/** Whether LangWatch itself supplies this provider's credentials. */
+export const modelProviderIsManagedSchema = z.object({ managed: z.boolean() }).strict();
+
+/** The id of the default-models config a save created or replaced. */
+export const modelDefaultConfigSavedSchema = z.object({ id: z.string() }).strict();

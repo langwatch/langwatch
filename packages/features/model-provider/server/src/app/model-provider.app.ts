@@ -25,6 +25,9 @@
  */
 import {
   CODEX_DEFAULT_MODEL,
+  featureByKey,
+  ModelCostPreviewUnavailableError,
+  ModelProviderAnchorRequiredError,
   ModelProviderApi,
   type ModelCostDeleteRequest,
   type ModelCostWriteRequest,
@@ -32,7 +35,14 @@ import {
   type ModelDefaultConfigWriteRequest,
   type ModelDefaultDeleteRequest,
   type ModelDefaultSnapshotRequest,
+  type CostRuleMatchingSpansPreview,
+  type ModelCostPreviewRequest,
+  type ModelLimits,
   type ModelProviderCaller,
+  type ModelProviderCodexDeviceApproval,
+  type ModelProviderCodexDeviceSignIn,
+  type ModelProviderCredentialProbeRequest,
+  type ModelProviderStoredCredentialProbeRequest,
   type ModelProviderDeleteRequest,
   type ModelProviderTestConnectionRequest,
   type ModelProviderWriteRequest,
@@ -48,8 +58,6 @@ import {
   type ModelDefaultSnapshot,
   type ModelProvider,
   type ModelProviderAlternateResolution,
-  type ModelProviderApiKeyValidation,
-  type ModelProviderApiKeyValidationInput,
   type ModelProviderCodexGatewayRefresh,
   type ModelProviderCodexGatewayRefreshInput,
   type ModelProviderCodexStatus,
@@ -67,7 +75,21 @@ import {
   type TranslateOutput,
 } from "@langwatch/model-provider-contract";
 
+import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
+import type { CodexAccountService } from "../adapters/codex-oauth.model-provider-token-refresher.adapter.ts";
+import { ModelCostRegexSafetyService } from "../services/model-cost-regex-safety.service.ts";
+import { ModelLimitsService } from "../services/model-limits.service.ts";
+import {
+  ModelCostPreviewService,
+  type ModelCostPreviewSpanReader,
+} from "../services/model-cost-preview.service.ts";
+import type { ModelProviderCredentialProbePort } from "../ports/model-provider.port.ts";
+import type { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
+
 export type { ModelProviderCaller } from "@langwatch/model-provider-contract";
+
+/** The feature key the translation call is priced and routed under. */
+const TRANSLATE_FEATURE_KEY = "translate.text";
 
 /**
  * The process's span reader, opaque here. Only the process knows its concrete
@@ -82,6 +104,24 @@ export interface ModelProviderAppDependencies {
   modelProviders: ModelProviderService;
   /** The request's span reader, for the cost-rule preview. */
   spans: SpanReader;
+  /**
+   * The outbound credential probe, behind whatever egress fence the process
+   * composed. A technical port: the network is the deployment's, the decision
+   * about who may reach it is this application's.
+   */
+  credentialProbe: ModelProviderCredentialProbePort;
+  /**
+   * The per-scope write check the provider commands already run, reached here
+   * so the credential probe is held to the same standing. Nothing downstream
+   * re-authorizes a probe: it leaves for the vendor with the caller's keys.
+   */
+  providerAuthorization: ModelProviderWriteAuthorizationService;
+  /**
+   * The Codex device flow. Composed rather than built here because it holds
+   * the outbound `fetch` the deployment wants it to use, and the issuer it
+   * talks to is overridable outside production.
+   */
+  codexAccounts: CodexAccountService;
 }
 
 /**
@@ -96,6 +136,19 @@ export class ModelProviderApp implements ModelProviderApi {
   static create(dependencies: ModelProviderAppDependencies): ModelProviderApp {
     return new ModelProviderApp(dependencies);
   }
+
+  /** The registry's ceilings, read from the catalogue this package ships. */
+  readonly #limits = ModelLimitsService.create();
+  /** The cost-rule preview, over the request's own span reader. */
+  readonly #costPreview = ModelCostPreviewService.create({
+    regexSafety: ModelCostRegexSafetyService.create(),
+  });
+  /**
+   * The provider-failure policy one model call is wrapped in: the customer
+   * reads this application's typed cause, and the provider's own words go to
+   * the log, where internals belong.
+   */
+  readonly #aiCallFailures = AiCallFailureService.create();
 
   private constructor(private readonly dependencies: ModelProviderAppDependencies) {}
 
@@ -150,6 +203,15 @@ export class ModelProviderApp implements ModelProviderApi {
     return this.dependencies.modelProviders.upsert({ ...input, actorId: by.id });
   }
 
+  /**
+   * The project credential's own write. Nothing is attributed and nothing is
+   * authorized here: the key was already held to `project:update` on the one
+   * project it resolves to, which is the whole gate this door has ever had.
+   */
+  upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider> {
+    return this.dependencies.modelProviders.upsert(input);
+  }
+
   /** Removes a provider row, attributed to the caller. */
   delete(input: ModelProviderDeleteRequest, by: ModelProviderCaller): Promise<void> {
     return this.dependencies.modelProviders.delete({ ...input, actorId: by.id });
@@ -163,31 +225,48 @@ export class ModelProviderApp implements ModelProviderApi {
     return this.dependencies.modelProviders.testConnection({ ...input, actorId: by.id });
   }
 
-  validateApiKey(
-    input: ModelProviderApiKeyValidationInput,
-  ): Promise<ModelProviderApiKeyValidation> {
-    return this.dependencies.modelProviders.validateApiKey(input);
+  /**
+   * Probes a credential the caller has just typed. The standing check runs
+   * FIRST and is the whole gate: past it the keys leave this process for the
+   * vendor, and nothing downstream asks again.
+   */
+  async validateApiKey(
+    input: ModelProviderCredentialProbeRequest,
+    by: ModelProviderCaller,
+  ): Promise<ModelProviderCredentialVerdict> {
+    await this.dependencies.providerAuthorization.assertCanWrite(by.id, [
+      probedTenantScope(input),
+    ]);
+
+    return this.dependencies.credentialProbe.probe({
+      provider: input.provider,
+      customKeys: input.customKeys,
+    });
   }
 
-  /**
-   * The composed provider service, for the two process capabilities that are
-   * written against it rather than against this application.
-   *
-   * Deliberately narrow and deliberately named: the stored-credential probe
-   * reaches the provider's network and takes the service as an argument, and
-   * the process owns that function. A door asks the application for the
-   * collaborator instead of holding a service of its own, which is the point;
-   * when the probe's contract is rewritten to take an operation rather than a
-   * service, this accessor goes with it.
-   *
-   * It is an accessor rather than a wrapper method on purpose. A wrapper would
-   * have to be generic over the probe's result, and TypeScript resolves that
-   * against the constraint rather than the concrete port a process wires in —
-   * which would collapse the router's inferred output type to `unknown`, the
-   * exact loss the `TPorts` parameter on each transport exists to prevent.
-   */
-  get providerService(): ModelProviderService {
-    return this.dependencies.modelProviders;
+  /** Probes the stored (or environment-fed) credential against a base URL. */
+  validateStoredKey(
+    input: ModelProviderStoredCredentialProbeRequest,
+  ): Promise<ModelProviderCredentialVerdict> {
+    return this.dependencies.credentialProbe.probeStored({
+      projectId: input.projectId,
+      provider: input.provider,
+      customBaseUrl: input.customBaseUrl,
+      modelProviders: this.dependencies.modelProviders,
+    });
+  }
+
+  /** Codex step 1: ask the issuer for a device code. Nothing is stored yet. */
+  startCodexDeviceSignIn(): Promise<ModelProviderCodexDeviceSignIn> {
+    return this.dependencies.codexAccounts.startDeviceSignIn();
+  }
+
+  /** Codex step 2..n: one poll of the pending device authorization. */
+  pollCodexDeviceSignIn(input: {
+    deviceAuthId: string;
+    userCode: string;
+  }): Promise<ModelProviderCodexDeviceApproval> {
+    return this.dependencies.codexAccounts.pollDeviceSignIn(input);
   }
 
   /** Whether LangWatch itself supplies this provider's credentials. */
@@ -255,6 +334,13 @@ export class ModelProviderApp implements ModelProviderApi {
     by: ModelProviderCaller,
   ): Promise<ModelDefaultSnapshot> {
     return this.dependencies.modelProviders.getDefaultSnapshot({ ...input, actorId: by.id });
+  }
+
+  /** The same snapshot read as nobody, for a credential that names no person. */
+  getDefaultSnapshotUnattributed(
+    input: ModelDefaultSnapshotRequest,
+  ): Promise<ModelDefaultSnapshot> {
+    return this.dependencies.modelProviders.getDefaultSnapshot(input);
   }
 
   /**
@@ -329,22 +415,74 @@ export class ModelProviderApp implements ModelProviderApi {
     return this.dependencies.modelProviders.deleteCost({ ...input, actorId: by.id });
   }
 
+  /** The registry's ceilings for a model id, or null when it names no such model. */
+  findModelLimits(input: { model: string }): ModelLimits | null {
+    return this.#limits.tryGetModelLimits(input.model);
+  }
+
   /**
-   * This request's span reader, for the process's cost-rule preview.
+   * What a cost rule the caller is still typing would match, priced under the
+   * rates they have entered so far.
    *
-   * The preview reads the trace store, which is another feature's persistence,
-   * so it stays the process's function; what this application owns is which
-   * reader it runs against — the request's, not a process singleton. An
-   * accessor for the same reason as {@link providerService}.
+   * The reader is the trace read stack's, carried through this application as
+   * an opaque handle: only a process that composed one knows its concrete
+   * type, and a process that composed none must say so rather than answering
+   * "no matching spans" — an empty preview would talk somebody out of a rule
+   * that works.
    */
-  get spanReader(): SpanReader {
-    return this.dependencies.spans;
+  previewCostRuleMatchingSpans(
+    input: ModelCostPreviewRequest,
+  ): Promise<CostRuleMatchingSpansPreview> {
+    const spans = this.dependencies.spans;
+
+    if (!isPreviewSpanReader(spans)) throw new ModelCostPreviewUnavailableError();
+
+    return this.#costPreview.previewCostRuleMatchingSpans({ spans, input });
   }
 
   // ── translation ────────────────────────────────────────────────────────────
 
-  /** Translates content the caller is already looking at. */
+  /**
+   * Translates content the caller is already looking at.
+   *
+   * Wrapped in the provider-failure policy here rather than at a door, so
+   * every caller reads the same typed cause and the provider's own words
+   * reach the log rather than the browser.
+   */
   translate(input: TranslateInput): Promise<TranslateOutput> {
-    return this.dependencies.modelProviders.translate(input);
+    const feature = featureByKey(TRANSLATE_FEATURE_KEY);
+
+    // A missing registry entry is a build-time mistake, not a customer-actionable
+    // cause, so it stays a plain Error and degrades to unknown plus a trace id.
+    if (!feature) throw new Error(`${TRANSLATE_FEATURE_KEY} feature is not registered`);
+
+    return this.#aiCallFailures.wrapAiCall(feature, () =>
+      this.dependencies.modelProviders.translate(input),
+    );
   }
+}
+
+/**
+ * The tenant a probe is authorized against: the project when one is named,
+ * the organization otherwise. The wire schema refuses a request naming
+ * neither, so reaching here with neither is a wiring mistake, not a caller's.
+ */
+function probedTenantScope(input: ModelProviderCredentialProbeRequest): ModelDefaultScope {
+  if (input.projectId) return { scopeType: "PROJECT", scopeId: input.projectId };
+
+  if (input.organizationId) {
+    return { scopeType: "ORGANIZATION", scopeId: input.organizationId };
+  }
+
+  throw new ModelProviderAnchorRequiredError("project_or_organization");
+}
+
+/** Whether this application's opaque span handle answers the two preview reads. */
+function isPreviewSpanReader(spans: SpanReader): spans is ModelCostPreviewSpanReader {
+  const candidate = spans as Partial<ModelCostPreviewSpanReader> | null | undefined;
+
+  return (
+    typeof candidate?.getModelUsageStats === "function" &&
+    typeof candidate?.getRecentSpansByModels === "function"
+  );
 }

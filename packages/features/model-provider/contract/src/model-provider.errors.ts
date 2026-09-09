@@ -421,3 +421,21 @@ export class ModelCostNotFoundError extends HandledError {
     this.name = "ModelCostNotFoundError";
   }
 }
+
+/**
+ * The cost-rule preview was asked for on a process that composed no span
+ * reader. It says so rather than answering "no matching spans", which would
+ * talk somebody out of a rule that works.
+ */
+export class ModelCostPreviewUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super("service_unavailable", "This part of the product is not available on this deployment", {
+      httpStatus: 503,
+      fault: "platform",
+      meta: { capability: "the cost rule's span preview" },
+    });
+    this.name = "ModelCostPreviewUnavailableError";
+  }
+}

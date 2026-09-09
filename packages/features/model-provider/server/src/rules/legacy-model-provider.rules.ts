@@ -150,7 +150,7 @@ export function toLegacyProviderSummary(
 }
 
 export const getProjectModelProviders = async (
-  service: ModelProviderService,
+  service: Pick<ModelProviderService, "getExecutionProviders">,
   projectId: string,
 ): Promise<Record<string, LegacyModelProviderExecution>> => {
   const providers = await service.getExecutionProviders({ projectId });

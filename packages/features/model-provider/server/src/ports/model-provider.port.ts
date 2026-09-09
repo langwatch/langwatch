@@ -412,6 +412,18 @@ export abstract class ModelProviderCredentialProbePort {
     provider: string;
     customKeys: Record<string, string>;
   }): Promise<ModelProviderCredentialVerdict>;
+  /**
+   * The credential already stored for a project — or the one this deployment's
+   * environment supplies — probed against a base URL the caller may override.
+   * The gateway is handed over rather than held, because which rows this probe
+   * may read is the application's answer and not the fence's.
+   */
+  abstract probeStored(input: {
+    projectId: string;
+    provider: string;
+    customBaseUrl: string | undefined;
+    modelProviders: ModelProviderService;
+  }): Promise<ModelProviderCredentialVerdict>;
 }
 
 /** One fixed window, counted wherever the process counts its windows. */
