@@ -7,10 +7,12 @@ Feature: Sign-in flows (credentials, Google OAuth, enterprise OAuth)
   describe PERSISTENT sign-in behavior that must keep working long after the
   cutover, so they live on here as a durable spec record.
 
-  These are intentionally untagged: they document live behavior rather than
-  asserting a single bound test, so they are not counted by the
+  The first two are intentionally untagged: they document live behavior
+  rather than asserting a single bound test, so they are not counted by the
   feature-parity gate. Binding notes per scenario record where the behavior
-  is actually exercised today.
+  is actually exercised today. The enterprise OAuth callback-path outline is
+  tagged and bound to `legacyCallbackParity.test.ts`, since that behavior has
+  a real assertion rather than only browser-QA evidence.
 
   Ported at D13 (ADR-117): what the SCREENS do in front of these flows now
   starts with the address, and the answer to where it signs in is the
@@ -48,6 +50,7 @@ Feature: Sign-in flows (credentials, Google OAuth, enterprise OAuth)
   # the pinned path directly; there is no Next.js rewrite or plugin callback
   # hop. Full provider round-trips are still browser-QA evidence, not an
   # automated claim.
+  @unit
   Scenario Outline: Enterprise OAuth keeps the callback path customers registered
     Given NEXTAUTH_PROVIDER is "<provider>"
     And that provider's client credentials and issuer are set

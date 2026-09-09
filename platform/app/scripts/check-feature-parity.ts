@@ -366,7 +366,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/sessions/sessions-inventory.feature",
   "specs/analytics/posthog-cost-control.feature",
   "specs/audit-log/audit-log.feature",
-  "specs/auth/auth-signin-flows.feature",
   "specs/auth/dev-port-origin-alignment.feature",
   "specs/auth/diagnostic-logging-on-auth-failure.feature",
   "specs/auth/impersonation-banner.feature",
@@ -396,7 +395,6 @@ const LEGACY_INERT: string[] = [
   "specs/data-retention/monitoring.feature",
   "specs/data-retention/plan-gated-retention-menu.feature",
   "specs/data-retention/retention-policy-configuration.feature",
-  "specs/data-retention/retroactive-update.feature",
   "specs/data-retention/trace-pinning.feature",
   "specs/data-retention/ttl-activation.feature",
   "specs/data-retention/visibility-window-teaser-redaction.feature",
@@ -720,6 +718,13 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-governance/puller-framework/s3-polling.feature",
   "specs/analytics/dashboard-rest-api.feature",
   "specs/analytics/event-sourced-analytics-materialization.feature",
+  // Reason: left LEGACY_INERT once this branch tagged and bound the
+  // enterprise-OAuth callback-path outline to `legacyCallbackParity.test.ts`.
+  // The other two scenarios (on-prem credentials, Google OAuth) are
+  // deliberately untagged per the file's own header — they document live
+  // behaviour proven by browser QA and other unit tests, not a single bound
+  // assertion, so tagging them would misstate what covers them.
+  "specs/auth/auth-signin-flows.feature",
   "specs/automations/authoring-drawer.feature",
   "specs/automations/process-manager-dispatch.feature",
   "specs/ci/path-filters.feature",
@@ -741,6 +746,14 @@ const LEGACY_PARTIAL: string[] = [
   // and the trace-pipeline pair is proven for event_log but not yet for
   // stored_metric_records or dspy_steps. Each needs a test, not a tag.
   "specs/data-retention/ingestion-stamping.feature",
+  // Reason: left LEGACY_INERT once this branch tagged and bound the three
+  // event-log-category scenarios (category selection, per-tenant/category/
+  // table rate limiting, and parallel category mutations) to
+  // `retroactiveUpdate.unit.test.ts`. The seven that remain untagged predate
+  // this branch and describe the UI/progress-card side (confirmation dialog,
+  // progress tracking, kill-mutation button) and the immediate-vs-retroactive
+  // stamping contract, which this branch does not own.
+  "specs/data-retention/retroactive-update.feature",
   "specs/datasets/add-to-dataset-span-mapping.feature",
   "specs/dependencies/zod-first-schema-source-of-truth.feature",
   "specs/event-sourcing/payload-cost.feature",

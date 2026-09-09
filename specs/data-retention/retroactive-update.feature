@@ -23,6 +23,7 @@ Feature: Retroactive retention changes
     And the event_log mutation updates only trace-class rows
     And the event_log mutation preserves every security row classified as indefinite
 
+  @unit
   Scenario: Retroactive updates select the matching event-log category
     When the admin applies a retention change to existing scenario data
     Then simulation_runs and suite_runs are updated
@@ -36,12 +37,14 @@ Feature: Retroactive retention changes
     Then the UI shows a progress entry per table from system.mutations
     And the progress shows the parts still pending counting down to zero
 
+  @unit
   Scenario: Rate-limited to one mutation per tenant, category, and table
     Given a retroactive update is in progress for stored_spans
     When the admin attempts another retroactive update for stored_spans
     Then the request is rejected with a rate-limit error
     And the error indicates the existing mutation must complete first
 
+  @unit
   Scenario: Event-log category mutations can run in parallel
     Given a trace-category event_log mutation is in progress
     When scenario and experiment retroactive updates start for the same tenant

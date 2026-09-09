@@ -657,19 +657,14 @@ Feature: Two-step verification - one setup per person, and organizations that re
 
   # ── Failures read as words ─────────────────────────────────────────────
 
-  @integration
-  Scenario: Every named failure has copy a first-time reader understands
-    When a setup, a sign-in or an impersonation is refused with a named code
-    Then the screen shows the copy registered for that code
-    And the screen never shows the code itself or an internal error
-    And no message names a table, an environment variable or a service
-
-  @unit
-  Scenario: A failure we cannot name stays unnamed
-    When a challenge fails for a reason nothing anticipated
-    Then no invented code is attached to it
-    And the screen says it did not go through, with a trace identifier
-    And the real cause is logged
+  # The two rules — a named failure gets copy a first-time reader
+  # understands, and an unanticipated one stays unnamed rather than inventing
+  # a code for it — are specified once, in
+  # specs/identity/passkeys.feature ("Every named failure has copy a
+  # first-time reader understands" / "A failure we cannot name stays
+  # unnamed"), and apply here to setup, sign-in and impersonation refusals
+  # the same way they apply to passkey ceremonies. Not restated to avoid two
+  # specs drifting apart on the same rule.
 
   # ── The flag ───────────────────────────────────────────────────────────
 
