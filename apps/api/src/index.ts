@@ -18,7 +18,6 @@ export {
 export { ApiRestObservabilityComposition } from "./app/api-rest-observability.composition.ts";
 export {
   ApiProductionComposition,
-  LoggedApiAgentsAbsence,
   LoggedApiAuthAbsence,
   LoggedApiAuthzAbsence,
   LoggedApiDatabaseAbsence,
@@ -39,7 +38,10 @@ export {
   type TraceFeatureOptions,
 } from "./features/trace/trace.composition.ts";
 export { ApiTraceReadStackPort } from "./features/trace/trace-read-stack.port.ts";
-export type { ApiTracePorts, ComposedTraceFeature } from "./features/trace/trace.composition.types.ts";
+export type {
+  ApiTracePorts,
+  ComposedTraceFeature,
+} from "./features/trace/trace.composition.types.ts";
 /** The links a project shares outside itself, and the topics its traces carry. */
 export { installApiShare } from "./features/share/share.composition.ts";
 export type { ComposedShareFeature } from "./features/share/share.composition.types.ts";
@@ -53,7 +55,6 @@ export {
 export type { ComposedEntitlementFeature } from "./features/entitlement/entitlement.composition.types.ts";
 /** The studio's outbound dispatch and the agent test's own trace write. */
 export {
-  ApiStudioHostPort,
   composeHttpProxyFeature,
   refusingHttpProxyFeature,
 } from "./features/agent/http-proxy.composition.ts";
@@ -90,11 +91,7 @@ export {
   type ApiGatewayComposition,
   type ApiGatewayCompositionOptions,
 } from "./app/api-gateway.composition.ts";
-export {
-  ApiAgentsAbsenceReportPort,
-  ApiAgentsComposition,
-  type ApiAgentsCompositionOptions,
-} from "./app/api-agents.composition.ts";
+export { installApiAgent, type ApiAgentComposition } from "./app/api-agents.composition.ts";
 export {
   ApiAuthzAbsenceReportPort,
   ApiAuthzComposition,
@@ -217,10 +214,10 @@ export {
 } from "@langwatch/experiment-server";
 export { createApiKeysRestApp } from "@langwatch/api-key-server";
 export {
-  createFilesRestApp,
+  FILE_VIEW_PERMISSIONS,
   isPermissionDenial,
   requiredPermissionForPurpose,
-  type FilesDualAuthVariables,
+  storedObjectFileRest,
   type FilesProjectPermissionCheck,
   type FilesRateLimiter,
 } from "@langwatch/stored-object-server";
@@ -238,8 +235,11 @@ export {
 // gone: `GatewayApp` subsumed them. A process composes that application and
 // hands it in — `createGatewayPlatformRestApp({ security, gateway })` — and
 // reaches the class through `@langwatch/gateway-server`, where it is declared.
-export { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
-export { createGatewaySpendRestApp, type GatewaySpendRestPorts } from "@langwatch/gateway-server";
+export { createGatewayPlatformRestApp } from "@langwatch/gateway-server/api-rest/gateway-platform";
+export {
+  createGatewaySpendRestApp,
+  type GatewaySpendRestPorts,
+} from "@langwatch/gateway-server/api-rest/gateway-spend";
 export { createGovernanceRestApp } from "@langwatch/enterprise-api";
 export { type AgentPlatformUrlBuilder } from "@langwatch/agent-server";
 export { createTriggerRestApp } from "@langwatch/automation-server";
@@ -248,13 +248,16 @@ export {
   createCodingAgentRestApp,
 } from "@langwatch/coding-agent-server";
 export { createWebhookRestApp } from "@langwatch/enterprise-api";
-export { createEventsRestApp, type TrackedEventPorts } from "@langwatch/trace-server";
+export {
+  createEventsRestApp,
+  type TrackedEventPorts,
+} from "@langwatch/trace-server/api-rest/tracked-event";
 export {
   createExportTracesRestApp,
   type TraceExportPort,
   type TraceExportRequestFields,
   type TraceExportRestPorts,
-} from "@langwatch/trace-server";
+} from "@langwatch/trace-server/api-rest/trace-export";
 export { createGroupRestApp } from "@langwatch/organization-server";
 export { createModelDefaultsRestApp } from "@langwatch/model-provider-server";
 export { createModelProvidersRestApp } from "@langwatch/model-provider-server";
@@ -277,9 +280,9 @@ export {
 export {
   archiveScenarioSetRuns,
   createScenarioEventsRestApp,
-  createScenariosRestApp,
-  createSimulationRunsRestApp,
-} from "@langwatch/scenario-server";
+} from "@langwatch/scenario-server/api-rest/scenario-event";
+export { createScenariosRestApp } from "@langwatch/scenario-server/api-rest/scenario";
+export { createSimulationRunsRestApp } from "@langwatch/scenario-server/api-rest/simulation-run";
 export {
   createWorkflowsRestApp,
   type WorkflowEvaluationOutcome,

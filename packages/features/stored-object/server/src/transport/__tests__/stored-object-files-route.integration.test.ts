@@ -1,22 +1,23 @@
 /**
- * Characterisation of `GET /api/files/:id` through the real Hono family.
+ * Characterisation of `GET /api/files/:id` through the real declaration.
  * @vitest-environment node
  * Spec: specs/features/scenarios/externalize-event-byte-content.feature
  */
 import { Readable } from "node:stream";
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import { createRestRuntime } from "@langwatch/api/rest";
+import type { ErrorHandler } from "hono";
 import { HandledError } from "@langwatch/handled-error";
 import { StoredObjectOwnerLookupUnavailableError } from "@langwatch/stored-object-contract";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { StoredObjectApp, StoredObjectFileStreamRead } from "#app/stored-object.app";
+import type { StoredObjectFileStreamRead } from "#app/stored-object.app";
 import {
-  createFilesRestApp,
+  storedObjectFileRest,
   type FilesProjectPermissionCheck,
   type FilesRateLimiter,
-} from "../stored-object.api.ts";
+  type StoredObjectFileApi,
+} from "../stored-object-file.rest.ts";
 
 const OWNER_PROJECT = "project-owner";
 const OBJECT_ID = "stored-object-1";
@@ -312,13 +313,27 @@ describe("given the /api/files family", () => {
       expect(permissionCheck).not.toHaveBeenCalled();
     });
   });
+
+  describe("when the URL names the project that owns the object", () => {
+    // The same scenario the membership case above binds; a second annotation
+    // would bind nothing it does not already cover.
+    it("takes the owner from the path and never runs the cross-tenant lookup", async () => {
+      const owner = vi.fn(async () => ({ projectId: OWNER_PROJECT }));
+      const api = mount({ read: async () => availableRead(), owner });
+
+      const response = await api.fetch(`/api/files/${OWNER_PROJECT}/${OBJECT_ID}`);
+
+      expect(response.status).toBe(200);
+      expect(owner).not.toHaveBeenCalled();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
 // Harness
 // ---------------------------------------------------------------------------
 
-/** The family over one process's stored-object application. */
+/** The family over one process's byte reads, verifier, counter and gate. */
 function mount(options: {
   read?: () => Promise<StoredObjectFileStreamRead | null>;
   owner?: () => Promise<{ projectId: string } | null>;
@@ -328,26 +343,39 @@ function mount(options: {
   rateLimit?: FilesRateLimiter;
 }) {
   const caller = options.caller ?? { apiKeyProjectId: OWNER_PROJECT };
-  const app = {
-    readById: options.read ?? (async () => availableRead()),
-    resolveOwner: options.owner ?? (async () => ({ projectId: OWNER_PROJECT })),
-  } as unknown as StoredObjectApp;
-
-  const files = createFilesRestApp({
-    security: passThroughSecurity(),
-    app: () => app,
-    dualAuth: async (c, next) => {
-      if (caller.apiKeyProjectId) {
-        c.set("apiKeyProjectId", caller.apiKeyProjectId);
-        c.set("apiKeyCeiling", options.apiKeyCeiling ?? (async () => undefined));
-      }
-      if (caller.userId) c.set("userId", caller.userId);
-      await next();
-    },
+  const api: StoredObjectFileApi = {
+    identify: async () => ({
+      ...(caller.apiKeyProjectId
+        ? {
+            apiKeyProjectId: caller.apiKeyProjectId,
+            apiKeyCeiling: options.apiKeyCeiling ?? (async () => undefined),
+          }
+        : {}),
+      ...(caller.userId ? { userId: caller.userId } : {}),
+    }),
+    countRead: options.rateLimit ?? (async () => ({ allowed: true, resetAt: 0 })),
     requireProjectPermission: options.requireProjectPermission ?? (async () => undefined),
-    rateLimit: options.rateLimit ?? (async () => ({ allowed: true, resetAt: 0 })),
+    resolveOwner: options.owner ?? (async () => ({ projectId: OWNER_PROJECT })),
+    readById: options.read ?? (async () => availableRead()),
+  };
+
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new Error("A byte read asks no permission of its credential.");
+      },
+      identify: () => ({
+        actor: caller.userId ? ({ type: "user", id: caller.userId } as const) : null,
+        scope: null,
+      }),
+    },
   });
-  const hono = new Hono().route("/", files.hono as never);
+
+  const hono = runtime.mount(storedObjectFileRest.router(), {
+    app: () => api,
+    credential: "session",
+    onError: renderHandled,
+  });
 
   return {
     fetch: (path: string) => hono.fetch(new Request(`http://api.test${path}`)),
@@ -363,25 +391,3 @@ const renderHandled: ErrorHandler = (error, c) => {
   }
   return c.json({ error: String(error) }, 500);
 };
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: () => noop,
-    authorizeProjectPermission: () => noop,
-    authorizeApiKeyCeiling: () => noop,
-    authenticateOrganization: () => noop,
-    authorizeOrganizationPermission: () => noop,
-    authorizeRouteTeamPermission: () => noop,
-    authorizeRouteProjectPermission: () => noop,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: () => noop,
-  } as never);
-}

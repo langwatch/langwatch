@@ -23,7 +23,7 @@ import {
 } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 
-import { isPermissionDenial } from "../stored-object.api.ts";
+import { isPermissionDenial } from "../stored-object-file.rest.ts";
 
 describe("isPermissionDenial", () => {
   describe("given a refusal from the permission layer", () => {

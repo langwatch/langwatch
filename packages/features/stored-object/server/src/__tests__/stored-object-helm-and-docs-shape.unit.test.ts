@@ -339,13 +339,13 @@ describe("Route handlers delegate to the service and never touch the repository 
     /** @scenario "Route handlers delegate to the service and never touch the repository directly" */
     it("imports the service factory and does not import the repository", () => {
       const route = readRepoFile(
-        "packages/features/stored-object/server/src/transport/api-rest/stored-object.api.ts",
+        "packages/features/stored-object/server/src/transport/stored-object-file.rest.ts",
       );
 
-      // The family takes the stored-object application as an argument now, so
-      // the assertion is that it dispatches through that seam at all and still
-      // never names a repository.
-      expect(route).toContain("app()");
+      // The declaration is handed the application the process mounted it over,
+      // so the assertion is that it dispatches through that seam at all and
+      // still never names a repository.
+      expect(route).toContain("app.readById(");
       expect(route).not.toContain("stored-objects.repository");
     });
   });

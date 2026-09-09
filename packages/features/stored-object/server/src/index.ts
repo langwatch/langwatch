@@ -15,13 +15,17 @@ export {
   type StoredObjectInfrastructure,
 } from "./app/stored-object.app.ts";
 export {
-  createFilesRestApp,
+  FILE_VIEW_PERMISSIONS,
   isPermissionDenial,
   requiredPermissionForPurpose,
-  type FilesDualAuthVariables,
+  StoredObjectFileApi,
+  storedObjectFileRest,
   type FilesProjectPermissionCheck,
   type FilesRateLimiter,
-} from "./transport/api-rest/stored-object.api.ts";
+  type StoredObjectFileAllowance,
+  type StoredObjectFileCaller,
+  type StoredObjectFileViewPermission,
+} from "./transport/stored-object-file.rest.ts";
 export { StoredObjectOwnerLookupRuntimeAdapter } from "./adapters/stored-object-owner-lookup-runtime.adapter.ts";
 export {
   StoredObjectDestinationPolicyAdapter,

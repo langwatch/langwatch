@@ -54,6 +54,7 @@ import type { ApiErrorBody } from "@langwatch/api/rest";
 import { mountDashboardRest } from "../features/dashboard/dashboard-rest.mount.ts";
 import { mountEvaluatorRest } from "../features/evaluator/evaluator-rest.mount.ts";
 import { mountMonitorRest } from "../features/monitor/monitor-rest.mount.ts";
+import { mountStoredObjectFileRest } from "../features/stored-object/stored-object-file-rest.mount.ts";
 import type { ApiHandlerManagedCredentialPort } from "./app-rest.process-features.ts";
 
 import type { AgentCacheStore } from "../features/agent-cache/agent-cache-rest.ts";
@@ -264,10 +265,9 @@ export type ApiPackagedRestFamilyName =
  */
 export function mountApiPackagedRestFamilies(options: {
   /**
-   * The process's REST security seam. Read by no family here today: the three
-   * that mount are declared families, which bind a credential instead. It stays
-   * on the signature because it is what a hand-written family took, and the
-   * ones still to convert are all hand-written.
+   * The process's REST security seam. Read by no family here today: the four
+   * that mount are declared families, which bind a credential instead. It
+   * stays on the signature because a hand-written family took it.
    */
   security: AppRestSecurity;
   collaborators: ApiPackagedRestCollaborators;
@@ -344,7 +344,26 @@ export function mountApiPackagedRestFamilies(options: {
 
   mount("experiments", null);
 
-  mount("files", null);
+  // `/api/files` reads bytes a page renders and a key fetches, so it needs
+  // BOTH doors: the dual-credential verifier and the person's project
+  // permission. Either absent takes the family off rather than serving an
+  // object read that could not authorize.
+  const storedObjects = services.storedObjects;
+  const requireProjectPermission = ports.requireProjectPermission;
+  const dualAuth = ports.dualAuth;
+  mount(
+    "files",
+    storedObjects && requireProjectPermission && dualAuth
+      ? () =>
+          mountStoredObjectFileRest({
+            storedObjects,
+            dualAuth,
+            requireProjectPermission,
+            rateLimit: ports.rateLimit,
+            errors: ports.legacyErrors,
+          })
+      : null,
+  );
 
   mount("governance", null);
 
