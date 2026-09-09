@@ -331,6 +331,7 @@ function CostsPage() {
             sourcesConnected={holdsFigures}
             organizationId={organizationId}
             providerDays={providerDays.data?.rows ?? []}
+            providerDaysFailed={providerDays.isError}
           />
         </SampleSaidOnce>
       </VStack>
@@ -1473,6 +1474,7 @@ function CostBreakdowns({
   sourcesConnected: connected,
   organizationId,
   providerDays,
+  providerDaysFailed,
 }: {
   filters: CostFilters;
   breakdowns: Breakdowns;
@@ -1485,6 +1487,13 @@ function CostBreakdowns({
   organizationId: string;
   /** One figure per (day, provider) of the billed lane. */
   providerDays: readonly GovernanceCostProviderDayRowDto[];
+  /**
+   * Whether that read FAILED, which an empty row list cannot say on its own.
+   * Without it a failed read is an empty list, an empty list hides the panel,
+   * and a hidden panel beside filled neighbours reads as no spend — the same
+   * confusion `CostPanelUnrefreshed` exists to prevent.
+   */
+  providerDaysFailed: boolean;
 }) {
   const sample = useSampleSeries(periods, filters.interval, filters.department);
   const rows = measuredRows({ breakdowns, filters });
@@ -1504,7 +1513,12 @@ function CostBreakdowns({
           provider axis, and squeezing it into a third of a row would put the
           window's days behind a scrollbar — which is exactly where they were
           before this panel existed. */}
-      {!showSample && providerDays.length > 0 && (
+      {!showSample && providerDaysFailed && (
+        <CostPanel title="Cost by provider and day">
+          <CostPanelUnrefreshed />
+        </CostPanel>
+      )}
+      {!showSample && !providerDaysFailed && providerDays.length > 0 && (
         <CostPanel title="Cost by provider and day">
           <CostProviderDayPanel
             organizationId={organizationId}

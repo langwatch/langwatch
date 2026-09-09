@@ -174,7 +174,17 @@ function DayRecords({
       <Text fontSize="xs" color="fg.muted">
         {providerName(provider)} · {day}
       </Text>
-      {rows === null ? (
+      {/*
+        A failed read and a read still in flight both leave `rows` null, and
+        the screen this panel opens inside holds that the two must never look
+        alike: an empty answer is a finding, a failed read is something to try
+        again. So the failure is asked about first.
+      */}
+      {records.isError ? (
+        <Text fontSize="sm" color="fg.muted">
+          This day could not be read. Refresh to try again.
+        </Text>
+      ) : rows === null ? (
         <Text fontSize="sm" color="fg.muted">
           Reading what this day was made of.
         </Text>

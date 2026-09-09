@@ -666,6 +666,49 @@ describe("the Anthropic Admin puller", () => {
       });
     });
 
+    it("holds the cost window still when run after run is cut off before reading a page", async () => {
+      // A drained cost cursor carries no page token, and `parseCursor` gives
+      // exactly those cursors the repair look-back — so the window a run ASKS
+      // from sits earlier than the position on record. Saving the asked-from
+      // value when the deadline fires before page one would hand the next run
+      // an already-rewound position to look back from again, and each cut-off
+      // run would walk the window further into the past. With no page token
+      // there is nothing to resume, so the position on record is saved.
+      fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
+      const puller = new AnthropicAdminPuller();
+      const costConfig = {
+        adapter: "anthropic_admin" as const,
+        report: "cost" as const,
+        bucketWidth: "1d" as const,
+        schedule: "0 * * * *",
+        startingAt: "2026-08-01T00:00:00.000Z",
+      };
+
+      const drained = await puller.runOnce(RUN_OPTIONS, costConfig);
+      const drainedPosition = JSON.parse(drained.cursor!) as {
+        startingAt: string;
+        page: string | null;
+      };
+      expect(drainedPosition.page).toBeNull();
+
+      let cursor = drained.cursor!;
+      const positions: string[] = [];
+      for (let run = 0; run < 3; run += 1) {
+        const cutOff = await puller.runOnce(
+          { ...RUN_OPTIONS, cursor, deadlineMs: Date.now() - 1 },
+          costConfig,
+        );
+        cursor = cutOff.cursor!;
+        positions.push((JSON.parse(cursor) as { startingAt: string }).startingAt);
+      }
+
+      expect(positions).toEqual([
+        drainedPosition.startingAt,
+        drainedPosition.startingAt,
+        drainedPosition.startingAt,
+      ]);
+    });
+
     it("keeps a pre-query-binding usage watermark rather than rewinding into duplicates", async () => {
       fetchMock.mockResolvedValue(jsonResponse(USAGE_PAGE));
 

@@ -887,11 +887,16 @@ export class AnthropicAdminPuller
         // so a deadline costs latency rather than a window.
         return {
           events,
-          // The window start actually asked with, so the page token this run
-          // leaves behind is resumed against the same `starting_at` that
-          // minted it.
+          // With a page token in hand, save the window start actually asked
+          // with, so that token is resumed against the same `starting_at`
+          // that minted it. With NO token there is nothing to resume and
+          // nothing requires the rewound value — and saving it would walk
+          // the cursor backwards, because `parseCursor` applies the
+          // look-back a second time to any cursor whose page is null. Save
+          // the position on record instead, which is the floor this cursor
+          // may never drop below.
           cursor: encodeCursor({
-            startingAt: requestStart,
+            startingAt: page === null ? positionOnRecord : requestStart,
             page,
             query,
             watermark,
