@@ -296,4 +296,104 @@ describe("the sign-in, sign-up, reset and passkey refusals", () => {
       });
     });
   });
+
+  /**
+   * The rest of the table, one case each.
+   *
+   * The families above are tested for the property that makes them
+   * interesting — a collapse, a pass-through, a funnel that must keep
+   * working. Half the table has no such property to prove, only a mapping,
+   * and a mapping nobody asserts is a mapping a rename or a stray edit can
+   * silently retire: the endpoint keeps refusing, the screen keeps rendering,
+   * and the words are the generic unknown instead of the ones somebody wrote.
+   * So every remaining key gets a case, and the table is asserted whole.
+   */
+  describe("given a code the table names on its own family", () => {
+    describe("when it arrives on that family's path", () => {
+      it.each([
+        {
+          path: "/api/auth/sign-in/email",
+          betterAuthCode: "INVALID_PASSWORD",
+          answers: "identity_sign_in_refused",
+        },
+        {
+          path: "/api/auth/sign-up/email",
+          betterAuthCode: "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL",
+          answers: "email_already_registered",
+        },
+        {
+          path: "/api/auth/sign-up/email",
+          betterAuthCode: "PASSWORD_TOO_LONG",
+          answers: "identity_password_rejected",
+        },
+        {
+          path: "/api/auth/reset-password",
+          betterAuthCode: "PASSWORD_TOO_SHORT",
+          answers: "identity_password_rejected",
+        },
+        {
+          path: "/api/auth/reset-password",
+          betterAuthCode: "PASSWORD_TOO_LONG",
+          answers: "identity_password_rejected",
+        },
+        {
+          path: "/api/auth/verify-email",
+          betterAuthCode: "TOKEN_EXPIRED",
+          answers: "identity_verification_expired",
+        },
+        {
+          path: "/api/auth/passkey/verify-registration",
+          betterAuthCode: "FAILED_TO_VERIFY_REGISTRATION",
+          answers: "identity_passkey_ceremony_failed",
+        },
+        {
+          path: "/api/auth/two-factor/verify-totp",
+          betterAuthCode: "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE",
+          answers: "identity_mfa_locked_out",
+        },
+      ])(
+        "answers $betterAuthCode on $path with $answers",
+        async ({ path, betterAuthCode, answers }) => {
+          const body = await translate({ code: betterAuthCode, path }).then(
+            bodyOf,
+          );
+
+          expect(body.error).toBe(answers);
+          // The wire message is the code, never the endpoint's own sentence:
+          // the words come from the registry keyed by it.
+          expect(readHandledError(body)?.code).toBe(answers);
+        },
+      );
+    });
+  });
+
+  describe("given a confirmation link that ran out of time", () => {
+    describe("when it is opened", () => {
+      /**
+       * The verification pair is the one place in the table where expiry is
+       * deliberately NOT collapsed into its invalid sibling, and the reset
+       * pair right above is where it deliberately IS. Collapsing this one
+       * would cost the screen the only thing it can offer somebody holding a
+       * dead confirmation link — a fresh one — and it would read as an
+       * ordinary refusal on the way out.
+       */
+      /** @scenario "An expired verification link offers a resend, nothing else" */
+      it("says the link expired rather than that it was never good", async () => {
+        const [expired, invalid] = await Promise.all([
+          translate({
+            code: "TOKEN_EXPIRED",
+            path: "/api/auth/verify-email",
+          }).then(bodyOf),
+          translate({
+            code: "INVALID_TOKEN",
+            path: "/api/auth/verify-email",
+          }).then(bodyOf),
+        ]);
+
+        expect(expired.error).toBe("identity_verification_expired");
+        expect(invalid.error).toBe("identity_verification_invalid");
+        expect(expired).not.toEqual(invalid);
+      });
+    });
+  });
 });
