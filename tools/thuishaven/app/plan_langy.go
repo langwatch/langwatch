@@ -138,6 +138,7 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 		Name: "langyagent", Dir: opts.RepoRoot, Color: palette[6],
 		Shell: goServiceShell(opts.RepoRoot, "langyagent", opts.ShouldGoWatch),
 		Env: append(append([]string{}, base...),
+			domain.LaneEnv("langyagent"),
 			fmt.Sprintf("PORT=%d", port),
 			"SESSIONS_ROOT="+filepath.Join(laRoot, "sessions"),
 			"LANGY_WORKSPACE_ROOT="+filepath.Join(laRoot, "workspace"),

@@ -1,9 +1,11 @@
 import type { Logger, LogLevel, LogType } from "vite";
 
 /**
- * The dev server's lane, printed in the same shape the four Node/Go lanes
- * use instead of Vite's own two-digit clock and `[vite]` tag. Also collapses
- * a proxy failure to one line instead of a stack repeated per request.
+ * The dev server's lane, writing the same structured JSON every other lane
+ * writes (dev/docs/best_practices/dev-log-format.md) instead of Vite's own
+ * two-digit clock and `[vite]` tag - haven and `pnpm dev` render it for a
+ * person, same as any other lane. Also collapses a proxy failure to one line
+ * instead of a stack repeated per request.
  */
 
 export interface DevLogSink {
@@ -16,21 +18,44 @@ const CONSOLE_SINK: DevLogSink = {
   err: (line) => process.stderr.write(`${line}\n`),
 };
 
-/** `HH:mm:ss.SSS`, in local time, with no date. A dev terminal is always today. */
-export function timeOfDay(at: Date): string {
-  const pad = (value: number, width = 2) => String(value).padStart(width, "0");
-  return `${pad(at.getHours())}:${pad(at.getMinutes())}:${pad(at.getSeconds())}.${pad(
-    at.getMilliseconds(),
-    3,
-  )}`;
+/** The process identity every record carries, per the shared format. */
+const SERVICE_NAME = "langwatch-ui";
+
+/** A literal `[vite]` tag, when a message still carries one of its own. */
+const VITE_TAG = /^\[vite\]\s*/i;
+
+/**
+ * Built rather than written as a literal: the escape this matches is a
+ * control character, which a regex literal may not carry.
+ */
+const ANSI_COLOUR = new RegExp(String.fromCharCode(27) + "\\[[0-9;]*m", "g");
+
+function stripAnsi(value: string): string {
+  return value.replace(ANSI_COLOUR, "");
+}
+
+/** One record in the shared shape every lane writes. */
+export interface DevLogRecord {
+  time: string;
+  level: LogType;
+  msg: string;
+  service: string;
+  /** The full multi-line trace, as one string with `\n` in it. */
+  stack?: string;
 }
 
 /**
- * One line, in the shape every lane prints — a multi-line message (Vite's
- * startup banner, a stack) keeps its own shape after the first line rather
- * than being prefixed line by line.
+ * One record, in the shape every lane writes - a multi-line message (Vite's
+ * startup banner, a stack) becomes ONE object rather than one per line: for
+ * an ordinary message the lines rejoin with `\n` inside `msg`; for an error
+ * the first line is the message and the rest becomes `stack`, the same split
+ * a Node/Go lane reports an error with.
+ *
+ * `null` for a message that is blank once Vite's own tag and colour are
+ * stripped - Vite logs empty strings purely for terminal spacing, and a
+ * blank line carries nothing a structured record can hold.
  */
-export function devLogLine({
+export function devLogRecord({
   level,
   message,
   at,
@@ -38,10 +63,29 @@ export function devLogLine({
   level: LogType;
   message: string;
   at: Date;
-}): string {
-  const [first = "", ...rest] = message.split("\n");
-  const head = `[${timeOfDay(at)}] ${level.toUpperCase()} (vite): ${first}`;
-  return [head, ...rest].join("\n");
+}): DevLogRecord | null {
+  const lines = stripAnsi(message)
+    .split("\n")
+    .map((line) => line.replace(VITE_TAG, ""));
+  if (lines.every((line) => line.trim() === "")) return null;
+
+  const [first = "", ...rest] = lines;
+  const record: DevLogRecord = {
+    time: at.toISOString(),
+    level,
+    msg: level === "error" && rest.length > 0 ? first : lines.join("\n"),
+    service: SERVICE_NAME,
+  };
+  if (level === "error" && rest.length > 0) {
+    record.stack = rest.join("\n");
+  }
+  return record;
+}
+
+/** One JSON line, or `null` for a blank message - see {@link devLogRecord}. */
+export function devLogLine(options: { level: LogType; message: string; at: Date }): string | null {
+  const record = devLogRecord(options);
+  return record ? JSON.stringify(record) : null;
 }
 
 /** Vite's proxy failures, whichever of its three shapes they arrive in. */
@@ -50,17 +94,6 @@ function proxyFailurePath(message: string): string | null {
   if (http) return http[1] ?? "";
   if (/\bws proxy (socket )?error\b/.test(stripAnsi(message))) return "the websocket upgrade";
   return null;
-}
-
-/**
- * Built rather than written as a literal: the escape this matches is a
- * control character, which a regex literal may not carry. Strips Vite's own
- * ANSI colour before the proxy-failure pattern match runs.
- */
-const ANSI_COLOUR = new RegExp(String.fromCharCode(27) + "\\[[0-9;]*m", "g");
-
-function stripAnsi(value: string): string {
-  return value.replace(ANSI_COLOUR, "");
 }
 
 export interface DevLoggerOptions {
@@ -88,6 +121,7 @@ export function createDevLogger(options: DevLoggerOptions): Logger {
 
   const write = (level: LogType, message: string): void => {
     const line = devLogLine({ level, message, at: new Date(now()) });
+    if (line === null) return;
     if (level === "error") sink.err(line);
     else sink.out(line);
   };

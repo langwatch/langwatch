@@ -106,6 +106,13 @@ function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
   };
 }
 
+// One shape for every lane in a `pnpm dev` terminal, and the place the
+// proxy's failures are collapsed to one line - see ./vite/dev-logging. Built
+// once at module scope so the two startup diagnostics below can write
+// through it too, rather than through a bare `console.log` that arrives
+// under haven with none of the shared shape.
+const devLogger = createDevLogger({ proxyTarget: API_TARGET });
+
 export default defineConfig(async ({ command }): Promise<UserConfig> => {
   const devHttpsCredentials = loadDevHttpsCredentials();
   // The dev server is its own public address. `dev-stack.sh` aligns BASE_HOST
@@ -124,18 +131,18 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
   // TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`).
   if (command === "serve") {
     if (USE_HTTP2) {
-      console.log(
+      devLogger.info(
         `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
       );
     } else {
-      console.log("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
+      devLogger.info("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
     }
   }
 
   return {
     // One shape for every lane in a `pnpm dev` terminal, and the place the
     // proxy's failures are collapsed to one line — see ./vite/dev-logging.
-    customLogger: createDevLogger({ proxyTarget: API_TARGET }),
+    customLogger: devLogger,
     plugins: [
       react(),
       patchObjectInspectBrowserStub(),

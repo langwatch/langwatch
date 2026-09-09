@@ -7,6 +7,52 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
+// The Makefile's `service`/`service-watch` targets pipe a Go service's own
+// JSON through their own copy of dev/scripts/log-render.mjs unless
+// LANGWATCH_LANE names a lane already rendering it (Makefile:141) - the same
+// signal dev/scripts/lane.sh sets for the plain `pnpm dev` path. Every lane
+// haven supervises already sits behind haven's own renderer, so a child
+// missing this line gets its lines rendered twice: once by the nested
+// script, once by haven.
+//
+// @scenario "A supervised lane is never rendered twice"
+func TestEveryLaneCarriesItsOwnName(t *testing.T) {
+	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+	repo := t.TempDir()
+	st := domain.Stack{
+		Slug: "test",
+		Services: []domain.Service{
+			{Name: "gateway", Port: 44003},
+			{Name: "nlp", Port: 44001},
+			{Name: "idp", Port: 44010},
+		},
+		LangyTier: domain.LangyTierHostUnsafe,
+	}
+	children := o.planChildren(st, PlanOptions{
+		RepoRoot: repo,
+		Selection: domain.Selection{
+			Gateway: true, NLP: true, IDP: true,
+			DesignSystem: true, MailRoom: true, Langy: true,
+		},
+	}, repo, "")
+
+	if len(children) == 0 {
+		t.Fatal("expected at least one planned lane")
+	}
+	for _, c := range children {
+		want := domain.LaneEnv(c.Name)
+		found := false
+		for _, e := range c.Env {
+			if e == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("lane %q env %v is missing %q; a nested `make service` would render its own JSON a second time", c.Name, c.Env, want)
+		}
+	}
+}
+
 // A red prefix reads as an error even on an ordinary info log, so red (ANSI 31)
 // is reserved for genuine failures and no supervised lane may use it. The workers
 // lane in particular used to be red; this pins it (and every other lane) green-or-

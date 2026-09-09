@@ -270,6 +270,19 @@ func (s Stack) observabilityEnv() []string {
 	return env
 }
 
+// LaneEnv is the line that tells one supervised child which lane it is. It is
+// the same signal dev/scripts/lane.sh sets for the plain `pnpm dev` path
+// (LANGWATCH_LANE) and that the Makefile's `service`/`service-watch` targets
+// check before piping a Go service's own JSON through their own copy of
+// dev/scripts/log-render.mjs (Makefile:141): a renderer is already in front of
+// every lane haven supervises, so a nested one must not run too, or the same
+// line prints twice - once rendered by the launcher script, once by haven.
+// Every child gets it, not only the Go lanes that read it today, so the
+// invariant holds for whatever a future recipe checks.
+func LaneEnv(lane string) string {
+	return "LANGWATCH_LANE=" + lane
+}
+
 // EnvMap turns KEY=VALUE lines into a map, for callers that need to look a
 // value up or render the set as an object rather than replay it into a child.
 func EnvMap(lines []string) map[string]string {

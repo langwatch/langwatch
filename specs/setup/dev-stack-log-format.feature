@@ -61,11 +61,12 @@ Feature: One log format across every dev lane
   # --- The Vite lane ---
 
   @unit
-  Scenario: The dev server prints the same shape as everything else
+  Scenario: The browser lane's dev server writes the shared format
     Given the browser application's dev server logging
     When it writes a line
-    Then it reads as a bracketed time, a level, the scope "vite" and a message
+    Then it is the same structured JSON every other lane writes
     And no twelve-hour clock and no "[vite]" tag are on it
+    And a multi-line message becomes one record, not one per line
 
   @unit
   Scenario: What the browser reports through the dev server still arrives
@@ -107,6 +108,20 @@ Feature: One log format across every dev lane
     When it writes a line to the console
     Then the environment, service name and version are not on it
     And a machine-readable line still carries them, because nothing prefixes those
+
+  # haven's `service`/`service-watch` Makefile targets pipe a Go service's own
+  # JSON through their own copy of dev/scripts/log-render.mjs, for someone
+  # running it bare with no renderer in front of them. haven IS the renderer
+  # once it supervises the lane - the same "a renderer is already in front of
+  # me" signal dev/scripts/lane.sh sets for the `pnpm dev` path - so a child
+  # haven supervises must say so, or its own line is rendered twice: once by
+  # the nested script, once by haven.
+  @unit
+  Scenario: A supervised lane is never rendered twice
+    Given a Go lane haven supervises
+    When it writes a line
+    Then haven's overlay told it a renderer is already in front of it
+    And no launcher script renders that line a second time on the way
 
   # --- The vendored driver ---
 

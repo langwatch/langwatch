@@ -28,8 +28,12 @@ One JSON object per line, on stdout:
 | `stack`   | on error | the full multi-line trace, as one string with `\n` in it |
 | anything else | — | the line's own fields |
 
-Vite is not a logger and is left alone; its lines fall through as passthrough
-(see below). Node's own crash output and the lane wrappers do the same.
+Vite writes the same shape too, through a `customLogger` (`apps/ui/vite/dev-logging.ts`)
+that replaces its own two-digit clock and `[vite]` tag: a multi-line message  - 
+the startup banner, a stack - becomes one record, its lines rejoined with `\n`
+in `msg` (or, for an error, split into `msg` plus `stack`), rather than one
+record per line. Node's own crash output and the lane wrappers still fall
+through as passthrough (see below).
 
 Where it is configured:
 

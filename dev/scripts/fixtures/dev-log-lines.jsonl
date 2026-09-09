@@ -6,6 +6,7 @@
 {"time":"2026-09-07T11:10:49.000Z","level":"ERROR","msg":"uppercase level still reads","service":"langwatch-api"}
 {"time":"2026-09-07T11:10:49.500Z","level":30,"msg":"numeric pino level still reads","service":"langwatch-api"}
 {"time":"2026-09-07T11:10:50.000Z","level":"info","msg":"quoting","service":"langwatch-api","note":"two words","empty":"","url":"https://app.langwatch.localhost"}
+{"time":"2026-09-07T11:10:50.500Z","level":"info","msg":"VITE v8.1.2  ready in 193 ms","service":"langwatch-ui"}
     at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
 exited — restarting in 1s
 [23:42:54.604] INFO (vite): server restarted.

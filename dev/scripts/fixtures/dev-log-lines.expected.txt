@@ -9,6 +9,7 @@
 11:10:49.000  api        error  uppercase level still reads
 11:10:49.500  api        info   numeric pino level still reads
 11:10:50.000  api        info   quoting  empty=""  note="two words"  url=https://app.langwatch.localhost
+11:10:50.500  api        info   VITE v8.1.2  ready in 193 ms
 11:10:51.000  api                   at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
 11:10:51.000  api               exited — restarting in 1s
 11:10:51.000  api               [23:42:54.604] INFO (vite): server restarted.

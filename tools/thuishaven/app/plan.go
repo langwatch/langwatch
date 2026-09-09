@@ -69,14 +69,14 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	// `import "dotenv/config"`. Together with the `quiet: true` passed in
 	// server.mts / vite.config.ts, this keeps every Node lane starting on real
 	// logs — matching the Go services' clean startup.
-	nodeEnv := func() []string {
+	nodeEnv := func(lane string) []string {
 		return append(append([]string{}, base...),
-			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true")
+			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane))
 	}
 	out = append(out, Child{
 		Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath("ui"),
 		Shell: "pnpm -s --filter " + UIPackage + " dev",
-		Env:   nodeEnv(),
+		Env:   nodeEnv("ui"),
 		// Hold the browser application (vite) until the API answers /api/health.
 		// It proxies /api to the API lane, which is a much bigger process and
 		// boots slower; a browser that loads the SPA before the API is up gets
@@ -89,7 +89,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	// cannot answer for two listeners in one process, so each has its own
 	// address variable.
 	var goServices []string
-	goEnv := append([]string{}, base...)
+	goEnv := append(append([]string{}, base...), domain.LaneEnv(GoLane))
 	if opts.Selection.Gateway {
 		goServices = append(goServices, "aigateway")
 		goEnv = append(goEnv, fmt.Sprintf("%s=:%d", GatewayAddrEnv, port("gateway")))
@@ -106,7 +106,8 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		})
 	}
 	if opts.Selection.IDP {
-		idpEnv := append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("idp")))
+		idpEnv := append(append([]string{}, base...),
+			fmt.Sprintf("SERVER_ADDR=:%d", port("idp")), domain.LaneEnv("idp"))
 		// The issuer/metadata URLs the simulator publishes must be the routed
 		// hostname, not loopback — the browser follows them during a login.
 		for _, svc := range st.Services {
@@ -140,7 +141,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			Name: domain.DesignSystemService, Dir: repoDir, Color: palette[8], LogPath: logPath(domain.DesignSystemService),
 			Shell: fmt.Sprintf("pnpm -s --filter %s storybook --port %d --ci",
 				DesignSystemPackage, port(domain.DesignSystemService)),
-			Env: nodeEnv(),
+			Env: nodeEnv(domain.DesignSystemService),
 		})
 	}
 	if opts.Selection.MailRoom {
@@ -152,7 +153,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 			// this machine, and the proxy and the port probe both dial IPv4.
 			Shell: fmt.Sprintf("pnpm -s --filter %s dev --host 127.0.0.1 --port %d --strictPort",
 				MailPackage, port(domain.MailRoomService)),
-			Env: nodeEnv(),
+			Env: nodeEnv(domain.MailRoomService),
 		})
 	}
 	if opts.Selection.Langy {
@@ -174,7 +175,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		// separately.
 		Name: BackendLane, Dir: repoDir, Color: palette[0], LogPath: logPath(BackendLane),
 		Shell: "pnpm -s --filter " + BackendPackage + " dev",
-		Env:   nodeEnv(),
+		Env:   nodeEnv(BackendLane),
 	})
 	return out
 }

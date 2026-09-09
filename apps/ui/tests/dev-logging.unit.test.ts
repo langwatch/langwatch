@@ -6,9 +6,10 @@
 
 import { describe, expect, it } from "vitest";
 
-import { createDevLogger, devLogLine, timeOfDay } from "../vite/dev-logging";
+import { createDevLogger, devLogLine, devLogRecord } from "../vite/dev-logging";
 
 const AT = new Date(2026, 8, 3, 13, 10, 46, 108);
+const AT_ISO = AT.toISOString();
 
 /** A logger writing into arrays, and the clock it reads. */
 function testLogger(options: { quietMs?: number } = {}) {
@@ -33,33 +34,77 @@ function testLogger(options: { quietMs?: number } = {}) {
 
 describe("given the browser application's dev server logging", () => {
   describe("when it writes a line", () => {
-    /** @scenario "The dev server prints the same shape as everything else" */
-    it("reads as a time, a level, the scope and a message", () => {
-      expect(devLogLine({ level: "info", message: "ready in 812 ms", at: AT })).toBe(
-        "[13:10:46.108] INFO (vite): ready in 812 ms",
-      );
-      expect(devLogLine({ level: "warn", message: "a warning", at: AT })).toBe(
-        "[13:10:46.108] WARN (vite): a warning",
-      );
-      expect(devLogLine({ level: "error", message: "a failure", at: AT })).toBe(
-        "[13:10:46.108] ERROR (vite): a failure",
-      );
+    /** @scenario "The browser lane's dev server writes the shared format" */
+    it("is the same structured JSON every other lane writes", () => {
+      expect(devLogRecord({ level: "info", message: "ready in 812 ms", at: AT })).toEqual({
+        time: AT_ISO,
+        level: "info",
+        msg: "ready in 812 ms",
+        service: "langwatch-ui",
+      });
+      expect(devLogRecord({ level: "warn", message: "a warning", at: AT })).toEqual({
+        time: AT_ISO,
+        level: "warn",
+        msg: "a warning",
+        service: "langwatch-ui",
+      });
+      expect(devLogRecord({ level: "error", message: "a failure", at: AT })).toEqual({
+        time: AT_ISO,
+        level: "error",
+        msg: "a failure",
+        service: "langwatch-ui",
+      });
     });
 
-    /** @scenario "The dev server prints the same shape as everything else" */
+    /** @scenario "The browser lane's dev server writes the shared format" */
     it("carries no twelve-hour clock and no bracketed lane name", () => {
-      const line = devLogLine({ level: "info", message: "ready", at: AT });
+      const line = devLogLine({ level: "info", message: "[vite] ready", at: AT });
 
+      expect(line).not.toBeNull();
       expect(line).not.toMatch(/AM|PM/);
       expect(line).not.toContain("[vite]");
-      expect(timeOfDay(AT)).toBe("13:10:46.108");
+      expect(JSON.parse(line as string).msg).toBe("ready");
     });
 
-    /** @scenario "The dev server prints the same shape as everything else" */
-    it("leaves the rest of a multi-line message as it was written", () => {
-      expect(devLogLine({ level: "info", message: "first\n  second", at: AT })).toBe(
-        "[13:10:46.108] INFO (vite): first\n  second",
-      );
+    /** @scenario "The browser lane's dev server writes the shared format" */
+    it("strips Vite's own ANSI colour from the message", () => {
+      const record = devLogRecord({
+        level: "info",
+        message: "[32mready[0m in 812 ms",
+        at: AT,
+      });
+
+      expect(record?.msg).toBe("ready in 812 ms");
+    });
+
+    /** @scenario "The browser lane's dev server writes the shared format" */
+    it("joins a multi-line message into one record's msg, not one line per record", () => {
+      expect(devLogRecord({ level: "info", message: "first\n  second", at: AT })).toEqual({
+        time: AT_ISO,
+        level: "info",
+        msg: "first\n  second",
+        service: "langwatch-ui",
+      });
+    });
+
+    /** @scenario "The browser lane's dev server writes the shared format" */
+    it("splits a multi-line error into msg and stack", () => {
+      expect(
+        devLogRecord({ level: "error", message: "boom\n    at run (job.ts:1:1)", at: AT }),
+      ).toEqual({
+        time: AT_ISO,
+        level: "error",
+        msg: "boom",
+        service: "langwatch-ui",
+        stack: "    at run (job.ts:1:1)",
+      });
+    });
+
+    /** @scenario "The browser lane's dev server writes the shared format" */
+    it("drops a blank-only message rather than writing an empty record", () => {
+      expect(devLogRecord({ level: "info", message: "", at: AT })).toBeNull();
+      expect(devLogRecord({ level: "info", message: "\n  \n", at: AT })).toBeNull();
+      expect(devLogLine({ level: "info", message: "   ", at: AT })).toBeNull();
     });
   });
 });
@@ -72,9 +117,13 @@ describe("given the browser relaying an error through the dev server", () => {
 
       logger.error("(client) [console.error] something the page said");
 
-      expect(err).toEqual([
-        "[13:10:46.108] ERROR (vite): (client) [console.error] something the page said",
-      ]);
+      expect(err).toHaveLength(1);
+      expect(JSON.parse(err[0] as string)).toEqual({
+        time: AT_ISO,
+        level: "error",
+        msg: "(client) [console.error] something the page said",
+        service: "langwatch-ui",
+      });
     });
   });
 });
@@ -88,25 +137,27 @@ describe("given the api lane is not listening", () => {
       for (let request = 0; request < 20; request += 1) {
         advance(10);
         logger.error(
-          `\u001b[31mhttp proxy error: /api/trpc/health\u001b[0m\nAggregateError\n    at internalConnectMultiple`,
+          `[31mhttp proxy error: /api/trpc/health[0m\nAggregateError\n    at internalConnectMultiple`,
           { error: new Error("connect ECONNREFUSED 127.0.0.1:6560") },
         );
       }
 
-      expect(err).toEqual([
-        "[13:10:46.118] ERROR (vite): api not reachable at http://localhost:6560 for /api/trpc/health",
-      ]);
+      expect(err).toHaveLength(1);
+      expect(JSON.parse(err[0] as string).msg).toBe(
+        "api not reachable at http://localhost:6560 for /api/trpc/health",
+      );
     });
 
     /** @scenario "An unreachable API is one line, not a stack trace per request" */
     it("collapses a failed websocket upgrade the same way", () => {
       const { logger, err } = testLogger();
 
-      logger.error("\u001b[31mws proxy error:\u001b[0m\nError: connect ECONNREFUSED");
+      logger.error("[31mws proxy error:[0m\nError: connect ECONNREFUSED");
 
-      expect(err).toEqual([
-        "[13:10:46.108] ERROR (vite): api not reachable at http://localhost:6560 for the websocket upgrade",
-      ]);
+      expect(err).toHaveLength(1);
+      expect(JSON.parse(err[0] as string).msg).toBe(
+        "api not reachable at http://localhost:6560 for the websocket upgrade",
+      );
     });
   });
 });
@@ -123,9 +174,9 @@ describe("given the api lane has been unreachable for some time", () => {
       advance(2);
       logger.error("http proxy error: /api/three\nstack");
 
-      expect(err).toEqual([
-        "[13:10:46.108] ERROR (vite): api not reachable at http://localhost:6560 for /api/one",
-        "[13:10:51.109] ERROR (vite): api not reachable at http://localhost:6560 for /api/three",
+      expect(err.map((line) => JSON.parse(line).msg)).toEqual([
+        "api not reachable at http://localhost:6560 for /api/one",
+        "api not reachable at http://localhost:6560 for /api/three",
       ]);
     });
   });
@@ -139,7 +190,14 @@ describe("given an error that is not the proxy's", () => {
 
       logger.error("Internal server error\n    at somewhere");
 
-      expect(err).toEqual(["[13:10:46.108] ERROR (vite): Internal server error\n    at somewhere"]);
+      expect(err).toHaveLength(1);
+      expect(JSON.parse(err[0] as string)).toEqual({
+        time: AT_ISO,
+        level: "error",
+        msg: "Internal server error",
+        service: "langwatch-ui",
+        stack: "    at somewhere",
+      });
     });
   });
 });
