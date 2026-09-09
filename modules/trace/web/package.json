@@ -198,7 +198,7 @@
   },
   "scripts": {
     "test:unit": "vitest run",
-    "typecheck": "pnpm -w typecheck:declarations --project modules/trace/web/tsconfig.json && tsc --noEmit"
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",

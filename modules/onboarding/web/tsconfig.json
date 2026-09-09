@@ -29,12 +29,6 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-host/tsconfig.build.json"
-    },
-    {
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
@@ -42,6 +36,12 @@
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-host/tsconfig.build.json"
     }
   ]
 }

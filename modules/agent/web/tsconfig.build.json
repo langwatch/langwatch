@@ -32,8 +32,6 @@
     "**/testing.tsx"
   ],
   "references": [
-    { "path": "../../../packages/handled-error/tsconfig.build.json" },
-    { "path": "../../scenario/contract/tsconfig.build.json" },
     {
       "path": "../contract/tsconfig.build.json"
     },
@@ -42,6 +40,12 @@
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

@@ -207,7 +207,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project modules/workflow/web/tsconfig.json && tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

@@ -14,5 +14,9 @@
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
 
-  "references": []
+  "references": [
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    }
+  ]
 }

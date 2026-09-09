@@ -26,7 +26,9 @@
     "**/testing.tsx"
   ],
   "references": [
-    { "path": "../../agent/contract/tsconfig.build.json" },
+    {
+      "path": "../../agent/contract/tsconfig.build.json"
+    },
     {
       "path": "../../../packages/api/tsconfig.build.json"
     },
@@ -50,6 +52,9 @@
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../scenario/contract/tsconfig.build.json"

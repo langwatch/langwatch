@@ -35,9 +35,6 @@
       "path": "../../governance/contract/tsconfig.build.json"
     },
     {
-      "path": "../../governance/server/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/plan-gate/tsconfig.build.json"
     },
     {
@@ -62,10 +59,16 @@
       "path": "../../../../packages/prisma-client/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../governance/server/tsconfig.build.json"
     }
   ]
 }

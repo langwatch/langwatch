@@ -20,7 +20,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project modules/coding-agent/contract/tsconfig.json && tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

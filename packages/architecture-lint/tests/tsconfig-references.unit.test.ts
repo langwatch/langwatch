@@ -103,6 +103,58 @@ describe("given a workspace whose packages declare their dependencies", () => {
       ]);
     });
   });
+
+  describe("when the build config emits JavaScript rather than declarations", () => {
+    beforeEach(() => {
+      packageFixture("packages/mail", "@langwatch/mail", {
+        dependencies: { "@langwatch/time": "workspace:*" },
+      });
+      write("packages/mail/tsconfig.build.json", {
+        compilerOptions: { declaration: false },
+        references: [],
+      });
+      write("packages/mail/tsconfig.declarations.json", { references: [] });
+      packageFixture("packages/api", "@langwatch/api", {
+        dependencies: { "@langwatch/mail": "workspace:*" },
+      });
+    });
+
+    it("makes the package's declarations solution the producer consumers reference", () => {
+      expect(referencesOf("packages/api/tsconfig.build.json")).toEqual([
+        "../mail/tsconfig.declarations.json",
+      ]);
+    });
+
+    it("puts that solution first in the package's own consumer config", () => {
+      expect(referencesOf("packages/mail/tsconfig.json")).toEqual([
+        "tsconfig.declarations.json",
+        "../time/tsconfig.build.json",
+      ]);
+    });
+  });
+
+  describe("when an application owns a declarations solution and no build config", () => {
+    beforeEach(() => {
+      write("packages/platform-api/package.json", {
+        name: "@langwatch/platform-api",
+        dependencies: { "@langwatch/time": "workspace:*" },
+      });
+      write("packages/platform-api/tsconfig.json", {});
+      write("packages/platform-api/tsconfig.declarations.json", { references: [] });
+    });
+
+    it("derives the solution's references", () => {
+      expect(referencesOf("packages/platform-api/tsconfig.declarations.json")).toEqual([
+        "../time/tsconfig.build.json",
+      ]);
+    });
+
+    it("leaves the application's own tsconfig.json out of the derivation", () => {
+      const files = deriveWorkspaceReferences(root).map((project) => project.file);
+
+      expect(files).not.toContain(join(root, "packages/platform-api/tsconfig.json"));
+    });
+  });
 });
 
 describe("given the cyclic web group", () => {

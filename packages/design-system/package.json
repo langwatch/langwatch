@@ -274,7 +274,7 @@
   "scripts": {
     "storybook": "storybook dev --port 6006",
     "build:storybook": "storybook build",
-    "typecheck": "pnpm -w typecheck:declarations --project packages/design-system/tsconfig.json && tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

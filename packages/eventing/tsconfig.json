@@ -32,10 +32,10 @@
       "path": "../prisma-client/tsconfig.build.json"
     },
     {
-      "path": "../test-harness/tsconfig.build.json"
+      "path": "../time/tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
+      "path": "../test-harness/tsconfig.build.json"
     }
   ]
 }

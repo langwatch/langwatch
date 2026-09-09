@@ -106,6 +106,7 @@ for (const { path, entry } of undeducible) {
 console.log(
   `${changed.length} of ${projects.length} tsconfig files differ; ${undeducible.length} undeducible entries; ${driftedScripts.length} typecheck scripts spell a path.`,
 );
-if (!write && (changed.length > 0 || undeducible.length > 0 || driftedScripts.length > 0)) {
+const clean = changed.length === 0 && undeducible.length === 0 && driftedScripts.length === 0;
+if (!write && !clean) {
   process.exitCode = 1;
 }

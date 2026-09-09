@@ -20,30 +20,6 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/eventing/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/observability/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/prisma-client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/task/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/test-harness/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
       "path": "../../api-key/contract/tsconfig.build.json"
     },
     {
@@ -53,7 +29,16 @@
       "path": "../../evaluator/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
       "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../../langy/contract/tsconfig.build.json"
@@ -65,16 +50,34 @@
       "path": "../../monitor/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
       "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/task/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

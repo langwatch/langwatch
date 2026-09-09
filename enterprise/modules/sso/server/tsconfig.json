@@ -23,7 +23,7 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/auth/contract/tsconfig.build.json"
+      "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
     },
     {
       "path": "../../licensing/contract/tsconfig.build.json"
@@ -38,13 +38,16 @@
       "path": "../../../../modules/ops/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
+      "path": "../../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/runtime-composition/tsconfig.build.json"
+      "path": "../../../../modules/auth/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

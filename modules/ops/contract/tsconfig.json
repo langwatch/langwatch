@@ -19,22 +19,25 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/system-migrations/tsconfig.build.json"
-    },
-    {
-      "path": "../../project/contract/tsconfig.build.json"
     },
     {
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/system-migrations/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

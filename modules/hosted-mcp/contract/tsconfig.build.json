@@ -13,5 +13,9 @@
   },
   "files": ["./src/index.ts"],
   "include": ["src/**/*.ts"],
-  "references": [{ "path": "../../../packages/runtime-composition/tsconfig.build.json" }]
+  "references": [
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    }
+  ]
 }

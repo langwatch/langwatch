@@ -39,10 +39,10 @@
       "path": "../../organization/contract/tsconfig.build.json"
     },
     {
-      "path": "../../project/contract/tsconfig.build.json"
+      "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/prisma-client/tsconfig.build.json"
+      "path": "../../project/contract/tsconfig.build.json"
     },
     {
       "path": "../../secret/server/tsconfig.build.json"

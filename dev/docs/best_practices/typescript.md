@@ -80,7 +80,15 @@ its own `tsconfig.build.json`, or the group solution when it belongs to the
 cyclic web group; `tsconfig.build.json` references one producer per workspace
 `dependencies` entry, sorted by dependency name; `tsconfig.json` references its
 own producer first, then those, then the `devDependencies` producers; and
-`tsconfig.declarations.json` references both dependency kinds. An entry the
+`tsconfig.declarations.json` references both dependency kinds. Three
+consequences of those rules are worth naming: a build config that emits
+JavaScript rather than declarations (`declaration: false`, as `@langwatch/mail`
+does for its `.tsx` templates) is not the producer and is not part of the
+graph, so the package's `tsconfig.declarations.json` is what consumers
+reference; an application, which owns a declarations solution and no build
+config, carries its references there and nowhere else; and because references
+may not form a cycle while package dependencies may, one edge of each cycle is
+dropped, the first whose removal leaves the whole graph acyclic. An entry the
 rules cannot derive is kept only when the same file records it under
 `langwatchExtraReferences`, so a hand exception states itself. Adding a
 dependency and running the command is the whole ceremony; `--scripts` also

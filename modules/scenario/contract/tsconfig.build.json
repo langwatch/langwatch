@@ -26,7 +26,9 @@
     "**/testing.tsx"
   ],
   "references": [
-    { "path": "../../agent/contract/tsconfig.build.json" },
+    {
+      "path": "../../agent/contract/tsconfig.build.json"
+    },
     {
       "path": "../../automation/contract/tsconfig.build.json"
     },
@@ -35,6 +37,9 @@
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     }
   ]
 }

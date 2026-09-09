@@ -153,6 +153,79 @@ function unique(references: readonly string[]): string[] {
   return [...new Set(references)];
 }
 
+/**
+ * The project a consumer references to get this package's declarations. It is
+ * the build config, unless that config emits JavaScript only (`declaration:
+ * false`, as `@langwatch/mail` does for its `.tsx` templates), in which case
+ * the package's `tsconfig.declarations.json` is the producer instead.
+ */
+function producerFile(directory: string): string | undefined {
+  const build = join(directory, "tsconfig.build.json");
+  if (!existsSync(build)) return void 0;
+
+  const options = readJsonc(build).compilerOptions;
+  const emits = (options as { declaration?: unknown } | undefined)?.declaration !== false;
+  if (emits) return build;
+
+  const declarations = join(directory, "tsconfig.declarations.json");
+
+  return existsSync(declarations) ? declarations : void 0;
+}
+
+function firstCycle(
+  edges: ReadonlyMap<string, readonly string[]>,
+  dropped: ReadonlySet<string>,
+): string[] | undefined {
+  const done = new Set<string>();
+  const path: string[] = [];
+  const onPath = new Set<string>();
+
+  const walk = (node: string): string[] | undefined => {
+    if (onPath.has(node)) return [...path.slice(path.indexOf(node)), node];
+    if (done.has(node)) return void 0;
+
+    path.push(node);
+    onPath.add(node);
+    for (const next of edges.get(node) ?? []) {
+      if (dropped.has(`${node}\n${next}`)) continue;
+
+      const cycle = walk(next);
+      if (cycle) return cycle;
+    }
+    path.pop();
+    onPath.delete(node);
+    done.add(node);
+
+    return void 0;
+  };
+
+  for (const node of [...edges.keys()].sort()) {
+    const cycle = walk(node);
+    if (cycle) return cycle;
+  }
+
+  return void 0;
+}
+
+/**
+ * TypeScript project references may not form a cycle, but package dependencies
+ * may: two contracts can each name a type of the other. One edge of each cycle
+ * is dropped - the first, in the cycle's own order, whose removal leaves the
+ * whole graph acyclic, so a cycle through several packages costs one reference.
+ */
+function droppedEdges(edges: ReadonlyMap<string, readonly string[]>): Set<string> {
+  const dropped = new Set<string>();
+  for (let cycle = firstCycle(edges, dropped); cycle; cycle = firstCycle(edges, dropped)) {
+    const candidates = cycle.slice(0, -1).map((node, index) => `${node}\n${cycle[index + 1]}`);
+    const enough = candidates.find(
+      (candidate) => !firstCycle(edges, new Set([...dropped, candidate])),
+    );
+    dropped.add(enough ?? candidates[0] ?? "");
+  }
+
+  return dropped;
+}
+
 export function deriveProjects(
   root: string,
   members: readonly WorkspaceMember[],
@@ -165,41 +238,79 @@ export function deriveProjects(
     const member = byName.get(name);
     if (!member) return void 0;
 
-    const build = join(member.directory, "tsconfig.build.json");
-    if (!existsSync(build)) return void 0;
+    const producer = producerFile(member.directory);
+    if (!producer) return void 0;
     // A group member never references a sibling: the group builds them together.
     if (groupMembers.has(member.directory) && consumerIsMember) return groupSolution;
 
-    return build;
+    return producer;
   };
+
+  const targetsFor = (names: readonly string[], consumerIsMember: boolean): string[] =>
+    names.flatMap((name) => {
+      const producer = producerOf(name, consumerIsMember);
+
+      return producer ? [producer] : [];
+    });
+
+  // The declaration graph as the manifests describe it, the group's own
+  // references included, so a cycle is found wherever it runs.
+  const buildEdges = new Map<string, string[]>();
+  buildEdges.set(
+    groupSolution,
+    existsSync(groupSolution)
+      ? referencePaths(readJsonc(groupSolution), "references").map((path) =>
+          resolve(dirname(groupSolution), path),
+        )
+      : [],
+  );
+  for (const member of members) {
+    const isGroupMember = groupMembers.has(member.directory);
+    const producer = producerFile(member.directory);
+    if (!producer) continue;
+
+    const edges = isGroupMember ? [groupSolution] : targetsFor(member.dependencies, false);
+    buildEdges.set(
+      producer,
+      unique(edges).filter((edge) => edge !== producer),
+    );
+  }
+  const dropped = droppedEdges(buildEdges);
 
   const projects: DerivedProject[] = [];
   for (const member of members) {
     const isGroupMember = groupMembers.has(member.directory);
-    const ownProducer = isGroupMember
-      ? groupSolution
-      : join(member.directory, "tsconfig.build.json");
-    const targets = (names: readonly string[]): string[] =>
-      names.flatMap((name) => {
-        const producer = producerOf(name, isGroupMember);
-
-        return producer ? [producer] : [];
-      });
+    const ownProducer = isGroupMember ? groupSolution : producerFile(member.directory);
+    const targets = (names: readonly string[]): string[] => targetsFor(names, isGroupMember);
 
     // The group compiles its members together, so a member's producer is the group alone.
-    const buildTargets = isGroupMember ? [groupSolution] : targets(member.dependencies);
-    const consumerTargets = unique([
-      ownProducer,
+    const buildTargets = (isGroupMember ? [groupSolution] : targets(member.dependencies)).filter(
+      (target) => !dropped.has(`${producerFile(member.directory) ?? ""}\n${target}`),
+    );
+
+    const dependencyTargets = unique([
       ...targets(member.dependencies),
       ...targets(member.developmentDependencies),
     ]);
 
+    const consumerTargets = unique([...(ownProducer ? [ownProducer] : []), ...dependencyTargets]);
+
+    // An application carries its references in its declarations solution alone:
+    // it owns no build config, and its own tsconfig.json stays a plain project.
+    // A build config that emits JavaScript is not in the declaration graph at
+    // all, so its own references are left as its owner wrote them.
+    const build = join(member.directory, "tsconfig.build.json");
+
     const kinds: ReadonlyArray<{ file: string; targets: string[] }> = [
-      { file: join(member.directory, "tsconfig.build.json"), targets: unique(buildTargets) },
-      { file: join(member.directory, "tsconfig.json"), targets: consumerTargets },
+      ...(ownProducer === build || isGroupMember
+        ? [{ file: build, targets: unique(buildTargets) }]
+        : []),
+      ...(existsSync(build)
+        ? [{ file: join(member.directory, "tsconfig.json"), targets: consumerTargets }]
+        : []),
       {
         file: join(member.directory, "tsconfig.declarations.json"),
-        targets: unique(consumerTargets.filter((target) => target !== ownProducer)),
+        targets: dependencyTargets.filter((target) => target !== ownProducer),
       },
     ];
 
@@ -209,11 +320,14 @@ export function deriveProjects(
       const directory = dirname(kind.file);
       const config = readJsonc(kind.file);
       const extras = referencePaths(config, "langwatchExtraReferences");
+
       const derived = kind.targets
         .filter((target) => target !== kind.file)
         .map((target) => relativeReference(directory, target));
+
       const references = unique([...derived, ...extras.map(normalise)]);
       const current = referencePaths(config, "references").map(normalise);
+
       projects.push({
         file: kind.file,
         references,
@@ -271,12 +385,14 @@ export function renderReferences(text: string, references: readonly string[]): s
   const source = ts.parseJsonText("tsconfig.json", text);
   const property = referencesProperty(source);
   const unit = indentUnitOf(text);
+
   if (property) {
     const start = property.initializer.getStart(source);
     const indent = lineIndentAt(text, property.getStart(source));
 
     return `${text.slice(0, start)}${renderArray(references, indent, unit)}${text.slice(property.initializer.end)}`;
   }
+
   if (references.length === 0) return text;
 
   const closing = text.lastIndexOf("}");

@@ -20,19 +20,22 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/config/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../authz/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../../packages/redaction/tsconfig.build.json"

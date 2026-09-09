@@ -20,19 +20,22 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/config/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/organization/contract/tsconfig.build.json"
+      "path": "../../licensing/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/plans/tsconfig.build.json"
+      "path": "../../../../modules/organization/contract/tsconfig.build.json"
     },
     {
-      "path": "../../licensing/contract/tsconfig.build.json"
+      "path": "../../../../packages/plans/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"

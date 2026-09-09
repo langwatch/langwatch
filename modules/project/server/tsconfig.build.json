@@ -48,6 +48,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
       "path": "../../share/contract/tsconfig.build.json"
     },
     {

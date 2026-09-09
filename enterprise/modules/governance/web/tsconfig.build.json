@@ -26,14 +26,32 @@
     "**/testing.tsx"
   ],
   "references": [
-    { "path": "../../../../packages/api/tsconfig.build.json" },
-    { "path": "../../../../modules/authz/contract/tsconfig.build.json" },
-    { "path": "../../../../modules/authz/web/tsconfig.build.json" },
-    { "path": "../../../../dev/tsconfig.web-declarations.json" },
-    { "path": "../../../../packages/config/tsconfig.build.json" },
-    { "path": "../../../../packages/design-system/tsconfig.build.json" },
-    { "path": "../contract/tsconfig.build.json" },
-    { "path": "../../../../packages/time/tsconfig.build.json" },
-    { "path": "../../../../packages/ui-host/tsconfig.build.json" }
+    {
+      "path": "../../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/authz/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/coding-agent/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/ui-host/tsconfig.build.json"
+    }
   ]
 }

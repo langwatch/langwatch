@@ -32,14 +32,32 @@
     "**/testing.tsx"
   ],
   "references": [
-    { "path": "../../../packages/csv/tsconfig.build.json" },
-    { "path": "../../../packages/design-system/tsconfig.build.json" },
-    { "path": "../../../enterprise/modules/licensing/web/tsconfig.build.json" },
-    { "path": "../../entitlement/contract/tsconfig.build.json" },
-    { "path": "../../identity/contract/tsconfig.build.json" },
-    { "path": "../contract/tsconfig.build.json" },
-    { "path": "../../../packages/api/tsconfig.build.json" },
-    { "path": "../../../packages/time/tsconfig.build.json" },
-    { "path": "../../../packages/ui-host/tsconfig.build.json" }
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/csv/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/licensing/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-host/tsconfig.build.json"
+    }
   ]
 }

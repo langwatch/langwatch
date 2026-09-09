@@ -19,13 +19,7 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../../dev/tsconfig.web-declarations.json"
-    },
-    {
       "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../licensing/web/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/design-system/tsconfig.build.json"
@@ -35,6 +29,9 @@
     },
     {
       "path": "../../licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../licensing/web/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/entitlement/contract/tsconfig.build.json"

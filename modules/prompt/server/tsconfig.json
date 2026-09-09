@@ -42,10 +42,10 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../workflow/contract/tsconfig.build.json"
+      "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/time/tsconfig.build.json"
+      "path": "../../workflow/contract/tsconfig.build.json"
     }
   ]
 }

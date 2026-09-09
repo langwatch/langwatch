@@ -17,7 +17,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project packages/actor/tsconfig.json && tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run"
   },
   "dependencies": {

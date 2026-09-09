@@ -44,6 +44,12 @@
     },
     {
       "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
     }
   ]
 }

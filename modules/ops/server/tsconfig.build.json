@@ -69,6 +69,9 @@
       "path": "../../../packages/redaction/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/system-migrations/tsconfig.build.json"
     },
     {

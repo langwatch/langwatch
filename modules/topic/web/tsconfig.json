@@ -28,10 +28,10 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/ui-host/tsconfig.build.json"
+      "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../../../packages/ui-host/tsconfig.build.json"
     }
   ]
 }

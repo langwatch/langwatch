@@ -19,16 +19,10 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../packages/design-system/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-host/tsconfig.build.json"
+      "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../authz/contract/tsconfig.build.json"
@@ -37,7 +31,13 @@
       "path": "../../authz/web/tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-host/tsconfig.build.json"
     }
   ]
 }

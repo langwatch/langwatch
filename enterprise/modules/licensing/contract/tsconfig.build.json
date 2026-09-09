@@ -25,6 +25,9 @@
   ],
   "references": [
     {
+      "path": "../../../../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/config/tsconfig.build.json"
     },
     {
@@ -35,6 +38,9 @@
     },
     {
       "path": "../../../../packages/plans/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/runtime-composition/tsconfig.build.json"
     }
   ]
 }

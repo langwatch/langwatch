@@ -37,7 +37,7 @@
     "predev": "node ../../dev/scripts/ensure-built.mjs",
     "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/api.entrypoint.ts",
     "task": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/tasks/tasks.entrypoint.ts",
-    "typecheck": "pnpm -w typecheck:declarations --project apps/api/tsconfig.declarations.json && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "pnpm -w typecheck:declarations --project ./tsconfig.declarations.json && tsc --noEmit -p tsconfig.test.json",
     "typecheck:fast": "pnpm -w typecheck:declarations --project apps/api/tsconfig.declarations.json && tsc --noEmit -p tsconfig.json",
     "pretest": "node ../../dev/scripts/ensure-built.mjs @langwatch/mail",
     "test": "vitest run",

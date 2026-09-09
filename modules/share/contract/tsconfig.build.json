@@ -23,9 +23,20 @@
     "**/__bench__/**"
   ],
   "references": [
-    { "path": "../../data-retention/contract/tsconfig.build.json" },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../data-retention/contract/tsconfig.build.json"
+    },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
     }
   ]
 }

@@ -17,7 +17,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project packages/runtime-composition/tsconfig.json && node scripts/check-feature-names.mjs && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "pnpm -w typecheck:declarations --project . && node scripts/check-feature-names.mjs && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "test:unit": "vitest run"
   },

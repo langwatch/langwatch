@@ -18,19 +18,25 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
       "path": "../../agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/config/tsconfig.build.json"
     },
     {
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
       "path": "../../evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../../prompt/contract/tsconfig.build.json"

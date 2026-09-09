@@ -75,10 +75,16 @@
       "path": "../../../../packages/prisma-client/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/scenario/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/task/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/trace/contract/tsconfig.build.json"

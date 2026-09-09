@@ -9,7 +9,11 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
-    { "path": "./tsconfig.build.json" },
-    { "path": "../../../packages/runtime-composition/tsconfig.build.json" }
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    }
   ]
 }

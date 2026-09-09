@@ -18,6 +18,9 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {

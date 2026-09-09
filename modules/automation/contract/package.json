@@ -16,7 +16,7 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
-    "typecheck": "pnpm -w typecheck:declarations --project modules/automation/contract/tsconfig.json && tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

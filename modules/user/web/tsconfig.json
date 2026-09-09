@@ -33,10 +33,13 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../dev/tsconfig.web-declarations.json"
+      "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api/tsconfig.build.json"
+      "path": "../../coding-agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../coding-agent/web/tsconfig.build.json"
     },
     {
       "path": "../../../packages/config/tsconfig.build.json"
@@ -45,25 +48,22 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../coding-agent/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../gateway/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
     }
   ]
 }

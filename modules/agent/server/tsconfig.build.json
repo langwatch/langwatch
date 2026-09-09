@@ -33,22 +33,13 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../authz/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../api-key/contract/tsconfig.build.json"
     },
     {
       "path": "../../audit-log/contract/tsconfig.build.json"
     },
     {
-      "path": "../../project/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../user/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+      "path": "../../authz/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
@@ -60,7 +51,13 @@
       "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/redis-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../scenario/contract/tsconfig.build.json"
@@ -70,6 +67,9 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/contract/tsconfig.build.json"
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"

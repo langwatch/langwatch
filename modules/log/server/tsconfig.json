@@ -36,6 +36,9 @@
       "path": "../../../packages/otlp/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
@@ -43,9 +46,6 @@
     },
     {
       "path": "../../trace/server/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     }
   ]
 }

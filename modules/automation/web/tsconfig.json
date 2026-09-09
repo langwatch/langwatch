@@ -27,25 +27,25 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/design-system/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
+      "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../dataset/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
       "path": "../../monitor/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
+      "path": "../../authz/contract/tsconfig.build.json"
     }
   ]
 }

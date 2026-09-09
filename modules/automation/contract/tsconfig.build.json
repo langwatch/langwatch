@@ -25,6 +25,9 @@
   ],
   "references": [
     {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/config/tsconfig.build.json"
     },
     {
@@ -32,6 +35,12 @@
     },
     {
       "path": "../../monitor/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
     }
   ]
 }

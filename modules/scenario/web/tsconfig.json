@@ -23,16 +23,43 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
+      "path": "../../agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../agent/web/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../suite/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../suite/web/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
@@ -44,34 +71,7 @@
       "path": "../../../packages/ui-host/tsconfig.build.json"
     },
     {
-      "path": "../../agent/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../agent/web/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../experiment/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../feature-flag/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../model-provider/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../suite/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../suite/web/tsconfig.build.json"
-    },
-    {
       "path": "../../workflow/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
     }
   ]
 }

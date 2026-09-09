@@ -23,9 +23,6 @@
       "path": "tsconfig.declarations.json"
     },
     {
-      "path": "../design-system/tsconfig.build.json"
-    },
-    {
       "path": "../egress/tsconfig.build.json"
     },
     {
@@ -33,6 +30,9 @@
     },
     {
       "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../design-system/tsconfig.build.json"
     }
   ]
 }

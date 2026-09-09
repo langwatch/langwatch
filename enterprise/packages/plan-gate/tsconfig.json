@@ -23,10 +23,10 @@
       "path": "../../../modules/entitlement/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/licensing/contract/tsconfig.build.json"
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
+      "path": "../../modules/licensing/contract/tsconfig.build.json"
     }
   ]
 }

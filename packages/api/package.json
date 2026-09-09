@@ -44,7 +44,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project packages/api/tsconfig.json && tsc --noEmit && tsc -p tsconfig.type-tests.json",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit && tsc -p tsconfig.type-tests.json",
     "test": "vitest",
     "test:unit": "vitest run"
   },

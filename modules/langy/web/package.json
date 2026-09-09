@@ -63,7 +63,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project modules/langy/web/tsconfig.json && tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run",
     "generate:langy-skills": "node --experimental-transform-types scripts/generate-langy-skills.ts",

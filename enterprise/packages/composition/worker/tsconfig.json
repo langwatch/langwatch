@@ -18,10 +18,16 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../api/tsconfig.build.json"
+      "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
     },
     {
       "path": "../../../tsconfig.build.json"
+    },
+    {
+      "path": "../api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/audit-log/server/tsconfig.build.json"
     },
     {
       "path": "../../../modules/governance/server/tsconfig.build.json"
@@ -45,7 +51,13 @@
       "path": "../../../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"

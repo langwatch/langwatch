@@ -20,9 +20,6 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../../dev/tsconfig.web-declarations.json"
-    },
-    {
       "path": "../contract/tsconfig.build.json"
     }
   ]

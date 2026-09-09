@@ -30,10 +30,16 @@
       "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../../automation/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     }
   ]
 }

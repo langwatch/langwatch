@@ -24,6 +24,9 @@
       "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/otlp/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/project/contract/tsconfig.build.json"
     },
     {

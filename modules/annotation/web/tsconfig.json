@@ -23,6 +23,9 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
@@ -35,6 +38,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../organization/web/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
@@ -45,9 +51,6 @@
     },
     {
       "path": "../../../packages/ui-host/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
     }
   ]
 }

@@ -24,6 +24,12 @@
       "path": "../../modules/api-key/contract/tsconfig.build.json"
     },
     {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/api-key/server/tsconfig.build.json"
     },
     {
@@ -46,12 +52,6 @@
     },
     {
       "path": "../../modules/workflow/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../observability/tsconfig.build.json"
-    },
-    {
-      "path": "../time/tsconfig.build.json"
     }
   ]
 }

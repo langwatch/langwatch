@@ -24,9 +24,6 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/api-key/contract/tsconfig.build.json"
     },
     {
@@ -49,9 +46,6 @@
     },
     {
       "path": "../../../../modules/gateway/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/gateway/server/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/handled-error/tsconfig.build.json"
@@ -85,6 +79,12 @@
     },
     {
       "path": "../../../../modules/trace/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/gateway/server/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/test-harness/tsconfig.build.json"

@@ -17,7 +17,13 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/runtime-composition/tsconfig.build.json"

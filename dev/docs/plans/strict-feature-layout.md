@@ -225,6 +225,90 @@ drive replaced enactment with conversion; a conversion lane reads
 `feature-cleanup/<feature>.md` when it exists and its open findings ride the
 conversion. The README's own status table is retired; this board is the one.
 
+## 4a. Module census, 2026-09-09 22:5x (after the rename, head e28c2e6cb2)
+
+Measured by `$CLAUDE_JOB_DIR/tmp/module-census.txt`: `src files` counts every tracked file under
+the module's three `src` trees; `shape rows` is the module's entries in `feature-shape-baseline.json`;
+`legacy transport files` name `createServiceApp`/`createTrpcService` and kin; `ports/adapters files` is
+everything under `server/src/{ports,adapters}` (tests included); `api-side files` is
+`apps/api/src/features/<module>`; `hand web maps` is `createFeatureApi<...>` without `ContractApiMap`.
+Totals: 57 modules, 16 with no rows, 9 with one, 210 rows, 75 legacy transport files, 1,104
+ports/adapters files, 302 api-side files, 18 hand-written web maps.
+
+Tiers, and what each module needs:
+
+- **Tier A, full conversion** (transports still on the deleted builders, plus persistence and install):
+  governance, trace, scenario, langy, gateway, organization, agent, experiment, prompt, webhook.
+  Each: transports to `defineRestRouter`/`defineTrpcContract` (every operation, door and audit
+  target as on main, wire deltas recorded in §8a), `contract-service` folded into the app,
+  `ports/` and `adapters/` to `repositories/{prisma,memory}` and `<M>Infrastructure`, the installer
+  booted by the process as one install line, the web map derived, nested web entries flattened.
+- **Tier B, transports done, persistence and install left**: automation, workflow, github, billing,
+  identity, model-provider, coding-agent, licensing, auth, analytics, authz, api-key, project, ops,
+  user, scim, evaluator, managed-provider. Each: the persistence move, the `contract-service` fold,
+  the install line, and the memory twin where `postgres-without-memory` is listed.
+- **Tier C, one row**: metric, evaluation, log, presence, role, annotation, onboarding, navigation,
+  audit-log. One targeted change each (a registry, a memory twin test, a flat web entry).
+- **Done**: stored-object, dataset, topic, notification, sso, suite, entitlement, data-privacy,
+  feature-flag, dashboard, secret, monitor, data-retention, platform-health, share, saas.
+
+| module | ent | src files | shape rows | legacy transport files | ports/adapters files | repository files | api-side files | hand web maps | kinds left |
+|---|---|---|---|---|---|---|---|---|---|
+| governance | E | 413 | 9 | 16 | 107 | 27 | 0 | 1 | contract-service, legacy-transport-runtime, nested-transport, nested-web-entry, no-installer, persistence-adapter, postgres-without-memory, testing-entry, unregistered-repositories |
+| trace |  | 1667 | 8 | 12 | 130 | 59 | 16 | 1 | contract-service, legacy-transport-runtime, nested-transport, nested-web-entry, postgres-without-memory, refusing-composition, testing-entry, unregistered-repositories |
+| scenario |  | 721 | 10 | 12 | 63 | 34 | 7 | 1 | contract-service, legacy-transport-runtime, memory-twin-untested, nested-transport, nested-web-entry, no-installer, persistence-adapter, refusing-composition, testing-entry, unregistered-repositories |
+| langy |  | 649 | 10 | 10 | 65 | 20 | 11 | 1 | contract-service, installer-not-booted, legacy-transport-runtime, nested-transport, nested-web-entry, persistence-adapter, postgres-without-memory, refusing-composition, testing-entry, unregistered-repositories |
+| gateway |  | 367 | 9 | 9 | 56 | 50 | 7 | 1 | contract-service, installer-not-booted, legacy-transport-runtime, nested-transport, nested-web-entry, persistence-adapter, postgres-without-memory, testing-entry, unregistered-repositories |
+| automation |  | 378 | 9 | 0 | 45 | 20 | 4 | 0 | contract-service, fixtures-directory, installer-not-booted, nested-web-entry, persistence-adapter, postgres-without-memory, refusing-composition, testing-entry, unregistered-repositories |
+| organization |  | 217 | 9 | 7 | 12 | 25 | 10 | 2 | contract-service, installer-not-booted, legacy-transport-runtime, nested-transport, nested-web-entry, persistence-adapter, postgres-without-memory, refusing-composition, unregistered-repositories |
+| agent |  | 190 | 10 | 2 | 0 | 10 | 6 | 0 | contract-service, installer-not-booted, legacy-transport-runtime, nested-transport, nested-web-entry, persistence-adapter, postgres-without-memory, refusing-composition, testing-entry, unregistered-repositories |
+| experiment |  | 473 | 8 | 5 | 29 | 23 | 8 | 0 | contract-service, installer-not-booted, legacy-transport-runtime, nested-transport, nested-web-entry, persistence-adapter, refusing-composition, unregistered-repositories |
+| workflow |  | 359 | 8 | 0 | 31 | 4 | 7 | 1 | contract-service, installer-not-booted, nested-web-entry, persistence-adapter, postgres-without-memory, refusing-composition, testing-entry, unregistered-repositories |
+| github |  | 88 | 8 | 0 | 30 | 7 | 4 | 1 | contract-service, fixtures-directory, installer-not-booted, nested-web-entry, persistence-adapter, postgres-without-memory, refusing-composition, unregistered-repositories |
+| billing | E | 208 | 7 | 0 | 46 | 15 | 0 | 0 | contract-service, nested-web-entry, no-app, no-installer, persistence-adapter, postgres-without-memory, unregistered-repositories |
+| identity |  | 262 | 6 | 0 | 64 | 40 | 0 | 0 | no-app, no-installer, persistence-adapter, postgres-without-memory, testing-entry, unregistered-repositories |
+| prompt |  | 371 | 9 | 1 | 1 | 15 | 6 | 1 | contract-service, legacy-transport-runtime, nested-transport, nested-web-entry, no-installer, persistence-adapter, postgres-without-memory, refusing-composition, unregistered-repositories |
+| model-provider |  | 306 | 8 | 0 | 22 | 5 | 6 | 0 | contract-service, nested-web-entry, no-installer, persistence-adapter, postgres-without-memory, refusing-composition, testing-entry, unregistered-repositories |
+| coding-agent |  | 254 | 7 | 0 | 33 | 15 | 5 | 0 | contract-service, fixtures-directory, installer-not-booted, nested-web-entry, refusing-composition, testing-entry, unregistered-repositories |
+| licensing | E | 108 | 8 | 0 | 9 | 1 | 0 | 1 | fixtures-directory, installer-not-booted, nested-transport, nested-web-entry, persistence-adapter, postgres-without-memory, testing-entry, unregistered-repositories |
+| auth |  | 186 | 7 | 0 | 9 | 5 | 9 | 0 | contract-service, nested-web-entry, no-installer, persistence-adapter, postgres-without-memory, refusing-composition, unregistered-repositories |
+| analytics |  | 423 | 7 | 1 | 6 | 50 | 12 | 0 | contract-service, fixtures-directory, installer-not-booted, nested-web-entry, refusing-composition, testing-entry, unregistered-repositories |
+| authz |  | 198 | 5 | 0 | 42 | 41 | 1 | 1 | contract-service, nested-web-entry, persistence-adapter, postgres-without-memory, unregistered-repositories |
+| api-key |  | 127 | 6 | 0 | 16 | 4 | 6 | 0 | contract-service, nested-web-entry, persistence-adapter, postgres-without-memory, refusing-composition, unregistered-repositories |
+| project |  | 131 | 6 | 0 | 12 | 6 | 10 | 1 | contract-service, nested-web-entry, persistence-adapter, postgres-without-memory, refusing-composition, unregistered-repositories |
+| webhook |  | 65 | 6 | 0 | 11 | 7 | 0 | 0 | contract-service, installer-not-booted, legacy-transport-runtime, nested-transport, postgres-without-memory, unregistered-repositories |
+| ops |  | 497 | 4 | 0 | 42 | 60 | 8 | 1 | contract-service, nested-web-entry, persistence-adapter, refusing-composition |
+| user |  | 122 | 5 | 0 | 0 | 14 | 10 | 0 | contract-service, nested-web-entry, postgres-without-memory, refusing-composition, unregistered-repositories |
+| scim | E | 63 | 4 | 0 | 6 | 1 | 0 | 1 | contract-service, nested-web-entry, postgres-without-memory, unregistered-repositories |
+| evaluator |  | 129 | 3 | 0 | 5 | 8 | 4 | 0 | contract-service, no-installer, persistence-adapter |
+| managed-provider | E | 16 | 3 | 0 | 5 | 0 | 0 | 0 | contract-service, installer-not-booted, nested-web-entry |
+| stored-object |  | 110 | 0 | 0 | 43 | 13 | 8 | 0 | none |
+| metric |  | 70 | 1 | 0 | 23 | 8 | 0 | 0 | unregistered-repositories |
+| evaluation |  | 135 | 1 | 0 | 22 | 16 | 5 | 0 | contract-service |
+| hosted-mcp |  | 20 | 2 | 0 | 2 | 0 | 0 | 0 | installer-not-booted, nested-transport |
+| log |  | 37 | 1 | 0 | 11 | 7 | 0 | 0 | unregistered-repositories |
+| presence |  | 51 | 1 | 0 | 4 | 7 | 3 | 0 | memory-twin-untested |
+| role |  | 31 | 1 | 0 | 1 | 7 | 4 | 0 | memory-twin-untested |
+| annotation |  | 134 | 1 | 0 | 0 | 23 | 6 | 0 | refusing-composition |
+| onboarding |  | 127 | 1 | 0 | 0 | 0 | 0 | 1 | nested-web-entry |
+| navigation |  | 161 | 1 | 0 | 0 | 0 | 0 | 1 | nested-web-entry |
+| audit-log | E | 24 | 1 | 0 | 0 | 11 | 0 | 0 | memory-twin-untested |
+| dataset |  | 198 | 0 | 0 | 18 | 28 | 5 | 0 | none |
+| topic |  | 82 | 0 | 0 | 17 | 15 | 4 | 0 | none |
+| notification |  | 46 | 0 | 0 | 13 | 9 | 2 | 1 | none |
+| sso | E | 25 | 0 | 0 | 10 | 0 | 2 | 0 | none |
+| suite |  | 164 | 0 | 0 | 10 | 19 | 4 | 0 | none |
+| entitlement |  | 52 | 0 | 0 | 6 | 13 | 4 | 0 | none |
+| data-privacy |  | 80 | 0 | 0 | 6 | 9 | 4 | 0 | none |
+| feature-flag |  | 77 | 0 | 0 | 6 | 12 | 3 | 0 | none |
+| dashboard |  | 54 | 0 | 0 | 4 | 15 | 4 | 0 | none |
+| secret |  | 40 | 0 | 0 | 3 | 8 | 3 | 0 | none |
+| monitor |  | 49 | 0 | 0 | 3 | 10 | 5 | 0 | none |
+| data-retention |  | 74 | 0 | 0 | 3 | 16 | 3 | 0 | none |
+| platform-health |  | 19 | 0 | 0 | 2 | 0 | 3 | 0 | none |
+| saas | E | 9 | 0 | 0 | 0 | 0 | 0 | 0 | none |
+| share |  | 50 | 0 | 0 | 0 | 19 | 3 | 0 | none |
+
 ## 5. The API runtime (`@langwatch/api`)
 
 Nine transport files (`rest/{runtime,request,credential,response,openapi,security}.ts`,

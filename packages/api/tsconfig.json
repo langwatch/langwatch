@@ -22,9 +22,6 @@
       "path": "../actor/tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/authz/contract/tsconfig.build.json"
     },
     {
@@ -35,6 +32,9 @@
     },
     {
       "path": "../runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
     }
   ]
 }

@@ -47,6 +47,9 @@
     },
     {
       "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

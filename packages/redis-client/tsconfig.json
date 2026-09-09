@@ -20,6 +20,9 @@
   "references": [
     {
       "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
     }
   ]
 }

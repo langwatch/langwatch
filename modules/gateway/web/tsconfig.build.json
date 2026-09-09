@@ -30,8 +30,6 @@
     "**/testing.tsx"
   ],
   "references": [
-    { "path": "../../../dev/tsconfig.web-declarations.json" },
-    { "path": "../../trace/server/tsconfig.build.json" },
     {
       "path": "../../../packages/api/tsconfig.build.json"
     },

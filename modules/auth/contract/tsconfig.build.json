@@ -15,7 +15,16 @@
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     }
   ]
 }

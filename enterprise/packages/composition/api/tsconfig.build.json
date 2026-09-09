@@ -55,6 +55,9 @@
       "path": "../../../../modules/api-key/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
     },
     {
@@ -97,12 +100,6 @@
       "path": "../../../modules/sso/server/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/webhook/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/webhook/server/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/eventing/tsconfig.build.json"
     },
     {
@@ -130,10 +127,19 @@
       "path": "../../../../modules/project/server/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/webhook/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/webhook/server/tsconfig.build.json"
     }
   ]
 }

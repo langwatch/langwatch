@@ -36,7 +36,7 @@
       "path": "../../../../modules/authz/web/tsconfig.build.json"
     },
     {
-      "path": "../../../../dev/tsconfig.web-declarations.json"
+      "path": "../../../../modules/coding-agent/web/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/config/tsconfig.build.json"

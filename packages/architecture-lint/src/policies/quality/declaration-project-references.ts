@@ -179,6 +179,12 @@ export function lintDeclarationProjectReferences(
       const dependencyProducer = producerByName.get(name);
       if (!dependencyProducer || reachable.has(dependencyProducer)) continue;
 
+      // References may not form a cycle, so when the dependency depends back on
+      // this package one direction has to go unprepared. The web group is the
+      // remedy where the cycle spans sources that must be checked together.
+      const dependsBack = reachableProjects(dependencyProducer, projects).has(producer);
+      if (dependsBack) continue;
+
       violations.push({
         policy: "declaration-project-references",
         file: producer,
