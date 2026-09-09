@@ -23,7 +23,7 @@
   "dependencies": {
     "@langwatch/design-system": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "qs": "^6.15.3",
+    "qs": "^6.16.0",
     "react-error-boundary": "^6.1.2"
   },
   "devDependencies": {

@@ -10,6 +10,10 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./api-fixture": {
+      "types": "./dist/api-fixture.d.ts",
+      "default": "./src/api-fixture.ts"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"

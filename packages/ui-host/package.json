@@ -66,6 +66,10 @@
       "types": "./dist/use-organization-team-project.d.ts",
       "default": "./src/use-organization-team-project.ts"
     },
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "default": "./src/session.ts"
+    },
     "./format-time-ago": {
       "types": "./dist/format-time-ago.d.ts",
       "default": "./src/format-time-ago.ts"

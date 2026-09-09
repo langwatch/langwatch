@@ -112,9 +112,11 @@ function stringList(value: unknown): string[] | undefined {
  * vocabulary. Anything not named here is dropped, so a Zod version that adds a
  * field cannot start leaking content without this list changing first.
  */
-function metaForIssue(issue: RawIssue): ValidationIssueMeta {
+function metaForIssue(issue: RawIssue, schemaOnly: boolean): ValidationIssueMeta {
   const meta: ValidationIssueMeta = {
-    path: formatPath(issue.path),
+    // Record-map keys and unrecognised keys can be caller content. Output
+    // validation therefore uses schema-only metadata and omits every path.
+    path: schemaOnly ? "<redacted>" : formatPath(issue.path),
     code: typeof issue.code === "string" ? issue.code : "unknown",
   };
 
@@ -126,7 +128,7 @@ function metaForIssue(issue: RawIssue): ValidationIssueMeta {
       break;
 
     case "unrecognized_keys":
-      meta.keys = stringList(issue.keys);
+      if (!schemaOnly) meta.keys = stringList(issue.keys);
       break;
 
     case "invalid_enum_value":
@@ -217,13 +219,14 @@ function collectIssues(
   into: ValidationIssueMeta[],
   counter: { total: number },
   maxIssues: number,
+  schemaOnly: boolean,
 ): void {
   for (const issue of issues) {
     counter.total += 1;
-    if (into.length < maxIssues) into.push(metaForIssue(issue));
+    if (into.length < maxIssues) into.push(metaForIssue(issue, schemaOnly));
 
     for (const branch of unionBranches(issue)) {
-      collectIssues(branch, into, counter, maxIssues);
+      collectIssues(branch, into, counter, maxIssues, schemaOnly);
     }
   }
 }
@@ -235,13 +238,16 @@ function collectIssues(
  */
 export function validationMeta(
   error: unknown,
-  { maxIssues = MAX_VALIDATION_ISSUES }: { maxIssues?: number } = {},
+  {
+    maxIssues = MAX_VALIDATION_ISSUES,
+    privacy = "standard",
+  }: { maxIssues?: number; privacy?: "standard" | "schema-only" } = {},
 ): ValidationMeta | undefined {
   if (!hasIssues(error)) return undefined;
 
   const issues: ValidationIssueMeta[] = [];
   const counter = { total: 0 };
-  collectIssues(error.issues, issues, counter, maxIssues);
+  collectIssues(error.issues, issues, counter, maxIssues, privacy === "schema-only");
 
   const meta: ValidationMeta = { issueCount: counter.total, issues };
   if (counter.total > issues.length) meta.truncated = true;

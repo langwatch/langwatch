@@ -5,6 +5,7 @@
  */
 
 import type { UiScopeHostPort } from "./use-organization-team-project.ts";
+import type { UiSessionSnapshot } from "./session.ts";
 import type { UiSlotsPort } from "./slots.tsx";
 import { createContext, useContext } from "react";
 
@@ -141,6 +142,14 @@ export abstract class UiSessionPort {
    * same `false` to a screen, but must not be to a guard.
    */
   abstract isSettled(): boolean;
+
+  /**
+   * The shell's single session, scope and grant reading. Legacy ports that do
+   * not publish it fail by name instead of fabricating an auth state.
+   */
+  snapshot(): UiSessionSnapshot {
+    throw new UiCapabilityUnavailableError("session snapshot");
+  }
 
   /**
    * Whether a flag is on, off, or not yet answered — tri-state so a guard

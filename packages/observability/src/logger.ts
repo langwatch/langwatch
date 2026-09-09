@@ -1,4 +1,9 @@
-import pino, { type DestinationStream, type LoggerOptions, type Logger as PinoLogger } from "pino";
+import pino, {
+  type DestinationStream,
+  type LoggerOptions,
+  type Logger as PinoLogger,
+  type SerializedError,
+} from "pino";
 import { DEFAULT_SERVICE_NAME, REQUEST_CAUSE_FIELD } from "./constants.ts";
 import {
   resolveLoggerConfiguration,
@@ -66,7 +71,7 @@ function jsonSafe(value: unknown, seen: WeakSet<object>): unknown {
  * walks the error's own enumerable properties, so a `bigint` or nested
  * `Error` on a custom error class survives instead of being dropped.
  */
-const errorSerializer = (error: unknown) => {
+const errorSerializer = (error: unknown): SerializedError => {
   if (!(error instanceof Error)) {
     return pino.stdSerializers.err(error as Error);
   }

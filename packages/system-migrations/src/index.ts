@@ -16,6 +16,9 @@ export {
 } from "./types.ts";
 export {
   driveSystemMigrationsToConvergence,
+  runSystemMigrationsAtStartup,
   startSystemMigrations,
+  SystemMigrationStartupIncompleteError,
+  type SystemMigrationExecutionMode,
   type SystemMigrationPass,
 } from "./convergence.ts";

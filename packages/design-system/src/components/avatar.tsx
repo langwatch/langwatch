@@ -60,7 +60,7 @@ const AvatarFallback = React.forwardRef<HTMLDivElement, AvatarFallbackProps>(
   },
 );
 
-export const Avatar = {
+export const Avatar: typeof ChakraAvatar = {
   ...ChakraAvatar,
   Fallback: AvatarFallback,
 };

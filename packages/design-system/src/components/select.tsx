@@ -158,7 +158,21 @@ export const SelectItemGroup = React.forwardRef<HTMLDivElement, SelectItemGroupP
 export const SelectLabel = ChakraSelect.Label;
 export const SelectItemText = ChakraSelect.ItemText;
 
-export const Select = {
+export const Select: {
+  Root: typeof SelectRoot;
+  Trigger: typeof SelectTrigger;
+  Content: typeof SelectContent;
+  Item: typeof SelectItem;
+  ValueText: typeof SelectValueText;
+  ItemGroup: typeof SelectItemGroup;
+  Label: typeof SelectLabel;
+  ItemText: typeof SelectItemText;
+  Indicator: typeof ChakraSelect.Indicator;
+  HiddenSelect: typeof ChakraSelect.HiddenSelect;
+  Control: typeof ChakraSelect.Control;
+  IndicatorGroup: typeof ChakraSelect.IndicatorGroup;
+  ItemIndicator: typeof ChakraSelect.ItemIndicator;
+} = {
   Root: SelectRoot,
   Trigger: SelectTrigger,
   Content: SelectContent,

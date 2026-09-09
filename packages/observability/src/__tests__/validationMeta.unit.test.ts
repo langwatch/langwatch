@@ -356,4 +356,37 @@ describe("validationMeta", () => {
       expect(issue).toEqual({ path: "a", code: "some_future_code" });
     });
   });
+
+  describe("when output validation must not disclose response content", () => {
+    it("keeps schema facts while removing dynamic paths and unrecognised keys", () => {
+      const secret = "response-secret-marker";
+      const metadata = validationMeta(
+        {
+          issues: [
+            {
+              code: "unrecognized_keys",
+              path: ["records", secret],
+              keys: [secret],
+            },
+            {
+              code: "invalid_type",
+              path: [secret],
+              expected: "string",
+              received: "number",
+            },
+          ],
+        },
+        { privacy: "schema-only" },
+      );
+
+      expect(metadata).toMatchObject({
+        issueCount: 2,
+        issues: [
+          { code: "unrecognized_keys", path: "<redacted>" },
+          { code: "invalid_type", path: "<redacted>", expected: "string", received: "number" },
+        ],
+      });
+      expect(JSON.stringify(metadata)).not.toContain(secret);
+    });
+  });
 });

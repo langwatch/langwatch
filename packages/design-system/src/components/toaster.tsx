@@ -4,6 +4,8 @@ import {
   Box,
   Toaster as ChakraToaster,
   createToaster,
+  type CreateToasterReturn,
+  type ToastOptions,
   Portal,
   Spinner,
   Stack,
@@ -12,13 +14,15 @@ import {
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 
-const instance = createToaster({ placement: "bottom", pauseOnPageIdle: true });
+const instance: CreateToasterReturn = createToaster({ placement: "bottom", pauseOnPageIdle: true });
 
-type ToastCreateArgs = Omit<Parameters<typeof instance.create>[0], "meta"> & {
+type ToastCreateArgs = Omit<ToastOptions, "meta"> & {
   meta?: Record<string, unknown> & { closable?: never };
 };
 
-export const toaster = {
+export const toaster: Omit<CreateToasterReturn, "create"> & {
+  create(args: ToastCreateArgs): string;
+} = {
   ...instance,
   create: (args: ToastCreateArgs) =>
     instance.create({

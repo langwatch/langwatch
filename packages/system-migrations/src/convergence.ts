@@ -1,5 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import type { MigrationPassSummary } from "./types.ts";
+import type { SystemMigrationStateRepository } from "./state.repository.ts";
+import type { TenantSource } from "./tenant-source.ts";
+import type { SystemMigration } from "./system-migration.ts";
 
 /**
  * One composed pass over the fleet. The composition root binds the runner,
@@ -7,6 +10,16 @@ import type { MigrationPassSummary } from "./types.ts";
  * uses; this loop only decides whether another pass is worth running.
  */
 export type SystemMigrationPass = (input: { signal: AbortSignal }) => Promise<MigrationPassSummary>;
+export type SystemMigrationExecutionMode = "background" | "startup";
+
+export class SystemMigrationStartupIncompleteError extends Error {
+  declare readonly cause?: unknown;
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message);
+    if (options?.cause !== undefined) this.cause = options.cause;
+    this.name = "SystemMigrationStartupIncompleteError";
+  }
+}
 
 const logger = createLogger("langwatch:system-migrations:boot");
 
@@ -50,6 +63,121 @@ export function startSystemMigrations(args: { runPass: SystemMigrationPass }): {
     },
   };
 }
+
+/**
+ * Run the existing leased runner to a startup-safe point. A startup migration
+ * succeeds only when every in-cohort tenant has a durable `finalized` record;
+ * claimed work from another replica is re-read on the next bounded pass.
+ */
+export async function runSystemMigrationsAtStartup(args: {
+  runPass: SystemMigrationPass;
+  state: SystemMigrationStateRepository;
+  tenants: TenantSource;
+  migrations: readonly SystemMigration[];
+  cohort: (input: { tenantId: string; migrationName: string }) => boolean | Promise<boolean>;
+  signal?: AbortSignal;
+  maxPasses?: number;
+  pollDelayMs?: number;
+}): Promise<void> {
+  const signal = args.signal ?? new AbortController().signal;
+  const { maxPasses, pollDelayMs } = startupOptions(args);
+  let lastWaiting: StartupState | undefined;
+  for (let pass = 0; pass < maxPasses; pass++) {
+    assertStartupActive(signal);
+    try {
+      await args.runPass({ signal });
+    } catch (error) {
+      throw new SystemMigrationStartupIncompleteError("startup migration pass failed", {
+        cause: error,
+      });
+    }
+    assertStartupActive(signal);
+    const outcome = await startupState(args);
+    assertStartupActive(signal);
+    if (outcome.kind === "complete") return;
+    if (outcome.kind === "blocked") {
+      throw new SystemMigrationStartupIncompleteError(
+        `startup migration blocked at ${outcome.migrationName}/${outcome.tenantId} (${outcome.status})`,
+      );
+    }
+    lastWaiting = outcome;
+    await sleep({ ms: pollDelayMs, signal });
+  }
+  throw new SystemMigrationStartupIncompleteError(
+    lastWaiting?.kind === "waiting"
+      ? `startup migration did not finalize ${lastWaiting.migrationName}/${lastWaiting.tenantId} (${lastWaiting.status}) within the retry bound`
+      : "startup migration did not reach durable finalization within the retry bound",
+  );
+}
+
+function startupOptions(args: { maxPasses?: number; pollDelayMs?: number }): {
+  maxPasses: number;
+  pollDelayMs: number;
+} {
+  const maxPasses = args.maxPasses ?? MAX_PASSES;
+  const pollDelayMs = args.pollDelayMs ?? PASS_INTERVAL_MS;
+  if (!Number.isFinite(maxPasses) || !Number.isInteger(maxPasses) || maxPasses <= 0)
+    throw new RangeError("maxPasses must be a positive finite integer");
+  if (!Number.isFinite(pollDelayMs) || pollDelayMs < 0)
+    throw new RangeError("pollDelayMs must be a finite non-negative number");
+  return { maxPasses, pollDelayMs };
+}
+
+function assertStartupActive(signal: AbortSignal): void {
+  if (signal.aborted)
+    throw new SystemMigrationStartupIncompleteError("startup migration aborted", {
+      cause: signal.reason,
+    });
+}
+
+async function startupState(args: {
+  state: SystemMigrationStateRepository;
+  tenants: TenantSource;
+  migrations: readonly SystemMigration[];
+  cohort: (input: { tenantId: string; migrationName: string }) => boolean | Promise<boolean>;
+}): Promise<StartupState> {
+  let cursor: string | null = null;
+  let sawTenant = false;
+  let waiting: { migrationName: string; tenantId: string; status: string } | undefined;
+  for (;;) {
+    const page = await args.tenants.findTenantIdsAfter({ cursor, limit: 100 });
+    if (page.length === 0) break;
+    cursor = page[page.length - 1] ?? null;
+    for (const tenantId of page) {
+      sawTenant = true;
+      for (const migration of args.migrations) {
+        if (!(await args.cohort({ tenantId, migrationName: migration.name }))) continue;
+        const record = await args.state.tryFindRecord({
+          migrationName: migration.name,
+          tenantId,
+        });
+        if (record?.status === "rolled_back" || record?.status === "parked") {
+          return {
+            kind: "blocked",
+            migrationName: migration.name,
+            tenantId,
+            status: record.status,
+          };
+        }
+        if (record?.status !== "finalized" && waiting === undefined) {
+          waiting = {
+            migrationName: migration.name,
+            tenantId,
+            status: record?.status ?? "pending",
+          };
+        }
+      }
+    }
+  }
+  return !sawTenant || waiting === undefined
+    ? { kind: "complete" }
+    : { kind: "waiting", ...waiting };
+}
+
+type StartupState =
+  | { kind: "complete" }
+  | { kind: "waiting"; migrationName: string; tenantId: string; status: string }
+  | { kind: "blocked"; migrationName: string; tenantId: string; status: string };
 
 /**
  * The same loop, awaited rather than backgrounded: the boot-chain shape, for

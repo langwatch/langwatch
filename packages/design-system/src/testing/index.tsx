@@ -1,11 +1,11 @@
-import { render, type RenderOptions } from "@testing-library/react";
+import { render, type RenderResult, type RenderOptions } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { DesignSystemProvider } from "../provider/index.tsx";
 
 export function renderWithDesignSystem(
   element: ReactElement,
   options?: Omit<RenderOptions, "wrapper">,
-) {
+): RenderResult {
   if (typeof window !== "undefined" && !window.matchMedia) {
     Object.defineProperty(window, "matchMedia", {
       configurable: true,

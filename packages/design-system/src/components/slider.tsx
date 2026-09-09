@@ -89,7 +89,14 @@ const SliderMarks = React.forwardRef<HTMLDivElement, SliderMarksProps>(
   },
 );
 
-export const Slider = {
+export const Slider: {
+  Root: typeof SliderRoot;
+  Control: typeof SliderControl;
+  Track: typeof SliderTrack;
+  Range: typeof SliderRange;
+  Thumb: typeof SliderThumb;
+  HiddenInput: typeof SliderHiddenInput;
+} = {
   Root: SliderRoot,
   Control: SliderControl,
   Track: SliderTrack,
