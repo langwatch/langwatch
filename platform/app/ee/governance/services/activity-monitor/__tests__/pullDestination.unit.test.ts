@@ -46,8 +46,8 @@ describe("given a Genie config pointed somewhere the token must never go", () =>
      * phrasing alone would let it shrink to "invalid workspace URL" and still
      * pass, which is a rejection with nowhere to go.
      *
-     * @scenario "The token may only be sent to a Databricks workspace"
      */
+    /** @scenario "The token may only be sent to a Databricks workspace" */
     it("names every address that would have been accepted", () => {
       let message = "";
       try {
@@ -139,8 +139,8 @@ describe("given a Copilot config pointed somewhere the secret must never go", ()
      * A suffix check written without the leading dot would accept this, and
      * the domain is registrable by anyone.
      *
-     * @scenario "An environment address Microsoft does not host is refused at save time"
      */
+    /** @scenario "An environment address Microsoft does not host is refused at save time" */
     it("refuses a lookalike domain that merely ends in the same letters", () => {
       expect(() =>
         assertPullDestinationAllowed({
@@ -184,8 +184,8 @@ describe("given a Copilot config pointed somewhere the secret must never go", ()
      * the only place they learn that a ticket is the way forward rather than
      * a different spelling of the address.
      *
-     * @scenario "An environment address Microsoft does not host is refused at save time"
      */
+    /** @scenario "An environment address Microsoft does not host is refused at save time" */
     it("names every address that would have been accepted, and the way out", () => {
       let message = "";
       try {
@@ -212,8 +212,8 @@ describe("given a config whose adapter is known only to the caller", () => {
    * the check do nothing on precisely the request that repoints the host.
    * The caller passes the adapter from the stored row instead.
    *
-   * @scenario "An environment address Microsoft does not host is refused at save time"
    */
+  /** @scenario "An environment address Microsoft does not host is refused at save time" */
   it("checks the destination using the adapter the caller supplies", () => {
     const withoutAdapter = {
       environmentUrl: "https://attacker.example.com",
