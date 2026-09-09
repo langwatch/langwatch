@@ -91,13 +91,21 @@ export function createVoiceSessionPortsFromServices({
         scenarioRunId,
       });
       if (!run) return null;
-      const agentId = (run.metadata as { agentId?: unknown } | undefined)
-        ?.agentId;
+      const metadata = run.metadata as
+        | { agentId?: unknown; source?: unknown; audioUrl?: unknown }
+        | undefined;
+      const agentId = metadata?.agentId;
+      const source = metadata?.source;
+      const audioUrl = metadata?.audioUrl;
       // The status decides whether a retried finish short-circuits (terminal)
-      // or re-drives a half-written run (non-terminal, #7973).
+      // or re-drives a half-written run (non-terminal, #7973). The persisted
+      // source and recording let a terminal retry report the original run's
+      // transcript origin and Play control (AC14).
       return {
         agentId: typeof agentId === "string" ? agentId : null,
         status: run.status,
+        source: source === "provider" || source === "browser" ? source : null,
+        audioUrl: typeof audioUrl === "string" ? audioUrl : null,
       };
     },
 

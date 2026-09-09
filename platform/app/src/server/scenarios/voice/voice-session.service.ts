@@ -196,7 +196,12 @@ export interface VoiceSessionPorts {
   findExistingRun(input: {
     projectId: string;
     scenarioRunId: string;
-  }): Promise<{ agentId: string | null; status: ScenarioRunStatus } | null>;
+  }): Promise<{
+    agentId: string | null;
+    status: ScenarioRunStatus;
+    source: CallRecord["source"] | null;
+    audioUrl: string | null;
+  } | null>;
   /** Create the voice agent row on hang-up when the drawer had none yet. */
   createVoiceAgent(input: {
     projectId: string;
@@ -432,12 +437,18 @@ async function resolveScenarioContext(
   return { scenarioId, scenarioSetId: scenario.scenarioSetId };
 }
 
-type ExistingRun = { agentId: string | null; status: ScenarioRunStatus };
+type ExistingRun = {
+  agentId: string | null;
+  status: ScenarioRunStatus;
+  source: CallRecord["source"] | null;
+  audioUrl: string | null;
+};
 
 /**
  * The result for a terminal run returned untouched: a duplicate finish writes
  * nothing (AC14, #7973 AC1). The agent id comes from the token when it names
- * one, else from the run that already landed.
+ * one, else from the run that already landed; the transcript source and
+ * recording come from that run, so a retry keeps the Play control.
  */
 function terminalRunResult(
   scenarioRunId: string,
@@ -447,9 +458,10 @@ function terminalRunResult(
   return {
     runId: scenarioRunId,
     agentId: token.agentId ?? existing.agentId ?? "",
-    source: "provider",
+    source: existing.source ?? "provider",
     hasFetchFailed: false,
-    hasAudio: false,
+    hasAudio: existing.audioUrl !== null,
+    audioUrl: existing.audioUrl ?? undefined,
   };
 }
 

@@ -236,7 +236,12 @@ describe("finishVoiceSession", () => {
         // finish reads it back and short-circuits.
         const findExistingRun = vi.fn(async ({ scenarioRunId }) =>
           stored === scenarioRunId
-            ? { agentId: "agent_row", status: ScenarioRunStatus.SUCCESS }
+            ? {
+                agentId: "agent_row",
+                status: ScenarioRunStatus.SUCCESS,
+                source: "provider" as const,
+                audioUrl: null,
+              }
             : null,
         );
         const ports = fakePorts({
@@ -277,6 +282,8 @@ describe("finishVoiceSession", () => {
             findExistingRun: vi.fn(async () => ({
               agentId: "agent_existing",
               status: ScenarioRunStatus.SUCCESS,
+              source: "provider" as const,
+              audioUrl: null,
             })),
           },
         });
@@ -289,6 +296,36 @@ describe("finishVoiceSession", () => {
 
         expect(writeCallRun).not.toHaveBeenCalled();
         expect(result.agentId).toBe("agent_row");
+      });
+
+      /** @scenario "A retried hang-up leaves a terminal run untouched" */
+      it("reports the persisted source and recording so a retry keeps Play", async () => {
+        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+          async () => {},
+        );
+        const ports = fakePorts({
+          runner: fakeRunner(),
+          over: {
+            writeCallRun,
+            findExistingRun: vi.fn(async () => ({
+              agentId: "agent_existing",
+              status: ScenarioRunStatus.SUCCESS,
+              source: "browser" as const,
+              audioUrl: "https://example.test/rec.mp3",
+            })),
+          },
+        });
+
+        const result = await finishVoiceSession({
+          ports,
+          ...FINISH_BASE,
+          token: { ...TOKEN, agentId: "agent_row" },
+        });
+
+        expect(writeCallRun).not.toHaveBeenCalled();
+        expect(result.source).toBe("browser");
+        expect(result.hasAudio).toBe(true);
+        expect(result.audioUrl).toBe("https://example.test/rec.mp3");
       });
 
       /** @scenario "A retried hang-up leaves a terminal run untouched" */
@@ -307,6 +344,8 @@ describe("finishVoiceSession", () => {
             findExistingRun: vi.fn(async () => ({
               agentId: "agent_existing",
               status: ScenarioRunStatus.SUCCESS,
+              source: "provider" as const,
+              audioUrl: null,
             })),
           },
         });
@@ -337,6 +376,8 @@ describe("finishVoiceSession", () => {
             findExistingRun: vi.fn(async () => ({
               agentId: "agent_row",
               status: ScenarioRunStatus.IN_PROGRESS,
+              source: "provider" as const,
+              audioUrl: null,
             })),
           },
         });
