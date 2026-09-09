@@ -108,17 +108,31 @@ failure; the write path quietly denies them the check.
 
 ### The synchronous answer is barely used
 
-Of roughly twelve call sites of the identity write verbs, **ten discard the
-return value entirely** — a bare `await this.identity.attachIdentifier({...})`.
-Two read it:
+Of **40** call sites of the identity write verbs, **36 discard the return value
+entirely** — a bare `await this.identity.attachIdentifier({...})`. Four read it:
 
 - `account-identifiers.service.ts` takes `identifierId` off the attached fact
   to build the address-confirmation link;
-- the join-request expiry above.
+- the join-request expiry above;
+- `verification-ceremony.service.ts` reads the facts for a dead-end event to
+  decide whether to tell somebody the address belongs to a stranger — the same
+  defect class as the expiry, and the second of the three that reaches a person;
+- `sso-connection-grandfather.service.ts` counts them into a proof report.
+
+Two more depend on the guard throwing **synchronously** rather than on its
+return value: `identity-backfill.service.ts` wraps two dispatches in
+`tolerateRefusal`. They are not readers, but they are not indifferent either,
+and §"What a guard is for" records what that costs.
+
+> An earlier revision of this section said "roughly twelve call sites, ten
+> discard". That count was taken over `platform/app/src` alone and missed all
+> fourteen sites in `packages/identity-server/src` — including two of the four
+> readers. The argument is unchanged and slightly stronger: the ratio of
+> callers-who-read to callers-who-ignore is 1 in 10, not 1 in 6.
 
 So the whole layer — five ports, five writers, five deps interfaces, their
 specs and sender-name maps, `StagedLedgerWriter` and `ConvergentLedgerWriter` —
-exists to serve two callers, and it serves one of them wrongly.
+exists to serve four callers, and it served three of them wrongly.
 
 ## Decision
 
@@ -139,6 +153,19 @@ exists to serve two callers, and it serves one of them wrongly.
    comes from the state that is. Both are true by construction rather than by
    coincidence.
 
+   **Open: that wait needs a target it does not yet have.** `awaitConvergence`
+   compares the projection cursor against the last event it was handed, and a
+   `dispatch(command)` that no longer decides has no events to hand it. "The
+   cursor moved past dispatch time" is not a substitute: a command that
+   legitimately states nothing never moves the cursor, and an unrelated command
+   on the same lane can move it first. So "applied", "refused" and "not yet"
+   collapse into one answer, and §Decision 1's receipt cannot distinguish them —
+   which also makes the spec's *"A write refused by the rule records nothing and
+   says so"* unimplementable as written. A per-command outcome channel (the
+   handler records `{commandId, outcome}`; dispatch reads it) is the obvious
+   shape and is not yet designed. **This blocks the collapse in §Decision 4, and
+   nothing else in this ADR.**
+
 4. **The ledger layer collapses** to one function against the pipeline that
    already registers every command by name:
 
@@ -151,11 +178,30 @@ exists to serve two callers, and it serves one of them wrongly.
    `ConvergentLedgerSpec`, each sender-name map, `StagedLedgerWriter` and
    `ConvergentLedgerWriter` go with it.
 
-5. **Sign-up says so when it is not finished.** This is the one genuinely new
-   behaviour, and §"The cost" below is why it is needed. Where a person is
-   waiting on a fold that has not landed inside the bounded window, the screen
-   says the account is still being set up and polls. It never renders a row that
-   the log has not caused.
+5. **The sign-up door does not wait at all.** This is the one genuinely new
+   behaviour, decided 2026-09-10, and §"The cost" below is why it is shaped this
+   way.
+
+   Sign-up returns as soon as the rows it writes **itself** are committed and
+   the command is handed to the queue. It never blocks on the fold. The wait
+   moves off the door and onto the surfaces that actually read projections, and
+   those say so: *this is still being set up*, with a poll, never a row the log
+   has not caused.
+
+   Note what the session is issued from, because it is easy to state this wrongly
+   and an earlier draft of this decision did: it is issued from the **Postgres
+   `User` row the entrance commits directly** (`birth.ts` → `commitNewborn`),
+   which is durable before anything returns. It is *not* issued "from the event
+   log" — `stage` is an enqueue (`processor.send(): Promise<void>`), so at the
+   moment a session is minted the log has not been written and the fold has not
+   run. The door is honest because it only claims what it wrote with its own
+   hands.
+
+   Rejected: blocking for a short window and then showing a "setting up your
+   account" screen (it puts the queue on the door to buy a state we need
+   anyway), and keeping the block with a wider window (it strands the tail and
+   the window was never derived from data — see
+   `_shared/read-your-writes-window.ts`).
 
 ## Rationale / Trade-offs
 
@@ -182,19 +228,74 @@ folded rows to every reader except the guard that wrote them.
 
 ## The cost
 
-This puts the queue on sign-up's critical path. Provisional heads exist
-precisely to buy out of that: the front door reads the `Identifier` projection,
-the fold runs on the queue, and between a sign-up returning and its fold landing
-the address just registered is an address nobody holds.
+Provisional heads buy one thing, and it is real: between a sign-up returning and
+its fold landing, the address just registered is an address nobody holds. The
+front door reads the `Identifier` projection, so for that window the projection
+says this person has no address and no sign-in method.
 
-We accept the latency and answer it honestly. The bounded wait stays. When it
-expires, sign-up does not invent a row — it tells the person their account is
-still being set up and polls until the fold lands. If the fold never lands, they
-see a state that is true (nothing was recorded) rather than one that is
-convenient (a row saying it was).
+Deleting the rows does not delete the window. It makes the window **visible**,
+which is the point — and it means every reader in that window has to distinguish
+two things it currently cannot:
+
+| What the read sees | What it means | What it must say |
+| --- | --- | --- |
+| no identifier rows, cursor absent | the fold has not run yet | still being set up |
+| no identifier rows, cursor present | this person genuinely holds none | the real empty state |
+
+**`hasFolded` is the probe that separates them, so it survives.** An earlier
+draft had it deleted along with provisional heads, because it exists today only
+to stop the attach guard deduping against a provisional row. Under this decision
+it acquires a second, larger job: it is the only signal that tells a read surface
+"not yet" rather than "nothing". Deleting the provisional **write** is the
+decision; deleting the **probe** would leave every read surface guessing.
+
+The concrete casualty found while checking this is `/auth/join`, and it is worth
+naming because it is the opposite of a latency problem. `verifiedEmailsOf`
+returns `[]` — an empty list, not `null` — for a finalized user whose heads are
+empty. The legacy `User.email` fallback is keyed on `null`, so it is skipped, and
+the join lookup answers `{ outcome: "none" }`. A brand-new account on a verified
+company domain is therefore told there is nothing to join and pushed to create
+its own organization, which is precisely the orphan-workspace outcome
+join-before-create exists to prevent. Not blocking the door widens that window
+from "however long the fold took" to "until the fold lands", so the surface has
+to learn the difference above before the block comes off. This is sequencing,
+not a reason to keep the rows.
 
 That is the whole of "accept that this is an eventually consistent system and
-handle it": the honesty is in the UI, not in the database.
+handle it": the honesty is in the UI, not in the database — and the UI needs one
+bit of information to be honest with.
+
+## What a guard is for
+
+Checking the call sites turned up a distinction this ADR originally flattened,
+and getting it wrong would be worse than the defect being fixed.
+
+"Services validate and dispatch; the guard runs once, on the queue" is right
+about **decisions** — what facts a command states — and wrong about
+**preconditions**. The guards throw 37 domain errors synchronously: a wrong
+authenticator code is `IdentityMfaCodeInvalidError`, an address already held is
+`IdentityEmailInUseError`, a request already answered is
+`JoinRequestNotPendingError`. Move all of that to the queue and the caller gets
+a receipt for a write that was refused, and learns nothing.
+
+So a guard does two jobs and they separate cleanly:
+
+- **Preconditions** — "may this happen at all?" They refuse, they are what the
+  caller is owed an answer to, and they **must** run on the calling path. Running
+  them twice is harmless: a refusal is not a fact, and nothing is written.
+- **Decisions** — "what facts does this state?" They produce events, they run
+  **once**, on the queue, and their answer reaches the caller only by being read
+  back out of the projection.
+
+The defect this ADR removes is entirely in the second category. The first was
+never the problem, and §Decision 1's "does not run a guard" is too strong: it
+should read *does not decide*.
+
+> Stage 2 of the plan is done (commit `49f323f317`): all three
+> readers that reach a person — the join-request expiry, the confirmation link's
+> `identifierId`, and the verification ceremony's uniqueness-race report — now
+> answer from the projection. That fix needed none of the collapse below, which
+> is the evidence for doing it first.
 
 ## Consequences
 

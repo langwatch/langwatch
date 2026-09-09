@@ -14,12 +14,20 @@ Lands in PR #7631, on `feat/identity-auth`.
 | --- | --- |
 | Ledger writers, app layer | **1,278 lines** across 6 files |
 | Ledger ports, `@langwatch/identity-server` | **106 lines** across 5 files |
-| Write verbs to convert | **32** across 4 services |
-| Call sites of those verbs | ~12 — **10 discard the return value** |
-| Call sites that read the returned facts | **2** |
+| Write verbs to convert | **34** across 5 services |
+| Call sites of those verbs | **40** — 36 discard the return value |
+| Call sites that read the returned facts | **4** |
+| Call sites that depend on a synchronous throw | **2** (`tolerateRefusal`) |
 
-The last row is the whole reason this is tractable. The layer exists to give
-callers a synchronous answer, and almost nobody takes it.
+The last rows are the whole reason this is tractable. The layer exists to give
+callers a synchronous answer, and 9 in 10 do not take it.
+
+> Corrected 2026-09-10. The first pass said 32 verbs / ~12 call sites / 2
+> readers; it counted `platform/app/src` only and missed 14 sites in
+> `packages/identity-server/src`, two of which are readers. `link-proposal`
+> adds `confirmLink`/`rejectLink`, making 34 verbs across 5 services. The
+> `birth.ts` entrance is a writer path too and is in none of these counts —
+> it bypasses `commit` by design — so stage 3 has to convert it explicitly.
 
 ## Stages
 
@@ -27,32 +35,68 @@ Each stage is meant to land on its own and leave the tree green. The order is
 chosen so the user-visible defect is fixed early and the risky part happens
 late, with everything dead by the time it is deleted.
 
-### 0. Decide the unfinished-sign-up behaviour — **Alex, not code**
+### 0. Decide the unfinished-sign-up behaviour — **DONE 2026-09-10**
 
-Blocks stage 5 only. Everything before it can proceed. See "Open decisions".
+**The door does not wait.** Sign-up returns once it has committed its own rows
+and handed the command to the queue; the wait moves to the surfaces that read
+projections, and they say "still being set up" rather than rendering an empty
+state. ADR-135 §Decision 5 carries the wording and the two rejected options.
 
-### 1. Add the seam, change nothing — *small, additive*
+One correction that came out of deciding it: the session is issued from the
+Postgres `User` row the entrance commits directly, **not** "from the event log".
+`stage` is an enqueue, so at session time the log has not been written. The door
+is honest because it claims only what it wrote itself.
 
-Add `dispatch(command): Promise<Applied>` beside the existing ledgers: dispatch
-through the pipeline sender that already exists, then wait on the projection
-cursor using the comparison `StagedLedgerWriter.awaitConvergence` already
-implements. Nothing calls it yet.
+### 1. Design the completion signal — **BLOCKED, and not what this said**
 
-*Touches:* one new module. No existing behaviour.
+This used to read "add `dispatch(command): Promise<Applied>` beside the existing
+ledgers, waiting on the cursor with the comparison `awaitConvergence` already
+implements. Nothing calls it yet." That cannot be built as written.
 
-### 2. Fix the two callers that read facts — *small, and it is the bug fix*
+`awaitConvergence` compares the cursor against **the last event it was handed**.
+A `dispatch` that no longer decides has no events to hand it, so there is no
+comparison target. "The cursor moved past dispatch time" does not substitute: a
+command that legitimately states nothing never moves the cursor, and another
+command on the same lane can move it first. Without a target, *applied*,
+*refused* and *not yet* are one answer.
 
-- `join-request-adapters.ts` — notify from the recorded state rather than from
-  `facts.length`. **This is the live hazard**: an admin approving inside the
-  expiry window can currently produce both a membership and a "your request
-  lapsed" email.
-- `account-identifiers.service.ts` — read `identifierId` from the identifier
-  row after the write applies, instead of off a fact that may not have been
-  recorded.
+So stage 1 is a **design** task, not an additive one: a per-command outcome the
+handler records (`{commandId, outcome}`) and dispatch reads. Build it as the
+replacement rather than as a sibling — a seam that "changes nothing" is a second
+copy of a layer being deleted, and it could not be a no-op anyway.
 
-*Touches:* 2 files + tests. **If this plan gets compressed hard, keep this
-stage.** It is the only part that fixes something a person can currently be
-told wrongly, and it does not depend on the rest.
+**Stages 3, 4 and 6 depend on this. Stage 2 does not, which is why stage 2 went
+first.**
+
+### 2. Fix the callers that read facts — **DONE, commit `49f323f317`**
+
+It was three, not two — the third was found while checking the other two, and it
+is the same defect class reaching a person:
+
+- `join-request-adapters.ts` — notifies from the recorded PENDING → EXPIRED
+  transition rather than from `facts.length`. **This was the live hazard**: an
+  admin approving inside the expiry window could produce both a membership and a
+  "your request lapsed" email.
+- `account-identifiers.service.ts` — reads `identifierId` off the heads after
+  the write, so a confirmation link can never name a row the queue did not
+  write.
+- `verification-ceremony.service.ts` — answers from the identifier's recorded
+  state. Both directions of the old divergence lied: "lost" while the queue
+  verified tells somebody their own address belongs to a stranger; "won" while
+  the queue dead-ended tells them an address is theirs when it is not.
+
+Reading what landed admits a third answer the old code could not represent —
+*not recorded yet* — so there is a new handled code for it,
+`identity_verification_not_settled`, with the proof left unconsumed so "open the
+same link again" is real remediation. One new bound scenario; 58/58 in
+`identity-storage-adapter.feature`.
+
+`sso-connection-grandfather.service.ts` also reads `facts.length`, into a proof
+report rather than to a person. Left alone deliberately: it is not a lie told to
+anybody, and it disappears in stage 3.
+
+This needed none of the rest of the plan, which is the argument for having done
+it first.
 
 ### 3. Verbs return receipts — *wide but mechanical*
 
@@ -71,15 +115,51 @@ the only appender. `WaitedAppend` and its plumbing go.
 
 *Touches:* 3 ledger configs + the base class.
 
-### 5. Delete provisional heads, implement the honest wait — *the risky one*
+One thing to state out loud before doing it: durability moves from "appended
+before return" to "enqueued before return". The timeout log line that currently
+promises "the append is durable and the fold will converge" stops being true,
+and a dropped queue job now loses a fact that used to be on disk —
+`consumeBackupCode` and `confirmMfa` included. Decide whether that is accepted,
+and fix the log line either way.
 
-`writeProvisionalHeads` and `hasFolded` go. The born-finalized entrance
-(ADR-116 §3) currently sequences row writes between the two legs and must keep
-its ordering guarantee without them. Sign-up gains the state decided in stage 0.
+### 5. Delete the provisional WRITE — keep the probe — *the risky one*
 
-*Touches:* `ledger.ts`, `birth.ts`, the born-finalized entrance, the sign-up
+`writeProvisionalHeads` goes. **`hasFolded` stays**, and an earlier version of
+this plan was wrong to bin it with them.
+
+Today `hasFolded` exists only to stop the attach guard deduping against a
+provisional row. Under the A1 decision it picks up a bigger job: it is the only
+thing that distinguishes *the fold has not run* from *this person genuinely
+holds nothing*. Every read surface needs that bit to say "still being set up"
+instead of rendering an empty state — so deleting the write is the change, and
+deleting the probe would leave every reader guessing.
+
+Order inside the stage matters: remove the provisional **write** before or with
+the guard's probe, never the probe first. With provisional rows still being
+written, a guard that can no longer tell them apart dedupes against one and the
+log never gets the event — the address lock then holds forever.
+
+Two corrections to what this stage claimed:
+
+- **The born-finalized entrance never used provisional heads.** It calls the
+  guard, stages, commits the newborn rows and awaits the fold directly, bypassing
+  `commit` by design — `writeProvisionalHeads` lives only inside
+  `IdentityLedgerWriter.commit`. Its ordering guarantee (stage before rows, so an
+  unavailable engine fails the sign-up before any row exists) does not depend on
+  them. A1 makes this entrance *simpler*: the await-the-fold leg is deleted
+  outright, and the "nothing after leg two may fail" rule becomes vacuous.
+- **`/auth/join` is the surface that breaks first.** `verifiedEmailsOf` answers
+  `[]` rather than `null` for a finalized user with empty heads, so the legacy
+  `User.email` fallback is skipped and the join lookup says `{outcome: "none"}`
+  — a new account on a verified company domain is told nothing matches it and
+  pushed to create its own organization. That is the orphan-workspace outcome
+  join-before-create exists to prevent. Teach this surface the two-meanings
+  distinction BEFORE the block comes off the door.
+
+*Touches:* `ledger.ts`, `birth.ts`, `guards.ts` + the heads port and its
+in-memory double, `identity-email.service.ts`, the join lookup, the sign-up
 screens, and the specs that describe them. **Do not compress this stage into
-another.** It is the one that can strand a sign-up.
+another.**
 
 ### 6. Delete the layer — *pure removal*
 
@@ -98,18 +178,31 @@ must go; while it is there, the change is not finished.
 
 ## Open decisions
 
-**The unfinished sign-up.** When the fold has not landed inside the window:
+**~~The unfinished sign-up.~~** Answered 2026-09-10 — see stage 0. The door does
+not wait; the read surfaces carry the state. Questions 2 and 3 dissolved with it:
+there is no window on the door to size, and "the fold never landed" is now a
+thing a *screen* reports rather than a thing that strands a sign-up. The one
+sub-question that survives is narrower and is in the spec as a scenario: what a
+waiting screen offers when the fold never lands — retry, or carry on without it.
 
-1. What does the person see — a blocking "setting up your account" screen, or
-   the product with the new address shown as pending?
-2. How long is the window before we say so?
-3. If the fold never lands, do we offer a retry, or tell them to sign in again?
+**What a guard is for.** ADR-135 §Decision 1 says a verb "does not run a guard".
+Too strong, and shipping it literally would be worse than the defect: the guards
+throw 37 domain errors synchronously, so a wrong authenticator code would come
+back as a receipt. Split them — **preconditions** (refuse; must stay on the
+calling path; harmless to run twice since a refusal writes nothing) versus
+**decisions** (state facts; run once, on the queue). Only the second is what this
+change is about. ADR-135 §"What a guard is for" now records this; the stage-3
+work has to honour it verb by verb.
 
-These are product calls, and stage 5 cannot be written without them.
+**The completion signal.** See stage 1. Unresolved, and it blocks 3, 4 and 6.
 
-**How wide is "applied"?** Stage 1 waits on one aggregate's cursor. A write
-that fans out across aggregates has no single cursor to wait on. Confirm none
-of the 32 verbs does that, or the wait needs a different shape.
+**How wide is "applied"?** Stage 1 waits on one aggregate's cursor. A write that
+fans out across aggregates has no single cursor to wait on. Confirm none of the
+34 verbs does that, or the wait needs a different shape.
+
+**Opt in to the wait.** `Applied` with a bounded wait on every call spends up to
+two seconds on behalf of the 36 callers that read nothing — the backfill and the
+sweep most of all. Make the wait something a caller asks for.
 
 ## Risks
 

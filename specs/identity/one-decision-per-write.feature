@@ -72,34 +72,52 @@ Feature: A write states its facts once
 
   # --- Eventual consistency, said out loud --------------------------------
   #
-  # The queue is now on sign-up's critical path. That is the trade ADR-135
-  # accepts, and this is how it is paid honestly.
+  # The queue is OFF sign-up's critical path. Sign-up returns once the rows it
+  # writes itself are committed and the command is handed to the queue; it
+  # never waits for the fold. The surfaces that READ projections are the ones
+  # that carry the wait, and they are the ones that have to say so.
 
   # becomes @integration
   @unimplemented
-  Scenario: A sign-up whose fold lands in time continues as before
+  Scenario: A sign-up does not wait for its fold
     Given I am signing up
-    When the write is applied within the waiting window
-    Then I continue straight into the product
-    And nothing tells me anything is pending
+    When my account is committed and the write is handed to the queue
+    Then I am signed in without waiting for the fold to land
+    And nothing I am shown claims the write has been recorded
 
+  # THE REGRESSION THIS MUST NOT CAUSE. An empty projection means two different
+  # things, and a surface that cannot tell them apart tells a brand-new person
+  # on a verified company domain that there is nothing for them to join — then
+  # sends them off to start their own organization, which is the exact outcome
+  # join-before-create exists to prevent.
   # becomes @integration @e2e
   @unimplemented
-  Scenario: A sign-up that outruns the window says it is still finishing
-    Given I am signing up
-    When the write has not been applied by the end of the waiting window
-    Then I am told my account is still being set up
-    And the screen keeps checking without me doing anything
+  Scenario: A surface reading an unfolded account says "not yet", never "nothing"
+    Given I have just signed up
+    And the fold has not landed
+    When I open a screen that reads my identifiers
+    Then it tells me my account is still being set up
+    And it does not tell me I hold no address
+    And it does not offer to start an organization as though no team matched me
+    And it keeps checking without me doing anything
     And I am never shown an address or a method as though it were already mine
+
+  # becomes @unit
+  @unimplemented
+  Scenario: An empty projection with a landed fold is a real empty state
+    Given a person whose fold has landed
+    And they hold no identifiers
+    When a screen reads their identifiers
+    Then it shows the real empty state rather than saying it is still setting up
 
   # becomes @integration
   @unimplemented
   Scenario: A write that never lands leaves nothing claiming it did
-    Given I am signing up
+    Given I have signed up
     And the write is never applied
-    Then I am told my account could not be finished
-    And nothing in my account claims the write succeeded
-    And a way to try again is offered
+    Then my account exists and nothing in it claims the write succeeded
+    And the screen that was waiting stops saying it is still being set up
+    And it tells me that part could not be finished
 
   # --- What must keep working --------------------------------------------
 
