@@ -71,6 +71,15 @@ Reusable framework decisions live with their packages:
 | [112](./112-singular-feature-ownership.md)                             | Product domains use singular feature ownership                                                                            | Accepted                  |
 | [113](./113-explicit-runtime-boot.md)                                  | Explicit runtime boot owns configuration and application construction                                                     | Accepted                  |
 | [128](./128-public-rest-and-internal-trpc.md)                          | Public REST and internal tRPC are separate transport surfaces                                                             | Accepted                  |
+| [135](./135-lint-and-format-toolchain.md)                              | One linter, one formatter, and four places a rule may live                                                                | Proposed                  |
+| [136](./136-package-and-layer-boundaries.md)                           | Which package may name which, and in which direction                                                                      | Proposed                  |
+| [137](./137-module-source-grammar.md)                                  | A module's source layout is a grammar, not a convention                                                                   | Proposed                  |
+| [138](./138-persistence-containment.md)                                | Prisma stops at the repository seam                                                                                       | Proposed                  |
+| [139](./139-errors-results-and-naming.md)                              | A name states what a call answers with                                                                                    | Proposed                  |
+| [140](./140-complexity-and-readability-budgets.md)                     | Two complexity metrics, and the budgets that go with them                                                                 | Proposed                  |
+| [141](./141-platform-invariants.md)                                    | The invariants a single file can be checked against                                                                       | Proposed                  |
+| [142](./142-test-quality-rules.md)                                     | A test that cannot fail is worse than no test                                                                             | Proposed                  |
+| [143](./143-formatting.md)                                             | oxfmt is the only formatter, and it reads one configuration                                                               | Proposed                  |
 
 Package-local decisions are indexed beside their owners. The framework
 records are the [Eventing ADR index](../../../packages/eventing/adrs/README.md)

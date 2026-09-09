@@ -19,6 +19,8 @@ Feature: The oxlint baseline replaces the hand-written per-file registers
     When that rule runs over the file
     Then it reports nothing
 
+  Rule: `langwatch/nested-ternary` replaces the built-in so it can read the baseline
+
   @unit
   Scenario: A nested ternary is reported on the inner ternary
     Given a ternary whose consequent or alternate is itself a ternary
@@ -30,6 +32,8 @@ Feature: The oxlint baseline replaces the hand-written per-file registers
     Given a ternary whose branches are not ternaries
     When the nested-ternary rule runs over it
     Then it reports nothing
+
+  Rule: `oxlint` holds the ledger to a shrink-only ratchet
 
   @unit
   Scenario: The oxlint baseline is shrink-only and every entry carries a measured date
