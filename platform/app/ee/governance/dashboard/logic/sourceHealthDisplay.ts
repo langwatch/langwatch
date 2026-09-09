@@ -18,11 +18,18 @@ import { CircleAlert, CircleCheck, CircleDashed, CircleX } from "lucide-react";
  * goes unnoticed for a week.
  *
  * The exception is "disabled". A disabled source is not expected to be
- * pulling, so "Not pulling" is not news about it — it is the state an admin
+ * pulling, so "Pulls failing" is not news about it — it is the state an admin
  * chose, restated in red. Worse, it is unactionable: the reader clicks
  * through to fix an outage and finds nothing wrong. Configuration wins here
  * because health is only interesting about a source we are asking to run.
  */
+/** Refresh visible source health after scheduled pulls, without polling hidden tabs. */
+export const SOURCE_HEALTH_REFRESH = {
+  refetchOnWindowFocus: true,
+  refetchInterval: 30_000,
+  refetchIntervalInBackground: false,
+} as const;
+
 export interface SourceBadge {
   icon: typeof CircleCheck;
   label: string;
@@ -41,7 +48,7 @@ export const SOURCE_STATUS_META: Record<string, SourceBadge> = {
 
 export const SOURCE_UNHEALTHY_META: SourceBadge = {
   icon: CircleAlert,
-  label: "Not pulling",
+  label: "Pulls failing",
   color: "red.500",
 };
 

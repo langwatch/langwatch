@@ -145,6 +145,21 @@ describe("given an OpenAI Admin cost source", () => {
     fetchMock.mockReset();
     for (const level of Object.values(logged)) level.mockReset();
   });
+  it("preserves a provider rate-limit wait for the durable retry", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("private upstream payload", {
+        status: 429,
+        headers: { "retry-after": "120" },
+      }),
+    );
+    await expect(
+      new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG),
+    ).rejects.toMatchObject({
+      message: "OpenAI rate limit exceeded (HTTP 429).",
+      retryAfterMs: 120_000,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 
   describe("when the provider reports a day's spend", () => {
     /** @scenario "A day's spend is recorded as the dollars the provider reported" */

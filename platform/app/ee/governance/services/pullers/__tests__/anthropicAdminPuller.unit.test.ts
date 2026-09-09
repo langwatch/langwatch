@@ -925,6 +925,27 @@ describe("the Anthropic Admin puller", () => {
   });
 
   describe("when the transport fails", () => {
+    it("preserves the provider's rate-limit wait for the durable retry without leaking the response body", async () => {
+      fetchMock.mockResolvedValue(
+        new Response("private upstream payload", {
+          status: 429,
+          headers: { "retry-after": "120" },
+        }),
+      );
+      await expect(
+        new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+          adapter: "anthropic_admin",
+          report: "cost",
+          bucketWidth: "1d",
+          schedule: "0 * * * *",
+        }),
+      ).rejects.toMatchObject({
+        message: "Anthropic rate limit exceeded (HTTP 429).",
+        retryAfterMs: 120_000,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
     it("leaves the cursor where it was so the window is retried", async () => {
       fetchMock.mockRejectedValue(new Error("connection reset"));
 

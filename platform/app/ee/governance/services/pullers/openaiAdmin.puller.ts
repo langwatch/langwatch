@@ -38,7 +38,10 @@
 
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-
+import {
+  DispatchError,
+  parseRetryAfterMs,
+} from "~/server/event-sourcing/queues/dispatchError";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
 import type {
@@ -614,6 +617,8 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         options,
       });
     } catch (error) {
+      // Let the durable outbox retain Retry-After instead of losing it in errorCount.
+      if (error instanceof DispatchError) throw error;
       logger.error(
         {
           adapter: this.id,
@@ -738,6 +743,14 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       },
       signal,
     });
+    if (response.status === 429) {
+      await response.body?.cancel();
+      throw new DispatchError({
+        message: "OpenAI rate limit exceeded (HTTP 429).",
+        retryable: true,
+        retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
+      });
+    }
     if (!response.ok) {
       const detail = await safeResponseText(response);
       if (response.status === 400 && isKeyGroupingRefusal(detail)) {

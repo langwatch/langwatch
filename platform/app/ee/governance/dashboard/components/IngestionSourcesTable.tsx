@@ -203,7 +203,7 @@ function SourceTableRow({
 }) {
   const sourceType = source.sourceType as SourceType;
   // Health wins over configured status (a source whose last runs all failed
-  // is "Not pulling", not "Active"); see sourceHealthDisplay.
+  // is "Pulls failing", not "Active"); see sourceHealthDisplay.
   const status = sourceBadge({
     status: source.status,
     errorCount: source.errorCount,

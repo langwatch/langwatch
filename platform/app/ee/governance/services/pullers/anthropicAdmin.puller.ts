@@ -35,7 +35,10 @@
 
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-
+import {
+  DispatchError,
+  parseRetryAfterMs,
+} from "~/server/event-sourcing/queues/dispatchError";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
 import type {
@@ -612,6 +615,10 @@ export class AnthropicAdminPuller
     try {
       body = await this.fetchPage({ config, startingAt, page, options });
     } catch (error) {
+      // Keep Retry-After on the thrown error: the durable outbox already
+      // schedules its next attempt no earlier than this provider minimum.
+      // Returning only errorCount would discard both the wait and the cause.
+      if (error instanceof DispatchError) throw error;
       logger.error(
         {
           adapter: this.id,
@@ -685,6 +692,14 @@ export class AnthropicAdminPuller
       // host, so a redirect would hand the key to wherever it points.
       followRedirects: false,
     });
+    if (response.status === 429) {
+      await response.body?.cancel();
+      throw new DispatchError({
+        message: "Anthropic rate limit exceeded (HTTP 429).",
+        retryable: true,
+        retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
+      });
+    }
     if (!response.ok) {
       throw await fetchPageError(response, config.report);
     }

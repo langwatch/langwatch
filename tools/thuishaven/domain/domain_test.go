@@ -148,6 +148,21 @@ func TestOverlayEmitsClickHouseURLOnlyWhenManaged(t *testing.T) {
 	}
 }
 
+func TestManagedClickHouseClientsLeaveRoomForOtherLocalProcesses(t *testing.T) {
+	stack := Stack{ClickHouseHTTPPort: 18123, ClickHouseDatabase: "lw_test"}
+	if got := valueOf(stack.OverlayEnv(), "CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES"); got != "32" {
+		t.Errorf("client must know the managed server budget: got %q", got)
+	}
+	if got := valueOf(stack.OverlayEnv(), "CLICKHOUSE_MAX_OPEN_CONNECTIONS"); got != "4" {
+		t.Errorf("local API and worker clients must leave headroom for other stacks: got %q", got)
+	}
+	for _, key := range []string{"CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES", "CLICKHOUSE_MAX_OPEN_CONNECTIONS"} {
+		if hasKey((Stack{}).OverlayEnv(), key) {
+			t.Errorf("unmanaged ClickHouse must retain its own configuration: %s", key)
+		}
+	}
+}
+
 func TestOverlayDisablesGoogleDLPWhenAsked(t *testing.T) {
 	base := Stack{Slug: "brave-otter", APIPort: 1, Services: []Service{
 		{Name: "app", URL: "https://app.brave-otter.langwatch.localhost"},
