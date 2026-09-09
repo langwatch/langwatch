@@ -45,6 +45,23 @@ func TestPGDatabaseURL(t *testing.T) {
 	}
 }
 
+func TestPsqlServerURLDropsPrismaOnlyParameters(t *testing.T) {
+	got, err := psqlServerURL("postgres://u:p@127.0.0.1:5432/langwatch?schema=langwatch_db&sslmode=disable&connection_limit=5")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "postgres://u:p@127.0.0.1:5432/langwatch?sslmode=disable" {
+		t.Fatalf("psqlServerURL = %q", got)
+	}
+	args, err := psqlArgs("postgres://u:p@127.0.0.1:5432/langwatch?schema=langwatch_db", "apidiff_x_main", "SELECT 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if args[0] != "postgres://u:p@127.0.0.1:5432/apidiff_x_main" {
+		t.Fatalf("psqlArgs URL = %q", args[0])
+	}
+}
+
 func TestCHDatabaseURL(t *testing.T) {
 	got, err := chDatabaseURL("http://default:langwatch@127.0.0.1:58123", "apidiff_main")
 	if err != nil {

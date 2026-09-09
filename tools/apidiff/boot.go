@@ -132,6 +132,26 @@ func pgDatabaseURL(serverURL, database string) (string, error) {
 	return parsed.String(), nil
 }
 
+// prismaOnlyQueryKeys are the connection-string parameters Prisma reads and
+// libpq refuses ("invalid URI query parameter"). A developer's DATABASE_URL
+// carries them; psql must not see them.
+var prismaOnlyQueryKeys = []string{"schema", "connection_limit", "pool_timeout", "pgbouncer", "statement_cache_size", "socket_timeout"}
+
+// psqlServerURL is the server URL with every Prisma-only parameter removed,
+// so the same -pg-url serves both the booted instances and psql.
+func psqlServerURL(serverURL string) (string, error) {
+	parsed, err := url.Parse(serverURL)
+	if err != nil {
+		return "", fmt.Errorf("postgres URL: %w", err)
+	}
+	query := parsed.Query()
+	for _, key := range prismaOnlyQueryKeys {
+		query.Del(key)
+	}
+	parsed.RawQuery = query.Encode()
+	return parsed.String(), nil
+}
+
 // chDatabaseURL points a ClickHouse server URL at one database.
 func chDatabaseURL(serverURL, database string) (string, error) {
 	parsed, err := url.Parse(serverURL)
@@ -665,7 +685,11 @@ func (state *bootState) pgQuery(ctx context.Context, sql string) (string, error)
 	if _, err := exec.LookPath("psql"); err != nil {
 		return "", errors.New("external -pg-url requires psql on PATH for database administration")
 	}
-	err := state.run(ctx, commandSpec{name: "psql", args: []string{state.infra.pgServer, "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql}, dir: state.cfg.BranchDir}, &output)
+	serverURL, err := psqlServerURL(state.infra.pgServer)
+	if err != nil {
+		return "", err
+	}
+	err = state.run(ctx, commandSpec{name: "psql", args: []string{serverURL, "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql}, dir: state.cfg.BranchDir}, &output)
 	return strings.TrimSpace(output.String()), err
 }
 
@@ -681,7 +705,7 @@ func (state *bootState) pgQueryDB(ctx context.Context, database, sql string) (st
 	if _, err := exec.LookPath("psql"); err != nil {
 		return "", errors.New("external -pg-url requires psql on PATH for database administration")
 	}
-	databaseURL, err := pgDatabaseURL(state.infra.pgServer, database)
+	databaseURL, err := psqlDatabaseURL(state.infra.pgServer, database)
 	if err != nil {
 		return "", err
 	}
@@ -751,11 +775,21 @@ func (state *bootState) pgAdminDB(ctx context.Context, database, sql string) err
 // psqlArgs builds the host psql argv for one statement against one database
 // on an external server.
 func psqlArgs(serverURL, database, sql string) ([]string, error) {
-	databaseURL, err := pgDatabaseURL(serverURL, database)
+	databaseURL, err := psqlDatabaseURL(serverURL, database)
 	if err != nil {
 		return nil, err
 	}
 	return []string{databaseURL, "-v", "ON_ERROR_STOP=1", "-c", sql}, nil
+}
+
+// psqlDatabaseURL is pgDatabaseURL for psql: one database, no Prisma-only
+// parameters.
+func psqlDatabaseURL(serverURL, database string) (string, error) {
+	serverURL, err := psqlServerURL(serverURL)
+	if err != nil {
+		return "", err
+	}
+	return pgDatabaseURL(serverURL, database)
 }
 
 // chAdmin runs one ClickHouse statement over the HTTP interface.

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/openapidiff"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // Exit codes: 0 no behavioral differences, 1 differences found, 2
@@ -155,9 +156,14 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	flags.StringVar(&boot.CHURL, "ch-url", "", "external ClickHouse server URL")
 	flags.StringVar(&boot.RedisURL, "redis-url", "", "external redis server URL")
 	flags.StringVar(&boot.ComposeProject, "compose-project", "apidiff", "compose project name for the managed infra stack")
+	envFile := ""
+	flags.StringVar(&envFile, "env-file", "", "dotenv file whose DATABASE_URL, CLICKHOUSE_URL and REDIS_URL fill an empty -pg-url, -ch-url and -redis-url (never printed)")
 	registerProbeFlags(flags, probe)
 	if err := flags.Parse(args); err != nil {
 		return exitError
+	}
+	if envFile != "" {
+		applyEnvFile(envFile, &boot)
 	}
 
 	// The child processes inherit this context; canceling it kills them.
@@ -384,4 +390,22 @@ func writeJSONFile(path string, write func(*os.File) error) error {
 		return fmt.Errorf("write %s: %w", path, writeErr)
 	}
 	return closeErr
+}
+
+// applyEnvFile fills the external server URLs from a dotenv file. Reading the
+// file here, with a dotenv parser, is what keeps a shell from ever sourcing
+// it: a dotenv file is not a shell script, and a multi-line value it cannot
+// parse is echoed back by the shell as an error.
+func applyEnvFile(envFile string, boot *BootConfig) {
+	values := map[string]string{}
+	domain.ReadEnvFile(envFile, values)
+	if boot.PGURL == "" {
+		boot.PGURL = values["DATABASE_URL"]
+	}
+	if boot.CHURL == "" {
+		boot.CHURL = values["CLICKHOUSE_URL"]
+	}
+	if boot.RedisURL == "" {
+		boot.RedisURL = values["REDIS_URL"]
+	}
 }

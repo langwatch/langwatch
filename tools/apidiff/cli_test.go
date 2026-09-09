@@ -2,6 +2,8 @@ package apidiff
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -82,5 +84,17 @@ func TestLedgerBaselineMustExist(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "ledger baseline") {
 		t.Fatalf("stderr must name the baseline:\n%s", stderr.String())
+	}
+}
+
+func TestApplyEnvFileFillsOnlyEmptyURLs(t *testing.T) {
+	envFile := filepath.Join(t.TempDir(), ".env")
+	if err := os.WriteFile(envFile, []byte("DATABASE_URL=\"postgres://u:p@db/lw?schema=x\"\nCLICKHOUSE_URL=http://ch:8123 # local\nREDIS_URL=redis://r:6379\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	boot := BootConfig{RedisURL: "redis://given:6379"}
+	applyEnvFile(envFile, &boot)
+	if boot.PGURL != "postgres://u:p@db/lw?schema=x" || boot.CHURL != "http://ch:8123" || boot.RedisURL != "redis://given:6379" {
+		t.Fatalf("applyEnvFile = %+v", boot)
 	}
 }
