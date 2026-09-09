@@ -129,10 +129,41 @@ function readDeployment(): NavigationDeployment {
   }
 }
 
-/**
- * Mounts the host above whatever it wraps. Exported because the chrome
- * mounts it once, above the outlet, so every switcher and screen below reads the same workspace graph.
- */
+/** The team that holds the given project — where the chrome's personal-workspace
+ *  test and the cross-scope banner both read from. */
+function findTeamHoldingProject(graph: NavigationOrganization[], projectId: string | undefined) {
+  if (!projectId) return void 0;
+  for (const candidate of graph) {
+    const found = candidate.teams.find((entry) =>
+      entry.projects.some((project) => project.id === projectId),
+    );
+    if (found) return found;
+  }
+  return void 0;
+}
+
+/** Whether the palette may offer "Ask Langy" — permission, flag, and not the
+ *  demo project (which never gets its own Langy conversation). */
+function canAskLangyFor({
+  session,
+  project,
+  deployment,
+}: {
+  session: {
+    hasPermission: (permission: string) => boolean;
+    featureFlag: (flag: string) => unknown;
+  };
+  project: { slug: string } | undefined;
+  deployment: NavigationDeployment;
+}): boolean {
+  if (!session.hasPermission(LANGY_CREATE_PERMISSION)) return false;
+  if (session.featureFlag(LANGY_RELEASE_FLAG) !== true) return false;
+  return !isLangyDemoProject({
+    projectSlug: project?.slug,
+    demoProjectSlug: deployment.demoProjectSlug,
+  });
+}
+
 export function NavigationHostSection({
   children,
   commandBar = false,
@@ -183,16 +214,10 @@ export function NavigationHostSection({
 
   /** The team that holds the project on screen, which is where the chrome's
    * personal-workspace test and the cross-scope banner both read from. */
-  const team = useMemo(() => {
-    if (!activeScope.projectId) return void 0;
-    for (const candidate of graph) {
-      const found = candidate.teams.find((entry) =>
-        entry.projects.some((project) => project.id === activeScope.projectId),
-      );
-      if (found) return found;
-    }
-    return void 0;
-  }, [graph, activeScope.projectId]);
+  const team = useMemo(
+    () => findTeamHoldingProject(graph, activeScope.projectId),
+    [graph, activeScope.projectId],
+  );
 
   const project = useMemo(
     () => team?.projects.find((entry) => entry.id === activeScope.projectId),
@@ -230,13 +255,7 @@ export function NavigationHostSection({
   /** The assistant, as the palette's hand-off needs it; `null` is the gate — see the two constants above. */
   const askLangy = useLangyStore((store) => store.askLangy);
   const setHomeAskOpen = useLangyStore((store) => store.setHomeAskOpen);
-  const canAskLangy =
-    session.hasPermission(LANGY_CREATE_PERMISSION) &&
-    session.featureFlag(LANGY_RELEASE_FLAG) === true &&
-    !isLangyDemoProject({
-      projectSlug: project?.slug,
-      demoProjectSlug: deployment.demoProjectSlug,
-    });
+  const canAskLangy = canAskLangyFor({ session, project, deployment });
   const langy: NavigationLangy | null = useMemo(
     () =>
       canAskLangy

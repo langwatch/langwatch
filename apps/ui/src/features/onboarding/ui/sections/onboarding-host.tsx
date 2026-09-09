@@ -39,6 +39,32 @@ function toOnboardingProjects<P extends { id: string; name: string; slug: string
   }));
 }
 
+/** The active project, resolved from the organizations graph. Kept off the
+ *  host's own team/org shape (`OnboardingOrganization`) so the base key
+ *  read below stays a reading of its own rather than living on the graph. */
+function findActiveOnboardingProject<
+  T extends { teams: Array<{ projects: Array<{ id: string }> }> },
+>(graph: T[] | undefined, projectId: string | undefined) {
+  if (!projectId) return void 0;
+  for (const entry of graph ?? []) {
+    for (const team of entry.teams) {
+      const project = team.projects.find((candidate) => candidate.id === projectId);
+      if (project) return project;
+    }
+  }
+  return void 0;
+}
+
+/**
+ * Three states from two answers, order matters: a signed-out reader is
+ * bounced through SSO, so reading "not signed in" one render too early
+ * would round-trip a signed-in reader. `isSettled()` gates it.
+ */
+function onboardingSessionStatusOf(actor: unknown, isSettled: boolean): OnboardingSessionStatus {
+  if (actor) return "authenticated";
+  return isSettled ? "unauthenticated" : "loading";
+}
+
 export function OnboardingHost({ children }: { children: ReactNode }) {
   const { session, route, feedback, navigation } = useUiCapabilities();
   const activeScope = session.activeScope();
@@ -80,23 +106,16 @@ export function OnboardingHost({ children }: { children: ReactNode }) {
 
   // The active project, and — separately — its base key. See above: the key is
   // a reading of its own so the scope graph never carries a credential.
-  const activeProject = useMemo(() => {
-    if (!activeScope.projectId) return void 0;
-    for (const entry of graph ?? []) {
-      for (const team of entry.teams) {
-        const project = team.projects.find((candidate) => candidate.id === activeScope.projectId);
-        if (project) return project;
-      }
-    }
-    return void 0;
-  }, [graph, activeScope.projectId]);
+  const activeProject = useMemo(
+    () => findActiveOnboardingProject(graph, activeScope.projectId),
+    [graph, activeScope.projectId],
+  );
 
   const actor = session.currentUser();
-  const sessionStatus: OnboardingSessionStatus = actor
-    ? "authenticated"
-    : session.isSettled()
-      ? "unauthenticated"
-      : "loading";
+  const sessionStatus: OnboardingSessionStatus = onboardingSessionStatusOf(
+    actor,
+    session.isSettled(),
+  );
 
   const reading = route.reading();
 
