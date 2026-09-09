@@ -279,6 +279,12 @@ export function formatLastActive(minutesAgo: number | null): string | null {
  * The list view draws its Registered column from this. The card has no room
  * for the column and does not show it, which is one of the two facts the list
  * exists to surface.
+ *
+ * Years are counted in the same thirty-day months this counts months in, not
+ * in calendar years. Mixing the two units leaves a gap: a year measured as 365
+ * days has not started yet when a twelfth thirty-day month has already ended,
+ * so any day in that gap floors to zero and the reader is told "0 years ago".
+ * One unit throughout cannot produce a zero.
  */
 export function formatRegistered(daysAgo: number | null): string | null {
   if (daysAgo === null) return null;
@@ -286,6 +292,6 @@ export function formatRegistered(daysAgo: number | null): string | null {
   if (daysAgo < 30) return `${daysAgo} ${daysAgo === 1 ? "day" : "days"} ago`;
   const months = Math.floor(daysAgo / 30);
   if (months < 12) return `${months} ${months === 1 ? "month" : "months"} ago`;
-  const years = Math.floor(daysAgo / 365);
+  const years = Math.floor(months / 12);
   return `${years} ${years === 1 ? "year" : "years"} ago`;
 }
