@@ -12,7 +12,14 @@ const PROVIDER_NAMES: Record<string, string> = {
   copilot_studio_dataverse: "Microsoft Copilot Studio",
 };
 
-const providerName = (provider: string) =>
+/**
+ * The provider's product name, or the raw key when we have never seen it.
+ *
+ * Exported because the day-split panel names the same providers, and two
+ * tables of provider names is how one screen comes to call the same provider
+ * two different things.
+ */
+export const providerName = (provider: string) =>
   PROVIDER_NAMES[provider] ?? (provider || "Unknown provider");
 
 /** Provider reporting needs no person attribution. Missing USD stays unknown. */

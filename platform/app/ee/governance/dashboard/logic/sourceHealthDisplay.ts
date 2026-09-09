@@ -88,6 +88,18 @@ export const SOURCE_PARTIAL_META: SourceBadge = {
   color: "amber.500",
 };
 
+/**
+ * The stored completeness column as the two answers the badge understands.
+ *
+ * The column is a plain string, so anything that is neither answer — a row
+ * written before this existed, a value from a future producer this build does
+ * not know — becomes null and reads as unknown. Guessing either way is how a
+ * half-read source starts reading as fully collected.
+ */
+export function runCompleteness(stored: string | null): RunCompleteness | null {
+  return stored === "complete" || stored === "truncated" ? stored : null;
+}
+
 export function sourceBadge({
   status,
   errorCount,

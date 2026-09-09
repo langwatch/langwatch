@@ -78,6 +78,63 @@ export const governanceCostRouter = createTRPCRouter({
     }),
 
   /**
+   * The billed lane split by day AND provider over the window.
+   *
+   * Gated on the cost permission alone, like `summary` and unlike `spenders`:
+   * a provider is not a person, so this joins no identity data and buying
+   * figures is enough to see it.
+   */
+  dailyByProvider: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        windowDays: z.number().int().min(1).max(365).default(30),
+      }),
+    )
+    .permission("governanceCost:view")
+    .use(enterpriseGate)
+    .query(async ({ ctx, input }) => {
+      const service = GovernanceCostService.create({
+        prisma: ctx.prisma,
+        costRollup: getApp().governance.costRollup,
+        ocsfEvents: getApp().governance.ocsfEvents,
+      });
+      return await service.dailyByProvider({
+        organizationId: input.organizationId,
+        windowDays: input.windowDays,
+      });
+    }),
+
+  /**
+   * The records behind one day at one provider. Same grant as the figure they
+   * explain — a reader allowed to see a total is allowed to see what it is
+   * made of.
+   */
+  dayRecords: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        /** `YYYY-MM-DD`, the provider's business day in UTC. */
+        day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        provider: z.string(),
+      }),
+    )
+    .permission("governanceCost:view")
+    .use(enterpriseGate)
+    .query(async ({ ctx, input }) => {
+      const service = GovernanceCostService.create({
+        prisma: ctx.prisma,
+        costRollup: getApp().governance.costRollup,
+        ocsfEvents: getApp().governance.ocsfEvents,
+      });
+      return await service.dayRecords({
+        organizationId: input.organizationId,
+        day: input.day,
+        provider: input.provider,
+      });
+    }),
+
+  /**
    * Who spent the pulled money over the window, labeled with the People
    * screen's words. See `checkSpenderBreakdownPermissions` for why this is
    * gated harder than `summary`.

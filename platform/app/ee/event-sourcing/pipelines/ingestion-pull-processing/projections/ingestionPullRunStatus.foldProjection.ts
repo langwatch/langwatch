@@ -165,13 +165,10 @@ const ingestionPullEvents = [
 /**
  * What the run reported about how far it read, off a completion event.
  *
- * Read through a widening rather than off the event type because the two
- * fields are not on `IngestionPullRunCompletedEventSchema` yet -- that schema
- * is being changed in another branch and is held. The widening is not a
- * workaround for a missing field so much as the correct reading either way:
- * the log is append-only, every completion already on it was written before
- * runs said how far they read, and the answer for those is "we do not know"
- * rather than any particular value.
+ * Both fields are optional on the event, and that is the correct reading
+ * rather than a gap: the log is append-only, every completion already on it
+ * was written before runs said how far they read, and the answer for those is
+ * "we do not know" rather than any particular value.
  *
  * Absent means the two stay at whatever the row already held, so a producer
  * that has not been taught to report yet cannot erase what an earlier one did.
@@ -180,10 +177,7 @@ function readThroughOf(event: IngestionPullRunCompletedEvent): {
   LastReadThroughAt?: number;
   LastRunCompleteness?: "complete" | "truncated";
 } {
-  const reported = event.data as typeof event.data & {
-    readThroughAt?: number;
-    completeness?: "complete" | "truncated";
-  };
+  const reported = event.data;
   return {
     ...(typeof reported.readThroughAt === "number"
       ? { LastReadThroughAt: reported.readThroughAt }

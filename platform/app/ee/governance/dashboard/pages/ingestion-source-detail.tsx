@@ -15,6 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { confirmArchiveSource } from "@ee/governance/dashboard/logic/confirmArchiveSource";
 import {
+  runCompleteness,
   SOURCE_HEALTH_REFRESH,
   sourceBadge,
 } from "@ee/governance/dashboard/logic/sourceHealthDisplay";
@@ -121,6 +122,9 @@ function SourceDetailHeader({
   const status = sourceBadge({
     status: source.status,
     errorCount: source.errorCount,
+    // A run stopped by a page limit reports no error, so without this the
+    // badge reads Active on a source collecting a fraction of its data.
+    completeness: runCompleteness(source.lastRunCompleteness),
   });
   const StatusIcon = status.icon;
   return (

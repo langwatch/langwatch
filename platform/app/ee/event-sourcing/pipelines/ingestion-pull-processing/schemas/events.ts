@@ -93,6 +93,29 @@ export const ingestionPullRunCompletedEventDataSchema = sourceEnvelope.extend({
    * right for that history — those producers had no notion of partial success.
    */
   errorCount: z.number().int().nonnegative().optional(),
+  /**
+   * Whether the run reached the end of what it set out to read.
+   *
+   * A truncated run is not a failed one — its money and audit rows are
+   * written and its cursor advances — so this rides beside `errorCount`
+   * rather than in it. It is the only evidence separating a source stuck
+   * permanently on a fraction of its data from a healthy quiet one.
+   *
+   * Optional for the same reason `errorCount` above is: the fold reads events
+   * straight off an append-only log, and every completion written before this
+   * existed has no such key. Absent means "we do not know", which is the
+   * honest answer for that history and must never render as either value.
+   */
+  completeness: z.enum(["complete", "truncated"]).optional(),
+  /**
+   * The instant the source is known to have been read up to, epoch ms.
+   *
+   * Deliberately NOT the instant the run finished. The run clock advances on
+   * every attempt, so a stuck source re-reading the same half would look like
+   * steady progress; this value does not move until the read does. Nullable
+   * for a run that reached nowhere at all.
+   */
+  readThroughAt: z.number().nullable().optional(),
 });
 export type IngestionPullRunCompletedEventData = z.infer<
   typeof ingestionPullRunCompletedEventDataSchema

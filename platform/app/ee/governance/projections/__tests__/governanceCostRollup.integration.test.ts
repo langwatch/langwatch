@@ -858,7 +858,17 @@ describe("governance cost rollup", () => {
       });
 
       expect(lanes).toHaveLength(1);
-      expect(lanes[0]!.cellsWithoutAmount).toBe(2);
+      // Zero, and this is the whole point of the test rather than an aside.
+      // The euro and yen cells each hold a real 4.2-unit amount, and unpriced
+      // means no amount in ANY currency, so neither is unpriced. "We hold no
+      // DOLLAR figure for it" and "we hold no figure for it at all" are
+      // different questions about the same cell, and only the second one
+      // withholds the day's total. An earlier rule answered 2 here, which
+      // withheld the dollar figure of every day that touched a foreign bill.
+      // That the count is live rather than stuck at zero is pinned next door,
+      // in governanceCostRollupReads.integration.test.ts, where a cell with no
+      // currency and no money at all makes the same count read 1.
+      expect(lanes[0]!.cellsWithoutAmount).toBe(0);
       // Sorted and USD-free: USD names no currency the screen could report,
       // and an unstable order would make the rendered sentence flap.
       expect(lanes[0]!.currenciesWithoutUsdAmount).toEqual(["EUR", "JPY"]);

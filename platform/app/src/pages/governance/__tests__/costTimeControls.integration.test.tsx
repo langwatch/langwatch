@@ -73,6 +73,7 @@ vi.mock("~/utils/api", () => {
     api: {
       governanceCost: {
         spenders: recording(undefined),
+        dailyByProvider: recording(undefined),
         summary: recording({
           unavailableReason: null,
           billed: { amountUsd: 900, cellsWithoutAmount: 0 },

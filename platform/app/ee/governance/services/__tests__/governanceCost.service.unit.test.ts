@@ -344,6 +344,12 @@ describe("GovernanceCostService.summary", () => {
             billedByCurrency: [
               { currencyCode: "USD", amount: 12, previousAmount: null },
             ],
+            // Nothing on this day is billed in anything but dollars, so the
+            // dollar figure leaves nothing out and there is no currency to
+            // name. Asserted as empty rather than omitted: the field is what
+            // stops a partial figure reading as a day's total, and a day that
+            // silently dropped it would look exactly like a complete one.
+            billedCurrenciesWithoutUsdAmount: [],
           },
         ]);
       });
@@ -1009,6 +1015,7 @@ describe("GovernanceCostService.summary", () => {
           prisma: prismaWithGovProject("gov-1"),
           costRollup: {
             sumWindowByProvider: vi.fn().mockResolvedValue([]),
+            sumWindowByCurrency: vi.fn().mockResolvedValue([]),
             sumDaysByLane: vi
               .fn()
               .mockRejectedValue(new Error("cost rollup is down")),

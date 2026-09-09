@@ -198,12 +198,6 @@ function titleCaseFragment(fragment: string): string {
   return upper.charAt(0) + fragment.slice(1).toLowerCase();
 }
 
-/** "EUR", "EUR and JPY", "EUR, JPY and GBP". */
-function joinCurrencies(codes: readonly string[]): string {
-  if (codes.length <= 1) return codes[0] ?? "";
-  return `${codes.slice(0, -1).join(", ")} and ${codes[codes.length - 1]}`;
-}
-
 /**
  * Why a lane shows no total.
  *
@@ -218,20 +212,47 @@ function joinCurrencies(codes: readonly string[]): string {
  * names one — a cell recorded in dollars that still carries no dollar figure —
  * the sentence says only what we know, rather than guessing at a currency.
  */
-export function laneWithheldTotalNote({
-  currenciesWithoutUsdAmount,
-}: {
-  currenciesWithoutUsdAmount: readonly string[];
-}): string {
-  const withheld =
-    "No total is shown until every amount can be stated in US dollars.";
-  if (currenciesWithoutUsdAmount.length === 0) {
-    return `Some usage in this lane has no amount stated in US dollars. ${withheld}`;
-  }
-  return `Some usage in this lane is billed in ${joinCurrencies(
-    currenciesWithoutUsdAmount,
-  )} rather than US dollars. ${withheld}`;
+export function laneWithheldTotalNote(): string {
+  return "We hold no dollar figure for part of what this lane covers, so no total is shown for it.";
 }
+
+/**
+ * One currency total's digits, with the currency named rather than symbolised.
+ *
+ * The code, not a symbol: a symbol table is a thing that has to be exhaustive
+ * to work, and the one currency it does not know renders as the amount alone
+ * with nothing saying what it is. `EUR 40.00` is unmistakable in every
+ * currency there will ever be, and it is how the provider's own invoice reads.
+ *
+ * Same magnitude bands as the dollar figure beside it, so two totals on one
+ * card round alike. An amount we hold none of is an em dash, never a zero.
+ */
+export function formatLaneCurrencyTotal({
+  currencyCode,
+  amount,
+}: {
+  currencyCode: string;
+  amount: number | null;
+}): string {
+  const named = currencyCode === "" ? "No currency named" : currencyCode;
+  if (amount === null) return `${named} —`;
+  const magnitude = Math.abs(amount);
+  const digits =
+    magnitude >= CENTS_STOP_MATTERING_AT
+      ? GROUPED_WHOLE.format(magnitude)
+      : GROUPED_CENTS.format(magnitude);
+  return `${named} ${amount < 0 ? "-" : ""}${digits}`;
+}
+
+/** The dollar formatters' currency-free twins — same bands, no symbol. */
+const GROUPED_CENTS = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const GROUPED_WHOLE = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
 
 /**
  * The sentence the billed lane shows for each Azure billing note.

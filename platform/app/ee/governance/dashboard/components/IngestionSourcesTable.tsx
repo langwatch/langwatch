@@ -16,7 +16,7 @@ import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { confirmArchiveSource } from "../logic/confirmArchiveSource";
 import { shortPullCadence } from "../logic/pullCadence";
-import { sourceBadge } from "../logic/sourceHealthDisplay";
+import { runCompleteness, sourceBadge } from "../logic/sourceHealthDisplay";
 import {
   groupForMode,
   modeForSourceType,
@@ -185,6 +185,9 @@ function SourceTableRow({
   const status = sourceBadge({
     status: source.status,
     errorCount: source.errorCount,
+    // A run stopped by a page limit reports no error, so without this the
+    // badge reads Active on a source collecting a fraction of its data.
+    completeness: runCompleteness(source.lastRunCompleteness),
   });
   const StatusIcon = status.icon;
   const typeLabel = SOURCE_TYPE_LABEL[sourceType] ?? source.sourceType;

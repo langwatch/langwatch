@@ -41,8 +41,12 @@ import { resolveGovProjectId } from "@ee/governance/services/govProject";
 import { noDataSinceNotice } from "@ee/governance/services/pullers/sourceHealth";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { nanoUsdToDecimalString } from "~/server/gateway/wireMoney";
 import {
+  nanoMinorToDecimalString,
+  nanoUsdToDecimalString,
+} from "~/server/gateway/wireMoney";
+import {
+  GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_SOURCE,
   GOVERNANCE_SETTLING_WINDOW_DAYS,
 } from "../projections/governanceCostRollup.constants";
@@ -98,6 +102,34 @@ export interface GovernanceCostLaneDto {
    * claiming a currency it cannot support.
    */
   currenciesWithoutUsdAmount: string[];
+  /**
+   * One total per currency the lane was BILLED in, sorted by code.
+   *
+   * These REPLACE the single dollar figure rather than sitting beside it: the
+   * US dollar entry IS `amountUsd`, stated once, so a screen cannot show a
+   * withheld total next to a stated one for the same money. Money the provider
+   * priced in euros gets a line of its own instead of counting as money we
+   * hold no amount for, and NO RATE is ever applied between two lines — there
+   * is none to apply, and inventing one would put a number on the screen
+   * nobody was charged (ADR-128 §3).
+   */
+  currencyTotals: GovernanceCostCurrencyTotalDto[];
+}
+
+/**
+ * One currency's total for a lane.
+ *
+ * `amount` is in that currency's own units and is withheld under exactly the
+ * same rule as the lane figure: any cell of the line holding no amount at all
+ * withholds the whole line, because the priced part alone reads as the
+ * complete one. Zero and "no amount at all" are written the same way in the
+ * provider's own figure, which is why the count rides beside it.
+ */
+export interface GovernanceCostCurrencyTotalDto {
+  /** ISO code, or empty for cells the provider named no currency for. */
+  currencyCode: string;
+  amount: number | null;
+  cellsWithoutAmount: number;
 }
 
 /**
@@ -160,12 +192,26 @@ export interface GovernanceCostDayDto {
    */
   billedRevisedAt: number | null;
   /**
-   * What the billed lane said this day cost before that restatement. Null when
-   * no restatement happened, and null when any cell of the day can state no
-   * prior figure — a partial "was" reads as the whole one, which is the same
-   * lie `billedUsd` refuses to tell.
+   * The billed lane's day, split by the currency it was billed in, and what
+   * each currency held immediately before `billedRevisedAt`.
+   *
+   * There is no single prior dollar figure any more, and that is the point: a
+   * day reissued between two currencies that are not dollars has nothing such
+   * a field could say, which is the case this whole batch exists to get right.
+   * Each line's `previousAmount` is withheld under the same rule the figure
+   * beside it is — a partial "was" reads as the whole one — and is null rather
+   * than zero when the currency simply was not on this day before the
+   * revision.
    */
-  billedPreviousUsd: number | null;
+  billedByCurrency: GovernanceCostDayCurrencyLineDto[];
+  /**
+   * Currencies whose spend the day's dollar figure LEAVES OUT, sorted.
+   *
+   * Needed because a mixed day now shows a dollar figure that is only part of
+   * the day: money the provider priced in euros no longer withholds it. Left
+   * unsaid, the bar would read as the day's total.
+   */
+  billedCurrenciesWithoutUsdAmount: string[];
   /**
    * Whether the day is still inside its settling window, i.e. a pull touched
    * it recently enough that the provider may still move it (§15).
@@ -176,6 +222,24 @@ export interface GovernanceCostDayDto {
    * independent facts and the common case is both.
    */
   billedProvisional: boolean;
+}
+
+/**
+ * One currency of one billed day: what it holds, and what it held immediately
+ * before the day's latest revision.
+ *
+ * Amounts are in the currency's own units. Two lines are never added together
+ * and no rate is applied between them.
+ */
+export interface GovernanceCostDayCurrencyLineDto {
+  currencyCode: string;
+  amount: number | null;
+  /**
+   * Null when the currency names no earlier amount — either it was not on this
+   * day before the revision at all, or part of what the line covers can state
+   * no prior figure and a partial "was" is withheld whole.
+   */
+  previousAmount: number | null;
 }
 
 /**
@@ -280,6 +344,49 @@ export interface GovernanceSpenderRowDto {
   cellsWithoutAmount: number;
 }
 
+/**
+ * One (day, provider) figure of the billed lane.
+ *
+ * A separate figure per pair, never one for the day and one for the provider:
+ * the whole point is to say which provider a day belongs to.
+ */
+export interface GovernanceCostProviderDayRowDto {
+  /** `YYYY-MM-DD`, the provider's business day in UTC. */
+  day: string;
+  provider: string;
+  /** Withheld (null) unless every cell behind it holds an amount. */
+  amountUsd: number | null;
+  cellsWithoutAmount: number;
+}
+
+export interface GovernanceCostProviderDayBreakdownDto {
+  unavailableReason: GovernanceCostUnavailableReason | null;
+  /** Oldest day first, provider-alphabetical within a day. Empty while unavailable. */
+  rows: GovernanceCostProviderDayRowDto[];
+  windowDays: number;
+}
+
+/**
+ * One record behind a (day, provider) figure: what it was for and what it
+ * cost.
+ *
+ * Two facts and no third. The screen asked for what a charge was for and what
+ * it came to, and every extra dimension offered here is one a reader has to
+ * decide to ignore.
+ */
+export interface GovernanceCostDayRecordDto {
+  /** The model, and the agent beside it when the provider named one. */
+  label: string;
+  amountUsd: number | null;
+  cellsWithoutAmount: number;
+}
+
+export interface GovernanceCostDayRecordsDto {
+  unavailableReason: GovernanceCostUnavailableReason | null;
+  /** Largest figure first, withheld ones after. Empty while unavailable. */
+  records: GovernanceCostDayRecordDto[];
+}
+
 export interface GovernanceSpenderBreakdownDto {
   unavailableReason: GovernanceCostUnavailableReason | null;
   /**
@@ -299,6 +406,7 @@ function laneWithoutFigure(): GovernanceCostLaneDto {
     amountUsd: null,
     cellsWithoutAmount: 0,
     currenciesWithoutUsdAmount: [],
+    currencyTotals: [],
   };
 }
 
@@ -401,15 +509,34 @@ export class GovernanceCostService {
     // still fails the whole summary: this screen is about money, and a money
     // lane that swallowed its own failure would render an absence as a
     // measurement.
-    const [rows, seats, staleSources, azureBilling, unpricedWindow, providers] =
-      await Promise.all([
-        costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
-        this.readSeats({ tenantId }),
-        this.readStaleSources({ organizationId }),
-        this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
-        this.readUnpricedWindow({ organizationId }),
-        costRollup.sumWindowByProvider({ tenantId, fromDay, toDay }),
-      ]);
+    const [
+      rows,
+      seats,
+      staleSources,
+      azureBilling,
+      unpricedWindow,
+      providers,
+      billedCurrencies,
+    ] = await Promise.all([
+      costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
+      this.readSeats({ tenantId }),
+      this.readStaleSources({ organizationId }),
+      this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
+      this.readUnpricedWindow({ organizationId }),
+      costRollup.sumWindowByProvider({ tenantId, fromDay, toDay }),
+      // The billed lane's currency lines come from their OWN window read
+      // rather than from folding the day rows, because the lane's headline
+      // does too. Both describe the same snapshot that way, which is the
+      // guarantee the read below the comment is about; folding one from days
+      // and reading the other from the window would let a backfill land
+      // between them and put two answers for the same money on one card.
+      costRollup.sumWindowByCurrency({
+        tenantId,
+        fromDay,
+        toDay,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      }),
+    ]);
 
     return {
       unavailableReason: null,
@@ -422,6 +549,7 @@ export class GovernanceCostService {
             providers.flatMap((row) => row.currenciesWithoutUsdAmount),
           ),
         ].sort(),
+        currencyTotals: currencyTotalsFrom(billedCurrencies),
       },
       providers: providers.map((row) => ({
         provider: row.provider,
@@ -521,6 +649,111 @@ export class GovernanceCostService {
     }
 
     return { unavailableReason: null, rows, windowDays };
+  }
+
+  /**
+   * The billed lane split by day AND provider over the window.
+   *
+   * The screen could already say what a provider cost over a quarter, and what
+   * the organization spent on a given day. It could not say which provider
+   * caused a day that stood out, which is the first question anybody asks of a
+   * day that stood out.
+   *
+   * Each figure obeys the same withholding rule as every other on this screen:
+   * a (day, provider) holding any cell we have no amount for states no figure,
+   * because the priced part alone reads as the whole one and the reader has no
+   * way to see it is short.
+   */
+  async dailyByProvider({
+    organizationId,
+    windowDays,
+    now = new Date(),
+  }: {
+    organizationId: string;
+    windowDays: number;
+    now?: Date;
+  }): Promise<GovernanceCostProviderDayBreakdownDto> {
+    const { costRollup, prisma } = this.deps;
+    if (!costRollup) {
+      return { unavailableReason: "no_cost_store", rows: [], windowDays };
+    }
+    const tenantId = await resolveGovProjectId({ prisma, organizationId });
+    if (!tenantId) {
+      return {
+        unavailableReason: "no_governance_project",
+        rows: [],
+        windowDays,
+      };
+    }
+
+    const toDay = utcDay(now);
+    const fromDay = utcDay(
+      new Date(now.getTime() - (windowDays - 1) * 86_400_000),
+    );
+    const groups = await costRollup.sumDaysByProvider({
+      tenantId,
+      fromDay,
+      toDay,
+    });
+
+    return {
+      unavailableReason: null,
+      rows: groups.map((group) => ({
+        day: group.day,
+        provider: group.provider,
+        ...spenderFigure([group]),
+      })),
+      windowDays,
+    };
+  }
+
+  /**
+   * The records behind ONE day at ONE provider: what each was for, and what it
+   * cost.
+   *
+   * "What it was for" is the model, and the agent beside it when the provider
+   * named one — those are the dimensions the figure was grouped by, so the
+   * records add up to exactly the figure a reader clicked and no residue is
+   * left over for them to wonder about.
+   */
+  async dayRecords({
+    organizationId,
+    day,
+    provider,
+  }: {
+    organizationId: string;
+    /** `YYYY-MM-DD`, the provider's business day in UTC. */
+    day: string;
+    provider: string;
+  }): Promise<GovernanceCostDayRecordsDto> {
+    const { costRollup, prisma } = this.deps;
+    if (!costRollup) {
+      return { unavailableReason: "no_cost_store", records: [] };
+    }
+    const tenantId = await resolveGovProjectId({ prisma, organizationId });
+    if (!tenantId) {
+      return { unavailableReason: "no_governance_project", records: [] };
+    }
+
+    const groups = await costRollup.sumDayRecordsByProvider({
+      tenantId,
+      day,
+      provider,
+    });
+
+    return {
+      unavailableReason: null,
+      records: groups
+        .map((group) => ({
+          label: recordLabel(group),
+          ...spenderFigure([group]),
+        }))
+        .sort(
+          (a, b) =>
+            (b.amountUsd ?? -1) - (a.amountUsd ?? -1) ||
+            a.label.localeCompare(b.label),
+        ),
+    };
   }
 
   private readonly people = new DiscoveredPersonRepository();
@@ -778,18 +1011,17 @@ function seatsFrom(
     : { status: "awaiting_data" };
 }
 
-type LaneRow = {
-  day: string;
-  costSource: string;
-  amountNanoUsd: number | null;
-  cellsWithoutAmount: number;
-  currenciesWithoutUsdAmount: string[];
-  /** Unix SECONDS — see the repository; these two are `DateTime` columns. */
-  revisedAt: number | null;
-  previousAmountNanoUsd: number | null;
-  cellsWithoutPreviousAmount: number;
-  lastObservedAt: number;
-};
+/**
+ * One (day, lane) row, exactly as the repository answers it.
+ *
+ * DERIVED rather than restated. It used to be a hand-written mirror of the
+ * repository's return type, which is a second place to remember: a field added
+ * to the read landed here as a compile error only if somebody thought to
+ * copy it, and a field whose meaning changed would not have shown up at all.
+ */
+type LaneRow = Awaited<
+  ReturnType<GovernanceCostRollupClickHouseRepository["sumDaysByLane"]>
+>[number];
 
 /**
  * Nano-USD to the dollar figure the screen renders, or null.
@@ -854,6 +1086,29 @@ function isWithinSettlingWindow({
 type SpenderGroup = Awaited<
   ReturnType<GovernanceCostRollupClickHouseRepository["sumWindowBySpender"]>
 >[number];
+
+/**
+ * What one record was for, in the provider's own words.
+ *
+ * The model alone when that is all the provider named, and "model (agent)"
+ * when it named both — one spender spends through several agents and a list
+ * showing the model twice with two different figures reads as a bug. Neither
+ * is translated or prettified here: a reader matches this against the
+ * provider's own invoice, and a name we improved is a name that no longer
+ * matches.
+ */
+function recordLabel({
+  model,
+  agentId,
+}: {
+  model: string;
+  agentId: string;
+}): string {
+  if (model === "" && agentId === "") return "Not named";
+  if (agentId === "") return model;
+  if (model === "") return agentId;
+  return `${model} (${agentId})`;
+}
 
 /** NUL never appears in a provider name, so the key cannot be forged by an id. */
 function spenderKey(provider: string, rawActorId: string): string {
@@ -929,6 +1184,125 @@ function previousFigureFor(row: LaneRow): number | null {
 }
 
 /**
+ * One figure in a currency that may not be dollars, under the same withholding
+ * rule every other figure on this screen obeys.
+ *
+ * `nanoMinorToDecimalString` rather than the USD one because nothing about the
+ * arithmetic is dollar-specific — the stored unit is nano of the currency's
+ * major unit either way — and calling the USD function would be a claim about
+ * the currency in the name of a value that is not in it.
+ */
+function minorFigure({
+  totalNanoMinor,
+  cellsWithoutAmount,
+}: {
+  totalNanoMinor: number | null;
+  cellsWithoutAmount: number;
+}): number | null {
+  if (cellsWithoutAmount > 0 || totalNanoMinor === null) return null;
+  return Number(nanoMinorToDecimalString(BigInt(totalNanoMinor)));
+}
+
+/** The lane's per-currency window totals, as the per-currency read answers them. */
+function currencyTotalsFrom(
+  rows: readonly {
+    currencyCode: string;
+    amountNanoMinor: number | null;
+    cellsWithoutAmount: number;
+  }[],
+): GovernanceCostCurrencyTotalDto[] {
+  return rows
+    .map((row) => ({
+      currencyCode: row.currencyCode,
+      amount: minorFigure({
+        totalNanoMinor: row.amountNanoMinor,
+        cellsWithoutAmount: row.cellsWithoutAmount,
+      }),
+      cellsWithoutAmount: row.cellsWithoutAmount,
+    }))
+    .sort((a, b) => a.currencyCode.localeCompare(b.currencyCode));
+}
+
+/**
+ * A lane's per-currency window totals folded from its own DAY rows.
+ *
+ * Used for the gateway lane, whose headline is folded from the same rows, so
+ * the lines and the figure over them describe one snapshot. The billed lane
+ * takes its lines from the window read instead, for exactly the same reason —
+ * see the comment on that read in `summary`.
+ */
+function currencyTotalsFoldedFrom(
+  rows: readonly LaneRow[],
+): GovernanceCostCurrencyTotalDto[] {
+  const byCode = new Map<
+    string,
+    { amountNanoMinor: number | null; cellsWithoutAmount: number }
+  >();
+  for (const row of rows) {
+    for (const line of row.byCurrency) {
+      const held = byCode.get(line.currencyCode) ?? {
+        amountNanoMinor: null,
+        cellsWithoutAmount: 0,
+      };
+      byCode.set(line.currencyCode, {
+        amountNanoMinor:
+          line.amountNanoMinor === null
+            ? held.amountNanoMinor
+            : (held.amountNanoMinor ?? 0) + line.amountNanoMinor,
+        cellsWithoutAmount: held.cellsWithoutAmount + line.cellsWithoutAmount,
+      });
+    }
+  }
+  return currencyTotalsFrom(
+    [...byCode.entries()].map(([currencyCode, held]) => ({
+      currencyCode,
+      ...held,
+    })),
+  );
+}
+
+/**
+ * The billed day's currency lines, and what each held before its revision.
+ *
+ * A day whose read answers no currency lines at all falls back to the single
+ * US dollar line the day-level figures already describe. That is not a shape
+ * the store produces — a day that holds cells holds at least one currency —
+ * but a day read through anything that answers only the day-level fields
+ * still holds dollars, and a card with no line at all would say the day held
+ * nothing.
+ */
+function dayCurrencyLinesFrom(
+  row: LaneRow,
+): GovernanceCostDayCurrencyLineDto[] {
+  if (row.byCurrency.length === 0) {
+    return [
+      {
+        currencyCode: GOVERNANCE_COST_CURRENCY_USD,
+        amount: figureFor([row]),
+        previousAmount: previousFigureFor(row),
+      },
+    ];
+  }
+  return row.byCurrency.map((line) => ({
+    currencyCode: line.currencyCode,
+    amount: minorFigure({
+      totalNanoMinor: line.amountNanoMinor,
+      cellsWithoutAmount: line.cellsWithoutAmount,
+    }),
+    // A day nobody revised names no earlier amount on any of its lines: there
+    // is no moment to have held something before, and the marker that would
+    // carry it is not rendered anyway.
+    previousAmount:
+      row.revisedAt === null
+        ? null
+        : minorFigure({
+            totalNanoMinor: line.previousAmountNanoMinor,
+            cellsWithoutAmount: line.cellsWithoutPreviousAmount,
+          }),
+  }));
+}
+
+/**
  * One lane's window total.
  *
  * A lane with no rows at all, a lane whose every row holds no figure, and a
@@ -950,6 +1324,7 @@ function totalFor(
     currenciesWithoutUsdAmount: [
       ...new Set(lane.flatMap((row) => row.currenciesWithoutUsdAmount)),
     ].sort(),
+    currencyTotals: currencyTotalsFoldedFrom(lane),
   };
 }
 
@@ -978,7 +1353,8 @@ function seriesFrom(
       billedCellsWithoutAmount: 0,
       gatewayCellsWithoutAmount: 0,
       billedRevisedAt: null,
-      billedPreviousUsd: null,
+      billedByCurrency: [],
+      billedCurrenciesWithoutUsdAmount: [],
       billedProvisional: false,
     };
     if (row.costSource === GOVERNANCE_COST_SOURCE.PULLED) {
@@ -986,7 +1362,8 @@ function seriesFrom(
       entry.billedCellsWithoutAmount = row.cellsWithoutAmount;
       entry.billedRevisedAt =
         row.revisedAt === null ? null : row.revisedAt * 1000;
-      entry.billedPreviousUsd = previousFigureFor(row);
+      entry.billedByCurrency = dayCurrencyLinesFrom(row);
+      entry.billedCurrenciesWithoutUsdAmount = row.currenciesWithoutUsdAmount;
       // The settling window is per SOURCE, and this row spans every source the
       // billed lane holds that day. Every source runs on the default today —
       // only Anthropic's window has been measured, and the rest are provisional

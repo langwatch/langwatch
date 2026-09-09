@@ -65,12 +65,20 @@ function registerIngestionPullPipeline(
       ),
       dispatch: {
         runPort: {
-          run: (params) =>
-            runIngestionPull({
+          run: async (params) => {
+            const outcome = await runIngestionPull({
               ...params,
               pulledUsage: deps.pulledUsage,
               identityMatch: deps.identityMatch,
-            }),
+            });
+            return {
+              ...outcome,
+              // The durable log carries instants as epoch milliseconds, so
+              // the conversion happens once, here at the seam, rather than
+              // giving the worker a second money-shaped date type to hold.
+              readThroughAt: outcome.readThroughAt?.getTime() ?? null,
+            };
+          },
         },
         agentListingPort: createAgentListingPort({ prisma: deps.prisma }),
         peopleListingPort: createPeopleListingPort({ prisma: deps.prisma }),

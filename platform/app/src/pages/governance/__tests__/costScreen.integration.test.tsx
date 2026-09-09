@@ -102,9 +102,11 @@ vi.mock("~/utils/api", () => {
         summary: {
           useQuery: () => harness.query,
         },
-        // The spender panel is its own read with its own tests; here it
-        // answers nothing so the lane assertions stay about the lanes.
+        // The spender panel and the day split are their own reads with their
+        // own tests; here they answer nothing so the lane assertions stay
+        // about the lanes.
         spenders: empty,
+        dailyByProvider: empty,
       },
       activityMonitor: {
         summary: empty,
