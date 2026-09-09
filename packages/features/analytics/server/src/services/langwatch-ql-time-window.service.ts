@@ -1,6 +1,6 @@
-import { z } from "zod";
 /**
- * LangWatchQL analytics SQL — what a surface may do with the reserved time-window names, and the two ways it may not.
+ * LangWatchQL analytics SQL — what a surface may do with the reserved
+ * time-window names, and the two ways it may not.
  * @see ./errors.ts — the two refusals
  * @see packages/features/analytics/specs/analytics-lwql-workbench.feature
  */
@@ -56,7 +56,7 @@ function valueFor(name: LangWatchQLTimeWindowParameter, timeWindow: LangWatchQLT
   );
 }
 
-function withInjected({
+function findInjected({
   parameters,
   injected,
 }: {
@@ -107,11 +107,11 @@ export interface LangWatchQLGranularityResolution {
 }
 
 /**
- * The finest offered step whose bucket count fits the ceiling, for the surfaces that coarsen instead of refusing.
- * Undefined when even the coarsest offered step overflows: the ceiling is a hard browser-safety cap, so a window
- * nothing fits must refuse rather than hand back an in-budget-looking answer carrying many times the budget.
+ * The finest offered step whose bucket count fits the ceiling, for a surface
+ * that coarsens instead of refusing. Undefined when even the coarsest step
+ * overflows, which the caller must refuse.
  */
-function finestFittingStep(windowSeconds: number): number | undefined {
+function findFinestFittingStep(windowSeconds: number): number | undefined {
   for (const step of LWQL_GRANULARITY_STEPS) {
     if (bucketCount(windowSeconds, step) <= LWQL_GRANULARITY_MAX_BUCKETS) {
       return step;
@@ -204,7 +204,7 @@ function resolveAgainstBudget({
     });
   }
 
-  const effective = finestFittingStep(windowSeconds);
+  const effective = findFinestFittingStep(windowSeconds);
   if (effective === undefined) {
     // Even the one-hour floor overflows: refuse with the same arithmetic the
     // refuse path names, so the caller learns the window is what must narrow.
@@ -226,54 +226,6 @@ function resolveAgainstBudget({
     ...(effective > granularitySeconds ? { coarsenedFromSeconds: granularitySeconds } : {}),
   };
 }
-
-/**
- * The period a caller reports over, as every door accepts it.
- * @see ./timeWindow.ts — the vocabulary these values fill
- */
-
-/**
- * The widest and narrowest UTC years a bound may land on. `Date` parses ISO strings with an
- * extended six-digit year (`+010000-01-01`), which then formats with five digits everywhere
- * downstream. Nothing a caller legitimately reports over lives outside the four-digit range.
- */
-const MIN_UTC_YEAR = 0;
-const MAX_UTC_YEAR = 9999;
-
-/**
- * A coerced bound that only accepts what a caller can actually have sent. The union runs BEFORE
- * coercion on purpose.
- */
-const lwqlTimeWindowBound = z
-  .union([z.string(), z.number(), z.date()])
-  .pipe(z.coerce.date())
-  .refine(
-    (value) => {
-      const year = value.getUTCFullYear();
-
-      return year >= MIN_UTC_YEAR && year <= MAX_UTC_YEAR;
-    },
-    {
-      message: `UTC year must be between ${MIN_UTC_YEAR} and ${MAX_UTC_YEAR}.`,
-    },
-  );
-
-export const lwqlTimeWindowSchema = z.object({
-  start: lwqlTimeWindowBound,
-  end: lwqlTimeWindowBound,
-});
-
-/**
- * The datapoint step a caller may request, as every door accepts it — one of the offered {@link
- * LWQL_GRANULARITY_STEPS}, nothing else.
- */
-export const lwqlGranularityStepSchema = z.union(
-  LWQL_GRANULARITY_STEPS.map((step) => z.literal(step)) as [
-    z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>,
-    z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>,
-    ...z.ZodLiteral<(typeof LWQL_GRANULARITY_STEPS)[number]>[],
-  ],
-);
 
 /**
  * What the reserved period parameters mean for one request: the window a
@@ -347,7 +299,7 @@ export class LangWatchQLTimeWindowService {
         valueFor(parameter.name as LangWatchQLTimeWindowParameter, timeWindow),
       ]),
     );
-    const merged = withInjected({ parameters, injected });
+    const merged = findInjected({ parameters, injected });
 
     return {
       ...(merged ? { parameters: merged } : {}),
@@ -357,9 +309,9 @@ export class LangWatchQLTimeWindowService {
   }
 
   /**
-   * The save-time half of the granularity contract, shared by every door that persists a statement: a
-   * granularity declaration is only meaningful when both period bounds are declared too -- without them
-   * the bucket budget the dashboard computes is uncomputable -- and only when declared as `UInt32`.
+   * The save-time half of the granularity contract: a granularity declaration
+   * is only meaningful when both period bounds are declared too, and only when
+   * declared as `UInt32`.
    */
   assertGranularityDeclaration(declared: readonly LangWatchQLParameter[]): void {
     const declaredGranularity = declared.find(

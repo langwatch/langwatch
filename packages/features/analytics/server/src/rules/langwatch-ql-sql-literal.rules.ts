@@ -5,12 +5,6 @@
  */
 
 /**
- * Longest statement any LangWatchQL surface accepts. A shape ceiling rather than a cost one —
- * the cost ceilings are pinned server-side by the settings profile.
- */
-export const MAX_LWQL_LENGTH = 50_000;
-
-/**
  * Identifier shape both ClickHouse and PostgreSQL accept unquoted. Names come from deployment
  * configuration rather than from a request, so the check the service applies is a
  * programming-error guard, not a customer-facing one.

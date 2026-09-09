@@ -1,5 +1,25 @@
 export { AnalyticsAdapter } from "./adapters/analytics.adapter.ts";
 export { analyticsServer } from "./analytics.server.ts";
+
+/** The transport declarations a process mounts, and the doors they open on. */
+export {
+  analyticsRest,
+  analyticsTimeseriesResponseSchema,
+  analyticsTimeseriesRestBodySchema,
+} from "./transport/analytics.rest.ts";
+export { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
+export {
+  AnalyticsQueryApi,
+  langWatchQLCallerProtections,
+  queryRest,
+} from "./transport/query.rest.ts";
+export {
+  SavedWorkbenchChartApi,
+  savedWorkbenchChartRest,
+  savedWorkbenchChartUrl,
+} from "./transport/saved-workbench-chart.rest.ts";
+export { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
+export { AnalyticsLwqlApi, analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
 export {
   AnalyticsApp,
   type AnalyticsInfrastructure,
@@ -46,11 +66,6 @@ export {
   type LangWatchQLResultLimits,
 } from "./ports/langwatch-ql-executor.port.ts";
 export { ClickHouseLangWatchQLExecutorAdapter } from "./adapters/clickhouse.langwatch-ql-executor.adapter.ts";
-export { MAX_LWQL_LENGTH } from "./rules/langwatch-ql-sql-literal.rules.ts";
-export {
-  lwqlGranularityStepSchema,
-  lwqlTimeWindowSchema,
-} from "./services/langwatch-ql-time-window.service.ts";
 
 /**
  * The filter picker: the values one field can offer, and the two facts a door
@@ -86,7 +101,6 @@ export {
   QueryTimeoutError,
 } from "@langwatch/analytics-contract";
 export { generateClickHouseFilterConditions } from "./rules/analytics-filter-conditions.rules.ts";
-export type { SavedWorkbenchChartRestService } from "./services/langwatch-ql-route-guards.service.ts";
 
 // The LangWatchQL key map: the row a project's access is granted by, written at
 // project creation and repaired by the deploy backfill.

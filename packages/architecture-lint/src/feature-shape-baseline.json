@@ -55,14 +55,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "analytics|legacy-transport-runtime",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "analytics|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "analytics|nested-web-entry",
       "measured": "2026-09-08"
     },

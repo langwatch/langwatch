@@ -1,20 +1,21 @@
 /**
- * The questions the LangWatchQL analytics SQL API answers, asked against an engineered seed across two tenants.
+ * The questions the LangWatchQL analytics SQL API answers, asked against an
+ * engineered seed across two tenants.
  * @see specs/analytics/lwql-api.feature
  * @vitest-environment node
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { Hono } from "hono";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { SHIPPED_LWQL_DEDUP } from "../../../services/langwatch-ql-view-statements.service.ts";
-import { LangWatchQLViewProvisioningService } from "../../../services/langwatch-ql-view-provisioning.service.ts";
-import { LangWatchQLCapabilityService } from "../../../services/langwatch-ql-capability.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
+import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
+import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
 
-import { ClickHouseLangWatchQLExecutorAdapter } from "../../../adapters/clickhouse.langwatch-ql-executor.adapter.ts";
-import { LangWatchQLService } from "../../../services/langwatch-ql.service.ts";
+import { ClickHouseLangWatchQLExecutorAdapter } from "../../adapters/clickhouse.langwatch-ql-executor.adapter.ts";
+import { LangWatchQLService } from "../../services/langwatch-ql.service.ts";
 import {
   type LangWatchQLClickHouseHarness,
   type LangWatchQLPostgresHarness,
@@ -22,8 +23,8 @@ import {
   postgresTenantSeedStatements,
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
-} from "../../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
-import { createQueryRestApp } from "../query.api.ts";
+} from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
+import { langWatchQLCallerProtections, queryRest, type AnalyticsQueryApi } from "../query.rest.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 
@@ -1356,55 +1357,45 @@ function mountQueryDoor({
   tenant: () => QueryTenant;
   service: () => LangWatchQLService;
 }): { fetch: (path: string, init?: RequestInit) => Promise<Response> } {
+  const projectScope = () => ({ tier: "project" as const, id: tenant().id });
+
+  const runtime = createRestRuntime({
+    // The whole of the credential chain this test fakes: one authenticated
+    // tenant, resolved as the project scope every handler reads.
+    identity: {
+      authenticate: () => ({ actor: { type: "api_key", id: "key-asking" }, scope: projectScope() }),
+    },
+  });
+
+  const queryApi: AnalyticsQueryApi = {
+    runCallerFor: async () => tenant(),
+    describeSchema: (input) => service().describeSchema(input),
+    execute: (input) => service().execute(input),
+  };
+
   const app = new Hono().route(
     "/",
-    createQueryRestApp({
-      security: passThroughSecurity(tenant),
-      ports: {
-        projects: () => ({ getById: async () => tenant() }) as never,
-        langWatchQL: service,
-        protectionsFor: async () => ({
+    runtime.mount(queryRest.router(), {
+      app: () => queryApi,
+      onError: renderHandled,
+      facts: [
+        bindRestMiddleware(langWatchQLCallerProtections, () => ({
           canSeeCosts: true,
           canSeeCapturedInput: true,
           canSeeCapturedOutput: true,
-        }),
-      } as never,
+        })),
+      ],
     }),
   );
+
   return {
     fetch: async (path: string, init?: RequestInit) =>
       await app.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
 
-function passThroughSecurity(tenant: () => QueryTenant): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const asProject: MiddlewareHandler = async (c, next) => {
-    c.set("project", { ...tenant(), slug: "asking", teamId: "team-1", name: "Asking" });
-    await next();
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: () => asProject,
-    authorizeProjectPermission: () => noop,
-    authorizeApiKeyCeiling: () => noop,
-    authenticateOrganization: () => noop,
-    authorizeOrganizationPermission: () => noop,
-    authorizeRouteTeamPermission: () => noop,
-    authorizeRouteProjectPermission: () => noop,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: () => noop,
-  } as never);
-}
-
 /** A handled refusal must reach the caller at its own status with its own code. */
-const renderHandled: ErrorHandler = (error, c) => {
+const renderHandled: RestErrorHandler = (error, c) => {
   const handled = error as { httpStatus?: number; code?: string; message?: string };
   if (typeof handled.httpStatus === "number") {
     return c.json(

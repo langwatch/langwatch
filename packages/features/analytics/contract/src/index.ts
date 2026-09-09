@@ -8,6 +8,9 @@ export {
 } from "./analytics.precondition-matchers.ts";
 export * from "./analytics.service.ts";
 export * from "./analytics.api.ts";
+export * from "./analytics.trpc.ts";
+export * from "./analytics-lwql.trpc.ts";
+export * from "./analytics-lwql.schemas.ts";
 export * from "./analytics.lwql.ts";
 export * from "./analytics.lwql-time-window.ts";
 export * from "./series-points.ts";
