@@ -6,16 +6,26 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { models } from "../config/models";
 import { beforeSessionCreate } from "../hooks";
-import { PasskeySignUpRegistration } from "../passkey-signup";
+import {
+  PASSKEY_SIGNUP_EMAIL_TAKEN,
+  type PasskeySignUpAddressHolder,
+  PasskeySignUpRegistration,
+} from "../passkey-signup";
 
 vi.mock("~/env.mjs", () => ({
   env: { NEXTAUTH_SECRET: "passkey-proof-first-test-secret" },
 }));
 
-vi.mock("~/server/users/credential-user", () => ({
-  belongsToSomebody: () => false,
-  PasskeySignUpAddressTakenError: class extends Error {},
-}));
+// `~/server/users/credential-user` is deliberately NOT mocked. It holds
+// `belongsToSomebody`, which is the decision the registration guard makes —
+// half-made ceremony wreckage, let them retry, against somebody else's
+// account, refuse — and it holds `PasskeySignUpAddressTakenError`, which the
+// write path maps to a refusal by `instanceof`. Standing either one in would
+// disarm the predicate this file is the only place that exercises against a
+// real plugin, and a bare `class extends Error {}` would break the mapping
+// outright. The module is framework-free and store-free (its own header says
+// so), so there is nothing to isolate from. The sibling
+// `passkey-signup.unit.test.ts` states the same rule for the same reason.
 
 type Row = Record<string, unknown>;
 
@@ -255,5 +265,129 @@ describe("real BetterAuth proof-first passkey enrollment", () => {
     });
     expect(db.passkey).toHaveLength(1);
     expect(db.Session).toHaveLength(1);
+  });
+});
+
+/**
+ * The taken-address guard, driven through the real plugin.
+ *
+ * `belongsToSomebody` is the line between "an earlier ceremony died and this
+ * person should get their address back" and "this is somebody else's account,
+ * refuse" — and the whole point of this file is that it is the one place the
+ * real plugin, the real attestation check and the real predicate meet. So the
+ * predicate is exercised here on both of its answers, over the rows a
+ * directory really returns, rather than being taken on trust from a stand-in.
+ */
+describe("the taken-address guard, through the real plugin", () => {
+  const guardedOptions = async (
+    holder: PasskeySignUpAddressHolder | null,
+  ): Promise<Response> => {
+    const email = "guarded@example.com";
+    const db: Record<string, Row[]> = {
+      User: [],
+      Account: [],
+      Session: [],
+      VerificationToken: [],
+      passkey: [],
+    };
+    const registration = new PasskeySignUpRegistration({
+      eligibility: { isAllowed: async () => true },
+      directory: { findAddressHolder: async () => holder },
+      accounts: {
+        createPasskeyUser: async () => ({ id: "unused", created: true }),
+      },
+      verification: {
+        validateAddressProof: async () => true,
+        claimAddressProof: async () => true,
+      },
+    });
+    const auth = betterAuth({
+      baseURL: "http://localhost:3000",
+      secret: "test-secret-test-secret-test-secret",
+      database: memoryAdapter(db),
+      ...models(),
+      plugins: [
+        passkey({
+          rpName: "LangWatch",
+          registration: {
+            requireSession: false,
+            resolveUser: (args) => registration.resolveUser(args),
+            afterVerification: (args) => registration.afterVerification(args),
+          },
+        }),
+      ],
+    });
+    const context = encodeURIComponent(
+      JSON.stringify({
+        email,
+        claim: "a".repeat(43),
+        addressProof: "mailbox-proof",
+      }),
+    );
+    return auth.handler(
+      new Request(
+        `http://localhost:3000/api/auth/passkey/generate-register-options?context=${context}`,
+        { headers: { origin: "http://localhost:3000" } },
+      ),
+    );
+  };
+
+  describe("given an address whose account holds no way to sign in", () => {
+    describe("when a passkey sign-up arrives for it", () => {
+      it("lets the ceremony open rather than burning the address", async () => {
+        // Exactly what a sign-up that died between the account write and the
+        // browser prompt leaves behind: a row, and nothing on it anybody
+        // could present. Refusing this is how an address becomes permanently
+        // unusable by the person who owns it.
+        const options = await guardedOptions({
+          id: "wreckage-user",
+          accounts: [],
+          accountCredentials: [],
+          passkeys: [],
+          orgMemberships: [],
+        });
+
+        expect(options.status).toBe(200);
+      });
+    });
+  });
+
+  describe("given an address somebody actually holds", () => {
+    describe("when a passkey sign-up arrives for it", () => {
+      it("refuses it in the taken-address vocabulary", async () => {
+        const options = await guardedOptions({
+          id: "real-user",
+          accounts: [{ provider: "credential", password: "argon2-hash" }],
+          accountCredentials: [],
+          passkeys: [],
+          orgMemberships: [],
+        });
+        const body = (await options.json()) as { code?: string };
+
+        // The code the sign-up screen watches for to turn itself into the
+        // log-in screen. A different one, or a bare failure, and the person
+        // is told nothing they can act on.
+        expect(options.status).toBe(400);
+        expect(body.code).toBe(PASSKEY_SIGNUP_EMAIL_TAKEN);
+      });
+    });
+  });
+
+  describe("given an account whose only rows are a membership", () => {
+    describe("when a passkey sign-up arrives for it", () => {
+      it("still refuses, because membership makes the account somebody's", async () => {
+        const options = await guardedOptions({
+          id: "member-user",
+          accounts: [],
+          accountCredentials: [],
+          passkeys: [],
+          orgMemberships: [{ organizationId: "org-1" }],
+        });
+        const body = (await options.json()) as { code?: string };
+
+        expect(options.status).toBe(400);
+        expect(body.code).toBe(PASSKEY_SIGNUP_EMAIL_TAKEN);
+      });
+    });
   });
 });

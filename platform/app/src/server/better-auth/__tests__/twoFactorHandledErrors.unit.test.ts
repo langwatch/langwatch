@@ -102,6 +102,60 @@ describe("the two-factor endpoints' refusals", () => {
     });
   });
 
+  describe("given the plugin has stopped answering after repeated wrong codes", () => {
+    describe("when it refuses with its own attempt-limit code", () => {
+      /**
+       * The lockout reaches this boundary under TWO of better-auth's codes,
+       * not one, and only the other was ever asserted. They are the same
+       * event to the person in front of the screen — the factor has stopped
+       * answering and there is a wait — so they answer with the same code and
+       * the same words. Naming only one of them is how the other quietly
+       * becomes "something went wrong": a person told that goes and burns
+       * backup codes against a factor that was never going to answer.
+       */
+      /** @scenario "Repeated wrong codes stop the factor answering for a while" */
+      it("names the lockout rather than a wrong code", async () => {
+        const translated = await translateBetterAuthError({
+          response: refusal({
+            code: "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE",
+            status: 429,
+          }),
+          path: "/api/auth/two-factor/verify-totp",
+        });
+
+        const body = await bodyOf(translated);
+        expect(body.error).toBe("identity_mfa_locked_out");
+        expect(body.error).not.toBe("identity_mfa_code_invalid");
+        expect(translated.status).toBe(429);
+      });
+
+      /** @scenario "Repeated wrong codes stop the factor answering for a while" */
+      it("answers it exactly the way the plugin's other lockout code is answered", async () => {
+        const [attemptLimit, temporarilyLocked] = await Promise.all([
+          translateBetterAuthError({
+            response: refusal({
+              code: "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE",
+              status: 429,
+            }),
+            path: "/api/auth/two-factor/verify-totp",
+          }).then(bodyOf),
+          translateBetterAuthError({
+            response: refusal({
+              code: "ACCOUNT_TEMPORARILY_LOCKED",
+              status: 429,
+            }),
+            path: "/api/auth/two-factor/verify-totp",
+          }).then(bodyOf),
+        ]);
+
+        // Which of the plugin's two counters tripped is its business, and
+        // telling them apart on the wire would say something about how the
+        // limit is configured without helping anybody get back in.
+        expect(attemptLimit).toEqual(temporarilyLocked);
+      });
+    });
+  });
+
   describe("given a wrong code of either kind", () => {
     /** @scenario Backup codes are locked out with everything else */
     it("collapses both to one refusal, so the endpoint is no oracle", async () => {
