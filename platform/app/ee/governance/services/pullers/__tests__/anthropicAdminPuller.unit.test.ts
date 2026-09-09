@@ -699,7 +699,9 @@ describe("the Anthropic Admin puller", () => {
           costConfig,
         );
         cursor = cutOff.cursor!;
-        positions.push((JSON.parse(cursor) as { startingAt: string }).startingAt);
+        positions.push(
+          (JSON.parse(cursor) as { startingAt: string }).startingAt,
+        );
       }
 
       expect(positions).toEqual([
