@@ -16,9 +16,11 @@ feature ownership, and runtime composition in one physical source tree.
 
 `packages/enterprise` is the governing legal root and `@langwatch/enterprise`
 is a portable catalogue of explicitly named Enterprise feature contracts. The
-catalogue contains only `audit-log`, `billing`, `governance`, `licensing`,
-`managed-provider`, `saas`, `scim`, `sso`, and `webhook`; core `ops` is not an
-Enterprise feature. SaaS is classified here because its implementation source
+catalogue contains only `billing`, `governance`, `licensing`,
+`managed-provider`, `saas`, `scim`, and `sso`. Core `ops`, `audit-log` and
+`webhook` are not Enterprise features; the latter two placements are amended by
+[ADR-134](../../../dev/docs/adr/134-private-prisma-table-ownership.md).
+SaaS is classified here because its implementation source
 is governed by the Enterprise licence, even though SaaS deployment selection
 is not itself an Enterprise entitlement check.
 

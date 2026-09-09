@@ -27,7 +27,7 @@ import {
 import {
   WebhookEndpointTrpcApi,
   type WebhookEndpointTrpcContext,
-} from "@langwatch/enterprise-webhook-server";
+} from "@langwatch/webhook-server";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /** Every context requirement the three surfaces place on the process. */

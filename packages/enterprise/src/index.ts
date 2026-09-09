@@ -1,4 +1,3 @@
-import { AUDIT_LOG_FEATURE_ID } from "@langwatch/enterprise-audit-log-contract";
 import { BILLING_FEATURE_ID } from "@langwatch/enterprise-billing-contract";
 import { GOVERNANCE_FEATURE_ID } from "@langwatch/enterprise-governance-contract";
 import { LICENSING_FEATURE_ID } from "@langwatch/enterprise-licensing-contract";
@@ -6,19 +5,16 @@ import { MANAGED_PROVIDER_FEATURE_ID } from "@langwatch/enterprise-managed-provi
 import { SAAS_FEATURE_ID } from "@langwatch/enterprise-saas-contract";
 import { SCIM_FEATURE_ID } from "@langwatch/enterprise-scim-contract";
 import { SSO_FEATURE_ID } from "@langwatch/enterprise-sso-contract";
-import { WEBHOOK_FEATURE_ID } from "@langwatch/enterprise-webhook-contract";
 import { z } from "zod";
 
 export const enterpriseFeatureIdSchema = z.enum([
   LICENSING_FEATURE_ID,
   SSO_FEATURE_ID,
   SCIM_FEATURE_ID,
-  AUDIT_LOG_FEATURE_ID,
   BILLING_FEATURE_ID,
   GOVERNANCE_FEATURE_ID,
   MANAGED_PROVIDER_FEATURE_ID,
   SAAS_FEATURE_ID,
-  WEBHOOK_FEATURE_ID,
 ]);
 export type EnterpriseFeatureId = z.infer<typeof enterpriseFeatureIdSchema>;
 
@@ -48,12 +44,6 @@ const SCIM_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
   serverPackage: "@langwatch/enterprise-scim-server",
 });
 
-const AUDIT_LOG_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
-  id: AUDIT_LOG_FEATURE_ID,
-  contractPackage: "@langwatch/enterprise-audit-log-contract",
-  serverPackage: "@langwatch/enterprise-audit-log-server",
-});
-
 const BILLING_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
   id: BILLING_FEATURE_ID,
   contractPackage: "@langwatch/enterprise-billing-contract",
@@ -81,12 +71,6 @@ const SAAS_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
   webPackage: "@langwatch/enterprise-saas-web",
 });
 
-const WEBHOOKS_DESCRIPTOR = enterpriseFeatureDescriptorSchema.parse({
-  id: WEBHOOK_FEATURE_ID,
-  contractPackage: "@langwatch/enterprise-webhook-contract",
-  serverPackage: "@langwatch/enterprise-webhook-server",
-});
-
 /** Portable feature discovery. Runtime installers belong to composition packages. */
 export class EnterpriseCatalogue {
   private constructor(private readonly descriptors: readonly EnterpriseFeatureDescriptor[]) {}
@@ -96,12 +80,10 @@ export class EnterpriseCatalogue {
       LICENSING_DESCRIPTOR,
       SSO_DESCRIPTOR,
       SCIM_DESCRIPTOR,
-      AUDIT_LOG_DESCRIPTOR,
       BILLING_DESCRIPTOR,
       GOVERNANCE_DESCRIPTOR,
       MANAGED_PROVIDERS_DESCRIPTOR,
       SAAS_DESCRIPTOR,
-      WEBHOOKS_DESCRIPTOR,
     ]);
   }
 

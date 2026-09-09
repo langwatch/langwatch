@@ -8,7 +8,7 @@ import {
   PostgresGovernanceInstallationAdapter,
   type GovernanceInstallationOptions,
 } from "@langwatch/enterprise-governance-server";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -38,7 +38,7 @@ type GovernanceRuntimeOptions = {
   personalUsage?: AppPersonalUsageReadAdapter;
   organizations: OrganizationService;
   projects: ProjectService;
-  apiKeys: ApiKeyService;
+  apiKeys: ApiKeyApi;
   gatewayBaseUrl: string;
   virtualKeys: GovernanceVirtualKeyPort;
   budgetOverview: GovernanceBudgetOverviewPort;

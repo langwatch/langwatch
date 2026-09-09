@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { eventMatches } from "@langwatch/enterprise-webhook-contract";
+import { eventMatches } from "@langwatch/webhook-contract";
 import {
   WebhookDeliveryService,
   WEBHOOK_SEND_MAX_ATTEMPTS,
   type WebhookDeliveryProcessDeps,
-} from "@langwatch/enterprise-webhook-server";
+} from "@langwatch/webhook-server";
 import {
   GovernanceEventDeliveryProcess,
   GovernanceWebhookPort,

@@ -21,11 +21,6 @@ describe("EnterpriseCatalogue", () => {
         serverPackage: "@langwatch/enterprise-scim-server",
       },
       {
-        id: "audit-log",
-        contractPackage: "@langwatch/enterprise-audit-log-contract",
-        serverPackage: "@langwatch/enterprise-audit-log-server",
-      },
-      {
         id: "billing",
         contractPackage: "@langwatch/enterprise-billing-contract",
         serverPackage: "@langwatch/enterprise-billing-server",
@@ -47,11 +42,6 @@ describe("EnterpriseCatalogue", () => {
         id: "saas",
         contractPackage: "@langwatch/enterprise-saas-contract",
         webPackage: "@langwatch/enterprise-saas-web",
-      },
-      {
-        id: "webhook",
-        contractPackage: "@langwatch/enterprise-webhook-contract",
-        serverPackage: "@langwatch/enterprise-webhook-server",
       },
     ]);
   });

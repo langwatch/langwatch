@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { describe, expect, it, vi } from "vitest";
-import type { WebhookEndpointView } from "@langwatch/enterprise-webhook-contract";
-import type { WebhookDeliveryProcessDeps } from "@langwatch/enterprise-webhook-server";
+import type { WebhookEndpointView } from "@langwatch/webhook-contract";
+import type { WebhookDeliveryProcessDeps } from "@langwatch/webhook-server";
 import { AppGovernanceWebhookPort } from "../governance-webhook.adapter.ts";
 
 function endpoint(

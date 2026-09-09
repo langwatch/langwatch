@@ -24,7 +24,6 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/enterprise-audit-log-contract": "workspace:*",
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
@@ -32,7 +31,6 @@
     "@langwatch/enterprise-saas-contract": "workspace:*",
     "@langwatch/enterprise-scim-contract": "workspace:*",
     "@langwatch/enterprise-sso-contract": "workspace:*",
-    "@langwatch/enterprise-webhook-contract": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

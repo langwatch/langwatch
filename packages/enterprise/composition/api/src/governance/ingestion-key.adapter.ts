@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { ApiKeyRevocationCause, ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyRevocationCause, ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   IngestionKeyIssuerPort,
   IngestionKeyRepository,
@@ -32,7 +32,7 @@ type IngestionKeyRevokeInput = {
 };
 
 /** One key row as the API-key service answers it. */
-type ApiKeyIngestionRow = Awaited<ReturnType<ApiKeyService["listIngestionKeysForProject"]>>[number];
+type ApiKeyIngestionRow = Awaited<ReturnType<ApiKeyApi["listIngestionKeysForProject"]>>[number];
 
 /** One key row's stamps, on the one clock the governance seam reads. */
 function storedIngestionKeyOf(key: ApiKeyIngestionRow): StoredIngestionKey {
@@ -47,11 +47,11 @@ function storedIngestionKeyOf(key: ApiKeyIngestionRow): StoredIngestionKey {
 }
 
 export class AppIngestionKeyRepository extends IngestionKeyRepository {
-  private constructor(private readonly apiKeys: ApiKeyService) {
+  private constructor(private readonly apiKeys: ApiKeyApi) {
     super();
   }
 
-  static create(apiKeys: ApiKeyService): AppIngestionKeyRepository {
+  static create(apiKeys: ApiKeyApi): AppIngestionKeyRepository {
     return new AppIngestionKeyRepository(apiKeys);
   }
 
@@ -61,7 +61,7 @@ export class AppIngestionKeyRepository extends IngestionKeyRepository {
     sourceType: string;
   }): Promise<StoredIngestionKey | null> {
     return this.apiKeys
-      .tryGetIngestionKey(input)
+      .findIngestionKey(input)
       .then((key) => (key === null ? null : storedIngestionKeyOf(key)));
   }
 
@@ -77,7 +77,7 @@ export class AppIngestionKeyRepository extends IngestionKeyRepository {
   async tryFindByLookupId(input: {
     lookupId: string;
   }): Promise<StoredIngestionKeyOwnership | null> {
-    const key = await this.apiKeys.tryGetByLookupId(input);
+    const key = await this.apiKeys.findByLookupId(input);
     if (!key) return null;
 
     return {
@@ -91,11 +91,11 @@ export class AppIngestionKeyRepository extends IngestionKeyRepository {
 }
 
 export class AppIngestionKeyIssuerPort extends IngestionKeyIssuerPort {
-  private constructor(private readonly apiKeys: ApiKeyService) {
+  private constructor(private readonly apiKeys: ApiKeyApi) {
     super();
   }
 
-  static create(apiKeys: ApiKeyService): AppIngestionKeyIssuerPort {
+  static create(apiKeys: ApiKeyApi): AppIngestionKeyIssuerPort {
     return new AppIngestionKeyIssuerPort(apiKeys);
   }
 
@@ -114,9 +114,9 @@ export class AppIngestionKeyIssuerPort extends IngestionKeyIssuerPort {
 }
 
 export class AppIngestionKeyAdapter {
-  private constructor(private readonly apiKeys: ApiKeyService) {}
+  private constructor(private readonly apiKeys: ApiKeyApi) {}
 
-  static create(apiKeys: ApiKeyService): AppIngestionKeyAdapter {
+  static create(apiKeys: ApiKeyApi): AppIngestionKeyAdapter {
     return new AppIngestionKeyAdapter(apiKeys);
   }
 

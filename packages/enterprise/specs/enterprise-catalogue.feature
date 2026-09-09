@@ -6,7 +6,8 @@ Feature: Enterprise package catalogue
     When a caller lists its features
     Then the catalogue identifies every installed contract package
     And each available server or web package is named without importing it
-    And the catalogue contains audit-log, billing, governance, licensing, managed-provider, saas, scim, sso, and webhook
+    And the catalogue contains billing, governance, licensing, managed-provider, saas, scim, and sso
+    And audit-log and webhook belong to the core catalogue
     And the catalogue does not contain admin or ops
 
   Scenario: Import the catalogue without runtime registration
