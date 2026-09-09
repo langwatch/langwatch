@@ -121,3 +121,17 @@ export class GithubInstallationAccountMismatchError extends HandledError {
     this.attemptedOrganizationId = input.attemptedOrganizationId;
   }
 }
+
+/**
+ * The caller holds the permission but is not a member of that organization.
+ * The sentence names nothing about it: echoing the id would confirm a valid
+ * organization to a non-member.
+ */
+export class GithubOrganizationMembershipRequiredError extends HandledError {
+  declare readonly code: "forbidden";
+
+  constructor() {
+    super("forbidden", "Forbidden", { httpStatus: 403 });
+    this.name = "GithubOrganizationMembershipRequiredError";
+  }
+}

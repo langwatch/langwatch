@@ -44,3 +44,15 @@ export type GithubDisconnectResult = z.infer<typeof githubDisconnectResultSchema
 export const githubPullRequestLiveStatusesSchema = z.object({
   statuses: z.array(githubPullRequestLiveStatusSchema),
 });
+
+/**
+ * One line the deployment's audit trail records about a connection: who acted,
+ * the organization it was done to, the stable name of the act, and the little
+ * the trail keeps of what was named. Both doors write the same shape.
+ */
+export type GithubConnectionAuditEntry = Readonly<{
+  userId: string;
+  organizationId: string;
+  action: string;
+  args: Readonly<Record<string, unknown>>;
+}>;

@@ -1,23 +1,20 @@
 /**
- * The installation flow's own routes: /install signs state for the session that
- * started it, /setup binds the installation to that state before recording, and
- * /webhook verifies GitHub's HMAC before anything is applied. The legacy
- * `/github-langy/*` aliases are exercised because the App registrations we do
- * not own still point at them.
+ * @vitest-environment node
+ * The installation flow's routes and their `/github-langy/*` aliases.
  * @see specs/integrations/github-connection.feature
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import { createRestRuntime } from "@langwatch/api/rest";
 import type {
+  GithubApi,
   GithubAppConfig,
   GithubInstallStatePayload,
-  GithubService,
 } from "@langwatch/github-contract";
 import { createHmac } from "node:crypto";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ErrorHandler } from "hono";
+import { describe, expect, it } from "vitest";
 
-import { GithubInstallStateAdapter } from "../../../adapters/github-install-state.adapter.ts";
-import { createGithubRestApp, type GithubRestPorts } from "../github.api.ts";
+import { GithubInstallStateAdapter } from "../../adapters/github-install-state.adapter.ts";
+import { githubInstallRest, type GithubInstallApi } from "../github-install.rest.ts";
 
 const SIGNING_KEY = "x".repeat(64);
 const WEBHOOK_SECRET = "whsecret";
@@ -44,66 +41,94 @@ function signedState(overrides: Partial<GithubInstallStatePayload> = {}): string
   });
 }
 
+function githubStub(overrides: Partial<GithubApi>): GithubApi {
+  return overrides as GithubApi;
+}
+
+/** Every refusal these routes word is an answer, so nothing should reach here. */
+const renderError: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
+
 function mount(
   options: {
     member?: boolean;
     canManage?: boolean;
+    configured?: boolean;
     session?: { user: { id: string } } | null;
   } = {},
 ) {
   const recorded: Array<{ installationId: string; organizationId: string }> = [];
   const webhookEvents: Array<{ action: string; installationId: string }> = [];
+  const memberChecks: Array<{ userId: string; organizationId: string }> = [];
   const audits: Array<{ action: string }> = [];
+  const sessionReads = { count: 0 };
 
-  const service = {
-    getAppConfig: () => appConfig,
+  const service: Partial<GithubApi> = {
+    getAppConfig: () => ({ ...appConfig, configured: options.configured ?? true }),
     getAppInstallUrl: () => INSTALL_URL,
     getInstallStateTtlMs: () => state.getTtlMs(),
-    registerInstallNonce: vi.fn(async () => false),
-    tryConsumeInstallNonce: vi.fn(async () => true),
-    signInstallState: (payload: GithubInstallStatePayload) => state.sign(payload),
-    tryVerifyInstallState: (token: string | null) => state.tryVerify(token),
-    popupResponseHtml: (login: string) => `<p>${login}</p>`,
-    popupErrorHtml: (message: string) => `<p>${message}</p>`,
-    isOrganizationMember: vi.fn(async () => options.member ?? true),
-    recordInstallation: vi.fn(async (input: { installationId: string; organizationId: string }) => {
+    registerInstallNonce: async () => false,
+    tryConsumeInstallNonce: async () => true,
+    signInstallState: (payload) => state.sign(payload),
+    tryVerifyInstallState: (token) => state.tryVerify(token),
+    popupResponseHtml: (login) => `<p>${login}</p>`,
+    popupErrorHtml: (message) => `<p>${message}</p>`,
+    isOrganizationMember: async ({ userId, organizationId }) => {
+      memberChecks.push({ userId, organizationId });
+
+      return options.member ?? true;
+    },
+    recordInstallation: async (input) => {
       recorded.push({
         installationId: input.installationId,
         organizationId: input.organizationId,
       });
+
       return { accountLogin: "acme" };
-    }),
-    handleWebhookEvent: vi.fn(async (input: { action: string; installationId: string }) => {
+    },
+    handleWebhookEvent: async (input) => {
       webhookEvents.push({ action: input.action, installationId: input.installationId });
-    }),
+    },
     tryParsePullRequestEvent: () => null,
-    applyPullRequestEvent: vi.fn(async () => true),
+    applyPullRequestEvent: async () => true,
   };
 
-  const ports: GithubRestPorts = {
-    github: () => service as unknown as GithubService,
-    session: async () =>
-      options.session === undefined ? { user: { id: "user_1" } } : options.session,
+  const installation: GithubInstallApi = {
+    github: () => githubStub(service),
+    resolveSession: async () => {
+      sessionReads.count += 1;
+
+      return options.session === undefined ? { user: { id: "user_1" } } : options.session;
+    },
     canManageOrganization: async () => options.canManage ?? true,
-    audit: async (entry) => {
+    recordAudit: async (entry) => {
       audits.push({ action: entry.action });
     },
+    backfillPullRequestMappings: async () => {},
   };
 
-  const hono = new Hono().route(
-    "/",
-    createGithubRestApp({ security: passthroughSecurity(), ports }),
-  );
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new Error("The GitHub installation flow answers with no credential resolved.");
+      },
+    },
+  });
+
+  const app = runtime.mount(githubInstallRest.router(), {
+    app: () => installation,
+    onError: renderError,
+  });
 
   return {
-    service,
     recorded,
     webhookEvents,
+    memberChecks,
     audits,
+    sessionReads,
     install: (query: string) =>
-      hono.fetch(new Request(`http://api.test/api/github/install?${query}`)),
+      app.fetch(new Request(`http://api.test/api/github/install?${query}`)),
     setup: (path: string, query: string) =>
-      hono.fetch(new Request(`http://api.test/api${path}?${query}`)),
+      app.fetch(new Request(`http://api.test/api${path}?${query}`)),
     webhook: (
       path: string,
       body: unknown,
@@ -113,7 +138,8 @@ function mount(
       const signature =
         webhookOptions.signature ??
         `sha256=${createHmac("sha256", WEBHOOK_SECRET).update(raw).digest("hex")}`;
-      return hono.fetch(
+
+      return app.fetch(
         new Request(`http://api.test/api${path}`, {
           method: "POST",
           body: raw,
@@ -128,39 +154,39 @@ function mount(
   };
 }
 
-const renderError: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
+describe("given the declared installation family", () => {
+  it("answers at exactly the addresses the App registrations point at", () => {
+    const declaration = githubInstallRest.router();
 
-/**
- * The door's own checks are exercised by the security suite; these routes carry
- * their session and permission checks in the handler, which is what this pins.
- */
-function passthroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderError,
-    canonicalErrorHandler: renderError,
-    authenticateProject: () => noop,
-    authorizeProjectPermission: () => noop,
-    authorizeApiKeyCeiling: () => noop,
-    authenticateOrganization: () => noop,
-    authorizeOrganizationPermission: () => noop,
-    authorizeRouteTeamPermission: () => noop,
-    authorizeRouteProjectPermission: () => noop,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: () => noop,
-  } as never);
-}
-
-describe("given the GitHub installation routes", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+    expect(declaration.routes.map((route) => `${route.method.toUpperCase()} ${route.path}`)).toEqual(
+      [
+        "GET /api/github/install",
+        "GET /api/github/setup",
+        "POST /api/github/webhook",
+        "GET /api/github-langy/setup",
+        "POST /api/github-langy/webhook",
+      ],
+    );
+    expect(declaration.addressing).toBe("literal");
   });
 
+  it("resolves no credential, and reads the webhook body unparsed", () => {
+    const declaration = githubInstallRest.router();
+
+    expect(declaration.routes.map((route) => route.access?.kind)).toEqual([
+      "public",
+      "public",
+      "public",
+      "public",
+      "public",
+    ]);
+    expect(
+      declaration.routes.filter((route) => route.rawBody).map((route) => route.operation),
+    ).toEqual(["receiveGithubWebhook", "receiveGithubWebhookOnLegacyPath"]);
+  });
+});
+
+describe("given the GitHub installation routes", () => {
   describe("when an organization manager starts an installation", () => {
     /** @scenario Starting an installation redirects to GitHub with signed state */
     it("redirects to GitHub carrying state bound to the session and organization", async () => {
@@ -185,10 +211,51 @@ describe("given the GitHub installation routes", () => {
 
       expect(response.status).toBe(302);
       // The only questions asked are membership and organization management:
-      // an organization with no Langy access reaches GitHub exactly the same way.
-      expect(api.service.isOrganizationMember).toHaveBeenCalledWith({
-        userId: "user_1",
-        organizationId: "org_1",
+      // an organization with no Langy access reaches GitHub the same way.
+      expect(api.memberChecks).toEqual([{ userId: "user_1", organizationId: "org_1" }]);
+    });
+  });
+
+  describe("when the instance registered no GitHub App", () => {
+    /**
+     * The session is an operation this handler calls, not a declared fact the
+     * runtime resolves ahead of it, so an instance that cannot start a flow
+     * answers without asking who is on the other end.
+     */
+    /** @scenario App not configured on the instance hides the feature */
+    it("answers 503 before it reads a session", async () => {
+      const api = mount({ configured: false });
+
+      const response = await api.install("organizationId=org_1");
+
+      expect(response.status).toBe(503);
+      expect(api.sessionReads.count).toBe(0);
+    });
+  });
+
+  describe("when nobody is signed in", () => {
+    /** @scenario Starting an installation requires organization management */
+    it("answers 401 rather than starting a flow with no owner", async () => {
+      const api = mount({ session: null });
+
+      const response = await api.install("organizationId=org_1");
+
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({ error: "Not authenticated" });
+      expect(api.memberChecks).toEqual([]);
+    });
+  });
+
+  describe("when the caller is not a member of the organization", () => {
+    /** @scenario Starting an installation requires organization management */
+    it("refuses before the permission is probed, so the answer says nothing about the org", async () => {
+      const api = mount({ member: false });
+
+      const response = await api.install("organizationId=org_1");
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        error: "Not a member of this organization.",
       });
     });
   });
@@ -232,7 +299,6 @@ describe("given the GitHub installation routes", () => {
 
       expect(response.status).toBe(400);
       expect(await response.text()).toContain("Invalid state or missing installation");
-      expect(api.service.recordInstallation).not.toHaveBeenCalled();
       expect(api.recorded).toEqual([]);
     });
   });
@@ -269,7 +335,6 @@ describe("given the GitHub installation routes", () => {
       );
       expect(unsigned.status).toBe(401);
 
-      expect(api.service.handleWebhookEvent).not.toHaveBeenCalled();
       expect(api.webhookEvents).toEqual([]);
     });
   });

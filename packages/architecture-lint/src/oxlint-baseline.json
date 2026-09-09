@@ -5847,10 +5847,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|packages/features/github/server/src/transport/api-rest/github.api.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "condition-shape|packages/features/hosted-mcp/server/src/transport/api-mcp/__tests__/hosted-mcp.api.integration.test.ts",
       "measured": "2026-09-06"
     },

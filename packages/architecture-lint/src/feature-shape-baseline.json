@@ -383,14 +383,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "github|legacy-transport-runtime",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "github|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "github|nested-web-entry",
       "measured": "2026-09-08"
     },

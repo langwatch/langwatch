@@ -26,7 +26,6 @@ export {
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,
 } from "./processes/github-branch-recheck.process.ts";
-// The tRPC transport is not exported: it still names the deleted legacy builder.
 export { GithubConnectionService } from "./services/github-connection.service.ts";
 export { GithubApp, type GithubInfrastructure } from "./app/github.app.ts";
 export { githubServer } from "./github.server.ts";
@@ -35,7 +34,11 @@ export { githubServer } from "./github.server.ts";
 // protocol-mandated Setup URL and the HMAC-verified webhook, plus the two
 // `github-langy` aliases held by App registrations we do not own.
 export {
-  createGithubRestApp,
-  type GithubRestPorts,
-  type GithubRestSessionPort,
-} from "./transport/api-rest/github.api.ts";
+  githubInstallRest,
+  GithubInstallApi,
+  type GithubInstallSession,
+} from "./transport/github-install.rest.ts";
+
+// The `github.*` procedures: the connection, its repositories, the live
+// pull-request read and the disconnect.
+export { githubTrpcTransport, GithubConnectionApi } from "./transport/github.trpc.ts";
