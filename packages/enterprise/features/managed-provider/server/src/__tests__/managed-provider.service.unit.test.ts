@@ -39,6 +39,10 @@ class Projects extends ProjectService {
     return "org_1";
   }
 
+  async listPaths(): Promise<never[]> {
+    return [];
+  }
+
   updateSettings(): never {
     throw new Error("Not used by this test");
   }
