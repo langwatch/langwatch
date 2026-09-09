@@ -18,6 +18,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -170,15 +171,16 @@ afterEach(() => {
 
 /** @scenario "Switching governance tabs unmounts the inactive content" */
 it("unmounts Explore when switching to Dashboards", async () => {
+  const user = userEvent.setup();
   renderPage(AnalyticsPage);
   fireEvent.click(screen.getByRole("button", { name: "Requests by model" }));
   const content = screen.getByRole("tabpanel", {
     name: "Explore",
   }).firstElementChild;
   expect(content).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("tab", { name: /Dashboards/ }));
+  await user.click(screen.getByRole("tab", { name: /Dashboards/ }));
   await waitFor(() => expect(content).not.toBeInTheDocument());
-  fireEvent.click(screen.getByRole("tab", { name: "Explore" }));
+  await user.click(screen.getByRole("tab", { name: "Explore" }));
   expect(
     await screen.findByText("usage | summarize count() by model, bin(1d)"),
   ).toBeInTheDocument();

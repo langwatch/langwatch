@@ -28,6 +28,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -189,10 +190,11 @@ afterEach(() => cleanup());
 describe("the inventory tab shell", () => {
   /** @scenario "Switching governance tabs unmounts the inactive content" */
   it("unmounts the catalog content when switching to Sources", async () => {
+    const user = userEvent.setup();
     renderInventoryAt(["/governance/inventory"]);
     const content = screen.getByRole("tabpanel").firstElementChild;
     expect(content).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("tab", { name: /^Sources/ }));
+    await user.click(screen.getByRole("tab", { name: /^Sources/ }));
     await waitFor(() => expect(content).not.toBeInTheDocument());
   });
 
