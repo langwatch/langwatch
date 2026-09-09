@@ -16,7 +16,13 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -204,8 +210,7 @@ const READS_ON_THE_SCREEN = [
 ];
 
 /** The refresh control, however it is labelled, as long as a reader can find it. */
-const refreshControl = () =>
-  screen.getByRole("button", { name: /refresh/i });
+const refreshControl = () => screen.getByRole("button", { name: /refresh/i });
 
 beforeEach(() => {
   harness.reads = [];
@@ -309,7 +314,9 @@ describe("bringing the cost screen up to date", () => {
     it("issues no read that polls or re-runs on focus, and says so at each call site", () => {
       renderScreen();
 
-      const issued = [...new Set(harness.reads.map((call) => call.path))].sort();
+      const issued = [
+        ...new Set(harness.reads.map((call) => call.path)),
+      ].sort();
       expect(issued).toEqual(READS_ON_THE_SCREEN);
 
       for (const call of harness.reads) {

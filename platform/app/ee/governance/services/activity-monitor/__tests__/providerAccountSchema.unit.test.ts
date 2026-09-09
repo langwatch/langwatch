@@ -58,8 +58,8 @@ describe("given the connection row that holds which account a connection reads",
       // with a customer's provider credential. It is the only member of this
       // set, and a second one arriving is the change this test exists to
       // catch.
-      const keyish = Object.keys(modelFields("IngestionSource")).filter((name) =>
-        /hash|digest|fingerprint|secret|key/i.test(name),
+      const keyish = Object.keys(modelFields("IngestionSource")).filter(
+        (name) => /hash|digest|fingerprint|secret|key/i.test(name),
       );
 
       expect(keyish).toEqual(["ingestSecretHash"]);

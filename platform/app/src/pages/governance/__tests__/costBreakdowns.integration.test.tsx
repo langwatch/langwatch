@@ -533,9 +533,7 @@ describe("the cost breakdown panels", () => {
     it("splits each day by provider and adds those days back to the window total", () => {
       renderScreen();
 
-      const region = within(
-        screen.getByLabelText("Cost by provider and day"),
-      );
+      const region = within(screen.getByLabelText("Cost by provider and day"));
 
       // Each day carries a separate figure per provider, not one figure for
       // the day and one for the provider.
@@ -577,9 +575,7 @@ describe("the cost breakdown panels", () => {
       };
       renderScreen();
 
-      const region = within(
-        screen.getByLabelText("Cost by provider and day"),
-      );
+      const region = within(screen.getByLabelText("Cost by provider and day"));
       fireEvent.click(
         region.getByTestId("cost-provider-day-openai_admin-2026-01-15"),
       );
@@ -629,9 +625,7 @@ describe("the cost breakdown panels", () => {
       // up rebuilds exactly the partial sum the window total refused to show
       // them. The mark on the bars is what stops the chart from being that
       // sum.
-      const region = within(
-        screen.getByLabelText("Cost by provider and day"),
-      );
+      const region = within(screen.getByLabelText("Cost by provider and day"));
       expect(
         region.getByLabelText(/covers only part of what was spent/i),
       ).toBeInTheDocument();

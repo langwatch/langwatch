@@ -152,37 +152,36 @@ describe("listing column provenance", () => {
     expect(actual).toEqual(declared);
   });
 
-  it.each(NON_LISTING_HANDLERS)(
-    "%s leaves every listing column untouched",
-    (handlerName) => {
-      const before = stateWithListingsRecorded();
+  it.each(
+    NON_LISTING_HANDLERS,
+  )("%s leaves every listing column untouched", (handlerName) => {
+    const before = stateWithListingsRecorded();
 
-      const handler = (
-        projection as unknown as Record<
-          string,
-          | ((event: unknown, state: IngestionPullRunStatusData) => unknown)
-          | undefined
-        >
-      )[handlerName];
+    const handler = (
+      projection as unknown as Record<
+        string,
+        | ((event: unknown, state: IngestionPullRunStatusData) => unknown)
+        | undefined
+      >
+    )[handlerName];
 
-      // Thrown rather than asserted, because an `expect` here would record a
-      // failure and then let the call below run anyway. The first test already
-      // proves the name exists; this is the guard against reaching that call
-      // with nothing to call.
-      if (typeof handler !== "function") {
-        throw new Error(`${handlerName} is not a method on the projection`);
-      }
+    // Thrown rather than asserted, because an `expect` here would record a
+    // failure and then let the call below run anyway. The first test already
+    // proves the name exists; this is the guard against reaching that call
+    // with nothing to call.
+    if (typeof handler !== "function") {
+      throw new Error(`${handlerName} is not a method on the projection`);
+    }
 
-      // Called on the instance, so a handler that consults `this` -- the
-      // failure handler checks whether the run was superseded -- behaves as it
-      // does in the fold rather than throwing on an unbound call.
-      const after = handler.call(
-        projection,
-        eventForAnyHandler(),
-        before,
-      ) as IngestionPullRunStatusData;
+    // Called on the instance, so a handler that consults `this` -- the
+    // failure handler checks whether the run was superseded -- behaves as it
+    // does in the fold rather than throwing on an unbound call.
+    const after = handler.call(
+      projection,
+      eventForAnyHandler(),
+      before,
+    ) as IngestionPullRunStatusData;
 
-      expect(listingColumnsOf(after)).toEqual(listingColumnsOf(before));
-    },
-  );
+    expect(listingColumnsOf(after)).toEqual(listingColumnsOf(before));
+  });
 });

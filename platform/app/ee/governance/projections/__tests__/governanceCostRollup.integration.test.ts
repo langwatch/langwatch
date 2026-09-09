@@ -1001,7 +1001,10 @@ describe("governance cost rollup", () => {
       // about money is reached.
       expect(() =>
         governanceCostRollupKey(
-          retracted({ currencyCode: "EUR", observedAtMs: SECOND_PULL }) as never,
+          retracted({
+            currencyCode: "EUR",
+            observedAtMs: SECOND_PULL,
+          }) as never,
         ),
       ).not.toThrow();
 
@@ -1055,7 +1058,10 @@ describe("governance cost rollup", () => {
       // about money is reached.
       expect(() =>
         governanceCostRollupKey(
-          retracted({ currencyCode: "EUR", observedAtMs: SECOND_PULL }) as never,
+          retracted({
+            currencyCode: "EUR",
+            observedAtMs: SECOND_PULL,
+          }) as never,
         ),
       ).not.toThrow();
 
