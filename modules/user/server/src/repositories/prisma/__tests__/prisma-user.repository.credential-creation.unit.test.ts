@@ -46,18 +46,24 @@ function makeDatabase() {
   const accountUpdate = vi.fn(async () => ({}));
   const userUpdate = vi.fn(async () => ({}));
   const passkeyCount = vi.fn(async () => 0);
+  const userFindUnique = vi.fn<(...args: unknown[]) => Promise<Record<string, unknown> | null>>(
+    async () => null,
+  );
+  const accountFindFirst = vi.fn<(...args: unknown[]) => Promise<Record<string, unknown> | null>>(
+    async () => null,
+  );
   const state = { committed: false };
   const transaction = {
     user: {
       findMany: vi.fn(async () => []),
-      findUnique: vi.fn(async () => null),
+      findUnique: userFindUnique,
       findUniqueOrThrow: vi.fn(async () => ({})),
       create: userCreate,
       update: userUpdate,
     },
     account: {
       create: accountCreate,
-      findFirst: vi.fn(async () => null),
+      findFirst: accountFindFirst,
       update: accountUpdate,
     },
     passkey: { count: passkeyCount },
@@ -71,8 +77,10 @@ function makeDatabase() {
     database: transaction as unknown as UserDatabase,
     userCreate,
     userUpdate,
+    userFindUnique,
     accountCreate,
     accountUpdate,
+    accountFindFirst,
     passkeyCount,
     state,
   };
@@ -159,8 +167,8 @@ describe("PrismaUserRepository credential creation", () => {
   });
 
   it("fills an empty credential row without creating another account", async () => {
-    const { database, accountCreate, accountUpdate } = makeDatabase();
-    database.account.findFirst = vi.fn(async () => ({ id: "account-1", password: null }));
+    const { database, accountCreate, accountUpdate, accountFindFirst } = makeDatabase();
+    accountFindFirst.mockResolvedValue({ id: "account-1", password: null });
 
     await expect(
       repositoryOver(database).setFirstPassword({
@@ -199,11 +207,8 @@ describe("PrismaUserRepository credential creation", () => {
   });
 
   it("does not overwrite a credential that already has a password", async () => {
-    const { database, accountCreate, accountUpdate } = makeDatabase();
-    database.account.findFirst = vi.fn(async () => ({
-      id: "account-1",
-      password: "existing-hash",
-    }));
+    const { database, accountCreate, accountUpdate, accountFindFirst } = makeDatabase();
+    accountFindFirst.mockResolvedValue({ id: "account-1", password: "existing-hash" });
 
     await expect(
       repositoryOver(database).setFirstPassword({
@@ -217,10 +222,10 @@ describe("PrismaUserRepository credential creation", () => {
   });
 
   it("loads passkey presence and nudge dismissal together", async () => {
-    const { database, passkeyCount } = makeDatabase();
+    const { database, passkeyCount, userFindUnique } = makeDatabase();
     const dismissedAt = new Date(42);
     passkeyCount.mockResolvedValue(1);
-    database.user.findUnique = vi.fn(async () => ({ passkeyNudgeDismissedAt: dismissedAt }));
+    userFindUnique.mockResolvedValue({ passkeyNudgeDismissedAt: dismissedAt });
 
     await expect(repositoryOver(database).getPasskeyNudgeStatus("user-1")).resolves.toEqual({
       hasPasskey: true,

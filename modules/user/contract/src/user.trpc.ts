@@ -1,13 +1,13 @@
 /**
- * Every `user.*` procedure, declared once. The names are the browser's cache
- * keys, so they are the wire names the account and /me screens already call.
- * `personalUsage`, `budgetOverview` and `cliBootstrap` answer on this same
- * namespace from the Enterprise governance module, which the process merges in.
+ * Every `user.*` procedure and the one `identity.*` procedure this module owns.
+ * The names are the browser's cache keys. `personalUsage`, `budgetOverview` and
+ * `cliBootstrap` answer on `user` from Enterprise governance, merged by the process.
  */
 import { defineTrpcContract } from "@langwatch/api/contract";
 
 import {
   createdUserSchema,
+  identityVerificationCompletedSchema,
   userAccountInfoSchema,
   userAvatarResultSchema,
   userSsoStatusSchema,
@@ -27,6 +27,7 @@ import {
 } from "./user.responses.ts";
 import {
   userApiChangePasswordInputSchema,
+  userApiCompleteVerificationInputSchema,
   userApiEmptyInputSchema,
   userApiOrganizationInputSchema,
   userApiRegisterInputSchema,
@@ -133,4 +134,15 @@ export const userTrpc = defineTrpcContract("user")
   .query("homePagePickerState")
   .withInput(userApiOrganizationInputSchema)
   .withOutput(userApiHomePagePickerStateSchema)
+  .build();
+
+/**
+ * Spending an email verification ceremony for the session user's own record.
+ * The user module declares it because it acts on the caller's own account.
+ * Spec: specs/identity/identifier-model.feature.
+ */
+export const identityTrpc = defineTrpcContract("identity")
+  .mutation("completeVerification")
+  .withInput(userApiCompleteVerificationInputSchema)
+  .withOutput(identityVerificationCompletedSchema)
   .build();

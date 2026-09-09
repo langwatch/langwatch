@@ -204,10 +204,7 @@ describe("given the byte-serving file family", () => {
  */
 describe("given the avatar family over a reader that carries the owner kind", () => {
   describe("when a signed-in caller loads an avatar", () => {
-    /**
-     * @scenario "The avatar route serves an object whose purpose and owner kind
-     * are the avatar ones"
-     */
+    /** @scenario The avatar route serves an object whose purpose and owner kind are the avatar ones */
     it("streams the bytes with the stored media type", async () => {
       const api = mount(withAvatarObject(avatarRead()));
 

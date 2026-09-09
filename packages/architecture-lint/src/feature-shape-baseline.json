@@ -771,19 +771,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "user|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "user|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "user|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "user|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {

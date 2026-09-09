@@ -13,8 +13,7 @@ import { userAvatarCaller, userAvatarRest } from "../user-avatar.rest.ts";
 
 describe("given the avatar route", () => {
   describe("when the object is a user avatar", () => {
-    /** @scenario "The avatar route serves an object whose purpose and owner kind
-     *  are the avatar ones" */
+    /** @scenario The avatar route serves an object whose purpose and owner kind are the avatar ones */
     it("serves the bytes with the stored media type and a private cache", async () => {
       const api = mountAvatars(available());
 
