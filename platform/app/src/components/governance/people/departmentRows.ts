@@ -91,9 +91,13 @@ const foldName = (name: string) => name.trim();
  * print the same word twice and leave the reader to guess which one their spend
  * attributes to.
  *
- * Two records can never collide here: the partial unique index makes at most one
- * active `Department` per name, so no record's row can be overwritten by
- * another's.
+ * EVERY RECORD KEEPS ITS OWN ROW, keyed by id rather than by folded name. The
+ * partial unique index is on the name as stored, and nothing trims on the way
+ * in — the router validates length only, and the service and repository pass
+ * the string through — so `"Engineering"` and `"Engineering "` are two active
+ * records the database is happy to hold, and folding them into one key would
+ * have dropped whichever was written first. The fold is still how a directory
+ * name finds its record, which is the only job it ever had.
  *
  * Ordered by name. One list the reader looks a department up in, so it is
  * ordered the way a reader looks things up — not by headcount, which would rank
@@ -108,19 +112,38 @@ export function mergeDepartmentRows({
   observed: readonly ObservedDepartment[];
 }): DepartmentTableRow[] {
   const rows = new Map<string, DepartmentTableRow>();
+  /**
+   * Folded name to the row that answers to it, so a directory name can find
+   * its record without the name being the row's identity.
+   *
+   * When two records fold alike only the first claims the fold. Both keep
+   * their rows; the directory's people land on one of them, because there is
+   * no fact available that says which of two identically-named departments a
+   * provider meant. `departments` arrives ordered by name, so which one it is
+   * stays stable between reads rather than flipping under the reader.
+   */
+  const recordKeyByFoldedName = new Map<string, string>();
 
   for (const department of departments) {
-    rows.set(foldName(department.name), {
+    rows.set(department.id, {
       key: department.id,
       name: department.name,
       record: department,
       providers: [],
       directoryPeopleCount: null,
     });
+    const folded = foldName(department.name);
+    if (!recordKeyByFoldedName.has(folded)) {
+      recordKeyByFoldedName.set(folded, department.id);
+    }
   }
 
   for (const seen of observed) {
-    const key = foldName(seen.name);
+    const folded = foldName(seen.name);
+    // A discovered name has no identifier of its own, so the folded name is
+    // the only key available for it. Prefixed so it can never collide with a
+    // record's id.
+    const key = recordKeyByFoldedName.get(folded) ?? `observed:${folded}`;
     const existing = rows.get(key);
     // `groupObservedDepartments` groups on the directory's verbatim text, so
     // "Engineering" and " Engineering " reach here as two entries. The backend
@@ -129,10 +152,7 @@ export function mergeDepartmentRows({
     // arrived last stand for both, which would drop a provider's badge and
     // undercount the people it named.
     rows.set(key, {
-      // A discovered name has no identifier of its own, so the folded name is
-      // the only key available for it. Prefixed so it can never collide with a
-      // record's id.
-      key: existing?.key ?? `observed:${key}`,
+      key,
       name: existing?.name ?? seen.name,
       record: existing?.record ?? null,
       providers: [

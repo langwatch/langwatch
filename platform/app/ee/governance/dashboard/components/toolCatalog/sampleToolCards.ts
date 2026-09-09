@@ -16,7 +16,14 @@ import type { ToolCard } from "./toolCards";
  */
 
 /**
- * The eight tools the sample catalog shows, with every applicable row filled.
+ * The eight tools the sample catalog shows, with the applicable rows the
+ * platform can plausibly measure filled in.
+ *
+ * Not every declared row carries a figure. The licence rows and Copilot's
+ * token count stay empty on purpose: a licence price is a contract term the
+ * platform never reads, and inventing one would be the single thing this file
+ * must not do. Those cells fall through to the roadmap sentence, which is the
+ * honest answer and the same one a real card gives.
  *
  * This is the screen an organization gets once the measurements behind the
  * rows exist, and it is what makes the empty rows on a real card readable as a

@@ -1,4 +1,12 @@
-import { Button, Field, HStack, Input, Spacer, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  Spacer,
+  Spinner,
+  VStack,
+} from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
 
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
@@ -36,11 +44,17 @@ import { api } from "~/utils/api";
  * Spec: specs/ai-governance/dashboard/people-tabs.feature
  */
 export function AddDepartmentDrawer({ open = true }: { open?: boolean }) {
-  const { organization, hasAnyPermission } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
+  const { isLoading, organization, hasAnyPermission } =
+    useOrganizationTeamProject({ redirectToOnboarding: false });
   const organizationId = organization?.id ?? "";
   const canManage = hasAnyPermission("governance:manage");
+  // Grants are not "absent" until they have been read. While the organization
+  // query is in flight `hasAnyPermission` answers false for everything and
+  // `organization` is undefined, so a manager arriving on the deep link would
+  // read the refusal notice for the width of that window and then watch the
+  // form replace it — and a submit inside it would have posted an empty
+  // organization id. Three states, not two.
+  const isResolved = !isLoading && organizationId !== "";
 
   const { closeDrawer } = useDrawer();
   const utils = api.useUtils();
@@ -93,7 +107,9 @@ export function AddDepartmentDrawer({ open = true }: { open?: boolean }) {
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
-          {canManage ? (
+          {!isResolved ? (
+            <Spinner size="sm" aria-label="Loading" />
+          ) : canManage ? (
             // eslint-disable-next-line @typescript-eslint/no-misused-promises
             <form onSubmit={submit} id="add-department-form">
               <VStack align="stretch" gap={4}>
@@ -124,7 +140,7 @@ export function AddDepartmentDrawer({ open = true }: { open?: boolean }) {
             />
           )}
         </Drawer.Body>
-        {canManage && (
+        {isResolved && canManage && (
           <Drawer.Footer>
             <HStack width="full">
               <Spacer />

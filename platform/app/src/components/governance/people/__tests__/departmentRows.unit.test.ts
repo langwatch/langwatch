@@ -144,6 +144,45 @@ describe("given the departments an organization created and the ones its directo
     });
   });
 
+  describe("when two records the organization created fold to the same name", () => {
+    // The database allows this: the partial unique index compares the name as
+    // stored, and nothing on the write path trims. So "Engineering" and
+    // "Engineering " are two active records, and keying rows by folded name
+    // silently dropped whichever was written first.
+    const departments = [
+      { id: "dept_1", name: "Engineering" },
+      { id: "dept_2", name: "Engineering " },
+    ];
+
+    it("keeps both, rather than letting one overwrite the other", () => {
+      const rows = mergeDepartmentRows({ departments, observed: [] });
+
+      expect(rows).toHaveLength(2);
+      expect(rows.map((row) => row.record?.id).sort()).toEqual([
+        "dept_1",
+        "dept_2",
+      ]);
+    });
+
+    it("still lands a directory name on a record rather than inventing a third row", () => {
+      const rows = mergeDepartmentRows({
+        departments,
+        observed: [
+          { name: "Engineering", peopleCount: 6, providers: ["openai_admin"] },
+        ],
+      });
+
+      // Two rows, not three: the directory resolved to one of the records.
+      // Which one is not knowable — nothing distinguishes them but whitespace
+      // — so the first by name takes it and the other stays unmeasured.
+      expect(rows).toHaveLength(2);
+      const counted = rows.filter((row) => row.directoryPeopleCount !== null);
+      expect(counted).toHaveLength(1);
+      expect(counted[0]?.directoryPeopleCount).toBe(6);
+      expect(counted[0]?.record).not.toBeNull();
+    });
+  });
+
   describe("when there are several of each", () => {
     it("orders them by name, not by which side they came from", () => {
       const rows = mergeDepartmentRows({

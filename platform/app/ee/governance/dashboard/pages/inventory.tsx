@@ -612,9 +612,11 @@ function useInventoryPanes({
  * component owns the markup.
  */
 function useIngestionSourcesPage() {
-  const { organization, hasAnyPermission } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
+  const {
+    isLoading: isOrganizationLoading,
+    organization,
+    hasAnyPermission,
+  } = useOrganizationTeamProject({ redirectToOnboarding: false });
   const orgId = organization?.id ?? "";
   const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
   const canRead = hasAnyPermission("ingestionSources:view");
@@ -635,6 +637,46 @@ function useIngestionSourcesPage() {
   const refetch = () =>
     utils.ingestionSources.list.invalidate({ organizationId: orgId });
 
+  const composer = useSourceComposer({ orgId, refetch });
+
+  useAddParam({
+    isEnterprise,
+    isPlanLoading,
+    isPermissionLoading: isOrganizationLoading,
+    canManage,
+    canManageTools,
+    startComposer: composer.startComposer,
+    startToolRegistration: panes.startToolRegistration,
+  });
+
+  return {
+    ...panes,
+    ...composer,
+    orgId,
+    destinationCtx,
+    isEnterprise,
+    canRead,
+    canManage,
+    canManageTools,
+    sourcesQuery,
+  };
+}
+
+/**
+ * The composer drawer's draft and the writes it makes.
+ *
+ * Split from {@link useIngestionSourcesPage} because the draft, the edit
+ * target and the secret reveal are one lifecycle: every mutation below has to
+ * be able to close the drawer and drop the draft, so the state and the
+ * mutations that reset it cannot live on opposite sides of a boundary.
+ */
+function useSourceComposer({
+  orgId,
+  refetch,
+}: {
+  orgId: string;
+  refetch: () => void;
+}) {
   const [composing, setComposing] = useState(false);
   const [composer, setComposer] = useState<ComposerState>(blankComposer());
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
@@ -666,15 +708,6 @@ function useIngestionSourcesPage() {
     setComposing(true);
   }, []);
 
-  useAddParam({
-    isEnterprise,
-    isPlanLoading,
-    canManage,
-    canManageTools,
-    startComposer,
-    startToolRegistration: panes.startToolRegistration,
-  });
-
   /** Close the composer and drop the draft. */
   const closeComposer = () => {
     setComposing(false);
@@ -682,16 +715,8 @@ function useIngestionSourcesPage() {
   };
 
   return {
-    ...panes,
-    orgId,
-    destinationCtx,
-    isEnterprise,
-    canRead,
-    canManage,
-    canManageTools,
     startComposer,
     closeComposer,
-    sourcesQuery,
     composing,
     setComposing,
     composer,
@@ -726,8 +751,9 @@ function useIngestionSourcesPage() {
  * a reader without the grant it needs. The plan gate is the same
  * `gatedSourceTypeOptions` the menu reads, so a locked type can no more slip
  * in through the address than through a click. Nothing is decided until the
- * plan is known: an Enterprise link must not be thrown away because the plan
- * query was a tick behind the page.
+ * plan and the grants are known: an Enterprise link must not be thrown away
+ * because the plan query was a tick behind the page, and a manager's link must
+ * not be thrown away because the organization query was.
  */
 const ADD_TOOL_PARAM = "1";
 
@@ -793,6 +819,7 @@ function openAddFlow({
 function useAddParam({
   isEnterprise,
   isPlanLoading,
+  isPermissionLoading,
   canManage,
   canManageTools,
   startComposer,
@@ -800,6 +827,7 @@ function useAddParam({
 }: {
   isEnterprise: boolean;
   isPlanLoading: boolean;
+  isPermissionLoading: boolean;
   canManage: boolean;
   canManageTools: boolean;
   startComposer: (sourceType: SourceType) => void;
@@ -808,7 +836,12 @@ function useAddParam({
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("add");
   useEffect(() => {
-    if (requested === null || isPlanLoading) return;
+    // The plan gate's own reason, applied to grants: an unread grant is not a
+    // refused one. `useOrganizationTeamProject` answers false for every
+    // permission while the organization query is in flight, so without this a
+    // manager's link would open nothing AND have its flag stripped — the
+    // refusal path, reached because the answer had not arrived yet.
+    if (requested === null || isPlanLoading || isPermissionLoading) return;
     openAddFlow({
       requested,
       isEnterprise,
@@ -821,6 +854,7 @@ function useAddParam({
   }, [
     requested,
     isPlanLoading,
+    isPermissionLoading,
     isEnterprise,
     canManage,
     canManageTools,

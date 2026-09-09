@@ -130,7 +130,7 @@ describe("given the Sources tab in sample mode", () => {
       // Asserted through `sourceBadge` rather than over raw statuses because
       // the states are cycled BY POSITION over the catalog. Holding a type
       // back shifts every row after it, and the shift is silent — the badge
-      // that would go missing is "Not pulling", which needs its state to land
+      // that would go missing is "Pulls failing", which needs its state to land
       // on a PULL source, since a push row has its error count zeroed. This
       // fails loudly if the next held-back type costs the table a badge.
       const drawn = new Set(
@@ -144,7 +144,7 @@ describe("given the Sources tab in sample mode", () => {
       );
 
       expect(drawn).toEqual(
-        new Set(["Active", "Not pulling", "Awaiting first event", "Disabled"]),
+        new Set(["Active", "Pulls failing", "Awaiting first event", "Disabled"]),
       );
       // Arrival times spread rather than clustering on one timestamp. Not
       // asserted as all-distinct: there are more rows than states, so the
@@ -171,7 +171,7 @@ describe("given the Sources tab in sample mode", () => {
 
       for (const source of pushRows) {
         // `errorCount` counts consecutive PULL failures — only the puller
-        // worker writes it — so a push row showing "Not pulling" or a polling
+        // worker writes it — so a push row showing "Pulls failing" or a polling
         // cadence would be a state no real fleet can produce.
         expect(source.errorCount).toBe(0);
         expect(source.pullSchedule).toBeNull();

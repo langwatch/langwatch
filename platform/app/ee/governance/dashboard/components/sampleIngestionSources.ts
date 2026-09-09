@@ -47,7 +47,7 @@ const HOUR_MS = 60 * MINUTE_MS;
  * OTLP one. The cycle is only long enough to put every badge the table can
  * draw on screen at once: healthy sources at a range of arrival times, one
  * whose last runs all failed (three consecutive failures is what
- * `deriveSourceHealth` calls unhealthy, so that row reads "Not pulling"), one
+ * `deriveSourceHealth` calls unhealthy, so that row reads "Pulls failing"), one
  * still waiting for its first event, and one an admin switched off.
  *
  * The one exception the cycle cannot state is below: `errorCount` counts
@@ -56,7 +56,7 @@ const HOUR_MS = 60 * MINUTE_MS;
  *
  * INDEXED BY POSITION, so the cycle is coupled to the sampled list: holding a
  * type back or adding one shifts every state after it, and the shift is
- * silent. The badge it can cost is "Not pulling", whose state has to land on a
+ * silent. The badge it can cost is "Pulls failing", whose state has to land on a
  * PULL source or the exception above zeroes it away. Reorder or hold back
  * freely — a test asserts all four badges still reach the screen, and if one
  * goes missing the fix belongs in this cycle rather than in the catalog order.
@@ -96,7 +96,7 @@ export const SAMPLE_INGESTION_SOURCES: Source[] = sampleSourceTypeOptions().map(
     const state =
       SAMPLE_INSTANCE_STATES[index % SAMPLE_INSTANCE_STATES.length]!;
     // Only the puller worker ever writes `errorCount`, so a push source's is
-    // always zero. Showing "Not pulling" over a source nothing polls would be
+    // always zero. Showing "Pulls failing" over a source nothing polls would be
     // the sample inventing a state the product cannot reach.
     const errorCount = mode === "push" ? 0 : state.errorCount;
     const lastEventAt =

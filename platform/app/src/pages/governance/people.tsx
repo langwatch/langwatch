@@ -632,9 +632,17 @@ function PeopleSummaryStrip({
   // Invented rows are complete by construction. Real ones are only complete
   // once both halves of the population have come back: the money the gateway
   // metered, and the people the connected providers named.
+  //
+  // Success, not the absence of loading. A tRPC query that was never enabled
+  // is not loading and never will be, so `!isLoading` reads a skipped read as
+  // a finished one: the spend read is off for a reader without
+  // `activityMonitor:view` and off again for a non-Enterprise organization,
+  // and the departments read is off until `orgId` arrives. Each of those would
+  // have printed a confident population counted from the identity half alone,
+  // directly under a table showing that same reader a permission notice.
   const peopleMeasured =
-    sampleActive || (!reads.spend.isLoading && !reads.people.isLoading);
-  const departmentsMeasured = sampleActive || !reads.departments.isLoading;
+    sampleActive || (reads.spend.isSuccess && reads.people.isSuccess);
+  const departmentsMeasured = sampleActive || reads.departments.isSuccess;
 
   const summary = summarizePeople({
     rows,
