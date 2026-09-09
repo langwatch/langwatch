@@ -31,6 +31,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
     "@clickhouse/client": "^1.23.0",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",

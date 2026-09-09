@@ -1,28 +1,7 @@
-/**
- * The coding-agent feature's application: what both of its doors call.
- *
- * The session reads answer over two transports — the process's tRPC root for
- * the Sessions screen and the /me page, and a project-scoped REST family for
- * whatever an organization builds on top. Before this, each door declared its
- * own bag: the tRPC door `Readonly<{ codingAgents; github }>` plus three
- * ports, the REST family a `CodingAgentRestServices` with the SAME
- * organization lookup under a different name (`resolveOrganizationId` against
- * `tryResolveOrganizationForProject`) and its own `CodingAgentCallerScope`
- * derived from a different contract type than the tRPC one — two names for one
- * shape, agreeing only because nobody had changed either.
- *
- * What lives here as a method is what a door would otherwise have to know:
- *
- *   - resolving the organization behind a project and refusing when there is
- *     none, which is the tenancy boundary on every cross-project read;
- *   - the caller's permission cut over that organization, enumerated from the
- *     organization rather than taken from the request;
- *   - whether GitHub is connected and where to send someone who wants it to
- *     be, which the /me page renders and which is not a transport's fact.
- *
- * A caller arrives as an argument, never read from a session or a request.
- */
+import type { CodingAgentSessionLookupInput } from "@langwatch/coding-agent-contract";
+/** The coding-agent application shared by all transports. */
 import type {
+  CodingAgentApi,
   CodingAgentGithubConnection,
   CodingAgentPersonalPullRequestUsage,
   CodingAgentPersonalPullRequestUsageInput,
@@ -40,8 +19,25 @@ import type {
   CodingAgentUsageTotals,
   CodingAgentUsageTotalsInput,
 } from "@langwatch/coding-agent-contract";
-import { GithubPullRequestNotMappedError, type GithubService } from "@langwatch/github-contract";
+import type { SpanDetail } from "@langwatch/trace-contract";
+import type { TranscriptLogRecord } from "@langwatch/coding-agent-contract";
+import { CodingAgentApi as CodingAgentApiToken } from "@langwatch/coding-agent-contract";
+import { GithubApi } from "@langwatch/github-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import type { CodingAgentScopeCaller } from "#ports/coding-agent-caller-scope.port";
+import type { CodingAgentClickHousePort } from "#ports/coding-agent-clickhouse.port";
+import type { CodingAgentBillingPolicyPort } from "#ports/coding-agent-billing.port";
+import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
+import {
+  CodingAgentProjectionPersistenceAdapter,
+  CodingAgentRuntime,
+} from "../adapters/coding-agent.adapter.ts";
+import type {
+  CodingAgentCallerScopeDirectoryPort,
+  CodingAgentScopePermissionsPort,
+} from "../ports/coding-agent-caller-scope.port.ts";
 
 /**
  * The caller's permission cut over an organization: which of its projects they
@@ -91,35 +87,120 @@ export interface CodingAgentScopePorts {
 }
 
 /** What the process composes this feature's application from. */
-export interface CodingAgentAppDependencies {
-  codingAgents: CodingAgentService;
-  github: GithubService;
-  scope: CodingAgentScopePorts;
-}
+export type CodingAgentInfrastructure = Readonly<{
+  clickHouse: CodingAgentClickHousePort | null;
+  defaultTraceRetentionDays: number;
+  billing: CodingAgentBillingPolicyPort;
+  scopeDirectory: CodingAgentCallerScopeDirectoryPort;
+  scopePermissions: CodingAgentScopePermissionsPort;
+  /** Test-only service seam; production composition leaves this absent. */
+  service?: CodingAgentService;
+}>;
 
-export class CodingAgentApp {
-  static create(dependencies: CodingAgentAppDependencies): CodingAgentApp {
-    return new CodingAgentApp(dependencies);
+type CodingAgentDependencies = { projects: typeof ProjectApi; github: typeof GithubApi };
+type CodingAgentSetup = FeatureSetup<CodingAgentDependencies, CodingAgentInfrastructure, undefined>;
+
+export class CodingAgentApp implements CodingAgentApi {
+  static readonly contract = CodingAgentApiToken;
+  static readonly dependencies: CodingAgentDependencies = {
+    projects: ProjectApi,
+    github: GithubApi,
+  };
+
+  static create({ infrastructure, dependencies }: CodingAgentSetup): CodingAgentApp {
+    const projections = CodingAgentProjectionPersistenceAdapter.create({
+      clickHouse: infrastructure.clickHouse,
+      retention: { defaultTraceRetentionDays: infrastructure.defaultTraceRetentionDays },
+    });
+    const service =
+      infrastructure.service ??
+      CodingAgentRuntime.create({
+        projections,
+        github: dependencies.github,
+        projects: dependencies.projects,
+        billing: infrastructure.billing,
+      }).service;
+    const scopeService = CodingAgentCallerScopeService.create({
+      directory: infrastructure.scopeDirectory,
+      permissions: infrastructure.scopePermissions,
+    });
+    const scope: CodingAgentScopePorts = {
+      tryResolveOrganizationForProject: async (projectId) => {
+        try {
+          return await dependencies.projects.getOrganizationId(projectId);
+        } catch {
+          return undefined;
+        }
+      },
+      resolveCallerProjectScope: (input) => scopeService.resolve(input),
+    };
+    return new CodingAgentApp(service, dependencies.github, scope);
   }
 
-  private constructor(private readonly dependencies: CodingAgentAppDependencies) {}
+  readonly #codingAgents: CodingAgentService;
+  readonly #github: GithubApi;
+  readonly #scope: CodingAgentScopePorts;
+
+  private constructor(
+    codingAgents: CodingAgentService,
+    github: GithubApi,
+    scope: CodingAgentScopePorts,
+  ) {
+    this.#codingAgents = codingAgents;
+    this.#github = github;
+    this.#scope = scope;
+  }
+
+  logContentKeys(eventName: string) {
+    return this.#codingAgents.logContentKeys(eventName);
+  }
+
+  contentAttrKeys(eventName: string) {
+    return this.#codingAgents.contentAttrKeys(eventName);
+  }
+
+  shouldFilterSpan(input: {
+    scopeName: string | null | undefined;
+    spanName: string;
+    attributeKeys: readonly string[];
+  }): boolean {
+    return this.#codingAgents.shouldFilterSpan(input);
+  }
+
+  buildTranscript(input: { spans: SpanDetail[]; logs: TranscriptLogRecord[] }) {
+    return this.#codingAgents.buildTranscript(input);
+  }
+
+  tryGetBySessionId(input: CodingAgentSessionLookupInput) {
+    return this.#codingAgents.tryGetBySessionId(input);
+  }
+
+  tryGetSessionForTrace(input: { projectId: string; traceId: string }) {
+    return this.#codingAgents.tryGetSessionForTrace(input);
+  }
+
+  linkTraceSessionsToPullRequests(
+    input: Parameters<CodingAgentService["linkTraceSessionsToPullRequests"]>[0],
+  ) {
+    return this.#codingAgents.linkTraceSessionsToPullRequests(input);
+  }
 
   /** One session's event sequence, in time order, keyset-paginated. */
   getSessionEvents(input: CodingAgentSessionEventsInput): Promise<{
     events: CodingAgentSessionEvent[];
     nextCursor: CodingAgentSessionCursor | null;
   }> {
-    return this.dependencies.codingAgents.getSessionEvents(input);
+    return this.#codingAgents.getSessionEvents(input);
   }
 
   /** The project's "at a glance" totals over a window. */
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals> {
-    return this.dependencies.codingAgents.getUsageTotals(input);
+    return this.#codingAgents.getUsageTotals(input);
   }
 
   /** The project's recent sessions in a window, newest first. */
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]> {
-    return this.dependencies.codingAgents.listRecent(input);
+    return this.#codingAgents.listRecent(input);
   }
 
   /**
@@ -128,51 +209,35 @@ export class CodingAgentApp {
    * its caller, and fail-open — the branch recheck rebuilds the same mapping.
    */
   backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void> {
-    return this.dependencies.codingAgents.backfillPullRequestMappings(input);
+    return this.#codingAgents.backfillPullRequestMappings(input);
   }
 
   /** The Sessions screen's display projection for one project. */
   listForProject(input: CodingAgentSessionsListInput): Promise<CodingAgentSessionListRow[]> {
-    return this.dependencies.codingAgents.listForProject(input);
+    return this.#codingAgents.listForProject(input);
   }
 
   /** The GitHub web origin this instance is bound to. */
   githubWebBase(): string {
-    return this.dependencies.github.getWebBase();
+    return this.#github.getWebBase();
   }
 
   /** The organization a project belongs to, or undefined for an orphan. */
   tryResolveOrganizationForProject(projectId: string): Promise<string | undefined> {
-    return this.dependencies.scope.tryResolveOrganizationForProject(projectId);
+    return this.#scope.tryResolveOrganizationForProject(projectId);
   }
 
-  /**
-   * What one pull request cost, across every project of the organization the
-   * caller may read.
-   *
-   * A project belonging to no organization has no pull request to price, and
-   * saying so as "not mapped" is what both doors already answered — a caller
-   * cannot tell the difference and does not need to.
-   *
-   * The organization comes back beside the rollup rather than inside it: the
-   * REST door records who read an answer that names people, and the audit row
-   * is written against the organization the read actually reached. Answering
-   * with it spread into the rollup would put it on the wire.
-   *
-   * The caller is a CREDENTIAL where the door resolved one, exactly as
-   * {@link getOrganizationPullRequestUsage} takes it: a narrowed key reads
-   * with its own bindings rather than the full reach of whoever holds it.
-   */
+  /** Reads pull-request usage across the caller's permitted projects. */
   async getPullRequestUsage(
     pullRequest: CodingAgentPullRequestRef,
     by: CodingAgentScopeCaller,
   ): Promise<{ usage: CodingAgentPullRequestUsage; organizationId: string }> {
     const organizationId = await this.requireOrganizationFor(pullRequest);
-    const scope = await this.dependencies.scope.resolveCallerProjectScope({
+    const scope = await this.#scope.resolveCallerProjectScope({
       caller: by,
       organizationId,
     });
-    const usage = await this.dependencies.codingAgents.getPullRequestUsage({
+    const usage = await this.#codingAgents.getPullRequestUsage({
       organizationId,
       repositoryHost: pullRequest.repositoryHost,
       repositoryFullName: pullRequest.repositoryFullName,
@@ -182,19 +247,7 @@ export class CodingAgentApp {
     return { usage, organizationId };
   }
 
-  /**
-   * The same rollup, asked at the ORGANIZATION rather than through a project.
-   *
-   * The organization arrives from the credential itself, so there is no
-   * project id anywhere in the request and none to resolve one from. That is
-   * the whole difference: `getPullRequestUsage` recovers an organization
-   * through a project the caller named, which a key that is already
-   * organization-scoped makes an unnecessary indirection.
-   *
-   * The caller is a credential rather than a person here, so the cut is the
-   * KEY's — its bindings, and its holder's where it has one. A service key
-   * owns nobody, and reads with its bindings alone.
-   */
+  /** Reads pull-request usage when the organization is already known. */
   async getOrganizationPullRequestUsage(
     pullRequest: {
       organizationId: string;
@@ -204,11 +257,11 @@ export class CodingAgentApp {
     },
     by: CodingAgentScopeCaller,
   ): Promise<CodingAgentPullRequestUsage> {
-    const scope = await this.dependencies.scope.resolveCallerProjectScope({
+    const scope = await this.#scope.resolveCallerProjectScope({
       caller: by,
       organizationId: pullRequest.organizationId,
     });
-    return this.dependencies.codingAgents.getPullRequestUsage({
+    return this.#codingAgents.getPullRequestUsage({
       organizationId: pullRequest.organizationId,
       repositoryHost: pullRequest.repositoryHost,
       repositoryFullName: pullRequest.repositoryFullName,
@@ -223,11 +276,11 @@ export class CodingAgentApp {
     by: CodingAgentCaller,
   ): Promise<CodingAgentPullRequestDetail> {
     const organizationId = await this.requireOrganizationFor(pullRequest);
-    const scope = await this.dependencies.scope.resolveCallerProjectScope({
+    const scope = await this.#scope.resolveCallerProjectScope({
       caller: { kind: "user", userId: by.id },
       organizationId,
     });
-    return this.dependencies.codingAgents.getPullRequestDetail({
+    return this.#codingAgents.getPullRequestDetail({
       organizationId,
       repositoryHost: pullRequest.repositoryHost,
       repositoryFullName: pullRequest.repositoryFullName,
@@ -236,31 +289,20 @@ export class CodingAgentApp {
     });
   }
 
-  /**
-   * The personal project's pull requests and unmapped branches, plus whether
-   * GitHub is connected — all three at once, because the page needs all three
-   * to decide what to render and three round trips would show it in stages.
-   *
-   * An orphan project answers with an empty permission cut rather than a
-   * refusal: there is nothing to read, which is the same answer the rest of
-   * this surface gives, and the page still needs the connection block to offer
-   * the install.
-   */
+  /** Reads personal pull-request usage and GitHub connection state. */
   async getPersonalProjectPullRequestUsage(
     input: { projectId: string },
     by: CodingAgentCaller,
   ): Promise<CodingAgentPersonalPullRequestUsage & { connection: CodingAgentGithubConnection }> {
-    const organizationId = await this.dependencies.scope.tryResolveOrganizationForProject(
-      input.projectId,
-    );
+    const organizationId = await this.#scope.tryResolveOrganizationForProject(input.projectId);
     const scope = organizationId
-      ? await this.dependencies.scope.resolveCallerProjectScope({
+      ? await this.#scope.resolveCallerProjectScope({
           caller: { kind: "user", userId: by.id },
           organizationId,
         })
       : emptyCallerScope();
 
-    const usage = await this.dependencies.codingAgents.getForPersonalProject({
+    const usage = await this.#codingAgents.getForPersonalProject({
       projectId: input.projectId,
       ...scope,
     });
@@ -275,10 +317,8 @@ export class CodingAgentApp {
   async githubConnection(organizationId: string | undefined): Promise<CodingAgentGithubConnection> {
     if (!organizationId) return { connected: false, installUrl: null };
 
-    const installations = await this.dependencies.github.getAllForOrganization(organizationId);
-    const installable =
-      this.dependencies.github.configured &&
-      Boolean(this.dependencies.github.getAppConfig().appSlug);
+    const installations = await this.#github.getAllForOrganization(organizationId);
+    const installable = Boolean(this.#github.getAppConfig().appSlug);
     return {
       connected: installations.length > 0,
       installUrl: installable
@@ -287,15 +327,9 @@ export class CodingAgentApp {
     };
   }
 
-  /**
-   * The organization behind the project a pull-request read was asked against.
-   *
-   * An orphan project is answered as "not mapped" rather than "no
-   * organization": the caller asked about a pull request, and what they can do
-   * about it is the same either way.
-   */
+  /** Resolves a pull-request project's organization or preserves the old error. */
   private async requireOrganizationFor(pullRequest: CodingAgentPullRequestRef): Promise<string> {
-    const organizationId = await this.dependencies.scope.tryResolveOrganizationForProject(
+    const organizationId = await this.#scope.tryResolveOrganizationForProject(
       pullRequest.projectId,
     );
     if (organizationId) return organizationId;

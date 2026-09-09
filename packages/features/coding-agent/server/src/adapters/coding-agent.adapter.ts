@@ -6,8 +6,8 @@ import {
   type CodingAgentSessionMetricSeriesRecord,
   type CodingAgentTraceSessionRecord,
 } from "@langwatch/coding-agent-contract";
-import type { GithubService } from "@langwatch/github-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { GithubApi } from "@langwatch/github-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { CodingAgentClickHousePort } from "../ports/coding-agent-clickhouse.port.ts";
 import { SystemCodingAgentClockAdapter } from "./coding-agent-clock.adapter.ts";
 import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
@@ -126,8 +126,8 @@ export class CodingAgentProjectionPersistenceAdapter extends CodingAgentProjecti
 
 export type CodingAgentRuntimeOptions = {
   projections: CodingAgentProjectionPersistence;
-  github: GithubService;
-  projects: ProjectService;
+  github: GithubApi;
+  projects: ProjectApi;
   billing: CodingAgentBillingPolicyPort;
 };
 

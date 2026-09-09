@@ -8,6 +8,18 @@ import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { CodingAgentApp } from "#app/coding-agent.app";
+import { ResourceScope } from "@langwatch/runtime-composition";
+import {
+  TestBillingPolicy,
+  TestGithubService,
+  TestProjectService,
+  pullRequest,
+} from "../../../__tests__/fixtures/coding-agent.fixture.ts";
+import {
+  CodingAgentCallerScopeDirectoryPort,
+  CodingAgentScopePermissionsPort,
+} from "#ports/coding-agent-caller-scope.port";
+import { CodingAgentService } from "@langwatch/coding-agent-contract";
 import type { CodingAgentScopeCaller } from "#ports/coding-agent-caller-scope.port";
 import { createCodingAgentRestApp } from "../coding-agent.api.ts";
 
@@ -198,28 +210,73 @@ function mountOverScope(reach: { key: readonly string[]; holder: readonly string
   const callers: CodingAgentScopeCaller[] = [];
   const reads: Array<{ permittedProjectIds: readonly string[] }> = [];
 
-  const app = CodingAgentApp.create({
-    github: { getWebBase: () => "https://github.com" } as never,
-    scope: {
-      tryResolveOrganizationForProject: async () => "organization-1",
-      resolveCallerProjectScope: async ({ caller }) => {
-        callers.push(caller);
-        const ids = caller.kind === "apiKey" ? reach.key : reach.holder;
-        return {
-          permittedProjectIds: [...ids],
-          costProjectIds: [...ids],
-          projects: Object.fromEntries(
-            ids.map((id) => [id, { slug: id, contributorLabel: id, isLinkable: true }]),
-          ),
-        };
-      },
+  class ScopeDirectory extends CodingAgentCallerScopeDirectoryPort {
+    listOrganizationProjects() {
+      return Promise.resolve(
+        [...new Set([...reach.key, ...reach.holder])].map((id) => ({
+          id,
+          name: id,
+          slug: id,
+          teamId: `team-${id}`,
+          isPersonal: false,
+        })),
+      );
+    }
+
+    listPersonalTeamOwnerNames() {
+      return Promise.resolve(new Map<string, string>());
+    }
+  }
+
+  class ScopePermissions extends CodingAgentScopePermissionsPort {
+    projectCuts(input: { caller: CodingAgentScopeCaller }) {
+      callers.push(input.caller);
+      const ids = input.caller.kind === "apiKey" ? reach.key : reach.holder;
+      const allowed = new Set(ids);
+      return Promise.resolve(
+        new Map([
+          ["traces:view", allowed],
+          ["cost:view", allowed],
+        ]),
+      );
+    }
+  }
+
+  class GithubForRest extends TestGithubService {
+    constructor() {
+      super();
+      this.pullRequests = [pullRequest({ repositoryFullName: "acme/widgets" })];
+    }
+
+    override getWebBase(): string {
+      return "https://github.com";
+    }
+  }
+
+  class ProjectForRest extends TestProjectService {
+    override getOrganizationId(): Promise<string> {
+      return Promise.resolve("organization-1");
+    }
+  }
+
+  const codingAgents = {
+    getPullRequestUsage: async (input: { permittedProjectIds: readonly string[] }) => {
+      reads.push({ permittedProjectIds: input.permittedProjectIds });
+      return USAGE;
     },
-    codingAgents: {
-      getPullRequestUsage: async (input: { permittedProjectIds: readonly string[] }) => {
-        reads.push({ permittedProjectIds: input.permittedProjectIds });
-        return USAGE;
-      },
-    } as never,
+  } as CodingAgentService;
+  const app = CodingAgentApp.create({
+    dependencies: { github: new GithubForRest(), projects: new ProjectForRest() },
+    infrastructure: {
+      clickHouse: null,
+      defaultTraceRetentionDays: 30,
+      billing: new TestBillingPolicy(),
+      scopeDirectory: new ScopeDirectory(),
+      scopePermissions: new ScopePermissions(),
+      service: codingAgents,
+    },
+    config: undefined,
+    resources: new ResourceScope(),
   });
 
   const hono = new Hono().route(
@@ -261,7 +318,9 @@ describe("given a key bound to fewer projects than the person holding it", () =>
 
 describe("given a key for a personal workspace that belongs to no person", () => {
   describe("when it reads the project-scoped rollup", () => {
-    /** @scenario "An ownerless key on the personal rollup is refused rather than answered as the owner" */
+    /**
+     * @scenario "An ownerless key on the personal rollup is refused rather than answered as the owner"
+     */
     it("refuses by name rather than answering as the workspace's owner", async () => {
       const api = mount({ id: OWNER_PROJECT, isPersonal: true, ownerUserId: "user-1" }, null);
 

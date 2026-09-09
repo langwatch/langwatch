@@ -4,7 +4,7 @@ import {
   type CodingAgentSession,
 } from "@langwatch/coding-agent-contract";
 import { createLogger } from "@langwatch/observability";
-import type { GithubService } from "@langwatch/github-contract";
+import type { GithubApi } from "@langwatch/github-contract";
 import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
 import type { CodingAgentSessionReadService } from "./coding-agent-session-read.service.ts";
 
@@ -39,7 +39,7 @@ export type CodingAgentBackfillProjects = {
 export class CodingAgentPullRequestMappingBackfillService {
   static create(options: {
     sessionReads: CodingAgentSessionReads;
-    github: GithubService;
+    github: GithubApi;
     projects: CodingAgentBackfillProjects;
     clock: CodingAgentClockPort;
   }): CodingAgentPullRequestMappingBackfillService {
@@ -49,7 +49,7 @@ export class CodingAgentPullRequestMappingBackfillService {
   private constructor(
     private readonly dependencies: {
       sessionReads: CodingAgentSessionReads;
-      github: GithubService;
+      github: GithubApi;
       projects: CodingAgentBackfillProjects;
       clock: CodingAgentClockPort;
     },

@@ -21,8 +21,8 @@ import {
   type CodingAgentUsageTotals,
   type CodingAgentUsageTotalsInput,
 } from "@langwatch/coding-agent-contract";
-import type { GithubService } from "@langwatch/github-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { GithubApi } from "@langwatch/github-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port.ts";
 import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
 import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
@@ -48,8 +48,8 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
     traceSessions: CodingAgentTraceSessionRepository;
     metricSeries: SessionMetricSeriesRepository;
     sessionEvents: CodingAgentSessionEventRepository;
-    github: GithubService;
-    projects: ProjectService;
+    github: GithubApi;
+    projects: ProjectApi;
     billing: CodingAgentBillingPolicyPort;
     clock: CodingAgentClockPort;
   }): CodingAgentFeatureService {

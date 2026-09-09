@@ -24,6 +24,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "zod": "^4.4.3"

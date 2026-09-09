@@ -3,7 +3,7 @@ import type {
   CodingAgentTracePullRequestLink,
   CodingAgentTraceSessionCandidate,
 } from "@langwatch/coding-agent-contract";
-import type { GithubPullRequest, GithubService } from "@langwatch/github-contract";
+import type { GithubPullRequest, GithubApi } from "@langwatch/github-contract";
 import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
 
 type LinkableSession = CodingAgentTraceSessionCandidate & {
@@ -15,7 +15,7 @@ type LinkableSession = CodingAgentTraceSessionCandidate & {
 /** Private collaborator for attaching trace sessions to their branch's pull request. */
 export class CodingAgentTracePullRequestService {
   static create(options: {
-    github: GithubService;
+    github: GithubApi;
     assignments: CodingAgentPullRequestAssignmentService;
   }): CodingAgentTracePullRequestService {
     return new CodingAgentTracePullRequestService(options);
@@ -23,7 +23,7 @@ export class CodingAgentTracePullRequestService {
 
   private constructor(
     private readonly dependencies: {
-      github: GithubService;
+      github: GithubApi;
       assignments: CodingAgentPullRequestAssignmentService;
     },
   ) {}

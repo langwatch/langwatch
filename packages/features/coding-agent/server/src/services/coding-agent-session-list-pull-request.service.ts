@@ -1,13 +1,13 @@
 import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
-import type { GithubPullRequest, GithubService } from "@langwatch/github-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { GithubPullRequest, GithubApi } from "@langwatch/github-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { CodingAgentPullRequestAssignmentService } from "./coding-agent-pull-request-assignment.service.ts";
 
 /** Private GitHub enrichment collaborator for the bounded session-list view. */
 export class CodingAgentSessionListPullRequestService {
   static create(options: {
-    github: GithubService;
-    projects: ProjectService;
+    github: GithubApi;
+    projects: ProjectApi;
     assignments: CodingAgentPullRequestAssignmentService;
   }): CodingAgentSessionListPullRequestService {
     return new CodingAgentSessionListPullRequestService(options);
@@ -15,8 +15,8 @@ export class CodingAgentSessionListPullRequestService {
 
   private constructor(
     private readonly dependencies: {
-      github: GithubService;
-      projects: ProjectService;
+      github: GithubApi;
+      projects: ProjectApi;
       assignments: CodingAgentPullRequestAssignmentService;
     },
   ) {}

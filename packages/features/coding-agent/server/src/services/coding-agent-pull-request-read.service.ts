@@ -16,9 +16,9 @@ import {
 import {
   GithubPullRequestNotMappedError,
   type GithubPullRequest,
-  type GithubService,
+  type GithubApi,
 } from "@langwatch/github-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port.ts";
 import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
 import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
@@ -55,8 +55,8 @@ export class CodingAgentPullRequestReadService {
     sessions: CodingAgentSessionRepository;
     sessionEvents: CodingAgentSessionEventRepository;
     sessionReads: CodingAgentSessionReadService;
-    github: GithubService;
-    projects: ProjectService;
+    github: GithubApi;
+    projects: ProjectApi;
     billing: CodingAgentBillingPolicyPort;
     clock: CodingAgentClockPort;
     assignments: CodingAgentPullRequestAssignmentService;
@@ -81,8 +81,8 @@ export class CodingAgentPullRequestReadService {
       sessions: CodingAgentSessionRepository;
       sessionEvents: CodingAgentSessionEventRepository;
       sessionReads: CodingAgentSessionReadService;
-      github: GithubService;
-      projects: ProjectService;
+      github: GithubApi;
+      projects: ProjectApi;
       billing: CodingAgentBillingPolicyPort;
       clock: CodingAgentClockPort;
       assignments: CodingAgentPullRequestAssignmentService;
