@@ -1,15 +1,23 @@
+/**
+ * The pure guardrail pass in front of the operator-only ClickHouse EXPLAIN.
+ *
+ * Everything here decides whether a query may be wrapped and run at all, and
+ * what may be written about it afterwards. No client, no clock, no
+ * environment: the service owns which account runs the wrapped query, and this
+ * module owns whether there is a wrapped query to run.
+ */
 import { createHash } from "node:crypto";
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { z } from "zod";
 
-/// Pure helpers for the /api/ops/clickhouse/explain endpoint. The handler
-/// itself lives in src/server/routes/ops.ts (Hono); these functions stay
-/// pure so they can be unit-tested in isolation.
+import type { OpsExplainType } from "@langwatch/ops-contract";
 
-export const ALLOWED_EXPLAIN_TYPES = ["PLAN", "SYNTAX", "PIPELINE", "AST", "INDEXES"] as const;
-export type ExplainType = (typeof ALLOWED_EXPLAIN_TYPES)[number];
+/** Whether a query may be wrapped, and the wrapped form when it may. */
+export interface OpsExplainBuild {
+  wrapped?: string;
+  type?: OpsExplainType;
+  reason?: string;
+}
 
-/// `ANALYZE` would execute the inner query — never allow it. The other
+/// `ANALYZE` would execute the inner query - never allow it. The other
 /// entries here are tokens that would let a caller break out of the
 /// EXPLAIN wrapper into a statement that mutates state. Even though our
 /// EXPLAIN wrapping should prevent execution, ClickHouse's parser is
@@ -19,7 +27,7 @@ const FORBIDDEN_KEYWORD_RE =
 
 /// ClickHouse table functions that can reach external/internal network
 /// targets or read arbitrary local files. `readonly=1` does NOT block
-/// these — read-only just means "no INSERT/ALTER/DROP", and table
+/// these - read-only just means "no INSERT/ALTER/DROP", and table
 /// functions are read operations. We deny them at the pre-check layer;
 /// the dedicated `langwatch_ops` user adds the access-layer boundary.
 const TABLE_FUNCTION_RE =
@@ -29,31 +37,13 @@ const TABLE_FUNCTION_RE =
 /// of other tenants, etc.). Reject any reference to it.
 const SYSTEM_SCHEMA_RE = /\bsystem\s*\./i;
 
-/// Per-query ClickHouse-side guardrails. Must stay aligned with the
-/// langwatch_ops profile, which is provisioned per deployment rather than
-/// from this repo: a readonly=1 profile with no SOURCES grant.
-/// ClickHouseSettings is picky: `readonly` / `max_result_bytes` /
-/// `max_memory_usage` are typed `UInt64 = string`, `max_execution_time`
-/// is `Seconds = number`.
-export const explainBodySchema = z.object({
-  query: z.string().trim().min(1, "query is required").max(50_000),
-  type: z.enum(ALLOWED_EXPLAIN_TYPES).optional(),
-});
-
-export interface ParseResult {
-  ok: boolean;
-  wrapped?: string;
-  type?: ExplainType;
-  reason?: string;
-}
-
 /// Normalize the query for the regex safety pass with a single lexer that
 /// tracks string, line-comment, and (nested) block-comment state in
 /// ClickHouse order. A character is either inside a string, inside a
-/// comment, or in normal SQL — never two at once — so we walk char-by-char
+/// comment, or in normal SQL - never two at once - so we walk char-by-char
 /// with one state variable. See the full rationale in the previous
 /// commits' reviewer threads (string-vs-comment bypass, nested comments).
-function stripCommentsAndStrings(query: string): string {
+export function stripCommentsAndStrings(query: string): string {
   let out = "";
   let i = 0;
   const n = query.length;
@@ -141,50 +131,51 @@ function stripCommentsAndStrings(query: string): string {
   return out;
 }
 
-function buildExplainQuery(query: string, type: ExplainType = "PLAN"): ParseResult {
+export function buildExplainQuery(query: string, type: OpsExplainType = "PLAN"): OpsExplainBuild {
   const trimmed = query.trim();
-  if (!trimmed) return { ok: false, reason: "query is empty" };
+  if (!trimmed) return { reason: "query is empty" };
   if (/^\s*EXPLAIN\b/i.test(trimmed)) {
     return {
-      ok: false,
       reason:
-        "query already starts with EXPLAIN — pass the inner SELECT only and choose type via the `type` field",
+        "query already starts with EXPLAIN - pass the inner SELECT only and choose type via the `type` field",
     };
   }
   const normalized = stripCommentsAndStrings(trimmed);
   if (normalized.includes(";")) {
-    return { ok: false, reason: "query must be a single statement (no `;`)" };
+    return { reason: "query must be a single statement (no `;`)" };
   }
   const forbidden = FORBIDDEN_KEYWORD_RE.exec(normalized);
   if (forbidden) {
     return {
-      ok: false,
       reason: `forbidden keyword in query: ${(forbidden[1] ?? "").toUpperCase()}`,
     };
   }
   const tableFn = TABLE_FUNCTION_RE.exec(normalized);
   if (tableFn) {
     return {
-      ok: false,
       reason: `table function not allowed (SSRF / external-read surface): ${(tableFn[1] ?? "").toLowerCase()}()`,
     };
   }
   if (SYSTEM_SCHEMA_RE.test(normalized)) {
     return {
-      ok: false,
       reason: "references to the system.* schema are not allowed",
     };
   }
-  // `INDEXES` is not a top-level EXPLAIN type in ClickHouse — it's a
+  // `INDEXES` is not a top-level EXPLAIN type in ClickHouse - it's a
   // modifier on `EXPLAIN PLAN` (`EXPLAIN PLAN indexes = 1 ...`). Sending
   // `EXPLAIN INDEXES <query>` raises a parser error and the endpoint
   // 502s. Expand it to the canonical form so callers can pass `INDEXES`
   // as a logical type without needing to know that wrinkle.
   const prefix = type === "INDEXES" ? "EXPLAIN PLAN indexes = 1, actions = 1" : `EXPLAIN ${type}`;
-  return { ok: true, wrapped: `${prefix} ${trimmed}`, type };
+  return { wrapped: `${prefix} ${trimmed}`, type };
 }
 
-function redactQueryForAudit(query: string): {
+/**
+ * What may be written down about a query that ran: its SHAPE with every
+ * literal replaced, and a short digest of the original. Never the text - the
+ * audit stream outlives the incident, and a query can carry a tenant's data.
+ */
+export function redactQueryForAudit(query: string): {
   shape: string;
   sha256: string;
 } {
@@ -199,17 +190,12 @@ function redactQueryForAudit(query: string): {
 }
 
 /**
- * Parse CLICKHOUSE_OPS_URL into the pieces @clickhouse/client wants as
- * separate config fields. We do the userinfo split + percent-decoding
- * ourselves because the lib forwards `URL.username` / `URL.password`
- * to the wire as-is — both getters return the URL-encoded form. With a
- * Terraform-generated password that may contain '@' or '%' (which TF
- * wraps via `urlencode()` to keep the URL parseable), passing the URL
- * verbatim ends up authenticating with the encoded form (e.g. "p%40ss")
- * and ClickHouse rejects with "Authentication failed". Decoding here
- * means the wire password matches what users.xml hashes.
+ * The ops connection URL, split into the fields @clickhouse/client wants. The
+ * userinfo split and percent-decoding are ours because the library forwards
+ * `URL.username` / `URL.password` to the wire in their encoded form, so a
+ * password carrying '@' or '%' would authenticate as "p%40ss" and be refused.
  */
-function parseOpsConnection(raw: string): {
+export function findOpsConnection(raw: string): {
   url: string;
   username: string;
   password: string;
@@ -228,61 +214,4 @@ function parseOpsConnection(raw: string): {
   } catch {
     return null;
   }
-}
-
-/** Process-owned lazy client for the dedicated read-only ops account. */
-export class OpsClickHouseRuntime {
-  static create(options: { url?: string; buildTime: boolean }): OpsClickHouseRuntime {
-    return new OpsClickHouseRuntime(options.url, options.buildTime);
-  }
-
-  private client: ClickHouseClient | undefined;
-  private closeOperation: Promise<void> | undefined;
-  private closed = false;
-
-  private constructor(
-    private readonly url: string | undefined,
-    private readonly buildTime: boolean,
-  ) {}
-
-  resolveClient(): ClickHouseClient | null {
-    if (this.closed || this.buildTime || this.url?.trim() === "" || this.url === undefined) {
-      return null;
-    }
-    if (this.client !== undefined) return this.client;
-
-    const parsed = parseOpsConnection(this.url);
-    // No client-side `clickhouse_settings` here: the readonly profile forbids
-    // session-setting changes; its server-side profile enforces the limits.
-    this.client = createClient({
-      url: parsed?.url ?? this.url,
-      username: parsed?.username || undefined,
-      password: parsed?.password || undefined,
-      database: parsed?.database,
-      max_open_connections: 5,
-      keep_alive: { enabled: true, idle_socket_ttl: 1500 },
-    });
-    return this.client;
-  }
-
-  close(): Promise<void> {
-    if (this.closeOperation !== undefined) return this.closeOperation;
-    this.closed = true;
-    const client = this.client;
-    this.closeOperation = client === undefined ? Promise.resolve() : client.close();
-    return this.closeOperation;
-  }
-}
-
-export class OpsClickhouseExplainAdapter {
-  private constructor() {}
-
-  static create(): OpsClickhouseExplainAdapter {
-    return new OpsClickhouseExplainAdapter();
-  }
-
-  static stripCommentsAndStrings = stripCommentsAndStrings;
-  static buildExplainQuery = buildExplainQuery;
-  static redactQueryForAudit = redactQueryForAudit;
-  static parseOpsConnection = parseOpsConnection;
 }

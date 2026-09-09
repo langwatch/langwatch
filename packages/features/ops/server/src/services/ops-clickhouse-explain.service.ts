@@ -37,10 +37,10 @@ export class OpsExplainService {
     wrappedQuery: string;
     type: string;
     isProduction: boolean;
-    /** Redacted request shape for the audit log — never the raw query. */
+    /** Redacted request shape for the audit log - never the raw query. */
     auditFields: Record<string, unknown>;
   }): Promise<OpsExplainOutcome> {
-    const resolved = this.repository.tryResolveClient();
+    const resolved = this.repository.findClient();
     if (!resolved) {
       return { status: "unavailable" };
     }
@@ -50,7 +50,7 @@ export class OpsExplainService {
     if (usingFallback) {
       if (isProduction) {
         logger.error(
-          "CLICKHOUSE_OPS_URL is not set in production — refusing to fall back to the default-user client. " +
+          "CLICKHOUSE_OPS_URL is not set in production - refusing to fall back to the default-user client. " +
             "Provision a langwatch_ops ClickHouse user with a readonly=1 profile " +
             "and no SOURCES grant, then set CLICKHOUSE_OPS_URL to it.",
         );
@@ -61,7 +61,7 @@ export class OpsExplainService {
       if (!this.warnedAboutMissingOpsUrl) {
         this.warnedAboutMissingOpsUrl = true;
         logger.warn(
-          "CLICKHOUSE_OPS_URL is not set — /ops/clickhouse/explain is falling back to the default-user client. " +
+          "CLICKHOUSE_OPS_URL is not set - /ops/clickhouse/explain is falling back to the default-user client. " +
             "Provision a langwatch_ops ClickHouse user with a readonly=1 profile " +
             "and no SOURCES grant, then set CLICKHOUSE_OPS_URL to it to remove this fallback.",
         );

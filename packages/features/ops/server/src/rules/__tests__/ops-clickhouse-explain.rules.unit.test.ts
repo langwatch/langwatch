@@ -1,24 +1,22 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+/**
+ * The guardrail pass in front of the operator EXPLAIN: which queries may be
+ * wrapped at all, and what may be written down about one that ran.
+ */
+import { describe, expect, it } from "vitest";
 
-const clickHouseMocks = vi.hoisted(() => ({
-  close: vi.fn(async () => undefined),
-  createClient: vi.fn(),
-}));
-
-vi.mock("@clickhouse/client", () => ({
-  createClient: clickHouseMocks.createClient,
-}));
-import { OpsClickHouseRuntime } from "../ops-clickhouse-explain.adapter.ts";
-import { OpsClickhouseExplainAdapter } from "../ops-clickhouse-explain.adapter.ts";
-const { buildExplainQuery, parseOpsConnection, redactQueryForAudit, stripCommentsAndStrings } =
-  OpsClickhouseExplainAdapter;
+import {
+  buildExplainQuery,
+  findOpsConnection,
+  redactQueryForAudit,
+  stripCommentsAndStrings,
+} from "../ops-clickhouse-explain.rules.ts";
 
 const TENANT_OK = "SELECT count() FROM stored_spans WHERE TenantId = 'p_x'";
 
 describe("buildExplainQuery", () => {
   it("wraps a tenant-scoped SELECT with EXPLAIN PLAN by default", () => {
     const r = buildExplainQuery(TENANT_OK);
-    expect(r.ok).toBe(true);
+    expect(r.wrapped).toBeDefined();
     expect(r.type).toBe("PLAN");
     expect(r.wrapped).toBe(`EXPLAIN PLAN ${TENANT_OK}`);
   });
@@ -31,30 +29,30 @@ describe("buildExplainQuery", () => {
   it("accepts every allowed type", () => {
     for (const t of ["PLAN", "SYNTAX", "PIPELINE", "AST", "INDEXES"] as const) {
       const r = buildExplainQuery(TENANT_OK, t);
-      expect(r.ok, `type ${t} should be allowed`).toBe(true);
+      expect(r.wrapped, `type ${t} should be allowed`).toBeDefined();
     }
   });
 
   it("expands INDEXES to `EXPLAIN PLAN indexes = 1, actions = 1` (CH parser quirk)", () => {
     const r = buildExplainQuery(TENANT_OK, "INDEXES");
-    expect(r.ok).toBe(true);
+    expect(r.wrapped).toBeDefined();
     expect(r.wrapped).toBe(`EXPLAIN PLAN indexes = 1, actions = 1 ${TENANT_OK}`);
   });
 
   it("rejects an empty / whitespace-only query", () => {
-    expect(buildExplainQuery("").ok).toBe(false);
-    expect(buildExplainQuery("   ").ok).toBe(false);
+    expect(buildExplainQuery("").reason).toBeDefined();
+    expect(buildExplainQuery("   ").reason).toBeDefined();
   });
 
-  it("rejects a query that already starts with EXPLAIN — pick `type` instead", () => {
+  it("rejects a query that already starts with EXPLAIN - pick `type` instead", () => {
     const r = buildExplainQuery(`EXPLAIN PLAN ${TENANT_OK}`);
-    expect(r.ok).toBe(false);
+    expect(r.reason).toBeDefined();
     expect(r.reason).toMatch(/already starts with EXPLAIN/i);
   });
 
   it("rejects multi-statement queries (semicolon)", () => {
     const r = buildExplainQuery(`${TENANT_OK}; DROP TABLE stored_spans`);
-    expect(r.ok).toBe(false);
+    expect(r.reason).toBeDefined();
     expect(r.reason).toMatch(/single statement/i);
   });
 
@@ -68,14 +66,14 @@ describe("buildExplainQuery", () => {
     ];
     for (const q of cases) {
       const r = buildExplainQuery(q);
-      expect(r.ok, `should reject: ${q}`).toBe(false);
+      expect(r.reason, `should reject: ${q}`).toBeDefined();
       expect(r.reason).toMatch(/forbidden keyword/i);
     }
   });
 
   it("does not reject a forbidden keyword that only appears inside a string literal", () => {
     const q = "SELECT * FROM foo WHERE bar = 'DELETE' AND TenantId = 'p_x'";
-    expect(buildExplainQuery(q).ok).toBe(true);
+    expect(buildExplainQuery(q).wrapped).toBeDefined();
   });
 
   it("accepts realistic agent shapes (arrayJoin, WHERE, GROUP BY)", () => {
@@ -85,7 +83,7 @@ describe("buildExplainQuery", () => {
       WHERE TenantId = 'p_x' AND OccurredAt > now() - INTERVAL 1 DAY
       GROUP BY key ORDER BY n DESC LIMIT 50
     `.trim();
-    expect(buildExplainQuery(realistic).ok).toBe(true);
+    expect(buildExplainQuery(realistic).wrapped).toBeDefined();
   });
 
   it("rejects ClickHouse table functions (SSRF surface)", () => {
@@ -101,49 +99,50 @@ describe("buildExplainQuery", () => {
     ];
     for (const q of cases) {
       const r = buildExplainQuery(q);
-      expect(r.ok, `should reject: ${q}`).toBe(false);
+      expect(r.reason, `should reject: ${q}`).toBeDefined();
       expect(r.reason).toMatch(/table function/i);
     }
   });
 
-  it("accepts a cross-tenant query — operator endpoint by design", () => {
-    expect(buildExplainQuery("SELECT count() FROM stored_spans").ok).toBe(true);
+  it("accepts a cross-tenant query - operator endpoint by design", () => {
+    expect(buildExplainQuery("SELECT count() FROM stored_spans").wrapped).toBeDefined();
   });
 
   it("rejects references to the system.* schema", () => {
     const r = buildExplainQuery("SELECT * FROM system.users");
-    expect(r.ok).toBe(false);
+    expect(r.reason).toBeDefined();
     expect(r.reason).toMatch(/system/i);
   });
 
   describe("comment / string-literal bypasses", () => {
     it("rejects table functions hidden behind a block comment", () => {
       const r = buildExplainQuery(`SELECT * FROM url/**/('http://127.0.0.1:9/', CSV)`);
-      expect(r.ok).toBe(false);
+      expect(r.reason).toBeDefined();
       expect(r.reason).toMatch(/table function/i);
     });
 
     it("rejects a string-opener-inside-string bypass", () => {
       const q = `SELECT * FROM stored_spans WHERE '/*' = 'literal' OR SpanId IN (SELECT SpanId FROM url('http://127.0.0.1:9/', CSV)) /* trailing */`;
       const r = buildExplainQuery(q);
-      expect(r.ok).toBe(false);
+      expect(r.reason).toBeDefined();
       expect(r.reason).toMatch(/table function/i);
     });
 
     it("rejects DROP split by a block comment", () => {
       const r = buildExplainQuery(`DROP/**/TABLE stored_spans`);
-      expect(r.ok).toBe(false);
+      expect(r.reason).toBeDefined();
       expect(r.reason).toMatch(/forbidden keyword/i);
     });
 
     it("does not treat `;` inside a string as multi-statement", () => {
-      expect(buildExplainQuery(`SELECT name FROM stored_spans WHERE name = 'a;b'`).ok).toBe(true);
+      expect(buildExplainQuery(`SELECT name FROM stored_spans WHERE name = 'a;b'`).wrapped).toBeDefined();
     });
 
     it("treats a quoted block-comment marker as data", () => {
       expect(
-        buildExplainQuery(`SELECT count() FROM stored_spans WHERE name = '/* not a comment */'`).ok,
-      ).toBe(true);
+        buildExplainQuery(`SELECT count() FROM stored_spans WHERE name = '/* not a comment */'`)
+          .wrapped,
+      ).toBeDefined();
     });
   });
 });
@@ -197,9 +196,9 @@ describe("redactQueryForAudit", () => {
   });
 });
 
-describe("parseOpsConnection", () => {
+describe("findOpsConnection", () => {
   it("splits scheme/host from userinfo/database", () => {
-    const r = parseOpsConnection("http://langwatch_ops:secret@ch.example:8123/langwatch");
+    const r = findOpsConnection("http://langwatch_ops:secret@ch.example:8123/langwatch");
     expect(r).toEqual({
       url: "http://ch.example:8123",
       username: "langwatch_ops",
@@ -214,7 +213,7 @@ describe("parseOpsConnection", () => {
     // URL to parse at all. URL.password returns the encoded string, so the
     // client used to authenticate with the literal "%40" instead of "@" —
     // that's the "Authentication failed" we saw against prod CH.
-    const r = parseOpsConnection(
+    const r = findOpsConnection(
       "http://langwatch_ops:_1a4ZZx_kpR%40%25efk_lL%40fm%25WSwa5C%40AN@ch.example:8123/langwatch",
     );
     expect(r?.username).toBe("langwatch_ops");
@@ -222,54 +221,18 @@ describe("parseOpsConnection", () => {
   });
 
   it("returns empty strings when userinfo is absent", () => {
-    const r = parseOpsConnection("http://ch.example:8123/langwatch");
+    const r = findOpsConnection("http://ch.example:8123/langwatch");
     expect(r?.username).toBe("");
     expect(r?.password).toBe("");
     expect(r?.database).toBe("langwatch");
   });
 
   it("returns undefined database when path is empty or '/'", () => {
-    expect(parseOpsConnection("http://u:p@ch:8123")?.database).toBeUndefined();
-    expect(parseOpsConnection("http://u:p@ch:8123/")?.database).toBeUndefined();
+    expect(findOpsConnection("http://u:p@ch:8123")?.database).toBeUndefined();
+    expect(findOpsConnection("http://u:p@ch:8123/")?.database).toBeUndefined();
   });
 
   it("returns null on a non-URL string", () => {
-    expect(parseOpsConnection("not a url at all")).toBeNull();
-  });
-});
-
-describe("OpsClickHouseRuntime", () => {
-  beforeEach(() => {
-    clickHouseMocks.close.mockReset();
-    clickHouseMocks.createClient.mockReset();
-    clickHouseMocks.createClient.mockReturnValue({ close: clickHouseMocks.close });
-  });
-
-  it("returns null when no typed ops endpoint was composed", () => {
-    const runtime = OpsClickHouseRuntime.create({ buildTime: false });
-    expect(runtime.resolveClient()).toBeNull();
-  });
-
-  it("lazily builds, caches, and closes a typed endpoint client", async () => {
-    const runtime = OpsClickHouseRuntime.create({
-      url: "http://langwatch_ops:secret@ch.example:8123/langwatch",
-      buildTime: false,
-    });
-    const a = runtime.resolveClient();
-    const b = runtime.resolveClient();
-    expect(a).not.toBeNull();
-    expect(b).toBe(a);
-    await runtime.close();
-    expect(clickHouseMocks.close).toHaveBeenCalledOnce();
-    expect(runtime.resolveClient()).toBeNull();
-  });
-
-  it("does not materialize a client during BUILD_TIME", async () => {
-    const runtime = OpsClickHouseRuntime.create({
-      url: "http://langwatch_ops:secret@ch.example:8123/langwatch",
-      buildTime: true,
-    });
-    expect(runtime.resolveClient()).toBeNull();
-    await runtime.close();
+    expect(findOpsConnection("not a url at all")).toBeNull();
   });
 });

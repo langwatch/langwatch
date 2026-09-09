@@ -1,10 +1,12 @@
 /**
- * Integration tests for the bug-report intake, against the real database and the real Hono
- * route. Corresponds to the scenarios in specs/support/bug-reports.feature.
+ * The bug-report intake, against the real database, the real declaration and
+ * the real application. Corresponds to specs/support/bug-reports.feature.
  * @vitest-environment node
  */
 import { randomUUID } from "node:crypto";
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { BugReport } from "@langwatch/ops-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -12,35 +14,32 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { BugReport } from "@langwatch/ops-contract";
-import type { ErrorHandler } from "hono";
-import { HTTPException } from "hono/http-exception";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import {
-  BugReportRateLimitedError,
-  BugReportIntakeService,
-} from "../../../services/bug-report-intake.service.ts";
-import type { BugReportNotifierPort } from "../../../ports/bug-report-notifier.port.ts";
-import type { BugReportRateLimiterPort } from "../../../ports/bug-report-rate-limiter.port.ts";
-import { PrismaBugReportRepository } from "../../../repositories/prisma/prisma.bug-report.repository.ts";
-import { createBugReportsRestApp } from "../bug-report.api.ts";
+import type { BugReportNotifier, BugReportRateLimiter } from "../../app/ops.app.ts";
+import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";
+import { PrismaBugReportRepository } from "../../repositories/prisma/prisma.bug-report.repository.ts";
+import { BugReportRateLimitedError } from "../../services/bug-report-intake.service.ts";
+import { bugReportCredential, opsBugReportRest } from "../ops-bug-report.rest.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
-/** In-process fixed-window limiter, one bucket per callerKey, scoped to a test run. */
-function inMemoryRateLimiter(): BugReportRateLimiterPort {
+/** In-process fixed-window limiter, one bucket per callerKey, per test run. */
+function inMemoryRateLimiter(): BugReportRateLimiter {
   const counts = new Map<string, number>();
+
   return {
     consume: async ({ key, max }) => {
       const next = (counts.get(key) ?? 0) + 1;
       counts.set(key, next);
+
       return { allowed: next <= max };
     },
   };
 }
 
-function silentNotifier(): BugReportNotifierPort {
+function silentNotifier(): BugReportNotifier {
   return { notify: async () => void 0 };
 }
 
@@ -56,6 +55,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
 
   const trackReport = (id: string) => {
     createdReportIds.push(id);
+
     return id;
   };
 
@@ -68,9 +68,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   });
 
   afterAll(async () => {
-    await prisma.bugReport.deleteMany({
-      where: { id: { in: createdReportIds } },
-    });
+    await prisma.bugReport.deleteMany({ where: { id: { in: createdReportIds } } });
     for (const id of createdProjectIds)
       await prisma.project.delete({ where: { id } }).catch(() => void 0);
     for (const id of createdTeamIds)
@@ -80,25 +78,48 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
     await prisma.$disconnect();
   });
 
-  function mountApp(
+  /** The application, over the real rows and whatever the test wants watched. */
+  function opsApp(
     options: {
-      apiKeys?: Parameters<typeof createBugReportsRestApp>[0]["ports"]["apiKeys"];
+      apiKeys?: ApiKeyApi;
+      rateLimiter?: BugReportRateLimiter;
+      notifier?: BugReportNotifier;
     } = {},
   ) {
-    const app = createBugReportsRestApp({
-      security: passThroughSecurity(),
-      ports: {
-        reports: () => repository,
-        rateLimiter: inMemoryRateLimiter(),
-        notifier: silentNotifier(),
-        credentials: (request) => {
-          const token = request.headers.get("x-auth-token");
-          return token ? { token, projectId: null } : null;
-        },
-        ...(options.apiKeys ? { apiKeys: options.apiKeys } : {}),
+    const { app } = createOpsTestApp({
+      repositories: { bugReports: repository },
+      ...(options.apiKeys ? { apiKeys: options.apiKeys } : {}),
+      infrastructure: {
+        bugReportRateLimiter: options.rateLimiter ?? inMemoryRateLimiter(),
+        bugReportNotifier: options.notifier ?? silentNotifier(),
       },
     });
+
     return app;
+  }
+
+  function mountApp(options: { apiKeys?: ApiKeyApi } = {}) {
+    const app = opsApp(options);
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => {
+          throw new Error("The intake resolves its own credential.");
+        },
+      },
+    });
+
+    return runtime.mount(opsBugReportRest.router(), {
+      app: () => app,
+      credential: "public",
+      onError: (error, context) => context.json({ error: String(error) }, 500),
+      facts: [
+        bindRestMiddleware(bugReportCredential, (request) => {
+          const token = request.headers.get("x-auth-token");
+
+          return token ? { token, projectId: null } : null;
+        }),
+      ],
+    });
   }
 
   const postReport = async (
@@ -198,10 +219,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
 
     beforeAll(async () => {
       const organization = await prisma.organization.create({
-        data: {
-          name: `${testNamespace} org`,
-          slug: `${testNamespace}-org`,
-        },
+        data: { name: `${testNamespace} org`, slug: `${testNamespace}-org` },
       });
       createdOrgIds.push(organization.id);
       const team = await prisma.team.create({
@@ -230,11 +248,10 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
     /** @scenario "Reports with a valid project API key are linked to the project" */
     it("links the report to the project", async () => {
       const app = mountApp({
-        apiKeys: () =>
-          ({
-            findResolvedToken: async ({ token }: { token: string }) =>
-              token === legacyApiKey ? { project: { id: projectId } } : null,
-          }) as never,
+        apiKeys: createApiFixture<ApiKeyApi>({
+          findResolvedToken: async ({ token }) =>
+            token === legacyApiKey ? ({ project: { id: projectId } } as never) : null,
+        }),
       });
       const response = await postReport(baseReport(), { "x-auth-token": legacyApiKey }, app);
       expect(response.status).toBe(201);
@@ -250,7 +267,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
     /** @scenario "Reports with an invalid API key are still accepted, unlinked" */
     it("still accepts the report, unlinked", async () => {
       const app = mountApp({
-        apiKeys: () => ({ findResolvedToken: async () => null }) as never,
+        apiKeys: createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }),
       });
       const response = await postReport(
         baseReport(),
@@ -281,16 +298,11 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   describe("when Slack credentials are not configured", () => {
     /** @scenario "Missing Slack configuration never blocks intake" */
     it("stores the report without attempting a Slack call", async () => {
-      // The default notifier reads SLACK_BUG_REPORTS_BOT_TOKEN, unset in
-      // tests, and returns before touching any transport.
       const fetchSpy = vi.spyOn(globalThis, "fetch");
+
       try {
-        const { id } = await BugReportIntakeService.create({
-          reports: repository,
-          rateLimiter: inMemoryRateLimiter(),
-          notifier: silentNotifier(),
-        }).submit({
-          input: {
+        const { id } = await opsApp().submitBugReport({
+          report: {
             source: "cli",
             kind: "summary",
             title: `${testNamespace} no slack configured`,
@@ -303,13 +315,14 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
         expect(stored?.title).toBe(`${testNamespace} no slack configured`);
         const slackCalls = fetchSpy.mock.calls.filter((call) => {
           const target = call[0] instanceof Request ? call[0].url : String(call[0]);
-          let hostname: string;
+
           try {
-            hostname = new URL(target).hostname;
+            const hostname = new URL(target).hostname;
+
+            return hostname === "slack.com" || hostname.endsWith(".slack.com");
           } catch {
             return false;
           }
-          return hostname === "slack.com" || hostname.endsWith(".slack.com");
         });
         expect(slackCalls).toHaveLength(0);
       } finally {
@@ -337,20 +350,31 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
       });
       expect(response.status).toBe(400);
     });
+
+    it("rejects a body that is not JSON at all", async () => {
+      const app = mountApp();
+      const response = await app.request("/api/bug-reports", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "not json",
+      });
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: "Invalid body, expecting JSON",
+      });
+    });
   });
 
   describe("when the caller exceeds the rate limit", () => {
     /** @scenario "Submissions are rate limited per client" */
     it("rejects further reports for that caller only", async () => {
       const rateLimiter = inMemoryRateLimiter();
+      const app = opsApp({ rateLimiter });
       const callerKey = `ratelimit-${testNamespace}`;
       const submitOnce = () =>
-        BugReportIntakeService.create({
-          reports: repository,
-          rateLimiter,
-          notifier: silentNotifier(),
-        }).submit({
-          input: {
+        app.submitBugReport({
+          report: {
             source: "cli",
             kind: "summary",
             title: `${testNamespace} rate limited`,
@@ -365,12 +389,8 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
       }
       await expect(submitOnce()).rejects.toThrow(BugReportRateLimitedError);
 
-      const other = await BugReportIntakeService.create({
-        reports: repository,
-        rateLimiter,
-        notifier: silentNotifier(),
-      }).submit({
-        input: {
+      const other = await app.submitBugReport({
+        report: {
           source: "cli",
           kind: "summary",
           title: `${testNamespace} other caller`,
@@ -386,16 +406,14 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
     /** @scenario "The team is notified on Slack for each new report" */
     it("passes the stored report to the notifier", async () => {
       const notified: BugReport[] = [];
-      const { id } = await BugReportIntakeService.create({
-        reports: repository,
-        rateLimiter: inMemoryRateLimiter(),
+      const { id } = await opsApp({
         notifier: {
           notify: async ({ report }) => {
             notified.push(report);
           },
         },
-      }).submit({
-        input: {
+      }).submitBugReport({
+        report: {
           source: "mcp",
           kind: "summary",
           title: `${testNamespace} notified`,
@@ -413,16 +431,14 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   describe("when the team alert fails", () => {
     /** @scenario "Slack failures never fail the report intake" */
     it("stores the report and succeeds anyway", async () => {
-      const { id } = await BugReportIntakeService.create({
-        reports: repository,
-        rateLimiter: inMemoryRateLimiter(),
+      const { id } = await opsApp({
         notifier: {
           notify: async () => {
             throw new Error("slack unavailable");
           },
         },
-      }).submit({
-        input: {
+      }).submitBugReport({
+        report: {
           source: "cli",
           kind: "summary",
           title: `${testNamespace} slack down`,
@@ -436,38 +452,3 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
     });
   });
 });
-
-/**
- * Mirrors the production boundary on the one point this suite depends on: a
- * framework refusal answers with its own status (the body-size cap throws a
- * 413), and anything else stays legible rather than swallowed.
- */
-const renderUnexpected: ErrorHandler = (error, c) =>
-  error instanceof HTTPException && error.status < 500
-    ? c.json({ error: error.message }, error.status)
-    : c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}

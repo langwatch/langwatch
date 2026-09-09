@@ -1,5 +1,22 @@
-import type { ClickHouseSettings } from "@clickhouse/client";
-import type { OpsExplainClientResolution } from "../ports/ops-explain-client.port.ts";
+import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
+
+/** Which client an EXPLAIN resolved to, and whether it is the dedicated one. */
+export interface OpsExplainClientResolution {
+  client: ClickHouseClient;
+  /**
+   * True when the dedicated `langwatch_ops` readonly user is not configured on
+   * this instance and the call fell back to the default-user shared client.
+   */
+  usingFallback: boolean;
+}
+
+/**
+ * The ClickHouse account an EXPLAIN runs as, as the PROCESS resolves it. Null
+ * where neither the dedicated user nor a shared client is configured.
+ */
+export interface OpsExplainClients {
+  findClient(): OpsExplainClientResolution | null;
+}
 
 /**
  * The one call this repository makes, as it asks for it. Narrower than the
@@ -23,12 +40,13 @@ export abstract class OpsExplainRepository {
    * is configured, else the injected shared client as a fallback.
    * Null when neither is configured on this instance.
    */
-  abstract tryResolveClient(): OpsExplainClientResolution | null;
+  abstract findClient(): OpsExplainClientResolution | null;
 
   /**
-   * Runs the (already server-wrapped) EXPLAIN query. `guardrails` are ClickHouse settings sent only for
-   * the fallback client — the `langwatch_ops` user's `readonly_safe` profile forbids client-side setting
-   * modifications and already enforces the same caps server-side.
+   * Runs the (already server-wrapped) EXPLAIN query. `guardrails` are
+   * ClickHouse settings sent only for the fallback client: the `langwatch_ops`
+   * user's `readonly_safe` profile forbids client-side setting changes and
+   * already enforces the same caps server-side.
    */
   abstract runExplain(params: {
     client: OpsExplainQueryClient;

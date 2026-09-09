@@ -1,16 +1,9 @@
 /**
- * What the `ops.*` tRPC surface ANSWERS.
- *
- * Most of it is the operations vocabulary the other modules here already
- * declare — a queue page, a process instance, a replay run — reused rather
- * than restated. What is new is the shapes the SURFACE invents: the operator's
- * own scope probe, the acknowledgements the writes answer with, and the two
- * process-level readings (the pipeline registry and the event-log window) that
- * belong to no service.
- *
- * Every acknowledgement is its own named schema rather than one shared
- * `{ ok: true }`: they carry different counts, and a caller reading
- * `jobsRemoved` off a drain must not typecheck against a replay.
+ * What the `ops.*` tRPC surface ANSWERS: mostly the operations vocabulary the
+ * other modules here declare, reused rather than restated, plus the shapes the
+ * surface invents. Every acknowledgement is its own named schema rather than
+ * one shared `{ ok: true }`, so a caller reading `jobsRemoved` off a drain
+ * cannot typecheck against a replay.
  */
 import { z } from "zod";
 import { searchProjectsResultSchema } from "@langwatch/project-contract";
@@ -41,17 +34,39 @@ export const opsScopeSchema = z.union([
 ]);
 export type OpsScope = z.infer<typeof opsScopeSchema>;
 
+/**
+ * The operator behind a request, as far as this module reads them.
+ *
+ * `impersonator` is the real admin behind an impersonation session. It is what
+ * makes an impersonating operator still an operator on a read, and what
+ * refuses them on a write whose damage nobody would notice in time.
+ */
+export const opsOperatorSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
+  impersonator: z
+    .object({
+      /** Absent on a door that reads only the address the allow-list matches. */
+      id: z.string().optional(),
+      email: z.string().nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+});
+export type OpsOperator = z.infer<typeof opsOperatorSchema>;
+
+/** The two grains the operator surface is gated at: reads and writes. */
+export type OpsOperatorPermission = "ops:view" | "ops:manage";
+
 /** What the status probe answers, for any authenticated caller. */
 export const opsScopeProbeSchema = z.object({ scope: opsScopeSchema }).strict();
 
 /**
- * What `ops.getBadgeCounts` answers — the two integers the navigation badge
- * renders, and when they were computed.
- *
- * `computedAt` is nullable here and not on the collector's own reading: those
- * zeroes mean "we cannot say" rather than "nothing is wrong", and stamping the
- * current time beside them would present unavailable data as a fresh
- * all-clear.
+ * What `ops.getBadgeCounts` answers: the two integers the navigation badge
+ * renders, and when they were computed. `computedAt` is nullable because those
+ * zeroes mean "we cannot say" rather than "nothing is wrong", and a current
+ * timestamp beside them would present unavailable data as a fresh all-clear.
  */
 export const opsApiGetBadgeCountsOutputSchema = z
   .object({
@@ -69,7 +84,7 @@ export type OpsApiGetBadgeCountsOutput = z.infer<typeof opsApiGetBadgeCountsOutp
 /**
  * One registered projection, as the process's pipeline registry knows it.
  *
- * Named fields, not `unknown` — a tRPC procedure publishes what its handler
+ * Named fields, not `unknown` - a tRPC procedure publishes what its handler
  * returns, so an `unknown` here is what the browser gets, and every ops
  * surface reading a projection row was reading its fields off `{}`.
  */
@@ -90,7 +105,7 @@ export const opsEventSubscriberRegistrationSchema = z.object({
   subscriberName: z.string(),
   pipelineName: z.string(),
   aggregateType: z.string(),
-  /** The event types this subscriber reacts to — its transition triggers. */
+  /** The event types this subscriber reacts to - its transition triggers. */
   eventTypes: z.array(z.string()).readonly(),
 });
 export type OpsEventSubscriberRegistration = z.infer<typeof opsEventSubscriberRegistrationSchema>;
@@ -100,6 +115,7 @@ export const opsPipelineRegistrationsSchema = z.object({
   projections: z.array(opsProjectionRegistrationSchema),
   eventSubscribers: z.array(opsEventSubscriberRegistrationSchema),
 });
+export type OpsPipelineRegistrations = z.infer<typeof opsPipelineRegistrationsSchema>;
 
 /**
  * The bound on an event-log search: the default lookback the explorer uses and
@@ -111,6 +127,7 @@ export const opsEventLogSearchWindowSchema = z.object({
   hotTierDays: z.number().nullable(),
   hotTierEnvVar: z.string().nullable(),
 });
+export type OpsEventLogSearchWindow = z.infer<typeof opsEventLogSearchWindowSchema>;
 
 /** Grafana deep-link configuration; null when no Grafana is configured. */
 export const opsGrafanaLinkConfigSchema = z
@@ -120,12 +137,13 @@ export const opsGrafanaLinkConfigSchema = z
     lokiDatasourceUid: z.string().optional(),
   })
   .nullable();
+export type OpsGrafanaLinkConfig = z.infer<typeof opsGrafanaLinkConfigSchema>;
 
 // ---------------------------------------------------------------------------
 // Queue acknowledgements
 // ---------------------------------------------------------------------------
 
-/** Whether the group was blocked before the act — false means nothing moved. */
+/** Whether the group was blocked before the act - false means nothing moved. */
 export const opsQueueUnblockedGroupSchema = z.object({ wasBlocked: z.boolean() });
 export const opsQueueUnblockedAllSchema = z.object({ unblockedCount: z.number() });
 export const opsQueueDrainedGroupSchema = z.object({ jobsRemoved: z.number() });
@@ -248,3 +266,33 @@ export const opsMigrationWithdrawnSchema = z.object({ withdrawn: z.literal(true)
 export const opsMigrationPassStartedSchema = z.object({ started: z.literal(true) });
 export const opsMigrationDrainAssertedSchema = z.object({ asserted: z.literal(true) });
 export const opsMigrationRolledBackSchema = z.object({ rolledBack: z.literal(true) });
+
+// ---------------------------------------------------------------------------
+// The operator-only ClickHouse EXPLAIN
+// ---------------------------------------------------------------------------
+
+/** The plans an operator may ask for. `ANALYZE` is absent: it would execute. */
+export const opsExplainTypeSchema = z.enum(["PLAN", "SYNTAX", "PIPELINE", "AST", "INDEXES"]);
+export type OpsExplainType = z.infer<typeof opsExplainTypeSchema>;
+
+/** What the operator tool posts. */
+export const opsExplainRequestSchema = z.object({
+  query: z.string().trim().min(1, "query is required").max(50_000),
+  type: opsExplainTypeSchema.optional(),
+});
+export type OpsExplainRequest = z.infer<typeof opsExplainRequestSchema>;
+
+/**
+ * What one EXPLAIN answers.
+ *
+ * `refused` is the guardrail pass: a query the wrapper will not run, named so
+ * the operator can fix it. The rest are the deployment's own conditions, and
+ * `failed` deliberately carries no engine prose - the cluster's own message
+ * names internals, and the service logs it instead.
+ */
+export type OpsExplainAnswer =
+  | Readonly<{ status: "ok"; type: OpsExplainType; rows: unknown[] }>
+  | Readonly<{ status: "refused"; reason: string }>
+  | Readonly<{ status: "not_configured_in_production" }>
+  | Readonly<{ status: "unavailable" }>
+  | Readonly<{ status: "failed" }>;

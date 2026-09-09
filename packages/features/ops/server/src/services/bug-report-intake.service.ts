@@ -2,16 +2,19 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { BugReportRepositoryPort } from "../ports/bug-report.port.ts";
-import type { BugReportNotifierPort } from "../ports/bug-report-notifier.port.ts";
-import type { BugReportRateLimiterPort } from "../ports/bug-report-rate-limiter.port.ts";
+import type { SubmitBugReport } from "@langwatch/ops-contract";
+import type {
+  BugReportNotifier,
+  BugReportRateLimiter,
+} from "../app/ops.app.ts";
+import type { BugReportRepository } from "../repositories/bug-report.repository.ts";
 
 const logger = createLogger("langwatch:bug-reports");
 
 /**
- * Intake for issue reports sent by customers' coding agents (the CLI `langwatch report` command and the MCP report tool).
- * Deliberately unauthenticated: the reporter may be struggling precisely because setup failed, so a report must never require
- * a working login. An API key, when present, only enriches the report with a project link and is never a gate.
+ * Intake for the reports customers' coding agents send. Unauthenticated on
+ * purpose: the reporter may be struggling because setup failed, so a report
+ * must never require a working login. An API key only adds a project link.
  */
 
 export class BugReportRateLimitedError extends HandledError {
@@ -26,37 +29,24 @@ export class BugReportRateLimitedError extends HandledError {
 const RATE_LIMIT_WINDOW_SECONDS = 3600;
 const RATE_LIMIT_MAX_PER_WINDOW = 10;
 
-export interface SubmitBugReportInput {
-  source: "cli" | "mcp";
-  kind: "summary" | "full_session";
-  title: string;
-  summary?: string;
-  sessionData?: string;
-  sessionTruncated?: boolean;
-  agent?: string;
-  contactEmail?: string;
-  cliVersion?: string;
-  metadata?: Record<string, string | number | boolean>;
-}
-
 export class BugReportIntakeService {
   static create({
     reports,
     rateLimiter,
     notifier,
   }: {
-    reports: BugReportRepositoryPort;
-    rateLimiter: BugReportRateLimiterPort;
-    notifier: BugReportNotifierPort;
+    reports: BugReportRepository;
+    rateLimiter: BugReportRateLimiter;
+    notifier: BugReportNotifier;
   }): BugReportIntakeService {
     return new BugReportIntakeService({ reports, rateLimiter, notifier });
   }
 
   private constructor(
     private readonly deps: {
-      reports: BugReportRepositoryPort;
-      rateLimiter: BugReportRateLimiterPort;
-      notifier: BugReportNotifierPort;
+      reports: BugReportRepository;
+      rateLimiter: BugReportRateLimiter;
+      notifier: BugReportNotifier;
     },
   ) {}
 
@@ -67,12 +57,12 @@ export class BugReportIntakeService {
     projectIdHint,
     apiKeys,
   }: {
-    input: SubmitBugReportInput;
+    input: SubmitBugReport;
     /** Rate-limit bucket for the caller (nearest-hop IP; self-asserted). */
     callerKey: string;
     apiToken?: string;
     projectIdHint?: string | null;
-    apiKeys?: ApiKeyApi;
+    apiKeys: ApiKeyApi;
   }): Promise<{ id: string }> {
     const limit = await this.deps.rateLimiter.consume({
       key: `bug-report:${callerKey}`,
@@ -83,7 +73,7 @@ export class BugReportIntakeService {
       throw new BugReportRateLimitedError();
     }
 
-    const linkedProjectId = await resolveLinkedProjectId({
+    const linkedProjectId = await findLinkedProjectId({
       apiToken,
       projectIdHint,
       apiKeys,
@@ -133,7 +123,7 @@ export class BugReportIntakeService {
   }
 }
 
-function redactSubmission(input: SubmitBugReportInput): {
+function redactSubmission(input: SubmitBugReport): {
   title: string;
   summary?: string;
   sessionData?: string;
@@ -161,16 +151,16 @@ function redactSubmission(input: SubmitBugReportInput): {
  * expired, malformed) resolves to "not linked" rather than an error: linkage
  * is a nicety, intake is the point.
  */
-async function resolveLinkedProjectId({
+async function findLinkedProjectId({
   apiToken,
   projectIdHint,
   apiKeys,
 }: {
-  apiToken?: string;
+  apiToken?: string | undefined;
   projectIdHint?: string | null;
-  apiKeys?: ApiKeyApi;
+  apiKeys: ApiKeyApi;
 }): Promise<string | null> {
-  if (!apiToken || !apiKeys) {
+  if (!apiToken) {
     return null;
   }
 

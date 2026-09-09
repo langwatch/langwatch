@@ -1,9 +1,9 @@
 /**
  * The operator back office's application: what its door calls.
  *
- * It holds every capability the feature's api file reaches — the operations
+ * It holds every capability the feature's api file reaches - the operations
  * service and the three explorers the process composes alongside it, the
- * feature-flag registry and the project search — and it is the one typed thing
+ * feature-flag registry and the project search - and it is the one typed thing
  * a transport is given. Before it, the api file declared that composition
  * inline as a private `OpsApplication` bag, so nothing outside that one file
  * could reach it and a second door would have had to describe it again.
@@ -62,8 +62,27 @@ import type {
   ReplayHistoryEntry,
   ReplayStatus,
 } from "@langwatch/ops-contract";
-import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
-import { OpsApi } from "@langwatch/ops-contract";
+import type {
+  BugReport,
+  BugReportListing,
+  ListBugReportsInput,
+  OpsApiGetBadgeCountsOutput,
+  OpsEventLogSearchWindow,
+  OpsGrafanaLinkConfig,
+  OpsMigrationCohortResult,
+  OpsMigrationEnrollmentListing,
+  OpsMigrationOrganizationMatch,
+  OpsMigrationOverview,
+  OpsMigrationTargetedRunResult,
+  OpsOperator,
+  OpsOperatorPermission,
+  OpsPipelineRegistrations,
+  OpsExplainAnswer,
+  OpsExplainRequest,
+  OpsScope,
+  SubmitBugReport,
+} from "@langwatch/ops-contract";
+import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import {
   ProjectApi,
@@ -71,9 +90,49 @@ import {
   type SearchProjectsResult,
 } from "@langwatch/project-contract";
 import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contract";
+import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-key-contract";
+import type { OpsRepositories } from "#repositories/ops.repositories";
+import { BugReportInboxService } from "#services/bug-report-inbox.service";
+import { BugReportIntakeService } from "#services/bug-report-intake.service";
+import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
+import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
+import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsEventingIntrospectionPort } from "../ports/eventing-introspection.port.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { timingSafeEqual } from "node:crypto";
+import { nowInstant } from "@langwatch/time";
+import {
+  buildExplainQuery,
+  redactQueryForAudit,
+} from "../rules/ops-clickhouse-explain.rules.ts";
 import { withKillSwitchDescriptors } from "../rules/ops-kill-switch-catalogue.rules.ts";
+
+/**
+ * Who an operator request is attributed to: the impersonator where there is
+ * one, so a back-office read is recorded against the human who made it rather
+ * than against the account they were borrowing.
+ */
+function actingIdentityOf(operator: OpsOperator): OpsOperator;
+function actingIdentityOf(operator: OpsOperator | null): OpsOperator;
+function actingIdentityOf(operator: OpsOperator | null): OpsOperator {
+  if (!operator) return { id: "" };
+
+  const { impersonator } = operator;
+
+  if (!impersonator) return operator;
+
+  return {
+    ...operator,
+    ...(impersonator.id === undefined ? {} : { id: impersonator.id }),
+    ...(impersonator.email === undefined ? {} : { email: impersonator.email }),
+  };
+}
+
+/** How far back an event-log search reaches when the caller names no bound. */
+const EVENT_LOG_SEARCH_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
+
+/** What every audited row on the support inbox points at. */
+const BUG_REPORT_TARGET_KIND = "bugReport";
 
 /** One process ref, the triple every process-manager read is keyed by. */
 export type OpsProcessRef = {
@@ -87,7 +146,7 @@ export type OpsProcessRef = {
  * this feature calls.
  *
  * Structural rather than imported, because they are the process's own
- * composition over its event store — but typed with the contract's
+ * composition over its event store - but typed with the contract's
  * vocabulary, not `unknown`. They were `Promise<unknown>` under a comment
  * claiming the concrete types reached the client "through the context type
  * rather than through these shapes", and nothing did: a tRPC procedure
@@ -187,7 +246,7 @@ export type OpsProcessExplorer = {
  * The projection replay runner, as the operator surface calls it.
  *
  * Typed with the contract's own vocabulary rather than `unknown`. It was the
- * latter, and `unknown` is what the browser receives as `{}` — every field the
+ * latter, and `unknown` is what the browser receives as `{}` - every field the
  * replay drawer, the history table and the status banner read came back
  * unchecked.
  */
@@ -218,15 +277,6 @@ export type OpsCapability = OpsService & {
   snapshots: OpsSnapshotService | null;
 };
 
-/** The operator, as far as this feature reads them. */
-export type OpsOperator = Readonly<{
-  id: string;
-  name?: string | null;
-  email?: string | null;
-  /** The real admin behind an impersonation session, if there is one. */
-  impersonator?: Readonly<{ email?: string | null }> | null;
-}>;
-
 /** What the process composes this feature's application from. */
 export interface OpsAppDependencies {
   users: UserApiContract;
@@ -236,6 +286,93 @@ export interface OpsAppDependencies {
 }
 
 /** The process-owned adapters used to make one Ops capability at boot. */
+/**
+ * The in-place system migrations, as the process runs them.
+ *
+ * Infrastructure rather than a peer module: the runner is composed from the
+ * process's own migration registry and its ledger, and it is the one thing on
+ * this surface that no service of this module owns.
+ */
+export interface OpsSystemMigrationRunner {
+  getOverview(): Promise<OpsMigrationOverview[]>;
+  getEnrollments(input: { requestedBy: string }): Promise<OpsMigrationEnrollmentListing>;
+  searchOrganizations(input: { query: string }): Promise<OpsMigrationOrganizationMatch[]>;
+  /**
+   * Whether this migration's blast radius earns the rollback's guard. The
+   * migration's own declaration decides, so this gate and the page that asks
+   * for the confirmation cannot drift apart.
+   */
+  requiresOperatorConfirmation(input: { migrationName: string }): boolean;
+  enroll(input: {
+    organizationId: string;
+    migrationName: string;
+    actorUserId: string;
+  }): Promise<void>;
+  enrollCohort(input: {
+    migrationName: string;
+    sampleSize: number;
+    actorUserId: string;
+    includeEnterprise: boolean;
+    includePrivateDataplane: boolean;
+  }): Promise<OpsMigrationCohortResult>;
+  withdraw(input: {
+    organizationId: string;
+    migrationName: string;
+    actorUserId: string;
+  }): Promise<void>;
+  runForOrganization(input: {
+    organizationId: string;
+    migrationName: string;
+    actorUserId: string;
+  }): Promise<OpsMigrationTargetedRunResult>;
+  startPass(): void;
+  assertLegacyWritersDrained(input: {
+    migrationName: string;
+    tenantId: string;
+    minimumWriterGeneration: string;
+    actorUserId: string;
+  }): Promise<void>;
+  rollBack(input: {
+    migrationName: string;
+    tenantId: string;
+    actorUserId: string;
+  }): Promise<void>;
+}
+
+/** Team alert for a filed report. Best-effort: intake already succeeded. */
+export interface BugReportNotifier {
+  notify(input: { report: BugReport }): Promise<void>;
+}
+
+/**
+ * Fixed-window counter for the PUBLIC report endpoint. The bucket key is the
+ * nearest-hop IP, which the caller asserts, so this is a flood bound rather
+ * than an authorization: the deployment's own counter decides, and its absence
+ * would let one client fill a cross-tenant inbox.
+ */
+export interface BugReportRateLimiter {
+  consume(input: {
+    key: string;
+    windowSeconds: number;
+    max: number;
+  }): Promise<{ allowed: boolean }>;
+}
+
+/** The registered projections and event subscribers, as the process knows them. */
+export interface OpsPipelineRegistry {
+  listRegistrations(): OpsPipelineRegistrations;
+}
+
+/** The bound on an event-log search, as this deployment is configured. */
+export interface OpsEventLogWindowReader {
+  read(): OpsEventLogSearchWindow;
+}
+
+/** Grafana deep-link configuration, or null where no Grafana is configured. */
+export interface OpsGrafanaLinks {
+  findLinkConfig(): OpsGrafanaLinkConfig;
+}
+
 export interface OpsAppInfrastructure {
   createCapability(dependencies: OpsAppDependencies): OpsCapability;
   featureFlags: FeatureFlagApi;
@@ -244,22 +381,49 @@ export interface OpsAppInfrastructure {
    * set. Without it every generated key is unsettable.
    */
   eventingIntrospection: OpsEventingIntrospectionPort;
+  pipelines: OpsPipelineRegistry;
+  eventLogWindow: OpsEventLogWindowReader;
+  grafana: OpsGrafanaLinks;
+  systemMigrations: OpsSystemMigrationRunner;
+  bugReportRateLimiter: BugReportRateLimiter;
+  bugReportNotifier: BugReportNotifier;
+  /** The ClickHouse account an operator EXPLAIN runs as. */
+  explainClients: OpsExplainClients;
+  /**
+   * The operator secret a caller presents, read PER REQUEST so a deployment
+   * that rotates it without a restart is honoured. Null where this deployment
+   * configured none, which refuses every call.
+   */
+  findOpsApiKey(): string | null;
+  /**
+   * Whether this deployment is production, for the explain service's own
+   * fail-closed rule. Passed rather than read from the environment: a feature
+   * package reads none.
+   */
+  isProduction: boolean;
 }
 type OpsRuntimeDependencies = Readonly<{
   ops: OpsCapability;
   featureFlags: FeatureFlagApi;
   projects: ProjectApiContract;
+  auditLog: AuditLogApiContract;
+  apiKeys: ApiKeyApiContract;
   eventingIntrospection: OpsEventingIntrospectionPort;
+  pipelines: OpsPipelineRegistry;
+  eventLogWindow: OpsEventLogWindowReader;
+  grafana: OpsGrafanaLinks;
+  systemMigrations: OpsSystemMigrationRunner;
+  inbox: BugReportInboxService;
+  intake: BugReportIntakeService;
+  explain: OpsExplainService;
+  findOpsApiKey(): string | null;
+  isProduction: boolean;
 }>;
 type OpsSetup = FeatureSetup<
-  {
-    users: typeof UserApi;
-    auth: typeof AuthApi;
-    projects: typeof ProjectApi;
-    auditLog: typeof AuditLogApi;
-  },
+  typeof OpsApp.dependencies,
   OpsAppInfrastructure,
-  undefined
+  undefined,
+  OpsRepositories
 >;
 
 /** The badge's two integers, and when they were computed. */
@@ -293,7 +457,7 @@ export class OpsOperatorSessionRequiredError extends HandledError {
  * A destructive operator write was attempted from an impersonation session.
  *
  * The operator scope deliberately falls back to the impersonator's own grant,
- * so `ops:manage` is inherited by an impersonation session — and "acting as"
+ * so `ops:manage` is inherited by an impersonation session - and "acting as"
  * another user is the wrong posture for irreversible infrastructure surgery,
  * because the audit trail would name the impersonated account.
  */
@@ -313,8 +477,8 @@ export class OpsImpersonatedOperatorRefusedError extends HandledError {
 /**
  * A destructive operator write arrived without its typed confirmation.
  *
- * The damage these writes do is silent — deleting a blob completes the job
- * that referenced it without its handler ever running — so the confirmation is
+ * The damage these writes do is silent - deleting a blob completes the job
+ * that referenced it without its handler ever running - so the confirmation is
  * what makes the act deliberate rather than a mis-click. The dialog in the ops
  * UI is not this guard: every one of these procedures is callable directly.
  */
@@ -333,8 +497,8 @@ export class OpsConfirmationRequiredError extends HandledError {
 /**
  * A feature-flag write named a key the registry does not declare.
  *
- * Reads are deliberately permissive — the operator catalogue surfaces orphan
- * rows so they can be deleted — but a write to an unregistered key would store
+ * Reads are deliberately permissive - the operator catalogue surfaces orphan
+ * rows so they can be deleted - but a write to an unregistered key would store
  * a value nothing ever reads.
  */
 export class OpsUnknownFeatureFlagError extends HandledError {
@@ -350,6 +514,37 @@ export class OpsUnknownFeatureFlagError extends HandledError {
   }
 }
 
+/**
+ * Somebody who is not on the deployment's operator allow-list asked for an
+ * operator surface.
+ *
+ * The whole platform tier is decided by that list rather than by an RBAC grain
+ * an id in the input could be checked at, so the refusal is the module's and
+ * not a scope decision the door could have made.
+ */
+export class OpsOperatorRequiredError extends HandledError {
+  declare readonly code: "permission_denied";
+
+  constructor(permission: OpsOperatorPermission) {
+    super("permission_denied", "This is an operator-only surface.", {
+      httpStatus: 403,
+      fault: "customer",
+      meta: { permission },
+    });
+    this.name = "OpsOperatorRequiredError";
+  }
+}
+
+/** No operator secret was presented, or the presented one did not match. */
+export class OpsOperatorSecretRequiredError extends HandledError {
+  declare readonly code: "unauthorized";
+
+  constructor() {
+    super("unauthorized", "Unauthorized", { httpStatus: 401, fault: "customer" });
+    this.name = "OpsOperatorSecretRequiredError";
+  }
+}
+
 export class OpsApp implements OpsApi {
   static readonly contract = OpsApi;
   static readonly dependencies = {
@@ -357,17 +552,39 @@ export class OpsApp implements OpsApi {
     auth: AuthApi,
     projects: ProjectApi,
     auditLog: AuditLogApi,
+    apiKeys: ApiKeyApi,
   };
   static readonly configSchema = void 0;
 
   static create(setup: OpsSetup): OpsApp {
     const { infrastructure } = setup;
 
+    const inbox = BugReportInboxService.create({ reports: setup.repositories.bugReports });
+
     return new OpsApp({
       ops: infrastructure.createCapability(setup.dependencies),
+      inbox,
+      intake: BugReportIntakeService.create({
+        reports: setup.repositories.bugReports,
+        rateLimiter: infrastructure.bugReportRateLimiter,
+        notifier: infrastructure.bugReportNotifier,
+      }),
+      apiKeys: setup.dependencies.apiKeys,
       featureFlags: infrastructure.featureFlags,
       projects: setup.dependencies.projects,
+      auditLog: setup.dependencies.auditLog,
       eventingIntrospection: infrastructure.eventingIntrospection,
+      pipelines: infrastructure.pipelines,
+      eventLogWindow: infrastructure.eventLogWindow,
+      grafana: infrastructure.grafana,
+      systemMigrations: infrastructure.systemMigrations,
+      explain: OpsExplainService.create({
+        repository: OpsExplainClickHouseRepository.create({
+          resolver: infrastructure.explainClients,
+        }),
+      }),
+      findOpsApiKey: () => infrastructure.findOpsApiKey(),
+      isProduction: infrastructure.isProduction,
     });
   }
 
@@ -400,7 +617,7 @@ export class OpsApp implements OpsApi {
    *
    * `ops:manage` already resolves through the admin allow-list, but it is not
    * enough on its own: it is inherited by an impersonation session, and the
-   * damage is silent — pinning an organization back onto the legacy
+   * damage is silent - pinning an organization back onto the legacy
    * authorization path changes which tables answer every permission check for
    * that tenant without failing anything.
    *
@@ -530,8 +747,8 @@ export class OpsApp implements OpsApi {
    * Deletes a stored flag row.
    *
    * Deliberately permissive about the key: the operator catalogue surfaces
-   * orphan rows — keys that no longer match the registry or the pipeline graph
-   * — so operators can delete them, and validating the key here would break
+   * orphan rows - keys that no longer match the registry or the pipeline graph
+   * - so operators can delete them, and validating the key here would break
    * exactly that cleanup path.
    */
   clearFeatureFlag(input: { key: string; lastEditedBy: string | null }): Promise<void> {
@@ -542,8 +759,21 @@ export class OpsApp implements OpsApi {
     return this.#dependencies.ops.eventExplorer.discoverAggregates(input);
   }
 
-  searchAggregates(input: Parameters<OpsEventExplorer["searchAggregates"]>[0]) {
-    return this.#dependencies.ops.eventExplorer.searchAggregates(input);
+  /**
+   * The event-log search. A caller naming no lower bound gets the explorer's
+   * own default lookback, which lives here so two doors cannot disagree about
+   * how far back the same question reaches.
+   */
+  searchAggregates(input: {
+    query: string;
+    tenantIds: string[];
+    sinceMs?: number | undefined;
+  }): Promise<AggregateSearchResult[]> {
+    return this.#dependencies.ops.eventExplorer.searchAggregates({
+      query: input.query,
+      tenantIds: input.tenantIds,
+      sinceMs: input.sinceMs ?? nowInstant().epochMilliseconds - EVENT_LOG_SEARCH_LOOKBACK_MS,
+    });
   }
 
   getAggregateEvents(input: Parameters<OpsEventExplorer["getAggregateEvents"]>[0]) {
@@ -767,6 +997,335 @@ export class OpsApp implements OpsApi {
   }
   listParkedQueueTenants(input: Parameters<OpsService["listParkedQueueTenants"]>[0]) {
     return this.#dependencies.ops.listParkedQueueTenants(input);
+  }
+
+  // -- the platform-tier gate ------------------------------------------------
+
+  /**
+   * The caller's operator reach, as an answer rather than a refusal: the
+   * global menu polls it on every page load, so a non-operator gets
+   * `{ kind: "none" }` and not a console full of errors (lw#3584).
+   */
+  operatorScope(operator: OpsOperator | null): OpsScope {
+    return this.#operatorOf(operator) ? { kind: "platform" } : { kind: "none" };
+  }
+
+  /**
+   * The one gate every operator procedure passes. Platform-tier: it resolves
+   * the deployment's own allow-list and reads no id from the request, because
+   * there is no scope an operator surface could be checked at. A write whose
+   * damage nobody would notice in time passes a second gate as well.
+   */
+  admitOperator(operator: OpsOperator | null, permission: OpsOperatorPermission): void {
+    if (!this.#operatorOf(operator)) throw new OpsOperatorRequiredError(permission);
+  }
+
+  /**
+   * The staff gate on the support inbox. The same allow-list, named for what
+   * it decides there: a bug report carries no tenant, so staff is the only
+   * question that could be asked about it.
+   */
+  admitStaff(operator: OpsOperator | null): OpsOperator {
+    if (!this.#operatorOf(operator)) throw new OpsOperatorRequiredError("ops:view");
+
+    return actingIdentityOf(operator);
+  }
+
+  /**
+   * The same list, refused the back office's way: not-found rather than
+   * forbidden, so a probe learns nothing about whether the surface exists.
+   */
+  admitBackOfficeStaff(operator: OpsOperator | null): OpsOperator {
+    if (!this.#operatorOf(operator)) throw new AdminSurfaceHiddenError();
+
+    return actingIdentityOf(operator);
+  }
+
+  /**
+   * The acting operator, or nothing where the caller is not on the list. An
+   * impersonating operator is read as the operator: somebody debugging a
+   * customer account is still staff, and the list matches the ADDRESS.
+   */
+  #operatorOf(operator: OpsOperator | null): OpsOperator | null {
+    if (!operator) return null;
+
+    return this.isAdmin(actingIdentityOf(operator)) ? operator : null;
+  }
+
+  // -- the operator-only ClickHouse EXPLAIN ----------------------------------
+
+  /**
+   * The operator secret, compared in constant time. A deployment that
+   * configured none refuses every call: a blank expected secret must never
+   * match a blank presented one.
+   */
+  authorizeOperatorSecret(input: { presented: string | null }): void {
+    const expected = this.#dependencies.findOpsApiKey();
+
+    if (!expected || !input.presented) throw new OpsOperatorSecretRequiredError();
+
+    const presented = Buffer.from(input.presented);
+    const secret = Buffer.from(expected);
+
+    if (presented.length !== secret.length) throw new OpsOperatorSecretRequiredError();
+    if (!timingSafeEqual(presented, secret)) throw new OpsOperatorSecretRequiredError();
+  }
+
+  /** One EXPLAIN, wrapped so it cannot execute, audited by its shape. */
+  async explainClickHouseQuery(input: OpsExplainRequest): Promise<OpsExplainAnswer> {
+    const built = buildExplainQuery(input.query, input.type);
+
+    if (!built.wrapped || !built.type) {
+      return { status: "refused", reason: built.reason ?? "invalid query" };
+    }
+
+    const outcome = await this.#dependencies.explain.explain({
+      wrappedQuery: built.wrapped,
+      type: built.type,
+      isProduction: this.#dependencies.isProduction,
+      auditFields: redactQueryForAudit(input.query),
+    });
+
+    if (outcome.status === "ok") return { status: "ok", type: built.type, rows: outcome.rows };
+    // The engine's own prose names cluster internals; the explain service logs it.
+    if (outcome.status === "error") return { status: "failed" };
+
+    return outcome;
+  }
+
+  // -- the process's own readings --------------------------------------------
+
+  listPipelineRegistrations(): OpsPipelineRegistrations {
+    return this.#dependencies.pipelines.listRegistrations();
+  }
+
+  getEventLogSearchWindow(): OpsEventLogSearchWindow {
+    return this.#dependencies.eventLogWindow.read();
+  }
+
+  findGrafanaLinkConfig(): OpsGrafanaLinkConfig {
+    return this.#dependencies.grafana.findLinkConfig();
+  }
+
+  // -- in-place system migrations --------------------------------------------
+
+  listSystemMigrations(): Promise<OpsMigrationOverview[]> {
+    return this.#dependencies.systemMigrations.getOverview();
+  }
+
+  listMigrationEnrollments(input: { requestedBy: string }): Promise<OpsMigrationEnrollmentListing> {
+    return this.#dependencies.systemMigrations.getEnrollments(input);
+  }
+
+  searchMigrationOrganizations(input: {
+    query: string;
+  }): Promise<OpsMigrationOrganizationMatch[]> {
+    return this.#dependencies.systemMigrations.searchOrganizations(input);
+  }
+
+  async enrollMigrationTenant(input: {
+    organizationId: string;
+    migrationName: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<void> {
+    const actorUserId = this.#confirmedMigrationActor(input);
+
+    await this.#dependencies.systemMigrations.enroll({
+      organizationId: input.organizationId,
+      migrationName: input.migrationName,
+      actorUserId,
+    });
+  }
+
+  enrollMigrationCohort(input: {
+    migrationName: string;
+    sampleSize: number;
+    includeEnterprise: boolean;
+    includePrivateDataplane: boolean;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<OpsMigrationCohortResult> {
+    const actorUserId = this.#confirmedMigrationActor(input);
+
+    return this.#dependencies.systemMigrations.enrollCohort({
+      migrationName: input.migrationName,
+      sampleSize: input.sampleSize,
+      includeEnterprise: input.includeEnterprise,
+      includePrivateDataplane: input.includePrivateDataplane,
+      actorUserId,
+    });
+  }
+
+  withdrawMigrationTenant(input: {
+    organizationId: string;
+    migrationName: string;
+    actorUserId: string;
+  }): Promise<void> {
+    return this.#dependencies.systemMigrations.withdraw(input);
+  }
+
+  runSystemMigrationForOrganization(input: {
+    organizationId: string;
+    migrationName: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<OpsMigrationTargetedRunResult> {
+    const actorUserId = this.#confirmedMigrationActor(input);
+
+    return this.#dependencies.systemMigrations.runForOrganization({
+      organizationId: input.organizationId,
+      migrationName: input.migrationName,
+      actorUserId,
+    });
+  }
+
+  runSystemMigrationPass(): void {
+    this.#dependencies.systemMigrations.startPass();
+  }
+
+  async assertSystemMigrationLegacyWritersDrained(input: {
+    migrationName: string;
+    tenantId: string;
+    minimumWriterGeneration: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<void> {
+    this.requireDestructiveOperator(input.operator ?? null, input.confirm);
+
+    await this.#dependencies.systemMigrations.assertLegacyWritersDrained({
+      migrationName: input.migrationName,
+      tenantId: input.tenantId,
+      minimumWriterGeneration: input.minimumWriterGeneration,
+      actorUserId: this.#actorIdOf(input.operator),
+    });
+  }
+
+  /**
+   * Pin a migrated or finalized organization back onto its legacy path. Same
+   * posture as the blob-store writes: callable without the dialog, and it
+   * decides which tables answer an entire organization's permission checks.
+   */
+  async rollBackSystemMigrationTenant(input: {
+    migrationName: string;
+    tenantId: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<void> {
+    this.requireDestructiveOperator(input.operator ?? null, input.confirm);
+
+    await this.#dependencies.systemMigrations.rollBack({
+      migrationName: input.migrationName,
+      tenantId: input.tenantId,
+      actorUserId: this.#actorIdOf(input.operator),
+    });
+  }
+
+  /**
+   * The confirmation gate the migration itself declares, and the actor the
+   * enrollment is attributed to. Which migrations are guarded comes from their
+   * own declaration, so this gate and the page asking cannot drift apart.
+   */
+  #confirmedMigrationActor(input: {
+    migrationName: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): string {
+    const guarded = this.#dependencies.systemMigrations.requiresOperatorConfirmation({
+      migrationName: input.migrationName,
+    });
+
+    if (guarded) this.requireDestructiveOperator(input.operator ?? null, input.confirm);
+
+    return this.#actorIdOf(input.operator);
+  }
+
+  /** The opaque id a migration write is attributed to. */
+  #actorIdOf(operator: OpsOperator | null): string {
+    if (!operator) throw new OpsOperatorSessionRequiredError();
+
+    return operator.id;
+  }
+
+  // -- the support inbox -----------------------------------------------------
+
+  async listBugReports(
+    input: ListBugReportsInput & { actorUserId: string },
+  ): Promise<BugReportListing> {
+    await this.#recordBugReportRead({
+      actorUserId: input.actorUserId,
+      action: "bugReports.getAll",
+      // Never the raw search text: contact searches are email addresses, and
+      // audit rows outlive the inbox.
+      args: {
+        page: input.page,
+        pageSize: input.pageSize,
+        hasSearch: Boolean(input.search),
+      },
+    });
+
+    return this.#dependencies.inbox.getAll({
+      page: input.page,
+      pageSize: input.pageSize,
+      search: input.search,
+    });
+  }
+
+  async getBugReport(input: { id: string; actorUserId: string }): Promise<BugReport> {
+    await this.#recordBugReportRead({
+      actorUserId: input.actorUserId,
+      action: "bugReports.getById",
+      targetId: input.id,
+    });
+
+    const report = await this.#dependencies.inbox.findById({ id: input.id });
+
+    if (!report) throw new NotFoundError("not_found", "Report", input.id);
+
+    return report;
+  }
+
+  /**
+   * File one report from a customer's coding agent. Unauthenticated on
+   * purpose: the reporter may be struggling because setup failed, so a report
+   * must never require a working login. A credential only enriches it.
+   */
+  submitBugReport(input: {
+    report: SubmitBugReport;
+    callerKey: string;
+    apiToken?: string | undefined;
+    projectIdHint?: string | null;
+  }): Promise<{ id: string }> {
+    return this.#dependencies.intake.submit({
+      input: input.report,
+      callerKey: input.callerKey,
+      apiToken: input.apiToken,
+      projectIdHint: input.projectIdHint,
+      apiKeys: this.#dependencies.apiKeys,
+    });
+  }
+
+  /**
+   * Written BEFORE the answer, and awaited: reports carry reporter-submitted
+   * transcripts and contact addresses, so who opened one is itself a fact
+   * worth keeping.
+   */
+  async #recordBugReportRead(entry: {
+    actorUserId: string;
+    action: string;
+    args?: Readonly<Record<string, unknown>>;
+    targetId?: string;
+  }): Promise<void> {
+    await this.#dependencies.auditLog.record({
+      actorId: entry.actorUserId,
+      path: entry.action,
+      input: {
+        ...entry.args,
+        targetKind: BUG_REPORT_TARGET_KIND,
+        ...(entry.targetId === undefined ? {} : { targetId: entry.targetId }),
+      },
+      error: null,
+    });
   }
 
   /**

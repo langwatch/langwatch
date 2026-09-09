@@ -6,9 +6,11 @@
  */
 import { generate } from "@langwatch/ksuid";
 import type { BugReport, BugReportCreateInput } from "@langwatch/ops-contract";
-import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { BugReportRepositoryPort } from "../../ports/bug-report.port.ts";
+import { PrismaRepository } from "@langwatch/prisma-client";
+import type { Prisma } from "@langwatch/prisma-client/generated";
 import { type Instant, fromDate } from "@langwatch/time";
+
+import type { BugReportRepository } from "../bug-report.repository.ts";
 
 /**
  * The id prefix every report carries.
@@ -20,14 +22,27 @@ import { type Instant, fromDate } from "@langwatch/time";
  */
 const BUG_REPORT_KSUID_RESOURCE = "bugreport";
 
-export class PrismaBugReportRepository extends BugReportRepositoryPort {
-  static create(options: { prisma: PrismaClient }): PrismaBugReportRepository {
-    return new PrismaBugReportRepository(options.prisma);
-  }
+/** The columns a listing reads: everything but the stored transcript. */
+const bugReportRowSelect = {
+  id: true,
+  createdAt: true,
+  source: true,
+  kind: true,
+  title: true,
+  summary: true,
+  sessionTruncated: true,
+  agent: true,
+  contactEmail: true,
+  cliVersion: true,
+  linkedProjectId: true,
+  metadata: true,
+} as const;
 
-  private constructor(private readonly prisma: PrismaClient) {
-    super();
-  }
+export class PrismaBugReportRepository
+  extends PrismaRepository.for("BugReport")
+  implements BugReportRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaBugReportRepository(prisma));
 
   async create({ data }: { data: BugReportCreateInput }): Promise<BugReport> {
     return withInstantCreatedAt(
@@ -53,21 +68,8 @@ export class PrismaBugReportRepository extends BugReportRepositoryPort {
     search?: string | undefined;
   }): Promise<Omit<BugReport, "sessionData">[]> {
     const rows = await this.prisma.bugReport.findMany({
-      where: buildSearchWhere(search),
-      select: {
-        id: true,
-        createdAt: true,
-        source: true,
-        kind: true,
-        title: true,
-        summary: true,
-        sessionTruncated: true,
-        agent: true,
-        contactEmail: true,
-        cliVersion: true,
-        linkedProjectId: true,
-        metadata: true,
-      },
+      where: findSearchWhere(search),
+      select: bugReportRowSelect,
       orderBy: { createdAt: "desc" },
       skip: page * pageSize,
       take: pageSize,
@@ -76,14 +78,14 @@ export class PrismaBugReportRepository extends BugReportRepositoryPort {
     return rows.map(withInstantCreatedAt);
   }
 
-  async tryFindById({ id }: { id: string }): Promise<BugReport | null> {
+  async findById({ id }: { id: string }): Promise<BugReport | null> {
     const row = await this.prisma.bugReport.findUnique({ where: { id } });
 
     return row ? withInstantCreatedAt(row) : null;
   }
 
   count({ search }: { search?: string | undefined } = {}): Promise<number> {
-    return this.prisma.bugReport.count({ where: buildSearchWhere(search) });
+    return this.prisma.bugReport.count({ where: findSearchWhere(search) });
   }
 }
 
@@ -94,7 +96,7 @@ function withInstantCreatedAt<TRow extends { createdAt: Date }>(
   return { ...row, createdAt: fromDate(row.createdAt) };
 }
 
-function buildSearchWhere(search: string | undefined): Prisma.BugReportWhereInput | undefined {
+function findSearchWhere(search: string | undefined): Prisma.BugReportWhereInput | undefined {
   const term = search?.trim();
   if (!term) return undefined;
   return {

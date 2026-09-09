@@ -1,140 +1,115 @@
 /**
- * The transport -> service seam for the migration enrollment procedures: the
- * ops surface names the migration at the boundary, stamps the acting operator,
- * demands the right operator permission, and delegates everything else to the
- * system-migrations service.
+ * @vitest-environment node
  *
- * Corresponds to specs/migration/authz-grants-rollout.feature (the enrollment
- * scenarios).
+ * The transport -> application seam for the migration enrollment procedures:
+ * the surface names the migration, stamps the acting operator, demands the
+ * right grain, and delegates the rest to the runner the process supplies.
+ * Spec: specs/migration/authz-grants-rollout.feature.
  */
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import { HandledError } from "@langwatch/handled-error";
-import type { UserApi } from "@langwatch/user-contract";
-import type { AuthApi } from "@langwatch/auth-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import type { OpsOperator } from "@langwatch/ops-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  OpsTrpcApi,
-  type OpsTrpcContext,
-  type OpsTrpcPorts,
-} from "../../transport/api-trpc/ops.api.ts";
-import { OpsApp, type OpsCapability } from "../ops.app.ts";
-import { OpsEventingIntrospectionPort } from "../../ports/eventing-introspection.port.ts";
+
+import { createOpsTestApp, OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
+import type { OpsSystemMigrationRunner } from "../ops.app.ts";
+import { opsOperatorFact } from "../../transport/ops-operator.trpc.ts";
+import { opsPlatformTrpcTransport } from "../../transport/ops-platform.trpc.ts";
+import { opsTrpcTestPorts } from "../../transport/__tests__/ops.trpc.harness.ts";
 
 /**
- * Every mock is typed from the port itself. The port's own comment explains
- * why the shapes there stopped being `unknown` — a tRPC procedure publishes
- * what its handler returns — and a stub typed `(...args: unknown[])` opts back
- * out of exactly that: it accepts any call and resolves any value, so this
+ * Every stub is typed from the runner itself. A stub typed
+ * `(...args: unknown[])` accepts any call and resolves any value, so this
  * suite would keep passing while the browser read fields off nothing.
  */
-type SystemMigrations = OpsTrpcPorts["systemMigrations"];
-
 const service = {
-  enroll: vi.fn<SystemMigrations["enroll"]>(),
-  enrollCohort: vi.fn<SystemMigrations["enrollCohort"]>(),
-  withdraw: vi.fn<SystemMigrations["withdraw"]>(),
-  getEnrollments: vi.fn<SystemMigrations["getEnrollments"]>(),
-  getOverview: vi.fn<SystemMigrations["getOverview"]>(),
-  startPass: vi.fn<SystemMigrations["startPass"]>(),
-  rollBack: vi.fn<SystemMigrations["rollBack"]>(),
-  assertLegacyWritersDrained: vi.fn<SystemMigrations["assertLegacyWritersDrained"]>(),
-  runForOrganization: vi.fn<SystemMigrations["runForOrganization"]>(),
-  searchOrganizations: vi.fn<SystemMigrations["searchOrganizations"]>(),
+  enroll: vi.fn<OpsSystemMigrationRunner["enroll"]>(),
+  enrollCohort: vi.fn<OpsSystemMigrationRunner["enrollCohort"]>(),
+  withdraw: vi.fn<OpsSystemMigrationRunner["withdraw"]>(),
+  getEnrollments: vi.fn<OpsSystemMigrationRunner["getEnrollments"]>(),
+  getOverview: vi.fn<OpsSystemMigrationRunner["getOverview"]>(),
+  startPass: vi.fn<OpsSystemMigrationRunner["startPass"]>(),
+  rollBack: vi.fn<OpsSystemMigrationRunner["rollBack"]>(),
+  assertLegacyWritersDrained: vi.fn<OpsSystemMigrationRunner["assertLegacyWritersDrained"]>(),
+  runForOrganization: vi.fn<OpsSystemMigrationRunner["runForOrganization"]>(),
+  searchOrganizations: vi.fn<OpsSystemMigrationRunner["searchOrganizations"]>(),
   // Declared by the migration itself in production, so the stub answers the way
   // the registered migrations do: only the cutover changes how the fleet
   // behaves, and only it takes the typed confirmation.
   requiresOperatorConfirmation: vi.fn(
     ({ migrationName }: { migrationName: string }) => migrationName === "authz-grants-cutover",
   ),
+} satisfies OpsSystemMigrationRunner;
+
+type MigrationTestContext = { actor: { id: string }; operator: OpsOperator | null };
+
+const OPERATOR: OpsOperator = { id: "user_alex", email: OPS_STAFF_ADDRESS };
+const IMPERSONATING: OpsOperator = {
+  id: "user_customer",
+  email: "ana@acme.com",
+  impersonator: { email: OPS_STAFF_ADDRESS },
 };
 
-const ports = {
-  listPipelineRegistrations: () => ({ projections: [], eventSubscribers: [] }),
-  getEventLogSearchWindow: () => ({
-    searchLookbackDays: 365,
-    hotTierDays: null,
-    hotTierEnvVar: null,
-  }),
-  tryGetGrafanaLinkConfig: () => null,
-  systemMigrations: service,
-} satisfies OpsTrpcPorts;
-
-/** Which permission each procedure demanded, keyed by tRPC path — so a
- *  procedure wired to the wrong permission fails an assertion here instead of
- *  passing through an allow-everything stub unnoticed. */
+/**
+ * Which grain each procedure demanded, keyed by the name it was called under -
+ * so a procedure wired to the wrong grain fails an assertion here instead of
+ * passing through an allow-everything stub unnoticed.
+ */
 const demandedPermissions = new Map<string, string>();
 
-const trpc = initTRPC.context<OpsTrpcContext>().create();
+function callerFor(operator: OpsOperator) {
+  const { app } = createOpsTestApp({ infrastructure: { systemMigrations: service } });
+  const admitOperator = app.admitOperator.bind(app);
+  let current = "";
 
-const recordingPolicy =
-  (permission: "ops:view" | "ops:manage") =>
-  <TProcedure>(procedure: TProcedure): TProcedure =>
-    (procedure as { use(middleware: unknown): unknown }).use(
-      ({ path, next }: { path: string; next: () => unknown }) => {
-        demandedPermissions.set(path, permission);
-        return next();
-      },
-    ) as TProcedure;
+  vi.spyOn(app, "admitOperator").mockImplementation((asked, permission) => {
+    demandedPermissions.set(current, permission);
 
-const router = OpsTrpcApi.create(
-  trpc,
-  {
-    protected: trpc.procedure,
-    policy: recordingPolicy,
-    probePolicy: <TProcedure>(procedure: TProcedure): TProcedure => procedure,
-  },
-  ports,
-);
-
-/**
- * The application the migration procedures reach. Only the destructive-write
- * gate runs on it here — nothing on this surface reaches the operations
- * service, the flag store or the project index — so the composed capabilities
- * stay empty and the gate is exercised for real.
- */
-function buildApp(): OpsApp {
-  return OpsApp.create({
-    infrastructure: {
-      createCapability: () => createApiFixture<OpsCapability>(),
-      featureFlags: createApiFixture<FeatureFlagApi>(),
-      eventingIntrospection: new (class extends OpsEventingIntrospectionPort {
-        projections() {
-          return [];
-        }
-        killSwitches() {
-          return [];
-        }
-        processManagers() {
-          return [];
-        }
-        dejaViewProjections() {
-          return [];
-        }
-      })(),
-    },
-    dependencies: {
-      users: createApiFixture<UserApi>(),
-      auth: createApiFixture<AuthApi>(),
-      projects: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
-      auditLog: createApiFixture<AuditLogApi>(),
-    },
-    config: undefined,
-    resources: new ResourceScope(),
+    return admitOperator(asked, permission);
   });
+
+  const trpc = initTRPC.context<MigrationTestContext>().create();
+  const router = createTrpcRuntime<MigrationTestContext>({
+    root: trpc,
+    procedure: trpc.procedure,
+    ports: opsTrpcTestPorts(),
+  }).mount(opsPlatformTrpcTransport, () => app, {
+    facts: [bindTrpcFact(opsOperatorFact, (ctx: MigrationTestContext) => ctx.operator)],
+  });
+
+  // The name the grain is recorded under: tRPC hands the handler no path, and
+  // the application is what the grain is asked of.
+  const named = new Proxy(
+    router.createCaller({ actor: { id: operator.id }, operator }),
+    {
+      get: (target, property: string) => {
+        const procedure = Reflect.get(target, property) as unknown;
+
+        if (typeof procedure !== "function") return procedure;
+
+        return (...args: unknown[]) => {
+          current = property;
+
+          return (procedure as (...values: unknown[]) => unknown).call(target, ...args);
+        };
+      },
+    },
+  );
+
+  return named;
+}
+
+function buildCaller() {
+  return callerFor(OPERATOR);
 }
 
 /**
  * The stable code of the handled refusal a call raised.
  *
  * Asserted instead of the tRPC code because that mapping belongs to the
- * process's handled-error middleware, which this bare test root does not
- * mount: the feature raises a coded `HandledError` and the boundary decides
- * what status it becomes.
+ * boundary's own status table: the feature raises a coded `HandledError` and
+ * the boundary decides what status it becomes.
  */
 async function refusalCodeOf(call: Promise<unknown>): Promise<string> {
   try {
@@ -145,15 +120,6 @@ async function refusalCodeOf(call: Promise<unknown>): Promise<string> {
     throw error;
   }
   throw new Error("expected the call to be refused");
-}
-
-function buildCaller() {
-  return router.createCaller({
-    app: { ops: buildApp() },
-    actor: () => ({ id: "user_alex" }),
-    opsScope: { kind: "platform" },
-    session: { user: { id: "user_alex", email: "staff@langwatch.ai" } },
-  });
 }
 
 describe("ops migration enrollment procedures", () => {
@@ -214,18 +180,7 @@ describe("ops migration enrollment procedures", () => {
       // The audit trail names the impersonated account, which is the wrong
       // posture for a flip of this size.
       service.enroll.mockResolvedValue(undefined);
-      const impersonated = router.createCaller({
-        app: { ops: buildApp() },
-        actor: () => ({ id: "user_customer" }),
-        opsScope: { kind: "platform" },
-        session: {
-          user: {
-            id: "user_customer",
-            email: "ana@acme.com",
-            impersonator: { email: "staff@langwatch.ai" },
-          },
-        },
-      });
+      const impersonated = callerFor(IMPERSONATING);
 
       await expect(
         refusalCodeOf(
@@ -414,7 +369,7 @@ describe("ops migration enrollment procedures", () => {
       await expect(caller.listMigrationEnrollments()).resolves.toEqual(listing);
       expect(demandedPermissions.get("listMigrationEnrollments")).toBe("ops:view");
       // The listing carries the enrollers' names, so the service audits the
-      // read — the transport has to say who is reading.
+      // read - the transport has to say who is reading.
       expect(service.getEnrollments).toHaveBeenCalledWith({
         requestedBy: "user_alex",
       });

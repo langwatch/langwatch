@@ -56,3 +56,29 @@ export class AdminSurfaceHiddenError extends HandledError {
     this.name = "AdminSurfaceHiddenError";
   }
 }
+
+/** The cookie is gone, so there is nobody to attach an impersonation to. */
+export class AdminSessionExpiredError extends HandledError {
+  declare readonly code: "unauthorized";
+
+  constructor() {
+    super("unauthorized", "No active auth session for this admin request", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "AdminSessionExpiredError";
+  }
+}
+
+/** The back office sent something that was not a JSON object. */
+export class AdminMalformedBodyError extends HandledError {
+  declare readonly code: "malformed_request";
+
+  constructor() {
+    super("malformed_request", "Admin request body must be a JSON object", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "AdminMalformedBodyError";
+  }
+}

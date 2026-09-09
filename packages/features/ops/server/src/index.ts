@@ -7,19 +7,22 @@ export {
   OpsUnknownFeatureFlagError,
   type OpsAppDependencies,
   type OpsBadgeReading,
+  type BugReportNotifier,
+  type BugReportRateLimiter,
   type OpsCapability,
+  type OpsEventLogWindowReader,
   type OpsEventExplorer,
-  type OpsOperator,
+  type OpsGrafanaLinks,
+  type OpsPipelineRegistry,
+  type OpsSystemMigrationRunner,
   type OpsProcessExplorer,
   type OpsProcessRef,
   type OpsReplayRunner,
 } from "./app/ops.app.ts";
-export { BugReportRepositoryPort } from "./ports/bug-report.port.ts";
 export { PrismaBugReportRepository } from "./repositories/prisma/prisma.bug-report.repository.ts";
-export {
-  BugReportInboxService,
-  type BugReportListing,
-} from "./services/bug-report-inbox.service.ts";
+export { BugReportInboxService } from "./services/bug-report-inbox.service.ts";
+export type { BugReportRepository } from "./repositories/bug-report.repository.ts";
+export type { OpsRepositories } from "./repositories/ops.repositories.ts";
 export {
   PostgresOpsAdapter,
   type PostgresOpsAdapterOptions,
@@ -120,22 +123,16 @@ export { ProcessOpsPrismaRepository } from "./repositories/prisma/prisma.process
 export { ProcessAuditRepository } from "./repositories/prisma/prisma.process-audit.repository.ts";
 export { EventExplorerClickHouseRepository } from "./repositories/clickhouse/clickhouse.event-explorer.repository.ts";
 export { OpsExplainClickHouseRepository } from "./repositories/clickhouse/clickhouse.ops-explain.repository.ts";
-export {
-  OpsExplainClientPort,
-  type OpsExplainClientResolution,
-} from "./ports/ops-explain-client.port.ts";
+export type {
+  OpsExplainClientResolution,
+  OpsExplainClients,
+} from "./repositories/ops-explain.repository.ts";
 
 /** Public intake for the reports customers' coding agents file. */
 export {
   BugReportIntakeService,
   BugReportRateLimitedError,
-  type SubmitBugReportInput,
 } from "./services/bug-report-intake.service.ts";
-export {
-  BugReportNotifierPort,
-  SilentBugReportNotifier,
-} from "./ports/bug-report-notifier.port.ts";
-export { BugReportRateLimiterPort } from "./ports/bug-report-rate-limiter.port.ts";
 export {
   SlackBugReportNotifierAdapter,
   type OpsSlackAlertTransport,
@@ -187,42 +184,33 @@ export type {
   ProcessManagerPurgeTarget,
 } from "./repositories/process-manager-purge.repository.ts";
 
-// The back-office REST transport: impersonation, and the React Admin resource
-// operations. Its two session reads are ports, because who is acting and which
-// auth row they are acting on are the deployment's facts, not this feature's.
-export {
-  createAdminRestApp,
-  type AdminRestActor,
-  type AdminRestPorts,
-  type AdminRestSessionPorts,
-} from "./transport/api-rest/admin.api.ts";
-
-// The public issue-report intake, `POST /api/bug-reports`. Its optional
-// project credential is a port: reading one off a request is the deployment's
-// published precedence, and a second reading here is how the two would drift.
-export {
-  createBugReportsRestApp,
-  type BugReportRestCredentialReader,
-  type BugReportRestPorts,
-} from "./transport/api-rest/bug-report.api.ts";
+// The transport declarations the process mounts. Each is inert: it names its
+// routes or procedures, the access each is reached behind, and the facts the
+// mounting process must bind - and nothing about how this process runs.
+export { adminRest, adminActor, adminAuthSession } from "./transport/admin.rest.ts";
+export { opsBugReportRest, bugReportCredential } from "./transport/ops-bug-report.rest.ts";
+export { opsClickHouseExplainRest } from "./transport/ops-clickhouse-explain.rest.ts";
+export { opsOperatorFact } from "./transport/ops-operator.trpc.ts";
+export { opsDashboardTrpcTransport } from "./transport/ops-dashboard.trpc.ts";
+export { opsQueueTrpcTransport } from "./transport/ops-queue.trpc.ts";
+export { opsProcessTrpcTransport } from "./transport/ops-process.trpc.ts";
+export { opsEventLogTrpcTransport } from "./transport/ops-event-log.trpc.ts";
+export { opsPlatformTrpcTransport } from "./transport/ops-platform.trpc.ts";
+export { opsBugReportTrpcTransport } from "./transport/ops-bug-report.trpc.ts";
 
 // The operator-only ClickHouse EXPLAIN endpoint: the pure query guards and the
 // decision about which client an EXPLAIN is allowed to reach.
 export { CLICKHOUSE_GUARDRAILS } from "./rules/ops-clickhouse-guardrails.rules.ts";
+export { OpsClickHouseRuntime } from "./repositories/clickhouse/clickhouse.ops-explain.repository.ts";
 export {
-  ALLOWED_EXPLAIN_TYPES,
-  explainBodySchema,
-  type ExplainType,
-  OpsClickHouseRuntime,
-  type ParseResult,
-} from "./adapters/ops-clickhouse-explain.adapter.ts";
-export { OpsClickhouseExplainAdapter } from "./adapters/ops-clickhouse-explain.adapter.ts";
+  buildExplainQuery,
+  findOpsConnection,
+  redactQueryForAudit,
+  stripCommentsAndStrings,
+  type OpsExplainBuild,
+} from "./rules/ops-clickhouse-explain.rules.ts";
 export {
   type OpsExplainOutcome,
   OpsExplainService,
 } from "./services/ops-clickhouse-explain.service.ts";
-export {
-  createOpsClickHouseExplainRestApp,
-  type OpsClickHouseExplainRestPorts,
-} from "./transport/api-rest/ops-clickhouse-explain.api.ts";
 export { opsServer } from "./ops.server.ts";

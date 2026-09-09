@@ -1,5 +1,28 @@
 import { featureApi } from "@langwatch/runtime-composition";
 import type { AdminIdentity } from "./admin.ts";
+import type {
+  BugReport,
+  BugReportListing,
+  ListBugReportsInput,
+  SubmitBugReport,
+} from "./ops-bug-report.ts";
+import type {
+  OpsEventLogSearchWindow,
+  OpsExplainAnswer,
+  OpsExplainRequest,
+  OpsGrafanaLinkConfig,
+  OpsOperator,
+  OpsOperatorPermission,
+  OpsPipelineRegistrations,
+  OpsScope,
+} from "./ops.responses.ts";
+import type {
+  OpsMigrationCohortResult,
+  OpsMigrationEnrollmentListing,
+  OpsMigrationOrganizationMatch,
+  OpsMigrationOverview,
+  OpsMigrationTargetedRunResult,
+} from "./ops-system-migration.ts";
 import type { Anomaly, AnomalyKind } from "./ops-anomaly.ts";
 import type { DashboardData, GroupInfo } from "./ops-dashboard.ts";
 import type {
@@ -189,15 +212,98 @@ export interface OpsApi {
     maxTenants: number;
   }): Promise<OpsParkedTenantsPage>;
   isAdmin(identity: AdminIdentity): boolean;
-  requireDestructiveOperator(
-    operator: Readonly<{
-      id: string;
-      name?: string | null;
-      email?: string | null;
-      impersonator?: Readonly<{ email?: string | null }> | null;
-    }> | null,
-    confirmation: string | undefined,
-  ): void;
+  requireDestructiveOperator(operator: OpsOperator | null, confirmation: string | undefined): void;
+  /**
+   * The caller's operator reach. `{ kind: "none" }` is an answer rather than a
+   * refusal, so the global menu can poll it on every page load.
+   */
+  operatorScope(operator: OpsOperator | null): OpsScope;
+  /** Refuses anyone who is not on the deployment's operator allow-list. */
+  admitOperator(operator: OpsOperator | null, permission: OpsOperatorPermission): void;
+  /** Refuses anyone who is not on the deployment's staff allow-list. */
+  admitStaff(operator: OpsOperator | null): OpsOperator;
+  /**
+   * The same list, refused the back office's way: not-found rather than
+   * forbidden, so a probe learns nothing about whether the surface exists.
+   */
+  admitBackOfficeStaff(operator: OpsOperator | null): OpsOperator;
+  /**
+   * Refuses a caller who did not present this deployment's operator secret.
+   * Compared in constant time, and refused outright where no secret is set.
+   */
+  authorizeOperatorSecret(input: { presented: string | null }): void;
+  /** One operator EXPLAIN, guardrails and fail-closed rule included. */
+  explainClickHouseQuery(input: OpsExplainRequest): Promise<OpsExplainAnswer>;
+  listPipelineRegistrations(): OpsPipelineRegistrations;
+  getEventLogSearchWindow(): OpsEventLogSearchWindow;
+  /** Null when no Grafana is configured: callers render no link, not a dead one. */
+  findGrafanaLinkConfig(): OpsGrafanaLinkConfig;
+  listSystemMigrations(): Promise<OpsMigrationOverview[]>;
+  listMigrationEnrollments(input: {
+    requestedBy: string;
+  }): Promise<OpsMigrationEnrollmentListing>;
+  searchMigrationOrganizations(input: { query: string }): Promise<OpsMigrationOrganizationMatch[]>;
+  enrollMigrationTenant(input: {
+    organizationId: string;
+    migrationName: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<void>;
+  enrollMigrationCohort(input: {
+    migrationName: string;
+    sampleSize: number;
+    includeEnterprise: boolean;
+    includePrivateDataplane: boolean;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<OpsMigrationCohortResult>;
+  withdrawMigrationTenant(input: {
+    organizationId: string;
+    migrationName: string;
+    actorUserId: string;
+  }): Promise<void>;
+  runSystemMigrationForOrganization(input: {
+    organizationId: string;
+    migrationName: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<OpsMigrationTargetedRunResult>;
+  runSystemMigrationPass(): void;
+  assertSystemMigrationLegacyWritersDrained(input: {
+    migrationName: string;
+    tenantId: string;
+    minimumWriterGeneration: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<void>;
+  rollBackSystemMigrationTenant(input: {
+    migrationName: string;
+    tenantId: string;
+    operator: OpsOperator | null;
+    confirm?: string | undefined;
+  }): Promise<void>;
+  /**
+   * One page of the support inbox, audited before it is answered: reports
+   * carry reporter-submitted transcripts and contact addresses, so who opened
+   * the inbox is itself worth keeping. The search TEXT never reaches the audit
+   * row - a contact search is an email address, and audit rows outlive the
+   * inbox.
+   */
+  listBugReports(input: ListBugReportsInput & { actorUserId: string }): Promise<BugReportListing>;
+  /** One report in full, audited before it is answered. */
+  getBugReport(input: { id: string; actorUserId: string }): Promise<BugReport>;
+  /**
+   * File one report from a customer's coding agent. Unauthenticated on
+   * purpose: the reporter may be struggling because setup failed, so a report
+   * must never require a working login. A project credential only enriches the
+   * report with a project link.
+   */
+  submitBugReport(input: {
+    report: SubmitBugReport;
+    callerKey: string;
+    apiToken?: string | undefined;
+    projectIdHint?: string | null;
+  }): Promise<{ id: string }>;
   tryGetDashboardData(): DashboardData | null;
   badgeCounts(): { blockedCount: number; dlqCount: number; computedAt: Date | null };
   streamDashboard(input: { signal?: { readonly aborted: boolean } }): AsyncIterable<DashboardData>;
@@ -230,10 +336,15 @@ export interface OpsApi {
     since: string;
     tenantIds: string[];
   }): Promise<AggregateDiscovery>;
+  /**
+   * The event-log search. `sinceMs` is optional because the explorer's own
+   * default lookback is the module's rule, not the door's: two doors asking
+   * the same question must not disagree about how far back it reaches.
+   */
   searchAggregates(input: {
     query: string;
     tenantIds: string[];
-    sinceMs: number;
+    sinceMs?: number | undefined;
   }): Promise<AggregateSearchResult[]>;
   getAggregateEvents(input: {
     aggregateId: string;

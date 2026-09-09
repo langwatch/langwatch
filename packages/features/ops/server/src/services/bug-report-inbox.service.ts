@@ -1,21 +1,15 @@
 /**
  * The two reads the operator back office makes of the support inbox.
  */
-import type { BugReport } from "@langwatch/ops-contract";
-import type { BugReportRepositoryPort } from "../ports/bug-report.port.ts";
-
-/** One page of the inbox, with the count the pager renders. */
-export type BugReportListing = Readonly<{
-  reports: Omit<BugReport, "sessionData">[];
-  total: number;
-}>;
+import type { BugReport, BugReportListing } from "@langwatch/ops-contract";
+import type { BugReportRepository } from "../repositories/bug-report.repository.ts";
 
 export class BugReportInboxService {
-  static create(options: { reports: BugReportRepositoryPort }): BugReportInboxService {
+  static create(options: { reports: BugReportRepository }): BugReportInboxService {
     return new BugReportInboxService(options.reports);
   }
 
-  private constructor(private readonly reports: BugReportRepositoryPort) {}
+  private constructor(private readonly reports: BugReportRepository) {}
 
   async getAll(input: {
     page: number;
@@ -30,7 +24,7 @@ export class BugReportInboxService {
     return { reports, total };
   }
 
-  tryGetById(input: { id: string }): Promise<BugReport | null> {
-    return this.reports.tryFindById(input);
+  findById(input: { id: string }): Promise<BugReport | null> {
+    return this.reports.findById(input);
   }
 }
