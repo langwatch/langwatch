@@ -1,0 +1,37 @@
+{
+  "name": "@langwatch/data-privacy-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable scoped data-privacy policy contract.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "pnpm -w typecheck:declarations --project modules/data-privacy/contract/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/redaction": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

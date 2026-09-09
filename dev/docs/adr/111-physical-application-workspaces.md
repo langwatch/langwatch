@@ -168,7 +168,7 @@ already defined by ADR-101 and the
 [feature-package boundary](../../../packages/architecture-lint/adrs/001-feature-package-boundaries.md):
 
 ```text
-packages/enterprise/
+enterprise/
 ├── LICENSE.md                # governs this tree and every descendant
 ├── README.md                 # catalogue and licensing explanation
 ├── package.json              # @langwatch/enterprise
@@ -198,9 +198,9 @@ identity and catalogue declarations. It imports no feature implementation,
 React, Node built-in, transport or persistence adapter. Product licensing is
 not confused with the legal source license: signed-license schemas, validation,
 issuance, activation, persistence and UI move into the ordinary strict
-`packages/enterprise/features/licensing/{contract,server,web}` surfaces.
+`enterprise/modules/licensing/{contract,server,web}` surfaces.
 Licensing remains a source of entitlement information as decided by the
-[Entitlements feature](../../../packages/features/entitlement/adrs/001-provider-neutral-plan-resolution.md);
+[Entitlements feature](../../../modules/entitlement/adrs/001-provider-neutral-plan-resolution.md);
 it does not replace the provider-neutral plan decision or make SaaS depend on a
 signed self-host license.
 
@@ -227,10 +227,10 @@ Enterprise is a legal and composition group, not a broad product feature.
 ADR-112's singular ownership catalogue applies inside it. The Enterprise
 catalogue contains `audit-log`, `billing`, `governance`, `licensing`,
 `managed-provider`, `saas`, `scim`, `sso`, and `webhook`. SaaS deployment
-integrations remain under `packages/enterprise/features/saas` because their
+integrations remain under `enterprise/modules/saas` because their
 source is covered by the Enterprise license, even though SaaS activation is
 not itself an Enterprise entitlement check. Platform administration moves
-with operational tooling to core `packages/features/ops` and is not listed by
+with operational tooling to core `modules/ops` and is not listed by
 the portable Enterprise catalogue.
 
 There is no replacement `ee` alias, `apps/*/ee` tree, catch-all enterprise
@@ -344,7 +344,7 @@ The repository migrates in dependency order:
    `@langwatch/enterprise` and its separate API, worker and web composition
    packages; update workspace discovery and staging for those paths in the same
    stage; then extract `platform/app/ee` feature by feature into
-   `packages/enterprise/features`, replacing `@ee/*` imports with package
+   `enterprise/modules`, replacing `@ee/*` imports with package
    exports. Keep SaaS beneath the Enterprise legal root while treating its
    runtime activation separately from Enterprise entitlement, and merge
    platform Admin into core Ops rather than carrying that temporary Enterprise

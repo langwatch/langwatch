@@ -3,7 +3,7 @@
  * `prompts.*` and `promptTags.*` procedure names, and the `/api/prompts` base
  * path the REST family is published at. Both are mounted over the
  * process-owned Prompt service rather than building one per request.
- * @see packages/features/prompt/specs/prompt.feature
+ * @see modules/prompt/specs/prompt.feature
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";

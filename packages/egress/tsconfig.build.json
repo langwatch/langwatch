@@ -27,7 +27,7 @@
   ],
   "references": [
     {
-      "path": "../features/automation/contract/tsconfig.build.json"
+      "path": "../../modules/automation/contract/tsconfig.build.json"
     },
     {
       "path": "../eventing/tsconfig.build.json"

@@ -1,6 +1,6 @@
 /**
  * The worker's half of the AuthZ split: the consumer graph the application
- * produces into. Spec: packages/features/authz/specs/package-boundary.feature
+ * produces into. Spec: modules/authz/specs/package-boundary.feature
  */
 import {
   type AuthzGrantPipelineDatabase,

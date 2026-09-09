@@ -76,7 +76,7 @@ Feature: Workspace switcher
     Then the team row shows no "Create project" button
 
   # The "+" icon button these three describe is gone: the switcher is a combobox
-  # (packages/features/navigation/web/src/ui/blocks/project-switcher-combobox.tsx)
+  # (modules/navigation/web/src/ui/blocks/project-switcher-combobox.tsx)
   # whose per-team create entry is an always-visible menu row, so there is no
   # tooltip to auto-open, no icon button to focus and no hover to test. Tagged
   # @unimplemented rather than deleted because retiring a scenario needs a

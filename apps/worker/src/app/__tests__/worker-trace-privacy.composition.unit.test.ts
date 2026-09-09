@@ -16,7 +16,7 @@ import {
 } from "../worker-trace-privacy.composition.ts";
 
 /**
- * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature
+ * Spec: modules/data-privacy/specs/span-pii-redaction.feature
  *
  * A COMPOSITION-CAPABILITY test. Trace has not converted, so the application
  * still owns `RecordSpanCommand`'s adapters and nothing in this process

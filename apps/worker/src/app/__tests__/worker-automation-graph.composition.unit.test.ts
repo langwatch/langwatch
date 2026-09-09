@@ -20,7 +20,7 @@ import {
 import { createWorkerTraceCapabilityServices } from "../worker-trace-capability-services.composition.ts";
 
 /**
- * Spec: packages/features/automation/specs/graph-alert-worker-composition.feature
+ * Spec: modules/automation/specs/graph-alert-worker-composition.feature
  *
  * This is a COMPOSITION-CAPABILITY test, not a mounted pipeline. Trace's
  * real-time subscriber is still registered by the application, so nothing in

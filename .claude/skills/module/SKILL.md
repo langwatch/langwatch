@@ -1,20 +1,20 @@
 ---
 name: module
-description: "Build or change a LangWatch module (packages/features/<name>/{contract,server,web}), the annotation way: create one from scratch, extend an existing one with a new operation/field/screen/REST endpoint/tRPC procedure, convert a legacy-shaped module to the annotation shape, wire an installed module into apps/api/apps/worker/apps/tasks/apps/ui, move code into its owning module, or publish a piece of a module's web package for another module to mount. Use whenever someone says 'add a module', 'new feature package', 'add a mutation/column/filter/endpoint/procedure', 'make X look like annotation', 'convert X', 'hook it up', 'wire the worker', 'this belongs in X', 'move this into', 'reuse this component in another module', or 'export it from the web package'. One skill, one shape; the task decides which reference you read."
+description: "Build or change a LangWatch module (modules/<name>/{contract,server,web}), the annotation way: create one from scratch, extend an existing one with a new operation/field/screen/REST endpoint/tRPC procedure, convert a legacy-shaped module to the annotation shape, wire an installed module into apps/api/apps/worker/apps/tasks/apps/ui, move code into its owning module, or publish a piece of a module's web package for another module to mount. Use whenever someone says 'add a module', 'new feature package', 'add a mutation/column/filter/endpoint/procedure', 'make X look like annotation', 'convert X', 'hook it up', 'wire the worker', 'this belongs in X', 'move this into', 'reuse this component in another module', or 'export it from the web package'. One skill, one shape; the task decides which reference you read."
 user-invocable: true
 argument-hint: "<new|extend|convert|wire|move|web-surface> <module> [details]"
 ---
 
 # Build or change a module
 
-A **module** is one folder, `packages/features/<name>/`, owning three workspace
-packages: `contract`, `server` and `web`. The folder is still named `packages/features/`
+A **module** is one folder, `modules/<name>/`, owning three workspace
+packages: `contract`, `server` and `web`. The folder is still named `modules/`
 and every generated identifier still reads `Feature*` (`defineFeature`, `withFeature`,
 `featureApi`, `installApi<Name>`, `<Name>Api`, `FeatureName`) until the tree rename in
 `dev/docs/plans/modules-rename.md` lands; write those as code, say "module" in prose.
 
 Read `.claude/skills/architecture-guide/SKILL.md` first, always. It is the map of the
-whole shape; this skill is the set of procedures for changing it. `packages/features/annotation`
+whole shape; this skill is the set of procedures for changing it. `modules/annotation`
 is the one module with no entry in `packages/architecture-lint/src/feature-shape-baseline.json`,
 the reference every task below copies.
 
@@ -40,7 +40,7 @@ edits, evidence-first.
 ## The shape, in brief
 
 ```
-packages/features/<name>/
+modules/<name>/
 ├── feature.json · specs/ · adrs/
 ├── contract/src/    <name>.api.ts (interface <Name>Api + featureApi token), schemas,
 │                    errors, <name>.trpc.ts (defineTrpcContract), <name>-rest.schemas.ts

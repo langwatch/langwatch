@@ -1,0 +1,42 @@
+{
+  "name": "@langwatch/workflow-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Workflow feature contract and Zod 4 schemas.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "pnpm -w typecheck:declarations --project modules/workflow/contract/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "nanoid": "^5.1.5",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

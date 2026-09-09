@@ -4582,6 +4582,7 @@ function composeApiDatabase(
     resources: options.resources,
     database: options.config.infrastructure.database,
     nodeEnvironment: options.config.nodeEnvironment,
+    logger,
     report: LoggedApiDatabaseAbsence.create(logger),
   });
 }

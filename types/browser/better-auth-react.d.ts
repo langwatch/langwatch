@@ -5,7 +5,7 @@
  * a database adapter: importing `createAuthClient` loads 576 declaration files
  * into a browser program, 251 of them kysely — a SQL query builder no
  * first-party file names and no browser can run. The `paths` entries in
- * `apps/ui/tsconfig.json` and `packages/features/auth/web/tsconfig.json` point
+ * `apps/ui/tsconfig.json` and `modules/auth/web/tsconfig.json` point
  * the two browser programs here instead. Nothing about the RUNTIME changes:
  * vite and node both resolve the real package, which `paths` never touches.
  *

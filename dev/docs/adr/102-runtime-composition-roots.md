@@ -348,8 +348,8 @@ producer inversion, which forks the producer surface per role for no gain.
 
 `apps/tasks` is the fourth composition root: one root and one CMD for every
 one-shot program. A task lands in whichever package already owns its domain, so
-a billing task lives under `packages/enterprise/features/billing/server/src/tasks/`
-and a user task under `packages/features/user/server/src/tasks/`. Every task is
+a billing task lives under `enterprise/modules/billing/server/src/tasks/`
+and a user task under `modules/user/server/src/tasks/`. Every task is
 registered on `apps/tasks/src/tasks.catalogue.ts` and ships a unit test.
 
 A deployment may keep a task private. `@langwatch/task` is a plugin mechanism,

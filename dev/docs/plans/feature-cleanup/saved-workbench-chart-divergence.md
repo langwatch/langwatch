@@ -4,7 +4,7 @@ Status: live one now tested; dead one still standing, with the map to remove it.
 
 ## What is there
 
-|                    | `platform/app/src/server/analytics/saved-workbench-charts/`                                         | `packages/features/dashboard/server/src/services/`                    |
+|                    | `platform/app/src/server/analytics/saved-workbench-charts/`                                         | `modules/dashboard/server/src/services/`                    |
 | ------------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | File               | `savedWorkbenchChart.service.ts` (604 lines)                                                        | `saved-workbench-chart.service.ts` (268)                              |
 | Class              | `SavedWorkbenchChartService`                                                                        | `SavedWorkbenchChartService`                                          |
@@ -17,9 +17,9 @@ The live chain:
 ```
 tRPC analytics.savedWorkbenchCharts        platform/app/src/server/api/routers/analytics.ts:121
   -> createSavedWorkbenchChartTrpcRouter   apps/api/src/features/dashboard/dashboard-trpc.mount.ts:78
-  -> SavedWorkbenchChartTrpcApi            packages/features/dashboard/server/src/transport/api-trpc/
+  -> SavedWorkbenchChartTrpcApi            modules/dashboard/server/src/transport/api-trpc/
   -> DashboardApp -> DashboardService
-  -> SavedWorkbenchChartService            packages/features/dashboard/server/src/services/
+  -> SavedWorkbenchChartService            modules/dashboard/server/src/services/
 ```
 
 ## What is NOT dead in that file

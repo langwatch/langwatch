@@ -1,7 +1,7 @@
 /**
  * ADR-057: anonymous trace access goes through ONE endpoint. This walks the
  * real procedure map, so a new public surface fails until the allowlist below
- * is extended. Spec: packages/features/share/specs/share.feature
+ * is extended. Spec: modules/share/specs/share.feature
  */
 import { describe, expect, it } from "vitest";
 
@@ -24,8 +24,6 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
   // A mutation rather than a query on purpose: a per-address query cache is an
   // account-existence oracle built out of network timing.
   "frontDoor.route",
-  // Client bootstrap: exposes only the PUBLIC_* env whitelist, no tenant data.
-  "publicEnv",
   // Sign-up — necessarily pre-session.
   "user.register",
 ];

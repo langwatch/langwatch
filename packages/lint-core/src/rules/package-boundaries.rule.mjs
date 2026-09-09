@@ -39,8 +39,8 @@ function loadWorkspace(cwd) {
       }
     }
   };
-  addFeatures(join(cwd, "packages", "features"), false);
-  addFeatures(join(cwd, "packages", "enterprise", "features"), true);
+  addFeatures(join(cwd, "modules"), false);
+  addFeatures(join(cwd, "enterprise", "modules"), true);
   const workspace = { packages };
   workspaceCache.set(cwd, workspace);
   return workspace;
@@ -74,9 +74,7 @@ function declaredWebDependencies(cwd) {
 
 function packageRootForFile(filename, cwd) {
   const normalized = relative(cwd, filename).split(sep).join("/");
-  const match = normalized.match(
-    /^(packages\/(?:enterprise\/)?features\/[^/]+\/(?:contract|server|web))\//,
-  );
+  const match = normalized.match(/^((?:enterprise\/)?modules\/[^/]+\/(?:contract|server|web))\//);
   if (!match) return undefined;
   return resolve(cwd, match[1]);
 }
@@ -92,7 +90,7 @@ function isFeatureServerCompositionRoot(workspacePath) {
   // one place the import is unavoidable, and the only ways out are to stop testing the wiring
   // or to record a rule gap as if it were debt. A test elsewhere is still held: this is scoped
   // to the composition workspaces, not to test files in general.
-  return /^(apps\/(api|worker|tasks)|packages\/enterprise\/composition\/(api|worker))\/(?:src|tests)\//.test(
+  return /^(apps\/(api|worker|tasks)|enterprise\/packages\/composition\/(api|worker))\/(?:src|tests)\//.test(
     workspacePath,
   );
 }
@@ -137,7 +135,7 @@ export const boundaryRule = defineRule({
   kind: "problem",
   messages: {
     compositionRoot: {
-      what: "Only a composition root (`apps/api`, `apps/worker`, `apps/tasks`, `packages/enterprise/composition/*`) may import a feature server package.",
+      what: "Only a composition root (`apps/api`, `apps/worker`, `apps/tasks`, `enterprise/packages/composition/*`) may import a feature server package.",
       fix: "Import the feature's contract package here, or move this wiring into the composition root.",
     },
     crossFeature: {

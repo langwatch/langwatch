@@ -106,7 +106,7 @@ export function createFixtureWorkspace({ catalogue = {}, features = {}, files = 
   writeFile(cwd, "package.json", JSON.stringify({ name: "fixture-workspace", private: true }));
 
   for (const [feature, definition] of Object.entries(features)) {
-    const root = `packages/features/${feature}`;
+    const root = `modules/${feature}`;
     writeFile(
       cwd,
       `${root}/feature.json`,
@@ -125,7 +125,7 @@ export function createFixtureWorkspace({ catalogue = {}, features = {}, files = 
   const catalogueFeatures = Object.entries(catalogue).map(([id, subjects]) => ({ id, subjects }));
   writeFile(
     cwd,
-    "packages/features/catalogue.json",
+    "modules/catalogue.json",
     JSON.stringify({ version: 0, features: catalogueFeatures }),
   );
   for (const [path, contents] of Object.entries(files)) writeFile(cwd, path, contents);

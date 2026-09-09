@@ -1,0 +1,49 @@
+{
+  "name": "@langwatch/data-retention-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Data Retention screen, presentation and client contracts.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./data-retention": {
+      "langwatch-declaration-source": "./src/data-retention.ts",
+      "types": "./dist/data-retention.d.ts",
+      "default": "./src/data-retention.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project modules/data-retention/web/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-web": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "lucide-react": "^1.22.0"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

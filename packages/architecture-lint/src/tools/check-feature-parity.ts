@@ -47,7 +47,9 @@ function findRepoRoot(from: string): string {
 
     const parent = dirname(directory);
     if (parent === directory) {
-      throw new Error(`pnpm-workspace.yaml not found above ${from}; is this inside the repository?`);
+      throw new Error(
+        `pnpm-workspace.yaml not found above ${from}; is this inside the repository?`,
+      );
     }
 
     directory = parent;
@@ -85,6 +87,8 @@ function discoverPackageSpecRoots(packagesRoot: string): string[] {
 const SPECS_ROOTS = [
   resolve(REPO_ROOT, "specs"),
   ...discoverPackageSpecRoots(resolve(REPO_ROOT, "packages")),
+  ...discoverPackageSpecRoots(resolve(REPO_ROOT, "modules")),
+  ...discoverPackageSpecRoots(resolve(REPO_ROOT, "enterprise")),
   resolve(REPO_ROOT, "sdks/typescript/specs"),
 ] as const;
 
@@ -101,6 +105,9 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // conversational behavior. Without this root those specs could only be
   // @unimplemented. It is reached through the "apps" root below.
   "packages",
+  // The module trees: every module's own suite, core and Enterprise alike.
+  "modules",
+  "enterprise",
   // The process compositions (apps/api, apps/ui, apps/worker, apps/server). Code moving out of
   // the platform application took its tests with it — the worker's liveness/metrics server is
   // the first — and without this root every scenario those tests bind would silently become
@@ -297,8 +304,8 @@ const LEGACY_INERT: string[] = [
   // would bind them (packages/architecture-lint's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
   // first real binding.
-  "packages/features/authz/specs/offboarding.feature",
-  "packages/features/scenario/specs/simulation-run.feature",
+  "modules/authz/specs/offboarding.feature",
+  "modules/scenario/specs/simulation-run.feature",
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",
   "specs/ai-gateway/azure-endpoint-from-api-base.feature",
@@ -593,8 +600,8 @@ const LEGACY_INERT: string[] = [
   "specs/skills/prompt-compiler.feature",
   "specs/studio/nlpgo-true-root-span-without-traceparent.feature",
   "specs/suites/simulations-performance.feature",
-  "packages/features/topic/specs/run-history.feature",
-  "packages/features/topic/specs/topics-source-of-truth.feature",
+  "modules/topic/specs/run-history.feature",
+  "modules/topic/specs/topics-source-of-truth.feature",
   "specs/trace-drawer/attribute-table.feature",
   "specs/trace-drawer/eval-chips-in-header.feature",
   "specs/trace-drawer/playground-affordance.feature",
@@ -607,7 +614,7 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/conversation-message-expand.feature",
   "specs/traces-v2/editable-trace-name-alignment.feature",
   "specs/traces-v2/facet-perspectives.feature",
-  "packages/features/trace/specs/flame-graph.feature",
+  "modules/trace/specs/flame-graph.feature",
   "specs/traces-v2/grouping-engine.feature",
   "specs/traces-v2/io-pretty-markdown.feature",
   "specs/traces-v2/lens-preset-groups.feature",
@@ -642,7 +649,7 @@ const LEGACY_INERT: string[] = [
   "specs/traces/span-attribute-unicode-sanitisation.feature",
   "specs/traces/trace-export.feature",
   "specs/traces/trace-io-extraction.feature",
-  "packages/features/trace/specs/vertex-adk-canonicalisation.feature",
+  "modules/trace/specs/vertex-adk-canonicalisation.feature",
   "specs/triggers/event-sourced-graph-triggers.feature",
   "specs/typescript-sdk/cli-docs.feature",
   "specs/typescript-sdk/cli-projects-api-keys.feature",

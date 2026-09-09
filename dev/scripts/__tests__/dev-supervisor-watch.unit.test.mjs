@@ -64,7 +64,7 @@ describe("shouldIgnoreWatchPath", () => {
 
   it("ignores a *.test.ts file outside __tests__", () => {
     assert.equal(
-      shouldIgnoreWatchPath("../../packages/features/trace/server/src/foo.test.ts"),
+      shouldIgnoreWatchPath("../../modules/trace/server/src/foo.test.ts"),
       true,
     );
   });
@@ -75,10 +75,10 @@ describe("shouldIgnoreWatchPath", () => {
 
   it("ignores an editor temp file written beside its target", () => {
     assert.equal(
-      shouldIgnoreWatchPath("../../packages/features/trace/web/src/a.tsx.tmp.17938.dfd323429215"),
+      shouldIgnoreWatchPath("../../modules/trace/web/src/a.tsx.tmp.17938.dfd323429215"),
       true,
     );
-    assert.equal(shouldIgnoreWatchPath("../../packages/features/trace/web/src/a.tsx"), false);
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/web/src/a.tsx"), false);
   });
 
   it("ignores a test suite's scratch directory beside the package", () => {
@@ -88,7 +88,7 @@ describe("shouldIgnoreWatchPath", () => {
   });
 
   it("ignores dist and generated churn", () => {
-    assert.equal(shouldIgnoreWatchPath("../../packages/features/trace/server/dist/index.js"), true);
+    assert.equal(shouldIgnoreWatchPath("../../modules/trace/server/dist/index.js"), true);
     assert.equal(shouldIgnoreWatchPath("src/generated/types.ts"), true);
   });
 
@@ -100,7 +100,7 @@ describe("shouldIgnoreWatchPath", () => {
   it("does not ignore an ordinary source file", () => {
     assert.equal(shouldIgnoreWatchPath("src/api.entrypoint.ts"), false);
     assert.equal(
-      shouldIgnoreWatchPath("../../packages/features/trace/server/src/trace.service.ts"),
+      shouldIgnoreWatchPath("../../modules/trace/server/src/trace.service.ts"),
       false,
     );
   });
@@ -115,10 +115,10 @@ describe("resolveWatchConfig", () => {
 
   it("reads an override for both the dirs and the debounce window", () => {
     const config = resolveWatchConfig({
-      LANGWATCH_DEV_WATCH_DIRS: "src, ../../packages/features/trace ",
+      LANGWATCH_DEV_WATCH_DIRS: "src, ../../modules/trace ",
       LANGWATCH_DEV_WATCH_DEBOUNCE_MS: "150",
     });
-    assert.deepEqual(config.dirs, ["src", "../../packages/features/trace"]);
+    assert.deepEqual(config.dirs, ["src", "../../modules/trace"]);
     assert.equal(config.debounceMs, 150);
   });
 
@@ -175,7 +175,7 @@ describe("createDebouncer", () => {
     // is genuinely still.
     for (let burst = 0; burst < 4; burst += 1) {
       setTimeout(() => {
-        for (let i = 0; i < 100; i += 1) debouncer.note(`packages/features/x/src/f${burst}-${i}.ts`);
+        for (let i = 0; i < 100; i += 1) debouncer.note(`modules/x/src/f${burst}-${i}.ts`);
       }, burst * 20);
     }
     setTimeout(() => {

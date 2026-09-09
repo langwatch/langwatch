@@ -56,17 +56,17 @@ function writeWorkspace(): void {
     `import { ComposedService } from "@fixture/thing-server";\n` +
       `export function composeApi() {\n  return ComposedService.create({});\n}\n`,
   );
-  manifest("packages/features/thing/server", "@fixture/thing-server");
+  manifest("modules/thing/server", "@fixture/thing-server");
   write(
-    "packages/features/thing/server/src/services/composed.service.ts",
+    "modules/thing/server/src/services/composed.service.ts",
     `export class ComposedService {\n  static create(options: object) {\n    return new ComposedService();\n  }\n}\n`,
   );
   write(
-    "packages/features/thing/server/src/services/uncomposed.service.ts",
+    "modules/thing/server/src/services/uncomposed.service.ts",
     `export class UncomposedService {\n  static create() {\n    return new UncomposedService();\n  }\n}\n`,
   );
   write(
-    "packages/features/thing/server/src/index.ts",
+    "modules/thing/server/src/index.ts",
     `export { ComposedService } from "./services/composed.service.ts";\n` +
       `export { UncomposedService } from "./services/uncomposed.service.ts";\n`,
   );
@@ -91,7 +91,7 @@ describe("composed exports", () => {
 
       expect(messages).toHaveLength(1);
       expect(messages[0]).toContain("`UncomposedService` is exported from");
-      expect(messages[0]).toContain("`packages/features/thing/server`");
+      expect(messages[0]).toContain("`modules/thing/server`");
       expect(messages[0]).toContain("composed by no application");
       expect(messages[0]).toContain("Compose it in the owning `*.composition.ts`, or delete it");
     });
@@ -106,11 +106,11 @@ describe("composed exports", () => {
     /** @scenario "A transport factory nothing mounts is reported" */
     it("reports the factory by name", () => {
       write(
-        "packages/features/thing/server/src/transport/thing-webhook.api.ts",
+        "modules/thing/server/src/transport/thing-webhook.api.ts",
         `export function createThingWebhookRestApp() {\n  return {};\n}\n`,
       );
       write(
-        "packages/features/thing/server/src/index.ts",
+        "modules/thing/server/src/index.ts",
         `export { ComposedService } from "./services/composed.service.ts";\n` +
           `export { createThingWebhookRestApp } from "./transport/thing-webhook.api.ts";\n`,
       );
@@ -165,11 +165,11 @@ describe("composed exports", () => {
     /** @scenario "A testing export is not required to be composed" */
     it("skips a service published from a testing module", () => {
       write(
-        "packages/features/thing/server/src/testing/fake.service.ts",
+        "modules/thing/server/src/testing/fake.service.ts",
         `export class FakeThingService {}\n`,
       );
       write(
-        "packages/features/thing/server/src/index.ts",
+        "modules/thing/server/src/index.ts",
         `export { ComposedService } from "./services/composed.service.ts";\n` +
           `export { FakeThingService } from "./testing/fake.service.ts";\n`,
       );
@@ -180,11 +180,11 @@ describe("composed exports", () => {
     /** @scenario "An abstract port is not required to be composed" */
     it("skips an abstract port class", () => {
       write(
-        "packages/features/thing/server/src/ports/thing.port.ts",
+        "modules/thing/server/src/ports/thing.port.ts",
         `export abstract class ThingLookupService {\n  abstract find(): void;\n}\n`,
       );
       write(
-        "packages/features/thing/server/src/index.ts",
+        "modules/thing/server/src/index.ts",
         `export { ComposedService } from "./services/composed.service.ts";\n` +
           `export { ThingLookupService } from "./ports/thing.port.ts";\n`,
       );
@@ -195,11 +195,11 @@ describe("composed exports", () => {
     /** @scenario "An error class is not required to be composed" */
     it("skips a class that extends an error", () => {
       write(
-        "packages/features/thing/server/src/rules/thing.errors.ts",
+        "modules/thing/server/src/rules/thing.errors.ts",
         `export class ThingRefusedService extends HandledError {}\n`,
       );
       write(
-        "packages/features/thing/server/src/index.ts",
+        "modules/thing/server/src/index.ts",
         `export { ComposedService } from "./services/composed.service.ts";\n` +
           `export { ThingRefusedService } from "./rules/thing.errors.ts";\n`,
       );
@@ -210,13 +210,13 @@ describe("composed exports", () => {
     /** @scenario "A schema export is not required to be composed" */
     it("skips a zod schema and its inferred type", () => {
       write(
-        "packages/features/thing/server/src/rules/thing.schema.ts",
+        "modules/thing/server/src/rules/thing.schema.ts",
         `import { z } from "zod";\n` +
           `export const thingServiceSchema = z.object({});\n` +
           `export type ThingService = z.infer<typeof thingServiceSchema>;\n`,
       );
       write(
-        "packages/features/thing/server/src/index.ts",
+        "modules/thing/server/src/index.ts",
         `export { ComposedService } from "./services/composed.service.ts";\n` +
           `export { thingServiceSchema } from "./rules/thing.schema.ts";\n` +
           `export type { ThingService } from "./rules/thing.schema.ts";\n`,
@@ -229,18 +229,18 @@ describe("composed exports", () => {
   describe("when the package is not server code", () => {
     /** @scenario "A web package is not read at all" */
     it("skips a web package", () => {
-      manifest("packages/features/thing/web", "@fixture/thing-web");
-      write("packages/features/thing/web/src/index.ts", `export class BrowserThingService {}\n`);
-      write("packages/features/thing/server/src/index.ts", "export {};\n");
+      manifest("modules/thing/web", "@fixture/thing-web");
+      write("modules/thing/web/src/index.ts", `export class BrowserThingService {}\n`);
+      write("modules/thing/server/src/index.ts", "export {};\n");
 
       expect(reported()).toEqual([]);
     });
 
     /** @scenario "A contract package is not read at all" */
     it("skips a contract package", () => {
-      manifest("packages/features/thing/contract", "@fixture/thing-contract");
-      write("packages/features/thing/contract/src/index.ts", `export class WireThingService {}\n`);
-      write("packages/features/thing/server/src/index.ts", "export {};\n");
+      manifest("modules/thing/contract", "@fixture/thing-contract");
+      write("modules/thing/contract/src/index.ts", `export class WireThingService {}\n`);
+      write("modules/thing/server/src/index.ts", "export {};\n");
 
       expect(reported()).toEqual([]);
     });
@@ -249,7 +249,7 @@ describe("composed exports", () => {
   describe("when the export is baselined", () => {
     /** @scenario "A baselined export is accepted while it stays baselined" */
     it("reports nothing for it", () => {
-      baseline(["packages/features/thing/server|UncomposedService"]);
+      baseline(["modules/thing/server|UncomposedService"]);
 
       expect(reported()).toEqual([]);
     });
@@ -259,10 +259,10 @@ describe("composed exports", () => {
     /** @scenario "The baseline may only shrink" */
     it("reports an entry the merge base does not carry", () => {
       baseline([
-        "packages/features/thing/server|OtherService",
-        "packages/features/thing/server|UncomposedService",
+        "modules/thing/server|OtherService",
+        "modules/thing/server|UncomposedService",
       ]);
-      baseline(["packages/features/thing/server|UncomposedService"], "merge-base");
+      baseline(["modules/thing/server|UncomposedService"], "merge-base");
 
       const messages = lintComposedExportsBaseline(
         root,
@@ -270,17 +270,17 @@ describe("composed exports", () => {
       ).violations.map((violation) => violation.message);
 
       expect(messages).toHaveLength(1);
-      expect(messages[0]).toContain("packages/features/thing/server|OtherService");
+      expect(messages[0]).toContain("modules/thing/server|OtherService");
       expect(messages[0]).toContain("shrink-only");
     });
 
     /** @scenario "An entry the merge base carried may be removed" */
     it("accepts a baseline with one fewer entry", () => {
-      baseline(["packages/features/thing/server|UncomposedService"]);
+      baseline(["modules/thing/server|UncomposedService"]);
       baseline(
         [
-          "packages/features/thing/server|OtherService",
-          "packages/features/thing/server|UncomposedService",
+          "modules/thing/server|OtherService",
+          "modules/thing/server|UncomposedService",
         ],
         "merge-base",
       );

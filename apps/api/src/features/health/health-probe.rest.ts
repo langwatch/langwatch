@@ -1,7 +1,7 @@
 /**
  * The project-keyed door onto the five subsystem probes, which live in
  * `@langwatch/platform-health-server`.
- * @see packages/features/platform-health/specs/platform-health.feature
+ * @see modules/platform-health/specs/platform-health.feature
  */
 import { publicRoute } from "@langwatch/api/access";
 import {

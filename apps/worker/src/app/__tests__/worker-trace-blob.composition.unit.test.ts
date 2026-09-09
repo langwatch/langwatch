@@ -13,7 +13,7 @@ import {
 } from "../worker-trace-blob.composition.ts";
 
 /**
- * Spec: packages/features/trace/specs/trace-payload-claim-check.feature
+ * Spec: modules/trace/specs/trace-payload-claim-check.feature
  *
  * A COMPOSITION-CAPABILITY test. Trace has not converted, so nothing in this
  * process reads a spool object or recalls an offloaded field. What has to be

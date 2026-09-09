@@ -43,6 +43,7 @@ function readDeployment(): {
   isSaas: boolean;
   appBaseUrl: string;
   passkeysEnabled: boolean;
+  authProvider: string | undefined;
   demoProjectSlug?: string;
 } {
   try {
@@ -51,6 +52,7 @@ function readDeployment(): {
       isSaas: config.deployment === "saas",
       appBaseUrl: config.appBaseUrl,
       passkeysEnabled: config.passkeys,
+      authProvider: config.authProvider,
       ...(config.demoProjectSlug ? { demoProjectSlug: config.demoProjectSlug } : {}),
     };
   } catch {
@@ -58,7 +60,12 @@ function readDeployment(): {
     // address rather than a broken one. Passkeys read OFF there for the same
     // reason the section gates on the flag at all: offering a ceremony a
     // deployment never mounted an endpoint for is an offer we cannot honour.
-    return { isSaas: false, appBaseUrl: "https://app.langwatch.ai", passkeysEnabled: false };
+    return {
+      isSaas: false,
+      appBaseUrl: "https://app.langwatch.ai",
+      passkeysEnabled: false,
+      authProvider: undefined,
+    };
   }
 }
 

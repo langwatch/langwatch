@@ -4,7 +4,7 @@
 #
 # Implementation:
 #   packages/design-system/src/shiki-adapter.ts   (eager base, ensureLanguageLoaded, normalizeShikiLang)
-#   packages/features/trace/web/src/ui/elements/markdown/shiki-highlight.tsx (ShikiCodeBlock + render-gating hook)
+#   modules/trace/web/src/ui/elements/markdown/shiki-highlight.tsx (ShikiCodeBlock + render-gating hook)
 #
 # Related specs (same Shiki highlighting path, all governed by ADR-027):
 #   specs/traces-v2/attribute-value-readability.feature — JSON via the shared Shiki renderer

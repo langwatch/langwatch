@@ -21,7 +21,7 @@ mechanism per transport, one enumeration per process, and zero per-feature
 wiring inside the serving app beyond a single entry in that enumeration.
 
 ```
-  packages/features/<x>/server          the feature: behaviour + transports
+  modules/<x>/server          the feature: behaviour + transports
         │
         │  create<X>RestApp / <X>TrpcApi.create / <X>WorkerFeatureInstaller
         ▼
@@ -98,7 +98,7 @@ composition — owns the feature's dependency assembly.
 ## Enterprise features
 
 A core package may never depend on an Enterprise one, so Enterprise surfaces
-mount through `packages/enterprise/composition/api` (e.g.
+mount through `enterprise/packages/composition/api` (e.g.
 `EnterpriseGovernanceTrpcComposition.create`), which the process calls beside
 the core list. Plan gates cross the boundary as a `planGate:
 ProcedureDecorator` the composition supplies — a feature package never

@@ -45,9 +45,9 @@ const QUEUE = path.join(REPO_ROOT, "dev/scripts/check-queue.mjs");
 const MEMBER_PARENTS = [
   "apps",
   "packages",
-  "packages/features",
-  "packages/enterprise/features",
-  "packages/enterprise/composition",
+  "modules",
+  "enterprise/modules",
+  "enterprise/packages/composition",
   "services",
   "mcp",
   "tools",
@@ -85,7 +85,7 @@ function discoverBinDirs(repoRoot) {
     for (const name of childDirs(path.join(repoRoot, parent))) {
       const member = `${parent}/${name}`;
       if (EXCLUDED_MEMBERS.has(member)) continue;
-      // packages/features/<feature> holds contract/server/web, one level deeper.
+      // modules/<feature> holds contract/server/web, one level deeper.
       const candidates = [
         member,
         ...childDirs(path.join(repoRoot, member)).map((c) => `${member}/${c}`),

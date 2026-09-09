@@ -739,7 +739,7 @@ mentions it in a comment, so there are **9 real importers**. A tenth entry,
 republishes the whole package and adds three compatibility aliases.
 
 Symbols they use: `SubscriptionTrpcApi`, `SubscriptionTrpcContext`
-(`packages/enterprise/composition/api/src/trpc/enterprise-trpc.composition.ts:21-22`),
+(`enterprise/packages/composition/api/src/trpc/enterprise-trpc.composition.ts:21-22`),
 `PostgresBillingAdapter`, `ClickHouseBillingAdapter`,
 `ClickHouseBillableEventsMeterAdapter`, `StripeErrorAdapter`,
 `SeatEventSubscriptionService`, `SubscriptionItemCalculatorService`,
@@ -768,6 +768,6 @@ test or fixture. Eleven of the twelve are application UI under
 touches them, and only by moving four re-exported names back to the contract
 import they already come from.
 
-`packages/enterprise/src/index.ts:62` and
-`packages/enterprise/tests/enterprise-catalogue.unit.test.ts:30` name both
+`enterprise/src/index.ts:62` and
+`enterprise/tests/enterprise-catalogue.unit.test.ts:30` name both
 packages in the enterprise feature catalogue; neither package name changes.

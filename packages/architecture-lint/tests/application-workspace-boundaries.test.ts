@@ -82,19 +82,19 @@ function enterpriseComposition(
   role: EnterpriseCompositionRole,
   dependencies: Record<string, string> = {},
 ): void {
-  writeManifest(`packages/enterprise/composition/${role}/package.json`, {
+  writeManifest(`enterprise/packages/composition/${role}/package.json`, {
     name: ENTERPRISE_COMPOSITION_NAMES[role],
     dependencies,
   });
   const className = `${role[0]?.toUpperCase()}${role.slice(1)}Composition`;
   write(
-    `packages/enterprise/composition/${role}/src/index.ts`,
+    `enterprise/packages/composition/${role}/src/index.ts`,
     `export class ${className} { static create() { return new ${className}(); } }`,
   );
 }
 
 function enterpriseFeature(feature: string, role: "contract" | "server" | "web"): void {
-  const featureRoot = `packages/enterprise/features/${feature}`;
+  const featureRoot = `enterprise/modules/${feature}`;
   write(`${featureRoot}/feature.json`, JSON.stringify({ layoutVersion: 0 }));
   writeManifest(`${featureRoot}/${role}/package.json`, {
     name: `@langwatch/enterprise-${feature}-${role}`,
@@ -104,13 +104,13 @@ function enterpriseFeature(feature: string, role: "contract" | "server" | "web")
 }
 
 function enterpriseRoot(): void {
-  write("packages/enterprise/LICENSE.md", "# LangWatch Enterprise License\n");
-  write("packages/enterprise/README.md", "# LangWatch Enterprise\n");
-  writeManifest("packages/enterprise/package.json", {
+  write("enterprise/LICENSE.md", "# LangWatch Enterprise License\n");
+  write("enterprise/README.md", "# LangWatch Enterprise\n");
+  writeManifest("enterprise/package.json", {
     name: "@langwatch/enterprise",
     license: "SEE LICENSE IN LICENSE.md",
   });
-  write("packages/enterprise/src/index.ts", "export {};");
+  write("enterprise/src/index.ts", "export {};");
 }
 
 function violations(): ArchitectureViolation[] {
@@ -282,9 +282,9 @@ describe("Enterprise aggregate boundaries", () => {
 
   it("requires the governing license and rejects Apache descendant metadata", () => {
     enterpriseFeature("billing", "contract");
-    write("packages/enterprise/README.md", "# LangWatch Enterprise\n");
+    write("enterprise/README.md", "# LangWatch Enterprise\n");
     write(
-      "packages/enterprise/features/billing/contract/package.json",
+      "enterprise/modules/billing/contract/package.json",
       JSON.stringify({
         name: "@langwatch/enterprise-billing-contract",
         type: "module",
@@ -300,16 +300,16 @@ describe("Enterprise aggregate boundaries", () => {
 
   it("keeps the root portable and composition packages class based", () => {
     enterpriseRoot();
-    writeManifest("packages/enterprise/package.json", {
+    writeManifest("enterprise/package.json", {
       name: "@langwatch/enterprise",
       license: "SEE LICENSE IN LICENSE.md",
       dependencies: { react: "19.2.4" },
     });
-    write("packages/enterprise/src/index.ts", 'import React from "react"; export { React };');
-    writeManifest("packages/enterprise/composition/api/package.json", {
+    write("enterprise/src/index.ts", 'import React from "react"; export { React };');
+    writeManifest("enterprise/packages/composition/api/package.json", {
       name: "@langwatch/enterprise-api",
     });
-    write("packages/enterprise/composition/api/src/index.ts", "export const create = () => ({});");
+    write("enterprise/packages/composition/api/src/index.ts", "export const create = () => ({});");
 
     expect(policy("enterprise-composition")).toHaveLength(2);
     expect(policy("composition-source")).toHaveLength(1);

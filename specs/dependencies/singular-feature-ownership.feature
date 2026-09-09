@@ -5,7 +5,7 @@
 # Physical executable extraction remains owned by
 # application-workspace-boundaries.feature.
 # Enterprise catalogue membership remains owned by
-# ../../packages/enterprise/specs/enterprise-catalogue.feature.
+# ../../enterprise/specs/enterprise-catalogue.feature.
 
 Feature: Singular feature ownership
   As a platform maintainer
@@ -24,21 +24,21 @@ Feature: Singular feature ownership
 
       Examples:
         | domain         | root                              |
-        | user           | packages/features/user           |
-        | organization   | packages/features/organization   |
-        | project        | packages/features/project        |
-        | role           | packages/features/role           |
-        | auth           | packages/features/auth           |
-        | authz          | packages/features/authz          |
-        | api-key        | packages/features/api-key        |
-        | dashboard      | packages/features/dashboard      |
-        | data-privacy   | packages/features/data-privacy   |
-        | github         | packages/features/github         |
-        | model-provider | packages/features/model-provider |
-        | presence       | packages/features/presence       |
-        | prompt         | packages/features/prompt         |
-        | dataset        | packages/features/dataset        |
-        | topic          | packages/features/topic          |
+        | user           | modules/user           |
+        | organization   | modules/organization   |
+        | project        | modules/project        |
+        | role           | modules/role           |
+        | auth           | modules/auth           |
+        | authz          | modules/authz          |
+        | api-key        | modules/api-key        |
+        | dashboard      | modules/dashboard      |
+        | data-privacy   | modules/data-privacy   |
+        | github         | modules/github         |
+        | model-provider | modules/model-provider |
+        | presence       | modules/presence       |
+        | prompt         | modules/prompt         |
+        | dataset        | modules/dataset        |
+        | topic          | modules/topic          |
 
     @unimplemented
     @architecture @naming
@@ -86,7 +86,7 @@ Feature: Singular feature ownership
 
     @unit @architecture
     Scenario: Every production subject has exactly one owner
-      Given packages/features/catalogue.json declares core and Enterprise subjects
+      Given modules/catalogue.json declares core and Enterprise subjects
       When architecture lint checks governed feature source
       Then every production module subject resolves to exactly one registered feature
       And duplicate or unowned subjects fail with their source path
@@ -132,7 +132,7 @@ Feature: Singular feature ownership
     Scenario: SaaS remains inside the Enterprise source-license boundary
       Given SaaS deployment integrations contain Enterprise-licensed vendor integration source
       When package ownership and the Enterprise catalogue are inspected
-      Then SaaS lives at packages/enterprise/features/saas
+      Then SaaS lives at enterprise/modules/saas
       And its packages use the @langwatch/enterprise-saas prefix
       And the Enterprise catalogue contains saas
       And deployment-mode activation is not described as an Enterprise entitlement gate
@@ -142,9 +142,9 @@ Feature: Singular feature ownership
     Scenario: Platform administration belongs to core Ops
       Given backoffice administration and operational tooling are available to every installation
       When their implementation ownership is inspected
-      Then both live in packages/features/ops
+      Then both live in modules/ops
       And Ops owns admin access, impersonation, queues, replay, schedulers, and event and process operations
-      And no packages/enterprise/features/admin root remains
+      And no enterprise/modules/admin root remains
       And existing admin routes may remain thin compatibility transports
 
     @unimplemented

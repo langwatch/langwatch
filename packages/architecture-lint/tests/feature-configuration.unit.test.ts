@@ -12,13 +12,13 @@ const catalogue: FeatureCatalogueEntry[] = [
   {
     classification: "core",
     id: "widget",
-    root: "packages/features/widget",
+    root: "modules/widget",
     subjects: ["widget"],
   },
   {
     classification: "core",
     id: "gadget",
-    root: "packages/features/gadget",
+    root: "modules/gadget",
     subjects: ["gadget"],
   },
 ];
@@ -46,7 +46,7 @@ describe("feature configuration", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
     it("accepts it", () => {
       write(
-        "packages/features/widget/contract/src/widget.config.ts",
+        "modules/widget/contract/src/widget.config.ts",
         'export const widgetServerConfigSchema = 1; const leaf = { env: "WIDGET_URL" };',
       );
 
@@ -58,7 +58,7 @@ describe("feature configuration", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
     it("refuses it and names the export it needs", () => {
       write(
-        "packages/features/widget/contract/src/widget.config.ts",
+        "modules/widget/contract/src/widget.config.ts",
         'const leaf = { env: "WIDGET_URL" };',
       );
 
@@ -71,17 +71,17 @@ describe("feature configuration", () => {
     /** @scenario "One variable has one owner across every process" */
     it("refuses the second and names the first", () => {
       write(
-        "packages/features/widget/contract/src/widget.config.ts",
+        "modules/widget/contract/src/widget.config.ts",
         'export const widgetServerConfigSchema = 1; const leaf = { env: "SHARED_URL" };',
       );
       write(
-        "packages/features/gadget/contract/src/gadget.config.ts",
+        "modules/gadget/contract/src/gadget.config.ts",
         'export const gadgetServerConfigSchema = 1; const leaf = { env: "SHARED_URL" };',
       );
 
       const violations = findings();
       expect(violations).toHaveLength(1);
-      expect(violations[0]?.message).toContain("packages/features/widget/contract");
+      expect(violations[0]?.message).toContain("modules/widget/contract");
     });
   });
 
@@ -89,7 +89,7 @@ describe("feature configuration", () => {
     /** @scenario "One variable has one owner across every process" */
     it("refuses it and points at the feature's own definition", () => {
       write(
-        "packages/features/widget/contract/src/widget.config.ts",
+        "modules/widget/contract/src/widget.config.ts",
         'export const widgetServerConfigSchema = 1; const leaf = { env: "WIDGET_URL" };',
       );
       write(

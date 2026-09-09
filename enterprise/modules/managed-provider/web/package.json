@@ -1,0 +1,39 @@
+{
+  "name": "@langwatch/enterprise-managed-provider-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Enterprise managed-provider UI.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./surfaces/managed-provider-alert": {
+      "types": "./dist/surfaces/managed-provider-alert/index.d.ts",
+      "default": "./src/surfaces/managed-provider-alert/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project enterprise/modules/managed-provider/web/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/enterprise-managed-provider-contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

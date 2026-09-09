@@ -3,6 +3,44 @@ import { PrismaDriverAdapterService, type PrismaDriverAdapterFactory } from "./d
 import type { PrismaConfiguration } from "./config.ts";
 import type { Pool } from "pg";
 import type { PrismaPg } from "@prisma/adapter-pg";
+import type { Logger } from "@langwatch/observability";
+
+/**
+ * A short constant name per Prisma log level, used as the pino `msg` so a
+ * filtered console reads the event kind without opening the line.
+ */
+const PRISMA_EVENT_MESSAGE: Record<Prisma.LogLevel, string> = {
+  error: "prisma error",
+  warn: "prisma warning",
+  info: "prisma info",
+  query: "prisma query",
+};
+
+/** Prisma's `query` level has no logger counterpart, so it lands as debug. */
+function prismaLoggerLevel(level: Prisma.LogLevel): "error" | "warn" | "info" | "debug" {
+  return level === "query" ? "debug" : level;
+}
+
+/** A query event carries `query` where a log event carries `message`. */
+function prismaEventMessage(event: Prisma.LogEvent | Prisma.QueryEvent): string {
+  return "query" in event ? event.query : event.message;
+}
+
+/** Forwards one Prisma client event to the process logger as one structured line. */
+export function forwardPrismaEvent({
+  logger,
+  level,
+  event,
+}: {
+  logger: Logger;
+  level: Prisma.LogLevel;
+  event: Prisma.LogEvent | Prisma.QueryEvent;
+}): void {
+  logger[prismaLoggerLevel(level)](
+    { target: event.target, message: prismaEventMessage(event), timestamp: event.timestamp },
+    PRISMA_EVENT_MESSAGE[level],
+  );
+}
 
 export interface PrismaQueryContext {
   model?: string | undefined;
@@ -32,6 +70,7 @@ export abstract class PrismaQueryGuard {
 export interface PrismaClientFactoryInput {
   adapter: PrismaPg;
   log: Prisma.LogLevel[];
+  logger: Logger;
 }
 
 export abstract class PrismaClientFactory {
@@ -40,12 +79,20 @@ export abstract class PrismaClientFactory {
 
 class GeneratedPrismaClientFactory extends PrismaClientFactory {
   create(input: PrismaClientFactoryInput): PrismaClient {
-    return new PrismaClient({ adapter: input.adapter, log: input.log });
+    const client = new PrismaClient({
+      adapter: input.adapter,
+      log: input.log.map((level) => ({ level, emit: "event" as const })),
+    });
+    for (const level of input.log) {
+      client.$on(level, (event) => forwardPrismaEvent({ logger: input.logger, level, event }));
+    }
+    return client;
   }
 }
 
 export interface PrismaConnectionServiceOptions {
   guard: PrismaQueryGuard;
+  logger: Logger;
   driverAdapter?: PrismaDriverAdapterFactory | undefined;
   clientFactory?: PrismaClientFactory | undefined;
 }
@@ -82,6 +129,7 @@ export class PrismaConnectionService {
     private readonly guard: PrismaQueryGuard,
     private readonly driverAdapter: PrismaDriverAdapterFactory,
     private readonly clientFactory: PrismaClientFactory,
+    private readonly logger: Logger,
   ) {}
 
   static create(options: PrismaConnectionServiceOptions): PrismaConnectionService {
@@ -89,6 +137,7 @@ export class PrismaConnectionService {
       options.guard,
       options.driverAdapter ?? PrismaDriverAdapterService.create(),
       options.clientFactory ?? new GeneratedPrismaClientFactory(),
+      options.logger,
     );
   }
 
@@ -97,6 +146,7 @@ export class PrismaConnectionService {
     const client = this.clientFactory.create({
       adapter,
       log: configuration.log,
+      logger: this.logger,
     });
     const guard = this.guard;
 

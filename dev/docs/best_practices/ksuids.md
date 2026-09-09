@@ -26,8 +26,8 @@ const id = generate(KSUID_RESOURCES.MODEL_PROVIDER).toString();
 
 ## Where to add a new resource type
 
-`KSUID_RESOURCES` (today duplicated in `packages/features/trace/web/src/model/constants.ts`
-and `packages/features/workflow/web/src/model/constants.ts` — add the prefix to
+`KSUID_RESOURCES` (today duplicated in `modules/trace/web/src/model/constants.ts`
+and `modules/workflow/web/src/model/constants.ts` — add the prefix to
 both until they are folded back into one module):
 
 ```typescript

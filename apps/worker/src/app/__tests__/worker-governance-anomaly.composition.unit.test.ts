@@ -1,5 +1,5 @@
 /**
- * Spec: packages/enterprise/features/governance/specs/governance.feature
+ * Spec: enterprise/modules/governance/specs/governance.feature
  *       ("Anomaly delivery delegates network safety")
  *
  * The spend-spike evaluator was composed by nothing. `startSpendSpikeAnomalyWorker`

@@ -413,7 +413,7 @@ one look like an oversight rather than a decision.
 ### P11 — `ports/trace.port.ts` exports `TraceRepository`, not a `*Port` (R4, policy)
 
 `packages/architecture-lint/src/port-module-baseline.json:32` carries
-`"packages/features/trace/server/src/ports/trace.port.ts"` as a standing exception
+`"modules/trace/server/src/ports/trace.port.ts"` as a standing exception
 to `strict-port-module`, because its exported abstract class is named
 `TraceRepository` (`ports/trace.port.ts:27`) and the rule requires the name to end
 in `Port`. Per R4 the file and the class are one rename or neither: it is a
@@ -777,9 +777,9 @@ files) and the seven `@langwatch/trace-web/*.store` entries (all inside
 
 Two stale workspace dependencies worth clearing while nearby:
 
-- `packages/features/gateway/web/package.json:31-32` declares `@langwatch/trace-server`
+- `modules/gateway/web/package.json:31-32` declares `@langwatch/trace-server`
   and `@langwatch/trace-web`; its only production import is `escapeValue` from
   `@langwatch/trace-contract`. Both are used solely in
   `src/__tests__/traces-href-for-key.unit.test.ts`.
-- `packages/features/coding-agent/server/package.json:49` declares
+- `modules/coding-agent/server/package.json:49` declares
   `@langwatch/trace-server`; all five usages are in `__tests__`.

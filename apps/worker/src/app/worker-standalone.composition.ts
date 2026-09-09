@@ -36,6 +36,7 @@ export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort
       resources,
       database: config.infrastructure.database,
       nodeEnvironment: config.nodeEnvironment,
+      logger: observability.logger,
     });
     const prisma = database.connection.client as unknown as WorkerDatabaseCompositionOptions;
 

@@ -71,8 +71,8 @@ repositories/prisma/*
 ```
 
 Both ends of `AutomationGraphNotifierPort` are the feature's own code. The port
-exists so a class in `platform/app` can wrap a class in `packages/features/automation`
-to hand it back to `packages/features/automation`.
+exists so a class in `platform/app` can wrap a class in `modules/automation`
+to hand it back to `modules/automation`.
 
 ## 2. Problems
 

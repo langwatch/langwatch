@@ -1,0 +1,41 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
+    "lib": ["es2022"],
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/redaction/tsconfig.build.json"
+    }
+  ]
+}

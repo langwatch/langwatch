@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { planLiteralsRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
-const BASELINED = "packages/enterprise/features/billing/contract/src/plan-limits.ts";
+const BASELINED = "enterprise/modules/billing/contract/src/plan-limits.ts";
 
 const workspace = createFixtureWorkspace({
   features: { agent: { layoutVersion: 0, roles: { server: {} } } },
@@ -16,7 +16,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "packages/features/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/server/src/services/agent.service.ts";
 
 function report(code, filename = SERVICE) {
   return runRule(planLiteralsRule, { code, cwd: workspace.cwd, filename });
@@ -100,7 +100,7 @@ describe("given a file the rule does not govern", () => {
       expect(
         ids(
           "const plan = { maxMembers: 2, canPublish: true };",
-          "packages/features/agent/server/src/__tests__/agent.unit.test.ts",
+          "modules/agent/server/src/__tests__/agent.unit.test.ts",
         ),
       ).toEqual([]);
     });

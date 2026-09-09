@@ -34,7 +34,7 @@ TTL IF(_retention_days > 0, toDateTime(StartedAt) + toIntervalDay(_retention_day
 `StartedAt` is not stable. The fold takes the **minimum** business time it has ever seen for the session:
 
 ```ts
-// packages/features/coding-agent/server/src/projections/coding-agent-session.projection.ts
+// modules/coding-agent/server/src/projections/coding-agent-session.projection.ts
 // The session starts when its earliest signal does. Spans refine this
 // below with their own start time, which can predate arrival order.
 startedAtMs:

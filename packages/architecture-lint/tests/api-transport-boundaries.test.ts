@@ -23,7 +23,7 @@ function write(path: string, content: string): void {
 }
 
 function featureServer(): ClassifiedPackage {
-  const packageRoot = join(root, "packages/features/widget/server");
+  const packageRoot = join(root, "modules/widget/server");
   return {
     name: "@langwatch/widget-server",
     root: packageRoot,
@@ -31,7 +31,7 @@ function featureServer(): ClassifiedPackage {
     manifest: { name: "@langwatch/widget-server" },
     kind: "server",
     feature: "widget",
-    featureRoot: join(root, "packages/features/widget"),
+    featureRoot: join(root, "modules/widget"),
     layoutVersion: 0,
     subjects: ["widget"],
     enterprise: false,
@@ -65,7 +65,7 @@ function policy(
 describe("strict feature API transport boundaries", () => {
   it("allows typed @langwatch/api registration over a composed service", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         import type { ServiceBuilder } from "@langwatch/api";
         import type { WidgetService } from "@langwatch/widget-contract";
@@ -151,7 +151,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("rejects persistence, environment and application implementation imports", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         import { PrismaClient } from "@langwatch/prisma-client/generated";
         import { WidgetRepository } from "../../repositories/widget.repository";
@@ -171,7 +171,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("rejects service and repository construction in inline and named handlers", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         class WidgetService { static create() { return new WidgetService(); } }
         class WidgetRepository {}
@@ -191,7 +191,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("rejects legacy registerRoute handlers through the same global boundary", () => {
     write(
-      "packages/features/widget/server/src/transport/api-rest/widget.api.ts",
+      "modules/widget/server/src/transport/api-rest/widget.api.ts",
       `
         declare const service: { registerRoute(...args: unknown[]): void };
         const handler = async (context: { req: Request }) => context.req;
@@ -211,7 +211,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("rejects raw Hono route registration in a strict feature API", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         import type { Hono } from "hono";
         export function install(app: Hono) {
@@ -227,7 +227,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("rejects generic string-path query and mutate dispatch", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         abstract class RpcClient {
           abstract query(path: string, input: unknown): Promise<unknown>;
@@ -248,7 +248,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("refuses a transport that reads the caller off the request context bag", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         declare const c: { get(key: string): unknown };
         const apiKeyId = c.get("apiKeyId");
@@ -263,7 +263,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("accepts a transport reading the application's own context keys", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         declare const c: { get(key: string): unknown };
         void c.get("project");
@@ -275,7 +275,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("accepts a synchronous request query-string reader", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         type RequestQuery = {
           query(name: string): string | undefined;
@@ -290,7 +290,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("keeps endpoint handlers to one service call without domain control flow", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         declare const group: { register(...args: unknown[]): void };
         const toPublic = (value: unknown) => value;
@@ -346,7 +346,7 @@ describe("strict feature API transport boundaries", () => {
     ],
   ])("counts nested feature service calls through %s", (_name, body) => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
       group.register("many", "2026-08-28", async (context, input) => { ${body} });
     `,
@@ -358,7 +358,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("rejects nested feature-service calls inside callbacks", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
       group.register("nested", "2026-08-28", async (context, input) => {
         return Promise.all(input.ids.map(id => context.app.widget.widgets.get(id)));
@@ -374,7 +374,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("applies the same thin-handler law to every fluent REST method", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         class WidgetService { static create() { return new WidgetService(); } }
         declare const rest: {
@@ -436,7 +436,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("requires inline handlers and rejects raw transport responses and empty sentinels", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         declare const rest: { get(...args: unknown[]): void };
         const detached = async (context: { req: Request; app: { widgets: { get(): Promise<unknown> } } }) => {
@@ -464,7 +464,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("allows the complete typed handler context and a void return", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         declare const rest: { post(...args: unknown[]): void };
         rest.post("/widgets", "2026-08-28", (endpoint) => endpoint.handle(async ({ input, app, actor, scope, signal }) => {
@@ -479,7 +479,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("rejects handler header access and response-shaped methods while allowing DTO status", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         declare const rest: { post(...args: unknown[]): void };
         rest.post("/widgets", "2026-08-28", (endpoint) => endpoint.withInput({}).handle(async ({ input, app }) => {
@@ -501,7 +501,7 @@ describe("strict feature API transport boundaries", () => {
 
   it("rejects computed raw context access and handler factories", () => {
     write(
-      "packages/features/widget/server/src/api/public/widget.api.ts",
+      "modules/widget/server/src/api/public/widget.api.ts",
       `
         declare const rest: { get(...args: unknown[]): void };
         const makeHandler = () => async (context: unknown) => context;
@@ -522,7 +522,7 @@ describe("feature app construction", () => {
     "rejects %s in a request handler",
     (construction) => {
       write(
-        "packages/features/widget/server/src/api/public/widget.api.ts",
+        "modules/widget/server/src/api/public/widget.api.ts",
         `
       group.register("create", "2026-08-28", async (context, input) => ${construction});
     `,

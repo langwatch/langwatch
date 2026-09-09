@@ -8,8 +8,8 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "packages/features/agent/server/src/services/agent-dispatch.service.ts";
-const TEST = "packages/features/agent/server/src/services/__tests__/agent-dispatch.unit.test.ts";
+const SERVICE = "modules/agent/server/src/services/agent-dispatch.service.ts";
+const TEST = "modules/agent/server/src/services/__tests__/agent-dispatch.unit.test.ts";
 
 function report(code, filename = SERVICE) {
   return runRule(unboundedLoopRule, { code, cwd: workspace.cwd, filename });

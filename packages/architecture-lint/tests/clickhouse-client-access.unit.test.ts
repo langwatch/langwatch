@@ -28,7 +28,7 @@ import { describe, expect, it } from "vitest";
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 
 /** Both trees that ship application code. */
-const ROOTS = ["packages", "apps"];
+const ROOTS = ["packages", "modules", "enterprise", "apps"];
 
 const SKIPPED_DIRECTORIES = new Set([
   "node_modules",
@@ -75,9 +75,9 @@ const MAY_CONSTRUCT = new Set([
   "apps/tasks/src/platform/tasks-host.composition.ts",
   "packages/clickhouse-client/src/tasks/goose.migration-runner.ts",
   "packages/clickhouse-client/src/tasks/ttl.reconciler.ts",
-  "packages/features/analytics/server/src/adapters/clickhouse.langwatch-ql-executor.adapter.ts",
-  "packages/features/analytics/server/src/tasks/lwql-provision.task.ts",
-  "packages/features/ops/server/src/adapters/ops-clickhouse-explain.adapter.ts",
+  "modules/analytics/server/src/adapters/clickhouse.langwatch-ql-executor.adapter.ts",
+  "modules/analytics/server/src/tasks/lwql-provision.task.ts",
+  "modules/ops/server/src/adapters/ops-clickhouse-explain.adapter.ts",
   "packages/test-harness/src/clickhouse-test-endpoints.ts",
 ]);
 

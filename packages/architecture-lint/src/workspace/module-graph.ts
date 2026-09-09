@@ -15,7 +15,7 @@ const SOURCE_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs",
  * How deep below a workspace root a `package.json` may sit.
  *
  * Four is what the deepest glob in `pnpm-workspace.yaml` needs
- * (`packages/enterprise/features/<feature>/<role>`), and a bound is what keeps
+ * (`enterprise/modules/<feature>/<role>`), and a bound is what keeps
  * this from descending through `apps/ui/src` — thousands of directories that
  * cannot contain a workspace manifest — on every lint run.
  */

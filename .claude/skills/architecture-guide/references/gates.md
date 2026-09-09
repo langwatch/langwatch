@@ -39,7 +39,7 @@ pnpm --filter @langwatch/architecture-lint test:unit tests/frontend-boundary.uni
 
 `lint` runs the CLI in `packages/architecture-lint/src/cli.ts`; the oxlint half runs
 separately over `.oxlintrc.architecture.json`. Filter the CLI output to your module
-(`grep "packages/features/<f>"`) and to the policies you care about; the full output is
+(`grep "modules/<f>"`) and to the policies you care about; the full output is
 thousands of lines while the burn-down is in progress. Read `check:feature-parity`'s
 `✗ THIS RUN FAILS: …` banner, never a `grep -c`: a `✓ all bound` under one `▸` heading is
 scoped to that file and says nothing about the run. See `.claude/skills/spec-bind/SKILL.md`.

@@ -144,7 +144,7 @@ The reserved-name rule is written three times in one class and forgotten a fourt
 
 `getValues` is the only method that returns plaintext. Its one caller splices the
 result straight into a scenario target's execution environment:
-`packages/features/scenario/server/src/services/scenario-target-prefetch.service.ts:71-74`.
+`modules/scenario/server/src/services/scenario-target-prefetch.service.ts:71-74`.
 
 So `langy_vk_secret` — the project's Langy virtual-key plaintext, which
 `reserved-secret-names.ts:11-16` describes as product-owned and load-bearing —
@@ -175,7 +175,7 @@ Also `database: object` at `:7`, cast at
 depends on `@langwatch/prisma-client` and imports `PrismaClient` two files away
 (`prisma.secret.repository.ts:7`), so the widening buys nothing and removes the
 only check. (Sibling packages that use `database: object` at least pair it with a
-type guard — `packages/features/github/server/src/repositories/prisma/github-installations.repository.ts:65`.)
+type guard — `modules/github/server/src/repositories/prisma/github-installations.repository.ts:65`.)
 
 ### P6 — Two `ctx.actor()` calls whose result is thrown away (breaks R7)
 
@@ -249,7 +249,7 @@ Nothing outside the package imports the concrete one.
 (`packages/architecture-lint/src/feature-layout.ts:88-89`,
 `^transport/${NAME}/${NAME}\.api\.ts$`). `api/public-rest/secret.api.ts` matches
 none of `SERVER_PATTERNS` (`feature-layout.ts:65-92`), and the package is
-`layoutVersion: 0` (`packages/features/secret/feature.json`), so `lintServer`
+`layoutVersion: 0` (`modules/secret/feature.json`), so `lintServer`
 applies to it (`feature-layout.ts:432-436`).
 
 Being honest about the disagreement rather than the verdict: a **different**
@@ -396,7 +396,7 @@ Deliberately unchanged, with the reason:
   in-package implementation, but this is the R1 seam itself: it is what keeps
   `PrismaClient` out of the service. Dataset's target tree keeps the equivalent.
 - **`abstract SecretService`** in the contract. Cross-package, and it has a real
-  second consumer that is not a transport: `packages/features/scenario/server/src/services/scenario-target-prefetch.service.ts:8,89`
+  second consumer that is not a transport: `modules/scenario/server/src/services/scenario-target-prefetch.service.ts:8,89`
   depends on the contract without depending on `@langwatch/secret-server`.
 - **`SecretApp`** (`app/secret.app.ts`). Required by the layout rule, and it holds
   a real rule rather than a delegation: `create` and `update` stamp `actorId` from
@@ -461,7 +461,7 @@ Six commits, smallest risk first, each green on its own.
 | ---------------------------- | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/api`                   |     7 | `SecretApp`, `SecretTrpcApi`, `SecretTrpcContext`, `SecretPublicRestApi`, `SecretService`, `Secret`, `SecretNotFoundError`, `SecretDuplicateError`, `SecretReservedNameError`, `SecretLimitReachedError`, `secretPublicRest`, `toSecretPublic`, `secretPublicCreateInputSchema`, `secretPublicUpdateInputSchema` |
 | `platform/app`               |     5 | `SecretApp`, `SecretTrpcApi`, `SecretPublicRestApi`, `PostgresSecretAdapter`, `SecretEncryptionPort`, `SecretService`                                                                                                                                                                                            |
-| `packages/features/scenario` |     2 | `SecretService` (contract only)                                                                                                                                                                                                                                                                                  |
+| `modules/scenario` |     2 | `SecretService` (contract only)                                                                                                                                                                                                                                                                                  |
 
 The named files: `apps/api/src/{api-secret-rest.feature,api.application,api.process}.ts`,
 `apps/api/src/app-rest/app-rest.features.ts`,
@@ -470,7 +470,7 @@ The named files: `apps/api/src/{api-secret-rest.feature,api.application,api.proc
 `platform/app/src/runtime/app/features/secret.ts`,
 `platform/app/src/runtime/app/internal-api/secrets.router.ts`,
 `platform/app/src/server/app-layer/{app,dependencies,presets}.ts`;
-`packages/features/scenario/server/src/services/{scenario-execution-prefetcher,scenario-target-prefetch}.service.ts`.
+`modules/scenario/server/src/services/{scenario-execution-prefetcher,scenario-target-prefetch}.service.ts`.
 
 One thing the blast radius hides and commit 2 depends on: **`apps/api`'s Secret
 doors are not composed in production today.** `ApiProductionComposition` is only

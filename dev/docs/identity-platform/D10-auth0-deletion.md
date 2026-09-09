@@ -4,8 +4,8 @@ Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wa
 
 > **Amendment 2026-09-03:** `platform/app` itself has since been deleted
 > entirely (commit `faaa9ec333`). The Auth0 surfaces this deliverable targets
-> now live in `packages/enterprise/features/sso/server/src/adapters/` and
-> `packages/features/auth/server/src/services/auth0-password.service.ts` —
+> now live in `enterprise/modules/sso/server/src/adapters/` and
+> `modules/auth/server/src/services/auth0-password.service.ts` —
 > re-verify what remains against the current tree before executing this
 > deliverable's exit gate.
 

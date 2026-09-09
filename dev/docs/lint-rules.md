@@ -302,7 +302,7 @@ Messages:
 
 - `foreignSubject`
   - what: Source module {{path}} claims {{subject}}, which belongs to the singular {{owner}} feature.
-  - fix: Move the file into `packages/features/{{owner}}/…` (see the `feature-move` skill), or rename the subject if it is genuinely different.
+  - fix: Move the file into `modules/{{owner}}/…` (see the `feature-move` skill), or rename the subject if it is genuinely different.
 
 ## `langwatch/id-generation-origin`
 
@@ -451,7 +451,7 @@ Options: none.
 Messages:
 
 - `compositionRoot`
-  - what: Only a composition root (`apps/api`, `apps/worker`, `apps/tasks`, `packages/enterprise/composition/*`) may import a feature server package.
+  - what: Only a composition root (`apps/api`, `apps/worker`, `apps/tasks`, `enterprise/packages/composition/*`) may import a feature server package.
   - fix: Import the feature's contract package here, or move this wiring into the composition root.
 - `contractRuntime`
   - what: A contract package is transport-neutral: `{{specifier}}` is a node/browser/server runtime.

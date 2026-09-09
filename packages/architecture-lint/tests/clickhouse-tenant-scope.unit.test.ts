@@ -17,8 +17,8 @@ const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
  * guard wraps.
  */
 const SCANNED_DIRECTORIES = [
-  "packages/features",
-  "packages/enterprise",
+  "modules",
+  "enterprise",
   "packages/eventing/src/server/adapters/clickhouse",
 ];
 

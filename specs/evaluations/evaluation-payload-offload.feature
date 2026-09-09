@@ -1,4 +1,4 @@
-# Stored Objects persistence and accounting: ../../packages/features/stored-object/adrs/001-package-boundary.md
+# Stored Objects persistence and accounting: ../../modules/stored-object/adrs/001-package-boundary.md
 Feature: Evaluation payload offload
   As the LangWatch evaluations pipeline persisting evaluator inputs
   I want oversized evaluation inputs offloaded to object storage with a
@@ -19,7 +19,7 @@ Feature: Evaluation payload offload
 
   # Implementation notes (bindings live on the test cases as @scenario tags):
   #   - Offload decision + marker shaping + resolve fail-safe:
-  #     packages/features/evaluation/server/src/services/evaluation-inputs-offload.service.ts
+  #     modules/evaluation/server/src/services/evaluation-inputs-offload.service.ts
   #     (EVAL_INPUTS_INLINE_MAX_BYTES = 1 MiB, HARD_CEILING = 50 MiB, preview 16 KiB).
   #   - Write-time wiring (event carries the marker): the offload runs inside
   #     emitReported in evaluation-execution-intent.service.ts BEFORE EventUtils.createEvent,
@@ -39,7 +39,7 @@ Feature: Evaluation payload offload
   # Integration coverage:
   #   src/server/app-layer/evaluations/__tests__/evaluation-payload-offload.integration.test.ts
   #   Unit coverage:
-  #   packages/features/evaluation/server/tests/evaluation-inputs-offload.service.unit.test.ts
+  #   modules/evaluation/server/tests/evaluation-inputs-offload.service.unit.test.ts
 
   Background:
     Given the evaluations pipeline persists evaluator inputs with each run

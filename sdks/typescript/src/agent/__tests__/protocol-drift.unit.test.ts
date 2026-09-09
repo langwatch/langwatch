@@ -1,7 +1,7 @@
 /**
  * The SDK's frame shapes against the platform's protocol module.
  *
- * `packages/features/agent/contract/src/connected-agent.protocol.ts` is the
+ * `modules/agent/contract/src/connected-agent.protocol.ts` is the
  * contract; `src/agent/protocol.ts` is the SDK's copy. This test reads the
  * platform source from the repository and pins the frame type names and the
  * top-level keys of every frame, so the two cannot drift apart without a
@@ -17,7 +17,7 @@ import { PROTOCOL_VERSION } from "../protocol";
 
 const PLATFORM_PROTOCOL = resolve(
   __dirname,
-  "../../../../../packages/features/agent/contract/src/connected-agent.protocol.ts",
+  "../../../../../modules/agent/contract/src/connected-agent.protocol.ts",
 );
 const SDK_PROTOCOL = resolve(__dirname, "../protocol.ts");
 const SDK_CLIENT = resolve(__dirname, "../client.ts");

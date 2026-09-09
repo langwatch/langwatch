@@ -1,0 +1,64 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "noEmitOnError": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
+  },
+  "files": [
+    "./src/index.ts",
+    "./src/governance/governance-ingestion-pull.host.ts",
+    "./src/governance/spend-spike-anomaly.worker.ts"
+  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**",
+    "**/testing.ts",
+    "**/testing.tsx"
+  ],
+  "references": [
+    {
+      "path": "../api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/governance/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/managed-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/managed-provider/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/project/contract/tsconfig.build.json"
+    }
+  ]
+}

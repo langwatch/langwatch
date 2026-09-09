@@ -13,7 +13,7 @@ pass (see "Browser QA" below):
 `langy-agent.ts`'s `makeLangyAdapter()` drives Langy through the **real product
 surface** — the same `langy.createConversation` / `langy.continueConversation`
 tRPC mutations and `langy.onTurnStream` SSE subscription the browser panel uses
-(`packages/features/langy/web/src/features/langy/behavior/logic/langy-chat-transport.ts`) — authenticated as a real
+(`modules/langy/web/src/features/langy/behavior/logic/langy-chat-transport.ts`) — authenticated as a real
 user session. It is NOT a shortcut/mock transport, so a passing scenario proves
 the whole stack (app → `services/langyagent` → aigateway → provider) works.
 

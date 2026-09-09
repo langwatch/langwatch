@@ -111,9 +111,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 # `@langwatch/langy-contract` is the CLI's one workspace dependency; it is
 # source-only (its `main` points at src/index.ts) and is bundled into the
 # binary. `packages/langy` used to be copied here and no longer exists — the
-# canonical langy packages live under packages/features/langy.
+# canonical langy packages live under modules/langy.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
-COPY packages/features/langy/contract ./packages/features/langy/contract
+COPY modules/langy/contract ./modules/langy/contract
 COPY sdks/typescript ./sdks/typescript
 # Full source for the langy-worker wrapper: its Bun compile below bundles
 # src/ + the pi SDK from node_modules, so manifests alone are not enough.
@@ -125,10 +125,10 @@ COPY services/langyworker/scripts ./services/langyworker/scripts
 # Manifests only. `--frozen-lockfile` checks the lockfile against every
 # workspace member it can see, so each member needs at least its package.json.
 COPY packages/api/package.json ./packages/api/
-COPY packages/features/authz/contract/package.json ./packages/features/authz/contract/
-COPY packages/features/authz/server/package.json ./packages/features/authz/server/
-COPY packages/features/automation/contract/package.json ./packages/features/automation/contract/
-COPY packages/features/automation/server/package.json ./packages/features/automation/server/
+COPY modules/authz/contract/package.json ./modules/authz/contract/
+COPY modules/authz/server/package.json ./modules/authz/server/
+COPY modules/automation/contract/package.json ./modules/automation/contract/
+COPY modules/automation/server/package.json ./modules/automation/server/
 COPY packages/system-migrations/package.json ./packages/system-migrations/
 COPY packages/observability/package.json ./packages/observability/
 COPY packages/react-rum/package.json ./packages/react-rum/
@@ -158,9 +158,9 @@ WORKDIR /src/sdks/typescript
 # ../../ paths copy-types.sh expects relative to /src/sdks/typescript), then run
 # the generators. These are written INTO the image, so .dockerignore's
 # `*.generated.*` filter (a host→context rule) does not strip them.
-COPY packages/features/trace/contract/src/trace-format.schemas.ts /src/packages/features/trace/contract/src/trace-format.schemas.ts
-COPY packages/features/evaluator/contract/src/evaluators.native.ts /src/packages/features/evaluator/contract/src/evaluators.native.ts
-COPY packages/features/model-provider/contract/src/catalog/model-catalog.json /src/packages/features/model-provider/contract/src/catalog/model-catalog.json
+COPY modules/trace/contract/src/trace-format.schemas.ts /src/modules/trace/contract/src/trace-format.schemas.ts
+COPY modules/evaluator/contract/src/evaluators.native.ts /src/modules/evaluator/contract/src/evaluators.native.ts
+COPY modules/model-provider/contract/src/catalog/model-catalog.json /src/modules/model-provider/contract/src/catalog/model-catalog.json
 COPY packages/redaction/src                           /src/packages/redaction/src
 COPY apps/api/src/features/discovery/openapi-document.json /src/apps/api/src/features/discovery/openapi-document.json
 COPY services/langevals/ts-integration/evaluators.generated.ts /src/services/langevals/ts-integration/evaluators.generated.ts

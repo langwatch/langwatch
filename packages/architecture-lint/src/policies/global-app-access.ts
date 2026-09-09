@@ -21,7 +21,14 @@ const BASELINE_PATH = "packages/architecture-lint/src/global-app-access-baseline
 const ACCESSOR_FILE = "platform/app/src/server/app-layer/app.ts";
 const ACCESSOR_ALIAS = "~/server/app-layer/app";
 const SYMBOLS = ["getApp", "tryGetApp"] as const;
-const SOURCE_ROOTS = ["apps", "mcp/typescript", "packages", "tools"] as const;
+const SOURCE_ROOTS = [
+  "apps",
+  "enterprise",
+  "mcp/typescript",
+  "modules",
+  "packages",
+  "tools",
+] as const;
 
 type ForbiddenSymbol = (typeof SYMBOLS)[number];
 type AccessKind = "import" | "reference";
@@ -543,9 +550,7 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
 }
 
 export function collectGlobalAppAccesses(root: string): GlobalAppAccess[] {
-  return sourceFiles(root).flatMap((file) =>
-    collectFileAccesses(root, file, sourceText({ file })),
-  );
+  return sourceFiles(root).flatMap((file) => collectFileAccesses(root, file, sourceText({ file })));
 }
 
 function entry(access: GlobalAppAccess): BaselineEntry {

@@ -25,8 +25,8 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."
  * into the runner's program.
  */
 const BARRELS_THE_RUNNER_DOES_NOT_NEED = [
-  join(REPO_ROOT, "packages", "features", "scenario", "server", "src", "index.ts"),
-  join(REPO_ROOT, "packages", "features", "trace", "server", "src", "index.ts"),
+  join(REPO_ROOT, "modules", "scenario", "server", "src", "index.ts"),
+  join(REPO_ROOT, "modules", "trace", "server", "src", "index.ts"),
 ] as const;
 
 /**

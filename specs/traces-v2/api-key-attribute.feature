@@ -4,9 +4,9 @@
 # the key's name and links to that key on the API keys settings page.
 #
 # Implementation:
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/api-key-attribute.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/attribute-table.tsx
-#   packages/features/api-key/web/src/model/api-key-anchor.ts
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/api-key-attribute.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/attribute-table.tsx
+#   modules/api-key/web/src/model/api-key-anchor.ts
 
 Feature: Ingest API key attribute in the trace drawer
   As a user inspecting a trace

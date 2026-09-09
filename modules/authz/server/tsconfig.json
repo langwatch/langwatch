@@ -1,0 +1,57 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+
+    "lib": ["es2022"],
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    // Consumers import the TypeScript sources directly (see the package's
+    // `exports`), so this project only ever type-checks - nothing is built.
+    "noEmit": true,
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/actor/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/system-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
+    }
+  ]
+}

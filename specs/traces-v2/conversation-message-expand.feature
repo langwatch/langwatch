@@ -1,11 +1,11 @@
 # Conversation view — per-message expand + expand all
 #
 # Implementation:
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/conversation-view.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/chat-turn-row.tsx        (ThreadMessage)
-#   packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx  (shared bubble)
-#   packages/features/trace/web/src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts
-#   packages/features/trace/web/src/ui/elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/conversation-view.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/chat-turn-row.tsx        (ThreadMessage)
+#   modules/trace/web/src/ui/sections/explorer/trace-table/registry/addons/conversation/bubble.tsx  (shared bubble)
+#   modules/trace/web/src/behavior/explorer/trace-drawer/conversation-view/expand-context.ts
+#   modules/trace/web/src/ui/elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx
 #
 # Motivation (round 5): long messages in the conversation view are
 # truncated with a bare "…" and no way to read the rest in place. Replace

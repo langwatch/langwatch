@@ -22,7 +22,7 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../enterprise/features/licensing/contract/tsconfig.build.json"
+      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
       "path": "../handled-error/tsconfig.build.json"

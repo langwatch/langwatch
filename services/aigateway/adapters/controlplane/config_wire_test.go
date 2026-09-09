@@ -460,7 +460,7 @@ func TestConfigWire_KeyExpiry(t *testing.T) {
 // date. Pin both the field and its unit.
 func TestControlPlaneMaterialiserEmitsTheKeyExpiry(t *testing.T) {
 	src := readControlPlaneSource(t,
-		"packages", "features", "gateway", "server", "src", "services",
+		"modules", "gateway", "server", "src", "services",
 		"gateway-config-materialisation.service.ts")
 
 	// Whitespace-tolerant: a formatter may break the expression across lines
@@ -472,7 +472,7 @@ func TestControlPlaneMaterialiserEmitsTheKeyExpiry(t *testing.T) {
 	// expiresAtWire's own seconds conversion now lives in the shared
 	// wire-rules module the materialiser calls through to.
 	rulesSrc := readControlPlaneSource(t,
-		"packages", "features", "gateway", "server", "src", "rules",
+		"modules", "gateway", "server", "src", "rules",
 		"gateway-config-wire.rules.ts")
 	if !regexp.MustCompile(`Math\.floor\(\s*expiresAt\.getTime\(\)\s*/\s*1000\s*\)`).MatchString(rulesSrc) {
 		t.Error("gateway-config-wire.rules.ts no longer emits expires_at in unix SECONDS; milliseconds would push the date out of reach")

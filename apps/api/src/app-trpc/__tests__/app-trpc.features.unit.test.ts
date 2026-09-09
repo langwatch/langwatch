@@ -47,7 +47,6 @@ describe("the app tRPC feature list", () => {
         "plan",
         "presence",
         "project",
-        "publicEnv",
         "role",
         "roleBinding",
         "savedViews",
@@ -158,18 +157,9 @@ describe("the app tRPC feature list", () => {
       ]);
     });
 
-    it("mounts publicEnv as a bare procedure, because that is the name the client calls", () => {
-      const publicEnv = buildAppTrpcFeatures().publicEnv as {
-        _def: { type: string; procedure: boolean };
-      };
-
-      expect(publicEnv._def.procedure).toBe(true);
-      expect(publicEnv._def.type).toBe("query");
-    });
-
     it("leaves no namespace without procedures", () => {
       const features = buildAppTrpcFeatures();
-      const routers = Object.entries(features).filter(([name]) => name !== "publicEnv");
+      const routers = Object.entries(features);
 
       for (const [name, router] of routers) {
         expect({ name, procedures: procedureNamesOf(router).length > 0 }).toEqual({

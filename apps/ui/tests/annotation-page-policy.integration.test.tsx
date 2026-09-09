@@ -1,7 +1,7 @@
 /**
  * What the four annotations addresses are actually behind, proved by mounting them — and which VIEW each of them is.
  * @vitest-environment jsdom
- * Spec: packages/features/annotation/specs/annotations-list-selection.feature
+ * Spec: modules/annotation/specs/annotations-list-selection.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

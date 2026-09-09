@@ -1,11 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 import ts from "typescript";
-import {
-  sourceFile,
-  sourceText,
-  type WorkspaceModuleResolver,
-} from "../workspace/module-graph.ts";
+import { sourceFile, sourceText, type WorkspaceModuleResolver } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "../types.ts";
 
@@ -482,7 +478,7 @@ function apiToken(
   return isExpectedName ? declaration : void 0;
 }
 function canonicalApiFile(file: string, feature: string): boolean {
-  return file.includes(`/features/${feature}/contract/src/${feature}.api.ts`);
+  return file.includes(`/modules/${feature}/contract/src/${feature}.api.ts`);
 }
 function canonicalApiTokenDeclaration(
   declaration: VariableDeclaration,
@@ -1888,7 +1884,7 @@ function apiOrService(
 
   const local = declaration(file, name, resolver);
   const owner = local && resolver.owningPackage({ file: local.file });
-  if (!owner || !owner.directory.includes(`${sep}features${sep}`)) return undefined;
+  if (!owner || !owner.directory.includes(`${sep}modules${sep}`)) return undefined;
 
   const feature = appFeature(local.file, packages);
   const expected = feature
@@ -1896,7 +1892,7 @@ function apiOrService(
     .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
     .join("");
   const serviceFile =
-    local.file.includes(`${sep}features${sep}`) && /\.service\.[^/]+$/.test(local.file);
+    local.file.includes(`${sep}modules${sep}`) && /\.service\.[^/]+$/.test(local.file);
   const declaredName = declarationName(local.node, short);
   const canonicalName =
     !expected || declaredName === `${expected}Api` || declaredName === `${expected}Service`;

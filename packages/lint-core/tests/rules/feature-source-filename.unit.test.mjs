@@ -20,7 +20,7 @@ describe("given a strict feature source file", () => {
   describe("when the filename is not lower kebab case", () => {
     /** @scenario "A misnamed strict source file is reported with the allowed artifacts" */
     it("reports filename naming the file and the allowed artifacts", () => {
-      const found = report("packages/features/agent/server/src/services/AgentService.service.ts");
+      const found = report("modules/agent/server/src/services/AgentService.service.ts");
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("filename");
@@ -32,7 +32,7 @@ describe("given a strict feature source file", () => {
   describe("when the filename is already lower kebab case", () => {
     /** @scenario "A correctly named strict source file is left alone" */
     it("reports nothing", () => {
-      expect(report("packages/features/agent/server/src/services/agent.service.ts")).toEqual([]);
+      expect(report("modules/agent/server/src/services/agent.service.ts")).toEqual([]);
     });
   });
 });

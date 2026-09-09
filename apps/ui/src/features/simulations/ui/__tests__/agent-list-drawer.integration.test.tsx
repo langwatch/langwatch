@@ -40,7 +40,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
 }));
 
 vi.mock(
-  "../../../../../../../packages/features/scenario/web/src/behavior/use-organization-team-project.ts",
+  "../../../../../../../modules/scenario/web/src/behavior/use-organization-team-project.ts",
   () => ({
     useOrganizationTeamProject: () => ({
       project: { id: "test-project-id" },
@@ -103,7 +103,7 @@ const mockAgents = [
 ];
 
 // Mock the API
-vi.mock("../../../../../../../packages/features/agent/web/src/behavior/agent-api.ts", () => ({
+vi.mock("../../../../../../../modules/agent/web/src/behavior/agent-api.ts", () => ({
   agentApi: {
     agents: {
       getAll: {

@@ -2,7 +2,7 @@
 
 Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D03 (router) + D13 (sign-up interstitial hook) · Flag: `JOIN_REQUESTS`
 
-> **D05 is not a dependency.** Approvals land in the existing `/settings/members` UI beside D11's invitation management, which D05 later absorbs anyway. They need no new permission either: every invite procedure in `packages/features/organization/server/src/transport/api-trpc/organization.api.ts` (`platform/app` is deleted; amended 2026-09-03) is already gated on `organization:manage`, an existing registered permission, and answering a request is the same authority pointed the other way. Nothing from the authz precondition checklist is required.
+> **D05 is not a dependency.** Approvals land in the existing `/settings/members` UI beside D11's invitation management, which D05 later absorbs anyway. They need no new permission either: every invite procedure in `modules/organization/server/src/transport/api-trpc/organization.api.ts` (`platform/app` is deleted; amended 2026-09-03) is already gated on `organization:manage`, an existing registered permission, and answering a request is the same authority pointed the other way. Nothing from the authz precondition checklist is required.
 
 # Overview
 

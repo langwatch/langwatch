@@ -1,0 +1,57 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "jsx": "react-jsx",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"],
+      "@langwatch/authz-contract": ["../../../../modules/authz/contract/src/index.ts"],
+      "@langwatch/authz-web/surfaces/scope-picker": [
+        "../../../../modules/authz/web/src/surfaces/scope-picker/index.ts"
+      ],
+      "@langwatch/coding-agent-web": ["../../../../modules/coding-agent/web/src/index.ts"]
+    },
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/authz/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/ui-host/tsconfig.build.json"
+    }
+  ]
+}

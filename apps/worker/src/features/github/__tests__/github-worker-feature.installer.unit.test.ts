@@ -9,7 +9,7 @@
  * than an inert stand-in. A pipeline that registers and never re-checks looks
  * identical from every health signal the fleet watches.
  *
- * Spec: packages/features/github/specs/github-branch-maintenance.feature
+ * Spec: modules/github/specs/github-branch-maintenance.feature
  */
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { GITHUB_BRANCH_RECHECK_PROCESS_NAME } from "@langwatch/github-server";

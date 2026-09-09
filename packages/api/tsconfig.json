@@ -25,7 +25,7 @@
       "path": "../time/tsconfig.build.json"
     },
     {
-      "path": "../features/authz/contract/tsconfig.build.json"
+      "path": "../../modules/authz/contract/tsconfig.build.json"
     },
     {
       "path": "../handled-error/tsconfig.build.json"

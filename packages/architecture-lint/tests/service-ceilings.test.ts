@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { lintServiceCeilingsFile } from "../src/index.ts";
 
 const root = resolve(import.meta.dirname, "../../..");
-const apiKeyService = "packages/features/api-key/server/src/services/api-key.service.ts";
+const apiKeyService = "modules/api-key/server/src/services/api-key.service.ts";
 
 describe("service ceilings", () => {
   /** @scenario "Strict services, ports, and contract builds remain mechanically bounded" */
@@ -29,9 +29,9 @@ describe("service ceilings", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "service-ceilings-file-"));
     const service = join(
       fixtureRoot,
-      "packages/features/example/server/src/services/example.service.ts",
+      "modules/example/server/src/services/example.service.ts",
     );
-    mkdirSync(join(fixtureRoot, "packages/features/example/server/src/services"), {
+    mkdirSync(join(fixtureRoot, "modules/example/server/src/services"), {
       recursive: true,
     });
     writeFileSync(service, `${"\n".repeat(500)}export class ExampleService {}\n`);

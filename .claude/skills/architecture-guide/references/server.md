@@ -1,10 +1,10 @@
 # Server packages
 
-`packages/features/<name>/server` is `@langwatch/<name>-server`. `apps/api`, `apps/worker`
+`modules/<name>/server` is `@langwatch/<name>-server`. `apps/api`, `apps/worker`
 and `apps/tasks` all boot it. A request enters through a transport declaration the
 process mounted, reaches the module's one app, which calls its private services;
 services use repository interfaces; the repository backend was chosen once at boot.
-The reference is `packages/features/annotation/server`.
+The reference is `modules/annotation/server`.
 
 ```
 transport/<f>.rest.ts ─┐                                     ┌─ services/<f>.service.ts ──▶ repositories/<f>.repository.ts (interface)

@@ -2,7 +2,7 @@
 
 ## Specs are the requirements
 
-Feature files live in `packages/features/<name>/specs/*.feature` (module-owned),
+Feature files live in `modules/<name>/specs/*.feature` (module-owned),
 any `packages/**/specs/` directory, `specs/**` (repo-wide) and `sdks/typescript/specs`.
 Those are the roots `check-feature-parity` walks. Write or extend the scenario before
 writing code, and write the failure paths as scenarios with a named error code alongside

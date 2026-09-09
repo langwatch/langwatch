@@ -10,8 +10,8 @@ treat them as a separate task.
 ## 0. Locate the owner and its shape
 
 ```bash
-grep -n '"<subject>"' packages/features/catalogue.json        # who owns it
-find packages/features/<f> -maxdepth 4 -type d | grep -v node_modules
+grep -n '"<subject>"' modules/catalogue.json        # who owns it
+find modules/<f> -maxdepth 4 -type d | grep -v node_modules
 grep -n '"<f>"' packages/architecture-lint/src/feature-shape-baseline.json   # what it still carries from the older shape
 ```
 
@@ -26,7 +26,7 @@ has, say so in the report; converting the module is `references/convert.md`'s jo
 
 ## 1. Spec
 
-Add scenarios to `packages/features/<f>/specs/*.feature` (or `specs/<area>/*.feature`
+Add scenarios to `modules/<f>/specs/*.feature` (or `specs/<area>/*.feature`
 if the behaviour is cross-cutting): the golden path and each named failure with its
 error code, tagged `@unit`/`@integration`. Follow the `spec-bind` skill; every scenario
 you add will be bound by a test in this change.
@@ -101,9 +101,9 @@ task instead of hand-editing the frozen document, and bind the scenario. The ref
 implementation is `annotation`, end to end:
 
 ```
-packages/features/annotation/contract/src/annotation-rest.schemas.ts   params, query, body and response schemas
-packages/features/annotation/contract/src/annotation.api.ts            the operation the handler calls
-packages/features/annotation/server/src/transport/annotation.rest.ts   the declaration with inline handlers
+modules/annotation/contract/src/annotation-rest.schemas.ts   params, query, body and response schemas
+modules/annotation/contract/src/annotation.api.ts            the operation the handler calls
+modules/annotation/server/src/transport/annotation.rest.ts   the declaration with inline handlers
 apps/api/src/features/annotation/annotation-rest.mount.ts              the process mount
 packages/api/src/rest/runtime.ts · index.ts                            defineRestRouter and createRestRuntime
 ```
@@ -132,7 +132,7 @@ add it there if it is new (section 2 above), and the app implements it.
 
 ### 6.2. Write the handler on the declaration
 
-`packages/features/<f>/server/src/transport/<f>.rest.ts`:
+`modules/<f>/server/src/transport/<f>.rest.ts`:
 
 ```ts
 export const annotationRest = defineRestRouter(AnnotationApi)
@@ -238,7 +238,7 @@ the breaking direction: the frozen document lists an operation no route serves.
 
 ### 6.5. REST tests
 
-- `packages/features/<f>/server/src/transport/__tests__/<f>.rest.integration.test.ts`:
+- `modules/<f>/server/src/transport/__tests__/<f>.rest.integration.test.ts`:
   mount the declaration through the harness host over `create<F>TestApp()` and assert the
   golden path, the refusal for each declared error, and a call without the permission.
 - `apps/api/src/features/<f>/__tests__/<f>.composition.integration.test.ts` drives the
@@ -256,15 +256,15 @@ mount in `apps/api/src/features/<f>/<f>-trpc.mount.ts` and the namespace in
 never `AppRouter`, ADR-130) plus its hook. The reference is `annotation`:
 
 ```
-packages/features/annotation/contract/src/annotation-trpc.schemas.ts       input schemas
-packages/features/annotation/contract/src/annotation.trpc.ts               the `annotation.*` declaration (defineTrpcContract)
-packages/features/annotation/contract/src/annotation-score.trpc.ts         the `annotationScore.*` declaration
-packages/features/annotation/contract/src/annotation.api.ts                the operations the handlers call
-packages/features/annotation/server/src/transport/annotation.trpc.ts       the `annotation.*` binding (defineTrpcRouter)
-packages/features/annotation/server/src/transport/annotation-score.trpc.ts the `annotationScore.*` binding
+modules/annotation/contract/src/annotation-trpc.schemas.ts       input schemas
+modules/annotation/contract/src/annotation.trpc.ts               the `annotation.*` declaration (defineTrpcContract)
+modules/annotation/contract/src/annotation-score.trpc.ts         the `annotationScore.*` declaration
+modules/annotation/contract/src/annotation.api.ts                the operations the handlers call
+modules/annotation/server/src/transport/annotation.trpc.ts       the `annotation.*` binding (defineTrpcRouter)
+modules/annotation/server/src/transport/annotation-score.trpc.ts the `annotationScore.*` binding
 apps/api/src/features/annotation/annotation-trpc.mount.ts                  the mount (runtime.mount)
 apps/api/src/app-trpc/app-trpc.features.ts · app-trpc.composed.ts          the namespaces and the composed slot
-packages/features/annotation/web/src/behavior/annotation-api.ts            the browser client, derived from the contract
+modules/annotation/web/src/behavior/annotation-api.ts            the browser client, derived from the contract
 ```
 
 tRPC is the first-party browser transport only. Public integrations get REST (ADR-128,
@@ -293,7 +293,7 @@ in `<f>.errors.ts`, its code added to `packages/handled-error/src/app-codes.ts` 
 copy to `packages/handled-error/src/presentation.ts` in the same change.
 
 Then the procedure itself joins the namespace's declaration in
-`packages/features/<f>/contract/src/<f>.trpc.ts` (one file per namespace):
+`modules/<f>/contract/src/<f>.trpc.ts` (one file per namespace):
 
 ```ts
 export const annotationScoreTrpc = defineTrpcContract("annotationScore")
@@ -316,7 +316,7 @@ export const annotationScoreTrpc = defineTrpcContract("annotationScore")
 
 ### 7.3. Server: bind permission and handler
 
-`packages/features/<f>/server/src/transport/<f>.trpc.ts`. One file per namespace; it
+`modules/<f>/server/src/transport/<f>.trpc.ts`. One file per namespace; it
 constructs nothing and repeats nothing the contract said:
 
 ```ts
@@ -400,7 +400,7 @@ the real mount with `createApiFixture` peers and a recording Prisma client.
 
 ### 7.5. The browser side
 
-`packages/features/<f>/web/src/behavior/<f>-api.ts` derives the client from the contract;
+`modules/<f>/web/src/behavior/<f>-api.ts` derives the client from the contract;
 a new procedure on a declared namespace needs no edit here:
 
 ```ts

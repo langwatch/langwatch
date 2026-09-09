@@ -38,9 +38,9 @@ scope says otherwise.
 The physical ownership is:
 
 ```text
-packages/features/<feature>/contract  portable schemas, values, errors, service
-packages/features/<feature>/server    service implementation and thin adapters
-packages/features/<feature>/web       reusable browser behaviour and a small port
+modules/<feature>/contract  portable schemas, values, errors, service
+modules/<feature>/server    service implementation and thin adapters
+modules/<feature>/web       reusable browser behaviour and a small port
 apps/api                              app graph, transport roots and middleware
 apps/ui                               routing and the real tRPC client adapter
 ```

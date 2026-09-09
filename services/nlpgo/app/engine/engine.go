@@ -1023,7 +1023,7 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 	}
 
 	// Evaluator slug lives on the typed `data.evaluator` field in the
-	// canonical Studio shape (packages/features/workflow/contract/src/
+	// canonical Studio shape (modules/workflow/contract/src/
 	// studio-workflow.ts → `evaluator?: EvaluatorTypes | "custom/<id>" |
 	// "evaluators/<id>"`).
 	// Older workflows may have stuffed it into parameters[]; honor both

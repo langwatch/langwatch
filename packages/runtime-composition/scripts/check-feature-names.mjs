@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../../..");
-const cataloguePath = resolve(root, "packages/features/catalogue.json");
+const cataloguePath = resolve(root, "modules/catalogue.json");
 const generatedPath = resolve(root, "packages/runtime-composition/src/feature-names.generated.ts");
 const catalogue = JSON.parse(await readFile(cataloguePath, "utf8"));
 const expected = catalogue.features.map((feature) => feature.id);
@@ -13,7 +13,7 @@ if (duplicates.length > 0) {
 }
 
 const generatedSource = `${[
-  "/** Generated from packages/features/catalogue.json. Do not edit by hand. */",
+  "/** Generated from modules/catalogue.json. Do not edit by hand. */",
   "export const FEATURE_NAMES = [",
   ...expected.map((name) => `  ${JSON.stringify(name)},`),
   "] as const;",

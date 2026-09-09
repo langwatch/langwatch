@@ -33,15 +33,15 @@ const GUARD_IMPORT = /from\s+["'](?:@langwatch\/csv(?:\/download)?|\.\/formula-g
 const GUARDED_WRITERS: Record<string, string> = {
   "packages/csv/src/download-csv.ts":
     "the browser-side writer; maps neutralizeFormula over fields and rows",
-  "packages/features/scenario/server/src/services/scenario-run-export-csv.service.ts":
+  "modules/scenario/server/src/services/scenario-run-export-csv.service.ts":
     "server-side; every free-text cell goes through text() -> neutralizeFormula",
-  "packages/features/trace/server/src/rules/trace-export-csv.rules.ts":
+  "modules/trace/server/src/rules/trace-export-csv.rules.ts":
     "server-side; headers and rows both go through neutralizeFormula",
-  "packages/features/experiment/web/src/ui/sections/batch-evaluation-results.csv.ts":
+  "modules/experiment/web/src/ui/sections/batch-evaluation-results.csv.ts":
     "generateCsvContent applies neutralizeFormula before serializing",
-  "packages/features/gateway/web/src/screens/gateway/gateway-usage.screen.tsx":
+  "modules/gateway/web/src/screens/gateway/gateway-usage.screen.tsx":
     "sectioned rows with no separate header row, so it guards each row in place",
-  "packages/features/organization/web/src/screens/organization/audit-log.screen.tsx":
+  "modules/organization/web/src/screens/organization/audit-log.screen.tsx":
     "hands the file to the host rather than the DOM, so it guards fields and rows in place",
 };
 
@@ -50,7 +50,7 @@ const GUARDED_WRITERS: Record<string, string> = {
  * uploaded JSON file into the CSV text the import parser reads back moments later.
  */
 const INTERNAL_SERIALIZERS = new Set([
-  "packages/features/dataset/web/src/model/parse-tabular-file.ts",
+  "modules/dataset/web/src/model/parse-tabular-file.ts",
 ]);
 
 /**

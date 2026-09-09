@@ -5,7 +5,7 @@ Feature: Organization role awareness across the platform
   So that features can tailor access and experience based on role
 
   # The role-recognition and permission-grant scenarios below are bound to
-  # `packages/features/authz/server/src/services/__tests__/authz-permission-resolution.unit.test.ts`,
+  # `modules/authz/server/src/services/__tests__/authz-permission-resolution.unit.test.ts`,
   # which asks the same questions of the authorization service the tRPC and
   # REST boundaries ask. The demo-project scenario is superseded (see its own
   # note); the UI scenario still wants a rendered page and stays parked.

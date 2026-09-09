@@ -9,7 +9,7 @@
  * THIS graph's revoke rather than an inert stand-in. A pipeline that registers
  * and never revokes looks identical from every health signal the fleet watches.
  *
- * Spec: packages/features/langy/specs/langy-session-key-maintenance.feature
+ * Spec: modules/langy/specs/langy-session-key-maintenance.feature
  */
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import { LANGY_SESSION_KEY_REAP_PROCESS_NAME } from "@langwatch/langy-server";

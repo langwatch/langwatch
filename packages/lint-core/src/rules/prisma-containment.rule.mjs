@@ -19,7 +19,7 @@ const APPLICATION_ROOTS = new Set(["ui", "api", "worker", "server"]);
  */
 function prismaPackageOf(workspacePath) {
   const feature = workspacePath.match(
-    /^packages\/(enterprise\/)?features\/([^/]+)\/(contract|server|web)\/src\/(.+)$/,
+    /^(enterprise\/)?modules\/([^/]+)\/(contract|server|web)\/src\/(.+)$/,
   );
   if (feature) {
     return { kind: feature[3], feature: feature[2], relative: feature[4], workspacePath };
@@ -29,7 +29,7 @@ function prismaPackageOf(workspacePath) {
     return { kind: "application", relative: application[2], workspacePath };
   }
   const composition = workspacePath.match(
-    /^packages\/enterprise\/composition\/(api|worker)\/src\/(.+)$/,
+    /^enterprise\/packages\/composition\/(api|worker)\/src\/(.+)$/,
   );
   if (composition) {
     return { kind: "enterprise-composition", relative: composition[2], workspacePath };

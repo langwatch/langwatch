@@ -23,7 +23,7 @@ function write(path: string, source: string): void {
 }
 
 function strictServer(feature = "agent"): ClassifiedPackage {
-  const packageRoot = join(root, "packages", "features", feature, "server");
+  const packageRoot = join(root, "modules", feature, "server");
   return {
     name: `@langwatch/${feature}-server`,
     root: packageRoot,
@@ -31,7 +31,7 @@ function strictServer(feature = "agent"): ClassifiedPackage {
     manifest: { name: `@langwatch/${feature}-server` },
     kind: "server",
     feature,
-    featureRoot: join(root, "packages", "features", feature),
+    featureRoot: join(root, "modules", feature),
     layoutVersion: 0,
     subjects: [feature],
     enterprise: false,
@@ -88,11 +88,11 @@ describe("Eventing role lint", () => {
 
   it("applies executable eventing rules in Enterprise API and worker composition", () => {
     write(
-      "packages/enterprise/composition/api/src/processes/unsafe.process.ts",
+      "enterprise/packages/composition/api/src/processes/unsafe.process.ts",
       'import "node:http"; export async function evolve() { await fetch("https://example.com"); }',
     );
     write(
-      "packages/enterprise/composition/worker/src/governance/unsafe.projection.ts",
+      "enterprise/packages/composition/worker/src/governance/unsafe.projection.ts",
       'import "node:http"; export async function project() { await fetch("https://example.com"); }',
     );
 
@@ -105,7 +105,7 @@ describe("Eventing role lint", () => {
   it("requires a named redelivery test for every strict-package subscriber", () => {
     const pkg = strictServer();
     write(
-      "packages/features/agent/server/src/subscribers/agent.subscriber.ts",
+      "modules/agent/server/src/subscribers/agent.subscriber.ts",
       "export class AgentSubscriber {}",
     );
 
@@ -115,13 +115,13 @@ describe("Eventing role lint", () => {
     // beside their subjects, and asserting it does NOT satisfy it is what keeps
     // the rule from drifting back to reading two locations.
     write(
-      "packages/features/agent/server/tests/subscribers/agent.subscriber.redelivery.test.ts",
+      "modules/agent/server/tests/subscribers/agent.subscriber.redelivery.test.ts",
       "export {};",
     );
     expect(policies([pkg])).toContain("eventing-subscriber-idempotency");
 
     write(
-      "packages/features/agent/server/src/subscribers/__tests__/agent.subscriber.redelivery.test.ts",
+      "modules/agent/server/src/subscribers/__tests__/agent.subscriber.redelivery.test.ts",
       "export {};",
     );
     expect(policies([pkg])).not.toContain("eventing-subscriber-idempotency");
@@ -130,14 +130,14 @@ describe("Eventing role lint", () => {
   it("does not accept a redelivery test that is not beside its subscriber", () => {
     const pkg = strictServer();
     write(
-      "packages/features/agent/server/src/subscribers/agent.subscriber.ts",
+      "modules/agent/server/src/subscribers/agent.subscriber.ts",
       "export class AgentSubscriber {}",
     );
     // Right name, wrong directory: the pairing has to be visible from the
     // subscriber's own folder, or the next person to move one takes its test
     // out of range without noticing.
     write(
-      "packages/features/agent/server/src/__tests__/agent.subscriber.redelivery.test.ts",
+      "modules/agent/server/src/__tests__/agent.subscriber.redelivery.test.ts",
       "export {};",
     );
 

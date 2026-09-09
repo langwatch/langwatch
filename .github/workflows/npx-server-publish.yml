@@ -258,7 +258,7 @@ jobs:
             "package/app/mcp/typescript/package.json"
             "package/app/mcp/typescript/dist/create-mcp-server.js"
             # Langy reads the feature map at runtime
-            # (packages/features/langy/contract/src/cards/registry.ts imports it
+            # (modules/langy/contract/src/cards/registry.ts imports it
             # from the repo root).
             "package/app/feature-map.json"
             # The app's prepare step imports the skills front-matter helper

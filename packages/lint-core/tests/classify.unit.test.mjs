@@ -27,7 +27,7 @@ function classifyPath(workspacePath) {
 
 const CASES = [
   {
-    path: "packages/features/agent/server/src/services/agent.service.ts",
+    path: "modules/agent/server/src/services/agent.service.ts",
     expected: {
       role: "server",
       kind: "server",
@@ -49,7 +49,7 @@ const CASES = [
     },
   },
   {
-    path: "packages/features/agent/contract/src/agent.commands.ts",
+    path: "modules/agent/contract/src/agent.commands.ts",
     expected: {
       role: "contract",
       kind: "contract",
@@ -68,23 +68,23 @@ const CASES = [
     },
   },
   {
-    path: "packages/features/agent/server/src/repositories/prisma/agent.repository.ts",
+    path: "modules/agent/server/src/repositories/prisma/agent.repository.ts",
     expected: { role: "server", kind: "server", isPrismaSeam: true, isServiceModule: false },
   },
   {
-    path: "packages/features/agent/server/src/adapters/postgres.agent.adapter.ts",
+    path: "modules/agent/server/src/adapters/postgres.agent.adapter.ts",
     expected: { role: "server", isPrismaSeam: true },
   },
   {
-    path: "packages/features/agent/server/src/adapters/redis.agent.adapter.ts",
+    path: "modules/agent/server/src/adapters/redis.agent.adapter.ts",
     expected: { role: "server", isPrismaSeam: false },
   },
   {
-    path: "packages/features/agent/server/src/services/__tests__/agent.service.unit.test.ts",
+    path: "modules/agent/server/src/services/__tests__/agent.service.unit.test.ts",
     expected: { role: "server", isTest: true, isProduction: false, strictSource: undefined },
   },
   {
-    path: "packages/features/agent/server/tests/wiring.integration.test.ts",
+    path: "modules/agent/server/tests/wiring.integration.test.ts",
     expected: {
       role: "server",
       relative: "tests/wiring.integration.test.ts",
@@ -93,11 +93,11 @@ const CASES = [
     },
   },
   {
-    path: "packages/features/agent/server/package.json",
+    path: "modules/agent/server/package.json",
     expected: { role: "other", kind: undefined, feature: undefined, relative: undefined },
   },
   {
-    path: "packages/features/legacy/server/src/services/legacy.service.ts",
+    path: "modules/legacy/server/src/services/legacy.service.ts",
     expected: {
       role: "server",
       layoutVersion: undefined,
@@ -119,7 +119,7 @@ const CASES = [
     expected: { role: "other", kind: undefined, sourcePath: undefined },
   },
   {
-    path: "packages/enterprise/composition/api/src/wiring.ts",
+    path: "enterprise/packages/composition/api/src/wiring.ts",
     expected: { role: "other", kind: "enterprise-composition", sourcePath: "wiring.ts" },
   },
   {
@@ -152,7 +152,7 @@ describe("given the one classification every rule gates on", () => {
   describe("when the path is enterprise", () => {
     it("carries the enterprise flag and still finds no layout version without a feature.json", () => {
       const file = classifyPath(
-        "packages/enterprise/features/governance/server/src/services/governance.service.ts",
+        "enterprise/modules/governance/server/src/services/governance.service.ts",
       );
 
       expect(file).toMatchObject({
@@ -168,7 +168,7 @@ describe("given the one classification every rule gates on", () => {
   describe("when the same file is classified twice", () => {
     it("returns the memoised object rather than recomputing it", () => {
       resetClassificationCache();
-      const context = { cwd: workspace.cwd, filename: "packages/features/agent/server/src/x.ts" };
+      const context = { cwd: workspace.cwd, filename: "modules/agent/server/src/x.ts" };
 
       expect(classify(context)).toBe(classify(context));
     });
@@ -179,11 +179,11 @@ describe("given the one classification every rule gates on", () => {
       resetClassificationCache();
       const file = classify({
         cwd: workspace.cwd,
-        filename: `${workspace.cwd}/packages/features/agent/server/src/services/agent.service.ts`,
+        filename: `${workspace.cwd}/modules/agent/server/src/services/agent.service.ts`,
       });
 
       expect(file.workspacePath).toBe(
-        "packages/features/agent/server/src/services/agent.service.ts",
+        "modules/agent/server/src/services/agent.service.ts",
       );
     });
   });

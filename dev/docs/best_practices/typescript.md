@@ -71,6 +71,22 @@ reachable from the producer, even when the normal no-emit config already
 references them. Missing or cyclic references fail lint before preparation;
 generated output is not required to run this check.
 
+Nobody types a project reference. `pnpm sync:references` derives every
+`references` array from the workspace manifests and rewrites it in place;
+`node dev/scripts/sync-tsconfig-references.mjs --check` prints the files that
+would change and exits non-zero, and the same rule reports drift as a lint
+violation naming the missing or extra entry. The rules: a package's producer is
+its own `tsconfig.build.json`, or the group solution when it belongs to the
+cyclic web group; `tsconfig.build.json` references one producer per workspace
+`dependencies` entry, sorted by dependency name; `tsconfig.json` references its
+own producer first, then those, then the `devDependencies` producers; and
+`tsconfig.declarations.json` references both dependency kinds. An entry the
+rules cannot derive is kept only when the same file records it under
+`langwatchExtraReferences`, so a hand exception states itself. Adding a
+dependency and running the command is the whole ceremony; `--scripts` also
+checks that each package's `typecheck` script spells no path, because
+`typecheck:declarations --project .` resolves the caller's own config.
+
 Standalone adopted packages keep declarations and incremental state in their
 own `dist/` directory. The cyclic web group keeps one build-info file beside
 its staging output under `dev/.cache`; its declarations and maps are distributed

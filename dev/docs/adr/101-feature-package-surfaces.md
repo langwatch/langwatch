@@ -12,9 +12,9 @@ defined by [ADR-111](./111-physical-application-workspaces.md) and singular
 domain ownership defined by [ADR-112](./112-singular-feature-ownership.md).
 
 **Concrete boundaries:**
-[Agents](../../../packages/features/agent/adrs/001-package-boundary.md),
-[Entitlements](../../../packages/features/entitlement/adrs/001-provider-neutral-plan-resolution.md),
-[Stored Objects](../../../packages/features/stored-object/adrs/001-package-boundary.md),
+[Agents](../../../modules/agent/adrs/001-package-boundary.md),
+[Entitlements](../../../modules/entitlement/adrs/001-provider-neutral-plan-resolution.md),
+[Stored Objects](../../../modules/stored-object/adrs/001-package-boundary.md),
 [the design system](../../../packages/design-system/adrs/001-design-system-boundary.md),
 [shared JavaScript configuration](../../../packages/config/adrs/001-shared-runtime-configuration.md),
 and [package-boundary enforcement](../../../packages/architecture-lint/adrs/001-feature-package-boundaries.md).
@@ -91,7 +91,7 @@ A feature is a namespace that groups up to three independently installable and
 typechecked packages:
 
 ```text
-packages/features/<feature>/
+modules/<feature>/
   contract/              # @langwatch/<feature>-contract
     package.json
     src/
@@ -116,7 +116,7 @@ Package names remain flat within the `@langwatch` npm scope because npm does
 not support another package-name hierarchy below the scope.
 
 `<feature>` is the singular identifier registered in
-`packages/features/catalogue.json`. The catalogue is authoritative for both
+`modules/catalogue.json`. The catalogue is authoritative for both
 core and Enterprise feature roots and their subjects. A local manifest cannot
 claim a subject owned by another feature. The granularity rule, initial domain
 catalogue, and subordinate-behaviour examples are fixed by ADR-112.
@@ -332,7 +332,7 @@ contract-owned values.
 Enterprise features mirror the same physical structure:
 
 ```text
-packages/enterprise/features/<feature>/
+enterprise/modules/<feature>/
   contract/
   server/
   web/

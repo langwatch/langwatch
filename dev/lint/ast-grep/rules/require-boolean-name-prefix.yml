@@ -60,7 +60,7 @@ constraints:
 files:
   - "apps/**/*.ts"
   - "packages/**/*.ts"
-  - "packages/enterprise/**/*.ts"
+  - "enterprise/**/*.ts"
 ignores:
   - "**/*.test.ts"
   - "**/*.spec.ts"

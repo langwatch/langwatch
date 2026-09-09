@@ -50,7 +50,7 @@ none of it is speculative. Traced 2026-07-21:
   `event-sourcing/projections/stateProjection.types.ts`, persisted per document
   by `StateProjectionStore` (`StoredProjection.cursor`) — including by the
   Langy turn fold — with the portable comparator in
-  `packages/features/langy/contract/src/event-sourcing/contracts/cursor.ts`.
+  `modules/langy/contract/src/event-sourcing/contracts/cursor.ts`.
   "Snapshot + cursor" means exposing a stored field, not inventing one.
 - **The live push channel exists.** The
   `langyConversationUpdateBroadcast` subscriber receives every Langy event

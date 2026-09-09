@@ -1,3 +1,4 @@
+import type { Logger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   type PrismaConnection,
@@ -13,6 +14,8 @@ export type WorkerDatabaseInfrastructureOptions = {
   database: WorkerDatabaseConfig;
   /** Decides the client's log levels, exactly as it does in the application. */
   nodeEnvironment: string;
+  /** The process logger every Prisma client event is forwarded to. */
+  logger: Logger;
 };
 
 /**
@@ -47,6 +50,7 @@ export class WorkerDatabaseInfrastructure {
     });
     const connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
+      logger: options.logger,
     }).connect(configuration);
 
     const infrastructure = new WorkerDatabaseInfrastructure(connection);

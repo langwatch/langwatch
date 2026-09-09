@@ -11,7 +11,7 @@
 # Product ownership, singular names and canonical cross-feature services remain
 # owned by singular-feature-ownership.feature.
 # License and plan behaviour remains owned by
-# ../../packages/features/entitlement/specs/entitlement-resolution.feature and
+# ../../modules/entitlement/specs/entitlement-resolution.feature and
 # ../licensing/license-validation.feature. Locked capability discovery remains
 # owned by ../licensing/self-hosted-enterprise-discovery.feature.
 # Repository lint and format migration is owned by oxc-toolchain.feature.
@@ -135,7 +135,7 @@ Feature: Physical application workspace boundaries
     @architecture @enterprise @typecheck
     Scenario: Enterprise has one portable root package and one legal license boundary
       Given enterprise packages are installed
-      When the packages/enterprise ownership root is inspected
+      When the enterprise ownership root is inspected
       Then its LICENSE.md is the LangWatch Enterprise License
       And that notice governs every file and package below the root
       And its README explains the open-core split and catalogues the features
@@ -170,11 +170,11 @@ Feature: Physical application workspace boundaries
     Scenario: Enterprise features use the strict version-zero package layout
       Given reusable enterprise product behaviour is extracted from platform/app/ee
       When its ownership root is inspected
-      Then it lives under packages/enterprise/features/<feature>
+      Then it lives under enterprise/modules/<feature>
       And its contract, server and optional web surfaces are separate workspace packages
       And its package names use the @langwatch/enterprise-<feature>-<surface> form
       And it obeys the same class, filename, repository and public-export rules as a core feature
-      And product licensing lives at packages/enterprise/features/licensing rather than in an aggregate package
+      And product licensing lives at enterprise/modules/licensing rather than in an aggregate package
       And every Enterprise feature uses its singular identifier from the ownership catalogue
 
     @unimplemented
@@ -213,7 +213,7 @@ Feature: Physical application workspace boundaries
       Given the current image and self-host distribution include enterprise behaviour
       When that behaviour moves into strict enterprise feature packages
       Then the same selected packages are staged into the existing distribution
-      And packages/enterprise/LICENSE.md and README.md are staged above them
+      And enterprise/LICENSE.md and README.md are staged above them
       And licensing and deployment topology remain unchanged
 
   Rule: UI hosting remains compatible while source ownership separates

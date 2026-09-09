@@ -38,7 +38,7 @@ function writeBaselineFile(root: string, entries: readonly unknown[]): void {
 
 const edge: Edge = {
   kind: "cross-feature",
-  from: "packages/features/dashboard/server/package.json",
+  from: "modules/dashboard/server/package.json",
   to: "@langwatch/analytics-server",
 };
 
@@ -82,7 +82,7 @@ describe("boundary edge baseline (R8)", () => {
   it("silences a listed, unexpired edge and leaves everything else untouched", () => {
     const otherPolicyViolation = {
       policy: "cross-feature",
-      file: "packages/features/other/server/package.json",
+      file: "modules/other/server/package.json",
       specifier: "@langwatch/unrelated-server",
       message: "Feature cannot depend on that package.",
     };
@@ -134,7 +134,7 @@ describe("boundary edge baseline (R8)", () => {
     const root = mkdtempSync(join(tmpdir(), "boundary-edge-growth-"));
     const secondEdge: Edge = {
       kind: "private-runtime-export",
-      from: "packages/features/new/server/src/index.ts",
+      from: "modules/new/server/src/index.ts",
       to: "./repositories/prisma/new.repository",
     };
     writeBaselineFile(root, [row(edge, "2099-02-01"), row(secondEdge, "2099-01-01")]);
@@ -176,7 +176,7 @@ describe("boundary edge baseline (R8)", () => {
           row(
             {
               kind: "private-runtime-export",
-              from: "packages/features/gone/server/src/index.ts",
+              from: "modules/gone/server/src/index.ts",
               to: "./repositories/prisma/gone.repository",
             },
             "2099-01-01",
@@ -207,12 +207,12 @@ describe("boundary edge baseline (R8)", () => {
       { policy: "cross-feature", file: edge.from, specifier: edge.to, message: "x" },
       {
         policy: "feature-source-layout",
-        file: "packages/features/x/server/src/y.ts",
+        file: "modules/x/server/src/y.ts",
         message: "x",
       },
       {
         policy: "private-runtime-export",
-        file: "packages/features/x/server/src/index.ts",
+        file: "modules/x/server/src/index.ts",
         message: "x",
       },
     ]);

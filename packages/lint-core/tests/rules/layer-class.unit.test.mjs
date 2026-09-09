@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "packages/features/project/server/src/services/example.service.ts";
+const SERVICE = "modules/project/server/src/services/example.service.ts";
 const ALLOWED =
   "Hold the collaborator at the caller and delete the class, or give it the rules that justify it." +
   " `app/<feature>.app.ts` and routed repositories are exempt.";
@@ -123,11 +123,11 @@ describe("given a TypeScript source the over-abstraction policies read", () => {
   e(input: In): Out { return this.deps.example.e(input); }
 }`;
 
-      expect(report(facade, "packages/features/project/server/src/app/example.app.ts")).toEqual([]);
+      expect(report(facade, "modules/project/server/src/app/example.app.ts")).toEqual([]);
       expect(
         report(
           facade,
-          "packages/features/project/server/src/repositories/routed/routed.example.repository.ts",
+          "modules/project/server/src/repositories/routed/routed.example.repository.ts",
         ),
       ).toEqual([]);
     });
@@ -146,10 +146,10 @@ describe("given a TypeScript source the over-abstraction policies read", () => {
 }`;
 
       expect(
-        report(code, "packages/features/project/server/src/services/example.service.test.ts"),
+        report(code, "modules/project/server/src/services/example.service.test.ts"),
       ).toEqual([]);
       expect(
-        report(code, "packages/features/project/server/src/generated/example.service.ts"),
+        report(code, "modules/project/server/src/generated/example.service.ts"),
       ).toEqual([]);
     });
   });

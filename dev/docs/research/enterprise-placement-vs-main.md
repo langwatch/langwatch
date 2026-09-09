@@ -3,7 +3,7 @@
 Compared on 2026-09-07 against local `main` (`7fb95fe904`, August 18) and the
 newer locally available `origin/main` (`8b51631777`, September 7). No fetch was
 needed. The old root was `platform/app/ee`; the new root is
-`packages/enterprise`. The newer snapshot contains 451 files under `ee`,
+`enterprise`. The newer snapshot contains 451 files under `ee`,
 including 236 production TypeScript files after excluding tests.
 
 The check combined Git rename matches, exported-symbol searches, source reads
@@ -27,14 +27,14 @@ not proof that every old route and entitlement behaves identically.
 
 ## Placement correction
 
-The original `packages/features/trace/server/src/rules/ingest-key-provenance.rules.ts`
+The original `modules/trace/server/src/rules/ingest-key-provenance.rules.ts`
 was in core Trace but retained `SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise`.
 Git identifies it as a 93% similar move of
 `platform/app/ee/governance/services/ingestKeyProvenance.utils.ts`.
 The implementation contains source classification, non-billable attribution
 and Copilot scope policy as well as generic authenticated-key stamping.
 The working-tree correction places source and billing policy in
-[Enterprise Governance](../../../packages/enterprise/features/governance/server/src/rules/ingest-key-provenance.rules.ts)
+[Enterprise Governance](../../../enterprise/modules/governance/server/src/rules/ingest-key-provenance.rules.ts)
 and generic attribute protection in [OTLP](../../../packages/otlp/src/receiver-policy.ts).
 Composition resolves declarative policy through Governance's existing complete
 contract. The authenticated key is stamped last so policy cannot erase it.

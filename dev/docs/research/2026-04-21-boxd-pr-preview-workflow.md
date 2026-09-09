@@ -7,7 +7,7 @@
 
 > **Amendment 2026-09-03:** `platform/app` is deleted (commit `faaa9ec333`).
 > The product is now `apps/ui`, `apps/api`, `apps/worker`, plus
-> `packages/features/<name>/{contract,server,web}`; any reference below to
+> `modules/<name>/{contract,server,web}`; any reference below to
 > `platform/app/src/` describes a path that no longer exists.
 
 ## Starting state / context

@@ -167,7 +167,7 @@ Rule: Search autocomplete
 
 Rule: Strongly typed filter field registry
   Every filterable field is defined once in `SEARCH_FIELDS`
-  (`packages/features/trace/contract/src/trace-query-metadata.ts`). The registry
+  (`modules/trace/contract/src/trace-query-metadata.ts`). The registry
   drives autocomplete, sidebar facets, AST validation, and ClickHouse query translation.
 
   Scenario: Unknown field rejected at parse time

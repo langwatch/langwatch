@@ -133,8 +133,8 @@ const BREAKS_INGEST = {
   sha: "cea66e8e12fd3de8720bf9ba6978b471d4bd9286",
   what: "capped the OTLP and collector routes, which stopped serving chunked uploads",
   files: [
-    "packages/features/trace/server/src/transport/api-rest/collector.api.ts",
-    "packages/features/trace/server/src/transport/api-rest/otlp-ingest.api.ts",
+    "modules/trace/server/src/transport/api-rest/collector.api.ts",
+    "modules/trace/server/src/transport/api-rest/otlp-ingest.api.ts",
     "packages/otlp/src/body.ts",
     "packages/otlp/src/errors.ts",
   ],
@@ -167,8 +167,8 @@ const REPAIRS_INGEST = {
     ".github/workflows/npx-server-smoke.yml",
     "packages/api/src/rest/body-limit.ts",
     "packages/api/src/rest/__tests__/body-limit.unit.test.ts",
-    "packages/features/trace/server/src/transport/api-rest/collector.api.ts",
-    "packages/features/trace/server/src/transport/api-rest/otlp-ingest.api.ts",
+    "modules/trace/server/src/transport/api-rest/collector.api.ts",
+    "modules/trace/server/src/transport/api-rest/otlp-ingest.api.ts",
   ],
   wasFiles: [
     ".github/workflows/npx-server-smoke.yml",

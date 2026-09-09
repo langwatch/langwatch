@@ -185,7 +185,7 @@ packages) set `environment: "jsdom"` globally** — which directly contradicts `
 own claim that "neither config declares a global `environment`." For those 16 packages the
 per-file docblock is redundant, not load-bearing; the per-file convention is real only for
 the remaining packages that mix jsdom and node tests in one config (e.g.
-`packages/features/analytics/web`, which explicitly comments "every file that renders
+`modules/analytics/web`, which explicitly comments "every file that renders
 declares `@vitest-environment jsdom`" and sets `environment: "node"` as the default). **The
 `CLAUDE.md` line describing the per-file convention as universal should be corrected to
 name the exception** — it's accurate for mixed-environment packages, not for the 16 that
@@ -209,13 +209,13 @@ does exist — a script limitation (didn't try stripping `.js` before checking `
 real gap. **One confirmed real stale mock:**
 
 ```ts
-// packages/features/scenario/web/src/ui/sections/agent-testing/run/__tests__/run-dialog.integration.test.tsx:105
+// modules/scenario/web/src/ui/sections/agent-testing/run/__tests__/run-dialog.integration.test.tsx:105
 vi.mock("../../use-run-scenario", () => ({
   useRunScenario: () => ({ runScenario: mockRunScenario, isRunning: false }),
 }));
 ```
 
-The real hook lives at `packages/features/scenario/web/src/ui/sections/use-run-scenario.ts`
+The real hook lives at `modules/scenario/web/src/ui/sections/use-run-scenario.ts`
 — three directory levels up from the test file (`__tests__/../../../`), not two
 (`__tests__/../../`) as the mock path resolves. The mock is silently a no-op: it never
 intercepts the real import, so this test may be exercising the unmocked hook and passing for
@@ -231,7 +231,7 @@ caught the real hit above at zero false-positive rate. Recommend
 
 #### 11. Value-echo tests — **~4 likely-real hits out of 15 raw matches**
 
-`packages/features/organization/web/src/screens/organization/__tests__/members.unit.test.tsx`
+`modules/organization/web/src/screens/organization/__tests__/members.unit.test.tsx`
 has three real hits: `expect(true).toBe(true)` (lines 59, 66, 72) — proves nothing. One hit
 in `apps/api/.../api-database.infrastructure.unit.test.ts` (`expect(infrastructure.
 connection).toBe(infrastructure.connection)`) needs a manual look — could be a legitimate
@@ -294,7 +294,7 @@ unmeasured.
 ### 2.1 What already exists to build on
 
 - `packages/architecture-lint/src/feature-catalogue.ts` reads
-  `packages/features/catalogue.json` — 53 entries, each `{ id, root, classification:
+  `modules/catalogue.json` — 53 entries, each `{ id, root, classification:
   core|enterprise, subjects: string[] }`. This is the canonical feature list.
 - `packages/architecture-lint/src/check-feature-parity.ts` (1,890 lines) already solves
   "does this scenario have a test": discovers `.feature` files, parses scenarios + tags,
@@ -340,7 +340,7 @@ truncated description), one surface per `*.screen.tsx`, one per top-level entry 
 `web/src/surfaces/`, one per `*.process.ts`, one per `*.subscriber.ts`.
 
 **Spec text collection per feature**: union of the feature's own
-`packages/features/<id>/specs/**/*.feature` (105 files exist across 41 of 53 packages) and
+`modules/<id>/specs/**/*.feature` (105 files exist across 41 of 53 packages) and
 any top-level `specs/*` directory whose name normalizes (lowercase, `-`/`_`/space collapsed,
 trailing `s` stripped) to the feature id or a declared subject.
 
@@ -435,7 +435,7 @@ coverage — see limitations below.
   absence.
 - **No cross-feature dedup** of spec text matched by more than one feature's directory
   pattern — not observed to matter in this run, not specifically ruled out either.
-- Enterprise packages (`packages/enterprise/features/*`) are included via the same code
+- Enterprise packages (`enterprise/modules/*`) are included via the same code
   path as core features but weren't spot-checked line-by-line for correctness.
 
 ### 2.6 Proposed rollout — three stages, all starting after this release
@@ -476,8 +476,8 @@ as Parts 1-2 — every claim below is grep/filesystem-verified against the insta
 
 Almost every package.json pins `"vitest": "^5.0.0"`, and `node_modules/.pnpm` confirms
 `vitest@5.0.0` is the resolved version nearly everywhere. **Two packages still pin
-`^4.1.9`**: `packages/features/langy/server/package.json` and
-`packages/features/model-provider/server/package.json`. This is why `pnpm-lock.yaml`
+`^4.1.9`**: `modules/langy/server/package.json` and
+`modules/model-provider/server/package.json`. This is why `pnpm-lock.yaml`
 resolves both `vitest@5.0.0` and `vitest@4.1.10` in the same workspace — two full copies of
 Vitest on disk, and those two packages' test scripts run under v4's behavior (different pool
 defaults, different CLI) while every sibling package runs v5. **First step of "optimal

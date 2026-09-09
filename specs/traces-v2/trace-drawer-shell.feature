@@ -1,9 +1,9 @@
 # Trace Drawer Shell — Gherkin Spec
 # Implementation:
 #   [gone] src/features/traces-v2/components/TraceDrawer/**
-#   packages/features/trace/web/src/drawer.store.ts
+#   modules/trace/web/src/drawer.store.ts
 #   [gone] src/features/traces-v2/hooks/{useDrawerUrlSync,useTraceDrawerShortcuts,useTraceDrawerNavigation}.ts
-#   packages/features/trace/web/src/ui/sections/explorer/hooks/trace-drawer-shortcut-table.ts
+#   modules/trace/web/src/ui/sections/explorer/hooks/trace-drawer-shortcut-table.ts
 #
 # Audited 2026-05-01: drift between spec and code was significant.
 #   - Drawer tabs are SUMMARY / LLM-OPTIMIZED / PROMPTS (the latter only when

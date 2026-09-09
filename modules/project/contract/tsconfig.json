@@ -1,0 +1,35 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
+    "lib": ["es2022"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": [
+    "src/**/*.ts",
+    "../../project/contract/tests/project.service.unit.test.ts",
+    "../../project/contract/src/project.service.ts",
+    "../../project/contract/src/index.ts"
+  ],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    }
+  ]
+}

@@ -401,7 +401,7 @@ starting consumers or transports.
 
 This supersedes the canonical-service-only public boundary in ADR-101 and the
 strict layout ADR for every catalogue owner, core and Enterprise. Enforcement
-starts from `packages/features/catalogue.json`, independently of whether an
+starts from `modules/catalogue.json`, independently of whether an
 installer or contract package already exists. Missing apps, missing required
 installers and displaced caller paths are migration failures, not exemptions.
 The global command remains red until those owners are migrated; no baseline
@@ -482,7 +482,7 @@ an explicit disabled capability state.
 
 **3. One registration source.** Each selected feature contributes routes, jobs
 and lifecycle hooks through its installation declaration. Runtime manifests
-derive from those declarations. `packages/features/catalogue.json` stays the
+derive from those declarations. `modules/catalogue.json` stays the
 ownership authority; there is no competing catalogue.
 
 - Guard today: `feature-catalogue` (`packages/architecture-lint/src/feature-catalogue.ts`)

@@ -1,0 +1,34 @@
+{
+  "name": "@langwatch/gateway-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Gateway service contract.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project modules/gateway/contract/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

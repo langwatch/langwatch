@@ -122,8 +122,8 @@
   },
   "proposedRootChanges": {
     "webhook": {
-      "from": "packages/enterprise/features/webhook",
-      "to": "packages/features/webhook",
+      "from": "enterprise/modules/webhook",
+      "to": "modules/webhook",
       "reason": "Core outbound delivery used by multiple features; Enterprise caller does not make the shared capability Enterprise."
     }
   }

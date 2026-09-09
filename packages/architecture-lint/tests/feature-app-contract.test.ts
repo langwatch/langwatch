@@ -9,8 +9,8 @@ import { snapshotOf } from "./workspace.ts";
 
 let root: string;
 let packages: ClassifiedPackage[];
-const contract = "packages/features/widget/contract";
-const server = "packages/features/widget/server";
+const contract = "modules/widget/contract";
+const server = "modules/widget/server";
 let catalogue: FeatureCatalogueEntry[];
 
 function write(file: string, text: string): void {
@@ -50,7 +50,7 @@ beforeEach(() => {
   catalogue = [
     {
       id: "widget",
-      root: "packages/features/widget",
+      root: "modules/widget",
       classification: "core",
       subjects: ["widget"],
     },
@@ -312,23 +312,23 @@ describe("feature API contract lint", () => {
   it("accepts a peer API token through a barrel and local dependency alias", () => {
     catalogue.push({
       id: "peer",
-      root: "packages/features/peer",
+      root: "modules/peer",
       classification: "core",
       subjects: ["peer"],
     });
     write(
-      "packages/features/peer/contract/src/peer.api.ts",
+      "modules/peer/contract/src/peer.api.ts",
       'import { featureApi } from "@langwatch/runtime-composition"; export interface PeerApi { ping(): void; } export const PeerApi = featureApi<PeerApi>("peer");',
     );
-    write("packages/features/peer/contract/src/index.ts", 'export { PeerApi } from "./peer.api";');
+    write("modules/peer/contract/src/index.ts", 'export { PeerApi } from "./peer.api";');
     write(
-      "packages/features/peer/contract/package.json",
+      "modules/peer/contract/package.json",
       JSON.stringify({ name: "@langwatch/peer-contract", exports: { ".": "./src/index.ts" } }),
     );
     packages.push({
       name: "@langwatch/peer-contract",
-      root: join(root, "packages/features/peer/contract"),
-      manifestPath: join(root, "packages/features/peer/contract/package.json"),
+      root: join(root, "modules/peer/contract"),
+      manifestPath: join(root, "modules/peer/contract/package.json"),
       manifest: { name: "@langwatch/peer-contract", exports: { ".": "./src/index.ts" } },
       kind: "contract",
       feature: "peer",

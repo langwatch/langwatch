@@ -21,11 +21,11 @@ const tester = new RuleTester({
 tester.run("package-boundaries", plugin.rules["package-boundaries"], {
   valid: [
     {
-      filename: "packages/features/agent/contract/src/example.ts",
+      filename: "modules/agent/contract/src/example.ts",
       code: 'import { z } from "zod"; export const value = z.string();',
     },
     {
-      filename: "packages/features/agent/server/src/repositories/prisma/example.ts",
+      filename: "modules/agent/server/src/repositories/prisma/example.ts",
       code: 'import type { PrismaClient } from "@prisma/client"; export type Db = PrismaClient;',
     },
     {
@@ -41,7 +41,7 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
     },
     {
-      filename: "packages/enterprise/composition/api/src/example.ts",
+      filename: "enterprise/packages/composition/api/src/example.ts",
       code: 'import { GovernanceService } from "@langwatch/enterprise-governance-server"; export { GovernanceService };',
     },
     {
@@ -53,22 +53,22 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
     },
     {
-      filename: "packages/enterprise/composition/worker/tests/wiring.unit.test.ts",
+      filename: "enterprise/packages/composition/worker/tests/wiring.unit.test.ts",
       code: 'import { GovernanceService } from "@langwatch/enterprise-governance-server"; export { GovernanceService };',
     },
     {
-      filename: "packages/features/project/server/tests/agent.integration.test.ts",
+      filename: "modules/project/server/tests/agent.integration.test.ts",
       code: 'import { fixture } from "@langwatch/agent-server/testing"; export { fixture };',
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/contract/src/example.ts",
+      filename: "modules/agent/contract/src/example.ts",
       code: 'import React from "react"; export { React };',
       errors: [{ messageId: "contractRuntime" }],
     },
     {
-      filename: "packages/features/agent/server/src/example.ts",
+      filename: "modules/agent/server/src/example.ts",
       code: 'import type { ReactNode } from "react"; export type Value = ReactNode;',
       errors: [{ messageId: "serverImportsBrowser" }],
     },
@@ -98,27 +98,27 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       errors: [{ messageId: "compositionRoot" }],
     },
     {
-      filename: "packages/features/agent/contract/src/example.ts",
+      filename: "modules/agent/contract/src/example.ts",
       code: 'export { AgentService } from "../../server/src";',
       errors: [{ messageId: "packageEscape" }],
     },
     {
-      filename: "packages/features/entitlement/contract/src/example.ts",
+      filename: "modules/entitlement/contract/src/example.ts",
       code: 'export { Agent } from "@langwatch/agent-contract/private";',
       errors: [{ messageId: "sealedExports" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/example.ts",
+      filename: "modules/agent/server/src/services/example.ts",
       code: 'import type { PrismaClient } from "@prisma/client"; export type Db = PrismaClient;',
       errors: [{ messageId: "prismaContainment" }],
     },
     {
-      filename: "packages/features/agent/server/src/example.ts",
+      filename: "modules/agent/server/src/example.ts",
       code: 'import { zValidator } from "@hono/zod-validator"; export { zValidator };',
       errors: [{ messageId: "schemaBoundary" }],
     },
     {
-      filename: "packages/features/agent/contract/src/example.ts",
+      filename: "modules/agent/contract/src/example.ts",
       code: 'import { z } from "zod/v3"; export const value = z.string();',
       errors: [{ messageId: "retiredPackageRuntime" }],
     },
@@ -133,22 +133,22 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
       errors: [{ messageId: "retiredPackageRuntime" }],
     },
     {
-      filename: "packages/features/agent/server/src/example.ts",
+      filename: "modules/agent/server/src/example.ts",
       code: 'import { resolver } from "hono-openapi/zod"; export { resolver };',
       errors: [{ messageId: "schemaBoundary" }],
     },
     {
-      filename: "packages/features/agent/server/src/api/internal/agent.api.ts",
+      filename: "modules/agent/server/src/api/internal/agent.api.ts",
       code: 'import type { AgentRepository } from "../../repositories/agent.repository"; export type Value = AgentRepository;',
       errors: [{ messageId: "featureLayer" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'import type { AgentApi } from "../api/internal/agent.api"; export type Value = AgentApi;',
       errors: [{ messageId: "featureLayer" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository"; export { PrismaAgentRepository };',
       errors: [{ messageId: "featureLayer" }],
     },
@@ -160,7 +160,7 @@ tester.run("package-boundaries", plugin.rules["package-boundaries"], {
 tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
   valid: [
     {
-      filename: "packages/features/agent/tests/example.test.ts",
+      filename: "modules/agent/tests/example.test.ts",
       code: "export const value = process.env.TEST_VALUE;",
     },
     {
@@ -180,7 +180,7 @@ tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
       code: "export const value = process.env.BENCHMARK_VALUE;",
     },
     {
-      filename: "packages/features/agent/server/src/testing/runtime.spec.ts",
+      filename: "modules/agent/server/src/testing/runtime.spec.ts",
       code: "export const value = process.env.TEST_VALUE;",
     },
     {
@@ -213,7 +213,7 @@ tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
   ],
   invalid: [
     {
-      filename: "packages/features/agent/contract/src/example.ts",
+      filename: "modules/agent/contract/src/example.ts",
       code: "export const value = process.env.AGENTS_VALUE;",
       errors: [{ messageId: "environment" }],
     },
@@ -255,22 +255,22 @@ tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
       errors: [{ messageId: "environment" }],
     },
     {
-      filename: "packages/enterprise/composition/api/src/config.ts",
+      filename: "enterprise/packages/composition/api/src/config.ts",
       code: "export const value = process?.env.DATABASE_URL;",
       errors: [{ messageId: "environment" }],
     },
     {
-      filename: "packages/enterprise/composition/worker/src/config.ts",
+      filename: "enterprise/packages/composition/worker/src/config.ts",
       code: 'export const value = process?.["env"].QUEUE_URL;',
       errors: [{ messageId: "environment" }],
     },
     {
-      filename: "packages/features/agent/server/src/config.ts",
+      filename: "modules/agent/server/src/config.ts",
       code: "export const value = process[`env`].AGENT_KEY;",
       errors: [{ messageId: "environment" }],
     },
     {
-      filename: "packages/features/agent/server/src/config.ts",
+      filename: "modules/agent/server/src/config.ts",
       code: 'export const value = process["e" + "nv"].AGENT_KEY;',
       errors: [{ messageId: "environment" }],
     },
@@ -280,7 +280,7 @@ tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
       errors: [{ messageId: "environment" }],
     },
     {
-      filename: "packages/features/agent/server/src/runtime.unit.helper.ts",
+      filename: "modules/agent/server/src/runtime.unit.helper.ts",
       code: "export const value = process.env.AGENT_KEY;",
       errors: [{ messageId: "environment" }],
     },
@@ -297,58 +297,58 @@ tester.run("environment-boundaries", plugin.rules["environment-boundaries"], {
 tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
   valid: [
     {
-      filename: "packages/features/agent/contract/src/agent.service.ts",
+      filename: "modules/agent/contract/src/agent.service.ts",
       code: "export abstract class AgentService {}",
     },
     {
-      filename: "packages/features/agent/server/src/repositories/agent.repository.ts",
+      filename: "modules/agent/server/src/repositories/agent.repository.ts",
       code: "export abstract class AgentRepository {}",
     },
     {
-      filename: "packages/features/api-key/server/src/ports/credential.port.ts",
+      filename: "modules/api-key/server/src/ports/credential.port.ts",
       code: "export type CredentialId = string; export abstract class CredentialPort { abstract load(id: CredentialId): Promise<void>; }",
     },
     {
-      filename: "packages/features/automation/server/src/ports/automation-graph.port.ts",
+      filename: "modules/automation/server/src/ports/automation-graph.port.ts",
       code: "export abstract class AutomationGraphNotifierPort { abstract dispatch(): Promise<void>; }",
     },
     {
-      filename: "packages/features/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
+      filename: "modules/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
       code: "export class PrismaAgentRepository { static create() { return new PrismaAgentRepository(); } }",
     },
     {
-      filename: "packages/features/agent/server/src/api/internal/agent.api.ts",
+      filename: "modules/agent/server/src/api/internal/agent.api.ts",
       code: "export class AgentApi { static create() { return new AgentApi(); } }",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/contract/src/agent.service.ts",
+      filename: "modules/agent/contract/src/agent.service.ts",
       code: "export interface AgentService {}",
       errors: [{ messageId: "abstract" }],
     },
     {
-      filename: "packages/features/agent/server/src/projections/agent.projection.ts",
+      filename: "modules/agent/server/src/projections/agent.projection.ts",
       code: "export class AgentProjection {}",
       errors: [{ messageId: "create" }],
     },
     {
-      filename: "packages/features/agent/server/src/api/internal/agent.api.ts",
+      filename: "modules/agent/server/src/api/internal/agent.api.ts",
       code: "export function createAgentApi() { return {}; }",
       errors: [{ messageId: "concrete" }, { messageId: "standalone" }],
     },
     {
-      filename: "packages/features/agent/server/src/api/internal/agent.api.ts",
+      filename: "modules/agent/server/src/api/internal/agent.api.ts",
       code: "class AgentApi { static create() { return new AgentApi(); } }",
       errors: [{ messageId: "concrete" }],
     },
     {
-      filename: "packages/features/api-key/server/src/ports/credential.port.ts",
+      filename: "modules/api-key/server/src/ports/credential.port.ts",
       code: "export type CredentialPort = { load(id: string): Promise<void>; };",
       errors: [{ messageId: "abstract" }],
     },
     {
-      filename: "packages/features/api-key/server/src/ports/credential.port.ts",
+      filename: "modules/api-key/server/src/ports/credential.port.ts",
       code: "export abstract class CredentialPort { abstract load(id: string): Promise<void>; } export type LegacyCredentialPort = { load(id: string): Promise<void>; };",
       errors: [{ messageId: "abstract" }],
     },
@@ -360,18 +360,18 @@ tester.run("feature-module-classes", plugin.rules["feature-module-classes"], {
 tester.run("service-classes", plugin.rules["service-classes"], {
   valid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "function normalise() { return true; } export class AgentService { static create() { normalise(); return new AgentService(); } private constructor() {} }",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function createAgentService() { return {}; }",
       errors: [{ messageId: "missing" }, { messageId: "standalone" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export class AgentService {}",
       errors: [{ messageId: "create" }],
     },
@@ -381,31 +381,31 @@ tester.run("service-classes", plugin.rules["service-classes"], {
 tester.run("service-quality", plugin.rules["service-quality"], {
   valid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export class AgentService {\nstatic create() {\nreturn new AgentService();\n}\nprivate constructor() {}\nasync run() {\nconst value = await Promise.resolve(true);\nreturn value;\n}\n}",
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'export class AgentService {\nstatic create() {\nreturn new AgentService();\n}\nprivate constructor() {}\n["literal"]() {\nreturn true;\n}\n}',
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export class AgentService {\nstatic create() {\nreturn new AgentService();\n}\nprivate constructor() {}\noverload(input: string): string;\noverload(input: number): string;\noverload(input: string | number) {\nreturn String(input);\n}\n}",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export class AgentService {\nstatic create() { return new AgentService(); }\nconstructor() {}\nrun() { return { repeated: 1, repeated: 2 }; }\n}",
       errors: [{ messageId: "publicConstructor" }, { messageId: "duplicateObjectKey" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'export class AgentService {\nstatic create() {\nreturn new AgentService();\n}\nprivate constructor() {}\nrun() {\nreturn { ["repeated"]: 1, ["repeated"]: 2 };\n}\n}',
       errors: [{ messageId: "duplicateObjectKey" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'export class AgentService {\nstatic create() { return new AgentService(); }\nprivate constructor() {}\noverload(input: string): string;\noverload(input: number): string;\noverload(input: string | number) { return String(input); }\noverload = () => "invalid second implementation";\n}',
       languageOptions: { parserOptions: { ignoreNonFatalErrors: true } },
       errors: [{ messageId: "duplicateMember" }],
@@ -416,13 +416,13 @@ tester.run("service-quality", plugin.rules["service-quality"], {
 tester.run("max-statements-per-line", plugin.rules["max-statements-per-line"], {
   valid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export class AgentService {\nstatic create() { return new AgentService(); }\nprivate constructor() {}\nrun() { return true; }\noverload(input: string): string;\noverload(input: number): string;\noverload(input: string | number) {\nreturn String(input);\n}\n}",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export class AgentService {\nstatic create() { return new AgentService(); }\nprivate constructor() {}\nrun() {\nconst first = 1; const second = 2;\nreturn first + second;\n}\n}",
       errors: [{ messageId: "maxStatementsPerLine" }],
     },
@@ -432,13 +432,13 @@ tester.run("max-statements-per-line", plugin.rules["max-statements-per-line"], {
 tester.run("service-member-spacing", plugin.rules["service-member-spacing"], {
   valid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export class AgentService {\nfirst() {}\n\n// This belongs to the following method.\nsecond() {}\n}",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export class AgentService {\nfirst() {}\nsecond() {}\n}",
       output: "export class AgentService {\nfirst() {}\n\nsecond() {}\n}",
       errors: [{ messageId: "memberSpacing" }],
@@ -450,42 +450,42 @@ tester.run("service-member-spacing", plugin.rules["service-member-spacing"], {
 tester.run("api-context-services", plugin.rules["api-context-services"], {
   valid: [
     {
-      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "modules/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { async handle(context, input) { await context.authorize(input.permission); return context.app.agents.create({ ...input, actorId: context.actor().id }); } }",
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export class AgentService { constructor(repository) { this.repository = repository; } }",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "modules/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { handle(context) { return this.options.service(context).list(); } }",
       errors: [{ messageId: "resolver" }],
     },
     {
-      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "modules/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { handle(context) { return this.options.projectId(context); } }",
       errors: [{ messageId: "resolver" }],
     },
     {
-      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "modules/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { handle(input) { return this.options.loadService(input.projectId).list(); } }",
       errors: [{ messageId: "resolver" }],
     },
     {
-      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "modules/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { handle(context) { return (context as Context).app.agents.list(); } }",
       errors: [{ messageId: "contextCast" }],
     },
     {
-      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "modules/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { handle() { return new AgentService(); } }",
       errors: [{ messageId: "construction" }],
     },
     {
-      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "modules/agent/server/src/api/public/agent.api.ts",
       code: "export class AgentApi { async handle(context) { return await (await loadAgentService(context)).list(); } }",
       errors: [{ messageId: "doubleAwait" }],
     },
@@ -501,7 +501,7 @@ tester.run("service-dependencies", plugin.rules["service-dependencies"], {
       code: 'import type { OrganizationRepository } from "./repositories/organization.repository"; import type { PromptTagService } from "../../prompt-config/prompt-tag.service"; export class OrganizationService {}',
     },
     {
-      filename: "packages/features/organization/server/src/services/organization.service.ts",
+      filename: "modules/organization/server/src/services/organization.service.ts",
       code: 'import type { OrganizationRepository } from "../repositories/organization.repository"; import type { ProjectService } from "@langwatch/project-contract"; export class OrganizationService {}',
     },
   ],
@@ -517,7 +517,7 @@ tester.run("service-dependencies", plugin.rules["service-dependencies"], {
       errors: [{ messageId: "foreignRepository" }],
     },
     {
-      filename: "packages/features/organization/server/src/services/organization.service.ts",
+      filename: "modules/organization/server/src/services/organization.service.ts",
       code: 'import type { ProjectRepository } from "@langwatch/project-server"; export class OrganizationService {}',
       errors: [{ messageId: "foreignRepository" }],
     },
@@ -537,7 +537,7 @@ tester.run("service-dependencies", plugin.rules["service-dependencies"], {
 tester.run("runtime-undefined", plugin.rules["runtime-undefined"], {
   valid: [
     {
-      filename: "packages/features/agent/contract/src/example.ts",
+      filename: "modules/agent/contract/src/example.ts",
       code: `type Missing = undefined;
 interface Result { value?: undefined }
 const object = { undefined: 1 };
@@ -545,19 +545,19 @@ object.undefined;
 export { value as undefined };`,
     },
     {
-      filename: "packages/features/agent/contract/src/example.ts",
+      filename: "modules/agent/contract/src/example.ts",
       code: `import { undefined as absent } from "fixture";
 export { undefined } from "fixture";
 const value = "undefined";`,
     },
     {
-      filename: "packages/features/agent/contract/src/example.ts",
+      filename: "modules/agent/contract/src/example.ts",
       code: `function read(undefined: unknown) { return undefined; }`,
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/contract/src/example.ts",
+      filename: "modules/agent/contract/src/example.ts",
       code: `const a = undefined;
 const b = obj[undefined];
 const c = undefined as string;
@@ -574,7 +574,7 @@ const d = ({ undefined: void 0 });`,
       ],
     },
     {
-      filename: "packages/features/agent/contract/src/example.ts",
+      filename: "modules/agent/contract/src/example.ts",
       code: `function read(value = undefined) { return value; }
 if (value === undefined) throw undefined;`,
       output: `function read(value = void 0) { return value; }
@@ -591,7 +591,7 @@ if (value === void 0) throw void 0;`,
 tester.run("logical-statement-spacing", plugin.rules["logical-statement-spacing"], {
   valid: [
     {
-      filename: "packages/features/agent/server/src/example.ts",
+      filename: "modules/agent/server/src/example.ts",
       code: `function run() {
   if (ready) {
     start();
@@ -604,7 +604,7 @@ tester.run("logical-statement-spacing", plugin.rules["logical-statement-spacing"
 }`,
     },
     {
-      filename: "packages/features/agent/server/src/example.ts",
+      filename: "modules/agent/server/src/example.ts",
       code: `function run() {
   if (ready) finish();
   else wait();
@@ -619,7 +619,7 @@ tester.run("logical-statement-spacing", plugin.rules["logical-statement-spacing"
 }`,
     },
     {
-      filename: "packages/features/agent/server/src/example.ts",
+      filename: "modules/agent/server/src/example.ts",
       code: `function run() {
   return true;
 }`,
@@ -627,7 +627,7 @@ tester.run("logical-statement-spacing", plugin.rules["logical-statement-spacing"
   ],
   invalid: [
     {
-      filename: "packages/features/agent/server/src/example.ts",
+      filename: "modules/agent/server/src/example.ts",
       code: `function run() {
   if (ready) {
     start();
@@ -649,13 +649,13 @@ tester.run("logical-statement-spacing", plugin.rules["logical-statement-spacing"
       errors: [{ messageId: "statementSpacing" }, { messageId: "statementSpacing" }],
     },
     {
-      filename: "packages/features/agent/server/src/example.ts",
+      filename: "modules/agent/server/src/example.ts",
       code: "function run() { if (ready) { start(); } finish(); }",
       output: "function run() { if (ready) { start(); }\n\n finish(); }",
       errors: [{ messageId: "statementSpacing" }],
     },
     {
-      filename: "packages/features/agent/server/src/example.ts",
+      filename: "modules/agent/server/src/example.ts",
       code: `function run() {
   if (ready) {
     start();
@@ -672,7 +672,7 @@ tester.run("logical-statement-spacing", plugin.rules["logical-statement-spacing"
       errors: [{ messageId: "statementSpacing" }],
     },
     {
-      filename: "packages/features/agent/server/src/example.ts",
+      filename: "modules/agent/server/src/example.ts",
       code: "function run() {\r\n  try { work(); } catch { recover(); } finally { cleanup(); }\r\n  return true;\r\n}",
       output:
         "function run() {\r\n  try { work(); } catch { recover(); } finally { cleanup(); }\r\n\r\n  return true;\r\n}",
@@ -729,22 +729,22 @@ tester.run("boolean-wall", plugin.rules["boolean-wall"], {
 tester.run("awaited-return-chain", plugin.rules["awaited-return-chain"], {
   valid: [
     {
-      filename: "packages/features/api-key/server/src/services/api-key.service.ts",
+      filename: "modules/api-key/server/src/services/api-key.service.ts",
       code: "export class ApiKeyService { async run() { return await this.repository.list(); } }",
     },
     {
-      filename: "packages/features/api-key/server/src/services/api-key.service.ts",
+      filename: "modules/api-key/server/src/services/api-key.service.ts",
       code: "export class ApiKeyService { async run() { return this.repository.list().map((item) => item.id); } }",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/api-key/server/src/services/api-key.service.ts",
+      filename: "modules/api-key/server/src/services/api-key.service.ts",
       code: "export class ApiKeyService { async run() { return (await this.repository.list()).map((item) => item.id); } }",
       errors: [{ messageId: "awaitedReturnChain" }],
     },
     {
-      filename: "packages/features/api-key/server/src/services/api-key.service.ts",
+      filename: "modules/api-key/server/src/services/api-key.service.ts",
       code: "export class ApiKeyService { async run() { return (await this.repository.list()).data.items; } }",
       errors: [{ messageId: "awaitedReturnChain" }],
     },
@@ -755,33 +755,33 @@ tester.run("awaited-return-chain", plugin.rules["awaited-return-chain"], {
 tester.run("package-boundaries: portable contracts", plugin.rules["package-boundaries"], {
   valid: [
     {
-      filename: "packages/features/agent/contract/src/agent.service.ts",
+      filename: "modules/agent/contract/src/agent.service.ts",
       code: 'import { z } from "zod"; export const agent = z.object({ id: z.string() });',
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/contract/src/agent.service.ts",
+      filename: "modules/agent/contract/src/agent.service.ts",
       code: 'import React from "react"; export { React };',
       errors: [{ messageId: "contractRuntime" }],
     },
     {
-      filename: "packages/features/agent/contract/src/agent.service.ts",
+      filename: "modules/agent/contract/src/agent.service.ts",
       code: 'import { readFile } from "node:fs/promises"; export { readFile };',
       errors: [{ messageId: "contractRuntime" }],
     },
     {
-      filename: "packages/features/agent/contract/src/agent.service.ts",
+      filename: "modules/agent/contract/src/agent.service.ts",
       code: 'import { PrismaClient } from "@prisma/client"; export { PrismaClient };',
       errors: [{ messageId: "prismaContainment" }],
     },
     {
-      filename: "packages/features/agent/contract/src/agent.service.ts",
+      filename: "modules/agent/contract/src/agent.service.ts",
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
       errors: [{ messageId: "contractRuntime" }],
     },
     {
-      filename: "packages/features/agent/contract/src/agent.service.ts",
+      filename: "modules/agent/contract/src/agent.service.ts",
       code: 'import { AgentCard } from "@langwatch/agent-web/screens/agent-management"; export { AgentCard };',
       errors: [{ messageId: "contractRuntime" }],
     },
@@ -792,18 +792,18 @@ tester.run("package-boundaries: portable contracts", plugin.rules["package-bound
 tester.run("package-boundaries: transport neutrality", plugin.rules["package-boundaries"], {
   valid: [
     {
-      filename: "packages/features/agent/contract/src/agent.command.ts",
+      filename: "modules/agent/contract/src/agent.command.ts",
       code: 'import { z } from "zod"; export const createAgent = z.object({ name: z.string() });',
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/contract/src/agent.command.ts",
+      filename: "modules/agent/contract/src/agent.command.ts",
       code: 'import { zValidator } from "@hono/zod-validator"; export { zValidator };',
       errors: [{ messageId: "schemaBoundary" }],
     },
     {
-      filename: "packages/features/agent/contract/src/agent.command.ts",
+      filename: "modules/agent/contract/src/agent.command.ts",
       code: 'import { resolver } from "hono-openapi/zod"; export { resolver };',
       errors: [{ messageId: "schemaBoundary" }, { messageId: "contractRuntime" }],
     },
@@ -814,23 +814,23 @@ tester.run("package-boundaries: transport neutrality", plugin.rules["package-bou
 tester.run("package-boundaries: server stays headless", plugin.rules["package-boundaries"], {
   valid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'import type { Agent } from "@langwatch/agent-contract"; export type Value = Agent;',
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'import React from "react"; export { React };',
       errors: [{ messageId: "serverImportsBrowser" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'import { Box } from "@chakra-ui/react"; export { Box };',
       errors: [{ messageId: "serverImportsBrowser" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'import { AgentCard } from "@langwatch/agent-web/screens/agent-management"; export { AgentCard };',
       errors: [{ messageId: "serverImportsBrowser" }],
     },
@@ -849,7 +849,7 @@ tester.run("package-boundaries: server installers", plugin.rules["package-bounda
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
     },
     {
-      filename: "packages/enterprise/composition/api/src/enterprise-api.composition.ts",
+      filename: "enterprise/packages/composition/api/src/enterprise-api.composition.ts",
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
     },
   ],
@@ -875,7 +875,7 @@ tester.run("package-boundaries: composition root tests", plugin.rules["package-b
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
     },
     {
-      filename: "packages/enterprise/composition/api/tests/wiring.unit.test.ts",
+      filename: "enterprise/packages/composition/api/tests/wiring.unit.test.ts",
       code: 'import { AgentService } from "@langwatch/agent-server"; export { AgentService };',
     },
   ],
@@ -892,13 +892,13 @@ tester.run("package-boundaries: composition root tests", plugin.rules["package-b
 tester.run("package-boundaries: package escape", plugin.rules["package-boundaries"], {
   valid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'import type { AgentRepository } from "../repositories/agent.repository"; export type Value = AgentRepository;',
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'import type { Agent } from "../../../contract/src/agent.service"; export type Value = Agent;',
       errors: [{ messageId: "packageEscape" }],
     },
@@ -909,13 +909,13 @@ tester.run("package-boundaries: package escape", plugin.rules["package-boundarie
 tester.run("package-boundaries: sealed exports", plugin.rules["package-boundaries"], {
   valid: [
     {
-      filename: "packages/features/prompt/web/src/prompt-list.tsx",
+      filename: "modules/prompt/web/src/prompt-list.tsx",
       code: 'import type { Agent } from "@langwatch/agent-contract"; export type Value = Agent;',
     },
   ],
   invalid: [
     {
-      filename: "packages/features/prompt/web/src/prompt-list.tsx",
+      filename: "modules/prompt/web/src/prompt-list.tsx",
       code: 'import type { Agent } from "@langwatch/agent-contract/src/agent.service"; export type Value = Agent;',
       errors: [{ messageId: "sealedExports" }],
     },
@@ -926,23 +926,23 @@ tester.run("package-boundaries: sealed exports", plugin.rules["package-boundarie
 tester.run("package-boundaries: feature layer direction", plugin.rules["package-boundaries"], {
   valid: [
     {
-      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "modules/agent/server/src/api/public/agent.api.ts",
       code: 'import type { AgentService } from "../../services/agent.service"; export type Value = AgentService;',
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/server/src/api/public/agent.api.ts",
+      filename: "modules/agent/server/src/api/public/agent.api.ts",
       code: 'import type { AgentRepository } from "../../repositories/agent.repository"; export type Value = AgentRepository;',
       errors: [{ messageId: "featureLayer" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'import type { AgentApi } from "../api/public/agent.api"; export type Value = AgentApi;',
       errors: [{ messageId: "featureLayer" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: 'import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository"; export { PrismaAgentRepository };',
       errors: [{ messageId: "featureLayer" }],
     },
@@ -953,11 +953,11 @@ tester.run("package-boundaries: feature layer direction", plugin.rules["package-
 tester.run("package-boundaries: web feature surfaces", plugin.rules["package-boundaries"], {
   valid: [
     {
-      filename: "packages/features/prompt/web/src/ui/elements/browser-panel.tsx",
+      filename: "modules/prompt/web/src/ui/elements/browser-panel.tsx",
       code: 'import { BrowserPort } from "@langwatch/agent-web/surfaces/browser-port"; export { BrowserPort };',
     },
     {
-      filename: "packages/enterprise/features/billing/web/src/ui/elements/scope-row.tsx",
+      filename: "enterprise/modules/billing/web/src/ui/elements/scope-row.tsx",
       code: 'import { ScopePicker } from "@langwatch/authz-web/surfaces/scope-picker"; export { ScopePicker };',
     },
     {
@@ -967,17 +967,17 @@ tester.run("package-boundaries: web feature surfaces", plugin.rules["package-bou
   ],
   invalid: [
     {
-      filename: "packages/features/prompt/web/src/ui/elements/briefing.tsx",
+      filename: "modules/prompt/web/src/ui/elements/briefing.tsx",
       code: 'import { Langy } from "@langwatch/langy-web"; export { Langy };',
       errors: [{ messageId: "crossFeature" }],
     },
     {
-      filename: "packages/features/prompt/web/src/ui/elements/briefing.tsx",
+      filename: "modules/prompt/web/src/ui/elements/briefing.tsx",
       code: 'import { TraceDrawers } from "@langwatch/trace-web/drawers"; export { TraceDrawers };',
       errors: [{ messageId: "crossFeature" }],
     },
     {
-      filename: "packages/features/prompt/web/src/ui/elements/agents.tsx",
+      filename: "modules/prompt/web/src/ui/elements/agents.tsx",
       code: 'import { AgentManagementScreen } from "@langwatch/agent-web/screens/agent-management"; export { AgentManagementScreen };',
       errors: [{ messageId: "crossFeature" }],
     },
@@ -989,7 +989,7 @@ tester.run("package-boundaries: web test seam", plugin.rules["package-boundaries
   valid: [
     {
       filename:
-        "packages/features/scenario/web/src/behavior/suites/__tests__/cancel-button.integration.test.tsx",
+        "modules/scenario/web/src/behavior/suites/__tests__/cancel-button.integration.test.tsx",
       code: 'import { makeScenarioRunData } from "@langwatch/suite-web/testing"; export { makeScenarioRunData };',
     },
     {
@@ -999,7 +999,7 @@ tester.run("package-boundaries: web test seam", plugin.rules["package-boundaries
   ],
   invalid: [
     {
-      filename: "packages/features/scenario/web/src/behavior/suites/run-history.ts",
+      filename: "modules/scenario/web/src/behavior/suites/run-history.ts",
       code: 'import { makeScenarioRunData } from "@langwatch/suite-web/testing"; export { makeScenarioRunData };',
       errors: [{ messageId: "crossFeature" }],
     },
@@ -1009,54 +1009,54 @@ tester.run("package-boundaries: web test seam", plugin.rules["package-boundaries
 tester.run("cognitive-complexity", plugin.rules["cognitive-complexity"], {
   valid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function classify(a, b, c) { if (a) { return 1; } if (b) { return 2; } if (c) { return 3; } return 0; }",
       options: [{ max: 3 }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export const pick = (a, b) => (a ? 1 : b ? 2 : 3);",
       options: [{ max: 3 }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function outer(items) { return items.map((item) => { if (item) { return 1; } return 0; }); }",
       options: [{ max: 2 }],
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function classify(a, b, c) { if (a) { return 1; } if (b) { return 2; } if (c) { return 3; } return 0; }",
       options: [{ max: 2 }],
       errors: [{ messageId: "tooComplex" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function nested(a, b, c) { if (a) { for (const x of b) { while (c) { c = false; } } } }",
       options: [{ max: 5 }],
       errors: [{ messageId: "tooComplex" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function chain(a, b, c, d, e) { if (a && b && c || d || e) { return 1; } return 0; }",
       options: [{ max: 2 }],
       errors: [{ messageId: "tooComplex" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function ternary(a) { return a ? (a ? 1 : 2) : 3; }",
       options: [{ max: 2 }],
       errors: [{ messageId: "tooComplex" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function loopWithArrow(items) { for (const item of items) { items.map((value) => (value ? 1 : 2)); } }",
       options: [{ max: 3 }],
       errors: [{ messageId: "tooComplex" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function countdown(n) { if (n > 0) { return countdown(n - 1); } return 0; }",
       options: [{ max: 1 }],
       errors: [{ messageId: "tooComplex" }],
@@ -1067,60 +1067,60 @@ tester.run("cognitive-complexity", plugin.rules["cognitive-complexity"], {
 tester.run("condition-shape", plugin.rules["condition-shape"], {
   valid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function guard(input) { if (!input.id) { return null; } return input; }",
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function ready(state) { if (state.loaded && state.visible) { return true; } return false; }",
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function pick(state) { return state.enabled ? 1 : 0; }",
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function scan(rows) { while (rows.length) { rows.pop(); } }",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function deep(input) { if (input.meta.owner.name) { return 1; } return 0; }",
       errors: [{ messageId: "nameCondition" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function optional(input) { if (input?.meta?.owner?.name) { return 1; } return 0; }",
       errors: [{ messageId: "nameCondition" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function calls(a, b) { if (first(a) && second(b)) { return 1; } return 0; }",
       errors: [{ messageId: "nameCondition" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function operators(a, b, c, d) { if (a && b || c && d) { return 1; } return 0; }",
       errors: [{ messageId: "nameCondition" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function nestedTernary(a, b) { return (a ? b : !b) ? 1 : 0; }",
       errors: [{ messageId: "nameCondition" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function loop(rows, index) { while (rows.at(index).children.length) { index += 1; } }",
       errors: [{ messageId: "nameCondition" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function branch(input) { switch (input.meta.owner.kind) { default: return 0; } }",
       errors: [{ messageId: "nameCondition" }],
     },
     {
-      filename: "packages/features/agent/server/src/services/agent.service.ts",
+      filename: "modules/agent/server/src/services/agent.service.ts",
       code: "export function loosened(a, b, c) { if (a && b && c) { return 1; } return 0; }",
       options: [{ maxOperators: 1 }],
       errors: [{ messageId: "nameCondition" }],
@@ -1136,44 +1136,44 @@ tester.run("condition-shape", plugin.rules["condition-shape"], {
 tester.run("fallible-result-naming", plugin.rules["fallible-result-naming"], {
   valid: [
     {
-      filename: "packages/features/project/contract/src/project.service.ts",
+      filename: "modules/project/contract/src/project.service.ts",
       code: "export abstract class ProjectService { abstract tryGetById(): Promise<string | null>; }",
     },
     {
-      filename: "packages/features/project/contract/src/project.service.ts",
+      filename: "modules/project/contract/src/project.service.ts",
       code: "export abstract class ProjectService { abstract getById(): Promise<string>; }",
     },
     {
-      filename: "packages/features/project/contract/src/project.service.ts",
+      filename: "modules/project/contract/src/project.service.ts",
       code: "export class EvaluationPreconditionService { requiredFieldsArePresent(): boolean { return true; } }",
     },
     {
-      filename: "packages/features/project/server/src/services/project.service.ts",
+      filename: "modules/project/server/src/services/project.service.ts",
       code: "export class ProjectService { getById(): Promise<string> { return Promise.resolve('project'); } private map(row: string | null): string | null { return row; } }",
     },
     {
-      filename: "packages/features/project/server/src/app/project.app.ts",
+      filename: "modules/project/server/src/app/project.app.ts",
       code: "export class ProjectApp { findById() { return null; } }",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/project/contract/src/project.service.ts",
+      filename: "modules/project/contract/src/project.service.ts",
       code: "export abstract class ProjectService { abstract findById(): Promise<string | null>; }",
       errors: [{ messageId: "untriedAbsence" }],
     },
     {
-      filename: "packages/features/project/contract/src/project.service.ts",
+      filename: "modules/project/contract/src/project.service.ts",
       code: "export abstract class ProjectService { abstract requireById(): Promise<string>; }",
       errors: [{ messageId: "requirePrefix" }],
     },
     {
-      filename: "packages/features/project/contract/src/project.service.ts",
+      filename: "modules/project/contract/src/project.service.ts",
       code: "export abstract class ProjectService { abstract tryGetById(): Promise<string>; }",
       errors: [{ messageId: "tryWithoutAbsence" }],
     },
     {
-      filename: "packages/features/project/server/src/services/project.service.ts",
+      filename: "modules/project/server/src/services/project.service.ts",
       code: "export class ProjectService { requireById() { return 'project'; } tryGetById() { return null; } }",
       errors: [
         { messageId: "requirePrefix" },
@@ -1182,7 +1182,7 @@ tester.run("fallible-result-naming", plugin.rules["fallible-result-naming"], {
       ],
     },
     {
-      filename: "packages/features/project/server/src/ports/project.port.ts",
+      filename: "modules/project/server/src/ports/project.port.ts",
       code: "export abstract class ProjectRepositoryPort { abstract findById(): Promise<string | null>; }",
       errors: [{ messageId: "untriedAbsence" }],
     },
@@ -1192,33 +1192,33 @@ tester.run("fallible-result-naming", plugin.rules["fallible-result-naming"], {
 tester.run("feature-source-filename", plugin.rules["feature-source-filename"], {
   valid: [
     {
-      filename: "packages/features/project/server/src/services/project.service.ts",
+      filename: "modules/project/server/src/services/project.service.ts",
       code: "export const value = 1;",
     },
     {
       filename:
-        "packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts",
+        "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
       code: "export const value = 1;",
     },
     {
       filename:
-        "packages/features/project/server/src/services/__tests__/projectService.unit.test.ts",
+        "modules/project/server/src/services/__tests__/projectService.unit.test.ts",
       code: "export const value = 1;",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/project/server/src/services/projectService.service.ts",
+      filename: "modules/project/server/src/services/projectService.service.ts",
       code: "export const value = 1;",
       errors: [{ messageId: "filename" }],
     },
     {
-      filename: "packages/features/project/web/src/ui/ProjectPanel.tsx",
+      filename: "modules/project/web/src/ui/ProjectPanel.tsx",
       code: "export const value = 1;",
       errors: [{ messageId: "filename" }],
     },
     {
-      filename: "packages/features/project/server/src/repositories/prisma-project.repository.ts",
+      filename: "modules/project/server/src/repositories/prisma-project.repository.ts",
       code: "export const value = 1;",
       errors: [{ messageId: "filename" }],
     },
@@ -1231,66 +1231,66 @@ tester.run("feature-source-filename", plugin.rules["feature-source-filename"], {
 tester.run("feature-source-layout", plugin.rules["feature-source-layout"], {
   valid: [
     {
-      filename: "packages/features/project/contract/src/project.service.ts",
+      filename: "modules/project/contract/src/project.service.ts",
       code: "export const value = 1;",
     },
     {
-      filename: "packages/features/project/contract/src/index.ts",
+      filename: "modules/project/contract/src/index.ts",
       code: "export const value = 1;",
     },
     {
-      filename: "packages/features/project/server/src/transport/api-rest/project.api.ts",
+      filename: "modules/project/server/src/transport/api-rest/project.api.ts",
       code: "export const value = 1;",
     },
     {
-      filename: "packages/features/project/server/src/rules/project.rules.ts",
+      filename: "modules/project/server/src/rules/project.rules.ts",
       code: "export const registry = new Map<string, string>();",
     },
     {
-      filename: "packages/features/project/server/src/services/__tests__/project.unit.test.ts",
+      filename: "modules/project/server/src/services/__tests__/project.unit.test.ts",
       code: "export class Helper {}",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/project/contract/src/service.ts",
+      filename: "modules/project/contract/src/service.ts",
       code: "export const value = 1;",
       errors: [{ messageId: "contractMissingSubject" }],
     },
     {
-      filename: "packages/features/project/contract/src/project.port.ts",
+      filename: "modules/project/contract/src/project.port.ts",
       code: "export const value = 1;",
       errors: [{ messageId: "contractServerArtifact" }],
     },
     {
-      filename: "packages/features/project/server/src/helpers/project-helper.ts",
+      filename: "modules/project/server/src/helpers/project-helper.ts",
       code: "export const value = 1;",
       errors: [{ messageId: "serverPath" }],
     },
     {
       // A test outside a `__tests__` directory is still a server source path.
-      filename: "packages/features/project/server/src/services/project.service.unit.test.ts",
+      filename: "modules/project/server/src/services/project.service.unit.test.ts",
       code: "export const covered = true;",
       errors: [{ messageId: "serverPath" }],
     },
     {
       filename:
-        "packages/features/project/server/src/repositories/prisma/prisma.project.extra.repository.ts",
+        "modules/project/server/src/repositories/prisma/prisma.project.extra.repository.ts",
       code: "export const value = 1;",
       errors: [{ messageId: "serverPath" }],
     },
     {
-      filename: "packages/features/project/server/src/services/project-process.service.ts",
+      filename: "modules/project/server/src/services/project-process.service.ts",
       code: "export const value = 1;",
       errors: [{ messageId: "processManagerService" }],
     },
     {
-      filename: "packages/features/project/server/src/rules/project.rules.ts",
+      filename: "modules/project/server/src/rules/project.rules.ts",
       code: "export class ProjectRules {}",
       errors: [{ messageId: "rulesImpurity" }],
     },
     {
-      filename: "packages/features/project/server/src/rules/project.rules.ts",
+      filename: "modules/project/server/src/rules/project.rules.ts",
       code: "import { Client } from './client'; export const client = new Client();",
       errors: [{ messageId: "rulesImpurity" }],
     },
@@ -1302,26 +1302,26 @@ tester.run("feature-source-layout", plugin.rules["feature-source-layout"], {
 tester.run("feature-source-subject", plugin.rules["feature-source-subject"], {
   valid: [
     {
-      filename: "packages/features/project/server/src/services/project.service.ts",
+      filename: "modules/project/server/src/services/project.service.ts",
       code: "export const value = 1;",
     },
     {
-      filename: "packages/features/project/server/src/index.ts",
+      filename: "modules/project/server/src/index.ts",
       code: "export const value = 1;",
     },
     {
-      filename: "packages/features/project/server/src/ports/notification.port.ts",
+      filename: "modules/project/server/src/ports/notification.port.ts",
       code: "export const value = 1;",
     },
   ],
   invalid: [
     {
-      filename: "packages/features/project/server/src/services/notification.service.ts",
+      filename: "modules/project/server/src/services/notification.service.ts",
       code: "export const value = 1;",
       errors: [{ messageId: "foreignSubject" }],
     },
     {
-      filename: "packages/features/evaluator/server/src/adapters/prisma.audit-log.adapter.ts",
+      filename: "modules/evaluator/server/src/adapters/prisma.audit-log.adapter.ts",
       code: "export const value = 1;",
       errors: [{ messageId: "foreignSubject" }],
     },
@@ -1332,11 +1332,11 @@ tester.run("prisma-containment", plugin.rules["prisma-containment"], {
   valid: [
     {
       filename:
-        "packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts",
+        "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
       code: "import { PrismaClient } from '@langwatch/prisma-client/generated'; export type Db = PrismaClient;",
     },
     {
-      filename: "packages/features/project/server/src/adapters/postgres.project.adapter.ts",
+      filename: "modules/project/server/src/adapters/postgres.project.adapter.ts",
       code: "import { PrismaClient } from '@langwatch/prisma-client/generated'; export type Db = PrismaClient;",
     },
     {
@@ -1350,17 +1350,17 @@ tester.run("prisma-containment", plugin.rules["prisma-containment"], {
   ],
   invalid: [
     {
-      filename: "packages/features/project/server/src/services/project.service.ts",
+      filename: "modules/project/server/src/services/project.service.ts",
       code: "import { PrismaClient } from '@langwatch/prisma-client/generated'; export type Db = PrismaClient;",
       errors: [{ messageId: "generatedPrisma" }],
     },
     {
-      filename: "packages/features/project/contract/src/project.service.ts",
+      filename: "modules/project/contract/src/project.service.ts",
       code: "export { PrismaClient } from '@langwatch/prisma-client/generated';",
       errors: [{ messageId: "generatedPrisma" }],
     },
     {
-      filename: "packages/features/project/server/src/services/project.service.ts",
+      filename: "modules/project/server/src/services/project.service.ts",
       code: "import { prisma } from '@langwatch/prisma-client'; export { prisma };",
       errors: [{ messageId: "featurePrismaClient" }],
     },
@@ -1376,28 +1376,28 @@ tester.run("typed-prisma-seam", plugin.rules["typed-prisma-seam"], {
   valid: [
     {
       filename:
-        "packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts",
+        "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
       code: "export class R { static create(prisma: PrismaClient) { return new R(prisma); } }",
     },
     {
-      filename: "packages/features/project/server/src/services/project.service.ts",
+      filename: "modules/project/server/src/services/project.service.ts",
       code: "export const db = client as PrismaClient;",
     },
     {
       // Already on the shrink-only baseline, so the sweep owns it, not the run.
-      filename: "packages/features/automation/server/src/adapters/postgres.automation.adapter.ts",
+      filename: "modules/automation/server/src/adapters/postgres.automation.adapter.ts",
       code: "export const db = client as PrismaClient;",
     },
   ],
   invalid: [
     {
       filename:
-        "packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts",
+        "modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
       code: "export const db = client as PrismaClient;",
       errors: [{ messageId: "cast" }],
     },
     {
-      filename: "packages/features/project/server/src/adapters/postgres.project.adapter.ts",
+      filename: "modules/project/server/src/adapters/postgres.project.adapter.ts",
       code: "export class A { static create(database: object) { return new A(); } }",
       errors: [{ messageId: "databaseObject" }],
     },
@@ -1417,7 +1417,7 @@ tester.run("no-raw-hono-mount", plugin.rules["no-raw-hono-mount"], {
     },
     {
       // Serving a request through the composed app registers nothing.
-      filename: "packages/features/monitor/server/src/app/__tests__/monitor.transport.unit.test.ts",
+      filename: "modules/monitor/server/src/app/__tests__/monitor.transport.unit.test.ts",
       code: 'export const response = app.hono.request("/api/monitors");',
     },
     {
@@ -1444,7 +1444,7 @@ tester.run("no-raw-hono-mount", plugin.rules["no-raw-hono-mount"], {
   ],
 });
 
-const layerFilename = "packages/features/project/server/src/services/example.service.ts";
+const layerFilename = "modules/project/server/src/services/example.service.ts";
 
 tester.run("layer-class", plugin.rules["layer-class"], {
   valid: [
@@ -1492,7 +1492,7 @@ tester.run("layer-class", plugin.rules["layer-class"], {
 }`,
     },
     {
-      filename: "packages/features/project/server/src/app/example.app.ts",
+      filename: "modules/project/server/src/app/example.app.ts",
       code: `export class ExampleApp {
   a(input: In): Out { return this.deps.example.a(input); }
   b(input: In): Out { return this.deps.example.b(input); }
@@ -1503,7 +1503,7 @@ tester.run("layer-class", plugin.rules["layer-class"], {
     },
     {
       filename:
-        "packages/features/project/server/src/repositories/routed/routed.example.repository.ts",
+        "modules/project/server/src/repositories/routed/routed.example.repository.ts",
       code: `export class RoutedExampleRepository {
   a(input: In): Out { return this.primary.a(input); }
   b(input: In): Out { return this.primary.b(input); }

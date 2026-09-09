@@ -182,11 +182,14 @@ jobs:
               # apps/ui — plus apps/server, the npx self-host CLI. This IS the
               # code these jobs exist to protect: the monolith they were
               # written for is gone, and every transport, router, worker
-              # installer and browser screen lives here or under packages/.
+              # installer and browser screen lives here, under modules/ or
+              # under packages/.
               - 'apps/**'
               # Workspace members the applications' `...` closures install from
               # source — a change there is a change to all three.
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               # @langwatch/langyworker tests + typecheck run on unit shard 1;
               # without this a wrapper-only change runs zero app CI.
               - 'services/langyworker/**'
@@ -248,6 +251,8 @@ jobs:
               - 'charts/gateway/tests/**'
               - 'apps/**'
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               - 'skills/**'
               - 'plugins/**'
               - 'tools/**'
@@ -372,6 +377,8 @@ jobs:
         with:
           path: |
             packages/**/node_modules/.cache/tsbuildinfo
+            modules/**/node_modules/.cache/tsbuildinfo
+            enterprise/**/node_modules/.cache/tsbuildinfo
             apps/*/node_modules/.cache/tsbuildinfo
           key: ${{ runner.os }}-pkg-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
@@ -381,7 +388,7 @@ jobs:
       # Not --no-bail: one package's failure should not hide the rest, and a
       # migration in flight tends to break several at once. The job still fails.
       - name: Run every package typecheck
-        run: pnpm -r --workspace-concurrency=1 --no-bail --filter "./packages/**" --filter "./apps/**" typecheck
+        run: pnpm -r --workspace-concurrency=1 --no-bail --filter "./packages/**" --filter "./modules/**" --filter "./enterprise/**" --filter "./apps/**" typecheck
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -630,7 +637,7 @@ jobs:
         run: pnpm --filter @langwatch/webhook-server run test
 
       # The six enterprise contract packages whose suites `vitest` could not
-      # even discover until `packages/enterprise/vitest.config.ts` learned the
+      # even discover until `enterprise/vitest.config.ts` learned the
       # `src/__tests__/` layout their tests moved to. 155 tests, all green the
       # first time they ran; naming them keeps them that way.
       - name: Run @langwatch/enterprise-billing-contract tests
@@ -670,7 +677,7 @@ jobs:
       # share-safe payload cache. Its suites live under packages/, so the app's
       # vitest root cannot see them and nothing here named them: the whole
       # feature's own coverage ran nowhere, while the scenarios it binds in
-      # packages/features/share/specs/share.feature still counted as bound by
+      # modules/share/specs/share.feature still counted as bound by
       # check-feature-parity.ts. Same raw-TypeScript, shard-1 arrangement as
       # the packages above.
       - name: Run @langwatch/share-contract unit tests

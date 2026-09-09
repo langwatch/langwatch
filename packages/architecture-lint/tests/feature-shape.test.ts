@@ -15,7 +15,7 @@ import { snapshotOf } from "./workspace.ts";
 
 let root = "";
 const catalogue: FeatureCatalogueEntry[] = [
-  { id: "widget", root: "packages/features/widget", classification: "core", subjects: ["widget"] },
+  { id: "widget", root: "modules/widget", classification: "core", subjects: ["widget"] },
 ];
 
 beforeEach(() => {
@@ -33,7 +33,7 @@ function write(path: string, content = "export {};\n"): void {
 }
 
 function pkg(kind: "contract" | "server" | "web", feature = "widget"): ClassifiedPackage {
-  const featureRoot = join(root, `packages/features/${feature}`);
+  const featureRoot = join(root, `modules/${feature}`);
   const directory = join(featureRoot, kind);
 
   return {
@@ -52,21 +52,21 @@ function pkg(kind: "contract" | "server" | "web", feature = "widget"): Classifie
 
 /** The annotation reference shape, reduced to the paths the policy reads. */
 function referenceFeature(): void {
-  write("packages/features/widget/contract/src/widget.api.ts");
-  write("packages/features/widget/server/src/widget.server.ts");
-  write("packages/features/widget/server/src/app/widget.app.ts");
-  write("packages/features/widget/server/src/app/__tests__/widget.fixture.ts");
-  write("packages/features/widget/server/src/services/widget.service.ts");
-  write("packages/features/widget/server/src/repositories/widget.repository.ts");
-  write("packages/features/widget/server/src/repositories/widget-repositories.registry.ts");
-  write("packages/features/widget/server/src/repositories/prisma/prisma.widget.repository.ts");
-  write("packages/features/widget/server/src/repositories/memory/memory.widget.repository.ts");
+  write("modules/widget/contract/src/widget.api.ts");
+  write("modules/widget/server/src/widget.server.ts");
+  write("modules/widget/server/src/app/widget.app.ts");
+  write("modules/widget/server/src/app/__tests__/widget.fixture.ts");
+  write("modules/widget/server/src/services/widget.service.ts");
+  write("modules/widget/server/src/repositories/widget.repository.ts");
+  write("modules/widget/server/src/repositories/widget-repositories.registry.ts");
+  write("modules/widget/server/src/repositories/prisma/prisma.widget.repository.ts");
+  write("modules/widget/server/src/repositories/memory/memory.widget.repository.ts");
   write(
-    "packages/features/widget/server/src/repositories/__tests__/widget.repository.contract.test.ts",
+    "modules/widget/server/src/repositories/__tests__/widget.repository.contract.test.ts",
   );
-  write("packages/features/widget/server/src/transport/widget.rest.ts");
-  write("packages/features/widget/server/src/transport/widget.trpc.ts");
-  write("packages/features/widget/web/src/widgets.ts");
+  write("modules/widget/server/src/transport/widget.rest.ts");
+  write("modules/widget/server/src/transport/widget.trpc.ts");
+  write("modules/widget/web/src/widgets.ts");
   write(
     "apps/api/src/features/widget/widget.composition.ts",
     'createApp().withFeature(widgetServer).boot({ role: "api" });\n',
@@ -117,12 +117,12 @@ describe("feature shape", () => {
   describe("given a feature still carrying the older shape", () => {
     beforeEach(() => {
       referenceFeature();
-      write("packages/features/widget/contract/src/widget.service.ts");
-      write("packages/features/widget/server/src/adapters/postgres.widget.adapter.ts");
-      write("packages/features/widget/server/src/fixtures/widget.fixture.ts");
-      write("packages/features/widget/server/src/testing.ts");
+      write("modules/widget/contract/src/widget.service.ts");
+      write("modules/widget/server/src/adapters/postgres.widget.adapter.ts");
+      write("modules/widget/server/src/fixtures/widget.fixture.ts");
+      write("modules/widget/server/src/testing.ts");
       write(
-        "packages/features/widget/server/src/transport/api-trpc/widget.api.ts",
+        "modules/widget/server/src/transport/api-trpc/widget.api.ts",
         "export const widgetApi = createTrpcService({ name: 'widget' });\n",
       );
     });
@@ -133,32 +133,32 @@ describe("feature shape", () => {
         {
           feature: "widget",
           kind: "contract-service",
-          path: "packages/features/widget/contract/src/widget.service.ts",
+          path: "modules/widget/contract/src/widget.service.ts",
         },
         {
           feature: "widget",
           kind: "fixtures-directory",
-          path: "packages/features/widget/server/src/fixtures",
+          path: "modules/widget/server/src/fixtures",
         },
         {
           feature: "widget",
           kind: "legacy-transport-runtime",
-          path: "packages/features/widget/server/src/transport/api-trpc/widget.api.ts",
+          path: "modules/widget/server/src/transport/api-trpc/widget.api.ts",
         },
         {
           feature: "widget",
           kind: "nested-transport",
-          path: "packages/features/widget/server/src/transport/api-trpc",
+          path: "modules/widget/server/src/transport/api-trpc",
         },
         {
           feature: "widget",
           kind: "persistence-adapter",
-          path: "packages/features/widget/server/src/adapters/postgres.widget.adapter.ts",
+          path: "modules/widget/server/src/adapters/postgres.widget.adapter.ts",
         },
         {
           feature: "widget",
           kind: "testing-entry",
-          path: "packages/features/widget/server/src/testing.ts",
+          path: "modules/widget/server/src/testing.ts",
         },
       ]);
     });
@@ -196,7 +196,7 @@ describe("feature shape", () => {
         { feature: "widget", kind: "persistence-adapter" },
         { feature: "widget", kind: "testing-entry" },
       ]);
-      rmSync(join(root, "packages/features/widget/server/src/testing.ts"));
+      rmSync(join(root, "modules/widget/server/src/testing.ts"));
 
       expect(violations()).toMatchObject([
         {
@@ -235,7 +235,7 @@ describe("feature shape", () => {
     it("reports the family as running on the legacy runtime, naming the file", () => {
       referenceFeature();
       write(
-        "packages/features/widget/server/src/transport/widget.rest.ts",
+        "modules/widget/server/src/transport/widget.rest.ts",
         'const { service } = security.createVersionedApp({ name: "widgets" });\n',
       );
 
@@ -243,7 +243,7 @@ describe("feature shape", () => {
         {
           feature: "widget",
           kind: "legacy-transport-runtime",
-          path: "packages/features/widget/server/src/transport/widget.rest.ts",
+          path: "modules/widget/server/src/transport/widget.rest.ts",
         },
       ]);
     });
@@ -255,7 +255,7 @@ describe("feature shape", () => {
       rmSync(
         join(
           root,
-          "packages/features/widget/server/src/repositories/widget-repositories.registry.ts",
+          "modules/widget/server/src/repositories/widget-repositories.registry.ts",
         ),
       );
 
@@ -267,7 +267,7 @@ describe("feature shape", () => {
       rmSync(
         join(
           root,
-          "packages/features/widget/server/src/repositories/__tests__/widget.repository.contract.test.ts",
+          "modules/widget/server/src/repositories/__tests__/widget.repository.contract.test.ts",
         ),
       );
 
@@ -276,7 +276,7 @@ describe("feature shape", () => {
 
     it("asks for the memory twin when only Prisma repositories exist", () => {
       referenceFeature();
-      rmSync(join(root, "packages/features/widget/server/src/repositories/memory"), {
+      rmSync(join(root, "modules/widget/server/src/repositories/memory"), {
         recursive: true,
       });
 
@@ -287,14 +287,14 @@ describe("feature shape", () => {
   describe("given a feature that lacks a piece of the reference", () => {
     it("asks for the installer when no <feature>.server.ts exists", () => {
       referenceFeature();
-      rmSync(join(root, "packages/features/widget/server/src/widget.server.ts"));
+      rmSync(join(root, "modules/widget/server/src/widget.server.ts"));
 
       expect(findings().map((finding) => finding.kind)).toEqual(["no-installer"]);
     });
 
     it("asks for the one app when no app/<feature>.app.ts exists", () => {
       referenceFeature();
-      rmSync(join(root, "packages/features/widget/server/src/app/widget.app.ts"));
+      rmSync(join(root, "modules/widget/server/src/app/widget.app.ts"));
 
       expect(findings().map((finding) => finding.kind)).toEqual(["no-app"]);
     });
@@ -308,7 +308,7 @@ describe("feature shape", () => {
         {
           feature: "widget",
           kind: "installer-not-booted",
-          path: "packages/features/widget/server/src/widget.server.ts",
+          path: "modules/widget/server/src/widget.server.ts",
         },
       ]);
     });
@@ -341,14 +341,14 @@ describe("feature shape", () => {
 
     it("reports web entries still nested under screens/ or surfaces/", () => {
       referenceFeature();
-      write("packages/features/widget/web/src/screens/widgets/index.ts");
-      write("packages/features/widget/web/src/surfaces");
+      write("modules/widget/web/src/screens/widgets/index.ts");
+      write("modules/widget/web/src/surfaces");
 
       expect(findings()).toEqual([
         {
           feature: "widget",
           kind: "nested-web-entry",
-          path: "packages/features/widget/web/src/screens",
+          path: "modules/widget/web/src/screens",
         },
       ]);
     });
@@ -367,8 +367,8 @@ describe("feature shape", () => {
     /** @scenario "An out-of-order or duplicated file is refused before it is read" */
     it("refuses an unsorted or duplicated inventory", () => {
       referenceFeature();
-      write("packages/features/widget/server/src/testing.ts");
-      write("packages/features/widget/contract/src/widget.service.ts");
+      write("modules/widget/server/src/testing.ts");
+      write("modules/widget/contract/src/widget.service.ts");
       write(
         "packages/architecture-lint/src/feature-shape-baseline.json",
         JSON.stringify({
@@ -387,7 +387,7 @@ describe("feature shape", () => {
     });
 
     it("measures only catalogue features", () => {
-      write("packages/features/other/server/src/testing.ts");
+      write("modules/other/server/src/testing.ts");
 
       expect(collectFeatureShapeFindings(root, catalogue, [pkg("server", "other")])).toEqual([]);
     });

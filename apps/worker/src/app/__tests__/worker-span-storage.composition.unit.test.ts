@@ -12,7 +12,7 @@ import {
 } from "../worker-span-storage.composition.ts";
 
 /**
- * Spec: packages/features/trace/specs/span-storage-write.feature
+ * Spec: modules/trace/specs/span-storage-write.feature
  *
  * A COMPOSITION-CAPABILITY test. Trace has not converted, so the application
  * still registers the span-storage projection and nothing in this process

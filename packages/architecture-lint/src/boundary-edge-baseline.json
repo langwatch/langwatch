@@ -3,482 +3,482 @@
   "policy": "boundary-edge",
   "entries": [
     {
-      "key": "cross-feature|packages/enterprise/features/billing/web/package.json|@langwatch/enterprise-licensing-web",
+      "key": "cross-feature|enterprise/modules/billing/web/package.json|@langwatch/enterprise-licensing-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/enterprise/features/billing/web/package.json|@langwatch/workflow-web",
+      "key": "cross-feature|enterprise/modules/billing/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/enterprise/features/governance/server/package.json|@langwatch/project-server",
+      "key": "cross-feature|enterprise/modules/governance/server/package.json|@langwatch/project-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/enterprise/features/governance/server/package.json|@langwatch/trace-server",
+      "key": "cross-feature|enterprise/modules/governance/server/package.json|@langwatch/trace-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/enterprise/features/governance/web/package.json|@langwatch/authz-web",
+      "key": "cross-feature|enterprise/modules/governance/web/package.json|@langwatch/authz-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/enterprise/features/governance/web/package.json|@langwatch/coding-agent-web",
+      "key": "cross-feature|enterprise/modules/governance/web/package.json|@langwatch/coding-agent-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/enterprise/features/scim/server/package.json|@langwatch/identity-server",
+      "key": "cross-feature|enterprise/modules/scim/server/package.json|@langwatch/identity-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/analytics/server/package.json|@langwatch/feature-flag-server",
+      "key": "cross-feature|modules/analytics/server/package.json|@langwatch/feature-flag-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/analytics/server/package.json|@langwatch/trace-server",
+      "key": "cross-feature|modules/analytics/server/package.json|@langwatch/trace-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/analytics/web/package.json|@langwatch/evaluator-web",
+      "key": "cross-feature|modules/analytics/web/package.json|@langwatch/evaluator-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/analytics/web/package.json|@langwatch/workflow-web",
+      "key": "cross-feature|modules/analytics/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/api-key/web/package.json|@langwatch/authz-web",
+      "key": "cross-feature|modules/api-key/web/package.json|@langwatch/authz-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/auth/server/package.json|@langwatch/identity-server",
+      "key": "cross-feature|modules/auth/server/package.json|@langwatch/identity-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/coding-agent/web/package.json|@langwatch/trace-web",
+      "key": "cross-feature|modules/coding-agent/web/package.json|@langwatch/trace-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/dashboard/server/package.json|@langwatch/analytics-server",
+      "key": "cross-feature|modules/dashboard/server/package.json|@langwatch/analytics-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/dashboard/server/package.json|@langwatch/feature-flag-server",
+      "key": "cross-feature|modules/dashboard/server/package.json|@langwatch/feature-flag-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/data-privacy/web/package.json|@langwatch/authz-web",
+      "key": "cross-feature|modules/data-privacy/web/package.json|@langwatch/authz-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/data-retention/web/package.json|@langwatch/authz-web",
+      "key": "cross-feature|modules/data-retention/web/package.json|@langwatch/authz-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/dataset/web/package.json|@langwatch/workflow-web",
+      "key": "cross-feature|modules/dataset/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/evaluator/web/package.json|@langwatch/analytics-web",
+      "key": "cross-feature|modules/evaluator/web/package.json|@langwatch/analytics-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/evaluator/web/package.json|@langwatch/experiment-web",
+      "key": "cross-feature|modules/evaluator/web/package.json|@langwatch/experiment-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/evaluator/web/package.json|@langwatch/model-provider-web",
+      "key": "cross-feature|modules/evaluator/web/package.json|@langwatch/model-provider-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/evaluator/web/package.json|@langwatch/prompt-web",
+      "key": "cross-feature|modules/evaluator/web/package.json|@langwatch/prompt-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/evaluator/web/package.json|@langwatch/trace-web",
+      "key": "cross-feature|modules/evaluator/web/package.json|@langwatch/trace-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/evaluator/web/package.json|@langwatch/workflow-web",
+      "key": "cross-feature|modules/evaluator/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/experiment/server/package.json|@langwatch/agent-server",
+      "key": "cross-feature|modules/experiment/server/package.json|@langwatch/agent-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/experiment/server/package.json|@langwatch/prompt-server",
+      "key": "cross-feature|modules/experiment/server/package.json|@langwatch/prompt-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/experiment/server/package.json|@langwatch/suite-server",
+      "key": "cross-feature|modules/experiment/server/package.json|@langwatch/suite-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/experiment/web/package.json|@langwatch/dataset-web",
+      "key": "cross-feature|modules/experiment/web/package.json|@langwatch/dataset-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/experiment/web/package.json|@langwatch/evaluator-web",
+      "key": "cross-feature|modules/experiment/web/package.json|@langwatch/evaluator-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/experiment/web/package.json|@langwatch/langy-web",
+      "key": "cross-feature|modules/experiment/web/package.json|@langwatch/langy-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/experiment/web/package.json|@langwatch/model-provider-web",
+      "key": "cross-feature|modules/experiment/web/package.json|@langwatch/model-provider-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/experiment/web/package.json|@langwatch/prompt-web",
+      "key": "cross-feature|modules/experiment/web/package.json|@langwatch/prompt-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/experiment/web/package.json|@langwatch/trace-web",
+      "key": "cross-feature|modules/experiment/web/package.json|@langwatch/trace-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/experiment/web/package.json|@langwatch/workflow-web",
+      "key": "cross-feature|modules/experiment/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/gateway/web/package.json|@langwatch/authz-web",
+      "key": "cross-feature|modules/gateway/web/package.json|@langwatch/authz-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/identity/server/package.json|@langwatch/ops-server",
+      "key": "cross-feature|modules/identity/server/package.json|@langwatch/ops-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/langy/web/package.json|@langwatch/github-web",
+      "key": "cross-feature|modules/langy/web/package.json|@langwatch/github-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/langy/web/package.json|@langwatch/model-provider-web",
+      "key": "cross-feature|modules/langy/web/package.json|@langwatch/model-provider-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/langy/web/package.json|@langwatch/ops-web",
+      "key": "cross-feature|modules/langy/web/package.json|@langwatch/ops-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/langy/web/package.json|@langwatch/trace-web",
+      "key": "cross-feature|modules/langy/web/package.json|@langwatch/trace-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/langy/web/package.json|@langwatch/workflow-web",
+      "key": "cross-feature|modules/langy/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/log/server/package.json|@langwatch/data-privacy-server",
+      "key": "cross-feature|modules/log/server/package.json|@langwatch/data-privacy-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/log/server/package.json|@langwatch/trace-server",
+      "key": "cross-feature|modules/log/server/package.json|@langwatch/trace-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/metric/server/package.json|@langwatch/data-privacy-server",
+      "key": "cross-feature|modules/metric/server/package.json|@langwatch/data-privacy-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/metric/server/package.json|@langwatch/trace-server",
+      "key": "cross-feature|modules/metric/server/package.json|@langwatch/trace-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/model-provider/server/package.json|@langwatch/secret-server",
+      "key": "cross-feature|modules/model-provider/server/package.json|@langwatch/secret-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/model-provider/web/package.json|@langwatch/authz-web",
+      "key": "cross-feature|modules/model-provider/web/package.json|@langwatch/authz-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/model-provider/web/package.json|@langwatch/prompt-web",
+      "key": "cross-feature|modules/model-provider/web/package.json|@langwatch/prompt-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/model-provider/web/package.json|@langwatch/workflow-web",
+      "key": "cross-feature|modules/model-provider/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/onboarding/web/package.json|@langwatch/project-web",
+      "key": "cross-feature|modules/onboarding/web/package.json|@langwatch/project-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/ops/web/package.json|@langwatch/feature-flag-web",
+      "key": "cross-feature|modules/ops/web/package.json|@langwatch/feature-flag-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/organization/web/package.json|@langwatch/enterprise-licensing-web",
+      "key": "cross-feature|modules/organization/web/package.json|@langwatch/enterprise-licensing-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/organization/web/package.json|@langwatch/workflow-web",
+      "key": "cross-feature|modules/organization/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/project/web/package.json|@langwatch/analytics-web",
+      "key": "cross-feature|modules/project/web/package.json|@langwatch/analytics-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/project/web/package.json|@langwatch/langy-web",
+      "key": "cross-feature|modules/project/web/package.json|@langwatch/langy-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/project/web/package.json|@langwatch/navigation-web",
+      "key": "cross-feature|modules/project/web/package.json|@langwatch/navigation-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/project/web/package.json|@langwatch/organization-web",
+      "key": "cross-feature|modules/project/web/package.json|@langwatch/organization-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/project/web/package.json|@langwatch/trace-web",
+      "key": "cross-feature|modules/project/web/package.json|@langwatch/trace-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/prompt/web/package.json|@langwatch/dataset-web",
+      "key": "cross-feature|modules/prompt/web/package.json|@langwatch/dataset-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/prompt/web/package.json|@langwatch/experiment-web",
+      "key": "cross-feature|modules/prompt/web/package.json|@langwatch/experiment-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/prompt/web/package.json|@langwatch/model-provider-web",
+      "key": "cross-feature|modules/prompt/web/package.json|@langwatch/model-provider-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/prompt/web/package.json|@langwatch/workflow-web",
+      "key": "cross-feature|modules/prompt/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/scenario/web/package.json|@langwatch/agent-web",
+      "key": "cross-feature|modules/scenario/web/package.json|@langwatch/agent-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/scenario/web/package.json|@langwatch/analytics-web",
+      "key": "cross-feature|modules/scenario/web/package.json|@langwatch/analytics-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/scenario/web/package.json|@langwatch/langy-web",
+      "key": "cross-feature|modules/scenario/web/package.json|@langwatch/langy-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/scenario/web/package.json|@langwatch/model-provider-web",
+      "key": "cross-feature|modules/scenario/web/package.json|@langwatch/model-provider-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/scenario/web/package.json|@langwatch/prompt-web",
+      "key": "cross-feature|modules/scenario/web/package.json|@langwatch/prompt-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/scenario/web/package.json|@langwatch/suite-web",
+      "key": "cross-feature|modules/scenario/web/package.json|@langwatch/suite-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/scenario/web/package.json|@langwatch/trace-web",
+      "key": "cross-feature|modules/scenario/web/package.json|@langwatch/trace-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/scenario/web/package.json|@langwatch/workflow-web",
+      "key": "cross-feature|modules/scenario/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/server/package.json|@langwatch/data-retention-server",
+      "key": "cross-feature|modules/trace/server/package.json|@langwatch/data-retention-server",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/annotation-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/annotation-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/coding-agent-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/coding-agent-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/dataset-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/dataset-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/evaluator-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/evaluator-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/langy-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/langy-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/model-provider-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/model-provider-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/onboarding-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/onboarding-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/ops-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/ops-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/presence-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/presence-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/prompt-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/prompt-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/scenario-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/scenario-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/share-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/share-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/suite-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/suite-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/trace/web/package.json|@langwatch/workflow-web",
+      "key": "cross-feature|modules/trace/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/user/web/package.json|@langwatch/coding-agent-web",
+      "key": "cross-feature|modules/user/web/package.json|@langwatch/coding-agent-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/user/web/package.json|@langwatch/gateway-web",
+      "key": "cross-feature|modules/user/web/package.json|@langwatch/gateway-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/workflow/web/package.json|@langwatch/agent-web",
+      "key": "cross-feature|modules/workflow/web/package.json|@langwatch/agent-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/workflow/web/package.json|@langwatch/dataset-web",
+      "key": "cross-feature|modules/workflow/web/package.json|@langwatch/dataset-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/workflow/web/package.json|@langwatch/evaluator-web",
+      "key": "cross-feature|modules/workflow/web/package.json|@langwatch/evaluator-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/workflow/web/package.json|@langwatch/experiment-web",
+      "key": "cross-feature|modules/workflow/web/package.json|@langwatch/experiment-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/workflow/web/package.json|@langwatch/langy-web",
+      "key": "cross-feature|modules/workflow/web/package.json|@langwatch/langy-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/workflow/web/package.json|@langwatch/model-provider-web",
+      "key": "cross-feature|modules/workflow/web/package.json|@langwatch/model-provider-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/workflow/web/package.json|@langwatch/prompt-web",
+      "key": "cross-feature|modules/workflow/web/package.json|@langwatch/prompt-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|packages/features/workflow/web/package.json|@langwatch/trace-web",
+      "key": "cross-feature|modules/workflow/web/package.json|@langwatch/trace-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"
     }

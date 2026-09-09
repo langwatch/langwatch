@@ -150,7 +150,7 @@ with the process-manager lease and attempt state.
 
 ## References
 
-- `packages/features/automation/contract/src/providers/webhook.ts`
+- `modules/automation/contract/src/providers/webhook.ts`
 - `platform/app/src/server/webhooks/sendWebhook.ts`
 - `platform/app/src/server/app-layer/automations/delivery/deliverWebhook.ts`
 - [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md)

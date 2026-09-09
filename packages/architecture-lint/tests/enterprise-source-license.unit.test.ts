@@ -26,14 +26,14 @@ describe("Enterprise source license placement", () => {
   it("reports a core feature source file with the Enterprise SPDX directive", () => {
     root = mkdtempSync(join(tmpdir(), "enterprise-license-"));
     write(
-      "packages/features/trace/server/src/trace.ts",
+      "modules/trace/server/src/trace.ts",
       "// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise\nexport {};\n",
     );
 
     expect(violations()).toMatchObject([
       {
         policy: "enterprise-source-license",
-        file: join(root, "packages/features/trace/server/src/trace.ts"),
+        file: join(root, "modules/trace/server/src/trace.ts"),
         line: 1,
       },
     ]);
@@ -81,7 +81,7 @@ describe("Enterprise source license placement", () => {
   it("allows Enterprise source", () => {
     root = mkdtempSync(join(tmpdir(), "enterprise-license-"));
     write(
-      "packages/enterprise/features/trace/server/src/trace.ts",
+      "enterprise/modules/trace/server/src/trace.ts",
       "// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise\nexport {};\n",
     );
 

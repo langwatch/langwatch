@@ -131,18 +131,13 @@ export function serverPackageIndexes({ root }: { root: string }): string[] {
     if (existsSync(file)) indexes.push(file);
   };
 
-  for (const group of [
-    join(root, "packages", "features"),
-    join(root, "packages", "enterprise", "features"),
-  ]) {
+  for (const group of [join(root, "modules"), join(root, "enterprise", "modules")]) {
     for (const feature of subdirectories(group)) {
       push(join(group, feature, "server", "src", "index.ts"));
     }
   }
 
   for (const name of subdirectories(join(root, "packages"))) {
-    if (name === "features" || name === "enterprise") continue;
-
     if (EXCLUDED_PACKAGE_SUFFIXES.some((suffix) => name.endsWith(suffix))) continue;
 
     if (!existsSync(join(root, "packages", name, "src", "server"))) continue;

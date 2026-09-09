@@ -4,7 +4,7 @@
 
 ## Why
 
-`packages/features/agent/server/src/services/` holds eighteen files, eighteen classes and
+`modules/agent/server/src/services/` holds eighteen files, eighteen classes and
 3,912 lines. Five of the classes are a namespace with two or three static functions in it.
 Three more hold one real method and a `create`. Three `for (;;)` loops carry the dispatch
 and long-poll state machines in their bodies. Seventeen call sites reach through
@@ -83,8 +83,8 @@ things and should be two methods.
 
 ## What does not change
 
-- The wire. `packages/features/agent/specs/*.feature` and every integration test under
-  `apps/api/src/features/agent/__tests__` and `packages/features/agent/server/src/**/__tests__`
+- The wire. `modules/agent/specs/*.feature` and every integration test under
+  `apps/api/src/features/agent/__tests__` and `modules/agent/server/src/**/__tests__`
   pass unedited except for `@scenario` annotations and imports that follow a moved symbol.
   A test that asserts on the old class names is rewritten to assert on behaviour through the
   new service; a test that only existed to construct a deleted class is deleted with it.
@@ -96,13 +96,13 @@ things and should be two methods.
 
 ## Guardrails
 
-- Only `packages/features/agent/server/**` and `packages/features/agent/contract/**`. If
+- Only `modules/agent/server/**` and `modules/agent/contract/**`. If
   `apps/api` needs an import path change because a symbol moved, list the file and the line
   in the report; do not edit it.
 - Never run `git add`, `git commit`, `git stash`, `git checkout` or any git write. Never
   edit a `*-baseline.json`; list lines to delete in the report. Never run root
   `pnpm typecheck`, `pnpm lint` or `pnpm format`. Never read `.env*`.
-- Kimi is editing `packages/features/api-key/**` and its type names right now. Import what
+- Kimi is editing `modules/api-key/**` and its type names right now. Import what
   the api-key contract exports at the moment you build; if a name changes under you,
   re-read and follow it, and say so in the report.
 - Lift the logic, do not redesign the protocol. A behaviour that looks wrong goes in the
@@ -111,14 +111,14 @@ things and should be two methods.
 ## Exit checks
 
 ```
-pnpm typecheck:one packages/features/agent/server
-pnpm typecheck:one packages/features/agent/contract
+pnpm typecheck:one modules/agent/server
+pnpm typecheck:one modules/agent/contract
 pnpm --filter @langwatch/agent-server test:unit
 pnpm --filter @langwatch/agent-contract test:unit
 pnpm --filter @langwatch/platform-api test:unit src/features/agent
-grep -rnE "for \(;;\)|while \(true\)|\btry[A-Z][A-Za-z]*\(|nanoid|randomUUID|_count|ok: true" packages/features/agent/server/src packages/features/agent/contract/src
-ls packages/features/agent/server/src/services
-pnpm exec oxlint --config .oxlintrc.architecture.json packages/features/agent/server/src packages/features/agent/contract/src
+grep -rnE "for \(;;\)|while \(true\)|\btry[A-Z][A-Za-z]*\(|nanoid|randomUUID|_count|ok: true" modules/agent/server/src modules/agent/contract/src
+ls modules/agent/server/src/services
+pnpm exec oxlint --config .oxlintrc.architecture.json modules/agent/server/src modules/agent/contract/src
 ```
 
 The grep prints nothing. The `ls` prints five files. oxlint reports no new findings.

@@ -1,0 +1,73 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
+    "jsx": "react-jsx",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@langwatch/authz-contract": ["../../authz/contract/src/index.ts"],
+      "@langwatch/gateway-contract": ["../contract/src/index.ts"],
+      "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"],
+      "@langwatch/authz-web/surfaces/scope-picker": [
+        "../../authz/web/src/surfaces/scope-picker/index.ts"
+      ],
+      "@langwatch/enterprise-billing-web/surfaces/contact-sales": [
+        "../../../enterprise/modules/billing/web/src/surfaces/contact-sales/index.ts"
+      ]
+    },
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/csv/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/server/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    }
+  ]
+}

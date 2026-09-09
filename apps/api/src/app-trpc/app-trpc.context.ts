@@ -255,9 +255,10 @@ export type ApiTrpcFeatureApplication = Readonly<{
   users: UserApi;
   workflows: WorkflowApp;
   /**
-   * The deployment answers `publicEnv` reads directly. One field today, and it
-   * is configuration rather than a service, so it rides the application slice
-   * the transport already receives instead of a second channel.
+   * The operator allow-list, for the ops feature's own admin gate. One field
+   * today, and it is configuration rather than a service, so it rides the
+   * application slice the transport already receives instead of a second
+   * channel.
    */
   config: Readonly<{ opsSidebarEmails?: readonly string[] | undefined }>;
 }>;

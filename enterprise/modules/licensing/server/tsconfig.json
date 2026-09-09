@@ -1,0 +1,43 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "lib": ["es2022"],
+    "types": ["node"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/plans/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/time/tsconfig.build.json"
+    }
+  ]
+}

@@ -19,5 +19,6 @@ export function toPublicEnvironment(config: PublicAppConfig): PublicEnvironment 
     HAS_LANGWATCH_NLP_SERVICE: config.capabilities.nlp,
     HAS_LANGEVALS_ENDPOINT: config.capabilities.langevals,
     STRIPE_LICENSE_PAYMENT_LINK_URL: config.licensePaymentUrl,
+    NEXTAUTH_PROVIDER: config.authProvider,
   };
 }

@@ -10,7 +10,7 @@ const DATABASE_OBJECT_ARG =
   /\.create\s*\([^)]*\bdatabase\s*:\s*object\b|\bstatic\s+create\s*\([^)]*\bdatabase\s*:\s*object\b/;
 
 const SEAM_PATH =
-  /^packages\/(?:enterprise\/)?features\/[^/]+\/server\/src\/(?:repositories\/prisma\/.+\.repository\.ts|adapters\/postgres\.[^/]+\.adapter\.ts)$/;
+  /^(?:enterprise\/)?modules\/[^/]+\/server\/src\/(?:repositories\/prisma\/.+\.repository\.ts|adapters\/postgres\.[^/]+\.adapter\.ts)$/;
 
 const typedPrismaSeamBaselineCache = new Map();
 

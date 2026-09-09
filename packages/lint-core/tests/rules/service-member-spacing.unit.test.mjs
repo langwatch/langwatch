@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "packages/features/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/server/src/services/agent.service.ts";
 
 describe("given a strict feature service module", () => {
   describe("when two methods sit on adjacent lines", () => {

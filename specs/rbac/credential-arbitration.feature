@@ -1,4 +1,4 @@
-# The claims runner lives in packages/features/authz/contract
+# The claims runner lives in modules/authz/contract
 # (credential-claims.ts); the
 # surfaces that arbitrate through it are the dual-auth byte endpoints
 # ([gone] src/app/api/middleware/dual-auth.ts) and the API-key

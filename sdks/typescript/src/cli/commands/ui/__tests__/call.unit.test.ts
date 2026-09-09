@@ -88,7 +88,7 @@ describe("the ui call command", () => {
     it("sets a deadline the agent harness cannot outrun", () => {
       // Both numbers belong to other layers, so they are written here as the
       // boundary this test pins. UI_ACTION_MAX_BUDGET_MS lives in
-      // packages/features/langy/server/src/services/langy-ui-action.service.ts.
+      // modules/langy/server/src/services/langy-ui-action.service.ts.
       const SERVER_BUDGET_CEILING_MS = 15_000;
       const AGENT_HARNESS_COMMAND_LIMIT_MS = 30_000;
 

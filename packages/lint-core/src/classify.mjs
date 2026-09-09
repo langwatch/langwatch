@@ -46,19 +46,18 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
  * @property {StrictFeatureSource | undefined} strictSource
  */
 
-const FEATURE_SOURCE = /^packages\/(enterprise\/)?features\/([^/]+)\/(contract|server|web)\/(.+)$/;
+const FEATURE_SOURCE = /^(enterprise\/)?modules\/([^/]+)\/(contract|server|web)\/(.+)$/;
 const APPLICATION_SOURCE = /^apps\/([^/]+)\/src\/(.+)$/;
 const ENTERPRISE_COMPOSITION_SOURCE =
-  /^packages\/enterprise\/composition\/(api|worker)\/src\/(.+)$/;
+  /^enterprise\/packages\/composition\/(api|worker)\/src\/(.+)$/;
 const SHARED_PACKAGE_SOURCE = /^packages\/(config|design-system)\/src\/(.+)$/;
 const SHARED_PACKAGE = /^packages\/(config|design-system|eventing|group-queue)\//;
 const PACKAGE_SOURCE_OR_TESTS = /^(src|tests)\//;
-const SERVICE_MODULE =
-  /^packages\/(enterprise\/)?features\/[^/]+\/server\/src\/services\/.+\.service\.ts$/;
+const SERVICE_MODULE = /^(enterprise\/)?modules\/[^/]+\/server\/src\/services\/.+\.service\.ts$/;
 const PRISMA_REPOSITORY_SEAM =
-  /^packages\/(?:enterprise\/)?features\/[^/]+\/server\/src\/repositories\/prisma\/.+\.repository\.ts$/;
+  /^(?:enterprise\/)?modules\/[^/]+\/server\/src\/repositories\/prisma\/.+\.repository\.ts$/;
 const POSTGRES_ADAPTER_SEAM =
-  /^packages\/(?:enterprise\/)?features\/[^/]+\/server\/src\/adapters\/postgres\.[^/]+\.adapter\.ts$/;
+  /^(?:enterprise\/)?modules\/[^/]+\/server\/src\/adapters\/postgres\.[^/]+\.adapter\.ts$/;
 const TEST_FILE = /\.(?:test|spec|unit|integration|e2e)\.[cm]?[jt]sx?$/;
 const TEST_DIRECTORY = /(?:^|\/)(?:__tests__|__mocks__|tests)(?:\/|$)/;
 
@@ -82,8 +81,8 @@ function featureLayoutVersion(cwd, enterprise, feature) {
   const key = `${cwd}:${enterprise ? "enterprise:" : "core:"}${feature}`;
   if (layoutVersionCache.has(key)) return layoutVersionCache.get(key);
   const root = enterprise
-    ? join(cwd, "packages", "enterprise", "features", feature)
-    : join(cwd, "packages", "features", feature);
+    ? join(cwd, "enterprise", "modules", feature)
+    : join(cwd, "modules", feature);
   const path = join(root, "feature.json");
   let version;
   if (existsSync(path)) {

@@ -1,9 +1,9 @@
 # Contract packages
 
-`packages/features/<name>/contract` is `@langwatch/<name>-contract`. It is the only
+`modules/<name>/contract` is `@langwatch/<name>-contract`. It is the only
 part of a module that other modules, the server half and the web half may all import,
 so it carries what exists, what can be asked, and what can go wrong, never how anything
-is done. The reference is `packages/features/annotation/contract`.
+is done. The reference is `modules/annotation/contract`.
 
 ## What may live in `contract/src`
 
@@ -56,7 +56,7 @@ export const AnnotationApi = featureApi<AnnotationApi>("annotation");
   implementation with `.withProvided(AnnotationApi, app)` or by installing the module,
   and boot rejects a missing, duplicate or cyclic provider by name.
 - `featureApi` takes a `FeatureName`, the literal union generated from
-  `packages/features/catalogue.json` (`packages/runtime-composition/src/feature-names.generated.ts`,
+  `modules/catalogue.json` (`packages/runtime-composition/src/feature-names.generated.ts`,
   regenerate with `node packages/runtime-composition/scripts/check-feature-names.mjs --write`).
   `featureApi("annotations")` does not compile.
 - Operation names use RPC verbs: `get` for one known record, `getMany` for known ids,

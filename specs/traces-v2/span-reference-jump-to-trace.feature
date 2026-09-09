@@ -1,10 +1,10 @@
 # Span reference buttons — jump to the Trace tab and open the span
 #
 # Implementation:
-#   packages/features/trace/web/src/ui/elements/explorer/trace-drawer/exceptions-content.tsx            (header exceptions)
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx  (summary tab)
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/waterfall-view.tsx   (selected span)
-#   packages/features/trace/web/src/drawer.store.ts  (viewMode, selectSpan)
+#   modules/trace/web/src/ui/elements/explorer/trace-drawer/exceptions-content.tsx            (header exceptions)
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx  (summary tab)
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/waterfall-view.tsx   (selected span)
+#   modules/trace/web/src/drawer.store.ts  (viewMode, selectSpan)
 #
 # Motivation (round 5): span reference buttons (an error span in the
 # header, eval/event/exception spans in the Summary tab, span refs in the

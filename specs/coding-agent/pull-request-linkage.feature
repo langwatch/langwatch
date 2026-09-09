@@ -1,25 +1,25 @@
 # Pull request linkage, sessions mapped to GitHub pull requests and priced
 #
 # Implementation:
-#   packages/features/github/server/src/services/github-pull-request-mapping.service.ts (branch-to-PR mapping + negative cache)
-#   packages/features/github/server/src/adapters/github-pull-request-event.adapter.ts   (the pull_request webhook payload, validated)
-#   packages/features/github/contract/src/github.ts                                           (the webhook delivery target)
-#   packages/features/github/server/src/services/github-pull-request-status.service.ts  (live status, Redis-cached, never the queue)
-#   packages/features/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts (fold trigger)
-#   packages/features/coding-agent/server/src/services/coding-agent-pull-request-assignment.service.ts (session-to-PR tenure rule)
-#   packages/features/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts      (org-first usage rollup)
-#   packages/features/coding-agent/server/src/repositories/coding-agent-session-event/clickhouse.repository.ts (per-model totals)
+#   modules/github/server/src/services/github-pull-request-mapping.service.ts (branch-to-PR mapping + negative cache)
+#   modules/github/server/src/adapters/github-pull-request-event.adapter.ts   (the pull_request webhook payload, validated)
+#   modules/github/contract/src/github.ts                                           (the webhook delivery target)
+#   modules/github/server/src/services/github-pull-request-status.service.ts  (live status, Redis-cached, never the queue)
+#   modules/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts (fold trigger)
+#   modules/coding-agent/server/src/services/coding-agent-pull-request-assignment.service.ts (session-to-PR tenure rule)
+#   modules/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts      (org-first usage rollup)
+#   modules/coding-agent/server/src/repositories/coding-agent-session-event/clickhouse.repository.ts (per-model totals)
 #   [gone] src/server/organizations/resolveCallerProjectScope.ts                 (the caller's permission cut and how each project is named, shared by both read surfaces)
 #   [gone] src/app/api/coding-agent/[[...route]]/                                (the usage REST endpoint)
 #   [gone] src/pages/me/pull-requests.tsx                                        (the personal Pull Requests page)
-#   packages/features/coding-agent/web/src/pull-requests-table.tsx                               (the table)
-#   packages/features/coding-agent/web/src/pull-request-detail-drawer.tsx                          (one pull request in full)
-#   packages/features/coding-agent/web/src/pull-request-status-badge.tsx                           (a status drawn the way GitHub draws it)
+#   modules/coding-agent/web/src/pull-requests-table.tsx                               (the table)
+#   modules/coding-agent/web/src/pull-request-detail-drawer.tsx                          (one pull request in full)
+#   modules/coding-agent/web/src/pull-request-status-badge.tsx                           (a status drawn the way GitHub draws it)
 #   [gone] src/components/me/usePullRequestSort.ts                                (the table's order, and the way back to it)
-#   packages/features/coding-agent/web/src/agent-label.tsx                                       (an assistant named like its product)
+#   modules/coding-agent/web/src/agent-label.tsx                                       (an assistant named like its product)
 #
 # Related specs:
-#   packages/features/coding-agent/specs/session-git-context.feature, where the repo+branch identity comes from
+#   modules/coding-agent/specs/session-git-context.feature, where the repo+branch identity comes from
 #   specs/integrations/github-connection.feature     , the org-level GitHub connection this rides
 #
 # Motivation: the ledger question "what did this pull request cost in assistant

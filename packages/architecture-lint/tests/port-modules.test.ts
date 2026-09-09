@@ -8,7 +8,7 @@ import { snapshotOf } from "./workspace.ts";
 let root = "";
 
 function packageForFixture(): ClassifiedPackage {
-  const featureRoot = join(root, "packages/features/example");
+  const featureRoot = join(root, "modules/example");
   const serverRoot = join(featureRoot, "server");
   return {
     name: "@langwatch/example-server",
@@ -25,8 +25,8 @@ function packageForFixture(): ClassifiedPackage {
 }
 
 function writePort(source: string): string {
-  const file = join(root, "packages/features/example/server/src/ports/example.port.ts");
-  mkdirSync(join(root, "packages/features/example/server/src/ports"), {
+  const file = join(root, "modules/example/server/src/ports/example.port.ts");
+  mkdirSync(join(root, "modules/example/server/src/ports"), {
     recursive: true,
   });
   writeFileSync(file, source);

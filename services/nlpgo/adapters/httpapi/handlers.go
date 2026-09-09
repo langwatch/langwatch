@@ -100,7 +100,7 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 //
 //  1. Discriminated event (preferred — matches the Python
 //     StudioClientEvent union declared by
-//     packages/features/workflow/contract/src/studio-events.ts):
+//     modules/workflow/contract/src/studio-events.ts):
 //     {"type":"execute_flow"|"execute_component"|"execute_evaluation",
 //     "payload":{trace_id, workflow, inputs?, origin?, ...}}
 //
@@ -163,7 +163,7 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 		UntilNodeID string `json:"until_node_id,omitempty"`
 		ProjectID   string `json:"project_id,omitempty"`
 		// RunID is present only on execute_evaluation envelopes
-		// (packages/features/workflow/web/src/ui/sections/optimization_studio/use-evaluation-execution.ts).
+		// (modules/workflow/web/src/ui/sections/optimization_studio/use-evaluation-execution.ts).
 		// Plumbed through to the engine so evaluation_state_change events
 		// carry the run_id Studio's reducer keys evaluations on.
 		RunID string `json:"run_id,omitempty"`
@@ -561,7 +561,7 @@ func executeStreamHandler(application *app.App, configuredHeartbeat, configuredI
 //	data: {"type":"<type>","payload":{...}}\n\n
 //
 // matching the Python /studio/execute SSE contract that Studio's TS
-// parser expects (packages/features/workflow/server/src/adapters/
+// parser expects (modules/workflow/server/src/adapters/
 // workflow-studio-stream.adapter.ts reads only `data:` lines and JSON.parses
 // the rest). An optional
 // `event:` line is intentionally omitted — the TS parser ignores it

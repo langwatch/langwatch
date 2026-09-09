@@ -1,0 +1,85 @@
+{
+  "name": "@langwatch/suite-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Suite run presentation primitives.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/run-formatters.ts",
+  "types": "./dist/run-formatters.d.ts",
+  "exports": {
+    "./testing": {
+      "types": "./dist/__tests__/test-helpers.d.ts",
+      "default": "./src/__tests__/test-helpers.ts"
+    },
+    "./run-cards": {
+      "langwatch-declaration-source": "./src/run-cards.ts",
+      "types": "./dist/run-cards.d.ts",
+      "default": "./src/run-cards.ts"
+    },
+    "./run-dialogs": {
+      "langwatch-declaration-source": "./src/run-dialogs.ts",
+      "types": "./dist/run-dialogs.d.ts",
+      "default": "./src/run-dialogs.ts"
+    },
+    "./run-formatters": {
+      "langwatch-declaration-source": "./src/run-formatters.ts",
+      "types": "./dist/run-formatters.d.ts",
+      "default": "./src/run-formatters.ts"
+    },
+    "./run-history-store": {
+      "langwatch-declaration-source": "./src/run-history-store.ts",
+      "types": "./dist/run-history-store.d.ts",
+      "default": "./src/run-history-store.ts"
+    },
+    "./suite-form": {
+      "langwatch-declaration-source": "./src/suite-form.ts",
+      "types": "./dist/suite-form.d.ts",
+      "default": "./src/suite-form.ts"
+    },
+    "./suite-pickers": {
+      "langwatch-declaration-source": "./src/suite-pickers.ts",
+      "types": "./dist/suite-pickers.d.ts",
+      "default": "./src/suite-pickers.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project modules/suite/web/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@hookform/resolvers": "^5.4.0",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/suite-contract": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
+    "@tanstack/react-virtual": "^3.14.5",
+    "lucide-react": "^1.22.0",
+    "react": "^19.2.7",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
+    "zod": "^4.4.3",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.2",
+    "vitest": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

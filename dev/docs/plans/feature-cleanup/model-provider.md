@@ -6,7 +6,7 @@ and [`overengineering.md`](../../best_practices/overengineering.md); shape follo
 
 ## 1. What is there now
 
-**`packages/features/model-provider/` — 10,610 non-test lines over 62 files, plus a
+**`modules/model-provider/` — 10,610 non-test lines over 62 files, plus a
 544 KB model catalogue.**
 
 | Surface                                              | Files | Lines  |
@@ -623,7 +623,7 @@ Five commits, smallest risk first, each leaving the suite green.
    `utils/model-provider-catalog-rules.ts`; the ten classes → six `*.port.ts`
    files named for what they are; delete `ModelProviderCredentialPolicy` and let
    `ModelProviderCredentialService` stand alone. Add
-   `packages/features/model-provider/server/src/ports/*.port.ts` entries as they
+   `modules/model-provider/server/src/ports/*.port.ts` entries as they
    land — the baseline may only shrink, so each new file must already comply.
    _(P7, P8)_
 4. **Collapse the layer.** Delete `services/model-provider.service.ts`, move its

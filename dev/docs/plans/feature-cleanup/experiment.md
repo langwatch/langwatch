@@ -295,7 +295,7 @@ Four files, 122 lines, none of which is a process:
   export const IdUtils = { generateDeterministicResultId } as const;
   ```
   The name collides with `IdUtils` in
-  `packages/features/trace/server/src/services/span-record-identity.rules.ts:105`,
+  `modules/trace/server/src/services/span-record-identity.rules.ts:105`,
   which `trace/server/src/index.ts:88` exports. Two different `IdUtils` in one
   repo, neither namespaced by feature.
 - `processes/experiment-run-event-guards.process.ts` — five type guards that

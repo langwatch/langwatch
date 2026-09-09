@@ -4,7 +4,7 @@
 
 **Status:** Proposed
 
-**Partially superseded by:** [Stored Objects ADR-001](../../../packages/features/stored-object/adrs/001-package-boundary.md) for Stored Objects persistence, write ordering, current-state projection and byte-ledger authority. This ADR continues to own evaluation thresholds, marker shapes, fail-open policy, read resolution and the evaluation-specific retention requirement.
+**Partially superseded by:** [Stored Objects ADR-001](../../../modules/stored-object/adrs/001-package-boundary.md) for Stored Objects persistence, write ordering, current-state projection and byte-ledger authority. This ADR continues to own evaluation thresholds, marker shapes, fail-open policy, read resolution and the evaluation-specific retention requirement.
 
 **Relates to:** [ADR-022](./022-event-log-source-of-truth.md) (event_log as source of truth, transient S3 spool for trace payloads), [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md) (event sourcing), [ADR-022 data-retention](./022-data-retention.md) (row TTL).
 
@@ -72,7 +72,7 @@ The unconditional repository cap is deliberately coarser than the offload (it tr
 ## References
 
 - Feature spec: `specs/evaluations/evaluation-payload-offload.feature`
-- Offload service: `packages/features/evaluation/server/src/services/evaluation-inputs-offload.service.ts`
+- Offload service: `modules/evaluation/server/src/services/evaluation-inputs-offload.service.ts`
 - App infrastructure adapter: `platform/app/src/runtime/app/features/evaluation.ts`
-- Unconditional caps: `packages/features/evaluation/server/src/repositories/clickhouse/clickhouse-evaluation.repository.ts`
+- Unconditional caps: `modules/evaluation/server/src/repositories/clickhouse/clickhouse-evaluation.repository.ts`
 - Related ADRs: [ADR-022](./022-event-log-source-of-truth.md) (event-log source of truth and transient spool) and the [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md).

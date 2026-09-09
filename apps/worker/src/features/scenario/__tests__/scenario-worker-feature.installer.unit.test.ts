@@ -10,7 +10,7 @@
  * with a deduplication id of the installer's own devising, registers cleanly
  * and then quietly never runs.
  *
- * Spec: packages/features/scenario/specs/simulation-service.feature
+ * Spec: modules/scenario/specs/simulation-service.feature
  */
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,

@@ -1,4 +1,4 @@
-/** Generated from packages/features/catalogue.json. Do not edit by hand. */
+/** Generated from modules/catalogue.json. Do not edit by hand. */
 export const FEATURE_NAMES = [
   "agent",
   "analytics",

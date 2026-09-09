@@ -5,7 +5,7 @@ import {
 } from "../worker-product-analytics.adapter.ts";
 
 /**
- * Spec: packages/features/trace/specs/trace-product-analytics-worker-composition.feature
+ * Spec: modules/trace/specs/trace-product-analytics-worker-composition.feature
  *
  * A FROZEN-TWIN test against `platform/app/src/server/posthog.ts`. Every
  * assertion below is a literal read of what that module puts on the wire —

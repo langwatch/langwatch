@@ -8,8 +8,8 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const PORT = "packages/features/agent/server/src/ports/agent.port.ts";
-const API = "packages/features/agent/contract/src/agent.api.ts";
+const PORT = "modules/agent/server/src/ports/agent.port.ts";
+const API = "modules/agent/contract/src/agent.api.ts";
 
 function report(code, filename = PORT) {
   return runRule(fallibleResultNamingRule, { code, cwd: workspace.cwd, filename });
@@ -61,7 +61,7 @@ describe("given a strict feature port module", () => {
     it("accepts a class whose implemented interface states the type", () => {
       const found = report(
         "export class AgentApp implements AgentApi { getById(input: { id: string }) { return this.service.getById(input); } }",
-        "packages/features/agent/server/src/app/agent.app.ts",
+        "modules/agent/server/src/app/agent.app.ts",
       );
 
       expect(found).toEqual([]);

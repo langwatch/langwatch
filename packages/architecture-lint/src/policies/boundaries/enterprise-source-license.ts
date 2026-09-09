@@ -5,7 +5,7 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import type { ArchitectureViolation } from "../../types.ts";
 
 const POLICY = "enterprise-source-license";
-const ENTERPRISE_ROOT = ["packages", "enterprise"];
+const ENTERPRISE_ROOT = "enterprise";
 const IGNORED_PATH_SEGMENTS = new Set(["dist", "fixtures", "generated", "node_modules", "tests"]);
 const ENTERPRISE_DIRECTIVE = /^SPDX-License-Identifier:\s*LicenseRef-LangWatch-Enterprise\s*$/;
 
@@ -65,7 +65,7 @@ function enterpriseDirectiveLine(source: string, file: string): number | undefin
 function isEnterprisePackageFile(root: string, file: string): boolean {
   const segments = relativeSegments(root, file);
 
-  return segments[0] === ENTERPRISE_ROOT[0] && segments[1] === ENTERPRISE_ROOT[1];
+  return segments[0] === ENTERPRISE_ROOT;
 }
 
 /**
@@ -76,7 +76,7 @@ function isEnterprisePackageFile(root: string, file: string): boolean {
 export function lintEnterpriseSourceLicense(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root } = snapshot;
   const violations: ArchitectureViolation[] = [];
-  const licensedFiles = ["apps", "packages"].flatMap((directory) =>
+  const licensedFiles = ["apps", "enterprise", "modules", "packages"].flatMap((directory) =>
     snapshot.files({
       directory: `${root}/${directory}`,
       accept: (file) => isEnterpriseSource(file, root),
@@ -96,7 +96,7 @@ export function lintEnterpriseSourceLicense(snapshot: WorkspaceSnapshot): Archit
       message:
         "Enterprise-licensed production source must move under the owning Enterprise feature; expose its portable contract through composition instead of removing the license header.",
       allowed:
-        "Move the implementation under packages/enterprise and expose only its contract through the composed feature API.",
+        "Move the implementation under enterprise and expose only its contract through the composed feature API.",
     });
   }
 

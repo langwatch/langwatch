@@ -218,10 +218,10 @@ const defaults = ALL_PERMISSIONS.filter(
 The two lists are not equal. `categorizablePermissions()`
 (`api-key.permissions.ts:273-278`) drops every resource whose registry `scopes`
 include `"platform"`; `ALL_PERMISSIONS` does not. The `ops` resource is exactly
-that (`packages/features/authz/contract/src/registry.ts:99-104`,
+that (`modules/authz/contract/src/registry.ts:99-104`,
 `scopes: ["platform"]`), so the server's org-admin default carries `ops:view`
 and `ops:manage`, which `ORG_ADMIN` does not hold
-(`packages/features/authz/contract/src/roles.ts:139-169`) and which
+(`modules/authz/contract/src/roles.ts:139-169`) and which
 `assertCeiling` (`api-key-grant-policy.service.ts:191-203`) therefore has to
 refuse. Everything else in the repo uses the contract helper: the CLI approval
 screen (`platform/app/src/pages/cli/auth.tsx:440`) and the pinned integration
@@ -320,7 +320,7 @@ AppApiKeyBindingIdPort.create()` (`:38`). The one real composition seam,
 
 ### P12 — The spec enforces nothing (no R1-R8 rule; flagged for honesty)
 
-`packages/features/api-key/specs/api-key.feature` has 0 occurrences of `@unit`,
+`modules/api-key/specs/api-key.feature` has 0 occurrences of `@unit`,
 `@integration`, `@e2e` or `@regression`. Per `CLAUDE.md`, `check-feature-parity.ts`
 reads an untagged file as `0/0 scenarios bound` / `✓ all bound`. Every scenario in
 it — including "A system-managed key is not customer-addressable", the one P3
@@ -572,9 +572,9 @@ the `ApiKeyService` type and are what commit 5 touches, most notably
 `platform/app/src/server/api-key/auth-middleware.ts`,
 `platform/app/src/server/routes/auth-cli.ts`,
 `platform/app/src/server/app-layer/dependencies.ts`,
-`packages/features/langy/server/src/services/langy-session-key.service.ts`,
-`packages/features/project/server/src/app/project.app.ts`,
-`packages/enterprise/composition/api/src/governance/ingestion-key.adapter.ts` and
+`modules/langy/server/src/services/langy-session-key.service.ts`,
+`modules/project/server/src/app/project.app.ts`,
+`enterprise/packages/composition/api/src/governance/ingestion-key.adapter.ts` and
 `apps/api/src/app/api-key-rest-security.adapter.ts`. The remaining ~38 import only
 types, errors and the token/permission helpers, and are unaffected by every commit
 except 3 (which adds codes rather than removing any).

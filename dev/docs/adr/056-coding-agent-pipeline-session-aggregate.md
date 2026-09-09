@@ -114,7 +114,7 @@ aggregate is the **session**, not the trace.
 
 7. **Provider vocabulary belongs to the feature contract.** Identity
    predicates, name prefixes, aliases, token buckets, and MCP naming are
-   single-sourced in `packages/features/coding-agent/contract/src/telemetry`.
+   single-sourced in `modules/coding-agent/contract/src/telemetry`.
    Event pipelines and UI callers consume that portable vocabulary; nothing
    agent-specific remains in `trace-processing`.
 
@@ -182,6 +182,6 @@ canonical metric tables.
 - Specs: `specs/coding-agent/session-aggregate.feature`,
   `specs/coding-agent/personal-usage.feature`.
 - Feature service boundary:
-  `packages/features/coding-agent/adrs/001-session-read-service-boundary.md`.
+  `modules/coding-agent/adrs/001-session-read-service-boundary.md`.
 - Claude Code telemetry reference:
   https://code.claude.com/docs/en/monitoring-usage

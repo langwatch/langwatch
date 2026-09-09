@@ -22,7 +22,7 @@ function write(path: string, source: string): void {
 }
 
 function strictServer(): ClassifiedPackage {
-  const featureRoot = join(root, "packages/features/example");
+  const featureRoot = join(root, "modules/example");
   const packageRoot = join(featureRoot, "server");
   return {
     name: "@langwatch/example-server",
@@ -45,7 +45,7 @@ function lint(): ReturnType<typeof lintServiceProjectionBoundaries> {
 describe("service projection boundaries", () => {
   it("rejects a projection write store received by a service", () => {
     write(
-      "packages/features/example/server/src/services/example.service.ts",
+      "modules/example/server/src/services/example.service.ts",
       `
         import type { ProjectionStore as WritableProjection } from "@langwatch/eventing";
 
@@ -66,7 +66,7 @@ describe("service projection boundaries", () => {
 
   it("rejects a service port which exposes projection write methods", () => {
     write(
-      "packages/features/example/server/src/ports/example-projection.port.ts",
+      "modules/example/server/src/ports/example-projection.port.ts",
       `
         export abstract class ExampleProjectionPort {
           abstract storeProjection(value: unknown): Promise<void>;
@@ -74,7 +74,7 @@ describe("service projection boundaries", () => {
       `,
     );
     write(
-      "packages/features/example/server/src/services/example.service.ts",
+      "modules/example/server/src/services/example.service.ts",
       `
         import type { ExampleProjectionPort as Writer } from "../ports/example-projection.port";
 
@@ -93,7 +93,7 @@ describe("service projection boundaries", () => {
 
   it("checks service properties and method parameters", () => {
     write(
-      "packages/features/example/server/src/ports/example-projection.port.ts",
+      "modules/example/server/src/ports/example-projection.port.ts",
       `
         export abstract class ExampleProjectionPort {
           abstract storeProjectionBatch(values: unknown[]): Promise<void>;
@@ -101,7 +101,7 @@ describe("service projection boundaries", () => {
       `,
     );
     write(
-      "packages/features/example/server/src/services/example.service.ts",
+      "modules/example/server/src/services/example.service.ts",
       `
         import type { FoldProjectionStore } from "@langwatch/eventing";
         import type { ExampleProjectionPort } from "../ports/example-projection.port";
@@ -126,7 +126,7 @@ describe("service projection boundaries", () => {
 
   it("accepts read-model ports and write stores owned by eventing roles", () => {
     write(
-      "packages/features/example/server/src/ports/example-read-model.port.ts",
+      "modules/example/server/src/ports/example-read-model.port.ts",
       `
         export abstract class ExampleReadModelPort {
           abstract getProjection(id: string): Promise<unknown>;
@@ -134,7 +134,7 @@ describe("service projection boundaries", () => {
       `,
     );
     write(
-      "packages/features/example/server/src/services/example.service.ts",
+      "modules/example/server/src/services/example.service.ts",
       `
         import type { ExampleReadModelPort } from "../ports/example-read-model.port";
 
@@ -144,7 +144,7 @@ describe("service projection boundaries", () => {
       `,
     );
     write(
-      "packages/features/example/server/src/projections/example.projection.ts",
+      "modules/example/server/src/projections/example.projection.ts",
       `
         import type { FoldProjectionStore } from "@langwatch/eventing";
 
@@ -154,7 +154,7 @@ describe("service projection boundaries", () => {
       `,
     );
     write(
-      "packages/features/example/server/src/processes/example.process.ts",
+      "modules/example/server/src/processes/example.process.ts",
       `
         import type { ProjectionStore } from "@langwatch/eventing";
 

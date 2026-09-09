@@ -66,12 +66,16 @@ jobs:
               - 'mcp/typescript/**'
               - 'services/langevals/**'
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               - '.github/workflows/codeql.yml'
             codeql-javascript:
               - 'apps/**'
               - 'sdks/typescript/**'
               - 'mcp/typescript/**'
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               - '.github/workflows/codeql.yml'
             codeql-python:
               - 'sdks/python/**'

@@ -17,7 +17,7 @@ architecture linter.
 
 ## Architecture
 
-- `packages/features/catalogue.json` is the ownership authority. Feature names
+- `modules/catalogue.json` is the ownership authority. Feature names
   are singular. Do not create a package per endpoint, table, or helper.
 - A feature may have `contract`, `server`, and `web` workspace packages. Create
   only the surfaces it needs. API and worker code are process composition or
@@ -60,7 +60,7 @@ architecture linter.
   contracts, web packages, and public declarations never expose it.
 - Environment access belongs to boot/config composition. Parse and validate it
   once, then inject typed semantic config. Packages do not read env modules.
-- Enterprise implementation stays under `packages/enterprise/**`. `saas` is
+- Enterprise implementation stays under `enterprise/**`. `saas` is
   Enterprise-licensed; `ops` is core. Core never imports Enterprise
   implementations.
 

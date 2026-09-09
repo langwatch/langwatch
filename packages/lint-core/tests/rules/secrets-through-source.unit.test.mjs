@@ -18,7 +18,7 @@ describe("given production source", () => {
     it("names the key and says to resolve it through the source chain", () => {
       const found = report(
         "export const key = process.env.OPENAI_API_KEY;",
-        "packages/features/agent/server/src/services/agent.service.ts",
+        "modules/agent/server/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -48,7 +48,7 @@ describe("given production source", () => {
       expect(
         report(
           "export const host = process.env.BASE_HOST;",
-          "packages/features/agent/server/src/services/agent.service.ts",
+          "modules/agent/server/src/services/agent.service.ts",
         ),
       ).toEqual([]);
     });
@@ -93,7 +93,7 @@ describe("given a test file", () => {
       expect(
         report(
           "export const key = process.env.OPENAI_API_KEY;",
-          "packages/features/agent/server/src/services/agent.service.unit.test.ts",
+          "modules/agent/server/src/services/agent.service.unit.test.ts",
         ),
       ).toEqual([]);
     });

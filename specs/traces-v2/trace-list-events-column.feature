@@ -1,7 +1,7 @@
 # Trace list Events column — Gherkin Spec
 # Implementation:
-#   packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/events-cell.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-list-events.ts
+#   modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/events-cell.tsx
+#   modules/trace/web/src/ui/sections/explorer/hooks/use-trace-list-events.ts
 #   [gone] src/server/api/routers/tracesV2.ts (`listEvents`)
 #   [gone] src/server/app-layer/traces/repositories/span-storage.clickhouse.repository.ts
 #

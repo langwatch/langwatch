@@ -104,7 +104,7 @@ The grouped row's `id` is a stable hash of its non-scope keys (e.g. `${role}::${
 
 ## UI shape: ScopeChipPicker
 
-One shared primitive — `packages/features/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx` — renders the multi-select of scopes the caller can write at. Every settings page that touches scoped resources uses it. Don't roll a new picker.
+One shared primitive — `modules/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx` — renders the multi-select of scopes the caller can write at. Every settings page that touches scoped resources uses it. Don't roll a new picker.
 
 The drawer/form that authors a new rule:
 
@@ -135,7 +135,7 @@ The chip picker only offers scopes from `available`. The server still re-authz's
 
 ## The shared scope contract
 
-The `{ scopeType, scopeId }` shape is `scopeAssignmentSchema` in `packages/features/data-retention/contract/src/data-retention.ts`, which is also where the three-tier `retentionScopeTypes` enum lives. The permission vocabulary keeps its own, wider tier list (`SCOPE_TIERS`, `scopeTierSchema`) in `packages/features/authz/contract/src/vocabulary.ts`, which adds `RESOURCE` and `PLATFORM` for permission questions. The wire/UI contract is the data-retention one; do not read the authz vocabulary as its replacement.
+The `{ scopeType, scopeId }` shape is `scopeAssignmentSchema` in `modules/data-retention/contract/src/data-retention.ts`, which is also where the three-tier `retentionScopeTypes` enum lives. The permission vocabulary keeps its own, wider tier list (`SCOPE_TIERS`, `scopeTierSchema`) in `modules/authz/contract/src/vocabulary.ts`, which adds `RESOURCE` and `PLATFORM` for permission questions. The wire/UI contract is the data-retention one; do not read the authz vocabulary as its replacement.
 
 ```ts
 import {
@@ -152,7 +152,7 @@ Rules:
 
 - **camelCase end-to-end.** `scopeType` / `scopeId` everywhere, including the TypeScript SDK. Do not introduce snake_case `scope_type` / `scope_id`. The sync layer passes scope values through verbatim and never defaults or transforms them.
 - **The shared type is the three universal tiers only.** Budget-only tiers (`VIRTUAL_KEY`, `PRINCIPAL`) are NOT in `SCOPE_TIERS`; they live on `GatewayBudget`'s own storage enum. The shared value-type is the API/UI contract; the per-table enum is the storage invariant.
-- **The cascade walk has one home.** `resolveScopeChain` in `packages/features/data-retention/contract/src/data-retention.ts` returns the `PROJECT → TEAM → ORGANIZATION` chain (most-specific-first) for a project context. Apply it as `scopes: { some: { OR: resolveScopeChain(ctx) } }` (junction) or `{ organizationId, OR: resolveScopeChain(ctx) }` (inline). The tie-break policy (which matched row wins) stays in the feature's own resolver.
+- **The cascade walk has one home.** `resolveScopeChain` in `modules/data-retention/contract/src/data-retention.ts` returns the `PROJECT → TEAM → ORGANIZATION` chain (most-specific-first) for a project context. Apply it as `scopes: { some: { OR: resolveScopeChain(ctx) } }` (junction) or `{ organizationId, OR: resolveScopeChain(ctx) }` (inline). The tie-break policy (which matched row wins) stays in the feature's own resolver.
 
 ## organizationId anchor and tenancy regimes
 
@@ -195,10 +195,10 @@ Migrations are immutable once deployed (see `feedback_never_modify_deployed_migr
 ## Reference implementations
 
 - **Decision record:** `dev/docs/adr/021-multi-scope-targeting-and-tenancy.md`
-- **Shared contract:** `packages/features/data-retention/contract/src/data-retention.ts` (`ScopeAssignment`, `retentionScopeTypes`, `resolveScopeChain`)
-- **Storage + read grouping:** `packages/features/model-provider/server/src/transport/api-trpc/model-provider.api.ts` → `getDefaultModelsForProject`
-- **Write per-scope:** `packages/features/model-provider/server/src/services/model-provider-defaults-write.service.ts`
-- **Multi-scope authz:** `packages/features/gateway/server/src/app/gateway.app.ts` → `assertCanManageAllScopes`
-- **UI primitive:** `packages/features/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx`
+- **Shared contract:** `modules/data-retention/contract/src/data-retention.ts` (`ScopeAssignment`, `retentionScopeTypes`, `resolveScopeChain`)
+- **Storage + read grouping:** `modules/model-provider/server/src/transport/api-trpc/model-provider.api.ts` → `getDefaultModelsForProject`
+- **Write per-scope:** `modules/model-provider/server/src/services/model-provider-defaults-write.service.ts`
+- **Multi-scope authz:** `modules/gateway/server/src/app/gateway.app.ts` → `assertCanManageAllScopes`
+- **UI primitive:** `modules/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx`
 - **Cascade-FK variant:** `GatewayBudget` model in `prisma/schema.prisma`
 - **Spec:** `specs/model-providers/role-based-default-models.feature`

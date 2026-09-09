@@ -1,6 +1,6 @@
 # governance (enterprise) — cleanup review
 
-Audit of `packages/enterprise/features/governance/` against
+Audit of `enterprise/modules/governance/` against
 [`feature-cleanup-review.md`](../../best_practices/feature-cleanup-review.md).
 Reference example: [`dataset.md`](./dataset.md).
 
@@ -125,7 +125,7 @@ if (!this.traceIngestion) {
 `traceIngestion` is optional (`:89`, `:103`). The only supplier anywhere is the
 unit test — `ports/__tests__/ingestion-pull-worker.service.unit.test.ts:383,409`.
 The production composition,
-`packages/enterprise/composition/api/src/governance/ingestion-pull-worker.adapter.ts:338-347`,
+`enterprise/packages/composition/api/src/governance/ingestion-pull-worker.adapter.ts:338-347`,
 passes `sources`, `registry`, `credentials`, `projects`, `sink`,
 `usageEntitlement`, `usageRecords`, `diagnostics` — and no `traceIngestion`.
 
@@ -475,7 +475,7 @@ Each new code needs an entry in
 
 - **The 10 puller adapters** (`adapters/{anthropic-admin,openai-admin,openai-compliance,claude-compliance,copilot-studio,copilot-studio-dataverse,databricks-genie,http-poller,s3-puller,poller-cursor}.adapter.ts`,
   ~7,900 lines). One file per source over an open set, registered by name at
-  `packages/enterprise/composition/api/src/governance/ingestion-pull-worker.adapter.ts:325-332`.
+  `enterprise/packages/composition/api/src/governance/ingestion-pull-worker.adapter.ts:325-332`.
   A new vendor touches nothing else. Correct as it is — including
   `databricks-genie-puller.adapter.ts` at 3,249 lines, whose only complaint is
   length on a hot correctness path.
@@ -485,7 +485,7 @@ Each new code needs an entry in
   not. A class would add a constructor and nothing else.
 - **~48 of the 64 ports.** This is the load-bearing correction to the "33 port
   files" headline: nearly every port here is a genuine cross-package inversion,
-  implemented in `packages/enterprise/composition/api/src/governance/` so the
+  implemented in `enterprise/packages/composition/api/src/governance/` so the
   feature never reaches the app. Nineteen of the feature's 31 production
   consumers _are_ that adapter package. `GovernanceHttpPort` has 11
   implementations, `GovernanceDiagnosticsPort` 10, `GovernanceEncryptionPort` 6,
@@ -567,13 +567,13 @@ follow the layer collapse, not lead it.
 
 **`@langwatch/enterprise-governance-server`** — 49 files import it, 31 outside
 tests. Nineteen of those are
-`packages/enterprise/composition/api/src/governance/*`, the adapter package that
+`enterprise/packages/composition/api/src/governance/*`, the adapter package that
 implements the ports. The rest: `platform/app/src/server/app-layer/` (3),
 `platform/app/src/server/workers/startWorkers.ts`,
 `platform/app/src/server/event-sourcing/registration/pipelineRegistry.ts`,
 `platform/app/src/server/api/routers/governance/`,
-`packages/enterprise/composition/worker/src/governance/`,
-`packages/enterprise/composition/api/src/trpc/`, and two scripts.
+`enterprise/packages/composition/worker/src/governance/`,
+`enterprise/packages/composition/api/src/trpc/`, and two scripts.
 
 124 distinct symbols are imported. The heaviest are the ports
 (`GovernanceHttpPort`, `GovernanceDiagnosticsPort`, `GovernanceEncryptionPort`,

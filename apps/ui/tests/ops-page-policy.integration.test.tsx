@@ -1,7 +1,7 @@
 /**
  * What each Ops address is actually behind, proved by mounting it.
  * @vitest-environment jsdom
- * Spec: packages/features/ops/specs/admin.feature
+ * Spec: modules/ops/specs/admin.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

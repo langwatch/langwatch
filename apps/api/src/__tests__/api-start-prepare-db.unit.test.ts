@@ -110,7 +110,7 @@ describe("given the API process start path", () => {
     /** @scenario "An operator can skip a migration step that a deploy already applied" */
     it("leaves each step its own opt-out", () => {
       // The knobs are the monolith's, unchanged, and each is honoured by the
-      // task itself (packages/clickhouse-client, packages/features/analytics,
+      // task itself (packages/clickhouse-client, modules/analytics,
       // apps/tasks) rather than by this shell chain — which is why the chain
       // names no condition of its own.
       expect(

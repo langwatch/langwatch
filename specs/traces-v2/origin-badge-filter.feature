@@ -1,9 +1,9 @@
 # Origin badge — click to filter
 #
 # Implementation:
-#   packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/simple-cells.tsx (OriginCell)
-#   packages/features/trace/web/src/ui/blocks/explorer/trace-table/registry/cells/filter-chip.tsx
-#   packages/features/trace/web/src/filter.store.ts (toggleFacet)
+#   modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/simple-cells.tsx (OriginCell)
+#   modules/trace/web/src/ui/blocks/explorer/trace-table/registry/cells/filter-chip.tsx
+#   modules/trace/web/src/filter.store.ts (toggleFacet)
 #
 # Motivation (round 5): the Origin column rendered a static badge while the
 # Model and Label cells were already click-to-filter chips. Make Origin

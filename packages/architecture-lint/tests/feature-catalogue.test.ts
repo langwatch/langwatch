@@ -7,7 +7,7 @@ import { readFeatureCatalogue, type ArchitectureViolation } from "../src/index.t
 let root = "";
 
 function writeCatalogue(catalogue: unknown): void {
-  const directory = join(root, "packages/features");
+  const directory = join(root, "modules");
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, "catalogue.json"), JSON.stringify(catalogue));
 }
@@ -39,13 +39,13 @@ describe("feature catalogue", () => {
         {
           classification: "core",
           id: "api-key",
-          root: "packages/features/api-key",
+          root: "modules/api-key",
           subjects: ["api-key", "credential"],
         },
         {
           classification: "enterprise",
           id: "governance",
-          root: "packages/enterprise/features/governance",
+          root: "enterprise/modules/governance",
           subjects: ["governance"],
         },
       ],
@@ -65,7 +65,7 @@ describe("feature catalogue", () => {
         {
           classification: "core",
           id: "user",
-          root: "packages/features/user",
+          root: "modules/user",
           subjects: ["user"],
           owner: "platform",
         },
@@ -88,7 +88,7 @@ describe("feature catalogue", () => {
         {
           classification: "core",
           id: "project",
-          root: "packages/features/project",
+          root: "modules/project",
           subjects: ["team", "project", "project"],
         },
       ],
@@ -112,13 +112,13 @@ describe("feature catalogue", () => {
         {
           classification: "core",
           id: "organization",
-          root: "packages/features/organization",
+          root: "modules/organization",
           subjects: ["membership"],
         },
         {
           classification: "core",
           id: "user",
-          root: "packages/features/user",
+          root: "modules/user",
           subjects: ["membership"],
         },
       ],

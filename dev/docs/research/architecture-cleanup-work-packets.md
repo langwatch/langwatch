@@ -6,7 +6,7 @@
 
 | Area | Result | Meaning |
 | --- | ---: | --- |
-| Catalogue features (`packages/features/catalogue.json`) | 54 | This is the ownership authority; the scan covers all its core feature entries plus Enterprise feature packages. |
+| Catalogue features (`modules/catalogue.json`) | 54 | This is the ownership authority; the scan covers all its core feature entries plus Enterprise feature packages. |
 | `feature.json` files outside nested web metadata | 67 | Filesystem layout is broader than the catalogue because it includes Enterprise and transitional/residual roots. |
 | Feature `*.server.ts` declarations | 40 | Installer adoption is incomplete/uneven. |
 | Current API + worker application `*.composition.ts` | 130 / 36,833 LOC | Current `find`/`wc` count excluding `__tests__`; hand-written process graphs remain the principal owner. |
@@ -37,7 +37,7 @@ for those concrete collaborators. Avoid both giant utility modules and chains of
 forwarding wrappers. Extract a collaborator because it owns behaviour, not merely
 to divide a large file. Review readability separately from passing checks.
 
-The current executable declaration is not hypothetical: `packages/features/coding-agent/server/src/coding-agent.server.ts:9-16` declares both REST and tRPC routers and contributes them with `withTransports`; `packages/features/data-retention/server/src/data-retention.server.ts:8-13` is the one-transport form. The current valid small App is audit-log at `packages/features/audit-log/server/src/app/audit-log.app.ts:20-48`:
+The current executable declaration is not hypothetical: `modules/coding-agent/server/src/coding-agent.server.ts:9-16` declares both REST and tRPC routers and contributes them with `withTransports`; `modules/data-retention/server/src/data-retention.server.ts:8-13` is the one-transport form. The current valid small App is audit-log at `modules/audit-log/server/src/app/audit-log.app.ts:20-48`:
 
 ```ts
 type AuditLogSetup = FeatureSetup<
@@ -94,7 +94,7 @@ class PrismaExampleRepository extends ExampleRepository {
 }
 ```
 
-The `PrismaDepartmentRepository` current shape at `packages/enterprise/features/governance/server/src/repositories/prisma/prisma.department.repository.ts:18-24` is the closest existing repository factory, but its exported narrowed database type is precisely the P12 cleanup target.
+The `PrismaDepartmentRepository` current shape at `enterprise/modules/governance/server/src/repositories/prisma/prisma.department.repository.ts:18-24` is the closest existing repository factory, but its exported narrowed database type is precisely the P12 cleanup target.
 
 ## Dependency graph
 
@@ -119,7 +119,7 @@ The `PrismaDepartmentRepository` current shape at `packages/enterprise/features/
 **First bounded slices (do these separately after P1):**
 
 1. `apps/api/src/app/api-production.composition.ts:852-860` plus the API root created by P1: audit-log already uses `auditLogServer`, but in a **second nested `createApp` runtime**. Install it in the API's one selected feature graph, obtain `AuditLogApi` from that graph, and remove only the nested runtime/resource owner.
-2. `apps/api/src/app/api-production.composition.ts:865-870` plus `packages/features/feature-flag/server/**`: move feature-flag fallback/config into installer setup and delete only `composedFeatureFlag` use in that slice.
+2. `apps/api/src/app/api-production.composition.ts:865-870` plus `modules/feature-flag/server/**`: move feature-flag fallback/config into installer setup and delete only `composedFeatureFlag` use in that slice.
 3. `apps/api/src/app-rest/app-rest.process-features.ts:4-90` plus the P1 reference feature: remove exactly one direct feature transport/service import and mount its declared contribution.
 
 **Accept / test.** No public feature service/repository/Prisma lookup; each selected App is created once; transport mounting cannot construct a second graph; missing declared dependency fails before listener start. Characterize readiness, stop order and unavailable-route mapping; run API composition integration/typecheck and standard checks.
@@ -164,7 +164,7 @@ The `PrismaDepartmentRepository` current shape at `packages/enterprise/features/
 
 ### P7 — Organization App and tRPC callback bag (Terra)
 
-**Evidence — mechanically verified.** `packages/features/organization/server/src/transport/api-trpc/organization.api.ts:85-108` defines local `app.organizations` context; its `OrganizationTrpcPorts` begins at `132` with auth, membership, billing and onboarding callbacks. `app/organization.app.ts:6-10` imports generated Prisma and duplicates row transport types at `91-99`.
+**Evidence — mechanically verified.** `modules/organization/server/src/transport/api-trpc/organization.api.ts:85-108` defines local `app.organizations` context; its `OrganizationTrpcPorts` begins at `132` with auth, membership, billing and onboarding callbacks. `app/organization.app.ts:6-10` imports generated Prisma and duplicates row transport types at `91-99`.
 
 **Change.** Put real callable use cases on `OrganizationApi`; App privately owns organization/membership services and receives complete Authz/Project APIs. Move actor extraction/access declarations to governed middleware and use `ctx.app`. Contract owns output schemas/types.
 
@@ -172,7 +172,7 @@ The `PrismaDepartmentRepository` current shape at `packages/enterprise/features/
 
 ### P8 — Prompt API vocabulary and Project dependency (Terra)
 
-**Evidence — mechanically verified.** `packages/features/prompt/contract/src/prompt.api.ts:31-170` exposes duplicate verbs (for example `getAllPrompts/listForProject`) and `Omit<CopyPromptCommand,"authorId">`. `app/prompt.app.ts:42-46` injects `PromptService` and `Pick<ProjectService,...>`. Lint also reports prompt-web cycle and 13 public-boundary leaks.
+**Evidence — mechanically verified.** `modules/prompt/contract/src/prompt.api.ts:31-170` exposes duplicate verbs (for example `getAllPrompts/listForProject`) and `Omit<CopyPromptCommand,"authorId">`. `app/prompt.app.ts:42-46` injects `PromptService` and `Pick<ProjectService,...>`. Lint also reports prompt-web cycle and 13 public-boundary leaks.
 
 **Change.** Name canonical API operations; retain old public names only as transport shims until callers migrate. Replace utility-derived inputs with explicit contract commands and depend on ProjectApi. Reverse prompt-web surface implementation imports in the same slice.
 
@@ -180,7 +180,7 @@ The `PrismaDepartmentRepository` current shape at `packages/enterprise/features/
 
 ### P9 — Gateway explicit command and actor boundary (Terra)
 
-**Evidence — heuristic candidate.** `packages/features/gateway/server/src/app/gateway.app.ts:142-186` derives operation inputs with conditional `infer`; `GatewayActor` is `unknown` at `47`. This conflicts with the repository ban on type mirrors/untyped boundary values, but is not a dedicated lint finding.
+**Evidence — heuristic candidate.** `modules/gateway/server/src/app/gateway.app.ts:142-186` derives operation inputs with conditional `infer`; `GatewayActor` is `unknown` at `47`. This conflicts with the repository ban on type mirrors/untyped boundary values, but is not a dedicated lint finding.
 
 **Change.** Put named virtual-key/budget/cache/guardrail commands and branded actor input in gateway contract. REST/tRPC maps credentials at the governed edge; App authorizes exact organization/project targets.
 
@@ -188,7 +188,7 @@ The `PrismaDepartmentRepository` current shape at `packages/enterprise/features/
 
 ### P10 — Ops explicit audit command and process ports (Terra)
 
-**Evidence — mechanically verified.** `apps/api/src/features/ops/ops.composition.ts:332-346` casts audit data through `unknown as Parameters<ApiAuditPort["record"]>[0]`; `378` accepts `Pick<OpsApp,"isAdmin">`. `packages/features/ops/server/src/app/ops.app.ts:87-174` embeds large process explorer interfaces; absence policy is duplicated at API lines `80-105`.
+**Evidence — mechanically verified.** `apps/api/src/features/ops/ops.composition.ts:332-346` casts audit data through `unknown as Parameters<ApiAuditPort["record"]>[0]`; `378` accepts `Pick<OpsApp,"isAdmin">`. `modules/ops/server/src/app/ops.app.ts:87-174` embeds large process explorer interfaces; absence policy is duplicated at API lines `80-105`.
 
 **Change.** Define audit command/operator actor in ops contract. Supply event-store/replay introspection as named process infrastructure ports; keep OpsApp callable. Select absent capability behaviour at boot.
 
@@ -196,7 +196,7 @@ The `PrismaDepartmentRepository` current shape at `packages/enterprise/features/
 
 ### P11 — Enterprise billing: request data at the tRPC edge (Luna)
 
-**Evidence — mechanically verified.** `packages/enterprise/features/billing/server/src/transport/api-trpc/currency.api.ts:38-40` puts `req` in context; `79-102` constructs `CurrencyService` per router and calls it with `ctx.req`. Lint flags line `102`; billing has a direct entitlement server dependency.
+**Evidence — mechanically verified.** `enterprise/modules/billing/server/src/transport/api-trpc/currency.api.ts:38-40` puts `req` in context; `79-102` constructs `CurrencyService` per router and calls it with `ctx.req`. Lint flags line `102`; billing has a direct entitlement server dependency.
 
 **Change.** Extract typed CurrencyRequest at governed mount and pass it to one BillingApp/BillingApi instance. Replace entitlement server dependency with EntitlementApi.
 
@@ -204,7 +204,7 @@ The `PrismaDepartmentRepository` current shape at `packages/enterprise/features/
 
 ### P12 — Enterprise governance private Prisma adapters (Terra)
 
-**Evidence — mechanically verified.** `packages/enterprise/features/governance/server/src/repositories/prisma/prisma.department.repository.ts:13-24` exports `Pick<PrismaClient,...>`; its representative four-table queries are at `27-115`. This representative filters tenants correctly, so this is a boundary correction, not an asserted incident.
+**Evidence — mechanically verified.** `enterprise/modules/governance/server/src/repositories/prisma/prisma.department.repository.ts:13-24` exports `Pick<PrismaClient,...>`; its representative four-table queries are at `27-115`. This representative filters tenants correctly, so this is a boundary correction, not an asserted incident.
 
 **Change.** Construct typed Prisma only in private strict adapters from GovernanceApp setup; expose only internal repository interfaces/services. Audit all organization/project predicates while moving each adapter.
 
@@ -212,7 +212,7 @@ The `PrismaDepartmentRepository` current shape at `packages/enterprise/features/
 
 ### P13 — Prompt web closure cluster (Luna)
 
-**Evidence — mechanically verified.** Lint reports prompt package/surface cycles and 13 boundary leaks; `packages/features/prompt/web/src/behavior/prompts/llm-prompt-config-utils.ts:14` imports the public prompt-form surface which re-exports drawer implementation.
+**Evidence — mechanically verified.** Lint reports prompt package/surface cycles and 13 boundary leaks; `modules/prompt/web/src/behavior/prompts/llm-prompt-config-utils.ts:14` imports the public prompt-form surface which re-exports drawer implementation.
 
 **Change.** Separate controlled reusable components from screen composition; internal model/behavior may not import its own public surface barrel. Pass data/actions explicitly.
 
@@ -220,7 +220,7 @@ The `PrismaDepartmentRepository` current shape at `packages/enterprise/features/
 
 ### P14 — Project home web closure cluster (Luna)
 
-**Evidence — mechanically verified.** Lint reports 18 project-web screen-closure findings: `packages/features/project/web/src/screens/home/components/traces-overview.tsx:4-5` imports analytics surfaces; `home-page-banners.tsx:19-22` imports Langy/navigation surfaces.
+**Evidence — mechanically verified.** Lint reports 18 project-web screen-closure findings: `modules/project/web/src/screens/home/components/traces-overview.tsx:4-5` imports analytics surfaces; `home-page-banners.tsx:19-22` imports Langy/navigation surfaces.
 
 **Change.** Use small named render ports in project-home composition, or move genuinely reusable widgets to their owning public surface. App UI retains routes/data hooks.
 

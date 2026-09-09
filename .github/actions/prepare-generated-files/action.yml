@@ -37,9 +37,9 @@ runs:
         # node_modules: @langwatch/prisma-client owns its generated source.
         path: |
           packages/prisma-client/src/generated
-          packages/features/evaluator/contract/src/evaluators.generated.ts
-          packages/features/langy/web/src/model/shared/langy/langySkills.generated.json
-          packages/features/langy/server/src/rules/setup-skill-bodies.rules.ts
+          modules/evaluator/contract/src/evaluators.generated.ts
+          modules/langy/web/src/model/shared/langy/langySkills.generated.json
+          modules/langy/server/src/rules/setup-skill-bodies.rules.ts
           sdks/typescript/dist
           mcp/typescript/dist
         key: >-
@@ -49,8 +49,8 @@ runs:
             'packages/prisma-client/prisma/schema/**',
             'packages/prisma-client/package.json',
             'package.json',
-            'packages/features/langy/web/scripts/generate-langy-skills.ts',
-            'packages/features/langy/server/scripts/generate-setup-skill-bodies.ts',
+            'modules/langy/web/scripts/generate-langy-skills.ts',
+            'modules/langy/server/scripts/generate-setup-skill-bodies.ts',
             'services/langevals/ts-integration/evaluators.generated.ts',
             'sdks/typescript/src/**',
             'sdks/typescript/package.json',

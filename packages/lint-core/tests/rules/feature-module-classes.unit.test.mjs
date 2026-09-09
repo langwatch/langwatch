@@ -12,11 +12,11 @@ function report(code, filename) {
   return runRule(featureModuleClassesRule, { code, cwd: workspace.cwd, filename });
 }
 
-const PORT = "packages/features/agent/server/src/ports/agent.port.ts";
-const ADAPTER = "packages/features/agent/server/src/adapters/agent.adapter.ts";
-const REPOSITORY = "packages/features/agent/server/src/repositories/agent.repository.ts";
+const PORT = "modules/agent/server/src/ports/agent.port.ts";
+const ADAPTER = "modules/agent/server/src/adapters/agent.adapter.ts";
+const REPOSITORY = "modules/agent/server/src/repositories/agent.repository.ts";
 const PRISMA_REPOSITORY =
-  "packages/features/agent/server/src/repositories/prisma/prisma.agent.repository.ts";
+  "modules/agent/server/src/repositories/prisma/prisma.agent.repository.ts";
 
 describe("given a strict feature port module", () => {
   describe("when it exports a concrete class named *Port", () => {
@@ -88,7 +88,7 @@ describe("given strict feature repositories", () => {
 
 describe("feature apps", () => {
   it("requires the public app contract to be abstract", () => {
-    const file = "packages/features/agent/contract/src/agent.app.ts";
+    const file = "modules/agent/contract/src/agent.app.ts";
     expect(report("export abstract class AgentApp {}", file)).toEqual([]);
     expect(report("export class AgentApp {}", file).map((entry) => entry.messageId)).toEqual([
       "abstract",
@@ -96,7 +96,7 @@ describe("feature apps", () => {
   });
 
   it("requires a concrete app factory", () => {
-    const file = "packages/features/agent/server/src/app/agent.app.ts";
+    const file = "modules/agent/server/src/app/agent.app.ts";
     expect(
       report("export class ComposedAgentApp {}", file).map((entry) => entry.messageId),
     ).toEqual(["create"]);

@@ -1,6 +1,6 @@
 /**
  * What the API process takes on when it composes AuthZ, and what it leaves to
- * the worker. Spec: packages/features/authz/specs/package-boundary.feature
+ * the worker. Spec: modules/authz/specs/package-boundary.feature
  */
 import type { GroupQueueDependencies } from "@langwatch/group-queue";
 import { PrismaConnection } from "@langwatch/prisma-client";

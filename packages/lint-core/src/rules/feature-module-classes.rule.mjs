@@ -98,19 +98,15 @@ function hasInvalidExportedPort(program) {
 }
 
 function featureModuleKind(normalized) {
-  if (
-    /^packages\/(?:enterprise\/)?features\/[^/]+\/contract\/src\/[^/]+\.app\.ts$/.test(normalized)
-  ) {
+  if (/^(?:enterprise\/)?modules\/[^/]+\/contract\/src\/[^/]+\.app\.ts$/.test(normalized)) {
     return { suffix: "App", abstract: true, concrete: false };
   }
   const contract = normalized.match(
-    /^packages\/(?:enterprise\/)?features\/[^/]+\/contract\/src\/.+\.service\.ts$/,
+    /^(?:enterprise\/)?modules\/[^/]+\/contract\/src\/.+\.service\.ts$/,
   );
   if (contract) return { suffix: "Service", abstract: true, concrete: false };
 
-  const server = normalized.match(
-    /^packages\/(?:enterprise\/)?features\/[^/]+\/server\/src\/(.+)$/,
-  );
+  const server = normalized.match(/^(?:enterprise\/)?modules\/[^/]+\/server\/src\/(.+)$/);
   if (!server) return undefined;
   const path = server[1];
   if (/^app\/[^/]+\.app\.ts$/.test(path)) {

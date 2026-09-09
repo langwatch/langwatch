@@ -1,7 +1,7 @@
 /**
  * How the legacy Agents family reads in the published document. It still
  * answers, so the document is the only thing that can tell an integrator not
- * to build on it. See packages/features/agent/specs/package-boundary.feature.
+ * to build on it. See modules/agent/specs/package-boundary.feature.
  */
 import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";

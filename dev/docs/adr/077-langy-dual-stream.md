@@ -9,7 +9,7 @@
 > successor; ADR-046 explicitly scopes the Redis token buffer OUT of itself.
 > Number 044 now belongs to scheduled-reports automation, so citing it here
 > would point at an unrelated document. The design lives in the code:
-> `packages/features/langy/server/src/streaming/` and `services/langyagent/`.
+> `modules/langy/server/src/streaming/` and `services/langyagent/`.
 
 **Builds on:** the event-driven-turns design (out-of-band spawn + Redis token
 buffer + liveness), ADR-046 (event-sourced Langy conversations: durable

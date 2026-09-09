@@ -10,12 +10,12 @@
 /apps/api/src/app/*.composition.ts                   @0xdeafcafe
 /apps/worker/src/app/*.composition.ts                @0xdeafcafe
 /apps/tasks/src/platform/*.composition.ts            @0xdeafcafe
-/packages/enterprise/composition/                    @0xdeafcafe
+/enterprise/packages/composition/                    @0xdeafcafe
 
 # Authorisation and the request security chain.
 /apps/api/src/api-rest.security.ts                   @0xdeafcafe
-/packages/features/authz/server/                     @0xdeafcafe
-/packages/features/identity/server/                  @0xdeafcafe
+/modules/authz/server/                     @0xdeafcafe
+/modules/identity/server/                  @0xdeafcafe
 
 # The rules encode the design; a wrong rule blesses a wrong pattern everywhere.
 /packages/architecture-lint/                         @0xdeafcafe

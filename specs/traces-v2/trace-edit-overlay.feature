@@ -4,10 +4,10 @@
 #   [gone] src/server/traces/edit-overlay/traceEditOverlay.schemas.ts    (patch contract, version 1)
 #   [gone] src/server/traces/edit-overlay/applyTraceEditOverlay.ts       (pure appliers)
 #   [gone] src/server/traces/edit-overlay/traceEditOverlay.repository.ts (one row per project + trace)
-#   packages/features/trace/server/src/services/trace-edit-overlay.service.ts    (read, upsert, merge, delete)
+#   modules/trace/server/src/services/trace-edit-overlay.service.ts    (read, upsert, merge, delete)
 #   packages/prisma-client/src/generated/models/TraceEditOverlay.ts                    (tRPC surface)
-#   packages/features/trace/server/src/services/trace-legacy-read.service.ts                            (withEditOverlay read seam)
-#   packages/features/annotation/server/src/transport/annotation.trpc.ts                                  (suggestion dual-write, queue marks)
+#   modules/trace/server/src/services/trace-legacy-read.service.ts                            (withEditOverlay read seam)
+#   modules/annotation/server/src/transport/annotation.trpc.ts                                  (suggestion dual-write, queue marks)
 #
 # Motivation: the curation loop is production traces, then correction, then an
 # evaluation dataset. Today the only correctable thing is the final expected
@@ -437,5 +437,5 @@ Feature: Correcting a trace without rewriting it
 
   # The end-of-queue dataset hand-off no longer stores marks on queue items.
   # Which traces a sitting keeps is collected in the browser for that sitting;
-  # see packages/features/annotation/specs/annotation-queue-workflow.feature,
+  # see modules/annotation/specs/annotation-queue-workflow.feature,
   # Rule "Session marks are local to this queue visit".

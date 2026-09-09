@@ -8,9 +8,9 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const WEB_FILE = "packages/features/auth/web/src/behavior/auth-client.ts";
+const WEB_FILE = "modules/auth/web/src/behavior/auth-client.ts";
 const UI_FILE = "apps/ui/src/behavior/ui-session-client.ts";
-const SERVER_FILE = "packages/features/auth/server/src/services/auth.service.ts";
+const SERVER_FILE = "modules/auth/server/src/services/auth.service.ts";
 
 function report(filename, code) {
   return runRule(webImportsServerShapedValueRule, { code, cwd: workspace.cwd, filename });
@@ -79,7 +79,7 @@ describe("given a browser test file", () => {
     it("reports nothing, because a test does not ship to a browser", () => {
       expect(
         report(
-          "packages/features/auth/web/src/behavior/__tests__/auth-client.unit.test.ts",
+          "modules/auth/web/src/behavior/__tests__/auth-client.unit.test.ts",
           'import { betterAuth } from "better-auth";',
         ),
       ).toEqual([]);

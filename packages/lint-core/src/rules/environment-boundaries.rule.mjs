@@ -62,7 +62,7 @@ export const environmentBoundariesRule = defineRule({
   },
   create(context, file) {
     const workspacePath = file.workspacePath;
-    const reusablePackage = /^packages\/.+\/src\//.test(workspacePath);
+    const reusablePackage = /^(?:packages|modules|enterprise)\/.+\/src\//.test(workspacePath);
     const processApp = isEnvironmentGovernedApp(workspacePath);
     const productionSource = !isNonProductionPackageSource(workspacePath);
     if ((!reusablePackage && !processApp) || !productionSource) return {};

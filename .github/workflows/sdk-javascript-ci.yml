@@ -80,7 +80,7 @@ jobs:
               # The Hono route modules the SDK posts to, and the shared
               # middleware the capped ones mount:
               # /api/otel/v1/{traces,logs,metrics} and /api/collector.
-              - 'packages/features/trace/server/src/transport/api-rest/**'
+              - 'modules/trace/server/src/transport/api-rest/**'
               - 'packages/api/src/rest/**'
               # Mounts those modules and fixes their order. A route that
               # resolves in the router but not on the wire is a mount bug,

@@ -1,0 +1,164 @@
+{
+  "name": "@langwatch/experiment-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable batch evaluation result presentation and comparison behaviour.",
+  "files": [
+    "src",
+    "tests"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./surfaces/batch-evaluation-state": {
+      "langwatch-declaration-source": "./src/ui/elements/experiments/batch-evaluation-v2.tsx",
+      "types": "./dist/ui/elements/experiments/batch-evaluation-v2.d.ts",
+      "default": "./src/ui/elements/experiments/batch-evaluation-v2.tsx"
+    },
+    "./surfaces/evaluation-progress-bar": {
+      "langwatch-declaration-source": "./src/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx",
+      "types": "./dist/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.d.ts",
+      "default": "./src/ui/elements/experiments/BatchEvaluationV2/evaluation-progress-bar.tsx"
+    },
+    "./drawers": {
+      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
+      "types": "./dist/ui/sections/drawers.d.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
+    "./surfaces/comparison-config-form": {
+      "langwatch-declaration-source": "./src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx",
+      "types": "./dist/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.d.ts",
+      "default": "./src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx"
+    },
+    "./surfaces/evaluation-mappings": {
+      "langwatch-declaration-source": "./src/behavior/experiments-v3/use-evaluation-mappings.ts",
+      "types": "./dist/behavior/experiments-v3/use-evaluation-mappings.d.ts",
+      "default": "./src/behavior/experiments-v3/use-evaluation-mappings.ts"
+    },
+    "./surfaces/workbench-types": {
+      "langwatch-declaration-source": "./src/model/experiments-v3/types.ts",
+      "types": "./dist/model/experiments-v3/types.d.ts",
+      "default": "./src/model/experiments-v3/types.ts"
+    },
+    "./surfaces/cell-failure": {
+      "langwatch-declaration-source": "./src/model/experiments-v3/cell-failure.ts",
+      "types": "./dist/model/experiments-v3/cell-failure.d.ts",
+      "default": "./src/model/experiments-v3/cell-failure.ts"
+    },
+    "./surfaces/evaluator-editor-callbacks": {
+      "langwatch-declaration-source": "./src/model/experiments-v3/evaluator-editor-callbacks.ts",
+      "types": "./dist/model/experiments-v3/evaluator-editor-callbacks.d.ts",
+      "default": "./src/model/experiments-v3/evaluator-editor-callbacks.ts"
+    },
+    "./surfaces/mapping-validation": {
+      "langwatch-declaration-source": "./src/model/experiments-v3/mapping-validation.ts",
+      "types": "./dist/model/experiments-v3/mapping-validation.d.ts",
+      "default": "./src/model/experiments-v3/mapping-validation.ts"
+    },
+    "./screens/experiments": {
+      "langwatch-declaration-source": "./src/screens/experiments/index.ts",
+      "types": "./dist/screens/experiments/index.d.ts",
+      "default": "./src/screens/experiments/index.ts"
+    },
+    "./surfaces/batch-results": {
+      "langwatch-declaration-source": "./src/surfaces/batch-results/index.ts",
+      "types": "./dist/surfaces/batch-results/index.d.ts",
+      "default": "./src/surfaces/batch-results/index.ts"
+    },
+    "./surfaces/workbench-store": {
+      "langwatch-declaration-source": "./src/behavior/experiments-v3/use-evaluations-v3-store.ts",
+      "types": "./dist/behavior/experiments-v3/use-evaluations-v3-store.d.ts",
+      "default": "./src/behavior/experiments-v3/use-evaluations-v3-store.ts"
+    },
+    "./surfaces/workbench-results-fold": {
+      "langwatch-declaration-source": "./src/model/experiments-v3/execution/results-fold.ts",
+      "types": "./dist/model/experiments-v3/execution/results-fold.d.ts",
+      "default": "./src/model/experiments-v3/execution/results-fold.ts"
+    },
+    "./surfaces/workbench-run-identification": {
+      "langwatch-declaration-source": "./src/model/experiments-v3/execution/run-identification.ts",
+      "types": "./dist/model/experiments-v3/execution/run-identification.d.ts",
+      "default": "./src/model/experiments-v3/execution/run-identification.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project modules/experiment/web/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/csv": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/dataset-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/evaluator-web": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/langy-web": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@opentelemetry/api": "^1.9.1",
+    "@tanstack/react-query": "5.101.4",
+    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-virtual": "^3.14.5",
+    "@trpc/client": "11.18.0",
+    "@trpc/react-query": "11.18.0",
+    "fast-deep-equal": "^3.1.3",
+    "lodash-es": "^4.18.1",
+    "lucide-react": "^1.22.0",
+    "mustache": "^4.2.0",
+    "nanoid": "^6.0.0",
+    "numeral": "^2.0.6",
+    "papaparse": "^5.5.4",
+    "posthog-js": "^1.396.9",
+    "react": "^19.2.7",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.80.0",
+    "react-icons": "^5.7.0",
+    "recharts": "^3.9.1",
+    "usehooks-ts": "^3.1.1",
+    "zod": "^4.4.3",
+    "zundo": "^2.3.0",
+    "zustand": "^4.5.7"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/lodash-es": "^4.17.12",
+    "@types/mustache": "^4.2.6",
+    "@types/node": "^22.0.0",
+    "@types/numeral": "^2.0.5",
+    "@types/papaparse": "^5.3.15",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitest/browser": "^5.0.0",
+    "@vitest/browser-playwright": "^5.0.0",
+    "jsdom": "^30.0.0",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7"
+  }
+}

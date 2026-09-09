@@ -18,7 +18,7 @@ A tRPC procedure was described three times.
 The feature's server wrote the name, the kind, the input schema, the output
 schema, the permission and the handler in one chain. The feature's contract
 held the schemas that chain named. The feature's **web** package then wrote the
-whole thing again by hand — `packages/features/annotation/web/src/behavior/annotation-api.ts`
+whole thing again by hand — `modules/annotation/web/src/behavior/annotation-api.ts`
 was 281 lines of a nested `AnnotationApiMap` whose own comment said it was
 "hand-written until the mounted router can generate it".
 
@@ -165,5 +165,5 @@ Convert a namespace at a time. Write the contract beside the schemas it already
 has, point the server at it, and delete the web map. The wire is unchanged if —
 and only if — every procedure name, namespace key, permission and schema
 survives byte-identical; annotation's are pinned in
-`packages/features/annotation/server/src/transport/__tests__/annotation.trpc.declaration.unit.test.ts`,
+`modules/annotation/server/src/transport/__tests__/annotation.trpc.declaration.unit.test.ts`,
 and the next feature should pin its own the same way before it starts.

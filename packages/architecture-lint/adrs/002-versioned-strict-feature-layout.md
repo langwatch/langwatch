@@ -40,7 +40,7 @@ tests, ADR, and declared version together. There are no file comments, globs,
 legacy modes, or package-specific exceptions that suppress a versioned rule.
 
 ```text
-packages/features/<feature>/
+modules/<feature>/
 ├── feature.json
 ├── contract/
 │   └── src/

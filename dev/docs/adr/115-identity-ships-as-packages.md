@@ -410,7 +410,7 @@ here.
 
 Specs: `specs/identity/identifier-model.feature` keeps its 22 scenarios;
 the `@scenario` bindings move with the tests. A new
-`packages/features/identity/specs/package-boundary.feature` states the boundaries as
+`modules/identity/specs/package-boundary.feature` states the boundaries as
 behaviour (`@unit`, bound to a graph-walking test in the `frontend-boundary`
 style): the pure package compiles without node types; identity-server
 imports no Prisma, env, or framework module; `better-auth/` reaches
@@ -544,7 +544,7 @@ package boundary refuses at the compiler and a folder merely frowns at.
 The boundaries above stand. Where the packages live does not.
 
 `packages/authz` and `packages/authz-server` — the reference shape this ADR
-copied — have since moved to `packages/features/authz/{contract,server}`, and
+copied — have since moved to `modules/authz/{contract,server}`, and
 the strict feature layout that established is what every other feature follows.
 Identity was the last vertical still beside the shared infrastructure packages,
 so the feature catalogue, the layout checks and the per-feature CI job all
@@ -552,12 +552,12 @@ skipped it.
 
 | ADR-115 said               | Now                                   |
 | -------------------------- | ------------------------------------- |
-| `packages/identity`        | `packages/features/identity/contract` |
-| `packages/identity-server` | `packages/features/identity/server`   |
+| `packages/identity`        | `modules/identity/contract` |
+| `packages/identity-server` | `modules/identity/server`   |
 
 `@langwatch/identity` is therefore `@langwatch/identity-contract`: the layout
 derives a package's name from its role, so a package at
-`packages/features/<feature>/<role>` must be `@langwatch/<feature>-<role>`.
+`modules/<feature>/<role>` must be `@langwatch/<feature>-<role>`.
 `@langwatch/identity-server` already matched. Everything this ADR decided about
 what each package may import, and in which direction, is unchanged — the rename
 touched 855 module specifiers and nothing else.
@@ -591,7 +591,7 @@ holds, and it is the reason the package was split out in the first place. So
 stronger one — and now the only one.
 
 The feature's own record is
-[`packages/features/identity/adrs/001-identity-ships-as-a-feature.md`](../../../packages/features/identity/adrs/001-identity-ships-as-a-feature.md),
+[`modules/identity/adrs/001-identity-ships-as-a-feature.md`](../../../modules/identity/adrs/001-identity-ships-as-a-feature.md),
 and the behavioural contract moved with the packages, from
 `specs/identity/identity-packages.feature` to
-`packages/features/identity/specs/package-boundary.feature`.
+`modules/identity/specs/package-boundary.feature`.

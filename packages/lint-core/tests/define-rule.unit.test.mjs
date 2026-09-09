@@ -81,12 +81,12 @@ describe("given a rule declared through defineRule", () => {
       const found = runRule(ruleReportingOn("FunctionDeclaration"), {
         code: "export function alpha() { return 1; }",
         cwd: workspace.cwd,
-        filename: "packages/features/agent/server/src/services/agent.service.ts",
+        filename: "modules/agent/server/src/services/agent.service.ts",
       });
 
       expect(found[0].message).toBe(
         "`alpha` is declared at the top level of" +
-          " packages/features/agent/server/src/services/agent.service.ts." +
+          " modules/agent/server/src/services/agent.service.ts." +
           " Move it onto the class.",
       );
     });
@@ -95,7 +95,7 @@ describe("given a rule declared through defineRule", () => {
       const found = runRule(ruleReportingOn("ClassDeclaration"), {
         code: "export class Alpha {}",
         cwd: workspace.cwd,
-        filename: "packages/features/agent/server/src/services/agent.service.ts",
+        filename: "modules/agent/server/src/services/agent.service.ts",
         options: [{ max: 9 }],
       });
 
@@ -111,7 +111,7 @@ describe("given a rule declared through defineRule", () => {
       const found = runRule(rule, {
         code: "export function alpha() { return 1; }",
         cwd: workspace.cwd,
-        filename: "packages/features/agent/server/src/services/agent.service.ts",
+        filename: "modules/agent/server/src/services/agent.service.ts",
       });
 
       expect(found).toEqual([]);
@@ -124,7 +124,7 @@ describe("given a rule declared through defineRule", () => {
       const found = runRule(rule, {
         code: "export function alpha() { return 1; }",
         cwd: workspace.cwd,
-        filename: "packages/features/agent/web/src/behavior/agent-api.ts",
+        filename: "modules/agent/web/src/behavior/agent-api.ts",
       });
 
       expect(found).toHaveLength(1);

@@ -1,9 +1,9 @@
 # Prompt version history — read the list, and read the change
 #
 # Implementation:
-#   packages/features/prompt/web/src/screens/prompt-studio/dialogs/version-history-list-popover.tsx  (the panel)
-#   packages/features/prompt/web/src/model/prompt-version-diff.ts                                    (what changed between two versions)
-#   packages/features/prompt/web/src/ui/elements/prompts/version-changes.tsx                         (rendering of a change)
+#   modules/prompt/web/src/screens/prompt-studio/dialogs/version-history-list-popover.tsx  (the panel)
+#   modules/prompt/web/src/model/prompt-version-diff.ts                                    (what changed between two versions)
+#   modules/prompt/web/src/ui/elements/prompts/version-changes.tsx                         (rendering of a change)
 #
 # Related specs:
 #   specs/prompts/prompt-version-history-author.feature   — who wrote a version

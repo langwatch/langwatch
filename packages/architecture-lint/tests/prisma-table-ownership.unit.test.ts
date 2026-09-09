@@ -36,7 +36,7 @@ model AuditLog {
     expression: string,
     options: { imports?: string; path?: string; declaration?: string } = {},
   ) {
-    const featureRoot = `packages/features/${feature}`;
+    const featureRoot = `modules/${feature}`;
     if (!catalogue.some((entry) => entry.id === feature)) {
       catalogue.push({
         id: feature,

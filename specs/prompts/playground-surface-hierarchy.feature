@@ -14,10 +14,10 @@ Feature: Prompt playground surface hierarchy
   # something the row already said or the reader could not act on.
   #
   # Implementation:
-  #   packages/features/prompt/web/src/screens/prompt-studio/save-prompt-button.tsx
-  #   packages/features/prompt/web/src/screens/prompt-studio/fields/editing-mode-title.tsx
-  #   packages/features/prompt/web/src/screens/prompt-studio/sidebar/add-prompt-button.tsx
-  #   packages/features/prompt/web/src/screens/prompt-studio/browser/prompt-playground-browser.tsx
+  #   modules/prompt/web/src/screens/prompt-studio/save-prompt-button.tsx
+  #   modules/prompt/web/src/screens/prompt-studio/fields/editing-mode-title.tsx
+  #   modules/prompt/web/src/screens/prompt-studio/sidebar/add-prompt-button.tsx
+  #   modules/prompt/web/src/screens/prompt-studio/browser/prompt-playground-browser.tsx
 
   Background:
     Given I am authenticated in project "my-project"

@@ -11,6 +11,8 @@ import { join } from "node:path";
 /** Where a workspace package may be declared. Mirrors `pnpm-workspace.yaml`. */
 export const WORKSPACE_ROOTS = [
   "apps",
+  "modules",
+  "enterprise",
   "packages",
   "sdks",
   "mcp",
@@ -20,17 +22,30 @@ export const WORKSPACE_ROOTS = [
 ];
 
 /** The roots holding TypeScript the workspace itself owns and ships. */
-export const SOURCE_ROOTS = ["apps", "mcp/typescript", "packages", "tools"] as const;
+export const SOURCE_ROOTS = [
+  "apps",
+  "enterprise",
+  "mcp/typescript",
+  "modules",
+  "packages",
+  "tools",
+] as const;
 
 /** The roots whose folders the shape budget measures. */
-export const PACKAGE_SOURCE_ROOTS = ["apps", "packages", "tools/dev-runtime"];
+export const PACKAGE_SOURCE_ROOTS = [
+  "apps",
+  "enterprise",
+  "modules",
+  "packages",
+  "tools/dev-runtime",
+];
 
 /** The process roots a boot scan reads to learn which feature installers run. */
 export const BOOT_SCAN_ROOTS = [
   "apps/api/src",
   "apps/worker/src",
   "apps/tasks/src",
-  "packages/enterprise/composition",
+  "enterprise/packages/composition",
 ];
 
 /**
@@ -71,7 +86,8 @@ export function walkFiles(
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       const path = join(directory, entry.name);
       if (entry.isDirectory()) {
-        if (isIgnoredDirectory({ name: entry.name, ignored: options?.ignoredDirectories })) continue;
+        if (isIgnoredDirectory({ name: entry.name, ignored: options?.ignoredDirectories }))
+          continue;
 
         visit(path);
       } else if (entry.isFile() && accept(path)) {

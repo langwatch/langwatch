@@ -9,7 +9,7 @@
  * graph's revoke rather than an inert stand-in. A pipeline that registers and
  * never revokes looks identical from every health signal the fleet watches.
  *
- * Spec: packages/features/api-key/specs/api-key.feature
+ * Spec: modules/api-key/specs/api-key.feature
  */
 import { AGENT_SANDBOX_KEY_REAP_PROCESS_NAME } from "@langwatch/api-key-server";
 import type { StaticPipelineDefinition } from "@langwatch/eventing";

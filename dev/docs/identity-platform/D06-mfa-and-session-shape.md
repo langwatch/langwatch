@@ -3,8 +3,8 @@
 Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 3 · Depends on: D03 · Flag: `MFA_ENROLLMENT_OPEN` · Specs: `specs/identity/mfa-and-session-shape.feature`
 
 > **Amendment 2026-09-03:** `platform/app` is deleted. BetterAuth config now
-> lives in `packages/features/auth/server/src/transport/better-auth/better-auth.api.ts`
-> and `packages/features/identity/server/src/better-auth/`. Verify current
+> lives in `modules/auth/server/src/transport/better-auth/better-auth.api.ts`
+> and `modules/identity/server/src/better-auth/`. Verify current
 > shape against that tree before treating paths below as live.
 
 # Overview

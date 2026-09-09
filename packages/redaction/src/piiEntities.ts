@@ -14,7 +14,7 @@
  * `apps/worker/src/platform/infrastructure/worker-pii-analysis.adapter.ts`
  * takes `PRESIDIO_STRICT_ENTITIES` from here rather than restating it, and the
  * strict-only difference is derived in
- * `packages/features/data-privacy/server/src/services/otlp-span-pii-redaction.service.ts`.
+ * `modules/data-privacy/server/src/services/otlp-span-pii-redaction.service.ts`.
  * They stay pinned here by literal all the same: an identifier that quietly
  * leaves a list stops being detected, and a span that was never scanned for it
  * looks exactly like a span that was scanned and found clean.

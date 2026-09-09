@@ -51,7 +51,7 @@ Feature: PR impact map comment
     Then the file is attributed to "Migrations"
 
   Scenario: Test files are attributed to Tests, not to the code they cover
-    Given a pull request changes "packages/features/analytics/server/tests/analytics.service.unit.test.ts"
+    Given a pull request changes "modules/analytics/server/tests/analytics.service.unit.test.ts"
     When the impact map is built
     Then the file is attributed to "Tests"
 

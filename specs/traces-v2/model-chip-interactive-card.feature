@@ -1,9 +1,9 @@
 # Multi-model chip — interactive model card
 #
 # Implementation:
-#   packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/model-cell.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/drawer-header.tsx  (ModelsTooltip consumer)
-#   packages/features/trace/web/src/filter.store.ts  (toggleFacet)
+#   modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/model-cell.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/drawer-header.tsx  (ModelsTooltip consumer)
+#   modules/trace/web/src/filter.store.ts  (toggleFacet)
 #
 # Motivation (round 5): a trace that touched several models renders one
 # chip — primary model + a quiet "+N". The full list lives in a

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { tryCreateWorkerTenantBroadcast } from "../worker-tenant-broadcast.composition.ts";
 
 /**
- * Spec: packages/features/notification/specs/tenant-broadcast-twin.feature
+ * Spec: modules/notification/specs/tenant-broadcast-twin.feature
  *
  * A COMPOSITION-CAPABILITY test: the three pipelines that will publish through
  * this are still registered by the application, so nothing in this process

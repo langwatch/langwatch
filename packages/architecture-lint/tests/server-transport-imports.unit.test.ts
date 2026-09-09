@@ -12,7 +12,7 @@ describe("server roots used by both API and worker composition", () => {
     "%s keeps its transports outside the root import graph",
     { timeout: 120_000 },
     (feature) => {
-      const source = join(root, "packages/features", feature, "server/src");
+      const source = join(root, "modules", feature, "server/src");
       const pending = [join(source, "index.ts")];
       const seen = new Set<string>();
 

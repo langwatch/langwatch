@@ -18,7 +18,7 @@ than waiting to be enrolled. Everything else here stands.
 
 The package names and implementation placement in this ADR are also
 superseded by the
-[AuthZ feature boundary](../../../packages/features/authz/adrs/001-package-boundary.md).
+[AuthZ feature boundary](../../../modules/authz/adrs/001-package-boundary.md).
 The portable contract is now `@langwatch/authz-contract`; concrete services,
 Prisma-compatible repositories, Redis and Eventing adapters, projections and
 the domain migration live in `@langwatch/authz-server`; the application
@@ -358,7 +358,7 @@ A single `as const` registry declares every resource, the actions it supports, t
 it, and its presentation metadata. Everything else is **derived** from it:
 
 ```
- packages/features/authz/contract/src/registry.ts
+ modules/authz/contract/src/registry.ts
  ┌─────────────────────────────────────────────────────────────────┐
  │ traces:       actions: view · share · create · update           │
  │               scopes:  project · team · org                     │
@@ -402,7 +402,7 @@ and hoping.
 ### 2. One resolver, one decision shape
 
 The six-step walk pictured above is implemented **once**, in
-`packages/features/authz/contract/src/engine.ts`, and every caller uses it:
+`modules/authz/contract/src/engine.ts`, and every caller uses it:
 
 - The batch case (`batchScopePermissions`, the model-defaults page) is the
   same function taking N scopes. Collect once, decide N times in memory.
@@ -1253,7 +1253,7 @@ while the seat is off, and it is waiting for them when it comes back on.
   (store-before-dispatch, preserved verbatim by waiting the append).
 - Related: [ADR-070](./070-modular-package-architecture.md) (bounded-context
   packages) and the
-  [AuthZ feature boundary](../../../packages/features/authz/adrs/001-package-boundary.md).
+  [AuthZ feature boundary](../../../modules/authz/adrs/001-package-boundary.md).
   `@langwatch/authz-contract` is the Prisma-free, env-free, browser-safe
   vocabulary and decision core. `@langwatch/authz-server` owns concrete
   services and private infrastructure; the application runtime root composes

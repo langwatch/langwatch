@@ -32,7 +32,7 @@ Feature: Anomaly detection — evaluate AnomalyRules + dispatch alerts (event-so
   Pairs with: anomaly-rules.feature (configuration entity)
               docs/ai-gateway/governance/architecture.md
               (Activity-monitor event sourcing section)
-  Backend: packages/enterprise/features/governance/server/src/projections/
+  Backend: enterprise/modules/governance/server/src/projections/
 
   Background:
     Given the org admin has authored at least one active AnomalyRule

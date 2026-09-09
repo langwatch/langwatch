@@ -108,7 +108,7 @@ a block, and renders its own fallback when nothing came back. Only `apps/ui`,
 the one package that may name both halves, decides what comes back.
 
 ```
- packages/features/*/web         packages/ui-host           apps/ui
+ modules/*/web         packages/ui-host           apps/ui
  ───────────────────────         ──────────────             ───────
  <UiSlot name="contactSales" />  UiSlotsPort                billing-slots.ts
  useUiSeatTypeCopy()        ──►   filled(name)         ◄──  licensing-slots.ts

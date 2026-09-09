@@ -6,7 +6,7 @@ import { defineRule } from "../define-rule.mjs";
 // definition is how two parts of the product come to quote a customer
 // different numbers.
 
-const GOVERNED = /^(?:apps\/[^/]+\/src\/|packages\/)/;
+const GOVERNED = /^(?:apps\/[^/]+\/src\/|packages\/|modules\/|enterprise\/)/;
 const CATALOGUE = /^packages\/plans\//;
 const DECLARATION = /\.d\.[cm]?ts$/;
 const GENERATED = /(?:^|\/)(?:dist|node_modules|generated)\/|\.generated\.[cm]?tsx?$/;

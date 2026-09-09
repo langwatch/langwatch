@@ -7,8 +7,8 @@ Feature: Welcome Onboarding Screen for Scenarios
     Given I am logged into project "my-project"
 
   # All 4 scenarios are bound to existing tests in
-  # packages/features/scenario/web/src/behavior/__tests__/use-new-scenario-flow.unit.test.ts
-  # and packages/features/scenario/web/src/ui/elements/scenarios/__tests__/scenario-welcome-screen.integration.test.tsx.
+  # modules/scenario/web/src/behavior/__tests__/use-new-scenario-flow.unit.test.ts
+  # and modules/scenario/web/src/ui/elements/scenarios/__tests__/scenario-welcome-screen.integration.test.tsx.
 
   # ============================================================================
   # Welcome Screen Trigger

@@ -244,7 +244,9 @@ function matchingEnterpriseComposition(
   return importer.applicationRole === target.enterpriseCompositionRole;
 }
 
-function lintClassifiedSourceImports(packages: readonly ClassifiedPackage[]): ArchitectureViolation[] {
+function lintClassifiedSourceImports(
+  packages: readonly ClassifiedPackage[],
+): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const sourcePackages = packages.filter((pkg) =>
     ["application", "dev-runtime", "enterprise-root", "enterprise-composition"].includes(pkg.kind),
@@ -329,7 +331,9 @@ function lintClassifiedSourceImports(packages: readonly ClassifiedPackage[]): Ar
   return violations;
 }
 
-function lintCompositionSourceShape(packages: readonly ClassifiedPackage[]): ArchitectureViolation[] {
+function lintCompositionSourceShape(
+  packages: readonly ClassifiedPackage[],
+): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const pkg of packages) {
     if (
@@ -762,7 +766,7 @@ function lintLegacyApplicationBoundaries(root: string): ArchitectureViolation[] 
 
 function lintNewEnterpriseAliases(root: string): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
-  for (const directory of ["apps", "packages", "tools"] as const) {
+  for (const directory of ["apps", "enterprise", "modules", "packages", "tools"] as const) {
     for (const sourceImport of sourceImports(join(root, directory))) {
       if (!sourceImport.specifier.startsWith("@ee/")) continue;
 

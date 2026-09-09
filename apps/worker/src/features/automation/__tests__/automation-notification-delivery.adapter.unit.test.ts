@@ -8,7 +8,7 @@ import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { WorkerAutomationNotificationDeliveryAdapter } from "../automation-notification-delivery.adapter.ts";
 
 /**
- * Spec: packages/features/automation/specs/graph-alert-delivery-envelope.feature
+ * Spec: modules/automation/specs/graph-alert-delivery-envelope.feature
  *
  * The expected envelope below was RECORDED from the application's own sender,
  * `platform/app/src/server/mailer/triggerEmail.ts`, under the key and host

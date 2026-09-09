@@ -138,7 +138,7 @@ export const guard = () => checkUserPermissionForProject(TeamRoleGroup.PROJECT_V
   describe("given a direct REST transport declaration", () => {
     it("inspects it with the same framework rule", () => {
       const root = mkdtempSync(join(tmpdir(), "api-transport-framework-"));
-      const packageRoot = join(root, "packages/features/agent/server");
+      const packageRoot = join(root, "modules/agent/server");
       const transport = join(packageRoot, "src/transport/agent.rest.ts");
       mkdirSync(join(packageRoot, "src/transport"), { recursive: true });
       writeFileSync(transport, 'import { Hono } from "hono";\nexport const app = new Hono();\n');
@@ -154,7 +154,7 @@ export const guard = () => checkUserPermissionForProject(TeamRoleGroup.PROJECT_V
               manifest: { name: "@langwatch/agent-server" },
               kind: "server",
               feature: "agent",
-              featureRoot: join(root, "packages/features/agent"),
+              featureRoot: join(root, "modules/agent"),
               layoutVersion: 0,
               subjects: ["agent"],
               enterprise: false,

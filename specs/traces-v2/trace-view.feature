@@ -1,9 +1,9 @@
 # Trace View (Summary Tab) — Gherkin Spec
 # Implementation:
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/io-viewer.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/attribute-table.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/use-io-viewer-state.ts
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/io-viewer.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/attribute-table.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/use-io-viewer-state.ts
 #
 # Audited 2026-05-01:
 #   - The drawer tab is "Summary" (`activeTab === "summary"`), not

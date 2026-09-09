@@ -21,31 +21,31 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../features/api-key/contract/tsconfig.build.json"
+      "path": "../../modules/api-key/contract/tsconfig.build.json"
     },
     {
-      "path": "../features/api-key/server/tsconfig.build.json"
+      "path": "../../modules/api-key/server/tsconfig.build.json"
     },
     {
-      "path": "../enterprise/features/licensing/server/tsconfig.build.json"
+      "path": "../../enterprise/modules/licensing/server/tsconfig.build.json"
     },
     {
-      "path": "../features/model-provider/contract/tsconfig.build.json"
+      "path": "../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
-      "path": "../features/prompt/contract/tsconfig.build.json"
+      "path": "../../modules/prompt/contract/tsconfig.build.json"
     },
     {
-      "path": "../features/role/contract/tsconfig.build.json"
+      "path": "../../modules/role/contract/tsconfig.build.json"
     },
     {
-      "path": "../features/secret/server/tsconfig.build.json"
+      "path": "../../modules/secret/server/tsconfig.build.json"
     },
     {
       "path": "../secrets/tsconfig.build.json"
     },
     {
-      "path": "../features/workflow/contract/tsconfig.build.json"
+      "path": "../../modules/workflow/contract/tsconfig.build.json"
     },
     {
       "path": "../observability/tsconfig.build.json"

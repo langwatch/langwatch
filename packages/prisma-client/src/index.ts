@@ -4,6 +4,7 @@ export {
   type PrismaConfigurationInput,
 } from "./config.ts";
 export {
+  forwardPrismaEvent,
   PrismaClientFactory,
   type PrismaClientFactoryInput,
   PrismaConnection,

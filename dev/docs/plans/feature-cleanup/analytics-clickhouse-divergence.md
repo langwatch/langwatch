@@ -7,7 +7,7 @@ Status: fixed for analytics, open as a repo-wide pattern.
 `aggregation-builder`, `field-mappings`, `filter-translator` and
 `metric-translator` existed twice, ~5,700 lines each side:
 
-|                    | `platform/app/src/server/analytics/clickhouse/` | `packages/features/analytics/server/src/clickhouse/`                     |
+|                    | `platform/app/src/server/analytics/clickhouse/` | `modules/analytics/server/src/clickhouse/`                     |
 | ------------------ | ----------------------------------------------- | ------------------------------------------------------------------------ |
 | Reached at runtime | no — zero importers outside its own directory   | yes: `presets.ts` → `AnalyticsAdapter` → `ClickHouseAnalyticsRepository` |
 | Test files         | 22                                              | 1                                                                        |

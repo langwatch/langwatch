@@ -29,7 +29,7 @@ function writeFixture(root: string, file: string, source: string): void {
 /** The records a workspace must hold before any policy can call it sealed. */
 function writeSealedWorkspace(root: string): void {
   writeFixture(root, "src/base.ts", "export const base = 1;");
-  writeFixture(root, "packages/features/catalogue.json", '{ "version": 0, "features": [] }');
+  writeFixture(root, "modules/catalogue.json", '{ "version": 0, "features": [] }');
 }
 
 /** A committed base plus uncommitted files, so `changedSourceFiles` sees them. */

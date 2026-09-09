@@ -1,0 +1,50 @@
+{
+  "name": "@langwatch/monitor-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side Monitor feature.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project modules/monitor/server/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "@trpc/server": "^11.18.0",
+    "nanoid": "^5.1.7",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

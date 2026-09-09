@@ -18,4 +18,5 @@ export type PublicEnvironment = Readonly<{
   HAS_LANGWATCH_NLP_SERVICE: boolean;
   HAS_LANGEVALS_ENDPOINT: boolean;
   STRIPE_LICENSE_PAYMENT_LINK_URL: string | undefined;
+  NEXTAUTH_PROVIDER: string | undefined;
 }>;

@@ -99,7 +99,7 @@ export const PLAN_DISPUTES: readonly PlanDispute[] = Object.freeze([
     alternatives: [
       {
         states: "200,000 events included",
-        source: "packages/enterprise/features/billing/web/src/model/billing-plans.ts:89",
+        source: "enterprise/modules/billing/web/src/model/billing-plans.ts:89",
       },
     ],
   },
@@ -122,7 +122,7 @@ export const PLAN_DISPUTES: readonly PlanDispute[] = Object.freeze([
       {
         states: "free 100, paid 1,000, enterprise 10,000",
         source:
-          "packages/features/automation/server/src/services/__tests__/automation.service.unit.test.ts:293",
+          "modules/automation/server/src/services/__tests__/automation.service.unit.test.ts:293",
       },
     ],
   },

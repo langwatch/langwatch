@@ -621,7 +621,7 @@ const leaksIn = (source: string): boolean => findLeaks(source).length > 0;
 /* ------------------------------------------------------------------ */
 
 /**
- * A file inside a `packages/features/<family>/web` package.
+ * A file inside a `modules/<family>/web` package.
  */
 const FEATURE_WEB_FILE = /[/\\]packages[/\\]features[/\\][^/\\]+[/\\]web[/\\]/;
 

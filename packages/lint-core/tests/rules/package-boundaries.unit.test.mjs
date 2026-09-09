@@ -47,7 +47,7 @@ describe("given package-boundaries", () => {
       expect(
         runRule(boundaryRule, {
           cwd: fixture.cwd,
-          filename: "packages/features/annotation/web/src/behavior/gate.ts",
+          filename: "modules/annotation/web/src/behavior/gate.ts",
           code: 'import { client } from "@langwatch/organization-web/personal-workspace-features";',
         }),
       ).toEqual([]);
@@ -75,7 +75,7 @@ describe("given package-boundaries", () => {
       expect(
         runRule(boundaryRule, {
           cwd: fixture.cwd,
-          filename: "packages/features/annotation/web/src/behavior/gate.ts",
+          filename: "modules/annotation/web/src/behavior/gate.ts",
           code: 'import { client } from "@langwatch/organization-web/personal-workspace-features";',
         }).map((entry) => entry.messageId),
       ).toContain("crossFeature");
@@ -88,7 +88,7 @@ describe("given package-boundaries", () => {
     /** @scenario "A web package importing another feature's server is reported as webImportsServer" */
     it("reports webImportsServer", () => {
       const found = report(
-        "packages/features/agent/web/src/behavior/agent-api.ts",
+        "modules/agent/web/src/behavior/agent-api.ts",
         'import { ProjectService } from "@langwatch/project-server";',
       );
 
@@ -105,7 +105,7 @@ describe("given package-boundaries", () => {
     /** @scenario "A server package importing another feature's web package is reported as serverImportsBrowser" */
     it("reports serverImportsBrowser with the specifier", () => {
       const found = report(
-        "packages/features/agent/server/src/services/agent.service.ts",
+        "modules/agent/server/src/services/agent.service.ts",
         'import { ProjectCard } from "@langwatch/project-web";',
       );
 
@@ -119,7 +119,7 @@ describe("given package-boundaries", () => {
     /** @scenario "A contract package importing a runtime is reported as contractRuntime" */
     it("reports contractRuntime with the specifier", () => {
       const found = report(
-        "packages/features/agent/contract/src/agent.commands.ts",
+        "modules/agent/contract/src/agent.commands.ts",
         'import { readFileSync } from "node:fs";',
       );
 
@@ -137,7 +137,7 @@ describe("given package-boundaries", () => {
     /** @scenario "A deleted alias import is reported as deadAlias" */
     it("reports deadAlias with the specifier", () => {
       const found = report(
-        "packages/features/agent/server/src/services/agent.service.ts",
+        "modules/agent/server/src/services/agent.service.ts",
         'import { helper } from "~/lib/helper";',
       );
 
@@ -154,19 +154,19 @@ describe("given package-boundaries", () => {
       // Build a second workspace by hand: an enterprise feature package the
       // core `agent` feature then imports from.
       enterprise.write(
-        "packages/features/agent/server/package.json",
+        "modules/agent/server/package.json",
         JSON.stringify({ name: "@langwatch/agent-server", exports: { ".": "." } }),
       );
-      enterprise.write("packages/features/agent/server/src/services/agent.service.ts", "export {}");
+      enterprise.write("modules/agent/server/src/services/agent.service.ts", "export {}");
       enterprise.write(
-        "packages/enterprise/features/governance/server/package.json",
+        "enterprise/modules/governance/server/package.json",
         JSON.stringify({ name: "@langwatch/enterprise-governance-server", exports: { ".": "." } }),
       );
       try {
         const found = runRule(boundaryRule, {
           code: 'import { GovernanceService } from "@langwatch/enterprise-governance-server";',
           cwd: enterprise.cwd,
-          filename: "packages/features/agent/server/src/services/agent.service.ts",
+          filename: "modules/agent/server/src/services/agent.service.ts",
         });
 
         expect(found.map((e) => e.messageId)).toContain("coreImportsEnterprise");
@@ -180,7 +180,7 @@ describe("given package-boundaries", () => {
     /** @scenario "An undeclared export subpath is reported as sealedExports" */
     it("reports sealedExports naming the subpath and package", () => {
       const found = report(
-        "packages/features/agent/server/src/services/agent.service.ts",
+        "modules/agent/server/src/services/agent.service.ts",
         'import { helper } from "@langwatch/project-contract/internal";',
       );
 
@@ -195,7 +195,7 @@ describe("given package-boundaries", () => {
     it("reports nothing", () => {
       expect(
         report(
-          "packages/features/agent/server/src/services/agent.service.ts",
+          "modules/agent/server/src/services/agent.service.ts",
           'import { AgentCommand } from "@langwatch/agent-contract";',
         ),
       ).toEqual([]);

@@ -37,14 +37,14 @@ function isBoundarySource(file: string, root: string): boolean {
   if (!isTypeScriptSource(file, root)) return false;
 
   const parts = relative(root, file).split(sep);
-  const isCoreFeature = parts.slice(0, 2).join("/") === "packages/features";
-  const isEnterpriseFeature = parts.slice(0, 3).join("/") === "packages/enterprise/features";
+  const isCoreFeature = parts[0] === "modules";
+  const isEnterpriseFeature = parts.slice(0, 2).join("/") === "enterprise/modules";
   const featureOffset = isEnterpriseFeature ? 1 : 0;
   const isFeature = isCoreFeature || isEnterpriseFeature;
   const isContract =
-    isFeature && parts[3 + featureOffset] === "contract" && parts[4 + featureOffset] === "src";
+    isFeature && parts[2 + featureOffset] === "contract" && parts[3 + featureOffset] === "src";
   const isServerApp =
-    isFeature && parts[3 + featureOffset] === "server" && parts[5 + featureOffset] === "app";
+    isFeature && parts[2 + featureOffset] === "server" && parts[4 + featureOffset] === "app";
   const isApplicationComposition = isApplicationCompositionPath(parts, file);
 
   return isContract || isServerApp || isApplicationComposition;
@@ -238,11 +238,9 @@ function boundaryViolations(file: string): ArchitectureViolation[] {
   return violations;
 }
 
-export function lintBoundarySignatureMirrors(
-  snapshot: WorkspaceSnapshot,
-): ArchitectureViolation[] {
+export function lintBoundarySignatureMirrors(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root } = snapshot;
-  const files = [join(root, "packages"), join(root, "apps")]
+  const files = [join(root, "modules"), join(root, "enterprise"), join(root, "apps")]
     .flatMap((directory) =>
       snapshot.files({ directory, accept: (file) => isBoundarySource(file, root) }),
     )

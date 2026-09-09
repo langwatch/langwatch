@@ -1,0 +1,33 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
+    "target": "es2023",
+    "lib": ["es2023", "dom"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "types": ["vitest/globals"],
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-host/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    }
+  ]
+}

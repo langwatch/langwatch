@@ -18,7 +18,7 @@ Feature: Frontend feature boundary lint
     Given apps/ui/src/features/catalogue.json declares prompt-studio
     And prompt-studio owns its exact route root and Prompt screen export
     When architecture lint checks the workspace
-    Then it does not require prompt-studio to match a packages/features catalogue name
+    Then it does not require prompt-studio to match a modules catalogue name
     And it accepts the declared @langwatch/prompt-web/screens/prompt-studio import
 
   @unit @architecture

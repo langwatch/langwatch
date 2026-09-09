@@ -100,7 +100,7 @@ lane's work, not this one's.
     api.entrypoint.ts -> install(featureServers)     <- ONE install, no composition
 ```
 
-The install model already exists in the tree — `packages/features/coding-agent/server/src/coding-agent.server.ts`
+The install model already exists in the tree — `modules/coding-agent/server/src/coding-agent.server.ts`
 is written in it — and it is blocked only on `@langwatch/api` publishing
 `createRestRouter` and `createTrpcRouter`. **That is the target, and
 `api-production.composition.ts` is not on the way to it.**
@@ -114,7 +114,7 @@ is written in it — and it is blocked only on `@langwatch/api` publishing
 | `apps/api/src/features/*/*-trpc.mount.ts` (21) | **BIN as they convert.** Each exists only because the process, not the feature, built the router. Under `defineTrpcRouter` the feature owns the declaration and there is no process-side mount file. |
 | `apps/api/src/features/*/*.composition.ts` + `.composition.types.ts` (~40 pairs) | **BIN.** The `.types.ts` split exists so importing a router type does not drag adapters in — a problem the install model does not have. |
 | `apps/api/src/api-rest.security.ts` | **REFACTOR.** The enforcement (7 middlewares) is good and should stay. The `create` / `projectPolicy` split, the `Envelope`/`"throw"` mode and the legacy body renderer are all legacy-builder artefacts. It should fill one port record for `createRestRuntime` and nothing else. |
-| `packages/enterprise/composition/api/src/trpc/*` (3 compositions) | **BIN.** They assemble feature transports on behalf of the process. Enterprise features should declare their own servers like every other module. |
+| `enterprise/packages/composition/api/src/trpc/*` (3 compositions) | **BIN.** They assemble feature transports on behalf of the process. Enterprise features should declare their own servers like every other module. |
 | `packages/api` — `createRestRouter`, `createTrpcRouter` | **ADD.** Everything above is blocked on these two. They are the highest-value thing in the repo right now. |
 | `security.createProjectVersionedApp` calls in ~30 REST transports | **CHANGE.** They load but cannot build. Each family converting to `defineRestRouter` removes one. |
 

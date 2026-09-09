@@ -5,7 +5,7 @@ Feature: Project Creation Flow
   So that I can start tracking my LLM application
 
   # The JSDOM render fixture this file kept asking for now exists:
-  # `packages/features/organization/web/src/ui/sections/__tests__/
+  # `modules/organization/web/src/ui/sections/__tests__/
   # create-project-drawer.integration.test.tsx`, written when the drawer was
   # recovered from `platform/app`. What is still @unimplemented below is what
   # that fixture genuinely does not reach — the new-team branch, and the two

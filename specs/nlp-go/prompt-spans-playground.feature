@@ -10,8 +10,8 @@ Feature: Prompt spans on the playground — trace→playground resume parity wit
   #   sdks/python/src/langwatch/prompts/decorators/prompt_tracing.py
   #   sdks/python/src/langwatch/attributes.py (LangWatchPrompt* keys)
   # Trace-UI consumers that depend on this shape:
-  #   packages/features/trace/web/src/model/prompt-attributes.ts
-  #   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/prompt-accordion.tsx
+  #   modules/trace/web/src/model/prompt-attributes.ts
+  #   modules/trace/web/src/ui/sections/explorer/trace-drawer/prompt-accordion.tsx
   #   [gone] src/features/traces-v2/utils/findPromptReferenceInAncestors.ts
   #
   # Bindings:

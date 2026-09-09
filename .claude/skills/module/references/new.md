@@ -2,7 +2,7 @@
 
 Read `.claude/skills/architecture-guide/SKILL.md` first, then the references for
 contract, server, web and install as you reach each step. Everything below is the order
-that keeps the linter green from the first commit. **Copy `packages/features/annotation`**;
+that keeps the linter green from the first commit. **Copy `modules/annotation`**;
 it is the reference and the only module with no entry in
 `packages/architecture-lint/src/feature-shape-baseline.json`. Do not copy a module that
 still has one.
@@ -10,14 +10,14 @@ still has one.
 ## 0. Decide the subject and check ownership
 
 - The module's name is a lower-kebab noun (`annotation`, `model-provider`, `coding-agent`).
-- Open `packages/features/catalogue.json`. If the subject already belongs to a module,
+- Open `modules/catalogue.json`. If the subject already belongs to a module,
   stop: this is `references/extend.md` on the owner, not a new package.
 - Ask only if two readings lead to materially different packages (project-scoped versus
   organization-scoped, say). Otherwise decide and state it.
 
 ## 1. Spec first
 
-Create `packages/features/<name>/specs/<name>.feature`. Write the golden path and the
+Create `modules/<name>/specs/<name>.feature`. Write the golden path and the
 named failures as scenarios, each tagged `@unit` or `@integration`, each with the error
 code it will carry (see the `spec-bind` skill):
 
@@ -35,15 +35,15 @@ Feature: Annotation scores
     Then the request fails with annotation_score_invalid
 ```
 
-(`packages/features/annotation/specs/annotation-service.feature` is the full reference.)
+(`modules/annotation/specs/annotation-service.feature` is the full reference.)
 
-Also create `packages/features/<name>/feature.json` with `{ "layoutVersion": 0 }`,
+Also create `modules/<name>/feature.json` with `{ "layoutVersion": 0 }`,
 `adrs/README.md` with a `001-<name>-boundary.md` modelled on
-`packages/features/annotation/adrs/001-annotation-service-boundary.md`, and add the
-module to `packages/features/catalogue.json`:
+`modules/annotation/adrs/001-annotation-service-boundary.md`, and add the
+module to `modules/catalogue.json`:
 
 ```json
-{ "id": "<name>", "root": "packages/features/<name>", "classification": "core", "subjects": ["<name>"] }
+{ "id": "<name>", "root": "modules/<name>", "classification": "core", "subjects": ["<name>"] }
 ```
 
 then regenerate the `FeatureName` union:
@@ -51,8 +51,8 @@ then regenerate the `FeatureName` union:
 
 ## 2. Contract package
 
-`packages/features/<name>/contract/` with `package.json` (`@langwatch/<name>-contract`,
-copy `packages/features/annotation/contract/package.json`), `tsconfig.json` and
+`modules/<name>/contract/` with `package.json` (`@langwatch/<name>-contract`,
+copy `modules/annotation/contract/package.json`), `tsconfig.json` and
 `tsconfig.build.json` (incremental, own `tsBuildInfoFile` under
 `node_modules/.cache/tsbuildinfo/`), `vitest.config.ts`, and `src/`:
 
@@ -66,6 +66,10 @@ index.ts
 <name>.errors.ts         HandledError subclasses with `declare readonly code`, httpStatus, fault
 ```
 
+Leave both `references` arrays empty and run `pnpm sync:references` once the
+`dependencies` are written: every project reference is derived from the
+manifests, and lint reports a hand-typed one as drift.
+
 Operations use RPC verbs (`get`, `getMany`, `list`, `create`, `update`, `delete`,
 `<verb><Entity>`); absence is `find*` returning `undefined`. Add each new error code to
 `packages/handled-error/src/app-codes.ts` (sorted) and its customer copy to
@@ -75,7 +79,7 @@ service: `feature-shape` inventories a `<name>.service.ts` in a contract.
 
 ## 3. Server package
 
-`packages/features/<name>/server/` (`@langwatch/<name>-server`,
+`modules/<name>/server/` (`@langwatch/<name>-server`,
 `"imports": { "#*": { "types": "./dist/*.d.ts", "default": "./src/*.ts" } }`):
 
 ```
@@ -115,7 +119,7 @@ integration test if the package declares a datastore in `vitest.integration.conf
 
 ## 4. Web package (skip with `--no-web`)
 
-`packages/features/<name>/web/` (`@langwatch/<name>-web`; `exports` lists one flat
+`modules/<name>/web/` (`@langwatch/<name>-web`; `exports` lists one flat
 entry per public piece plus `./testing`):
 
 ```

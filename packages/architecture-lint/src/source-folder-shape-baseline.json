@@ -51,55 +51,55 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/composition/api/src/governance",
+      "key": "crowded-folder|enterprise/packages/composition/api/src/governance",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/billing/contract/src",
+      "key": "crowded-folder|enterprise/modules/billing/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/billing/server/src/adapters",
+      "key": "crowded-folder|enterprise/modules/billing/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/billing/server/src/ports",
+      "key": "crowded-folder|enterprise/modules/billing/server/src/ports",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/billing/server/src/services",
+      "key": "crowded-folder|enterprise/modules/billing/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/governance/contract/src",
+      "key": "crowded-folder|enterprise/modules/governance/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/governance/server/src/adapters",
+      "key": "crowded-folder|enterprise/modules/governance/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/governance/server/src/ports",
+      "key": "crowded-folder|enterprise/modules/governance/server/src/ports",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/governance/server/src/repositories/prisma",
+      "key": "crowded-folder|enterprise/modules/governance/server/src/repositories/prisma",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/governance/server/src/services",
+      "key": "crowded-folder|enterprise/modules/governance/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/governance/server/src/transport/api-trpc",
+      "key": "crowded-folder|enterprise/modules/governance/server/src/transport/api-trpc",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/governance/web/src/screens/governance",
+      "key": "crowded-folder|enterprise/modules/governance/web/src/screens/governance",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/enterprise/features/licensing/contract/src",
+      "key": "crowded-folder|enterprise/modules/licensing/contract/src",
       "measured": "2026-09-08"
     },
     {
@@ -111,595 +111,595 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/agent/contract/src",
+      "key": "crowded-folder|modules/agent/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/agent/server/src/services",
+      "key": "crowded-folder|modules/agent/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/agent/web/src/ui/sections",
+      "key": "crowded-folder|modules/agent/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/analytics/contract/src",
+      "key": "crowded-folder|modules/analytics/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/analytics/contract/src/visualization",
+      "key": "crowded-folder|modules/analytics/contract/src/visualization",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/analytics/server/src/repositories/clickhouse",
+      "key": "crowded-folder|modules/analytics/server/src/repositories/clickhouse",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/analytics/server/src/rules",
+      "key": "crowded-folder|modules/analytics/server/src/rules",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/analytics/server/src/services",
+      "key": "crowded-folder|modules/analytics/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/analytics/web/src/behavior",
+      "key": "crowded-folder|modules/analytics/web/src/behavior",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/analytics/web/src/model",
+      "key": "crowded-folder|modules/analytics/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/analytics/web/src/ui/elements",
+      "key": "crowded-folder|modules/analytics/web/src/ui/elements",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/analytics/web/src/ui/sections",
+      "key": "crowded-folder|modules/analytics/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/annotation/contract/src",
+      "key": "crowded-folder|modules/annotation/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/annotation/web/src/ui/elements",
+      "key": "crowded-folder|modules/annotation/web/src/ui/elements",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/api-key/contract/src",
+      "key": "crowded-folder|modules/api-key/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/api-key/web/src/model",
+      "key": "crowded-folder|modules/api-key/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/auth/web/src/behavior",
+      "key": "crowded-folder|modules/auth/web/src/behavior",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/auth/web/src/model",
+      "key": "crowded-folder|modules/auth/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/auth/web/src/ui/elements",
+      "key": "crowded-folder|modules/auth/web/src/ui/elements",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/auth/web/src/ui/sections",
+      "key": "crowded-folder|modules/auth/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/authz/contract/src",
+      "key": "crowded-folder|modules/authz/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/authz/server/src/adapters",
+      "key": "crowded-folder|modules/authz/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/automation/contract/src",
+      "key": "crowded-folder|modules/automation/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/automation/contract/src/templating",
+      "key": "crowded-folder|modules/automation/contract/src/templating",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/automation/server/src/adapters",
+      "key": "crowded-folder|modules/automation/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/automation/server/src/ports",
+      "key": "crowded-folder|modules/automation/server/src/ports",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/automation/server/src/services",
+      "key": "crowded-folder|modules/automation/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/automation/web/src/features/authoring/ui/sections",
+      "key": "crowded-folder|modules/automation/web/src/features/authoring/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/coding-agent/contract/src",
+      "key": "crowded-folder|modules/coding-agent/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/coding-agent/server/src/adapters",
+      "key": "crowded-folder|modules/coding-agent/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/coding-agent/server/src/services",
+      "key": "crowded-folder|modules/coding-agent/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/coding-agent/web/src",
+      "key": "crowded-folder|modules/coding-agent/web/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/coding-agent/web/src/trace",
+      "key": "crowded-folder|modules/coding-agent/web/src/trace",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/data-privacy/contract/src",
+      "key": "crowded-folder|modules/data-privacy/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/dataset/contract/src",
+      "key": "crowded-folder|modules/dataset/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/dataset/web/src/model",
+      "key": "crowded-folder|modules/dataset/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/dataset/web/src/ui/elements",
+      "key": "crowded-folder|modules/dataset/web/src/ui/elements",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/evaluation/contract/src",
+      "key": "crowded-folder|modules/evaluation/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/evaluation/server/src/services",
+      "key": "crowded-folder|modules/evaluation/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/experiment/contract/src",
+      "key": "crowded-folder|modules/experiment/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/experiment/contract/src/workbench/actions/transforms",
+      "key": "crowded-folder|modules/experiment/contract/src/workbench/actions/transforms",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/experiment/server/src/ports",
+      "key": "crowded-folder|modules/experiment/server/src/ports",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/experiment/server/src/processes",
+      "key": "crowded-folder|modules/experiment/server/src/processes",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/experiment/server/src/services",
+      "key": "crowded-folder|modules/experiment/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/experiment/web/src/behavior/experiments-v3",
+      "key": "crowded-folder|modules/experiment/web/src/behavior/experiments-v3",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/experiment/web/src/model",
+      "key": "crowded-folder|modules/experiment/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/experiment/web/src/model/experiments-v3",
+      "key": "crowded-folder|modules/experiment/web/src/model/experiments-v3",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/experiment/web/src/ui/sections",
+      "key": "crowded-folder|modules/experiment/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/experiment/web/src/ui/sections/batch-results",
+      "key": "crowded-folder|modules/experiment/web/src/ui/sections/batch-results",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/experiment/web/src/ui/sections/experiments-v3",
+      "key": "crowded-folder|modules/experiment/web/src/ui/sections/experiments-v3",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/feature-flag/contract/src",
+      "key": "crowded-folder|modules/feature-flag/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/gateway/contract/src",
+      "key": "crowded-folder|modules/gateway/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/gateway/server/src/adapters",
+      "key": "crowded-folder|modules/gateway/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/gateway/server/src/ports",
+      "key": "crowded-folder|modules/gateway/server/src/ports",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/gateway/server/src/repositories",
+      "key": "crowded-folder|modules/gateway/server/src/repositories",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/gateway/server/src/repositories/prisma",
+      "key": "crowded-folder|modules/gateway/server/src/repositories/prisma",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/gateway/server/src/services",
+      "key": "crowded-folder|modules/gateway/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/identity/contract/src",
+      "key": "crowded-folder|modules/identity/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/identity/server/src/adapters",
+      "key": "crowded-folder|modules/identity/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/identity/server/src/intents",
+      "key": "crowded-folder|modules/identity/server/src/intents",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/identity/server/src/repositories/prisma",
+      "key": "crowded-folder|modules/identity/server/src/repositories/prisma",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/identity/server/src/rules",
+      "key": "crowded-folder|modules/identity/server/src/rules",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/identity/server/src/services",
+      "key": "crowded-folder|modules/identity/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/langy/contract/src",
+      "key": "crowded-folder|modules/langy/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/langy/server/src/adapters",
+      "key": "crowded-folder|modules/langy/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/langy/server/src/ports",
+      "key": "crowded-folder|modules/langy/server/src/ports",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/langy/server/src/rules",
+      "key": "crowded-folder|modules/langy/server/src/rules",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/langy/server/src/services",
+      "key": "crowded-folder|modules/langy/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/langy/web/src/behavior",
+      "key": "crowded-folder|modules/langy/web/src/behavior",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/langy/web/src/features/langy/ui/sections",
+      "key": "crowded-folder|modules/langy/web/src/features/langy/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/langy/web/src/model",
+      "key": "crowded-folder|modules/langy/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/langy/web/src/ui/sections",
+      "key": "crowded-folder|modules/langy/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/model-provider/contract/src",
+      "key": "crowded-folder|modules/model-provider/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/model-provider/contract/src/catalog",
+      "key": "crowded-folder|modules/model-provider/contract/src/catalog",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/model-provider/server/src/services",
+      "key": "crowded-folder|modules/model-provider/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/model-provider/web/src/behavior",
+      "key": "crowded-folder|modules/model-provider/web/src/behavior",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/model-provider/web/src/model",
+      "key": "crowded-folder|modules/model-provider/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/model-provider/web/src/ui/elements/icons",
+      "key": "crowded-folder|modules/model-provider/web/src/ui/elements/icons",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/model-provider/web/src/ui/sections",
+      "key": "crowded-folder|modules/model-provider/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/navigation/web/src/behavior",
+      "key": "crowded-folder|modules/navigation/web/src/behavior",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/navigation/web/src/model",
+      "key": "crowded-folder|modules/navigation/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/navigation/web/src/ui/elements",
+      "key": "crowded-folder|modules/navigation/web/src/ui/elements",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/navigation/web/src/ui/sections",
+      "key": "crowded-folder|modules/navigation/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/onboarding/web/src/behavior",
+      "key": "crowded-folder|modules/onboarding/web/src/behavior",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/onboarding/web/src/ui/sections",
+      "key": "crowded-folder|modules/onboarding/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/ops/contract/src",
+      "key": "crowded-folder|modules/ops/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/ops/server/src/adapters",
+      "key": "crowded-folder|modules/ops/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/ops/server/src/ports",
+      "key": "crowded-folder|modules/ops/server/src/ports",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/ops/server/src/repositories/prisma",
+      "key": "crowded-folder|modules/ops/server/src/repositories/prisma",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/ops/server/src/services",
+      "key": "crowded-folder|modules/ops/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/ops/web/src/features/event-store/ui/elements",
+      "key": "crowded-folder|modules/ops/web/src/features/event-store/ui/elements",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/ops/web/src/features/event-store/ui/sections",
+      "key": "crowded-folder|modules/ops/web/src/features/event-store/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/ops/web/src/features/foundry/ui/sections",
+      "key": "crowded-folder|modules/ops/web/src/features/foundry/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/ops/web/src/screens/ops",
+      "key": "crowded-folder|modules/ops/web/src/screens/ops",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/organization/contract/src",
+      "key": "crowded-folder|modules/organization/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/organization/server/src/services",
+      "key": "crowded-folder|modules/organization/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/organization/web/src/behavior",
+      "key": "crowded-folder|modules/organization/web/src/behavior",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/organization/web/src/ui/elements",
+      "key": "crowded-folder|modules/organization/web/src/ui/elements",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/organization/web/src/ui/sections",
+      "key": "crowded-folder|modules/organization/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/presence/web/src",
+      "key": "crowded-folder|modules/presence/web/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/project/web/src/screens/home/components",
+      "key": "crowded-folder|modules/project/web/src/screens/home/components",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/prompt/contract/src",
+      "key": "crowded-folder|modules/prompt/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/prompt/web/src/behavior",
+      "key": "crowded-folder|modules/prompt/web/src/behavior",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/prompt/web/src/model",
+      "key": "crowded-folder|modules/prompt/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/prompt/web/src/screens/prompt-studio",
+      "key": "crowded-folder|modules/prompt/web/src/screens/prompt-studio",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/scenario/contract/src",
+      "key": "crowded-folder|modules/scenario/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/scenario/server/src/adapters",
+      "key": "crowded-folder|modules/scenario/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/scenario/server/src/ports",
+      "key": "crowded-folder|modules/scenario/server/src/ports",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/scenario/server/src/services",
+      "key": "crowded-folder|modules/scenario/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/scenario/web/src/behavior",
+      "key": "crowded-folder|modules/scenario/web/src/behavior",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/scenario/web/src/model",
+      "key": "crowded-folder|modules/scenario/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/scenario/web/src/ui/elements",
+      "key": "crowded-folder|modules/scenario/web/src/ui/elements",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/scenario/web/src/ui/elements/agent-testing/shared",
+      "key": "crowded-folder|modules/scenario/web/src/ui/elements/agent-testing/shared",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/scenario/web/src/ui/sections/agent-testing/cases",
+      "key": "crowded-folder|modules/scenario/web/src/ui/sections/agent-testing/cases",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/scenario/web/src/ui/sections/agent-testing/results",
+      "key": "crowded-folder|modules/scenario/web/src/ui/sections/agent-testing/results",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/scenario/web/src/ui/sections/agent-testing/run",
+      "key": "crowded-folder|modules/scenario/web/src/ui/sections/agent-testing/run",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/stored-object/contract/src",
+      "key": "crowded-folder|modules/stored-object/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/stored-object/server/src/adapters",
+      "key": "crowded-folder|modules/stored-object/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/suite/contract/src",
+      "key": "crowded-folder|modules/suite/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/contract/src",
+      "key": "crowded-folder|modules/trace/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/server/src/adapters",
+      "key": "crowded-folder|modules/trace/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/server/src/ports",
+      "key": "crowded-folder|modules/trace/server/src/ports",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/server/src/repositories/clickhouse",
+      "key": "crowded-folder|modules/trace/server/src/repositories/clickhouse",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/server/src/rules",
+      "key": "crowded-folder|modules/trace/server/src/rules",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/server/src/services",
+      "key": "crowded-folder|modules/trace/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/behavior",
+      "key": "crowded-folder|modules/trace/web/src/behavior",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/model",
+      "key": "crowded-folder|modules/trace/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/ui/elements",
+      "key": "crowded-folder|modules/trace/web/src/ui/elements",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/ui/elements/icons",
+      "key": "crowded-folder|modules/trace/web/src/ui/elements/icons",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/ui/sections",
+      "key": "crowded-folder|modules/trace/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/ui/sections/explorer/filter-sidebar",
+      "key": "crowded-folder|modules/trace/web/src/ui/sections/explorer/filter-sidebar",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/ui/sections/explorer/hooks",
+      "key": "crowded-folder|modules/trace/web/src/ui/sections/explorer/hooks",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/ui/sections/explorer/search-bar",
+      "key": "crowded-folder|modules/trace/web/src/ui/sections/explorer/search-bar",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/ui/sections/explorer/toolbar",
+      "key": "crowded-folder|modules/trace/web/src/ui/sections/explorer/toolbar",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/ui/sections/explorer/trace-drawer",
+      "key": "crowded-folder|modules/trace/web/src/ui/sections/explorer/trace-drawer",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view",
+      "key": "crowded-folder|modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/ui/sections/explorer/trace-table",
+      "key": "crowded-folder|modules/trace/web/src/ui/sections/explorer/trace-table",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace",
+      "key": "crowded-folder|modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/user/web/src/ui/sections",
+      "key": "crowded-folder|modules/user/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/workflow/contract/src",
+      "key": "crowded-folder|modules/workflow/contract/src",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/workflow/server/src/adapters",
+      "key": "crowded-folder|modules/workflow/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/workflow/server/src/services",
+      "key": "crowded-folder|modules/workflow/server/src/services",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/workflow/web/src/behavior",
+      "key": "crowded-folder|modules/workflow/web/src/behavior",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/workflow/web/src/model",
+      "key": "crowded-folder|modules/workflow/web/src/model",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/workflow/web/src/model/code",
+      "key": "crowded-folder|modules/workflow/web/src/model/code",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/workflow/web/src/ui/elements",
+      "key": "crowded-folder|modules/workflow/web/src/ui/elements",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/workflow/web/src/ui/sections",
+      "key": "crowded-folder|modules/workflow/web/src/ui/sections",
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/features/workflow/web/src/ui/sections/optimization_studio",
+      "key": "crowded-folder|modules/workflow/web/src/ui/sections/optimization_studio",
       "measured": "2026-09-08"
     },
     {
@@ -831,531 +831,531 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/billing/contract/src/billing.service.ts",
+      "key": "fragment-file|enterprise/modules/billing/contract/src/billing.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/billing/contract/src/notification-types.ts",
+      "key": "fragment-file|enterprise/modules/billing/contract/src/notification-types.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/billing/web/src/model/display-formatters.ts",
+      "key": "fragment-file|enterprise/modules/billing/web/src/model/display-formatters.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/governance/contract/src/governance-attributes.ts",
+      "key": "fragment-file|enterprise/modules/governance/contract/src/governance-attributes.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/governance/contract/src/governance-audit.ts",
+      "key": "fragment-file|enterprise/modules/governance/contract/src/governance-audit.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/governance/contract/src/governance-signals.ts",
+      "key": "fragment-file|enterprise/modules/governance/contract/src/governance-signals.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/governance/contract/src/otlp-receiver-policy.ts",
+      "key": "fragment-file|enterprise/modules/governance/contract/src/otlp-receiver-policy.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/governance/contract/src/session-policy.ts",
+      "key": "fragment-file|enterprise/modules/governance/contract/src/session-policy.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/licensing/contract/src/license-limit-labels.ts",
+      "key": "fragment-file|enterprise/modules/licensing/contract/src/license-limit-labels.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/licensing/contract/src/license-member-type.ts",
+      "key": "fragment-file|enterprise/modules/licensing/contract/src/license-member-type.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/licensing/contract/src/license-plan.ts",
+      "key": "fragment-file|enterprise/modules/licensing/contract/src/license-plan.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/licensing/contract/src/license.queries.ts",
+      "key": "fragment-file|enterprise/modules/licensing/contract/src/license.queries.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/licensing/web/src/surfaces/global-upgrade-modal/plan-management-url.ts",
+      "key": "fragment-file|enterprise/modules/licensing/web/src/surfaces/global-upgrade-modal/plan-management-url.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/enterprise/features/saas/contract/src/saas-browser.service.ts",
+      "key": "fragment-file|enterprise/modules/saas/contract/src/saas-browser.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/agent/contract/src/agent.config.ts",
+      "key": "fragment-file|modules/agent/contract/src/agent.config.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/agent/contract/src/config/base.ts",
+      "key": "fragment-file|modules/agent/contract/src/config/base.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/agent/contract/src/config/workflow.ts",
+      "key": "fragment-file|modules/agent/contract/src/config/workflow.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/agent/contract/src/http-proxy.trpc.ts",
+      "key": "fragment-file|modules/agent/contract/src/http-proxy.trpc.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/analytics/contract/src/visualization/lwql-dataset-names.ts",
+      "key": "fragment-file|modules/analytics/contract/src/visualization/lwql-dataset-names.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/analytics/web/src/model/format-milliseconds.ts",
+      "key": "fragment-file|modules/analytics/web/src/model/format-milliseconds.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/analytics/web/src/model/format-money.ts",
+      "key": "fragment-file|modules/analytics/web/src/model/format-money.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/annotation/contract/src/annotation-queue.types.ts",
+      "key": "fragment-file|modules/annotation/contract/src/annotation-queue.types.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/annotation/contract/src/annotation-review.types.ts",
+      "key": "fragment-file|modules/annotation/contract/src/annotation-review.types.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/api-key/contract/src/api-key.config.ts",
+      "key": "fragment-file|modules/api-key/contract/src/api-key.config.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/api-key/contract/src/api-key.revocation-cause.ts",
+      "key": "fragment-file|modules/api-key/contract/src/api-key.revocation-cause.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/api-key/contract/src/api-key.visibility.ts",
+      "key": "fragment-file|modules/api-key/contract/src/api-key.visibility.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/audit-log/contract/src/audit-log.api.ts",
+      "key": "fragment-file|modules/audit-log/contract/src/audit-log.api.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/audit-log/contract/src/audit-log.commands.ts",
+      "key": "fragment-file|modules/audit-log/contract/src/audit-log.commands.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/auth/contract/src/auth.api.ts",
+      "key": "fragment-file|modules/auth/contract/src/auth.api.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/auth/contract/src/auth.service.ts",
+      "key": "fragment-file|modules/auth/contract/src/auth.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/auth/contract/src/cli-session-keys.ts",
+      "key": "fragment-file|modules/auth/contract/src/cli-session-keys.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/auth/web/src/ui/elements/github-icon.tsx",
+      "key": "fragment-file|modules/auth/web/src/ui/elements/github-icon.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/auth/web/src/ui/elements/microsoft-icon.tsx",
+      "key": "fragment-file|modules/auth/web/src/ui/elements/microsoft-icon.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/authz/contract/src/authz-scope-lineage.ts",
+      "key": "fragment-file|modules/authz/contract/src/authz-scope-lineage.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/automation/contract/src/automation.queries.ts",
+      "key": "fragment-file|modules/automation/contract/src/automation.queries.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/automation/contract/src/custom-graph.ts",
+      "key": "fragment-file|modules/automation/contract/src/custom-graph.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/automation/contract/src/email-suppression.ts",
+      "key": "fragment-file|modules/automation/contract/src/email-suppression.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/automation/contract/src/pause-reasons.ts",
+      "key": "fragment-file|modules/automation/contract/src/pause-reasons.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/automation/contract/src/templating.ts",
+      "key": "fragment-file|modules/automation/contract/src/templating.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/automation/web/src/features/authoring/ui/sections/automation-store.ts",
+      "key": "fragment-file|modules/automation/web/src/features/authoring/ui/sections/automation-store.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/coding-agent/contract/src/coding-agent-processing.commands.ts",
+      "key": "fragment-file|modules/coding-agent/contract/src/coding-agent-processing.commands.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/coding-agent/contract/src/telemetry/claude-code.ts",
+      "key": "fragment-file|modules/coding-agent/contract/src/telemetry/claude-code.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/coding-agent/contract/src/telemetry/copilot.ts",
+      "key": "fragment-file|modules/coding-agent/contract/src/telemetry/copilot.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/dataset/contract/src/dataset-normalization.ts",
+      "key": "fragment-file|modules/dataset/contract/src/dataset-normalization.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/evaluation/contract/src/azure-safety.ts",
+      "key": "fragment-file|modules/evaluation/contract/src/azure-safety.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/evaluation/contract/src/evaluation.config.ts",
+      "key": "fragment-file|modules/evaluation/contract/src/evaluation.config.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/evaluation/contract/src/evaluation.errors.ts",
+      "key": "fragment-file|modules/evaluation/contract/src/evaluation.errors.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/experiment/contract/src/experiment-legacy-workbench.ts",
+      "key": "fragment-file|modules/experiment/contract/src/experiment-legacy-workbench.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/experiment/contract/src/experiment-run-eventing.events.ts",
+      "key": "fragment-file|modules/experiment/contract/src/experiment-run-eventing.events.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/experiment/contract/src/experiment.api.ts",
+      "key": "fragment-file|modules/experiment/contract/src/experiment.api.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/experiment/server/src/adapters/noop-experiment-workbench-updates.adapter.ts",
+      "key": "fragment-file|modules/experiment/server/src/adapters/noop-experiment-workbench-updates.adapter.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/experiment/web/src/model/random.mulberry32.ts",
+      "key": "fragment-file|modules/experiment/web/src/model/random.mulberry32.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/gateway/contract/src/gateway.api.ts",
+      "key": "fragment-file|modules/gateway/contract/src/gateway.api.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/gateway/contract/src/gateway.audit-serializer.ts",
+      "key": "fragment-file|modules/gateway/contract/src/gateway.audit-serializer.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/gateway/contract/src/gateway.realtime-session.ts",
+      "key": "fragment-file|modules/gateway/contract/src/gateway.realtime-session.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/gateway/server/src/adapters/postgres.gateway-transaction.adapter.ts",
+      "key": "fragment-file|modules/gateway/server/src/adapters/postgres.gateway-transaction.adapter.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/gateway/web/src/surfaces/budget-overview/spent-subline.ts",
+      "key": "fragment-file|modules/gateway/web/src/surfaces/budget-overview/spent-subline.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/hosted-mcp/contract/src/hosted-mcp.api.ts",
+      "key": "fragment-file|modules/hosted-mcp/contract/src/hosted-mcp.api.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/identity/contract/src/identity-email.service.ts",
+      "key": "fragment-file|modules/identity/contract/src/identity-email.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/langy/contract/src/langy-prompt.ts",
+      "key": "fragment-file|modules/langy/contract/src/langy-prompt.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/langy/web/src/features/langy/ui/sections/derived-cards/langy-choices-card.tsx",
+      "key": "fragment-file|modules/langy/web/src/features/langy/ui/sections/derived-cards/langy-choices-card.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/log/contract/src/log-preparation.types.ts",
+      "key": "fragment-file|modules/log/contract/src/log-preparation.types.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/log/contract/src/log.commands.ts",
+      "key": "fragment-file|modules/log/contract/src/log.commands.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/log/contract/src/log.config.ts",
+      "key": "fragment-file|modules/log/contract/src/log.config.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/log/contract/src/log.constants.ts",
+      "key": "fragment-file|modules/log/contract/src/log.constants.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/metric/contract/src/metric.config.ts",
+      "key": "fragment-file|modules/metric/contract/src/metric.config.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/model-provider/contract/src/codex-account.ts",
+      "key": "fragment-file|modules/model-provider/contract/src/codex-account.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/notification/contract/src/notification.api.ts",
+      "key": "fragment-file|modules/notification/contract/src/notification.api.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/onboarding/web/src/behavior/product-flow.ts",
+      "key": "fragment-file|modules/onboarding/web/src/behavior/product-flow.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/ops/contract/src/ops-feature-flag.ts",
+      "key": "fragment-file|modules/ops/contract/src/ops-feature-flag.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/ops/web/src/features/event-store/ui/sections/process-recent-actions-panel.tsx",
+      "key": "fragment-file|modules/ops/web/src/features/event-store/ui/sections/process-recent-actions-panel.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/organization/contract/src/organization-group.service.ts",
+      "key": "fragment-file|modules/organization/contract/src/organization-group.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/organization/contract/src/organization.errors.ts",
+      "key": "fragment-file|modules/organization/contract/src/organization.errors.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/platform-health/contract/src/platform-health.config.ts",
+      "key": "fragment-file|modules/platform-health/contract/src/platform-health.config.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/prompt/contract/src/prompt.enums.ts",
+      "key": "fragment-file|modules/prompt/contract/src/prompt.enums.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/prompt/contract/src/prompt.sort-keys.ts",
+      "key": "fragment-file|modules/prompt/contract/src/prompt.sort-keys.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/prompt/contract/src/prompt.tags.ts",
+      "key": "fragment-file|modules/prompt/contract/src/prompt.tags.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/prompt/contract/src/prompt.token-limits.ts",
+      "key": "fragment-file|modules/prompt/contract/src/prompt.token-limits.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/prompt/web/src/model/prompt-form/are-form-values-equal.ts",
+      "key": "fragment-file|modules/prompt/web/src/model/prompt-form/are-form-values-equal.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/prompt/web/src/model/prompt-form/save-blocker-message.ts",
+      "key": "fragment-file|modules/prompt/web/src/model/prompt-form/save-blocker-message.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/prompt/web/src/screens/prompt-studio/browser/window/demonstrations-tab-content.tsx",
+      "key": "fragment-file|modules/prompt/web/src/screens/prompt-studio/browser/window/demonstrations-tab-content.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/prompt/web/src/screens/prompt-studio/fields/messages/remove-message-button.tsx",
+      "key": "fragment-file|modules/prompt/web/src/screens/prompt-studio/fields/messages/remove-message-button.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/prompt/web/src/screens/prompt-studio/prompt-studio-sidebar-empty-state.tsx",
+      "key": "fragment-file|modules/prompt/web/src/screens/prompt-studio/prompt-studio-sidebar-empty-state.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/prompt/web/src/surfaces/prompt-reference/organization-badge.tsx",
+      "key": "fragment-file|modules/prompt/web/src/surfaces/prompt-reference/organization-badge.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/prompt/web/src/surfaces/prompt-reference/prompt-handle.ts",
+      "key": "fragment-file|modules/prompt/web/src/surfaces/prompt-reference/prompt-handle.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/scenario/contract/src/field-mapping.ts",
+      "key": "fragment-file|modules/scenario/contract/src/field-mapping.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/scenario/contract/src/run-secret-ciphertext.ts",
+      "key": "fragment-file|modules/scenario/contract/src/run-secret-ciphertext.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/scenario/contract/src/scenario.ids.ts",
+      "key": "fragment-file|modules/scenario/contract/src/scenario.ids.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/scenario/contract/src/simulation-target.ts",
+      "key": "fragment-file|modules/scenario/contract/src/simulation-target.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/scenario/web/src/ui/elements/scenario-section-header.tsx",
+      "key": "fragment-file|modules/scenario/web/src/ui/elements/scenario-section-header.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/scenario/web/src/ui/sections/agent-testing/drawers/run-drawer-error-body.tsx",
+      "key": "fragment-file|modules/scenario/web/src/ui/sections/agent-testing/drawers/run-drawer-error-body.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/secret/contract/src/secret.config.ts",
+      "key": "fragment-file|modules/secret/contract/src/secret.config.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/share/web/src/readable-date.ts",
+      "key": "fragment-file|modules/share/web/src/readable-date.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/stored-object/contract/src/stored-object-owner-resolver.ts",
+      "key": "fragment-file|modules/stored-object/contract/src/stored-object-owner-resolver.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/stored-object/contract/src/validation.ts",
+      "key": "fragment-file|modules/stored-object/contract/src/validation.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/suite/contract/src/suite-set-id.ts",
+      "key": "fragment-file|modules/suite/contract/src/suite-set-id.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/suite/contract/src/suite.kind.ts",
+      "key": "fragment-file|modules/suite/contract/src/suite.kind.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/topic/contract/src/topic.api.ts",
+      "key": "fragment-file|modules/topic/contract/src/topic.api.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-captured-span.commands.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-captured-span.commands.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-content-part.async-dispatcher.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-content-part.async-dispatcher.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-content-part.record-schema.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-content-part.record-schema.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-content-part.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-content-part.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-content-part.visitor.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-content-part.visitor.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-derived-event.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-derived-event.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-ingress.commands.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-ingress.commands.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-ingress.constants.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-ingress.constants.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-ingress.event-envelope.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-ingress.event-envelope.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-list-window.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-list-window.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-otel-ids.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-otel-ids.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-topic-assignment.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-topic-assignment.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/contract/src/trace-viewer.service.ts",
+      "key": "fragment-file|modules/trace/contract/src/trace-viewer.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/server/src/adapters/null-query-field-values.adapter.ts",
+      "key": "fragment-file|modules/trace/server/src/adapters/null-query-field-values.adapter.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/server/src/adapters/trace-facet-span-name.clickhouse.adapter.ts",
+      "key": "fragment-file|modules/trace/server/src/adapters/trace-facet-span-name.clickhouse.adapter.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/server/src/services/langwatch-canonicaliser.service.ts",
+      "key": "fragment-file|modules/trace/server/src/services/langwatch-canonicaliser.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/server/src/services/trace-number-coercion.service.ts",
+      "key": "fragment-file|modules/trace/server/src/services/trace-number-coercion.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/server/src/services/trace-safe-json.service.ts",
+      "key": "fragment-file|modules/trace/server/src/services/trace-safe-json.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/server/src/services/vercel-canonicaliser.service.ts",
+      "key": "fragment-file|modules/trace/server/src/services/vercel-canonicaliser.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/web/src/ui/sections/conversation/trace-query.ts",
+      "key": "fragment-file|modules/trace/web/src/ui/sections/conversation/trace-query.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/web/src/ui/sections/explorer/find-bar/find-bar.tsx",
+      "key": "fragment-file|modules/trace/web/src/ui/sections/explorer/find-bar/find-bar.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/web/src/ui/sections/explorer/hooks/use-drawer-project-id.ts",
+      "key": "fragment-file|modules/trace/web/src/ui/sections/explorer/hooks/use-drawer-project-id.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/conversation/last-turn-cell.tsx",
+      "key": "fragment-file|modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/conversation/last-turn-cell.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/conversation/started-cell.tsx",
+      "key": "fragment-file|modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/conversation/started-cell.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/root-span-name-cell.tsx",
+      "key": "fragment-file|modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/root-span-name-cell.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/root-span-type-cell.tsx",
+      "key": "fragment-file|modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/root-span-type-cell.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/service-cell.tsx",
+      "key": "fragment-file|modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/service-cell.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/span-count-cell.tsx",
+      "key": "fragment-file|modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/span-count-cell.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/trace-id-cell.tsx",
+      "key": "fragment-file|modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/trace-id-cell.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/trace-name-cell.tsx",
+      "key": "fragment-file|modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/trace-name-cell.tsx",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/webhook/contract/src/webhook.queries.ts",
+      "key": "fragment-file|modules/webhook/contract/src/webhook.queries.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/workflow/contract/src/studio-optimization.ts",
+      "key": "fragment-file|modules/workflow/contract/src/studio-optimization.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/workflow/contract/src/workflow-component.commands.ts",
+      "key": "fragment-file|modules/workflow/contract/src/workflow-component.commands.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/features/workflow/web/src/model/sse/errors.ts",
+      "key": "fragment-file|modules/workflow/web/src/model/sse/errors.ts",
       "measured": "2026-09-08"
     },
     {

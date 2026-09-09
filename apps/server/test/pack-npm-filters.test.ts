@@ -191,7 +191,7 @@ describe("npm pack staging filters", () => {
       // `apps/ui/e2e/auth.json` is a saved signed-in Playwright session and is
       // anchored there. An auth.json anywhere else is ordinary source.
       "apps/api/src/features/auth/auth.json",
-      "packages/features/auth/server/src/auth.json",
+      "modules/auth/server/src/auth.json",
       // `packages/prisma-client/prisma/db.sqlite*` is a local scratch database
       // beside the schema. The name means nothing anywhere else.
       "apps/worker/src/fixtures/db.sqlite.ts",

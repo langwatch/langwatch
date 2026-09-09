@@ -20,10 +20,10 @@ COPY packages/handled-error ./packages/handled-error
 COPY packages/redaction/package.json ./packages/redaction/
 COPY packages/ssrf/package.json ./packages/ssrf/
 COPY packages/api/package.json ./packages/api/
-COPY packages/features/authz/contract/package.json ./packages/features/authz/contract/
-COPY packages/features/authz/server/package.json ./packages/features/authz/server/
-COPY packages/features/automation/contract/package.json ./packages/features/automation/contract/
-COPY packages/features/automation/server/package.json ./packages/features/automation/server/
+COPY modules/authz/contract/package.json ./modules/authz/contract/
+COPY modules/authz/server/package.json ./modules/authz/server/
+COPY modules/automation/contract/package.json ./modules/automation/contract/
+COPY modules/automation/server/package.json ./modules/automation/server/
 COPY packages/system-migrations/package.json ./packages/system-migrations/
 COPY packages/observability/package.json ./packages/observability/
 COPY packages/react-rum/package.json ./packages/react-rum/

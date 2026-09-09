@@ -1,0 +1,81 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "noEmitOnError": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
+  },
+  "files": ["./src/index.ts", "./src/adapters/workflow-evaluation.adapter.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**",
+    "**/testing.ts",
+    "**/testing.tsx"
+  ],
+  "references": [
+    {
+      "path": "../../analytics/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../automation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../dataset/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../monitor/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/contract/tsconfig.build.json"
+    }
+  ]
+}

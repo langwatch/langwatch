@@ -13,7 +13,7 @@ import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analy
 import { createWorkerTraceNarrowPorts } from "../worker-trace-narrow-ports.composition.ts";
 
 /**
- * Spec: packages/features/trace/specs/trace-ingestion-narrow-ports.feature
+ * Spec: modules/trace/specs/trace-ingestion-narrow-ports.feature
  *
  * A COMPOSITION-CAPABILITY test. Trace has not converted, so none of these
  * subscribers runs here. What has to be true today is that this composition

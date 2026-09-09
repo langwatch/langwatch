@@ -1,3 +1,4 @@
+import type { Logger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   type PrismaConnection,
@@ -13,6 +14,8 @@ export type ApiDatabaseInfrastructureOptions = {
   database: ApiDatabaseConfigResolution;
   /** Decides the client's log levels, exactly as it does in the legacy app. */
   nodeEnvironment: string;
+  /** The process logger every Prisma client event is forwarded to. */
+  logger: Logger;
 };
 
 /** Reports the composition decision an unconfigured database would otherwise hide. */
@@ -72,6 +75,7 @@ export class ApiDatabaseInfrastructure {
     });
     const connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
+      logger: options.logger,
     }).connect(configuration);
 
     const infrastructure = new ApiDatabaseInfrastructure(connection);

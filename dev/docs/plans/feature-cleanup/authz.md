@@ -15,7 +15,7 @@ retirement is a rollout decision that the code cannot prove.
 
 **17,525 lines across 72 non-test files** (server: 51 files / 13,531 lines;
 contract: 21 files / 3,994 lines), plus 48 test files / 12,932 lines. No `web`
-package — [`adrs/001-package-boundary.md`](../../../../packages/features/authz/adrs/001-package-boundary.md)
+package — [`adrs/001-package-boundary.md`](../../../../modules/authz/adrs/001-package-boundary.md)
 declines one deliberately, and that is correct.
 
 **51 distinct operations, declared 2–4 times each.** `AuthzService` is 32
@@ -120,15 +120,15 @@ and the declaration. The comment is the bug (R7).
 Because `AuthzService` is an abstract class, **every** test double must
 implement all 32. Six files do:
 
-- `packages/features/api-key/server/src/transport/api-rest/__tests__/support/test-authz-service.ts`
+- `modules/api-key/server/src/transport/api-rest/__tests__/support/test-authz-service.ts`
   — a 42-line file that is _nothing but_ 32 `unsupported<…>()` assignments
-- `packages/features/model-provider/server/src/ports/__tests__/model-provider.service.test.ts:132-275`
+- `modules/model-provider/server/src/ports/__tests__/model-provider.service.test.ts:132-275`
   — a 144-line `class Authorization extends AuthzService` with 31
   `return this.notUsed()` bodies for 1 real method
 - `apps/api/src/app/__tests__/api-key-rest-security.adapter.unit.test.ts:317-415`
   — 31 `this.unavailable()` bodies for 1 real method (`hasApiKeyPermission`)
-- plus `packages/features/langy/server/src/repositories/__tests__/langy-session-key.service.unit.test.ts`,
-  `packages/features/api-key/server/src/transport/api-rest/__tests__/api-key.transport.unit.test.ts`,
+- plus `modules/langy/server/src/repositories/__tests__/langy-session-key.service.unit.test.ts`,
+  `modules/api-key/server/src/transport/api-rest/__tests__/api-key.transport.unit.test.ts`,
   `platform/app/src/server/api/__tests__/langy-session-key.integration.test.ts`
 
 Two of those six files each want exactly **one** method.
@@ -257,7 +257,7 @@ async isOnEngine({ organizationId }: { organizationId: string }): Promise<boolea
 `isOnEngine` selects which head answers a permission read, and seven production
 call sites branch on it — `platform/app/src/server/api/rbac.ts:1199,1266,1384,1440,2046`,
 `platform/app/src/server/rbac/role-binding-resolver.ts:330,677`,
-`packages/features/share/server/src/repositories/ledger/ledger.share.repository.ts:462`.
+`modules/share/server/src/repositories/ledger/ledger.share.repository.ts:462`.
 An `AuthzService` composed without it reports every organization as migrated.
 Production always supplies it, so this is unreachable today — but the default
 for a rollout gate whose safe answer is "legacy" should not be "engine", and
@@ -479,7 +479,7 @@ export class AuthzAccessListingService extends AuthzAccessListingServiceContract
 the engine.
 
 The six test doubles then stub 17 or 9, not 32.
-`packages/features/api-key/.../support/test-authz-service.ts` and the
+`modules/api-key/.../support/test-authz-service.ts` and the
 `api-key-rest-security` stub want `hasApiKeyPermission` alone.
 
 ### The ledger port
@@ -642,8 +642,8 @@ at least one external consumer. That surface is already the right size.
 **`@langwatch/authz-contract` — 220 non-test files import it.** Densest
 consumers: `platform/app/src/runtime/app/internal-api` (16),
 `platform/app/src/runtime/app/features` (6),
-`packages/features/gateway/server/src/transport/api-trpc` (6),
-`packages/api/src/trpc` (5), `packages/features/organization/server/src/transport/api-trpc` (5).
+`modules/gateway/server/src/transport/api-trpc` (6),
+`packages/api/src/trpc` (5), `modules/organization/server/src/transport/api-trpc` (5).
 
 This is why commits 2 and 5 are the expensive ones and everything else is
 cheap: the server package has eight importers, the contract has two hundred and

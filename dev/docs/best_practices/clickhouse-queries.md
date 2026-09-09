@@ -216,7 +216,7 @@ boundary catches all three; `.catch()` on individual fields provides safe
 defaults for expected variations, while fields without one fail fast on drift.
 
 Reference implementation:
-`packages/features/trace/server/src/repositories/clickhouse/trace-event-payload.repository.ts`
+`modules/trace/server/src/repositories/clickhouse/trace-event-payload.repository.ts`
 (the pattern arrived with PR #7146's governance activity-monitor repositories,
 which did not survive the platform split in that shape). New
 `*.clickhouse.repository.ts` files should follow it; existing ones migrate

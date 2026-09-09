@@ -479,7 +479,7 @@ func selectEvaluationEntries(wf *dsl.Workflow, evaluateOn string, datasetEntry *
 		return nil, fmt.Errorf("evaluation: workflow has no entry node")
 	}
 	if entryNode.Data.Dataset == nil || entryNode.Data.Dataset.Inline == nil {
-		// Studio's dataset materializer (packages/features/workflow/server/src/
+		// Studio's dataset materializer (modules/workflow/server/src/
 		// services/studio-dataset-materializer.service.ts) is supposed to inline saved
 		// datasets server-side before posting the event to nlpgo. If
 		// we end up here it means the inlining was skipped (an older
@@ -487,7 +487,7 @@ func selectEvaluationEntries(wf *dsl.Workflow, evaluateOn string, datasetEntry *
 		// 3.2.0 prod for a 3.2.0 customer). Surface the *actionable*
 		// path — pointing at the TS helper — rather than blaming the
 		// user for "remote datasets not supported".
-		return nil, fmt.Errorf("evaluation: entry node has no inline dataset — Studio's loadDatasets() must inline saved datasets before forwarding to the Go engine; check packages/features/workflow/server/src/services/studio-dataset-materializer.service.ts")
+		return nil, fmt.Errorf("evaluation: entry node has no inline dataset — Studio's loadDatasets() must inline saved datasets before forwarding to the Go engine; check modules/workflow/server/src/services/studio-dataset-materializer.service.ts")
 	}
 	rows, err := dataset.Materialize(entryNode.Data.Dataset.Inline)
 	if err != nil {
@@ -609,7 +609,7 @@ func splitTrainTest(rows []map[string]any, trainSize, testSize *float64, seed *i
 
 // evaluationProgressEvent emits an evaluation_state_change carrying the
 // current progress + total counts. Studio's reducer renders the progress
-// bar and partial results from these (packages/features/workflow/web/src/ui/
+// bar and partial results from these (modules/workflow/web/src/ui/
 // sections/optimization_studio/use-post-event.tsx case
 // "evaluation_state_change"). Without these
 // the UI stays at "Waiting for evaluation results" until the success

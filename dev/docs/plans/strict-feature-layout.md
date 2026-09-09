@@ -28,8 +28,8 @@ Four processes compose the feature packages:
         │
         │ install
         ▼
-  packages/features/*            {contract, server, web}
-  packages/enterprise/features/* the same grammar, enterprise licence
+  modules/*            {contract, server, web}
+  enterprise/modules/* the same grammar, enterprise licence
 ```
 
 ### The eight clauses of the exit plan (2026-09-06)
@@ -68,7 +68,7 @@ Four processes compose the feature packages:
     (12 files per folder, 20-line fragment floor) and the review messages that
     read as the instruction an agent should have followed. **Lint DONE
     (`64322961e3`); 360 baselined rows to burn.**
-12. **`packages/features` becomes `modules`**, with `enterprise/{packages,modules}`.
+12. **`modules` becomes `modules`**, with `enterprise/{packages,modules}`.
     **DECISION on the tree shape, then QUEUED** (section 9, D-a).
 13. **The linter is rebuilt** to the same discipline (section 7).
 
@@ -84,7 +84,7 @@ Four processes compose the feature packages:
 
 Where an ADR states one, the ADR is the authority and this list is the index.
 
-- `packages/features/catalogue.json` is the authority for feature owners.
+- `modules/catalogue.json` is the authority for feature owners.
 - `apps/api`, `apps/worker`, `apps/ui` and `apps/tasks` are the physical
   composition roots. `apps/server` is local orchestration only.
 - A feature owns its contract, its canonical server implementation and its
@@ -102,7 +102,7 @@ Where an ADR states one, the ADR is the authority and this list is the index.
   repository claims only tables its feature owns; a read into another feature's
   tables is a port or that feature's API.
 - Core never imports an enterprise implementation. Role-specific enterprise
-  composition stays under `packages/enterprise/composition/**`.
+  composition stays under `enterprise/packages/composition/**`.
 - A knowable failure a caller can act on is a `HandledError` with a stable
   code and presentation copy; no `TRPCError` or `HTTPException` outside a
   transport file. The spec wins over the code: a test is never rewritten to
@@ -449,18 +449,18 @@ too long for a comment and too valuable to lose. Recover the original text with
 | `packages/clickhouse-client/src/tenancy.ts` | Fail-closed tenant routing. The cache never expires, it only evicts | ADR-127 appendix |
 | `apps/api/src/features/experiment/experiment-v3-rest.mount.ts` | The two named absences pattern (no analytics sink, no progress store), also in evaluations-legacy | Best practice: composition roots |
 | `apps/api/src/features/*/*.composition.types.ts` | Why the type lives apart from its composition (37 copies collapsed to one line) | `best_practices/service-repository-adapter-port.md` |
-| `packages/features/langy/server/src/repositories/prisma/prisma.langy-turn-admission.repository.ts` | The `COMMITTED_ABANDON_MS` backstop, and the deploy-boundary window where pre-hash receipt ids 409 a byte-identical retry | ADR-129 appendix |
-| `packages/features/langy/server/src/services/langy-local-session.service.ts` | Split-brain fencing through the presence instance id. GONE is not supersession | ADR-129 appendix |
-| `packages/features/langy/server/src/adapters/redis.langy-local-presence.adapter.ts` | The heartbeat against TTL race. Replaced against restored semantics | ADR-129 appendix |
-| `packages/features/langy/server/src/transport/api-trpc/langy-egress.api.ts` | The demo project leaked its egress allowlist because `project:view` is demo-granted. Gate on `langy:*` plus an explicit demo refusal | ADR-129 appendix, security note |
-| `packages/features/langy/server/src/transport/api-rest/langy.local-control-http.ts` | The CLI, worker and panel route table for local control | ADR-129 appendix |
-| `packages/features/langy/contract/src/cards/derived-safe.ts` | Three compile-time gates against the DERIVED-SAFE allowlist widening, plus the runtime pin test | ADR-060 appendix |
-| `packages/features/trace/contract/src/trace-ai-query.ts` | `AiActionErrorDetails.reason` never carries raw provider text. A 401 body once leaked a managed-provider key | Security note in `best_practices/error-handling.md` |
-| `packages/features/trace/server/src/projections/trace-derived.projection.ts` | Storage-anchor split history, the always-write-row fix for the store-miss ambiguity, and the accumulator keys coupled to `FOLD_ACCUMULATOR_KEYS` | ADR-066 and ADR-071 appendices |
+| `modules/langy/server/src/repositories/prisma/prisma.langy-turn-admission.repository.ts` | The `COMMITTED_ABANDON_MS` backstop, and the deploy-boundary window where pre-hash receipt ids 409 a byte-identical retry | ADR-129 appendix |
+| `modules/langy/server/src/services/langy-local-session.service.ts` | Split-brain fencing through the presence instance id. GONE is not supersession | ADR-129 appendix |
+| `modules/langy/server/src/adapters/redis.langy-local-presence.adapter.ts` | The heartbeat against TTL race. Replaced against restored semantics | ADR-129 appendix |
+| `modules/langy/server/src/transport/api-trpc/langy-egress.api.ts` | The demo project leaked its egress allowlist because `project:view` is demo-granted. Gate on `langy:*` plus an explicit demo refusal | ADR-129 appendix, security note |
+| `modules/langy/server/src/transport/api-rest/langy.local-control-http.ts` | The CLI, worker and panel route table for local control | ADR-129 appendix |
+| `modules/langy/contract/src/cards/derived-safe.ts` | Three compile-time gates against the DERIVED-SAFE allowlist widening, plus the runtime pin test | ADR-060 appendix |
+| `modules/trace/contract/src/trace-ai-query.ts` | `AiActionErrorDetails.reason` never carries raw provider text. A 401 body once leaked a managed-provider key | Security note in `best_practices/error-handling.md` |
+| `modules/trace/server/src/projections/trace-derived.projection.ts` | Storage-anchor split history, the always-write-row fix for the store-miss ambiguity, and the accumulator keys coupled to `FOLD_ACCUMULATOR_KEYS` | ADR-066 and ADR-071 appendices |
 | `packages/observability/src/logger.ts` | The logger factory cache keyed by name and `disableContext`. A fresh `pino()` measured 2.3 percent of production wall time. Per-request fields arrive through the mixin, so sharing is safe | New ADR: observability logger factory caching |
 | `packages/observability/src/logger.ts` | Pretty-console transport options must survive `structuredClone`, because they cross a worker-thread boundary. Building the pretty stream on this thread kills the OTel log transport silently | Appendix to the same ADR |
 | `apps/api/src/features/enterprise/webhook.composition.ts` | The webhook entitlement gate is a plan read, not an enterprise capability, so a deployment with no governance app answers a 403 instead of a 503 | Best practice: composition roots |
-| `packages/features/webhook/server/src/app/webhook.app.ts` | Why `WebhookApp` is a holder rather than a restatement of endpoint-store operations | `best_practices/service-repository-adapter-port.md` |
+| `modules/webhook/server/src/app/webhook.app.ts` | Why `WebhookApp` is a holder rather than a restatement of endpoint-store operations | `best_practices/service-repository-adapter-port.md` |
 | `apps/api/src/features/trace/trace-rest.mount.ts` | Named absence: the coding-agent transcript join is not supplied, because `composeApiTraceReadStack` refuses `LogService.getLogsByTraceId` by name | Best practice: composition roots |
 | `apps/ui/e2e/langy/local-control-fixture.ts` | The CLI API key mint is read back before use. `apiKey.create` answering 200 has left the binding unwritten under load | ADR-129 appendix |
 
@@ -499,7 +499,7 @@ order. Report the counters only after them.
    spare port slot or haven. Each lane is told which files another lane holds.
 7. **Seams are read once by Fable**, one fresh session per seam. The seams are
    `packages/api/src/rest` and `src/trpc`; the two production compositions;
-   `apps/api/src/api-rest.security.ts` with `packages/features/authz/server`;
+   `apps/api/src/api-rest.security.ts` with `modules/authz/server`;
    and the architecture-lint rules with `.oxlintrc.architecture.json`.
 8. **Code Owners review is required on `main`.** `.github/CODEOWNERS` names an
    owner for every seam, so a function cannot join a complexity register
@@ -547,8 +547,8 @@ everything in between.
 ```
 
 Sample two packages completely with the grammar checklist, one core
-(`packages/features/trace`) and one enterprise
-(`packages/enterprise/features/governance`). Any defect class found is then a
+(`modules/trace`) and one enterprise
+(`enterprise/modules/governance`). Any defect class found is then a
 grep across the other packages, not another read.
 
 Five questions answer faster than a review, and each is a grep:

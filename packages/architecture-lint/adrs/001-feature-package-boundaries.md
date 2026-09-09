@@ -86,8 +86,8 @@ packages/architecture-lint/
 ```
 
 The linter discovers core feature surfaces at
-`packages/features/<feature>/{contract,server,web}` and enterprise surfaces at
-`packages/enterprise/features/<feature>/{contract,server,web}`. Each surface is
+`modules/<feature>/{contract,server,web}` and enterprise surfaces at
+`enterprise/modules/<feature>/{contract,server,web}`. Each surface is
 a physical package. Its manifest name must match its location:
 
 ```text
@@ -99,7 +99,7 @@ Missing optional roles are valid. Unexpected directories containing a
 `package.json`, duplicate package names and a feature directory containing its
 own package manifest are errors.
 
-`packages/features/catalogue.json` is the authoritative ownership map for core
+`modules/catalogue.json` is the authoritative ownership map for core
 and Enterprise features. It registers each singular feature identifier, exact
 root, classification and sorted product subjects. `feature.json` selects only
 the strict layout version. Contract and server production filenames must
@@ -118,10 +118,10 @@ ADR-111 adds three non-feature enterprise packages at fixed paths beneath one
 legal ownership root:
 
 ```text
-packages/enterprise/LICENSE.md                    # governs the entire tree
-packages/enterprise/package.json                 # @langwatch/enterprise
-packages/enterprise/composition/api/             # @langwatch/enterprise-api
-packages/enterprise/composition/worker/          # @langwatch/enterprise-worker
+enterprise/LICENSE.md                    # governs the entire tree
+enterprise/package.json                 # @langwatch/enterprise
+enterprise/packages/composition/api/             # @langwatch/enterprise-api
+enterprise/packages/composition/worker/          # @langwatch/enterprise-worker
 ```
 
 The root package follows portable contract rules and owns catalogue vocabulary.

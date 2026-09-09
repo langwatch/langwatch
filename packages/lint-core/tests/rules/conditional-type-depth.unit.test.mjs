@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const CONTRACT = "packages/features/project/contract/src/example.contract.ts";
+const CONTRACT = "modules/project/contract/src/example.contract.ts";
 const ALLOWED =
   "State the shape rather than deriving it. A type this deep is usually re-computing something" +
   " a plain interface, a discriminated union, or a `satisfies` clause already says.";

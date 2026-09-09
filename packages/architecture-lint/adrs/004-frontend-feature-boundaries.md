@@ -32,7 +32,7 @@ and legacy application paths cannot demonstrate that distinction.
 
 Frontend features are independent, user-facing capabilities. `apps/ui` has one
 central frontend catalogue at `src/features/catalogue.json`; it is separate
-from `packages/features/catalogue.json` and does not claim server ownership.
+from `modules/catalogue.json` and does not claim server ownership.
 The catalogue explicitly opts feature-web packages into governance. Each
 frontend feature entry has a lower-kebab-case name, an exact root beneath
 `src/features`, its owner-only screen imports and its approved external surface
@@ -58,7 +58,7 @@ a deliberately public feature-web contribution.
 Feature web packages distinguish complete experiences from reusable pieces:
 
 ```text
-packages/features/prompt/web/src/
+modules/prompt/web/src/
 ├── screens/prompt-studio/       # owner-only Prompt Studio experiences
 ├── surfaces/prompt-reference/   # narrow controlled cross-feature contribution
 ├── surfaces/prompt-version/

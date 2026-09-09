@@ -1,7 +1,7 @@
 # Service, repository, adapter, port
 
 > **Status (2026-09-08).** The persistence half of this shape is superseded by the
-> annotation reference (`packages/features/annotation`, ADR-133): repositories are
+> annotation reference (`modules/annotation`, ADR-133): repositories are
 > interfaces with a Prisma and a memory implementation selected once at boot by
 > `defineRepositories`, services take repository interfaces, and the app builds its
 > services from the bundle it is handed. `adapters/postgres.*.adapter.ts` and
@@ -58,7 +58,7 @@ policy enforces.
 ### Port
 
 ```ts
-// packages/features/<feature>/server/src/ports/<subject>.port.ts
+// modules/<feature>/server/src/ports/<subject>.port.ts
 
 export type <Subject>Row = Readonly<{ …portable fields… }>;
 
@@ -77,7 +77,7 @@ export abstract class <Subject>Port {
 ### Repository
 
 ```ts
-// packages/features/<feature>/server/src/repositories/prisma/prisma.<subject>.repository.ts
+// modules/<feature>/server/src/repositories/prisma/prisma.<subject>.repository.ts
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { <Subject>Port } from "../../ports/<subject>.port";
@@ -104,7 +104,7 @@ export class Prisma<Subject>Repository extends <Subject>Port {
 ### Service
 
 ```ts
-// packages/features/<feature>/server/src/services/<subject>.service.ts
+// modules/<feature>/server/src/services/<subject>.service.ts
 
 import { <Subject>Port } from "../ports/<subject>.port";
 
@@ -135,7 +135,7 @@ export class <Subject>Service {
 ### Adapter
 
 ```ts
-// packages/features/<feature>/server/src/adapters/postgres.<subject>.adapter.ts
+// modules/<feature>/server/src/adapters/postgres.<subject>.adapter.ts
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { Prisma<Subject>Repository } from "../repositories/prisma/prisma.<subject>.repository";

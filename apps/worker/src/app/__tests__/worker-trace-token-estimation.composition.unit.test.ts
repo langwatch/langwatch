@@ -7,7 +7,7 @@ import { WorkerTiktokenCounterAdapter } from "../../platform/infrastructure/work
 import { createWorkerTraceTokenEstimation } from "../worker-trace-token-estimation.composition.ts";
 
 /**
- * Spec: packages/features/trace/specs/span-token-estimation.feature
+ * Spec: modules/trace/specs/span-token-estimation.feature
  *
  * A COMPOSITION-CAPABILITY test. Trace has not converted, so nothing in this
  * process estimates a token. What has to be true today is that this

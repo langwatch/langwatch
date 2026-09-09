@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const REPOSITORY = "packages/features/agent/server/src/repositories/prisma/agent.repository.ts";
+const REPOSITORY = "modules/agent/server/src/repositories/prisma/agent.repository.ts";
 
 function report(code) {
   return runRule(typedPrismaSeamRule, { code, cwd: workspace.cwd, filename: REPOSITORY });

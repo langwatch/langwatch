@@ -121,9 +121,9 @@ rules:
     paths:
       include:
         - "packages/clickhouse-client/src/**/*.ts"
-        - "packages/features/*/server/src/clickhouse/**/*.ts"
-        - "packages/features/*/server/src/repositories/**/clickhouse*.ts"
-        - "packages/enterprise/features/*/server/src/repositories/**/clickhouse*.ts"
+        - "modules/*/server/src/clickhouse/**/*.ts"
+        - "modules/*/server/src/repositories/**/clickhouse*.ts"
+        - "enterprise/modules/*/server/src/repositories/**/clickhouse*.ts"
         - "apps/api/src/**/clickhouse*.ts"
       exclude:
         - "**/migrations/**"
@@ -154,7 +154,7 @@ rules:
     paths:
       include:
         - "packages/clickhouse-client/src/**/*.ts"
-        - "packages/features/*/server/src/clickhouse/**/*.ts"
+        - "modules/*/server/src/clickhouse/**/*.ts"
         - "packages/clickhouse-client/src/tasks/**/*.ts"
         - "packages/clickhouse-client/migrations/**/*.sql"
       exclude:

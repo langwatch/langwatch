@@ -51,22 +51,20 @@ function issue(file: string, message: string, allowed?: string): ArchitectureVio
 }
 
 function expectedRoot(id: string, classification: FeatureClassification): string {
-  return classification === "enterprise"
-    ? `packages/enterprise/features/${id}`
-    : `packages/features/${id}`;
+  return classification === "enterprise" ? `enterprise/modules/${id}` : `modules/${id}`;
 }
 
 export function readFeatureCatalogue(
   workspaceRoot: string,
   violations: ArchitectureViolation[],
 ): FeatureCatalogueEntry[] {
-  const path = join(workspaceRoot, "packages", "features", "catalogue.json");
+  const path = join(workspaceRoot, "modules", "catalogue.json");
   if (!existsSync(path)) {
     violations.push(
       issue(
         path,
         "The repository must declare its singular feature ownership catalogue.",
-        "Add packages/features/catalogue.json with version 0 and its core and Enterprise feature entries.",
+        "Add modules/catalogue.json with version 0 and its core and Enterprise feature entries.",
       ),
     );
 

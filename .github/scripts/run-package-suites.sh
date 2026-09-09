@@ -11,7 +11,7 @@
 # invisible by DEFAULT rather than by decision. The core-application feature
 # extraction (dev/docs/plans/strict-feature-layout.md, F-CI-02)
 # turns that from a slow leak into an active one: every wave moves behaviour out
-# of the monolith, which CI ran, into packages/features/*, which it did not.
+# of the monolith, which CI ran, into modules/*, which it did not.
 #
 # So this script DISCOVERS the packages instead of being told about them. It
 # asks pnpm for the workspace membership, which is the same list the installer
@@ -46,7 +46,7 @@
 # A package that needs a datastore is NOT a case for the register on its own.
 # Its suite is expected to self-skip cleanly when the connection string is
 # absent (`describe.skipIf(!process.env.DATABASE_URL)`, the way
-# packages/features/share/server does it), so it runs its unit coverage here and
+# modules/share/server does it), so it runs its unit coverage here and
 # its integration coverage wherever a database exists. Only a suite that cannot
 # do that belongs in the register, with that as its stated reason.
 #
@@ -208,7 +208,7 @@ done <<< "$DISCOVERED"
 # A register entry naming a package the workspace does not have is dead weight
 # that reads as coverage. Renames are the common way it happens: the hand-written
 # block this job replaces still named `@langwatch/authz`, months after the
-# package became `@langwatch/authz-contract` under packages/features/.
+# package became `@langwatch/authz-contract` under modules/.
 STALE=0
 for i in "${!REG_ALL_NAMES[@]}"; do
   entry="${REG_ALL_NAMES[$i]}"

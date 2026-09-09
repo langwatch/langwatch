@@ -1,16 +1,16 @@
 # The Sessions screen, every coding-agent session I ran and what it cost me
 #
 # Implementation:
-#   packages/features/coding-agent/server/src/services/coding-agent.service.ts (the canonical read service)
-#   packages/features/coding-agent/contract/src/coding-agent.ts                        (codingAgents.sessionsList)
-#   packages/features/coding-agent/server/src/transport/api-trpc/coding-agent.gates.ts                  (the title and cost gates)
-#   packages/features/trace/server/src/services/trace-viewer-protections.service.ts (the shared content-visibility rule)
+#   modules/coding-agent/server/src/services/coding-agent.service.ts (the canonical read service)
+#   modules/coding-agent/contract/src/coding-agent.ts                        (codingAgents.sessionsList)
+#   modules/coding-agent/server/src/transport/api-trpc/coding-agent.gates.ts                  (the title and cost gates)
+#   modules/trace/server/src/services/trace-viewer-protections.service.ts (the shared content-visibility rule)
 #   The page and its table live under [gone] src/pages/me/ and
 #   [gone] src/components/me/.
 #
 # Related specs:
 #   specs/coding-agent/context-economics.feature    , what the context columns count
-#   packages/features/coding-agent/specs/session-git-context.feature, where the branch set comes from
+#   modules/coding-agent/specs/session-git-context.feature, where the branch set comes from
 #   specs/coding-agent/pull-request-linkage.feature , how a branch finds its pull requests
 #   specs/coding-agent/terminal-view.feature        , the replay a row opens
 #   specs/coding-agent/personal-usage.feature       , the totals card above the table

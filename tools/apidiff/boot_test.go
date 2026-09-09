@@ -50,10 +50,10 @@ func TestPsqlServerURLDropsPrismaOnlyParameters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != "postgres://u:p@127.0.0.1:5432/langwatch?sslmode=disable" {
+	if got != "postgres://u:p@127.0.0.1:5432/langwatch?options=-csearch_path%3Dlangwatch_db&sslmode=disable" {
 		t.Fatalf("psqlServerURL = %q", got)
 	}
-	args, err := psqlArgs("postgres://u:p@127.0.0.1:5432/langwatch?schema=langwatch_db", "apidiff_x_main", "SELECT 1")
+	args, err := psqlArgs("postgres://u:p@127.0.0.1:5432/langwatch?connection_limit=5", "apidiff_x_main", "SELECT 1")
 	if err != nil {
 		t.Fatal(err)
 	}

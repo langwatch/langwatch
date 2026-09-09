@@ -17,10 +17,10 @@ describe("given a feature package file", () => {
     const code = 'import type { PrismaModelClient } from "@langwatch/prisma-client";';
 
     expect(
-      report("packages/features/agent/server/src/repositories/prisma/agent.repository.ts", code),
+      report("modules/agent/server/src/repositories/prisma/agent.repository.ts", code),
     ).toEqual([]);
     expect(
-      report("packages/features/agent/server/src/services/agent.service.ts", code).map(
+      report("modules/agent/server/src/services/agent.service.ts", code).map(
         (issue) => issue.messageId,
       ),
     ).toEqual(["featurePrismaClient"]);
@@ -29,7 +29,7 @@ describe("given a feature package file", () => {
   it("rejects connection imports mixed into a repository type import", () => {
     expect(
       report(
-        "packages/features/agent/server/src/repositories/prisma/agent.repository.ts",
+        "modules/agent/server/src/repositories/prisma/agent.repository.ts",
         'import { type PrismaModelClient, PrismaConnectionService } from "@langwatch/prisma-client";',
       ).map((issue) => issue.messageId),
     ).toEqual(["featurePrismaClient"]);
@@ -38,7 +38,7 @@ describe("given a feature package file", () => {
   it("rejects ownership type leakage through the ownership subpath", () => {
     expect(
       report(
-        "packages/features/agent/server/src/services/agent.service.ts",
+        "modules/agent/server/src/services/agent.service.ts",
         'import type { ScopedPrismaClient } from "@langwatch/prisma-client/ownership";',
       ).map((issue) => issue.messageId),
     ).toEqual(["featurePrismaClient"]);
@@ -47,13 +47,13 @@ describe("given a feature package file", () => {
   it("allows repository runtime helpers only at repository and registry seams", () => {
     expect(
       report(
-        "packages/features/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
+        "modules/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
         'import { PrismaRepository } from "@langwatch/prisma-client";',
       ),
     ).toEqual([]);
     expect(
       report(
-        "packages/features/agent/server/src/repositories/agent-repositories.registry.ts",
+        "modules/agent/server/src/repositories/agent-repositories.registry.ts",
         'import { prismaRepositories } from "@langwatch/prisma-client";',
       ),
     ).toEqual([]);
@@ -62,7 +62,7 @@ describe("given a feature package file", () => {
   it("rejects repository runtime helpers outside their seams", () => {
     expect(
       report(
-        "packages/features/agent/server/src/services/agent.service.ts",
+        "modules/agent/server/src/services/agent.service.ts",
         'import { PrismaRepository, prismaRepositories } from "@langwatch/prisma-client";',
       ).map((issue) => issue.messageId),
     ).toEqual(["featurePrismaClient"]);
@@ -72,7 +72,7 @@ describe("given a feature package file", () => {
     /** @scenario "Generated Prisma imported outside the seam is reported" */
     it("reports generatedPrisma", () => {
       const found = report(
-        "packages/features/agent/server/src/services/agent.service.ts",
+        "modules/agent/server/src/services/agent.service.ts",
         'import { Prisma } from "@langwatch/prisma-client/generated";',
       );
 
@@ -85,7 +85,7 @@ describe("given a feature package file", () => {
     it("reports nothing", () => {
       expect(
         report(
-          "packages/features/agent/server/src/repositories/prisma/agent.repository.ts",
+          "modules/agent/server/src/repositories/prisma/agent.repository.ts",
           'import { Prisma } from "@langwatch/prisma-client/generated";',
         ),
       ).toEqual([]);
@@ -96,7 +96,7 @@ describe("given a feature package file", () => {
     /** @scenario "A feature owning a Prisma connection is reported" */
     it("reports featurePrismaClient", () => {
       const found = report(
-        "packages/features/agent/server/src/services/agent.service.ts",
+        "modules/agent/server/src/services/agent.service.ts",
         'import { PrismaClient } from "@langwatch/prisma-client";',
       );
 

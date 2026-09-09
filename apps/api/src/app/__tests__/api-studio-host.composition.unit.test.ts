@@ -3,7 +3,7 @@
  * deployment can be in: a per-project Lambda fleet, a single engine address,
  * and a fleet named but not described.
  *
- * @see packages/features/workflow/specs/studio-lambda-stream.feature
+ * @see modules/workflow/specs/studio-lambda-stream.feature
  */
 import {
   HttpWorkflowStudioStreamAdapter,

@@ -125,9 +125,6 @@ export function createAppTrpcFeatures(options: {
     // over `/api/trpc` and un-watchable over `/api/sse`.
     presence: composed.presence.router(mount),
     project: composed.project.router(mount),
-    // A procedure rather than a router: the client calls `publicEnv({})` at
-    // the root, and giving it a namespace would rename it.
-    publicEnv: authRouters.publicEnv,
     // Custom role definitions, and the bindings that hand them out: who holds
     // a role and what that role grants are one question asked from two ends.
     role: roleRouters.role,

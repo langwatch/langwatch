@@ -1,0 +1,49 @@
+{
+  "name": "@langwatch/dashboard-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side dashboard, graph, and saved workbench chart service.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project modules/dashboard/server/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/dashboard-contract": "workspace:*",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/time": "workspace:*"
+  },
+  "devDependencies": {
+    "@langwatch/analytics-server": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

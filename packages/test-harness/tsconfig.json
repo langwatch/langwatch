@@ -18,7 +18,7 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../features/workflow/server/tsconfig.build.json"
+      "path": "../../modules/workflow/server/tsconfig.build.json"
     },
     {
       "path": "../prisma-client/tsconfig.build.json"

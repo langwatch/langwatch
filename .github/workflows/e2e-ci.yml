@@ -50,6 +50,8 @@ jobs:
             relevant:
               - 'apps/**'
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               - 'sdks/python/**'
               - 'dev/tests/agentic-e2e/**'
               # The single lockfile, workspace definition, root manifest and

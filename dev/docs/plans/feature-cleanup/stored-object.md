@@ -159,8 +159,8 @@ awaited-through twice: `await app().resolveOwner({ id })` (`:363`) and
 
 ### P4 — Seven server files fail the strict layout grammar this branch exists to enforce (breaks the layout rule)
 
-`packages/features/stored-object/feature.json` declares `"layoutVersion": 0`
-and `packages/features/catalogue.json` lists the feature as governed. Checking
+`modules/stored-object/feature.json` declares `"layoutVersion": 0`
+and `modules/catalogue.json` lists the feature as governed. Checking
 every non-test server path against `SERVER_PATTERNS`
 (`packages/architecture-lint/src/feature-layout.ts:65-91`):
 

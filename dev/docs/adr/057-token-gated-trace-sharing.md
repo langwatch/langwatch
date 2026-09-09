@@ -211,7 +211,7 @@ trivial legacy backfill) rather than an oversight.
 
 ## References
 
-- Current package ADR: `packages/features/share/adrs/001-share-service-boundary.md`
-- Spec: `packages/features/share/specs/share.feature`
+- Current package ADR: `modules/share/adrs/001-share-service-boundary.md`
+- Spec: `modules/share/specs/share.feature`
 - Prior fix: PR #4692 (scope public-share authorization to projectId)
 - Templates: `src/server/gateway/gatewayJwt.ts`, `src/server/api-key/api-key-token.utils.ts`

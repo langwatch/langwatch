@@ -1,6 +1,6 @@
 # How feature web packages reach the server
 
-A `packages/features/<feature>/web` package holds React that needs data. This is
+A `modules/<feature>/web` package holds React that needs data. This is
 where that data comes from, who owns the client, which tier a hook belongs in,
 and what the pattern deliberately does not solve.
 
@@ -38,7 +38,7 @@ errors), [react.md](./react.md), [error-handling.md](./error-handling.md).
                                 │ declared as a dependency
                                 ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ packages/features/<feature>/web                                          │
+│ modules/<feature>/web                                          │
 │                                                                          │
 │   <feature>-api.ts    the procedure MAP (payload types from the contract) │
 │   use-*.ts            EXTERNAL hooks — exported, a contract               │
@@ -66,7 +66,7 @@ From its own feature package, never from `~/utils/api` and never from a client
 it builds itself.
 
 ```ts
-// packages/features/trace/web/src/trace-api.ts
+// modules/trace/web/src/trace-api.ts
 import { createFeatureApi } from "@langwatch/api/web";
 import type { TraceHeader, TraceHeaderReadInput } from "@langwatch/trace-contract";
 
@@ -95,7 +95,7 @@ change of import, not a change of idiom.
 One dependency and one map. That is the whole contract.
 
 ```jsonc
-// packages/features/<feature>/web/package.json
+// modules/<feature>/web/package.json
 "dependencies": {
   "@langwatch/api": "workspace:*",
   "@langwatch/<feature>-contract": "workspace:*"
@@ -270,7 +270,7 @@ ordinary tRPC key. Nothing in this pattern touches it.
 Which tier a hook lands in is a decision per hook, not a default.
 
 ```
-packages/features/trace/web/
+modules/trace/web/
   src/
     index.ts                   ← the public surface. Names every EXTERNAL thing.
     use-trace-header.ts        ← EXTERNAL: "what is this trace?"
@@ -317,7 +317,7 @@ rather than as a side effect of a second caller appearing:
 ### Which feature owns a hook
 
 The feature that owns the **subject**, not the one that happens to call it. The
-feature-flag hook goes to `packages/features/feature-flag/web`; auth hooks to
+feature-flag hook goes to `modules/feature-flag/web`; auth hooks to
 the auth feature; a hook that answers "what is this trace" to Trace, even if
 only Langy calls it today. A hook used by exactly one screen of one feature and
 answering a question about that feature's own state is internal to it. A hook
@@ -331,7 +331,7 @@ feature hook at all; it goes to a shared package or is deleted.
 The line is what the component knows.
 
 ```
-packages/design-system                 packages/features/<f>/web
+packages/design-system                 modules/<f>/web
 ──────────────────────────             ──────────────────────────
 knows Chakra, tokens, a11y             knows what a trace is
 takes strings, numbers, callbacks      takes TraceHeader, ScenarioRun
@@ -378,7 +378,7 @@ cache-key mistake would be visible immediately.
 
 ### 1. The contract owns the payload types
 
-`packages/features/trace/contract/src/trace-explorer.contract.ts`
+`modules/trace/contract/src/trace-explorer.contract.ts`
 
 ```ts
 export const traceHeaderReadInputSchema = z.object({
@@ -402,13 +402,13 @@ and belongs in the contract; the _words_ stay in the component (ADR-045).
 
 ### 2. The map, and the binding
 
-`packages/features/trace/web/src/trace-api.ts` — shown at the top of this
+`modules/trace/web/src/trace-api.ts` — shown at the top of this
 document. Segment names are mount points on the root router and become the
 cache key; spell one differently and the hooks quietly stop sharing a cache.
 
 ### 3. An external hook
 
-`packages/features/trace/web/src/use-trace-header.ts`
+`modules/trace/web/src/use-trace-header.ts`
 
 ```ts
 export function useTraceHeader({
@@ -438,7 +438,7 @@ that silently is how a hover-peek ends up paying a drawer's price.
 
 ### 4. An internal hook, with the invalidation
 
-`packages/features/trace/web/src/internal/use-rename-trace.ts`
+`modules/trace/web/src/internal/use-rename-trace.ts`
 
 ```ts
 const mutation = traceApi.tracesV2.changeName.useMutation({

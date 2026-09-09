@@ -8,7 +8,7 @@ import type { EmailContent } from "@langwatch/notification-server";
 import { JoinRequestMailAdapter } from "../join-request-mail.adapter.ts";
 
 /**
- * Spec: packages/features/identity/specs/join-request-worker-composition.feature
+ * Spec: modules/identity/specs/join-request-worker-composition.feature
  *
  * The guarantee is that both graphs send the SAME words, and it is checked by
  * rendering them rather than by transcribing them.

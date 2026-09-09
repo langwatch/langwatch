@@ -1,10 +1,10 @@
 # Web packages
 
-`packages/features/<name>/web` is `@langwatch/<name>-web`. It is optional, browser-safe,
+`modules/<name>/web` is `@langwatch/<name>-web`. It is optional, browser-safe,
 and depends on the module's contract, `@langwatch/api/web`,
 `@langwatch/design-system`, `@langwatch/ui-host` and `@langwatch/ui-drawer`. It never
 imports the server package or `apps/*`. The reference is
-`packages/features/annotation/web`.
+`modules/annotation/web`.
 
 ## Layers and direction
 

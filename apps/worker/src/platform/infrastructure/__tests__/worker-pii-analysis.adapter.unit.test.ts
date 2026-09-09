@@ -5,7 +5,7 @@ import type { WorkerTracePrivacyConfig } from "../../config/worker.config.ts";
 import { WorkerPiiAnalysisAdapter } from "../worker-pii-analysis.adapter.ts";
 
 /**
- * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature
+ * Spec: modules/data-privacy/specs/span-pii-redaction.feature
  *
  * The wire format between this process and the analysis service, pinned by
  * literal. The service answers with anonymized text and no positions, so a

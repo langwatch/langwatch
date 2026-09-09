@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "packages/features/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/server/src/services/agent.service.ts";
 
 function report(code) {
   return runRule(serviceQualityRule, { code, cwd: workspace.cwd, filename: SERVICE });

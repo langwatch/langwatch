@@ -243,7 +243,7 @@ document includes the optional path, registered dates and `latest`.
 A service is one file exporting a built Hono app. An endpoint is one `registerRoute` call carrying its method, its path, its version, its handler and its definition chain:
 
 ```ts
-// packages/features/things/server/src/transport/api-rest/things.api.ts
+// modules/things/server/src/transport/api-rest/things.api.ts
 import { z } from "zod";
 import type { AppRestSecurity } from "@langwatch/api/rest";
 
@@ -576,7 +576,7 @@ src/
 
 When creating a new API service using this framework:
 
-1. Create `packages/features/<feature>/server/src/transport/api-rest/<feature>.api.ts` exporting a factory that builds the app: `export function create<Feature>RestApp(options) { ...; return createService({ name })...build(); }`
+1. Create `modules/<feature>/server/src/transport/api-rest/<feature>.api.ts` exporting a factory that builds the app: `export function create<Feature>RestApp(options) { ...; return createService({ name })...build(); }`
 2. Mount the result in the owning application's composition, e.g. `apps/api/src/app/api-production.composition.ts`, with `rest.route("/", create<Feature>RestApp(...))` next to the other families (do not create a `route.ts`; `routeHandlers()` is only for legacy Next-style hosts)
 3. Use `createService({ name })` from `@langwatch/api/rest`, with the service name matching the URL path segment
 4. Pass auth and organization middleware through `createService({ auth, _legacy: { organizationMiddleware } })`; pass capability ports through `createService({ rateLimiter, cache })` when any endpoint declares them — declaring without the port fails the build

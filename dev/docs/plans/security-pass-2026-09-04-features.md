@@ -1,8 +1,8 @@
 # Security pass — feature API surfaces, 2026-09-04
 
-Read-only audit of every transport under `packages/features/*/server/src/transport/{api-rest,api-trpc,api-ws,api-mcp}` and
-`packages/enterprise/features/*/server/src/transport/**`, plus the services and repositories they reach and
-`packages/features/*/server/src/repositories/{clickhouse,prisma}/**`.
+Read-only audit of every transport under `modules/*/server/src/transport/{api-rest,api-trpc,api-ws,api-mcp}` and
+`enterprise/modules/*/server/src/transport/**`, plus the services and repositories they reach and
+`modules/*/server/src/repositories/{clickhouse,prisma}/**`.
 
 Branch `feat/strict-feature-layout-v0`. Nothing was modified, staged or run beyond reads and greps.
 
@@ -14,7 +14,7 @@ Branch `feat/strict-feature-layout-v0`. Nothing was modified, staged or run beyo
 | H1     | High         | SCIM webhook intake: non-constant-time secret compare, no replay protection, organization chosen from the payload | `enterprise/scim/.../api-rest/scim-webhook-intake.api.ts:49`             |
 | H2     | High         | License signing **private key** written verbatim into the audit table                                             | `packages/api/src/trpc/trpc-audit-redaction.ts:44`                       |
 | H3     | High         | Every per-IP rate limit on the unauthenticated tRPC surface keys on the literal string `"unknown"`                | `apps/api/src/api.application.ts:602`                                    |
-| H4     | High         | Organization REST apps resolve sub-org-tier permissions at **organization** scope (11 routes)                     | `packages/features/project/.../project.api.ts:251,263,344,353`           |
+| H4     | High         | Organization REST apps resolve sub-org-tier permissions at **organization** scope (11 routes)                     | `modules/project/.../project.api.ts:251,263,344,353`           |
 | H5     | High         | MCP access token outlives the grant it was minted from (30 days, no re-check)                                     | `hosted-mcp/.../api-mcp/hosted-mcp.api.ts:66,505`                        |
 | H6     | High         | Legacy project key reads any organization's OTTL rules by id                                                      | `enterprise/governance/.../api-rest/governance.api.ts:299`               |
 | H7     | High         | Prompt tag assignment writes into the prompt's owning project, not the authorized one                             | `prompt/.../api-rest/prompt.api.ts:455`                                  |
@@ -70,7 +70,7 @@ missing `payment_status` check, tenant-free `linkStripeId` and absent event de-d
   and the Hono `SecuredApp` makes one mandatory per route. Every finding below is a check that runs
   but resolves the wrong id, a declaration that claims more than the handler enforces, or a control
   that is inert.
-- `packages/enterprise/features/{audit-log,managed-provider,saas}` have **no** transport directory.
+- `enterprise/modules/{audit-log,managed-provider,saas}` have **no** transport directory.
 - ClickHouse: all 60 repository files swept. Every query carries `TenantId = {tenantId:String}` (or
   `TenantId IN {tenantIds:Array(String)}`) as its **first** predicate, bound as a placeholder. The
   three apparent misses were refuted: `clickhouse.run-configurations.repository.ts` inherits the
@@ -97,7 +97,7 @@ missing `payment_status` check, tenant-free `linkStripeId` and absent event de-d
 **Traced path**
 
 1. `POST /api/mcp/authorize` gates on `ports.probeProjectPermission`
-   (`packages/features/hosted-mcp/server/src/transport/api-rest/mcp-authorize.api.ts:231`), wired at
+   (`modules/hosted-mcp/server/src/transport/api-rest/mcp-authorize.api.ts:231`), wired at
    `api-production.composition.ts:1832-1840` to `authoringSession.permitted({ …, permission: "project:view" })`.
 2. On success the handler stores the project's **legacy** API key in the authorization code:
    `mcp-authorize.api.ts:257` — `encryptedApiKey: ports.encrypt(project.apiKey)`, where `project.apiKey`
@@ -107,8 +107,8 @@ missing `payment_status` check, tenant-free `linkStripeId` and absent event de-d
 
 **Why the grant is not what was checked.** A legacy project key resolves to
 `{ type: "legacyProjectKey", project }` with no `apiKeyId`, no `userId` and no bindings
-(`packages/features/api-key/contract/src/api-key.tokens.ts:58-70`;
-`packages/features/api-key/server/src/services/api-key-token-resolution.service.ts:126-133`). The
+(`modules/api-key/contract/src/api-key.tokens.ts:58-70`;
+`modules/api-key/server/src/services/api-key-token-resolution.service.ts:126-133`). The
 REST RBAC middleware then skips every check for it:
 
 ```ts
@@ -124,7 +124,7 @@ apply either. **35 project-scoped REST families** are reachable in full by such 
 `gateway-platform.api.ts`'s 24 `apiKeyPermission` routes (virtual keys, budgets, guardrails, providers).
 
 `project:view` is the weakest grant in the product — it is in the `viewer`, `lite-member` and
-`demo-viewer` bags (`packages/features/authz/contract/src/roles.ts:22,107,125`).
+`demo-viewer` bags (`modules/authz/contract/src/roles.ts:22,107,125`).
 
 **Exploit.** A viewer-role member of project `P`, signed in in a browser:
 
@@ -154,7 +154,7 @@ be viewer-reachable, mint a _scoped_ key bound to the caller's own grants instea
 
 ### H1 — SCIM webhook intake: weak compare, no replay protection, payload-chosen organization
 
-`packages/enterprise/features/scim/server/src/transport/api-rest/scim-webhook-intake.api.ts:49`
+`enterprise/modules/scim/server/src/transport/api-rest/scim-webhook-intake.api.ts:49`
 
 ```ts
 if (c.req.header("authorization") !== secret)
@@ -297,7 +297,7 @@ org admin cannot pass these either, so the routes are also broken for their inte
 
 ### H5 — MCP access token outlives the grant it was minted from
 
-`packages/features/hosted-mcp/server/src/transport/api-mcp/hosted-mcp.api.ts:66`
+`modules/hosted-mcp/server/src/transport/api-mcp/hosted-mcp.api.ts:66`
 (`TOKEN_TTL_SECONDS`, 30 days) and `:505-549` (`resolveSessionContext`).
 
 `resolveSessionContext` resolves a token from the in-memory map or Redis and returns the decrypted
@@ -315,7 +315,7 @@ permission in `resolveSessionContext` before returning the `apiKey`, refusing wh
 
 ### H6 — Legacy project key reads any organization's OTTL rules by id
 
-`packages/enterprise/features/governance/server/src/transport/api-rest/governance.api.ts:299`
+`enterprise/modules/governance/server/src/transport/api-rest/governance.api.ts:299`
 
 `apiKeyPermission("aiTools:view")` gates nothing for a legacy project key (see M1/C1). The bulk route
 `/ingestion-templates/admin` (`:291`) additionally carries `requireUserBoundCaller`; the by-id route
@@ -336,7 +336,7 @@ obtainable by any member holding `project:update` via `POST /api/auth/cli/projec
 
 ### H7 — Prompt tag assignment writes into the prompt's owning project
 
-`packages/features/prompt/server/src/transport/api-rest/prompt.api.ts:455`
+`modules/prompt/server/src/transport/api-rest/prompt.api.ts:455`
 
 `requires("prompts:manage")` is checked on the API key's project. The lookup at `:437` deliberately
 also matches org-scoped prompts owned by _sibling_ projects
@@ -684,7 +684,7 @@ which is the **entire** registry including `ops:view`/`ops:manage` and `project:
 which `bindingScopeCanGrantPermission` permits unconditionally:
 
 ```ts
-// packages/features/authz/contract/src/registry.ts:334-338
+// modules/authz/contract/src/registry.ts:334-338
 if (scopes.includes("platform")) return true; // LEGACY-QUIRK(C)
 if (scopeType === "ORGANIZATION") return true;
 ```

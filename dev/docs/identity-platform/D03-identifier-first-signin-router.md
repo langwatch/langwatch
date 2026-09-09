@@ -3,9 +3,9 @@
 Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 · Flag: `IDENTITY_ROUTER_V2` (shadow → enforce) · **Highest-risk deliverable**
 
 > **Amendment 2026-09-03:** `platform/app` is deleted. BetterAuth wiring now
-> lives in `packages/features/auth/server/src/transport/better-auth/`
+> lives in `modules/auth/server/src/transport/better-auth/`
 > (`better-auth.api.ts`, `better-auth-hooks.ts`, `sign-in-router-shadow.ts`)
-> and `packages/features/identity/server/src/better-auth/`. Verify current
+> and `modules/identity/server/src/better-auth/`. Verify current
 > shape against that tree before treating paths below as live.
 
 # Overview

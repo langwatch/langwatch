@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceEvaluationTrigger } from "../worker-trace-evaluation-trigger.composition.ts";
 
 /**
- * Spec: packages/features/trace/specs/evaluation-trigger.feature
+ * Spec: modules/trace/specs/evaluation-trigger.feature
  *
  * A COMPOSITION-CAPABILITY test. Trace has not converted, so the application
  * still registers `evaluationTrigger` and nothing here dispatches. What has to

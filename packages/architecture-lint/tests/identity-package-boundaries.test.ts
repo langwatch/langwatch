@@ -4,15 +4,15 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 /**
- * ADR-115's boundaries as graph facts (packages/features/identity/specs/package-boundary.feature).
+ * ADR-115's boundaries as graph facts (modules/identity/specs/package-boundary.feature).
  */
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 // The API process is the composition root now. The platform application was
 // the one that composed identity when this guard was written, and it is gone.
 const APP_SRC = join(REPO_ROOT, "apps", "api", "src");
-const IDENTITY_SRC = join(REPO_ROOT, "packages", "features", "identity", "contract", "src");
-const IDENTITY_SERVER_SRC = join(REPO_ROOT, "packages", "features", "identity", "server", "src");
+const IDENTITY_SRC = join(REPO_ROOT, "modules", "identity", "contract", "src");
+const IDENTITY_SERVER_SRC = join(REPO_ROOT, "modules", "identity", "server", "src");
 
 function sourceFiles(root: string): string[] {
   const files: string[] = [];

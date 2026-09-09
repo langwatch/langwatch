@@ -7,7 +7,7 @@ Feature: Unified FREE plan experience
     Given the platform is running in SaaS mode
 
   # 11 of 12 scenarios bound:
-  #   - 6 to packages/enterprise/features/billing/server/src/__tests__/planProvider.unit.test.ts
+  #   - 6 to enterprise/modules/billing/server/src/__tests__/planProvider.unit.test.ts
   #   - 5 to [gone] src/server/app-layer/usage/__tests__/usage-meter-policy.unit.test.ts
   # 1 @unimplemented remaining (#3458):
   #   - "Self-hosted free organization is never blocked" — needs IS_SAAS short-circuit

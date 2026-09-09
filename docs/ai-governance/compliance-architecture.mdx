@@ -93,7 +93,7 @@ See [Governance data retention](/ai-gateway/governance/retention) for the full c
 
 ### 3. RBAC: permission-driven, not role-driven
 
-LangWatch's authorization contract and service (`packages/features/authz/`) are the single source of truth for governance access. Permissions are the abstraction; role enums (`OrganizationUserRole.{ADMIN, MEMBER, EXTERNAL}`) are just default permission bags. Custom roles compose any subset via the existing `CustomRolePermissions` JSON column without requiring a Prisma enum change.
+LangWatch's authorization contract and service (`modules/authz/`) are the single source of truth for governance access. Permissions are the abstraction; role enums (`OrganizationUserRole.{ADMIN, MEMBER, EXTERNAL}`) are just default permission bags. Custom roles compose any subset via the existing `CustomRolePermissions` JSON column without requiring a Prisma enum change.
 
 **Governance permissions catalog** (added in this PR):
 

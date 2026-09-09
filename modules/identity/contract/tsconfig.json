@@ -1,0 +1,36 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
+    "target": "es2020",
+    "lib": ["es2020"],
+    // Deliberately NO "types": ["node"]. This package is isomorphic: the
+    // frontend and the backend both import it, so a `node:*` import or a
+    // `Buffer` reference must not compile here. That is the whole boundary —
+    // enforced by the compiler rather than by a convention in a barrel.
+    "types": [],
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts"],
+  // The package ships its TypeScript sources (exports point at src/*.ts), so
+  // nothing is emitted from here. Tests are checked by tsconfig.test.json,
+  // which supplies the `vitest` module types this config has no need of.
+  "exclude": ["src/__tests__/**"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    }
+  ]
+}

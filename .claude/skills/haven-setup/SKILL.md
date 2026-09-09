@@ -105,7 +105,7 @@ accepted reduced isolation): `LANGY_EGRESS_REQUIRE_TLS=false`.
 ## Gotcha 4: stale k8s overrides in `.env`
 
 `resolveWorkerCallbackUrl` / `resolveWorkerGatewayBaseUrl`
-(`packages/features/langy/contract/src/credential.ts`) read `LANGY_WORKER_CALLBACK_URL`
+(`modules/langy/contract/src/credential.ts`) read `LANGY_WORKER_CALLBACK_URL`
 and `LANGY_WORKER_GATEWAY_URL` **before** haven's own resolved URLs. Left over from a
 Minikube run they point at `host.minikube.internal`, which resolves nowhere under haven
 and silently breaks every LLM call and turn callback — no error, just retries.

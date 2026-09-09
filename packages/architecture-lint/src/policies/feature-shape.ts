@@ -88,7 +88,7 @@ const BOOT_SCAN_ROOTS = [
   "apps/api/src",
   "apps/worker/src",
   "apps/tasks/src",
-  "packages/enterprise/composition",
+  "enterprise/packages/composition",
 ];
 const COMPOSITION_ROOTS = ["apps/api/src/features", "apps/worker/src/features"];
 const BOOTED_INSTALLER = /withFeature\(\s*([A-Za-z0-9_]+)/g;

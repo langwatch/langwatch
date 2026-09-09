@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analytics.composition.ts";
 
 /**
- * Spec: packages/features/trace/specs/trace-product-analytics-worker-composition.feature
+ * Spec: modules/trace/specs/trace-product-analytics-worker-composition.feature
  *
  * A COMPOSITION-CAPABILITY test. Trace has not converted, so `projectMetadata`
  * still runs in the application and nothing here captures an event in

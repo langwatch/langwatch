@@ -207,7 +207,7 @@ const snippetSegment = "/codegen/snippets/"
 // snippetRoot is the package that owns those snippets. The tolerance is scoped
 // by tree as well as by segment, so a stray /codegen/snippets/ directory
 // anywhere else cannot silently drop a compiled file's codes.
-const snippetRoot = "packages/features/onboarding/web/"
+const snippetRoot = "modules/onboarding/web/"
 
 // toleratesParseFailure reports whether a file failing to parse is expected.
 // Only the onboarding snippets are: everywhere else the file is real, compiled

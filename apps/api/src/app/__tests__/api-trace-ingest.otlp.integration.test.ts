@@ -2,8 +2,8 @@ import type {
   GovernanceService,
   GovernanceOtlpPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
-import { TestGovernanceService } from "../../../../../packages/enterprise/features/governance/server/src/app/__tests__/support/test-governance-service.ts";
-import { buildIngestKeyReceiverPolicies } from "../../../../../packages/enterprise/features/governance/server/src/rules/ingest-key-provenance.rules.ts";
+import { TestGovernanceService } from "../../../../../enterprise/modules/governance/server/src/app/__tests__/support/test-governance-service.ts";
+import { buildIngestKeyReceiverPolicies } from "../../../../../enterprise/modules/governance/server/src/rules/ingest-key-provenance.rules.ts";
 /**
  * `POST /api/otel/v1/traces` end to end, through the real Hono app this process mounts
  * and the real ingestion service it composes.

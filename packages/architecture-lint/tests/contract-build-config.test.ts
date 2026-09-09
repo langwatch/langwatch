@@ -8,7 +8,7 @@ import { snapshotOf } from "./workspace.ts";
 let root = "";
 
 function contractPackage(feature: string, hasBuildScript = true): ClassifiedPackage {
-  const featureRoot = join(root, "packages/features", feature);
+  const featureRoot = join(root, "modules", feature);
   const contractRoot = join(featureRoot, "contract");
   return {
     name: `@langwatch/${feature}-contract`,
@@ -25,7 +25,7 @@ function contractPackage(feature: string, hasBuildScript = true): ClassifiedPack
 }
 
 function writeConfig(feature: string, config: Record<string, unknown>): void {
-  const directory = join(root, "packages/features", feature, "contract");
+  const directory = join(root, "modules", feature, "contract");
   mkdirSync(directory, { recursive: true });
   writeFileSync(join(directory, "tsconfig.build.json"), JSON.stringify(config));
 }

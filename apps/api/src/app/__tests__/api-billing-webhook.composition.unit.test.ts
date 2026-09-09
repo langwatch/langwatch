@@ -1,6 +1,6 @@
 /**
  * `POST /api/webhooks/stripe`: the door exists everywhere, the dispatcher only
- * where Stripe is. @see packages/enterprise/features/billing/specs/stripe-webhook.feature
+ * where Stripe is. @see enterprise/modules/billing/specs/stripe-webhook.feature
  */
 // @vitest-environment node
 import type { OrganizationService } from "@langwatch/organization-contract";

@@ -18,7 +18,7 @@ describe("given a reusable package", () => {
     it("reports environment with the fix", () => {
       const found = report(
         "export const url = process.env.DATABASE_URL;",
-        "packages/features/agent/server/src/services/agent.service.ts",
+        "modules/agent/server/src/services/agent.service.ts",
       );
 
       expect(found).toHaveLength(1);
@@ -48,7 +48,7 @@ describe("given a reusable package", () => {
       expect(
         report(
           "export const url = process.env.DATABASE_URL;",
-          "packages/features/agent/server/src/services/agent.service.test.ts",
+          "modules/agent/server/src/services/agent.service.test.ts",
         ),
       ).toEqual([]);
     });

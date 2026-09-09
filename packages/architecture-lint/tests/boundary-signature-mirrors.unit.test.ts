@@ -26,14 +26,14 @@ describe("boundary signature mirrors", () => {
   it("rejects global signature utility types in a core contract", () => {
     root = mkdtempSync(join(tmpdir(), "boundary-signatures-"));
     write(
-      "packages/features/trace/contract/src/trace.api.ts",
+      "modules/trace/contract/src/trace.api.ts",
       "type Input = Parameters<typeof create>[0];\nexport {};\n",
     );
 
     expect(findings()).toMatchObject([
       expect.objectContaining({
         policy: "boundary-signature-mirrors",
-        file: expect.stringContaining("packages/features/trace/contract/src/trace.api.ts"),
+        file: expect.stringContaining("modules/trace/contract/src/trace.api.ts"),
         line: 1,
       }),
     ]);
@@ -42,7 +42,7 @@ describe("boundary signature mirrors", () => {
   it("rejects ReturnType and ConstructorParameters in an Enterprise server app", () => {
     root = mkdtempSync(join(tmpdir(), "boundary-signatures-"));
     write(
-      "packages/enterprise/features/billing/server/src/app/billing.app.ts",
+      "enterprise/modules/billing/server/src/app/billing.app.ts",
       "type Output = ReturnType<typeof build>;\ntype Args = ConstructorParameters<typeof Billing>;\n",
     );
 
@@ -72,7 +72,7 @@ describe("boundary signature mirrors", () => {
   it("does not inspect comments or strings", () => {
     root = mkdtempSync(join(tmpdir(), "boundary-signatures-"));
     write(
-      "packages/features/trace/contract/src/comments.ts",
+      "modules/trace/contract/src/comments.ts",
       '// ReturnType<typeof create> and value as unknown as Output\nconst text = "Parameters<Foo>";\n',
     );
 
@@ -82,7 +82,7 @@ describe("boundary signature mirrors", () => {
   it("allows technical Parameters usage outside a boundary", () => {
     root = mkdtempSync(join(tmpdir(), "boundary-signatures-"));
     write(
-      "packages/features/trace/server/src/services/trace.service.ts",
+      "modules/trace/server/src/services/trace.service.ts",
       "type Input = Parameters<typeof create>[0];\n",
     );
 
@@ -92,7 +92,7 @@ describe("boundary signature mirrors", () => {
   it("does not flag local or imported names that shadow global utility types", () => {
     root = mkdtempSync(join(tmpdir(), "boundary-signatures-"));
     write(
-      "packages/features/trace/contract/src/shadowed.ts",
+      "modules/trace/contract/src/shadowed.ts",
       'import type { ReturnType } from "./types.ts";\ntype Parameters<T> = T;\ntype A = ReturnType<Foo>;\ntype B = Parameters<Foo>;\n',
     );
 
@@ -102,7 +102,7 @@ describe("boundary signature mirrors", () => {
   it("keeps lexical type shadowing local to its declaration", () => {
     root = mkdtempSync(join(tmpdir(), "boundary-signatures-"));
     write(
-      "packages/features/trace/contract/src/lexical.ts",
+      "modules/trace/contract/src/lexical.ts",
       "type Local<ReturnType> = ReturnType;\nexport type Leak = ReturnType<() => string>;\n",
     );
 
@@ -112,7 +112,7 @@ describe("boundary signature mirrors", () => {
   it("does not let a value-only binding shadow a global type utility", () => {
     root = mkdtempSync(join(tmpdir(), "boundary-signatures-"));
     write(
-      "packages/features/trace/contract/src/value-binding.ts",
+      "modules/trace/contract/src/value-binding.ts",
       "const Parameters = 1;\ntype Leak = Parameters<() => string>;\n",
     );
 
@@ -122,7 +122,7 @@ describe("boundary signature mirrors", () => {
   it("allows a generic utility name within its own type parameter scope", () => {
     root = mkdtempSync(join(tmpdir(), "boundary-signatures-"));
     write(
-      "packages/features/trace/contract/src/generic.ts",
+      "modules/trace/contract/src/generic.ts",
       "type Local<ReturnType> = ReturnType;\n",
     );
 
@@ -132,8 +132,8 @@ describe("boundary signature mirrors", () => {
   it("ignores tests and generated boundary files", () => {
     root = mkdtempSync(join(tmpdir(), "boundary-signatures-"));
     const source = "type A = ReturnType<typeof create>;\nconst b = value as unknown as Output;\n";
-    write("packages/features/trace/contract/src/__tests__/trace.test.ts", source);
-    write("packages/features/trace/contract/src/generated/trace.ts", source);
+    write("modules/trace/contract/src/__tests__/trace.test.ts", source);
+    write("modules/trace/contract/src/generated/trace.ts", source);
 
     expect(findings()).toEqual([]);
   });

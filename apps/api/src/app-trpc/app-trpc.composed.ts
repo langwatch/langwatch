@@ -179,7 +179,7 @@ export type ComposedApiFeatures = Readonly<{
   auth: ComposedAuthFeature;
   /**
    * Two namespaces and the `ctx.app.users` slice, plus the operator allow-list
-   * and the parsed `ctx.app.config` the retention gate and the sidebar read.
+   * the ops feature's own admin gate reads off `ctx.app.config`.
    */
   user: ComposedUserFeature;
   /**

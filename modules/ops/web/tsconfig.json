@@ -1,0 +1,45 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "types": ["vitest/globals"],
+    "paths": {
+      "@langwatch/ops-contract": ["../contract/src/index.ts"],
+      "@langwatch/feature-flag-contract": ["../../feature-flag/contract/src/index.ts"]
+    },
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/web/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    }
+  ]
+}

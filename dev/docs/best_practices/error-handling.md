@@ -58,7 +58,7 @@ forget:
    `errors/__tests__/codes.unit.test.ts`. Both directions are checked: a code in
    the list that nothing raises is dead copy and fails too.
 
-`packages/features/evaluation/contract/src/evaluation-execution.errors.ts` is a
+`modules/evaluation/contract/src/evaluation-execution.errors.ts` is a
 worked example:
 
 ```ts

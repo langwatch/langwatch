@@ -1,7 +1,7 @@
 /**
  * The annotations host provider, and the two readings it derives rather than forwards.
  * @vitest-environment jsdom
- * Spec: packages/features/annotation/specs/annotations-list-selection.feature
+ * Spec: modules/annotation/specs/annotations-list-selection.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

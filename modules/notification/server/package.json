@@ -1,0 +1,40 @@
+{
+  "name": "@langwatch/notification-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side notification record service, private persistence, and the process-owned outbound mail delivery capability.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project modules/notification/server/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "^3.1080.0",
+    "@langwatch/ksuid": "^2.0.2",
+    "@langwatch/notification-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@sendgrid/mail": "^8.1.6",
+    "nodemailer": "^9.0.3",
+    "undici": "^8.5.0"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^8.0.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

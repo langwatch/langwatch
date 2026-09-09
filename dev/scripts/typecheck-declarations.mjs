@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from "node:child_process";
-import { rmSync } from "node:fs";
+import { existsSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { artifactsIn, copyJsonInputs, publish, restore } from "./declaration-cache-artifacts.mjs";
@@ -14,7 +14,21 @@ import {
 const root = process.cwd();
 const options = process.argv.slice(2);
 const projectIndex = options.findIndex((option) => option === "--project" || option === "-p");
-const solution = projectIndex === -1 ? "dev/tsconfig.declarations.json" : options[projectIndex + 1];
+// A relative `--project` names the calling package's own config: pnpm sets INIT_CWD
+// to the directory the script ran from, so `--project .` is the same line everywhere.
+function projectFrom(value) {
+  if (typeof value !== "string" || !value.startsWith(".")) return value;
+
+  const target = resolve(process.env.INIT_CWD ?? root, value);
+
+  return existsSync(target) && statSync(target).isDirectory()
+    ? join(target, "tsconfig.json")
+    : target;
+}
+
+const solution = projectFrom(
+  projectIndex === -1 ? "dev/tsconfig.declarations.json" : options[projectIndex + 1],
+);
 if (projectIndex !== -1) {
   options.splice(projectIndex, 2);
 }

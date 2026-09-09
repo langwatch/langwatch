@@ -1,0 +1,36 @@
+{
+  "name": "@langwatch/enterprise-governance-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable LangWatch Enterprise governance contracts.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project enterprise/modules/governance/contract/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "^4.4.3",
+    "@langwatch/otlp": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

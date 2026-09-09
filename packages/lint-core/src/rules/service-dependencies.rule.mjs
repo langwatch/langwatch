@@ -8,9 +8,7 @@ function serviceSubject(filename) {
 
 function serviceOwnerRoot(filename, cwd) {
   const normalized = relative(cwd, filename).split(sep).join("/");
-  const feature = normalized.match(
-    /^(packages\/(?:enterprise\/)?features\/[^/]+\/server)\/src\/services\//,
-  );
+  const feature = normalized.match(/^((?:enterprise\/)?modules\/[^/]+\/server)\/src\/services\//);
   if (feature) return resolve(cwd, feature[1]);
   const application = normalized.match(/^(apps\/(?:api|worker|ui)\/src\/[^/]+)\//);
   return application ? resolve(cwd, application[1]) : dirname(filename);

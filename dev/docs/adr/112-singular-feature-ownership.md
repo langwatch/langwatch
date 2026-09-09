@@ -138,7 +138,7 @@ therefore have separate contracts even when an API operation composes them.
 
 ### The catalogue is the ownership authority
 
-`packages/features/catalogue.json` is the repository-wide source of truth for
+`modules/catalogue.json` is the repository-wide source of truth for
 core and Enterprise feature identities, roots, classifications, and owned
 subjects. Every subject has exactly one owning feature. A feature's
 `feature.json` continues to select its strict layout version but cannot broaden
@@ -192,14 +192,14 @@ reach a global Prisma client.
 
 ### Core and Enterprise ownership are distinct
 
-`ops` is a core feature under `packages/features/ops`. It absorbs the current
+`ops` is a core feature under `modules/ops`. It absorbs the current
 platform-operations implementation and the platform-admin/backoffice code now
-under `packages/features/ops`. Admin routes and UI names may remain
+under `modules/ops`. Admin routes and UI names may remain
 as compatibility transports, but there is no standalone `admin` feature and no
 Enterprise entitlement gate for this behaviour.
 
 `saas` remains an Enterprise-classified feature under
-`packages/enterprise/features/saas`. Its third-party analytics, support, and
+`enterprise/modules/saas`. Its third-party analytics, support, and
 hosted-deployment integrations are governed by the Enterprise source license.
 SaaS deployment selection is distinct from an Enterprise entitlement check,
 but that activation distinction does not relicense the implementation source.

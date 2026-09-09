@@ -47,7 +47,7 @@ prompt) and **`event.sequence`** (monotonic per session).
 
 Claude's spans have the structure but no content; the logs have the content but
 no span ids. `enrichCodingAgentSpansFromLogs`
-(`packages/features/trace/server/src/services/claude-code-log-enrichment.service.ts`)
+(`modules/trace/server/src/services/claude-code-log-enrichment.service.ts`)
 joins them at read time and is called by BOTH read paths — `tracesV2.spansFull`
 (the drawer) and the legacy `TraceService` (REST, exports, evals). Joins:
 
@@ -79,7 +79,7 @@ you already have, and its whole hierarchy rides on four glyphs at one monospace
 size: `❯` prompt, `⏺` call/message, `⎿` result, `✻` thinking. Chrome around it
 makes it read as a screenshot of a terminal rather than as the session.
 
-Components (`packages/features/trace/web/src/ui/sections/explorer/trace-drawer/terminal-view/`):
+Components (`modules/trace/web/src/ui/sections/explorer/trace-drawer/terminal-view/`):
 `TerminalTab` (data boundary) · `TerminalView` (the screen + status line) ·
 `buildStepsFromSpans` (spans → steps) · `TerminalOutput` (ANSI tool output,
 click-to-copy) · `TerminalDiff` + `diff.ts` · `terminalSession.ts` (timeline,

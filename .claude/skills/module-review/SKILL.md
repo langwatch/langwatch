@@ -1,6 +1,6 @@
 ---
 name: module-review
-description: "Audit a LangWatch module (packages/features/<name>), a directory, a diff or a branch against the annotation shape and its guards, and for over-abstraction, and report with file:line evidence: what the module still carries from the older shape (the feature-shape inventory), folder grammar and filenames, the app's public surface versus its API, repository interfaces with both backends, prisma containment and the typed seam, projectId and TenantId scoping, private runtime exports, transport rules, web layer direction and closed entries, spec parity and @scenario binding, boot-time provision versus refusing stubs, the frontend boundary, and identity functions, pass-through layers, ports with one implementation, optional dependencies production always supplies, and comment blocks that are really incident reports. Runs the mechanical detectors (architecture-lint, oxlint, ast-grep, check-feature-parity, package tests and typecheck) first, then reads what they cannot see. Use whenever someone says 'audit', 'review this module', 'review the changed files', 'is this module clean', 'does <package> follow the layout', 'why does lint fail here', 'what is left to convert in <module>', 'this is overengineered', 'too many tiny files', 'simplify this', or before opening a PR that touches a module."
+description: "Audit a LangWatch module (modules/<name>), a directory, a diff or a branch against the annotation shape and its guards, and for over-abstraction, and report with file:line evidence: what the module still carries from the older shape (the feature-shape inventory), folder grammar and filenames, the app's public surface versus its API, repository interfaces with both backends, prisma containment and the typed seam, projectId and TenantId scoping, private runtime exports, transport rules, web layer direction and closed entries, spec parity and @scenario binding, boot-time provision versus refusing stubs, the frontend boundary, and identity functions, pass-through layers, ports with one implementation, optional dependencies production always supplies, and comment blocks that are really incident reports. Runs the mechanical detectors (architecture-lint, oxlint, ast-grep, check-feature-parity, package tests and typecheck) first, then reads what they cannot see. Use whenever someone says 'audit', 'review this module', 'review the changed files', 'is this module clean', 'does <package> follow the layout', 'why does lint fail here', 'what is left to convert in <module>', 'this is overengineered', 'too many tiny files', 'simplify this', or before opening a PR that touches a module."
 user-invocable: true
 argument-hint: "<module name, package path, diff target, or directory>"
 ---
@@ -11,7 +11,7 @@ Read `.claude/skills/architecture-guide/SKILL.md` and `references/testing.md`. T
 audit is evidence first: every finding names a file and line and the rule or scenario
 it breaks. No finding without a path. Never edit code, never run `pnpm lint --fix`, never
 run the root `pnpm typecheck`. The reference the module is measured against is
-`packages/features/annotation`.
+`modules/annotation`.
 
 Auditing a change rather than a whole package? Diff against `origin/main`, or the PR base
 if on a PR branch, and apply the mechanical and reading passes to the touched files only.
@@ -25,7 +25,7 @@ prefixes and database tables do not define module ownership.
 ## 1. Mechanical pass, always first
 
 ```bash
-F=<module>; P=packages/features/$F
+F=<module>; P=modules/$F
 find $P -maxdepth 4 -type d | grep -v node_modules | grep -v __tests__
 grep -n "\"$F\"" packages/architecture-lint/src/feature-shape-baseline.json      # what it still carries
 pnpm --filter @langwatch/architecture-lint lint 2>&1 | grep -E "$P|apps/(api|worker|ui)/src/features/$F" > /tmp/audit-lint.txt; wc -l < /tmp/audit-lint.txt
@@ -50,7 +50,7 @@ names the gaps). Read the parity banner (`✗ THIS RUN FAILS: …`), not a per-f
 Then the shape survey, which no rule covers:
 
 ```bash
-T=packages/features/<name>/server/src
+T=modules/<name>/server/src
 for d in $(find $T -type d -not -path "*__tests__*"|sort); do \
   n=$(find "$d" -maxdepth 1 -name "*.ts" -not -name "*.test.ts"|wc -l); \
   [ "$n" -gt 0 ] && printf "%4s  %s\n" "$n" "$d"; done       # layer inventory

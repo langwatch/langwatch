@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { temporalOnlyRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
-const BASELINED = "packages/features/agent/server/src/services/legacy.service.ts";
+const BASELINED = "modules/agent/server/src/services/legacy.service.ts";
 
 const workspace = createFixtureWorkspace({
   features: { agent: { layoutVersion: 0, roles: { server: {} } } },
@@ -16,7 +16,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "packages/features/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/server/src/services/agent.service.ts";
 
 function report(code, filename = SERVICE) {
   return runRule(temporalOnlyRule, { code, cwd: workspace.cwd, filename });
@@ -105,7 +105,7 @@ describe("given a file outside the governed source", () => {
       expect(
         ids(
           "const at: Date = new Date();",
-          "packages/features/agent/server/src/repositories/prisma/agent.repository.ts",
+          "modules/agent/server/src/repositories/prisma/agent.repository.ts",
         ),
       ).toEqual([]);
     });
@@ -117,7 +117,7 @@ describe("given a file outside the governed source", () => {
       expect(
         ids(
           "const at = new Date();",
-          "packages/features/agent/server/src/adapters/postgres.agent.adapter.ts",
+          "modules/agent/server/src/adapters/postgres.agent.adapter.ts",
         ),
       ).toEqual([]);
     });
@@ -129,7 +129,7 @@ describe("given a file outside the governed source", () => {
       expect(
         ids(
           "const at = new Date('2026-06-15T10:30:00Z');",
-          "packages/features/agent/server/src/__tests__/agent.unit.test.ts",
+          "modules/agent/server/src/__tests__/agent.unit.test.ts",
         ),
       ).toEqual([]);
     });

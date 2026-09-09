@@ -173,7 +173,7 @@ lines of pure re-export from `langy-turn.shared.ts`.
 ### P4 — 19 more same-name delegations on `LangyService` (R3)
 
 The `no-same-name-delegation-ts` detector reports **22 hits inside
-`packages/features/langy`, and zero identity functions**:
+`modules/langy`, and zero identity functions**:
 
 ```
 uvx --from ast-grep-cli==0.42.3 ast-grep scan -c dev/lint/ast-grep/sgconfig.yml \
@@ -361,7 +361,7 @@ importers outside the package imports the bare specifier `@langwatch/langy-web`
 records which of its several hundred symbols anyone actually needs.
 
 The server's `index.ts` is better: 171 lines, no `export *`, 115 named symbols.
-But **80 of those 115 have no consumer outside `packages/features/langy`.**
+But **80 of those 115 have no consumer outside `modules/langy`.**
 Among them: `LangyPublicApi` (dead, P2), `LangyEventingPorts`,
 `LangyTrustedMessagePort`, `LangyFinalPartsService`, `LangyCliEnvelopeService`,
 `LangyFrameDedupStore`, `LangyResourceLinksStore`, `NullLangyWorkerMetricsAdapter`,
@@ -787,7 +787,7 @@ async ensureWorkerCredentials(args: {
   file path" rot, and it should be corrected in commit 6.
 
   `CLAUDE.md`'s frontend-boundary note still lists
-  `packages/features/langy/server/src/streaming/langy-turn-relay.ts` among the
+  `modules/langy/server/src/streaming/langy-turn-relay.ts` among the
   imports that predate the guard. That entry is stale and should be dropped —
   the enforcing test, `platform/app/src/server/__tests__/frontend-boundary.unit.test.ts`,
   walks the real graph, so nothing has regressed; only the prose is out of date.
@@ -851,7 +851,7 @@ Seven commits, smallest risk first, each leaving the suite green.
 
 ## 6. Blast radius
 
-Non-test files outside `packages/features/langy/` that import each package:
+Non-test files outside `modules/langy/` that import each package:
 
 | package                     | importers |
 | --------------------------- | --------- |

@@ -1,5 +1,5 @@
 // Package prompts emits the PromptApiService.get + Prompt.compile span
-// pair that the trace-UI consumer (packages/features/trace/contract/src/
+// pair that the trace-UI consumer (modules/trace/contract/src/
 // trace-prompt-reference.ts) walks to surface "Open in Prompts"
 // deep-links on LLM spans.
 //

@@ -23,7 +23,7 @@ const ROOTS = [
   join(PACKAGE_ROOT, "../api/src"),
   join(PACKAGE_ROOT, "../worker/src"),
   // `ee` was a root until `4faa77c658` moved governance and SCIM into
-  // `packages/enterprise`, which the packages root below already walks.
+  // `enterprise`, which the packages root below already walks.
   join(PACKAGE_ROOT, "../../packages"),
 ].filter((root) => existsSync(root));
 

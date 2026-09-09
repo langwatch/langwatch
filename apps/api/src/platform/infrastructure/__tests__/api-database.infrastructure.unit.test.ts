@@ -1,5 +1,9 @@
+import type { Logger } from "@langwatch/observability";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const fakeLogger = () =>
+  ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }) as unknown as Logger;
 
 // Only the CONSTRUCTION decision is intercepted: `connect` opens a pg pool and
 // a Prisma client, which a unit test must not do. Everything else in the
@@ -76,6 +80,7 @@ function compose(
     resources,
     database: { url },
     nodeEnvironment: "test",
+    logger: fakeLogger(),
   });
   return { infrastructure, resources };
 }
@@ -89,6 +94,7 @@ describe("ApiDatabaseInfrastructure", () => {
         resources: new ResourceScope(),
         database: { url: undefined },
         nodeEnvironment: "test",
+        logger: fakeLogger(),
         report,
       });
 
@@ -104,6 +110,7 @@ describe("ApiDatabaseInfrastructure", () => {
         resources: new ResourceScope(),
         database: { url: "   \t \n " },
         nodeEnvironment: "test",
+        logger: fakeLogger(),
         report,
       });
 
@@ -141,6 +148,7 @@ describe("ApiDatabaseInfrastructure", () => {
         resources: new ResourceScope(),
         database: { url: "postgresql://localhost/langwatch" },
         nodeEnvironment: "development",
+        logger: fakeLogger(),
       });
 
       expect(composed.connect).toHaveBeenCalledWith({
@@ -192,6 +200,7 @@ describe("ApiDatabaseInfrastructure", () => {
         resources: new ResourceScope(),
         database: { url: "postgresql://localhost/langwatch" },
         nodeEnvironment: "test",
+        logger: fakeLogger(),
       });
 
       expect(composed.guards).toHaveLength(2);

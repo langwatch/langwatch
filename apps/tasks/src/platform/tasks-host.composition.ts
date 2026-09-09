@@ -75,7 +75,7 @@ export class TasksHost extends TaskHostPort<
   static create(config: TasksConfig): TasksHost {
     const databaseUrl = config.databaseUrl?.trim();
     const prismaConnection = databaseUrl
-      ? PrismaConnectionService.create({ guard: PrismaTenancyGuardService.create() }).connect(
+      ? PrismaConnectionService.create({ guard: PrismaTenancyGuardService.create(), logger }).connect(
           PrismaConfigService.create().resolve({
             databaseUrl,
             log: config.nodeEnvironment === "development" ? ["error", "warn"] : ["error"],

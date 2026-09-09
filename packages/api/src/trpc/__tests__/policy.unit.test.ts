@@ -8,7 +8,7 @@
  *
  * The authorization port is a bare mock here — the engine's own decisions are
  * `authz-service.facade.unit.test.ts`'s business.
- * Spec: packages/features/authz/specs/permission-resolution.feature
+ * Spec: modules/authz/specs/permission-resolution.feature
  */
 import {
   type AuthzGetDecisionInput,

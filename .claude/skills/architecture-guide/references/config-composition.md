@@ -11,7 +11,7 @@ from the composition root. `process.env` is allowed only in a process boot file
 and tests.
 
 ```ts
-// packages/features/langy/contract/src/langy.config.ts: a module's own config, schema-driven
+// modules/langy/contract/src/langy.config.ts: a module's own config, schema-driven
 export const langyServerConfigDefinition = Config.group(
   {
     agentUrl: Config.value(z.string().optional(), { env: "LANGY_AGENT_URL" }),

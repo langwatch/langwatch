@@ -58,6 +58,12 @@ export const publicAppConfigSchema = z.strictObject({
    */
   identityFrontDoor: z.boolean(),
   licensePaymentUrl: z.string().min(1).optional(),
+  /**
+   * `"email"`, or the federated provider id this deployment mounted. Absent
+   * means email mode (ADR-027). A provider name, not a secret, so it rides
+   * the shell alongside the rest of the deployment's public shape.
+   */
+  authProvider: z.string().min(1).optional(),
 });
 
 export type PublicAppConfig = z.infer<typeof publicAppConfigSchema>;

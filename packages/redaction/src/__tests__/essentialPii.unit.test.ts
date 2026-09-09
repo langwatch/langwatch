@@ -4,7 +4,7 @@ import { compilePiiExceptPatterns, redactEssentialPiiInText } from "../essential
 import { subtractProtectedRanges } from "../essentialPii.ts";
 
 /**
- * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature
+ * Spec: modules/data-privacy/specs/span-pii-redaction.feature
  *
  * The native floor, exercised through its own entry point rather than through
  * the span service, because every sabotage that matters to a customer lands

@@ -1,8 +1,8 @@
 # Built-in lens preset groups — Cost & Performance dropdowns
 #
 # Implementation:
-#   packages/features/trace/web/src/view.store.ts        (builtInLenses, lens-group id sets, selectLens)
-#   packages/features/trace/web/src/ui/sections/explorer/toolbar/lens-tabs.tsx  (lens-group dropdown UI)
+#   modules/trace/web/src/view.store.ts        (builtInLenses, lens-group id sets, selectLens)
+#   modules/trace/web/src/ui/sections/explorer/toolbar/lens-tabs.tsx  (lens-group dropdown UI)
 #
 # Related specs:
 #   specs/traces-v2/view-system.feature     — lens system (tabs, drafts, persistence); owns shared built-in behaviour

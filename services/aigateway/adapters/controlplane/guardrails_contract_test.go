@@ -176,7 +176,7 @@ func TestContentForPacksEachDirectionUnderItsOwnKey(t *testing.T) {
 // monorepoRoot and controlPlaneRoot locate the TypeScript side relative to this
 // package. The control plane used to be one application package at a fixed path;
 // the feature extraction deleted it and split its gateway half into
-// <root>/packages/features/gateway. That is the second such move -- ADR-076 was
+// <root>/modules/gateway. That is the second such move -- ADR-076 was
 // the first -- and each one broke this file, which is why the layout is derived
 // in exactly one function.
 //
@@ -193,7 +193,7 @@ var (
 // layout through here, so a future move cannot repoint one and leave the other
 // stale -- which is the drift ADR-076 already caused once.
 func controlPlaneRootFor(root string) string {
-	return filepath.Join(root, "packages", "features", "gateway", "server")
+	return filepath.Join(root, "modules", "gateway", "server")
 }
 
 // The two witnesses that decide skip-versus-fail. Neither is a bare directory:
@@ -601,7 +601,7 @@ func TestRequireControlPlaneDispatchesTheVerdictItWasGiven(t *testing.T) {
 /** @scenario "the data plane and the control plane agree on the wire shape" */
 func TestControlPlaneSchemaAgreesOnTheWireShape(t *testing.T) {
 	text := readControlPlaneSource(t,
-		"packages", "features", "gateway", "server", "src", "transport", "api-rest",
+		"modules", "gateway", "server", "src", "transport", "api-rest",
 		"gateway-internal.api.ts")
 
 	start := strings.Index(text, "const guardrailCheckRequestSchema")
@@ -627,7 +627,7 @@ func TestControlPlaneSchemaAgreesOnTheWireShape(t *testing.T) {
 	// and this test read the same source of truth. The schema used to inline
 	// the storage enum instead, so every live gateway call failed validation.
 	service := readControlPlaneSource(t,
-		"packages", "features", "gateway", "server", "src", "services",
+		"modules", "gateway", "server", "src", "services",
 		"gateway-guardrail-evaluation.service.ts")
 	for _, direction := range []string{"request", "response", "stream_chunk"} {
 		if !strings.Contains(service, `"`+direction+`"`) {

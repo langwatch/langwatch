@@ -27,8 +27,8 @@ rule:
         stopBy: end
 files:
   - "apps/ui/src/**/*.tsx"
-  - "packages/features/*/web/src/**/*.tsx"
-  - "packages/enterprise/features/*/web/src/**/*.tsx"
+  - "modules/*/web/src/**/*.tsx"
+  - "enterprise/modules/*/web/src/**/*.tsx"
 ignores:
   - "**/*.test.tsx"
   - "**/*.spec.tsx"

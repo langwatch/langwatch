@@ -1,6 +1,6 @@
 # Convert a module to the annotation shape
 
-`packages/features/annotation` is the shape. This reference is the same procedure for
+`modules/annotation` is the shape. This reference is the same procedure for
 every other module: measure the distance, then close each gap by copying the annotation
 counterpart and moving the existing behaviour into it. Nothing is redesigned on the way:
 every operation, error code, query and screen the module has today it still has after
@@ -11,7 +11,7 @@ the one you are writing.
 ## 0. Measure the distance
 
 ```bash
-F=<module>; P=packages/features/$F
+F=<module>; P=modules/$F
 grep -n "\"$F\"" packages/architecture-lint/src/feature-shape-baseline.json
 find $P/contract/src $P/server/src $P/web/src -type f | grep -v __tests__ | grep -v node_modules | sort
 ls apps/api/src/features/$F apps/worker/src/features/$F 2>/dev/null

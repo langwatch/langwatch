@@ -17,12 +17,9 @@ const subjectOwnerCache = new Map();
 function subjectOwners(cwd) {
   if (subjectOwnerCache.has(cwd)) return subjectOwnerCache.get(cwd);
   const owners = new Map();
-  const file = join(cwd, "packages", "features", "catalogue.json");
+  const file = join(cwd, "modules", "catalogue.json");
   const migrated = new Set();
-  for (const featuresRoot of [
-    join(cwd, "packages", "features"),
-    join(cwd, "packages", "enterprise", "features"),
-  ]) {
+  for (const featuresRoot of [join(cwd, "modules"), join(cwd, "enterprise", "modules")]) {
     if (!existsSync(featuresRoot)) continue;
     // A feature is "migrated" once it has any physical contract/server/web
     // package; that is the same fact `loadWorkspace` computes for
@@ -76,7 +73,7 @@ export const featureSourceSubjectRule = defineRule({
   messages: {
     foreignSubject: {
       what: "Source module {{path}} claims {{subject}}, which belongs to the singular {{owner}} feature.",
-      fix: "Move the file into `packages/features/{{owner}}/…` (see the `feature-move` skill), or rename the subject if it is genuinely different.",
+      fix: "Move the file into `modules/{{owner}}/…` (see the `feature-move` skill), or rename the subject if it is genuinely different.",
     },
   },
   create(context, file) {

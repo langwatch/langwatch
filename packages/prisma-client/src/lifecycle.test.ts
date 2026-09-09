@@ -1,8 +1,10 @@
+import type { Logger } from "@langwatch/observability";
 import type { PrismaPg } from "@prisma/adapter-pg";
 import type { Pool } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import { PrismaConfigService } from "./config.ts";
 import {
+  forwardPrismaEvent,
   PrismaClientFactory,
   type PrismaClientFactoryInput,
   PrismaConnection,
@@ -76,6 +78,14 @@ const fakeClient = (overrides: Record<string, unknown> = {}): PrismaClient =>
     ...overrides,
   }) as unknown as PrismaClient;
 
+const fakeLogger = () =>
+  ({
+    error: vi.fn(),
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }) as unknown as Logger;
+
 describe("explicit Prisma lifecycle", () => {
   it("constructs one guarded client and one externally owned pool", async () => {
     const pool = fakePool();
@@ -84,6 +94,7 @@ describe("explicit Prisma lifecycle", () => {
     const guard = new RecordingGuard();
     const driver = new RecordingDriver({ adapter, pool });
     const clientFactory = new RecordingClientFactory(client);
+    const logger = fakeLogger();
     const config = PrismaConfigService.create().resolve({
       databaseUrl: "postgresql://localhost/langwatch",
       log: ["warn"],
@@ -93,13 +104,14 @@ describe("explicit Prisma lifecycle", () => {
       guard,
       driverAdapter: driver,
       clientFactory,
+      logger,
     }).connect(config);
 
     expect(connection.client).toBe(client);
     expect(connection.pool).toBe(pool);
     expect(driver.create).toHaveBeenCalledOnce();
     expect(driver.create).toHaveBeenCalledWith(config.databaseUrl);
-    expect(clientFactory.create).toHaveBeenCalledWith({ adapter, log: ["warn"] });
+    expect(clientFactory.create).toHaveBeenCalledWith({ adapter, log: ["warn"], logger });
 
     const extension = vi.mocked(client.$extends).mock.calls[0]?.[0] as {
       query: {
@@ -145,6 +157,7 @@ describe("explicit Prisma lifecycle", () => {
       guard,
       driverAdapter: driver,
       clientFactory,
+      logger: fakeLogger(),
     }).connect(config);
 
     const extension = vi.mocked(client.$extends).mock.calls[0]?.[0] as {
@@ -257,5 +270,43 @@ describe("explicit Prisma lifecycle", () => {
     await PrismaSeedService.create().run({ connection, seed });
 
     expect(seed.clients).toEqual([client]);
+  });
+
+  describe("forwardPrismaEvent", () => {
+    it("lands an emitted error event on the logger as one structured call", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-09-09T00:00:00.000Z");
+
+      forwardPrismaEvent({
+        logger,
+        level: "error",
+        event: { target: "postgres.query", message: "connection reset", timestamp },
+      });
+
+      expect(logger.error).toHaveBeenCalledOnce();
+      expect(logger.error).toHaveBeenCalledWith(
+        { target: "postgres.query", message: "connection reset", timestamp },
+        "prisma error",
+      );
+      expect(logger.warn).not.toHaveBeenCalled();
+      expect(logger.info).not.toHaveBeenCalled();
+      expect(logger.debug).not.toHaveBeenCalled();
+    });
+
+    it("lands a query event on the logger at debug, keyed by its SQL text", () => {
+      const logger = fakeLogger();
+      const timestamp = new Date("2026-09-09T00:00:00.000Z");
+
+      forwardPrismaEvent({
+        logger,
+        level: "query",
+        event: { target: "postgres.query", query: "SELECT 1", params: "[]", duration: 4, timestamp },
+      });
+
+      expect(logger.debug).toHaveBeenCalledWith(
+        { target: "postgres.query", message: "SELECT 1", timestamp },
+        "prisma query",
+      );
+    });
   });
 });

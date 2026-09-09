@@ -1,6 +1,5 @@
 /**
- * The two signed-out doors — `frontDoor.*` and the `publicEnv` procedure beside it —
- * composed as their own feature.
+ * The signed-out door, `frontDoor.*`, composed as its own feature.
  */
 import {
   AuthApp,
@@ -53,10 +52,7 @@ export type ApiPersonDeploymentFacts = Readonly<{
   adminEmails?: string | readonly string[] | undefined;
 }>;
 
-import {
-  createFrontDoorTrpcRouter,
-  createPublicEnvTrpcProcedure,
-} from "./auth-trpc.mount.ts";
+import { createFrontDoorTrpcRouter } from "./auth-trpc.mount.ts";
 import type { ComposedAuthFeature } from "./auth.composition.types.ts";
 
 /**
@@ -74,7 +70,7 @@ export function resolvePersonDeploymentFacts(options: {
   return options.adminEmails ? { ...supplied, adminEmails: options.adminEmails } : supplied;
 }
 
-/** Composes the two signed-out doors over this process's own graph. */
+/** Composes the signed-out door over this process's own graph. */
 export function composeAuthFeature(options: {
   /** The one guarded connection every row read below runs on. */
   prisma: PrismaClient;
@@ -254,13 +250,12 @@ export function composeAuthFeature(options: {
     resolveAuthProvider,
     routers: (mount) => ({
       frontDoor: createFrontDoorTrpcRouter(mount.runtime, () => app),
-      publicEnv: createPublicEnvTrpcProcedure(mount.runtime, () => app),
     }),
   };
 }
 
 /**
- * The two signed-out doors on a process that composed no user directory. Both still mount
+ * The signed-out door on a process that composed no user directory. It still mounts
  * and every call refuses by name.
  */
 export function refusingAuthFeature(processName: string): ComposedAuthFeature {
@@ -274,7 +269,6 @@ export function refusingAuthFeature(processName: string): ComposedAuthFeature {
     resolveAuthProvider: () => Promise.resolve("email"),
     routers: (mount) => ({
       frontDoor: createFrontDoorTrpcRouter(mount.runtime, () => app),
-      publicEnv: createPublicEnvTrpcProcedure(mount.runtime, () => app),
     }),
   };
 }

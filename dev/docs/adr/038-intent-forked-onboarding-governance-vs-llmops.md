@@ -120,7 +120,7 @@ model Organization {
 ```
 
 ```ts
-// packages/features/feature-flag/contract — release_ui_ai_governance_enabled
+// modules/feature-flag/contract — release_ui_ai_governance_enabled
 defaultValue: true, // Decision 7; operator rules provide per-organization rollback
 ```
 

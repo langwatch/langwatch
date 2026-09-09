@@ -18,7 +18,7 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../features/audit-log/contract/tsconfig.build.json"
+      "path": "../../modules/audit-log/contract/tsconfig.build.json"
     },
     {
       "path": "../runtime-composition/tsconfig.build.json"

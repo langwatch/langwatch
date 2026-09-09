@@ -138,13 +138,17 @@ func pgDatabaseURL(serverURL, database string) (string, error) {
 var prismaOnlyQueryKeys = []string{"schema", "connection_limit", "pool_timeout", "pgbouncer", "statement_cache_size", "socket_timeout"}
 
 // psqlServerURL is the server URL with every Prisma-only parameter removed,
-// so the same -pg-url serves both the booted instances and psql.
+// so the same -pg-url serves both the booted instances and psql. Prisma's
+// `schema` becomes libpq's search_path: the migrations table lives there.
 func psqlServerURL(serverURL string) (string, error) {
 	parsed, err := url.Parse(serverURL)
 	if err != nil {
 		return "", fmt.Errorf("postgres URL: %w", err)
 	}
 	query := parsed.Query()
+	if schema := query.Get("schema"); schema != "" {
+		query.Set("options", "-csearch_path="+schema)
+	}
 	for _, key := range prismaOnlyQueryKeys {
 		query.Del(key)
 	}

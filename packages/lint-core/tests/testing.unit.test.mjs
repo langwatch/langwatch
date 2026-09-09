@@ -8,7 +8,7 @@ let workspace;
 afterEach(() => workspace?.cleanup());
 
 function catalogueOf(fixture) {
-  return JSON.parse(readFileSync(join(fixture.cwd, "packages/features/catalogue.json"), "utf8"));
+  return JSON.parse(readFileSync(join(fixture.cwd, "modules/catalogue.json"), "utf8"));
 }
 
 describe("given a fixture workspace", () => {

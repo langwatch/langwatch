@@ -6,7 +6,7 @@ import { createWorkerTraceCostEnrichment } from "../worker-trace-cost-enrichment
 import { createWorkerTraceModelCostCatalogPort } from "../worker-trace-narrow-ports.composition.ts";
 
 /**
- * Spec: packages/features/trace/specs/record-time-cost-enrichment.feature
+ * Spec: modules/trace/specs/record-time-cost-enrichment.feature
  *
  * A COMPOSITION-CAPABILITY test. Trace has not converted, so nothing in this
  * process enriches a span. What has to be true today is that this composition

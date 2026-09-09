@@ -198,7 +198,7 @@ type cacheRuleWire struct {
 }
 
 // cacheMatchersWire mirrors the matchers shape emitted by the control-plane
-// materialiser (packages/features/gateway/server/src/services/gateway-config-materialisation.service.ts:121-128).
+// materialiser (modules/gateway/server/src/services/gateway-config-materialisation.service.ts:121-128).
 // Every recognized matcher must have an explicit field — silently dropping a
 // matcher at unmarshal collapses the rule's effective scope to "match all",
 // which has caused stripped `cache_control` on system blocks in matrix tests.

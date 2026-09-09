@@ -4,7 +4,7 @@ Feature: Model Provider Configuration
   So that I can use the provider for LangWatch operations
 
   # The JSDOM render harness this file kept asking for now exists:
-  # `packages/features/model-provider/web/src/ui/sections/__tests__/
+  # `modules/model-provider/web/src/ui/sections/__tests__/
   # edit-model-provider-drawer.integration.test.tsx`, written when the drawer was
   # recovered from `platform/app` (deleted in `cc91631cd8`, which is why a
   # customer could not add or edit a credential at all). It covers the headline

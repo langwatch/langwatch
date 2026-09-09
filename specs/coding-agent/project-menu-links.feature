@@ -2,12 +2,12 @@
 #
 # Implementation:
 #   packages/prisma-client/prisma/schema.prisma                                                                    (Project.lastCodingAgentSessionAt / lastCodingAgentPullRequestAt)
-#   packages/features/project/server/src/services/project.service.ts                                               (the throttled touch methods)
-#   packages/features/project/server/src/repositories/prisma/prisma.project.repository.ts                         (the staleness-guarded write)
-#   packages/features/coding-agent/server/src/services/coding-agent-session-seen.service.ts (the fold-commit stamp)
-#   packages/features/github/server/src/services/github-pull-request-mapping.service.ts                          (the pull-request trigger)
-#   packages/features/navigation/web/src/model/coding-agent-activity.ts                                                     (the recency rule)
-#   packages/features/navigation/web/src/ui/sections/main-menu.tsx                                                                       (the two destinations)
+#   modules/project/server/src/services/project.service.ts                                               (the throttled touch methods)
+#   modules/project/server/src/repositories/prisma/prisma.project.repository.ts                         (the staleness-guarded write)
+#   modules/coding-agent/server/src/services/coding-agent-session-seen.service.ts (the fold-commit stamp)
+#   modules/github/server/src/services/github-pull-request-mapping.service.ts                          (the pull-request trigger)
+#   modules/navigation/web/src/model/coding-agent-activity.ts                                                     (the recency rule)
+#   modules/navigation/web/src/ui/sections/main-menu.tsx                                                                       (the two destinations)
 #   [gone] src/pages/[project]/sessions.tsx                                                                  (the project Sessions page)
 #   [gone] src/pages/[project]/pull-requests.tsx                                                             (the project Pull Requests page)
 #

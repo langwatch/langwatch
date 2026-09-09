@@ -34,7 +34,7 @@ const SHELL_READINGS = {
   pathname: "/acme/simulations",
 };
 
-vi.mock("../../../packages/features/trace/web/src/ui/sections/explorer/trace-drawer", () => ({
+vi.mock("../../../modules/trace/web/src/ui/sections/explorer/trace-drawer", () => ({
   TraceV2DrawerShell: () => <div data-testid="trace-drawer">trace drawer</div>,
 }));
 

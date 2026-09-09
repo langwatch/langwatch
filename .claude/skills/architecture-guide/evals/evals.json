@@ -9,7 +9,7 @@
     },
     {
       "id": 2,
-      "prompt": "feature-source-layout is failing on packages/features/trace/server/src/utils/spanTree.ts. Why, and where does it go?",
+      "prompt": "feature-source-layout is failing on modules/trace/server/src/utils/spanTree.ts. Why, and where does it go?",
       "expected_output": "Explains the closed server grammar, that utils/ is not a layer, and places the code in a service, a rules module, or the contract if pure, with the canonical kebab filename.",
       "files": []
     },

@@ -7,7 +7,7 @@ Feature: Create Project Drawer
   # The drawer came back from `platform/app` in the ownerless-surfaces sweep
   # (deleted in `cc91631cd8` while three live surfaces kept writing the
   # address), and the JSDOM render fixture this note used to ask for came with
-  # it: `packages/features/organization/web/src/ui/sections/__tests__/
+  # it: `modules/organization/web/src/ui/sections/__tests__/
   # create-project-drawer.integration.test.tsx`. What is still @unimplemented
   # below is what neither it nor the validation test reaches — the entry-point
   # clicks that open the drawer, the chrome's three close mechanisms, the

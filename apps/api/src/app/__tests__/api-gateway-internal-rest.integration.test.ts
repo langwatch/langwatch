@@ -1,7 +1,7 @@
 /**
  * The Go data plane's door into this process, driven over real HTTP.
  * @see apps/api/src/app/api-gateway-internal-rest.composition.ts
- * @see packages/features/gateway/server/src/transport/api-rest/gateway-internal.api.ts
+ * @see modules/gateway/server/src/transport/api-rest/gateway-internal.api.ts
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";

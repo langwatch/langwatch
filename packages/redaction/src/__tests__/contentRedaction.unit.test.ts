@@ -13,7 +13,7 @@ import {
 import { SECRETS_REDACTION_MARKER } from "../secrets.ts";
 
 /**
- * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature
+ * Spec: modules/data-privacy/specs/span-pii-redaction.feature
  *
  * The composition of the two native passes for one resolved policy. Its
  * decisions are the ones a customer's privacy settings actually buy: which

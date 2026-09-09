@@ -4,7 +4,7 @@ Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wa
 
 > **Amendment 2026-09-03:** `platform/app` is deleted. Auth0 password-change
 > handling now lives at
-> `packages/features/auth/server/src/services/auth0-password.service.ts`.
+> `modules/auth/server/src/services/auth0-password.service.ts`.
 > Verify current shape against the tree before treating paths below as live.
 
 # Overview

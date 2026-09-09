@@ -1,6 +1,6 @@
 ---
 name: architecture-guide
-description: "The reference for the LangWatch repository layout: what apps/ui, apps/api, apps/worker and apps/tasks are, what a module is (contract/server/web), the server shape the annotation module set (one installer, one app, private services, repository interfaces with Prisma and memory backends, flat REST and tRPC declarations), the web layer order (model, behavior, ui/elements, ui/blocks, ui/sections, flat entry files), how config, composition roots, UI install and specs work, and which architecture-lint rule enforces each. Read this whenever you touch anything under packages/features, packages/enterprise/features, apps/api/src/app, apps/api/src/features, apps/worker/src/app or apps/ui/src/features, or when a user asks where something should live, why a lint rule fired, what an app/service/repository is here, or how a module is wired. The task skills `module` (build or change one: new, extend, including REST endpoints and tRPC procedures, convert, wire, move, web-surface) and `module-review` (audit one, or for over-abstraction) build on it, alongside `spec-bind` (bind a scenario to a test) and `lint-rule` (add or change a house lint rule)."
+description: "The reference for the LangWatch repository layout: what apps/ui, apps/api, apps/worker and apps/tasks are, what a module is (contract/server/web), the server shape the annotation module set (one installer, one app, private services, repository interfaces with Prisma and memory backends, flat REST and tRPC declarations), the web layer order (model, behavior, ui/elements, ui/blocks, ui/sections, flat entry files), how config, composition roots, UI install and specs work, and which architecture-lint rule enforces each. Read this whenever you touch anything under modules, enterprise/modules, apps/api/src/app, apps/api/src/features, apps/worker/src/app or apps/ui/src/features, or when a user asks where something should live, why a lint rule fired, what an app/service/repository is here, or how a module is wired. The task skills `module` (build or change one: new, extend, including REST endpoints and tRPC procedures, convert, wire, move, web-surface) and `module-review` (audit one, or for over-abstraction) build on it, alongside `spec-bind` (bind a scenario to a test) and `lint-rule` (add or change a house lint rule)."
 user-invocable: true
 argument-hint: "[layer: contract | server | web | config | composition | install | testing | gates]"
 ---
@@ -13,8 +13,8 @@ programs), plus the Go services `services/aigateway`, `services/nlpgo` and
 `services/langyagent`. Applications hold no product code: they boot modules over
 their own database, Redis and ClickHouse handles through `@langwatch/runtime-composition`.
 
-A **module** is a folder `packages/features/<name>/` that owns three workspace
-packages. The folder is still named `packages/features/` and every generated identifier
+A **module** is a folder `modules/<name>/` that owns three workspace
+packages. The folder is still named `modules/` and every generated identifier
 still reads `Feature*` (`defineFeature`, `withFeature`, `featureApi`,
 `installApi<Name>`, `<Name>Api`, `FeatureName`) - that is code, not prose, and it stays
 until the tree rename lands (`dev/docs/plans/modules-rename.md`); everywhere else, in
@@ -27,11 +27,11 @@ conversation and in these skills, the word for this shape is "module".
 | `web`      | `@langwatch/<name>-web`      | screens, surfaces, hooks, pure view models (optional)                          |
 
 The root is not a package. It holds `feature.json` (`{ "layoutVersion": 0 }`), `specs/`
-and `adrs/`. Enterprise modules mirror this under `packages/enterprise/features/<name>`;
-`packages/enterprise/composition/{api,worker}` compose the backend halves, and enterprise
+and `adrs/`. Enterprise modules mirror this under `enterprise/modules/<name>`;
+`enterprise/packages/composition/{api,worker}` compose the backend halves, and enterprise
 web packages install through `apps/ui/src/features/catalogue.json` like any other `*-web`.
 
-**The reference module is `annotation`** (`packages/features/annotation`, ADR-001 in its
+**The reference module is `annotation`** (`modules/annotation`, ADR-001 in its
 `adrs/`, shared decision ADR-133). Every other module is being converted to its shape;
 `packages/architecture-lint/src/feature-shape-baseline.json` is the list of what each
 module still carries from the older shape, and it may only shrink. Copy annotation, not
@@ -40,7 +40,7 @@ produce this same shape: `references/convert.md` closes a module's entries kind 
 `references/new.md`, `references/extend.md` and `references/web-surface.md` add to it.
 
 ```
-packages/features/annotation/
+modules/annotation/
 ├── feature.json · specs/ · adrs/
 ├── contract/src/
 │   ├── annotation.api.ts            interface AnnotationApi + featureApi token
@@ -75,7 +75,7 @@ apps/tasks  -> @langwatch/<f>-server -> @langwatch/<f>-contract
 web never imports server; server never imports web; contract imports no framework and no
 other half. Another module imports only the owner's contract, names the owner's `*Api`
 token in its app's `static dependencies`, and receives the owner's app at boot. Nobody
-imports another module's service or repository. `packages/features/catalogue.json` maps
+imports another module's service or repository. `modules/catalogue.json` maps
 every subject to exactly one owning module; `feature-source-subject` fires when a
 filename claims another module's subject, and `FeatureName` (the type `defineFeature`
 and `featureApi` accept) is generated from that catalogue.
@@ -163,9 +163,9 @@ Read the one that matches the layer you are about to touch. Each is short.
   `/** @scenario "<title>" */`, and test descriptions are actions in `given`/`when`
   describes.
 
-## The `packages/features` folder name
+## The `modules` folder name
 
-The tree still reads `packages/features/`, and every generated identifier still reads
+The tree still reads `modules/`, and every generated identifier still reads
 `Feature*`, because the rename to `modules` is a separate, queued change
 (`dev/docs/plans/modules-rename.md`). Write the folder and the identifiers as code;
 say "module" everywhere else.
@@ -174,7 +174,7 @@ say "module" everywhere else.
 
 - `dev/docs/adr/133-composition-spec.md` (the installer, the app factory, transports,
   repositories, the six requirements) and
-  `packages/features/annotation/adrs/001-annotation-service-boundary.md` (the reference)
+  `modules/annotation/adrs/001-annotation-service-boundary.md` (the reference)
 - `packages/architecture-lint/adrs/002-versioned-strict-feature-layout.md` (the grammar),
   `packages/architecture-lint/adrs/001-feature-package-boundaries.md`,
   `packages/architecture-lint/adrs/004-frontend-feature-boundaries.md`
@@ -190,7 +190,7 @@ say "module" everywhere else.
   (`prisma-containment`, `typed-prisma-seam`, `feature-source-layout`, `-filename`,
   `-subject`, `fallible-result-naming`, `layer-class`, and the rest; rendered in
   `dev/docs/lint-rules.md`)
-- `packages/features/README.md`
+- `modules/README.md`
 - `dev/docs/best_practices/error-handling.md`, `dev/docs/best_practices/drawers.md`,
   `dev/docs/best_practices/react.md`, `dev/docs/best_practices/clickhouse-queries.md`
 - `dev/docs/TESTING_PHILOSOPHY.md`, `specs/README.md`

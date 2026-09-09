@@ -66,7 +66,7 @@ parallel mechanism.
 15. **Two success statuses on one route.** `PATCH /api/dataset/:slugOrId/records/:recordId` answers 201 when it created and
     200 when it replaced; `responds` allows exactly one 2xx. Allow two when both carry the same schema.
 16. **A streamed answer.** `POST /api/dataset/generate` streamed a UI-message response; its rules are kept in
-    `packages/features/dataset/server/src/rules/dataset-generate-tools.rules.ts`. Item 2's raw response covers the body;
+    `modules/dataset/server/src/rules/dataset-generate-tools.rules.ts`. Item 2's raw response covers the body;
     what is missing is the session door (14).
 
 ## Part C: tRPC — LANDED `913e0feaec` (09-09 15:1x)
@@ -80,11 +80,11 @@ when it passes 1,800.
 
 ### Wiring still owed (the consumer lines, one lane)
 
-- `packages/features/monitor/server/src/transport/monitor.trpc.ts:19-31`: `.serviceAuthorized({... permissions: ["evaluations:view", "analytics:view"] ...})` → `.withPermission(["evaluations:view", "analytics:view"])`; `MonitorApp.performanceForProject`'s second check goes.
-- `packages/features/authz/contract/src/declared-middleware.ts:28-43`: `AuthzDeclaration` gains `{ kind: "permission-all"; permissions; via? }` and `{ kind: "public"; reason }`.
+- `modules/monitor/server/src/transport/monitor.trpc.ts:19-31`: `.serviceAuthorized({... permissions: ["evaluations:view", "analytics:view"] ...})` → `.withPermission(["evaluations:view", "analytics:view"])`; `MonitorApp.performanceForProject`'s second check goes.
+- `modules/authz/contract/src/declared-middleware.ts:28-43`: `AuthzDeclaration` gains `{ kind: "permission-all"; permissions; via? }` and `{ kind: "public"; reason }`.
 - `apps/api/src/app-trpc/__tests__/authz-declaration-sweep.unit.test.ts:160-177`: `coveredScopeFields` gains `case "permission-all"` (flatMap `forPermission`) and `case "public"` (`[]`).
 - `apps/api/src/app-trpc/app-trpc.policy.ts:122-126`: `createTrpcRuntime({ ..., anonymousProcedure: root.procedure })`, and fact bindings at the mounts that declare them.
-- `packages/features/user/server/src/transport/api-trpc/user.api.ts` (`register` on `publicRoute` + `callerAddressFact`, `otherSessionsToRevoke` on `browserSessionFact`) lands with the user module's conversion off `createTrpcService`.
+- `modules/user/server/src/transport/api-trpc/user.api.ts` (`register` on `publicRoute` + `callerAddressFact`, `otherSessionsToRevoke` on `browserSessionFact`) lands with the user module's conversion off `createTrpcService`.
 
 Original item 13 text follows.
 

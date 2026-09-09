@@ -29,6 +29,8 @@ WORKDIR /app
 COPY mcp/typescript ./mcp/typescript
 COPY services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY packages ./packages
+COPY modules ./modules
+COPY enterprise ./enterprise
 COPY skills ./skills
 COPY infra/docker/Dockerfile.langyagent ./infra/docker/Dockerfile.langyagent
 COPY feature-map.json ./feature-map.json
@@ -169,7 +171,7 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 # mcp/typescript must be copied alongside the applications because pnpm
 # workspace-symlinks @langwatch/mcp-server into
-# packages/features/hosted-mcp/server/node_modules, which apps/api mounts. langy
+# modules/hosted-mcp/server/node_modules, which apps/api mounts. langy
 # and handled-error are other root workspace packages linked the same way —
 # handled-error is imported for side effects by the API and worker entry points,
 # so omitting it fails the boot outright.
@@ -195,6 +197,10 @@ COPY --from=builder /app/sdks/typescript ./sdks/typescript
 # is separate and is the only workspace application the app does not import
 # in hundreds.
 COPY --from=builder /app/packages ./packages
+# The module trees, for the same reason: modules/ and enterprise/ are workspace
+# members outside packages/ since the tree rename.
+COPY --from=builder /app/modules ./modules
+COPY --from=builder /app/enterprise ./enterprise
 # The worker executable runs from source through tsx, the way apps/api does.
 # Whole, not just src/: `dist/server/scenario-child-process.cjs` is built above
 # and is what a scenario run spawns.

@@ -7,9 +7,9 @@ Feature: Variable insertion menu
   # All scenarios describe the VariableInsertMenu component (open
   # via {{ trigger, source-grouped fields, type icons, search, key
   # navigation, insertion). Tests exist at
-  # `packages/features/prompt/web/tests/surfaces/variables/
+  # `modules/prompt/web/tests/surfaces/variables/
   # variable-insert-menu.test.tsx` and the trigger logic in
-  # `packages/features/prompt/web/tests/surfaces/prompt-textarea/
+  # `modules/prompt/web/tests/surfaces/prompt-textarea/
   # prompt-textarea-with-variables.test.tsx`.
   #
   # All scenarios are pre-classified KEEP/UPDATE in

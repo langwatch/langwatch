@@ -1,8 +1,8 @@
 # Editable trace name — alignment while renaming
 #
 # Implementation:
-#   packages/features/trace/web/src/ui/sections/editable-trace-name.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/drawer-header.tsx  (status orb / StatusChip sibling)
+#   modules/trace/web/src/ui/sections/editable-trace-name.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/drawer-header.tsx  (status orb / StatusChip sibling)
 #
 # Motivation (round 5): clicking to rename the trace drops the inline
 # input AND, below it, a character counter (and any validation message).

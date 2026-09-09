@@ -275,7 +275,7 @@ or to the AI Gateway. nlpgo:
 | `evaluation`       | `runEvaluation.ts` — evaluation suite runs                                                                               |
 | `playground`       | `playground.ts` — Prompt Playground                                                                                      |
 | `scenario`         | `scenarios/.../*-agent.adapter.ts`                                                                                       |
-| `topic_clustering` | `packages/features/topic/server/src/intents/topic-clustering-runner.intent.ts` — worker batches                          |
+| `topic_clustering` | `modules/topic/server/src/intents/topic-clustering-runner.intent.ts` — worker batches                          |
 | `optimize`         | (LEGACY only) — DSPy optimization runs; never produced by Go engine. If observed in /go/* traffic, nlpgo logs a warning. |
 | `unknown`          | Default when no header is present                                                                                        |
 

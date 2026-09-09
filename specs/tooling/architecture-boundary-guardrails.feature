@@ -1,6 +1,6 @@
 Feature: Architecture repair instructions appear at the failing boundary
   Scenario: Enterprise implementation cannot silently move into core
-    Given a production module outside packages/enterprise has an Enterprise SPDX directive
+    Given a production module outside enterprise has an Enterprise SPDX directive
     When architecture lint runs
     Then enterprise-source-license reports the module and directive line
     And its repair message requires restoring ownership rather than deleting the marker

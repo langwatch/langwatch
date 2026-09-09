@@ -38,7 +38,7 @@ interface PackageJson {
  * dependency lists can be matched by name rather than by assuming the
  * directory and the package name agree. They mostly do not: `@langwatch/api`
  * is `packages/api`, but `@langwatch/trace-server` is
- * `packages/features/trace/server`.
+ * `modules/trace/server`.
  */
 function packagesByName(): Map<string, string> {
   const byName = new Map<string, string>();

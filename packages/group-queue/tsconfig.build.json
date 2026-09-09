@@ -33,7 +33,7 @@
       "path": "../observability/tsconfig.build.json"
     },
     {
-      "path": "../features/stored-object/contract/tsconfig.build.json"
+      "path": "../../modules/stored-object/contract/tsconfig.build.json"
     },
     {
       "path": "../task/tsconfig.build.json"

@@ -4,7 +4,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { zodObjectCompositionRule } from "../../src/rules/zod-object-composition.rule.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
-const filename = "packages/features/project/contract/src/example.contract.ts";
+const filename = "modules/project/contract/src/example.contract.ts";
 const workspace = createFixtureWorkspace({
   features: { project: { layoutVersion: 0, roles: { contract: {} } } },
   files: {
@@ -12,17 +12,17 @@ const workspace = createFixtureWorkspace({
       '{"name":"@langwatch/shared-schema","exports":{".":"./src/base.ts"}}',
     "packages/shared-schema/src/base.ts":
       'import { z } from "zod"; export const base = z.object({ id: z.string() });',
-    "packages/features/project/contract/src/base.ts":
+    "modules/project/contract/src/base.ts":
       'import { z } from "zod"; export const base = z.object({ id: z.string() });',
-    "packages/features/project/contract/src/barrel.ts":
+    "modules/project/contract/src/barrel.ts":
       'export { base as schema } from "./base.ts";',
-    "packages/features/project/contract/src/star.ts": 'export * from "./barrel.ts";',
-    "packages/features/project/contract/src/refined.ts":
+    "modules/project/contract/src/star.ts": 'export * from "./barrel.ts";',
+    "modules/project/contract/src/refined.ts":
       'import { z } from "zod"; export const base = z.object({ id: z.string() }).refine(value => value.id.length > 0);',
-    "packages/features/project/contract/src/other.ts":
+    "modules/project/contract/src/other.ts":
       "export const base = { extend(value) { return value; } };",
-    "packages/features/project/contract/src/cycle-a.ts": 'export * from "./cycle-b.ts";',
-    "packages/features/project/contract/src/cycle-b.ts": 'export * from "./cycle-a.ts";',
+    "modules/project/contract/src/cycle-a.ts": 'export * from "./cycle-b.ts";',
+    "modules/project/contract/src/cycle-b.ts": 'export * from "./cycle-a.ts";',
   },
 });
 mkdirSync(join(workspace.cwd, "node_modules/@langwatch"), { recursive: true });
@@ -119,7 +119,7 @@ describe("efficient Zod object composition", () => {
   });
 
   it("refreshes imported schema provenance when a source file changes", () => {
-    const path = "packages/features/project/contract/src/changing.ts";
+    const path = "modules/project/contract/src/changing.ts";
     workspace.write(path, "export const base = { extend(value) { return value; } };");
     const code = 'import { base } from "./changing.ts"; base.extend({});';
     expect(report(code)).toEqual([]);
@@ -131,7 +131,7 @@ describe("efficient Zod object composition", () => {
     expect(
       report(
         'import { z } from "zod"; z.object({}).extend({});',
-        `packages/features/project/contract/src/${name}`,
+        `modules/project/contract/src/${name}`,
       ),
     ).toEqual([]);
   });

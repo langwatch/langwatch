@@ -26,7 +26,7 @@ on a new drawer — the URL form gives you:
 ## Adding a new drawer
 
 1. Add the presentational component in the owning feature's `web` package
-   (e.g. `packages/features/<feature>/web/src/features/.../ui/sections/<MyDrawer>.tsx`).
+   (e.g. `modules/<feature>/web/src/features/.../ui/sections/<MyDrawer>.tsx`).
    It should render `Drawer.Root` with `open={true}` (the registry only mounts
    it when active), and call `closeDrawer()` from `useDrawer()` (from
    `@langwatch/ui-drawer`) on the close trigger.

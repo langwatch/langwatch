@@ -16,7 +16,7 @@ describe("given a strict feature contract module", () => {
   describe("when it names only the artifact and not the subject", () => {
     /** @scenario "A contract artifact missing its subject is reported" */
     it("reports contractMissingSubject with the artifact", () => {
-      const found = report("packages/features/agent/contract/src/commands.ts");
+      const found = report("modules/agent/contract/src/commands.ts");
 
       expect(found.map((e) => e.messageId)).toEqual(["contractMissingSubject"]);
       expect(found[0].data).toEqual({ name: "commands.ts", artifact: "commands" });
@@ -26,7 +26,7 @@ describe("given a strict feature contract module", () => {
   describe("when it names a server-only artifact", () => {
     /** @scenario "A server-only artifact in contract source is reported" */
     it("reports contractServerArtifact", () => {
-      const found = report("packages/features/agent/contract/src/agent.repository.ts");
+      const found = report("modules/agent/contract/src/agent.repository.ts");
 
       expect(found.map((e) => e.messageId)).toEqual(["contractServerArtifact"]);
     });
@@ -39,7 +39,7 @@ describe("given a strict feature server module", () => {
     'import { AgentBusyError } from "@langwatch/agent-contract"; export function check() { throw new AgentBusyError({}); }',
     'import { AgentBusyError as Busy } from "@langwatch/agent-contract"; export function check() { throw new Busy({}); }',
   ])("allows deterministic thrown contract errors: %s", (code) => {
-    expect(report("packages/features/agent/server/src/rules/agent.rules.ts", code)).toEqual([]);
+    expect(report("modules/agent/server/src/rules/agent.rules.ts", code)).toEqual([]);
   });
 
   it.each([
@@ -51,7 +51,7 @@ describe("given a strict feature server module", () => {
     "export function check() { throw new Error(new NetworkClient()); }",
   ])("keeps effectful or indirect construction out of rules: %s", (code) => {
     expect(
-      report("packages/features/agent/server/src/rules/agent.rules.ts", code).map(
+      report("modules/agent/server/src/rules/agent.rules.ts", code).map(
         (finding) => finding.messageId,
       ),
     ).toEqual(["rulesImpurity"]);
@@ -60,7 +60,7 @@ describe("given a strict feature server module", () => {
   describe("when a service filename ends in -process.service.ts", () => {
     /** @scenario "A process manager named as a service is reported" */
     it("reports processManagerService", () => {
-      const found = report("packages/features/agent/server/src/services/agent-process.service.ts");
+      const found = report("modules/agent/server/src/services/agent-process.service.ts");
 
       expect(found.map((e) => e.messageId)).toEqual(["processManagerService"]);
     });
@@ -70,7 +70,7 @@ describe("given a strict feature server module", () => {
     /** @scenario "A rules module constructing a class is reported" */
     it("reports rulesImpurity naming the class", () => {
       const found = report(
-        "packages/features/agent/server/src/rules/agent.rules.ts",
+        "modules/agent/server/src/rules/agent.rules.ts",
         "export class Helper {} export const x = new Helper();",
       );
 
@@ -82,7 +82,7 @@ describe("given a strict feature server module", () => {
   describe("when a source path has no home in layout v0", () => {
     /** @scenario "A path with no strict layout home is reported with the allowed homes" */
     it("reports serverPath listing the allowed directories", () => {
-      const found = report("packages/features/agent/server/src/misc/agent.helper.ts");
+      const found = report("modules/agent/server/src/misc/agent.helper.ts");
 
       expect(found.map((e) => e.messageId)).toEqual(["serverPath"]);
       expect(found[0].message).toContain("services/");
@@ -93,17 +93,17 @@ describe("given a strict feature server module", () => {
   describe("when the path matches a recognized server pattern", () => {
     /** @scenario "A recognized strict server path is left alone" */
     it("reports nothing", () => {
-      expect(report("packages/features/agent/server/src/services/agent.service.ts")).toEqual([]);
+      expect(report("modules/agent/server/src/services/agent.service.ts")).toEqual([]);
     });
 
     it("accepts direct API declarations and WebSocket protocol integrations", () => {
-      expect(report("packages/features/agent/server/src/transport/agent.rest.ts")).toEqual([]);
-      expect(report("packages/features/agent/server/src/transport/agent.trpc.ts")).toEqual([]);
-      expect(report("packages/features/agent/server/src/transport/agent-connect.ws.ts")).toEqual(
+      expect(report("modules/agent/server/src/transport/agent.rest.ts")).toEqual([]);
+      expect(report("modules/agent/server/src/transport/agent.trpc.ts")).toEqual([]);
+      expect(report("modules/agent/server/src/transport/agent-connect.ws.ts")).toEqual(
         [],
       );
       expect(
-        report("packages/features/agent/server/src/transport/agent.handler.ts").map(
+        report("modules/agent/server/src/transport/agent.handler.ts").map(
           (finding) => finding.messageId,
         ),
       ).toEqual(["serverPath"]);
@@ -111,19 +111,19 @@ describe("given a strict feature server module", () => {
 
     it("accepts repository provider bundles, registries, and local stores", () => {
       expect(
-        report("packages/features/agent/server/src/repositories/agent-repositories.registry.ts"),
+        report("modules/agent/server/src/repositories/agent-repositories.registry.ts"),
       ).toEqual([]);
       expect(
-        report("packages/features/agent/server/src/repositories/agent.repositories.ts"),
+        report("modules/agent/server/src/repositories/agent.repositories.ts"),
       ).toEqual([]);
       expect(
         report(
-          "packages/features/agent/server/src/repositories/prisma/prisma.agent.repositories.ts",
+          "modules/agent/server/src/repositories/prisma/prisma.agent.repositories.ts",
         ),
       ).toEqual([]);
       expect(
         report(
-          "packages/features/agent/server/src/repositories/memory/memory.agent-session.database.ts",
+          "modules/agent/server/src/repositories/memory/memory.agent-session.database.ts",
         ),
       ).toEqual([]);
     });
@@ -131,26 +131,26 @@ describe("given a strict feature server module", () => {
 });
 
 it.each([
-  "packages/features/agent/contract/src/agent.app.ts",
-  "packages/features/agent/server/src/agent.server.ts",
-  "packages/features/agent/server/src/app/agent.app.ts",
+  "modules/agent/contract/src/agent.app.ts",
+  "modules/agent/server/src/agent.server.ts",
+  "modules/agent/server/src/app/agent.app.ts",
 ])("accepts the app composition home %s", (file) => {
   expect(report(file)).toEqual([]);
 });
 
 it("requires a subject on an app contract filename", () => {
   expect(
-    report("packages/features/agent/contract/src/app.ts").map((entry) => entry.messageId),
+    report("modules/agent/contract/src/app.ts").map((entry) => entry.messageId),
   ).toEqual(["contractMissingSubject"]);
 });
 
 it("accepts the canonical feature API contract", () => {
-  expect(report("packages/features/agent/contract/src/agent.api.ts")).toEqual([]);
+  expect(report("modules/agent/contract/src/agent.api.ts")).toEqual([]);
 });
 
 it.each([
-  "packages/features/agent/contract/src/other.api.ts",
-  "packages/features/agent/contract/src/nested/agent.api.ts",
+  "modules/agent/contract/src/other.api.ts",
+  "modules/agent/contract/src/nested/agent.api.ts",
 ])("keeps noncanonical API modules out of contracts: %s", (file) => {
   expect(report(file).map((entry) => entry.messageId)).toEqual(["contractServerArtifact"]);
 });

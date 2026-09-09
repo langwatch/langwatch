@@ -22,7 +22,7 @@
 //	      | { ok: false, errors: [...] }
 //
 // Wire shape locked with the control plane's
-// `packages/enterprise/composition/api/src/governance/ottl-gateway.client.ts`.
+// `enterprise/packages/composition/api/src/governance/ottl-gateway.client.ts`.
 //
 // All endpoints are mounted under `/internal/*` and gated by the same
 // HMAC-signed channel the rest of the control-plane↔gateway internal

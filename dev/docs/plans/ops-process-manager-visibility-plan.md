@@ -34,7 +34,7 @@ the authoritative link to the producing trace, avoiding log searches.
 
 The process-manager repository (`ProcessOpsPrismaRepository`), app transport,
 worker registration, and Prometheus adapter live in
-`packages/features/ops/server/src/` (`repositories/prisma/`, `services/manager-explorer.service.ts`,
+`modules/ops/server/src/` (`repositories/prisma/`, `services/manager-explorer.service.ts`,
 `app/ops.app.ts`) — `platform/app` is deleted (commit `faaa9ec333`; amended
 2026-09-04) and this surface moved there whole, along with the rest of the
 feature, rather than staying split from it. The Ops package owns the reusable

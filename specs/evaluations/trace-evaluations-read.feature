@@ -1,5 +1,5 @@
 # Implementation:
-#   packages/features/evaluation/server/src/repositories/clickhouse/evaluation-run-read.repository.ts
+#   modules/evaluation/server/src/repositories/clickhouse/evaluation-run-read.repository.ts
 
 Feature: A trace reads back with the evaluations recorded on it
   The trace evaluation read selects DateTime columns from ClickHouse. Read

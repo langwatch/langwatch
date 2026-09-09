@@ -8,16 +8,17 @@ docs/api-reference/openapiLangWatch.json linguist-generated=true
 sdks/typescript/src/internal/generated/openapi/api-client.ts linguist-generated=true merge=ours
 sdks/go/client/internal/openapi/zz_generated.gen.go linguist-generated=true merge=ours
 packages/handled-error/src/codes.generated.ts linguist-generated=true merge=ours
-packages/features/evaluator/contract/src/evaluators.generated.ts linguist-generated=true
+modules/evaluator/contract/src/evaluators.generated.ts linguist-generated=true
 services/langevals/ts-integration/evaluators.generated.ts linguist-generated=true
-packages/features/langy/web/src/model/shared/langy/langySkills.generated.json linguist-generated=true
+modules/langy/web/src/model/shared/langy/langySkills.generated.json linguist-generated=true
 sdks/typescript/src/internal/generated/redaction/*.ts linguist-generated=true
 docs/llms.txt                           linguist-generated=true
 docs/llms-full.txt                      linguist-generated=true
 docs/api-reference/openapi-evals.json   linguist-generated=true
 packages/prisma-client/src/generated/** linguist-generated=true
-packages/features/langy/server/src/rules/setup-skill-bodies.rules.ts linguist-generated=true
-packages/features/analytics/contract/src/visualization/vega-lite-schema-validator.generated.js linguist-generated=true
-packages/features/analytics/contract/src/visualization/vega-lite-schema-validator.generated.d.ts linguist-generated=true
-packages/features/langy/web/src/model/shared/langy/feature-map.generated.json linguist-generated=true
+modules/langy/server/src/rules/setup-skill-bodies.rules.ts linguist-generated=true
+modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.js linguist-generated=true
+modules/analytics/contract/src/visualization/vega-lite-schema-validator.generated.d.ts linguist-generated=true
+modules/langy/web/src/model/shared/langy/feature-map.generated.json linguist-generated=true
 skills/_compiled/native/**/SKILL.md linguist-generated=true
+apps/api/src/features/discovery/openapi-document.json linguist-generated=true

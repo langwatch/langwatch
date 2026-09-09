@@ -92,8 +92,7 @@ function readFeatureConfiguration(
       file: path,
       message:
         "feature.json may only select layoutVersion; feature ownership is declared centrally.",
-      allowed:
-        "Change packages/features/catalogue.json and the owning ADR/spec to expand feature ownership.",
+      allowed: "Change modules/catalogue.json and the owning ADR/spec to expand feature ownership.",
     });
   }
 
@@ -128,7 +127,7 @@ export function discoverClassifiedPackages(root: string): {
         violations.push({
           policy: "feature-catalogue",
           file: featureRoot,
-          message: `Feature root ${JSON.stringify(feature)} is not registered in packages/features/catalogue.json.`,
+          message: `Feature root ${JSON.stringify(feature)} is not registered in modules/catalogue.json.`,
           allowed:
             "Use the singular catalogue identifier and record new ownership in its ADR and specification.",
         });
@@ -193,8 +192,8 @@ export function discoverClassifiedPackages(root: string): {
     }
   };
 
-  discoverFeatures(join(root, "packages", "features"), false);
-  discoverFeatures(join(root, "packages", "enterprise", "features"), true);
+  discoverFeatures(join(root, "modules"), false);
+  discoverFeatures(join(root, "enterprise", "modules"), true);
 
   const sharedApplicationRoot = join(root, "apps", "shared");
   if (existsSync(sharedApplicationRoot)) {
@@ -270,14 +269,14 @@ export function discoverClassifiedPackages(root: string): {
     });
   }
 
-  const enterpriseRoot = join(root, "packages", "enterprise");
+  const enterpriseRoot = join(root, "enterprise");
   const enterpriseLicense = join(enterpriseRoot, "LICENSE.md");
   const enterpriseReadme = join(enterpriseRoot, "README.md");
   const enterpriseManifest = join(enterpriseRoot, "package.json");
   const hasEnterprisePackages =
     existsSync(enterpriseManifest) ||
     ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) =>
-      existsSync(join(enterpriseRoot, "composition", role, "package.json")),
+      existsSync(join(enterpriseRoot, "packages", "composition", role, "package.json")),
     ) ||
     packages.some((pkg) => pkg.enterprise);
 
@@ -286,7 +285,7 @@ export function discoverClassifiedPackages(root: string): {
       policy: "enterprise-layout",
       file: enterpriseLicense,
       message:
-        "packages/enterprise/LICENSE.md must govern every Enterprise package before source is placed in this tree.",
+        "enterprise/LICENSE.md must govern every Enterprise package before source is placed in this tree.",
     });
   }
 
@@ -294,8 +293,7 @@ export function discoverClassifiedPackages(root: string): {
     violations.push({
       policy: "enterprise-layout",
       file: enterpriseReadme,
-      message:
-        "packages/enterprise/README.md must explain and catalogue the governed Enterprise tree.",
+      message: "enterprise/README.md must explain and catalogue the governed Enterprise tree.",
     });
   }
 
@@ -306,7 +304,7 @@ export function discoverClassifiedPackages(root: string): {
     violations.push({
       policy: "enterprise-license",
       file: enterpriseLicense,
-      message: "packages/enterprise/LICENSE.md must contain the LangWatch Enterprise License.",
+      message: "enterprise/LICENSE.md must contain the LangWatch Enterprise License.",
     });
   }
 
@@ -329,7 +327,7 @@ export function discoverClassifiedPackages(root: string): {
         policy: "enterprise-license",
         file: enterpriseManifest,
         message:
-          "The Enterprise root manifest must identify packages/enterprise/LICENSE.md rather than an Apache license.",
+          "The Enterprise root manifest must identify enterprise/LICENSE.md rather than an Apache license.",
         allowed: 'Use "license": "SEE LICENSE IN LICENSE.md".',
       });
     }
@@ -345,7 +343,7 @@ export function discoverClassifiedPackages(root: string): {
   }
 
   for (const composition of ENTERPRISE_COMPOSITION_PACKAGES) {
-    const compositionRoot = join(enterpriseRoot, "composition", composition.role);
+    const compositionRoot = join(enterpriseRoot, "packages", "composition", composition.role);
     const manifestPath = join(compositionRoot, "package.json");
     if (!existsSync(manifestPath)) continue;
 
@@ -371,7 +369,7 @@ export function discoverClassifiedPackages(root: string): {
 
   if (existsSync(enterpriseRoot)) {
     for (const directory of directories(enterpriseRoot)) {
-      if (directory === "composition" || directory === "features") continue;
+      if (directory === "packages" || directory === "modules") continue;
 
       const unexpectedManifest = join(enterpriseRoot, directory, "package.json");
       if (!existsSync(unexpectedManifest)) continue;
@@ -379,13 +377,13 @@ export function discoverClassifiedPackages(root: string): {
       violations.push({
         policy: "enterprise-layout",
         file: unexpectedManifest,
-        message: `Enterprise aggregate package at packages/enterprise/${directory} is outside the fixed package layout.`,
+        message: `Enterprise aggregate package at enterprise/${directory} is outside the fixed package layout.`,
         allowed:
-          "Use the portable root, composition/{api,worker,web}, or features/<feature>/{contract,server,web}.",
+          "Use the portable root, packages/composition/{api,worker,web}, or modules/<module>/{contract,server,web}.",
       });
     }
 
-    const compositionRoot = join(enterpriseRoot, "composition");
+    const compositionRoot = join(enterpriseRoot, "packages", "composition");
     for (const directory of directories(compositionRoot)) {
       if (ENTERPRISE_COMPOSITION_PACKAGES.some(({ role }) => role === directory)) {
         continue;
@@ -404,8 +402,6 @@ export function discoverClassifiedPackages(root: string): {
   }
 
   for (const directory of directories(join(root, "packages"))) {
-    if (directory === "enterprise") continue;
-
     const manifestPath = join(root, "packages", directory, "package.json");
     if (!existsSync(manifestPath)) continue;
 
@@ -415,9 +411,9 @@ export function discoverClassifiedPackages(root: string): {
     violations.push({
       policy: "enterprise-layout",
       file: manifestPath,
-      message: `${manifest.name} is an Enterprise aggregate outside packages/enterprise.`,
+      message: `${manifest.name} is an Enterprise aggregate outside enterprise.`,
       allowed:
-        "Use the portable root, composition/{api,worker,web}, or features/<feature>/{contract,server,web}.",
+        "Use the portable root, packages/composition/{api,worker,web}, or modules/<module>/{contract,server,web}.",
     });
   }
 
@@ -429,8 +425,7 @@ export function discoverClassifiedPackages(root: string): {
         policy: "enterprise-license",
         file: pkg.manifestPath,
         message: "An Enterprise descendant package cannot claim that its source is Apache-2.0.",
-        allowed:
-          "Inherit the LangWatch Enterprise license rooted at packages/enterprise/LICENSE.md.",
+        allowed: "Inherit the LangWatch Enterprise license rooted at enterprise/LICENSE.md.",
       });
     }
   }

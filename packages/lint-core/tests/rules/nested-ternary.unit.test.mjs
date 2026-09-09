@@ -10,7 +10,7 @@ const workspace = createFixtureWorkspace({
 afterAll(() => workspace.cleanup());
 afterEach(() => resetBaselineCache());
 
-const SERVICE = "packages/features/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/server/src/services/agent.service.ts";
 
 function report(code, options = []) {
   return runRule(nestedTernaryRule, { code, cwd: workspace.cwd, filename: SERVICE, options });

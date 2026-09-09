@@ -182,6 +182,8 @@ jobs:
               - 'infra/docker/Dockerfile.langyagent'
               - 'apps/**'
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               - 'mcp/typescript/**'
               - 'sdks/typescript/**'
               - 'skills/**'

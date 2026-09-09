@@ -8,10 +8,10 @@ Self-hosted auth, per-org SSO, MFA, passkeys, SCIM, join-requests — built on t
 **Review history:** Notion round 1 (identifiers storage, Redis resilience, self-hosted single-SSO priority, join-requests + invitation resilience); corpus audit round 2 (`review-spec` against `specs/` + `dev/docs/adr/` — findings folded in below); restructure round 3 (RBAC assumed done; epic → deliverables → delivery plan).
 
 > **Amendment 2026-09-03:** `platform/app` is deleted (commit `faaa9ec333`).
-> Enterprise SSO now lives in `packages/enterprise/features/sso/{contract,server,web}`,
-> SCIM in `packages/enterprise/features/scim/{contract,server,web}`, and the
+> Enterprise SSO now lives in `enterprise/modules/sso/{contract,server,web}`,
+> SCIM in `enterprise/modules/scim/{contract,server,web}`, and the
 > event-sourcing framework this epic builds on is `packages/eventing`, with the
-> identity pipeline itself under `packages/features/identity/server/src/`. See
+> identity pipeline itself under `modules/identity/server/src/`. See
 > those trees for current shape before treating paths below as live.
 
 # Overview

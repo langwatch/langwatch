@@ -21,7 +21,7 @@ refused against right now. The other value is recorded here and in
 
 - In force: `packages/plans/src/catalogue-data.ts:115` (`FREE_PLAN`)
 - Alternative: `packages/plans/src/licensing.ts:237` (`CLOUD_FREE_LICENSING_PLAN`, which
-  `packages/enterprise/features/licensing/contract/src/license-constants.ts` exports as
+  `enterprise/modules/licensing/contract/src/license-constants.ts` exports as
   `FREE_PLAN`)
 
 Both are reachable. Which one answers depends on which source resolves first,
@@ -51,7 +51,7 @@ the ordering and fixing the number are the same decision.
 | Alternative (pricing page copy) | 200,000 |
 
 - In force: `packages/plans/src/catalogue-data.ts:203` (`GROWTH_PLAN`)
-- Alternative: `packages/enterprise/features/billing/web/src/model/billing-plans.ts:89`
+- Alternative: `enterprise/modules/billing/web/src/model/billing-plans.ts:89`
   (and the same sentence in the upgrade block at line 63)
 
 No test compares the sentence with the ceiling, so the page has been quoting a
@@ -68,7 +68,7 @@ number the product does not honour.
 - In force: `packages/plans/src/catalogue-data.ts` (per plan: Free 50, Pro 500,
   Launch 150, Accelerate 300, Growth 500, Enterprise 5,000)
 - Alternative: `apps/api/src/app/api-automation.composition.ts:80`
-- Alternative: `packages/features/automation/server/src/services/__tests__/automation.service.unit.test.ts:293`
+- Alternative: `modules/automation/server/src/services/__tests__/automation.service.unit.test.ts:293`
 
 The buckets agree with the per-plan values on Free and Enterprise and flatten
 Launch and Accelerate to the paid bucket; the test pins numbers neither of the
@@ -88,7 +88,7 @@ two sites disagreeing about one plan's number.
 - **The Free tier's counting unit.** Billing's Free states no `usageUnit`;
   licensing's states `traces` (`licensing.ts:246`); the meter policy
   sends every free organization to `events`
-  (`packages/features/entitlement/server/src/services/usage-meter-policy.service.ts`).
+  (`modules/entitlement/server/src/services/usage-meter-policy.service.ts`).
   The catalogue records `messages-per-month`, matching the only site that
   states a unit for the plan itself.
 - **Retention days are prose only.** The pricing page says "14 days data

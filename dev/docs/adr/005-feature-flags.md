@@ -3,7 +3,7 @@
 **Date:** 2026-01-29
 
 **Status:** Superseded by
-[`feature-flag/adrs/001`](../../../packages/features/feature-flag/adrs/001-feature-flag-service-boundary.md)
+[`feature-flag/adrs/001`](../../../modules/feature-flag/adrs/001-feature-flag-service-boundary.md)
 — amended 2026-08-20 and 2026-08-31 before it was, see below
 
 This ADR introduced registered SYSTEM and PRODUCT flags, with PostHog handling

@@ -1,0 +1,182 @@
+/**
+ * The four default Comparison judge prompts are written down twice: in the langevals evaluator,
+ * which is the source of truth and the thing that actually calls the model, and again in this
+ * config form. Both files say they are kept byte-identical. Until this test, nothing checked.
+ */
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+import {
+  ALL_DEFAULT_JUDGE_PROMPTS,
+  JUDGE_PROMPT_GOLDEN_INPUT,
+  JUDGE_PROMPT_GOLDEN_NO_INPUT,
+  JUDGE_PROMPT_NO_GOLDEN_INPUT,
+  JUDGE_PROMPT_NO_GOLDEN_NO_INPUT,
+} from "../comparison-config-form.tsx";
+
+/** Walk up from this package until the workspace root (the one holding the
+ * evaluator source) is found, so the test resolves the same from any worktree. */
+function findRepoRoot(): string {
+  const holdsEvaluatorSource = (candidate: string) =>
+    existsSync(path.join(candidate, "services", "langevals"));
+  let dir = import.meta.dirname;
+  while (!holdsEvaluatorSource(dir)) {
+    const parent = path.dirname(dir);
+    if (parent === dir) throw new Error("workspace root not found above " + import.meta.dirname);
+    dir = parent;
+  }
+  return dir;
+}
+
+const REPO_ROOT = findRepoRoot();
+
+const EVALUATOR_SOURCE =
+  "services/langevals/evaluators/langevals/langevals_langevals/select_best_compare.py";
+const CONFIG_FORM_SOURCE =
+  "modules/experiment/web/src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx";
+
+/** `DEFAULT_SELECT_BEST_PROMPT... = """..."""`, at the start of a line so a
+ * docstring or a mention in prose can never be mistaken for a declaration. */
+const PYTHON_PROMPT_DECLARATION = /^(DEFAULT_SELECT_BEST_PROMPT[A-Z_]*)\s*=\s*"""([\s\S]*?)"""/gm;
+
+/**
+ * The escapes a plain (non-raw) Python string literal can carry. The backslash-newline is the
+ * line continuation in `"""\` that keeps the prompt from starting with a blank line, and is the
+ * only one the file uses today.
+ */
+const PYTHON_ESCAPES: Record<string, string> = {
+  "\n": "",
+  "\\": "\\",
+  n: "\n",
+  r: "\r",
+  t: "\t",
+  '"': '"',
+  "'": "'",
+};
+
+function decodePythonStringBody(body: string, constant: string): string {
+  return body.replace(/\\([\s\S])/g, (_match, escaped: string) => {
+    const decoded = PYTHON_ESCAPES[escaped];
+    if (decoded === undefined) {
+      throw new Error(
+        `Unsupported Python escape \\${escaped} in ${constant} (${EVALUATOR_SOURCE}). ` +
+          `Teach PYTHON_ESCAPES about it, decoding it wrong would compare a ` +
+          `prompt the judge never sends.`,
+      );
+    }
+    return decoded;
+  });
+}
+
+/** Every default judge prompt the evaluator ships, keyed by constant name. */
+function parseShippedJudgePrompts(pythonSource: string): Record<string, string> {
+  const prompts: Record<string, string> = {};
+
+  for (const match of pythonSource.matchAll(PYTHON_PROMPT_DECLARATION)) {
+    const [, name, body] = match;
+    if (name === undefined || body === undefined) continue;
+    prompts[name] = decodePythonStringBody(body, name);
+  }
+
+  return prompts;
+}
+
+/** Which config-form constant mirrors which of the judge's own defaults. */
+const PROMPT_PAIRS = [
+  {
+    judge: "DEFAULT_SELECT_BEST_PROMPT",
+    form: "JUDGE_PROMPT_GOLDEN_INPUT",
+    value: JUDGE_PROMPT_GOLDEN_INPUT,
+  },
+  {
+    judge: "DEFAULT_SELECT_BEST_PROMPT_GOLDEN_NO_INPUT",
+    form: "JUDGE_PROMPT_GOLDEN_NO_INPUT",
+    value: JUDGE_PROMPT_GOLDEN_NO_INPUT,
+  },
+  {
+    judge: "DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN",
+    form: "JUDGE_PROMPT_NO_GOLDEN_INPUT",
+    value: JUDGE_PROMPT_NO_GOLDEN_INPUT,
+  },
+  {
+    judge: "DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN_NO_INPUT",
+    form: "JUDGE_PROMPT_NO_GOLDEN_NO_INPUT",
+    value: JUDGE_PROMPT_NO_GOLDEN_NO_INPUT,
+  },
+] as const;
+
+/** Whitespace is exactly what drifts and exactly what a plain diff hides, so
+ * both sides are quoted with their escapes visible. */
+function driftReport({
+  judge,
+  form,
+  fromJudge,
+  fromForm,
+}: {
+  judge: string;
+  form: string;
+  fromJudge: string | undefined;
+  fromForm: string;
+}): string {
+  return [
+    `Default judge prompt drifted: ${judge} no longer matches ${form}.`,
+    `  ${EVALUATOR_SOURCE}`,
+    `    ${judge} = ${JSON.stringify(fromJudge ?? null)}`,
+    `  ${CONFIG_FORM_SOURCE}`,
+    `    ${form} = ${JSON.stringify(fromForm)}`,
+    `The evaluator is the source of truth: copy its value into ${form}.`,
+  ].join("\n");
+}
+
+describe("given the default judge prompts are written down in both the evaluator and the config form", () => {
+  const shippedByJudge = parseShippedJudgePrompts(
+    readFileSync(path.join(REPO_ROOT, EVALUATOR_SOURCE), "utf8"),
+  );
+
+  describe("when the two copies are compared", () => {
+    /** @scenario "The shipped judge prompts are identical wherever they are written down" */
+    it("finds every default byte-identical to the judge's own", () => {
+      // Counts first. A fifth default added to one side alone is drift too,
+      // and every pair below would still read as matching.
+      expect(
+        Object.keys(shippedByJudge).sort(),
+        `${EVALUATOR_SOURCE} ships a different set of defaults than ${CONFIG_FORM_SOURCE} mirrors. ` +
+          `Add or drop the matching JUDGE_PROMPT_* constant and its entry in PROMPT_PAIRS here.`,
+      ).toEqual(PROMPT_PAIRS.map(({ judge }) => judge).sort());
+
+      expect(
+        [...ALL_DEFAULT_JUDGE_PROMPTS].sort(),
+        `ALL_DEFAULT_JUDGE_PROMPTS in ${CONFIG_FORM_SOURCE} does not hold exactly the ` +
+          `${PROMPT_PAIRS.length} mirrored defaults. A default missing from it is never ` +
+          `recognized as untouched; an extra one has no counterpart in ${EVALUATOR_SOURCE}.`,
+      ).toEqual(PROMPT_PAIRS.map(({ value }) => value).sort());
+
+      for (const { judge, form, value } of PROMPT_PAIRS) {
+        const fromJudge = shippedByJudge[judge];
+        expect(value, driftReport({ judge, form, fromJudge, fromForm: value })).toBe(fromJudge);
+      }
+    });
+  });
+
+  describe("when the parser itself is checked", () => {
+    // A parser that silently reads nothing, or reads the Python literal's
+    // punctuation along with the text, would pass the comparison above
+    // forever while the prompts drifted underneath it.
+    it("reads the prompt text rather than the literal wrapped around it", () => {
+      const goldenAndInput = shippedByJudge.DEFAULT_SELECT_BEST_PROMPT;
+
+      expect(goldenAndInput).toBeDefined();
+      expect(goldenAndInput).toMatch(/^Pick the best of N candidate replies/);
+      expect(goldenAndInput).toContain("{candidates}");
+      expect(goldenAndInput).not.toContain('"""');
+      expect(goldenAndInput).not.toContain("\\");
+    });
+
+    it("rejects an escape it does not understand instead of guessing", () => {
+      expect(() =>
+        parseShippedJudgePrompts('DEFAULT_SELECT_BEST_PROMPT_X = """a\\u0041b"""'),
+      ).toThrow(/Unsupported Python escape/);
+    });
+  });
+});

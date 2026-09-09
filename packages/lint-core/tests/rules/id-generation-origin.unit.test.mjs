@@ -8,9 +8,9 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "packages/features/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/server/src/services/agent.service.ts";
 const APPLICATION = "apps/api/src/features/agent/agent.composition.ts";
-const TEST = "packages/features/agent/server/src/services/__tests__/agent.unit.test.ts";
+const TEST = "modules/agent/server/src/services/__tests__/agent.unit.test.ts";
 
 function report(code, filename = SERVICE) {
   return runRule(idGenerationOriginRule, { code, cwd: workspace.cwd, filename });

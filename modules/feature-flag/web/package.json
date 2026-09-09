@@ -1,0 +1,63 @@
+{
+  "name": "@langwatch/feature-flag-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Feature flag browser behaviour and controlled presentation.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./anonymous-id": {
+      "langwatch-declaration-source": "./src/anonymous-id.ts",
+      "types": "./dist/anonymous-id.d.ts",
+      "default": "./src/anonymous-id.ts"
+    },
+    "./experiment-catalogue": {
+      "langwatch-declaration-source": "./src/experiment-catalogue.ts",
+      "types": "./dist/experiment-catalogue.d.ts",
+      "default": "./src/experiment-catalogue.ts"
+    },
+    "./rule-editing": {
+      "langwatch-declaration-source": "./src/rule-editing.ts",
+      "types": "./dist/rule-editing.d.ts",
+      "default": "./src/rule-editing.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project modules/feature-flag/web/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "3.2.2",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "lucide-react": "^1.22.0",
+    "react": "^19.2.7"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "jsdom": "^30.0.1",
+    "react-dom": "^19.2.7",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "react": "^19.2.7"
+  }
+}

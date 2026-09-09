@@ -1,8 +1,8 @@
 # Trace list Annotations column — Gherkin Spec
 # Implementation:
-#   packages/features/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/annotations-cell.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/hooks/use-trace-list-annotations.ts
-#   packages/features/annotation/web/src/annotation-scores-chip.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/annotations-cell.tsx
+#   modules/trace/web/src/ui/sections/explorer/hooks/use-trace-list-annotations.ts
+#   modules/annotation/web/src/annotation-scores-chip.tsx
 #
 # Annotations are what reviewers left on a trace, and they live in Postgres,
 # while everything else on a row comes from the trace summary in ClickHouse.

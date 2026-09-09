@@ -31,7 +31,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
 }));
 
 vi.mock(
-  "../../../../../../../packages/features/scenario/web/src/behavior/use-organization-team-project.ts",
+  "../../../../../../../modules/scenario/web/src/behavior/use-organization-team-project.ts",
   () => ({
     useOrganizationTeamProject: () => ({
       project: { id: "project_1" },
@@ -104,7 +104,7 @@ const codeAgent = {
   outputs: [{ identifier: "output", type: "str" }],
 };
 
-vi.mock("../../../../../../../packages/features/scenario/web/src/behavior/scenario-api.ts", () => ({
+vi.mock("../../../../../../../modules/scenario/web/src/behavior/scenario-api.ts", () => ({
   api: {
     agents: {
       getById: {
@@ -196,9 +196,9 @@ describe("the Test agent panel of the editor drawers", () => {
   });
 });
 
-vi.mock("../../../../../../../packages/features/agent/web/src/behavior/agent-api.ts", async () => {
+vi.mock("../../../../../../../modules/agent/web/src/behavior/agent-api.ts", async () => {
   const { api } =
-    await import("../../../../../../../packages/features/scenario/web/src/behavior/scenario-api.ts");
+    await import("../../../../../../../modules/scenario/web/src/behavior/scenario-api.ts");
   return { agentApi: api };
 });
 
@@ -213,6 +213,6 @@ import "@testing-library/jest-dom/vitest";
 
 vi.mock("@langwatch/scenario-web/screens/simulations", async () => {
   const { api } =
-    await import("../../../../../../../packages/features/scenario/web/src/behavior/scenario-api.ts");
+    await import("../../../../../../../modules/scenario/web/src/behavior/scenario-api.ts");
   return { scenarioApi: api };
 });

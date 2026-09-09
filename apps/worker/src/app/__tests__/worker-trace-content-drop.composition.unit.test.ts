@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceContentDrop } from "../worker-trace-content-drop.composition.ts";
 
 /**
- * Spec: packages/features/data-privacy/specs/span-content-drop.feature
+ * Spec: modules/data-privacy/specs/span-content-drop.feature
  *
  * A COMPOSITION-CAPABILITY test. Trace has not converted, so nothing in this
  * process drops content. What has to be true today is that this composition

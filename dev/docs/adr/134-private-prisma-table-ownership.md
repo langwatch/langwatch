@@ -19,7 +19,7 @@ feature's back door into those tables.
 
 The inventory maps 125 Prisma models to proposed domain and framework owners.
 It is migration evidence, not a second ownership authority. Feature identities
-remain in `packages/features/catalogue.json`; executable table claims live on
+remain in `modules/catalogue.json`; executable table claims live on
 the owning repositories.
 
 ## Decision

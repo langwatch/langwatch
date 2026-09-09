@@ -14,7 +14,7 @@ The id is lower-kebab and names what the consumer mounts, not where the file sit
 is the contract; the module behind it is a flat entry file `src/<id>.ts` that names what
 the consumer may reach (the older `surfaces/<id>/index.ts` barrel is still accepted).
 
-`packages/features/annotation/web/src/annotation-card.ts` is the entry idiom:
+`modules/annotation/web/src/annotation-card.ts` is the entry idiom:
 
 ```ts
 export * from "./ui/blocks/annotation-card.tsx";
@@ -25,7 +25,7 @@ the api binding, the host port and a few hooks together.
 
 ## 2. Export it
 
-`packages/features/<owner>/web/package.json`:
+`modules/<owner>/web/package.json`:
 
 ```json
 "./annotation-card": {

@@ -30,7 +30,7 @@ export const REPO_ROOT = findRepoRoot();
 const SEED_FILE = resolve(REPO_ROOT, "packages/prisma-client/prisma/seed.ts");
 const API_KEY_TOKENS_FILE = resolve(
   REPO_ROOT,
-  "packages/features/api-key/contract/src/api-key.tokens.ts",
+  "modules/api-key/contract/src/api-key.tokens.ts",
 );
 
 /** A stack a suite can talk to, and the way to put it back down. */

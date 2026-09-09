@@ -173,11 +173,11 @@ for (const key of codingAgents?.contentAttrKeys(eventName) ?? contentAttrKeys(ev
 
 They are provably the same value, so the optional `codingAgents` parameter
 (`:77`) decides nothing. Two more consumers hold a whole eleven-method service to
-reach one pure function — `packages/features/trace/server/src/services/trace-ingestion.service.ts:306`
+reach one pure function — `modules/trace/server/src/services/trace-ingestion.service.ts:306`
 (`shouldFilterSpan` only) and `.../transport/api-trpc/trace-read-mappers.api.ts:812`
 (`logContentKeys` only) — and two test doubles restate all eleven abstract
 methods to satisfy it: `platform/app/src/test-utils/test-coding-agent.service.ts`
-(107 lines) and `packages/features/trace/server/src/services/__tests__/support/coding-agent.service.fake.ts`
+(107 lines) and `modules/trace/server/src/services/__tests__/support/coding-agent.service.fake.ts`
 (51 lines).
 
 ### P5 — A private copy of a registry-driven normaliser will silently drop the next agent (breaks R8) — **defect**
@@ -252,7 +252,7 @@ composition root.
 
 ### P7 — `index.ts` publishes 34 symbols; 12 have no external consumer (breaks R8)
 
-`server/src/index.ts`. Zero references outside `packages/features/coding-agent/`:
+`server/src/index.ts`. Zero references outside `modules/coding-agent/`:
 `CodingAgentAppDependencies`, `CodingAgentCaller`, `CodingAgentClockPort`,
 `CodingAgentCostMetricsPort`, `CodingAgentGithubConnection`,
 `CodingAgentProcessingPipelineDeps`, `CodingAgentProjectionPersistenceOptions`,
@@ -527,7 +527,7 @@ Five commits, smallest risk first, each leaving the suite green:
 **11 files outside the feature import `@langwatch/coding-agent-server`:**
 `apps/api/src/index.ts`, `apps/api/src/app-rest/app-rest.features.ts`,
 `apps/api/src/features/coding-agent/coding-agent-trpc.mount.ts`,
-`packages/features/trace/server/src/repositories/clickhouse/stored-span-row.codec.ts`,
+`modules/trace/server/src/repositories/clickhouse/stored-span-row.codec.ts`,
 `platform/app/src/runtime/app/features/coding-agent.ts`,
 `platform/app/src/runtime/app/features/coding-agent-trace-processing.adapter.ts`,
 `platform/app/src/runtime/app/__tests__/subscriber-throttle-policy.unit.test.ts`,

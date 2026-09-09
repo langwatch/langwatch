@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { tryCreateWorkerTraceBroadcast } from "../worker-trace-broadcast.composition.ts";
 
 /**
- * Spec: packages/features/trace/specs/trace-tenant-broadcast-worker-composition.feature
+ * Spec: modules/trace/specs/trace-tenant-broadcast-worker-composition.feature
  *
  * A COMPOSITION-CAPABILITY test driven THROUGH the port, not around it. Trace
  * has not converted — the application still registers both of these subscribers

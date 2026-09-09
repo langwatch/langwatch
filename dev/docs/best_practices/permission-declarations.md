@@ -254,8 +254,8 @@ A route or service that only needs one project-scoped permission and does not
 want to depend on the whole `AuthzService` can instead take a narrower
 `requireProjectPermission(args)` / `probeProjectPermission(ctx, id, permission)`
 capability as an injected port — several feature packages' REST/tRPC
-transports do this (e.g. `packages/features/stored-object/server/src/transport/api-rest/stored-object.api.ts`,
-`packages/features/dataset/server/src/transport/api-trpc/dataset.api.ts`).
+transports do this (e.g. `modules/stored-object/server/src/transport/api-rest/stored-object.api.ts`,
+`modules/dataset/server/src/transport/api-trpc/dataset.api.ts`).
 The composition root wires that port to `authz.authorizeProjectPermission` /
 `authz.hasPermission` — it is the same check, named narrowly at the call site.
 
@@ -345,7 +345,7 @@ carrying at most one scope id costs nothing.
 
 ## Where things live
 
-- `packages/features/authz/contract` — the registry and declaration types
+- `modules/authz/contract` — the registry and declaration types
   (`AccessDeclaration`, `ValidatePermissionForInput`, `PermissionScopeArg`,
   `TierOfScopeArg`), the middleware brand (`declareAuthzMiddleware`,
   `DeclaredAuthzMiddleware`), and the witness type. Browser-safe.

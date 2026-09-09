@@ -8,7 +8,7 @@ import {
 import { REDACTION_MARKER_ENTITIES, SECRET_MARKER_ENTITY } from "../markers.ts";
 
 /**
- * Spec: packages/features/data-privacy/specs/span-pii-redaction.feature
+ * Spec: modules/data-privacy/specs/span-pii-redaction.feature
  *
  * These are LITERAL pins, not reads of the application's source.
  *

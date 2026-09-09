@@ -66,7 +66,7 @@ A locally built manager therefore has ONLY the github skill unless you copy
   fix that needs the ceiling raised is a fix at the wrong layer: state the class
   in one principle, or move the constraint into the harness config.
 - **Rule numbers are load-bearing.** `skills/github/SKILL.md` says "see global
-  rule 14" and `packages/features/langy/web/src/model/langy-plan.ts` documents
+  rule 14" and `modules/langy/web/src/model/langy-plan.ts` documents
   itself against "AGENTS.md rule 14". Do not renumber the absolute rules;
   append new ones at the end, and grep for `rule <n>` before moving anything.
 - **The routing table must stay true.** Every skill it names must exist in

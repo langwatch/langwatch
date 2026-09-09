@@ -20,8 +20,8 @@ rule:
       kind: predefined_type
       regex: "^unknown$"
 files:
-  - "packages/features/*/contract/src/**/*.tsx"
-  - "packages/enterprise/features/*/contract/src/**/*.tsx"
+  - "modules/*/contract/src/**/*.tsx"
+  - "enterprise/modules/*/contract/src/**/*.tsx"
 ignores:
   # The evaluator catalogue spreads a GENERATED map over a native one and
   # asserts the result covers every key of a zod-derived union. TypeScript

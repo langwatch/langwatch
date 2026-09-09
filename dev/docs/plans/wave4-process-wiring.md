@@ -229,8 +229,8 @@ tables (tasks catalogue) and is not a user repository.
   mounts nothing. `api-experiment-run.composition.integration.test.ts:321` and
   `workflow/__tests__/execution-features.composition.integration.test.ts:366`: `await installApiEvaluation(...)`.
 - `EvaluationService` → `EvaluationApi` (type position, verbatim) in `apps/api/src/app/{api-trace-read-stack,api-evaluation-read}.composition.ts`,
-  `apps/worker/src/app/worker-report-schedule.composition.ts`, `packages/features/monitor/server/src/app/monitor.app.ts`,
-  `packages/features/trace/server/src/services/{trace-list-read,trace-legacy-read}.service.ts` and their tests;
+  `apps/worker/src/app/worker-report-schedule.composition.ts`, `modules/monitor/server/src/app/monitor.app.ts`,
+  `modules/trace/server/src/services/{trace-list-read,trace-legacy-read}.service.ts` and their tests;
   `automation-settlement-match-confirmation.service.unit.test.ts` `extends` it → `implements EvaluationApi`. That unblocks
   `contract-service` and the `tryGetRunByEvaluationId` → `findRunByEvaluationId`, `tryGetInputs` → `findInputs` renames
   (`trace-legacy-read.service.ts:338` calls the latter).
@@ -255,7 +255,7 @@ tables (tasks catalogue) and is not a user repository.
   `apps/api/src/app-trpc/__tests__/support/app-trpc-features.ts:188`,
   `apps/api/src/features/gateway/__tests__/gateway.composition.integration.test.ts:43,222` → a booted memory installation
   (`installation().boot({ role: "api" })` over `withPersistence("memory", {})`, as
-  `packages/features/stored-object/server/src/app/__tests__/stored-object-installation.unit.test.ts` does).
+  `modules/stored-object/server/src/app/__tests__/stored-object-installation.unit.test.ts` does).
 - New binding: `mountStoredObjectRest({ storedObjects: () => this.composedStoredObject.restServices.storedObjects(), credential })`
   from `apps/api/src/features/stored-object/stored-object-rest.mount.ts`. It publishes
   `/api/stored-objects/2026-08-22/storedObjects.{confirmUpload,get,delete}` and the dated twins; the deleted family was
@@ -296,11 +296,11 @@ tables (tasks catalogue) and is not a user repository.
   `getEnabledOnMessageMonitors` only). `worker-trace-capability-services.composition.ts:8-11,93,108,115`:
   `PostgresMonitorCatalogAdapter`, `MonitorCatalogDatabase`, `MonitorCatalogService` no longer exist; the worker's one
   `MonitorApi` fills `monitors`. Both files are in the 09-07 pile (the first is untracked on disk).
-- Type swaps `MonitorService` → `MonitorApi` (`@langwatch/monitor-contract`), verbatim: `packages/features/gateway/server/src/adapters/prisma.gateway.adapter.ts:2,38`,
+- Type swaps `MonitorService` → `MonitorApi` (`@langwatch/monitor-contract`), verbatim: `modules/gateway/server/src/adapters/prisma.gateway.adapter.ts:2,38`,
   `services/gateway-guardrail.service.ts:16,26,42`, `services/gateway-guardrail-evaluation.service.ts:8,71,77`,
   `__tests__/gateway.service.unit.test.ts:13,207,272,308` and `__tests__/gateway-guardrail-evaluation.integration.test.ts:13,43`
   (the `class … extends MonitorService` doubles become object literals: `MonitorApi` is an interface).
-  `packages/features/automation/server/src/app/__tests__/automation-app.fixture.ts:138` stubs `tryGetById`; it is `findById`.
+  `modules/automation/server/src/app/__tests__/automation-app.fixture.ts:138` stubs `tryGetById`; it is `findById`.
 - `packages/handled-error/src/remediation.ts`: entries for `monitor_check_settings_invalid`, `monitor_check_type_unknown`,
   `monitor_evaluator_required`, `monitor_not_found`, `monitor_source_project_forbidden` (codes and presentation landed).
 - Published documents regenerate once apps/api compiles: monitor operation ids become `listMonitors`, `getMonitor`,
@@ -335,9 +335,9 @@ tables (tasks catalogue) and is not a user repository.
   a worker-side boot in `apps/worker/src/features/dataset/` (`withPersistence("postgres", { prisma }).withFeature(datasetServer,
   { infrastructure }).boot({ role: "worker" })`) yielding one `DatasetApi`; `worker-dataset-normalization.composition.ts:45`
   `PrismaDatasetContentRepository.create(options.database)` → `.create({ prisma: options.database })`.
-- Surface key: `packages/features/dataset/web/package.json` export `./surfaces/dataset-table` → `./dataset-table`;
+- Surface key: `modules/dataset/web/package.json` export `./surfaces/dataset-table` → `./dataset-table`;
   `apps/ui/src/features/catalogue.json` `experiments.uses.surfaces` gains `@langwatch/dataset-web/dataset-table`; five
-  imports in `packages/features/experiment/web/src/{behavior/experiments-v3/use-dataset-sync.ts,
+  imports in `modules/experiment/web/src/{behavior/experiments-v3/use-dataset-sync.ts,
   ui/sections/experiments-v3/evaluations-v3-dataset-table-provider.tsx, ui/sections/experiments-v3/table-settings-menu.tsx,
   ui/sections/experiments-v3/evaluations-v3-table.tsx, ui/elements/experiments-v3/autosave-status.tsx}` repoint. One commit.
 - `specs/errors/handled-error-surfaces.feature:22,29,35,42` describe the deleted per-feature tRPC translation middleware;
@@ -367,7 +367,7 @@ tables (tasks catalogue) and is not a user repository.
   `PostgresEvaluatorAdapter.create({ database })` → `{ prisma }`. The second also builds `EvaluatorApp.create(...)` with no
   `AuthzApi` and no graph: `WorkflowApp` names `evaluators: EvaluatorApi` but calls five operations (`getAll`,
   `listByWorkflow`, `create`, `update`, `archive`); narrow that peer to a `WorkflowEvaluatorPort` in
-  `packages/features/workflow` and keep passing the service adapter (workflow lane).
+  `modules/workflow` and keep passing the service adapter (workflow lane).
 - Doubles: `api-trpc-record.test-doubles.ts:18,147,285`, `api-packaged-rest.usage-guard.integration.test.ts:13,63`,
   `app-trpc/__tests__/support/app-trpc-features.ts:36,182`, `gateway.composition.integration.test.ts:39,216` drop the
   refusing twin (omit the key). `role.composition.integration.test.ts:211` passes `workflows: () => workflowApp`,

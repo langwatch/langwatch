@@ -41,6 +41,7 @@ export const publicAppConfigProjectionDefinition = RuntimeConfig.define({
   }),
   demoProjectSlug: Config.value(z.string().min(1).optional(), { env: "DEMO_PROJECT_SLUG" }),
   isSaas: Config.value(exactTrue, { env: "IS_SAAS" }),
+  authProvider: Config.value(z.string().min(1).optional(), { env: "NEXTAUTH_PROVIDER" }),
   gateway: {
     publicUrl: Config.optionalUrl({ env: "LW_GATEWAY_PUBLIC_URL" }),
     legacyUrl: Config.optionalUrl({ env: "LW_GATEWAY_BASE_URL" }),
@@ -115,6 +116,7 @@ export type PublicAppConfigSource = Readonly<{
   SMTP_HOST?: string;
   RESEND_API_KEY?: string;
   IS_SAAS?: string | boolean;
+  NEXTAUTH_PROVIDER?: string;
   LW_GATEWAY_PUBLIC_URL?: string;
   LW_GATEWAY_BASE_URL?: string;
   POSTHOG_KEY?: string;
@@ -205,6 +207,7 @@ function projectPublicAppConfig(config: PublicAppConfigValues): PublicAppConfig 
     passkeys: config.identity.passkeys === "on",
     identityFrontDoor: config.identity.router === "enforce",
     licensePaymentUrl: config.licensePaymentUrl,
+    authProvider: config.authProvider,
   });
 }
 

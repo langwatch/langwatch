@@ -5,11 +5,11 @@
 # Implementation:
 #   [gone] src/server/app-layer/traces/facet-registry.ts        (RangeFacetDef: integer flag + default mode)
 #   [gone] src/server/app-layer/traces/trace-list.service.ts    (discrete-values descriptor for integer facets)
-#   packages/features/trace/web/src/ui/sections/explorer/filter-sidebar/range-section.tsx     (Range mode — existing slider)
-#   packages/features/trace/web/src/ui/sections/explorer/filter-sidebar/facet-section.tsx     (Discrete mode — reused categorical list)
-#   packages/features/trace/web/src/ui/elements/explorer/filter-sidebar/sidebar-section.tsx   (header mode-toggle icon)
-#   packages/features/trace/web/src/ui/sections/explorer/filter-sidebar/facet-manager-popover.tsx  (mode picker in the manager)
-#   packages/features/trace/web/src/                        (per-project per-facet mode setting, sibling of visibility)
+#   modules/trace/web/src/ui/sections/explorer/filter-sidebar/range-section.tsx     (Range mode — existing slider)
+#   modules/trace/web/src/ui/sections/explorer/filter-sidebar/facet-section.tsx     (Discrete mode — reused categorical list)
+#   modules/trace/web/src/ui/elements/explorer/filter-sidebar/sidebar-section.tsx   (header mode-toggle icon)
+#   modules/trace/web/src/ui/sections/explorer/filter-sidebar/facet-manager-popover.tsx  (mode picker in the manager)
+#   modules/trace/web/src/                        (per-project per-facet mode setting, sibling of visibility)
 #
 # Related specs:
 #   specs/traces-v2/search.feature           — owns the Range slider behaviour (Rule: Range facets) and the query syntax

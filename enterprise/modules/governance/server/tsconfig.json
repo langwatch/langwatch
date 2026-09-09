@@ -1,0 +1,93 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src",
+    "outDir": "dist",
+
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "lib": ["es2022", "dom"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"]
+    },
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/api-key/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/auth/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/plan-gate/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/gateway/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/gateway/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/otlp/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/project/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/trace/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/test-harness/tsconfig.build.json"
+    }
+  ]
+}

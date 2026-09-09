@@ -3,9 +3,9 @@
 Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D03 · Flag: `SSOCONN_ROUTING` (shadow → enforce)
 
 > **Amendment 2026-09-03:** `platform/app` is deleted. Enterprise SSO now
-> lives in `packages/enterprise/features/sso/{contract,server,web}`; the
+> lives in `enterprise/modules/sso/{contract,server,web}`; the
 > BetterAuth provider adapter is
-> `packages/enterprise/features/sso/server/src/adapters/better-auth.better-auth.adapter.ts`.
+> `enterprise/modules/sso/server/src/adapters/better-auth.better-auth.adapter.ts`.
 > Verify current shape against that tree before treating paths below as live.
 
 # Overview

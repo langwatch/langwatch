@@ -13,7 +13,7 @@ ten top-level categories, each with `children`, each child a feature with its `s
 underscore form; never create `FEATURE-MAP.md`.
 
 A **feature** here is a customer-facing capability, a row in this map, named the way a
-user would name it. It is not the same thing as a **module** (`packages/features/<name>`,
+user would name it. It is not the same thing as a **module** (`modules/<name>`,
 the contract/server/web package trio); one feature can be served by several modules, and
 one module can serve several features.
 
@@ -54,7 +54,7 @@ one module can serve several features.
 
 | Field             | Verify against                                                                                                                                                                                  |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `surfaces.api`    | `packages/features/<f>/server/src/transport/public-rest/` and `transport/api-rest/`, mounted by `apps/api/src/api-<f>-rest.feature.ts` or `apps/api/src/app-rest/app-rest.packaged-families.ts` |
+| `surfaces.api`    | `modules/<f>/server/src/transport/public-rest/` and `transport/api-rest/`, mounted by `apps/api/src/api-<f>-rest.feature.ts` or `apps/api/src/app-rest/app-rest.packaged-families.ts` |
 | tRPC namespaces   | `apps/api/src/app-trpc/app-trpc.features.ts`                                                                                                                                                    |
 | `platform.ui`     | `apps/ui/src/model/ui-route-table.ts` (the `path` of a route descriptor)                                                                                                                        |
 | sidebar placement | `apps/ui/src/features/chrome/`                                                                                                                                                                  |

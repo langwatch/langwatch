@@ -1,13 +1,13 @@
 # Inline annotation rail beside the conversation
 #
 # Implementation:
-#   packages/features/trace/web/src/annotation-draft.store.ts
-#   packages/features/trace/web/src/ui/sections/explorer/hooks/use-conversation-annotations.ts
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/use-rail-layout.ts
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/annotated-turn-row.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/turn-annotation-rail.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/annotation-card.tsx
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/annotation-editor-card.tsx
+#   modules/trace/web/src/annotation-draft.store.ts
+#   modules/trace/web/src/ui/sections/explorer/hooks/use-conversation-annotations.ts
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/use-rail-layout.ts
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/annotated-turn-row.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/turn-annotation-rail.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/annotation-card.tsx
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/annotation-editor-card.tsx
 #
 # Motivation: annotations used to hide behind a separate sub-tab of the
 # Conversation view, so a reviewer had to leave the conversation to read what

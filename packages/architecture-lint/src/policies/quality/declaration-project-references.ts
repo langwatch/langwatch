@@ -2,8 +2,9 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
+import { deriveWorkspaceReferences } from "../../workspace/tsconfig-references.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import type { ArchitectureViolation, ClassifiedPackage } from "../../types.ts";
+import type { ArchitectureViolation } from "../../types.ts";
 
 const configSchema = z.object({
   references: z.array(z.object({ path: z.string() })).optional(),
@@ -120,6 +121,31 @@ function producerDirectories(projects: ReadonlyMap<string, Project>): Map<string
   return producerByDirectory;
 }
 
+/** References are derived from package.json; a hand edit drifts from what the workspace declares. */
+function lintReferenceSync(root: string): ArchitectureViolation[] {
+  const violations: ArchitectureViolation[] = [];
+  for (const project of deriveWorkspaceReferences(root)) {
+    const missing = project.references.filter((entry) => !project.current.includes(entry));
+    const extra = project.current.filter((entry) => !project.references.includes(entry));
+    const ordered = project.references.join(" ") === project.current.join(" ");
+    if (missing.length === 0 && extra.length === 0 && ordered) continue;
+
+    const reasons = [
+      ...missing.map((entry) => `missing ${entry}`),
+      ...extra.map((entry) => `extra ${entry}`),
+    ];
+    violations.push({
+      policy: "declaration-project-references",
+      file: relative(root, project.file),
+      message: `Project references are out of sync with package.json: ${reasons.join(", ") || "the derived order differs"}.`,
+      allowed:
+        "Run pnpm sync:references, or record an entry no rule derives under langwatchExtraReferences.",
+    });
+  }
+
+  return violations;
+}
+
 /** Producer references determine preparation; no-emit consumer references cannot replace them. */
 export function lintDeclarationProjectReferences(
   snapshot: WorkspaceSnapshot,
@@ -163,5 +189,5 @@ export function lintDeclarationProjectReferences(
     }
   }
 
-  return violations;
+  return [...violations, ...lintReferenceSync(root)];
 }

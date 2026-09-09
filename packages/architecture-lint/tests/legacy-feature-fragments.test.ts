@@ -14,27 +14,27 @@ let root = "";
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "langwatch-legacy-feature-fragments-"));
   write(
-    "packages/features/catalogue.json",
+    "modules/catalogue.json",
     JSON.stringify({
       version: 0,
       features: [
         {
           id: "dataset",
-          root: "packages/features/dataset",
+          root: "modules/dataset",
           classification: "core",
           subjects: ["dataset"],
         },
       ],
     }),
   );
-  write("packages/features/dataset/feature.json", JSON.stringify({ layoutVersion: 0 }));
+  write("modules/dataset/feature.json", JSON.stringify({ layoutVersion: 0 }));
   write(
-    "packages/features/dataset/server/package.json",
+    "modules/dataset/server/package.json",
     JSON.stringify({ name: "@langwatch/dataset-server", type: "module" }),
   );
-  write("packages/features/dataset/server/src/index.ts", "export {};");
+  write("modules/dataset/server/src/index.ts", "export {};");
   write(
-    "packages/features/dataset/server/src/services/dataset.service.ts",
+    "modules/dataset/server/src/services/dataset.service.ts",
     "export class DatasetService {}",
   );
 });
@@ -60,7 +60,7 @@ function baseline(): void {
     catalogue: [
       {
         id: "dataset",
-        root: "packages/features/dataset",
+        root: "modules/dataset",
         classification: "core" as const,
         subjects: ["dataset"],
       },
@@ -68,8 +68,8 @@ function baseline(): void {
     packages: [
       {
         name: "@langwatch/dataset-server",
-        root: join(root, "packages/features/dataset/server"),
-        manifestPath: join(root, "packages/features/dataset/server/package.json"),
+        root: join(root, "modules/dataset/server"),
+        manifestPath: join(root, "modules/dataset/server/package.json"),
         manifest: {},
         kind: "server" as const,
         feature: "dataset",
@@ -106,7 +106,7 @@ describe("shrinking legacy feature fragment inventory", () => {
         [
           {
             id: "dataset",
-            root: "packages/features/dataset",
+            root: "modules/dataset",
             classification: "core",
             subjects: ["dataset"],
           },
@@ -114,8 +114,8 @@ describe("shrinking legacy feature fragment inventory", () => {
         [
           {
             name: "@langwatch/dataset-server",
-            root: join(root, "packages/features/dataset/server"),
-            manifestPath: join(root, "packages/features/dataset/server/package.json"),
+            root: join(root, "modules/dataset/server"),
+            manifestPath: join(root, "modules/dataset/server/package.json"),
             manifest: {},
             kind: "server",
             feature: "dataset",

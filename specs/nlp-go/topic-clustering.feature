@@ -11,10 +11,10 @@ Feature: Topic clustering runs on langevals
   # request/response shapes are unchanged.
 
   # All @unimplemented scenarios describe TS routing in
-  # packages/features/topic/server/src/intents/topic-clustering-runner.intent.ts (always
+  # modules/topic/server/src/intents/topic-clustering-runner.intent.ts (always
   # langevals, warn-and-skip when unconfigured, engine attribution log).
   # Existing tests in
-  # packages/features/topic/server/tests/topic-clustering.runner.unit.test.ts
+  # modules/topic/server/tests/topic-clustering.runner.unit.test.ts
   # plus fetchTracesFromClickHouse.integration.test.ts and
   # fetchCountsFromClickHouse.integration.test.ts cover ClickHouse query
   # behavior. Aspirational pending dedicated routing tests.

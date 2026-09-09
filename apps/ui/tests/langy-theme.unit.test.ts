@@ -78,7 +78,7 @@ describe("langyTheme token emission", () => {
        * rather than importing it: the assertions are about the CSS text, and a bundler
        * would hand back a module.
        */
-      join(process.cwd(), "../../packages/features/langy/web/src/ui/elements/langy-theme.css"),
+      join(process.cwd(), "../../modules/langy/web/src/ui/elements/langy-theme.css"),
       "utf8",
     );
     // One rule per selector in the sheet, so anchoring on the selector and

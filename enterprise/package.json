@@ -1,0 +1,40 @@
+{
+  "name": "@langwatch/enterprise",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable catalogue of LangWatch Enterprise features.",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "files": [
+    "src",
+    "LICENSE.md",
+    "README.md"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project enterprise/tsconfig.json && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/enterprise-managed-provider-contract": "workspace:*",
+    "@langwatch/enterprise-saas-contract": "workspace:*",
+    "@langwatch/enterprise-scim-contract": "workspace:*",
+    "@langwatch/enterprise-sso-contract": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

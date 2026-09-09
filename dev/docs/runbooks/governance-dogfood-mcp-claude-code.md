@@ -166,7 +166,7 @@ of record (andre 199226d77 + 5fcadd586 + 391cfd989).
 - The service-layer audit-uniform regression (asserts metadata.surface=mcp on
   create + install) likewise has no successor in the new layout. The governance
   MCP tools themselves now live in
-  `packages/enterprise/features/governance/server/src/transport/api-mcp/governance-tools.api.ts`,
+  `enterprise/modules/governance/server/src/transport/api-mcp/governance-tools.api.ts`,
   mounted by `apps/api/src/features/mcp/hosted-mcp.mount.ts`.
 - `feedback_fixtures_dont_replace_real_user_dogfood.md` — rchaves nudge
   memory; this runbook is the real-user-track companion to the probe.

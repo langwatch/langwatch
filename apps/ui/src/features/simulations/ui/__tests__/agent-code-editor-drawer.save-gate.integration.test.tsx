@@ -8,7 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScenarioInputMappingSectionProps } from "../../../../../../../packages/features/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx";
+import type { ScenarioInputMappingSectionProps } from "../../../../../../../modules/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx";
 import { AgentCodeEditorDrawer } from "../sections/agent-code-drawer.tsx";
 
 // ── Hoisted mock state ────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
 vi.mock(
-  "../../../../../../../packages/features/scenario/web/src/behavior/use-organization-team-project.ts",
+  "../../../../../../../modules/scenario/web/src/behavior/use-organization-team-project.ts",
   () => ({
     useOrganizationTeamProject: () => ({
       project: { id: "test-project", slug: "test-project" },
@@ -65,11 +65,11 @@ vi.mock("@langwatch/workflow-web/surfaces/code-block-editor", () => ({
 // isScenarioMappingValid / hasScenarioInputMapping so the save-gate tests
 // exercise the actual predicate, not a mock.
 vi.mock(
-  "../../../../../../../packages/features/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx",
+  "../../../../../../../modules/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx",
   async (importOriginal) => {
     const mod =
       await importOriginal<
-        typeof import("../../../../../../../packages/features/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx")
+        typeof import("../../../../../../../modules/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx")
       >();
     return {
       ...mod,
@@ -86,7 +86,7 @@ vi.mock(
   },
 );
 
-vi.mock("../../../../../../../packages/features/agent/web/src/behavior/agent-api.ts", () => ({
+vi.mock("../../../../../../../modules/agent/web/src/behavior/agent-api.ts", () => ({
   agentApi: {
     agents: {
       getById: {

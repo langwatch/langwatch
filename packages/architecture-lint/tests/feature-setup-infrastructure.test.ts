@@ -18,7 +18,7 @@ function write(file: string, text: string): void {
 }
 
 function server(feature: string, kind: "server" | "contract"): ClassifiedPackage {
-  const directory = `packages/features/${feature}/${kind}`;
+  const directory = `modules/${feature}/${kind}`;
   const manifest = { name: `@langwatch/${feature}-${kind}` };
   write(`${directory}/package.json`, JSON.stringify(manifest));
   return {
@@ -35,7 +35,7 @@ function server(feature: string, kind: "server" | "contract"): ClassifiedPackage
 
 function findings(body: string, extras = ""): ReturnType<typeof lintFeatureSetupInfrastructure> {
   write(
-    "packages/features/widget/server/src/app/widget.app.ts",
+    "modules/widget/server/src/app/widget.app.ts",
     `import type { FeatureSetup } from "@langwatch/runtime-composition";
 ${extras}
 ${body}`,
@@ -47,23 +47,23 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "feature-setup-infrastructure-"));
   packages = [server("widget", "server"), server("foreign", "contract")];
   write(
-    "packages/features/foreign/contract/src/foreign.api.ts",
+    "modules/foreign/contract/src/foreign.api.ts",
     "export interface ForeignApi { read(): void }",
   );
   write(
-    "packages/features/foreign/contract/src/index.ts",
+    "modules/foreign/contract/src/index.ts",
     'export type { ForeignApi } from "./foreign.api";',
   );
   catalogue = [
     {
       id: "widget",
-      root: "packages/features/widget",
+      root: "modules/widget",
       classification: "core",
       subjects: ["widget"],
     },
     {
       id: "foreign",
-      root: "packages/features/foreign",
+      root: "modules/foreign",
       classification: "core",
       subjects: ["foreign"],
     },
@@ -177,7 +177,7 @@ type Unused = string;`,
 
   it("unwraps readonly infrastructure and detects arbitrary owned service classes", () => {
     write(
-      "packages/features/widget/server/src/service/custom.service.ts",
+      "modules/widget/server/src/service/custom.service.ts",
       "export class AuxiliaryService { run(): void {} }",
     );
     const result = findings(
@@ -192,7 +192,7 @@ type Unused = string;`,
 
   it("follows method and callback locators, generic interfaces, and defaults", () => {
     write(
-      "packages/features/widget/server/src/widget.api.ts",
+      "modules/widget/server/src/widget.api.ts",
       "export interface WidgetApi { read(): void }",
     );
     const result = findings(`

@@ -6,7 +6,7 @@ import { defineRule } from "../define-rule.mjs";
 // an SDK. Everywhere else a moment is a `Temporal.Instant`.
 
 const GOVERNED =
-  /^(?:apps\/[^/]+\/src\/|packages\/[^/]+\/|sdks\/typescript\/src\/|mcp\/typescript\/src\/)/;
+  /^(?:apps\/[^/]+\/src\/|packages\/[^/]+\/|modules\/[^/]+\/[^/]+\/|enterprise\/|sdks\/typescript\/src\/|mcp\/typescript\/src\/)/;
 const TIME_PACKAGE = /^packages\/time\//;
 const PRISMA_SEAM = /(?:^|\/)(?:repositories\/prisma\/|adapters\/postgres\.)/;
 const DECLARATION = /\.d\.[cm]?ts$/;

@@ -8,7 +8,7 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const CONTRACT = "packages/features/project/contract/src/example.contract.ts";
+const CONTRACT = "modules/project/contract/src/example.contract.ts";
 const ALLOWED =
   "Give the two behaviours two names, or one signature whose return type already admits the" +
   " absent case. An overload set the reader has to diff is not documentation.";

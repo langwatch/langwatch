@@ -73,7 +73,7 @@ Feature: Feature package boundary lint
     Given the portable enterprise root and API, worker and web composition packages
     When architecture lint checks their paths, manifests and exports
     Then each has the package name and dependency role fixed by ADR-111
-    And packages/enterprise/LICENSE.md exists above every enterprise source package
+    And enterprise/LICENSE.md exists above every enterprise source package
     And the root manifest identifies that Enterprise license
     And no descendant manifest claims that enterprise source is Apache-2.0
     And no aggregate manifest is accepted outside the fixed root, composition and feature-surface paths

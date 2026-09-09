@@ -36,9 +36,9 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
 
   Implementation lives under:
     - apps/ui governance route                                         (page)
-    - packages/enterprise/features/governance/server/src/ (activity-monitor)             (service)
-    - packages/enterprise/features/governance/web/src/                 (chart wrappers — Phase B)
-    - packages/features/trace/web/src/model/rotating-colors.ts         (Phase C util)
+    - enterprise/modules/governance/server/src/ (activity-monitor)             (service)
+    - enterprise/modules/governance/web/src/                 (chart wrappers — Phase B)
+    - modules/trace/web/src/model/rotating-colors.ts         (Phase C util)
 
   Background:
     Given the user is signed in as an org admin of "acme-corp"
@@ -299,7 +299,7 @@ Feature: Bird's-eye governance dashboard v2 — graphs, Top-N framing, click-thr
     Then all three surfaces show that team in the SAME color
     And the color is derived deterministically from the team name
       (same algorithm ProjectAvatar uses today via
-       packages/features/trace/web/src/model/rotating-colors.ts → getColorForString)
+       modules/trace/web/src/model/rotating-colors.ts → getColorForString)
     And a different team named "marketing" renders in a different
       color (palette spread is a function of the name, not row order)
     And renaming a team changes its color (acceptable trade-off — the

@@ -167,7 +167,7 @@ so the tree typechecks and lints on its own at every step.
 ## Open items
 
 1. **Licensing placement.** The catalogue carries LangWatch Cloud list prices,
-   which today sit under `packages/enterprise/`, while the open-source baseline
+   which today sit under `enterprise/`, while the open-source baseline
    must stay readable by Apache-licensed code. This ADR builds **one** package
    under `packages/plans`, carrying the same `MIT` manifest licence the other
    shared packages carry, on the argument that splitting it repeats the drift

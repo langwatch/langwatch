@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { lintPrismaMigrationAccess } from "../src/policies/persistence/prisma-migration-access.ts";
 
 const roots: string[] = [];
-const featureRoot = "packages/enterprise/features/audit-log";
+const featureRoot = "enterprise/modules/audit-log";
 const repository = "repositories/prisma/prisma.history-migration.repository.ts";
 const source = `import { scopedPrismaClient, type ScopedPrismaClient } from "@langwatch/prisma-client/ownership";
 export class Repository {
@@ -111,7 +111,7 @@ describe("scoped migration Prisma access", () => {
   it("rejects a process importing the private repository directly", () => {
     const world = fixture();
     world.write(
-      "../../../../../apps/api/src/app.ts",
+      "../../../../apps/api/src/app.ts",
       `import { Repository } from "../../../${featureRoot}/server/src/${repository}";`,
     );
     expect(world.lint().some((issue) => issue.message.includes("must be private"))).toBe(true);

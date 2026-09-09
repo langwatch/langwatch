@@ -265,7 +265,7 @@ and `ScenarioTabStorePort` earns its second implementation (P7).
 `AppScenarioRuntime.create({ database, simulations, ids, folderIds, clock, secretCipher })`.
 `AppScenarioRuntime.build()` (`platform/app/src/runtime/app/features/scenario.ts:36-45`)
 re-passes all six to `PrismaScenarioAdapter.create`, which
-(`packages/features/scenario/server/src/adapters/prisma.scenario.adapter.ts:19-26`)
+(`modules/scenario/server/src/adapters/prisma.scenario.adapter.ts:19-26`)
 re-passes all six to `ScenarioService.create`. Three classes, 74 lines, six fields
 spelled three times, no behaviour. The simulation side is the same shape —
 `presets.ts:1411` → `AppSimulationRuntime.build()` (`simulation.ts:88-98`) →
@@ -614,6 +614,6 @@ in `apps/api/` is touched by any commit: it imports only `ScenarioTrpcApi`,
 signatures do not change.
 
 `@langwatch/scenario-contract` is imported by **84 non-test files outside the
-feature** — 17 in `packages/features/suite/web/`, the rest across
+feature** — 17 in `modules/suite/web/`, the rest across
 `platform/app/src/components/agent-testing/`, `components/suites/`, `hooks/` and
 `server/`. No commit above changes a contract signature.

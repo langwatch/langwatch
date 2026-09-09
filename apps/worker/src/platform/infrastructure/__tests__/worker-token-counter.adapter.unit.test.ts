@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkerTiktokenCounterAdapter } from "../worker-token-counter.adapter.ts";
 
 /**
- * Spec: packages/features/trace/specs/span-token-estimation.feature
+ * Spec: modules/trace/specs/span-token-estimation.feature
  *
  * The vendor transport on its own. `node-fetch-cache` is mocked for the whole
  * file so the remote path is deterministic: the real client keeps a one-year

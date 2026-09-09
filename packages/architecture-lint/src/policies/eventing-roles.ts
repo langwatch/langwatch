@@ -275,8 +275,8 @@ function eventingScanRoots(root: string, packages: readonly ClassifiedPackage[])
   const scanRoots = [
     join(root, "apps/api/src"),
     join(root, "apps/worker/src"),
-    join(root, "packages/enterprise/composition/api/src"),
-    join(root, "packages/enterprise/composition/worker/src"),
+    join(root, "enterprise/packages/composition/api/src"),
+    join(root, "enterprise/packages/composition/worker/src"),
     ...packages.filter((pkg) => pkg.kind === "server").map((pkg) => join(pkg.root, "src")),
   ];
 

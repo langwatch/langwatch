@@ -4,11 +4,11 @@
 > and `scripts/generate-license.ts` did not survive the split (see "What was
 > removed" below) — there is currently no CLI or task wired up to run it. The
 > signing logic itself lives on in `LicenseGenerationService`
-> (`packages/enterprise/features/licensing/server/src/services/license-generation.service.ts`),
+> (`enterprise/modules/licensing/server/src/services/license-generation.service.ts`),
 > plan templates in
-> `packages/enterprise/features/licensing/contract/src/license-plan-templates.ts`,
+> `enterprise/modules/licensing/contract/src/license-plan-templates.ts`,
 > and the verifier's public key in
-> `packages/enterprise/features/licensing/server/src/adapters/node.license-cryptography.adapter.ts`.
+> `enterprise/modules/licensing/server/src/adapters/node.license-cryptography.adapter.ts`.
 > The `pnpm tsx scripts/generate-license.ts` commands below describe intent,
 > not a runnable command — reinstate a CLI entry point (e.g. an `apps/tasks`
 > task) that calls `LicenseGenerationService` before relying on this guide.
@@ -44,7 +44,7 @@ Used by every dogfood / QA / seed flow that needs Enterprise surfaces unlocked.
 
 - `LANGWATCH_LICENSE_PRIVATE_KEY` set in `.env` (RSA private key, paired with
   the public key compiled into the verifier at
-  `packages/enterprise/features/licensing/server/src/adapters/node.license-cryptography.adapter.ts`). Ask the maintainer for the dev key —
+  `enterprise/modules/licensing/server/src/adapters/node.license-cryptography.adapter.ts`). Ask the maintainer for the dev key —
   it is **not** checked into the repo.
 - Postgres reachable via `DATABASE_URL`.
 - The target organization already exists (the script writes a `License` row
@@ -72,7 +72,7 @@ Arguments:
 | Flag            | Required | Default                | Description                                                                                                                                     |
 | --------------- | -------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--org-id`      | yes      | —                      | Target `Organization.id` to attach the license to. Org must already exist.                                                                      |
-| `--plan`        | no       | `ENTERPRISE`           | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `packages/enterprise/features/licensing/contract/src/license-plan-templates.ts`. |
+| `--plan`        | no       | `ENTERPRISE`           | One of `ENTERPRISE` / `GROWTH` / `PRO`. Plan templates live at `enterprise/modules/licensing/contract/src/license-plan-templates.ts`. |
 | `--max-members` | no       | `50`                   | Seat cap. Must be ≥ 1.                                                                                                                          |
 | `--email`       | no       | `<orgSlug>@local.test` | Issued-to email for the license metadata + audit-trail field.                                                                                   |
 

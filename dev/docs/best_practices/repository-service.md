@@ -51,7 +51,7 @@ Code is organized into three layers. The **domain layer** (Service + Repository)
 Thin wrapper over the database. No business logic.
 
 ```typescript
-// packages/features/dataset/server/src/repositories/prisma/prisma.dataset.repository.ts
+// modules/dataset/server/src/repositories/prisma/prisma.dataset.repository.ts
 export class DatasetRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -109,7 +109,7 @@ endpoint publishes, and the browser reads the fields off `{}`. Type the port.
 Business logic, orchestration, default resolution.
 
 ```typescript
-// packages/features/dataset/server/src/services/dataset.service.ts
+// modules/dataset/server/src/services/dataset.service.ts
 export class DatasetService {
   constructor(
     private readonly prisma: PrismaClient,
@@ -152,7 +152,7 @@ A failure the caller can act on is a `HandledError` subclass with a stable
 `code`. It crosses the boundary with meaning, and no router has to hand-map it:
 
 ```typescript
-// packages/features/dataset/server/src/services/errors.ts
+// modules/dataset/server/src/services/errors.ts
 export class DatasetNameTakenError extends HandledError {
   declare readonly code: "dataset_name_taken";
 
@@ -213,7 +213,7 @@ export { suiteTargetSchema, type SuiteTarget } from "~/server/suites/types";
 ```typescript
 // BAD: Domain type defined in API layer, imported by service
 // server/api/routers/suites/schemas.ts   <-- defined here
-// packages/features/suite/server/src/services/suite.service.ts  <-- imports from API layer (wrong direction)
+// modules/suite/server/src/services/suite.service.ts  <-- imports from API layer (wrong direction)
 ```
 
 **Rule of thumb:** If a type represents a business concept (not just a request shape), it belongs in the domain layer. Request-specific schemas (like `createSuiteSchema` with its validation messages) can stay in the router schemas file since they're API concerns.

@@ -31,7 +31,7 @@ broken.
 ## 3. Tests: the package's own suite, every package you touched
 
 ```bash
-grep -o '"test[a-z:]*"' packages/features/<f>/server/package.json   # find the script name first
+grep -o '"test[a-z:]*"' modules/<f>/server/package.json   # find the script name first
 pnpm --filter @langwatch/<f>-server test:unit                        # or `test` when there is no test:unit
 pnpm --filter @langwatch/<f>-contract test:unit
 ```
@@ -57,7 +57,7 @@ error in a file you touched is yours.
 ## 5. Lint: the rule you are serving, counted
 
 ```bash
-npx oxlint -c .oxlintrc.architecture.json packages/features/<f>/contract/src packages/features/<f>/server/src | grep -c <rule-name>
+npx oxlint -c .oxlintrc.architecture.json modules/<f>/contract/src modules/<f>/server/src | grep -c <rule-name>
 ```
 
 Before and after. The count for the rule goes to zero for `try*`; a remaining hit is
@@ -68,7 +68,7 @@ module's contract and server, transports and adapters included.
 ## 6. The old name is gone
 
 ```bash
-grep -rnE '\b<oldName>\b' packages/features/<f> --include='*.ts' --include='*.tsx' | grep -v node_modules | grep -v /dist/
+grep -rnE '\b<oldName>\b' modules/<f> --include='*.ts' --include='*.tsx' | grep -v node_modules | grep -v /dist/
 ```
 
 Prints nothing, or every remaining line is a call into another package that renames in

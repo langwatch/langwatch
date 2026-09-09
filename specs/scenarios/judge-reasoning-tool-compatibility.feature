@@ -13,9 +13,9 @@ Feature: Scenario judge reasoning and tool compatibility
   # playground, and workflow runtimes are not part of this failure.
   #
   # Bindings:
-  #   packages/features/scenario/server/src/adapters/litellm-model.adapter.ts
-  #   packages/features/scenario/server/tests/model.factory.unit.test.ts
-  #   packages/features/scenario/contract/src/scenario-infra-error.ts
+  #   modules/scenario/server/src/adapters/litellm-model.adapter.ts
+  #   modules/scenario/server/tests/model.factory.unit.test.ts
+  #   modules/scenario/contract/src/scenario-infra-error.ts
 
   @unit
   Scenario Outline: The affected gpt-5.6 judge disables reasoning by default

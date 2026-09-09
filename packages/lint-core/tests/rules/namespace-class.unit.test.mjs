@@ -8,8 +8,8 @@ const workspace = createFixtureWorkspace({
 
 afterAll(() => workspace.cleanup());
 
-const SERVICE = "packages/features/agent/server/src/services/agent-presence.service.ts";
-const TEST = "packages/features/agent/server/src/services/__tests__/agent-presence.unit.test.ts";
+const SERVICE = "modules/agent/server/src/services/agent-presence.service.ts";
+const TEST = "modules/agent/server/src/services/__tests__/agent-presence.unit.test.ts";
 
 function report(code, filename = SERVICE) {
   return runRule(namespaceClassRule, { code, cwd: workspace.cwd, filename });

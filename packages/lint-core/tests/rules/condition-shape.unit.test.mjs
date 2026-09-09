@@ -10,7 +10,7 @@ const workspace = createFixtureWorkspace({
 afterAll(() => workspace.cleanup());
 afterEach(() => resetBaselineCache());
 
-const SERVICE = "packages/features/agent/server/src/services/agent.service.ts";
+const SERVICE = "modules/agent/server/src/services/agent.service.ts";
 
 function report(code, options = []) {
   return runRule(conditionShapeRule, { code, cwd: workspace.cwd, filename: SERVICE, options });
@@ -122,7 +122,7 @@ describe("given a strict feature service module", () => {
       const found = runRule(conditionShapeRule, {
         code: "export function deep(input) { if (input.meta.owner.name) { return 1; } return 0; }",
         cwd: workspace.cwd,
-        filename: "packages/features/agent/server/src/services/invented.service.ts",
+        filename: "modules/agent/server/src/services/invented.service.ts",
         options: [],
       });
 

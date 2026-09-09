@@ -128,8 +128,8 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 ### API endpoints
 
 - **Contracts and handlers** — the owning singular feature under
-  `packages/features/<feature>/{contract,server}` or
-  `packages/enterprise/features/<feature>/{contract,server}`
+  `modules/<feature>/{contract,server}` or
+  `enterprise/modules/<feature>/{contract,server}`
 - **Transport composition** — `apps/api/`; compatibility routes still being
   drained from the application are tracked in the extraction ledger
 
@@ -171,7 +171,7 @@ Legend: ✅ present · — absent · `—` no SDK/CLI/skill/MCP by design
 
 ## Maintaining the Map
 
-When adding a feature or surface, update `feature-map.json` first — then update whatever derives from it (sidebar, skills, docs, this file). Feature ownership itself is recorded in `packages/features/catalogue.json`.
+When adding a feature or surface, update `feature-map.json` first — then update whatever derives from it (sidebar, skills, docs, this file). Feature ownership itself is recorded in `modules/catalogue.json`.
 
 Validation checklist:
 

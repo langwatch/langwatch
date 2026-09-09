@@ -54,7 +54,7 @@ const HELD_ON_SIX = new Set(["sdks/typescript", "mcp/typescript", "packages/arch
  * Where the workspace's own package manifests live, relative to the root.
  *
  * `packages/` is walked at any depth: a feature package's manifest is three
- * levels down (`packages/features/<feature>/<surface>/package.json`), so a
+ * levels down (`modules/<feature>/<surface>/package.json`), so a
  * single-segment alternation saw the flat packages and none of the 149 feature
  * and enterprise ones. `apps/` replaced the `platform/` alternation when the
  * monolith was deleted; without it the three applications were unscanned and

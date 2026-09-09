@@ -1,8 +1,8 @@
 # Conversation turn ledger — the per-turn separator line
 #
 # Implementation:
-#   packages/features/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/chat-turn-row.tsx
-#   packages/features/suite/web/src/formatters.ts (formatRelativeTimeAgo)
+#   modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/chat-turn-row.tsx
+#   modules/suite/web/src/formatters.ts (formatRelativeTimeAgo)
 #
 # Motivation: a customer found the separator between conversation turns too
 # busy and cryptic: "TURN 3 · small · 20.9s · 4.5K→538 · 1h". The model
