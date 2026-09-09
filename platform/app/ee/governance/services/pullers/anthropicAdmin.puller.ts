@@ -447,17 +447,38 @@ const pageSchema = z.object({
  * NOT the last element of the array. Anthropic does not promise an order
  * within a page, and reading the last bucket as the newest is only correct
  * while the page happens to ascend. On an out-of-order page it hands back an
- * earlier instant than one already emitted, and the watermark it mints either
- * re-reads the window — which, on the usage report, is duplicated spend rather
- * than a restatement — or, once a later page overwrites it, resumes past
- * buckets that were never read. The maximum is the only value every bucket on
- * the page is at or behind, which is exactly what a watermark has to mean.
+ * earlier instant than one already emitted, so the watermark it mints re-reads
+ * the window. Under an unchanged query that re-read restates rather than
+ * duplicating — the ids carry the bucket and its dimensions — and the cost is
+ * a window that stops advancing; it becomes duplicated spend on the usage
+ * report only once a query change moves the keys (see `cursorSchema`). The
+ * maximum is the only value every bucket on the page is at or behind, which is
+ * exactly what a watermark has to mean.
  *
  * Instants that do not parse are ignored rather than compared as strings: a
  * value we cannot order cannot be certified as a resume point. A page where
  * none parse yields null, and null resumes from the window start — a re-read,
  * never a skip.
  */
+/**
+ * The later of two instants, ignoring one that cannot be parsed.
+ *
+ * `newestBucketStart` orders a page against itself. Anthropic promises no
+ * order ACROSS pages either, so the run needs the same maximum one level up:
+ * without it the last page read wins, and a final page whose newest bucket is
+ * older than an earlier page's lowers the resume point below buckets this run
+ * has already emitted.
+ */
+function laterInstant(a: string | null, b: string | null): string | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  const aMs = Date.parse(a);
+  const bMs = Date.parse(b);
+  if (Number.isNaN(bMs)) return a;
+  if (Number.isNaN(aMs)) return b;
+  return bMs > aMs ? b : a;
+}
+
 function newestBucketStart(
   buckets: z.infer<typeof bucketSchema>[],
 ): string | null {
@@ -652,6 +673,21 @@ export class AnthropicAdminPuller
     const query = queryIdentity(config);
     let page = cursor.page;
     let watermark = cursor.watermark;
+    /**
+     * The newest bucket emitted across EVERY page this run read, which is what
+     * a drained window resumes from.
+     *
+     * Separate from `watermark` on purpose. `watermark` is the resume point a
+     * run that was CUT OFF leaves behind, and pages beyond the cut are unread,
+     * so raising it to a cross-page maximum could carry the next run past
+     * buckets nobody has fetched. At the drain there is no unread page left in
+     * the window, so the maximum is simply the newest thing emitted — and
+     * taking it is what stops a trailing out-of-order page from lowering the
+     * window start. Left lowered, a provider whose page order is stable
+     * re-mints the same low start every run, the window never advances, and it
+     * grows until it needs more than MAX_PAGES_PER_RUN to drain.
+     */
+    let newestEmitted = cursor.watermark;
 
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
       if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
@@ -672,15 +708,17 @@ export class AnthropicAdminPuller
       }
       events.push(...read.events);
       watermark = read.watermark ?? watermark;
+      newestEmitted = laterInstant(newestEmitted, read.watermark);
 
       if (read.nextPage === null) {
-        // Drained. The next run starts from the newest bucket read, so the
-        // watermark only ever moves forward — and the in-window watermark is
-        // retired: `startingAt` itself is now the resume point.
+        // Drained. The next run starts from the newest bucket this run
+        // emitted across all of its pages, so the window start only ever
+        // moves forward — and the in-window watermark is retired:
+        // `startingAt` itself is now the resume point.
         return {
           events,
           cursor: encodeCursor({
-            startingAt: watermark ?? startingAt,
+            startingAt: newestEmitted ?? startingAt,
             page: null,
             query,
             watermark: null,

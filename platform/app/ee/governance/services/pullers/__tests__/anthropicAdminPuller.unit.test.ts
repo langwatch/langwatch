@@ -1067,9 +1067,10 @@ describe("the Anthropic Admin puller", () => {
       const run = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, config);
 
       // The last element would send the next run back to 2026-08-01 and
-      // re-read two buckets — on the usage report that is duplicated spend
-      // rather than a restatement, because a re-read lands beside the rows it
-      // repeats instead of replacing them.
+      // re-read two buckets. Under an unchanged query that re-read restates
+      // (the id is `usage:<bucket>:<dimensions>`, so it lands on the same
+      // key) — the cost is a window that stops advancing, and duplication
+      // only once the query identity changes and the keys move with it.
       expect(run.events).toHaveLength(3);
       expect(JSON.parse(run.cursor!)).toMatchObject({
         startingAt: "2026-08-03T00:00:00Z",
@@ -1089,6 +1090,44 @@ describe("the Anthropic Admin puller", () => {
       expect(JSON.parse(run.cursor!)).toMatchObject({
         page: "p2",
         watermark: "2026-08-03T00:00:00Z",
+      });
+    });
+
+    it("resumes a drained window from the newest bucket across pages, not the last page's", async () => {
+      // Each page is internally ordered, so the per-page maximum is not what
+      // is being tested: page two's newest bucket is simply OLDER than page
+      // one's. Anthropic promises no order across pages either, and taking
+      // the last page's maximum would mint 2026-08-02 and hand the next run
+      // a window start behind buckets this one already emitted — which, if
+      // the provider's page order is stable, it would then re-mint forever.
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse({
+            data: [
+              { starting_at: "2026-08-04T00:00:00Z", results: [USAGE_ROW] },
+              { starting_at: "2026-08-05T00:00:00Z", results: [USAGE_ROW] },
+            ],
+            has_more: true,
+            next_page: "p2",
+          }),
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({
+            data: [
+              { starting_at: "2026-08-01T00:00:00Z", results: [USAGE_ROW] },
+              { starting_at: "2026-08-02T00:00:00Z", results: [USAGE_ROW] },
+            ],
+            has_more: false,
+            next_page: null,
+          }),
+        );
+
+      const run = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, config);
+
+      expect(run.events).toHaveLength(4);
+      expect(JSON.parse(run.cursor!)).toMatchObject({
+        startingAt: "2026-08-05T00:00:00Z",
+        watermark: null,
       });
     });
   });
