@@ -34,7 +34,7 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-import type { AnalyticsApp } from "#app/analytics.app";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 
 /**
  * The host supplies authentication; authorization arrives as `policy`.
@@ -44,7 +44,7 @@ import type { AnalyticsApp } from "#app/analytics.app";
  * mounted on it and so carries all of them.
  */
 export type AnalyticsTrpcContext = Readonly<{
-  app: Readonly<{ analytics: AnalyticsApp }>;
+  app: Readonly<{ analytics: AnalyticsApi }>;
 }>;
 
 type AnalyticsTrpcProcedures<

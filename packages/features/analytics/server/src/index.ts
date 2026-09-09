@@ -1,6 +1,8 @@
 export { AnalyticsAdapter } from "./adapters/analytics.adapter.ts";
+export { analyticsServer } from "./analytics.server.ts";
 export {
   AnalyticsApp,
+  type AnalyticsInfrastructure,
   type AnalyticsAppDependencies,
   type AnalyticsFilterOptionsLookup,
   type AnalyticsFilterOptionsRequest,
@@ -15,21 +17,6 @@ export { LoggingAnalyticsTripwireService } from "./services/analytics-tripwire.s
 export { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service.ts";
 export { PreconditionTraceDataService } from "./services/precondition-trace-data.service.ts";
 export { ANALYTICS_CLICKHOUSE_SETTINGS } from "./rules/clickhouse-settings.rules.ts";
-export {
-  AnalyticsTrpcApi,
-  type AnalyticsTrpcContext,
-  type AnalyticsTrpcPorts,
-} from "./transport/api-trpc/analytics.api.ts";
-export {
-  LangWatchQLTrpcApi,
-  type LangWatchQLTrpcContext,
-  type LangWatchQLTrpcPorts,
-} from "./transport/api-trpc/langwatch-ql.api.ts";
-export {
-  createAnalyticsRestApp,
-  type AnalyticsTimeseriesRestBody,
-} from "./transport/api-rest/analytics.api.ts";
-export { createAnalyticsLegacyRestApp } from "./transport/api-rest/analytics-legacy.api.ts";
 
 /**
  * The LangWatchQL workbench: its restricted-identity service, rollout gate,
@@ -99,14 +86,6 @@ export {
   QueryTimeoutError,
 } from "@langwatch/analytics-contract";
 export { generateClickHouseFilterConditions } from "./rules/analytics-filter-conditions.rules.ts";
-
-/** The saved-chart REST family. */
-export {
-  createLangWatchQLRestApp,
-  type LangWatchQLRestPorts,
-} from "./transport/api-rest/langwatch-ql.api.ts";
-/** The one door for raw LangWatchQL: `/api/v1/query`. */
-export { createQueryRestApp } from "./transport/api-rest/query.api.ts";
 export type { SavedWorkbenchChartRestService } from "./services/langwatch-ql-route-guards.service.ts";
 
 // The LangWatchQL key map: the row a project's access is granted by, written at

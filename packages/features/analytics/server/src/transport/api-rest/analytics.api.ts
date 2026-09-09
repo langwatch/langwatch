@@ -34,7 +34,7 @@ import type { Context, ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
-import type { AnalyticsApp } from "#app/analytics.app";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 
 const logger = createLogger("langwatch:api:analytics");
 
@@ -83,7 +83,7 @@ export function createAnalyticsRestApp(options: {
    * mounting a family must not force its services to be constructed, which is
    * what lets the OpenAPI spec generator build this app with none.
    */
-  analytics: () => AnalyticsApp;
+  analytics: () => AnalyticsApi;
   /**
    * The host's published timeseries body — its metric, group and filter-field
    * catalogue — with the period bounds accepting an ISO string as well as

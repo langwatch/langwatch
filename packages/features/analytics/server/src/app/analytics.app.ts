@@ -22,6 +22,10 @@
  * That is what lets one operation serve a browser session, an API key and a
  * background job without knowing which it is serving.
  */
+import {
+  analyticsServerConfigSchema,
+  AnalyticsApi as AnalyticsApiToken,
+} from "@langwatch/analytics-contract";
 import type {
   AnalyticsFeedbacksResult,
   AnalyticsFilterOption,
@@ -36,7 +40,15 @@ import type {
   LangWatchQLQueryResult,
   LangWatchQLSchema,
   LangWatchQLService,
+  AnalyticsServerConfig,
+  AnalyticsApi as AnalyticsApiContract,
 } from "@langwatch/analytics-contract";
+import type { ClickHouseClient } from "@clickhouse/client";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { AnalyticsAdapter } from "../adapters/analytics.adapter.ts";
+import { FilterOptionsAdapter } from "../adapters/filter-options.adapter.ts";
+import { LangWatchQLAdapter } from "../adapters/langwatch-ql.adapter.ts";
+import type { LangWatchQLConnection } from "../ports/langwatch-ql-executor.port.ts";
 
 /**
  * The filter-value read this feature makes on the host's filter registry.
@@ -80,29 +92,90 @@ export interface AnalyticsAppDependencies {
   langWatchQL: LangWatchQLService;
 }
 
-export class AnalyticsApp {
-  static create(dependencies: AnalyticsAppDependencies): AnalyticsApp {
-    return new AnalyticsApp(dependencies);
+export type AnalyticsInfrastructure = Readonly<{
+  resolveClickHouseClient: ((tenantId: string) => Promise<ClickHouseClient | null>) | null;
+  clickhouseEnabled?: boolean;
+  defaultRetentionDays?: number;
+}>;
+
+type AnalyticsSetup = FeatureSetup<
+  Record<never, never>,
+  AnalyticsInfrastructure,
+  AnalyticsServerConfig
+>;
+
+const isPresent = (value: string | undefined): value is string => Boolean(value);
+
+const langWatchQlConnection = (values: readonly string[]): LangWatchQLConnection => {
+  const [url, username, password, database, tenantSetting] = values;
+  if (!url || !username || !password || !database || !tenantSetting) {
+    throw new Error("LangWatchQL connection is incomplete");
+  }
+  return { url, username, password, database, tenantSetting };
+};
+
+export class AnalyticsApp implements AnalyticsApiContract {
+  static readonly contract = AnalyticsApiToken;
+  static readonly dependencies = {};
+  static readonly configSchema = analyticsServerConfigSchema;
+
+  static create(setup: AnalyticsSetup): AnalyticsApp {
+    const resolveClient = setup.infrastructure.resolveClickHouseClient;
+    const analytics = AnalyticsAdapter.create({
+      resolveClient: async (tenantId) => (resolveClient ? resolveClient(tenantId) : null),
+      clickhouseEnabled: setup.infrastructure.clickhouseEnabled ?? resolveClient !== null,
+      defaultRetentionDays: setup.infrastructure.defaultRetentionDays,
+    });
+    const langwatchQl = setup.config.langwatchQl;
+    const connectionValues = [
+      langwatchQl.url,
+      langwatchQl.username,
+      langwatchQl.password,
+      langwatchQl.database,
+      langwatchQl.tenantSetting,
+    ];
+    const connection: LangWatchQLConnection | null = connectionValues.every(isPresent)
+      ? langWatchQlConnection(connectionValues)
+      : null;
+    const langWatchQL = LangWatchQLAdapter.create({ connection });
+    setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
+    return new AnalyticsApp({
+      analytics,
+      filterOptions: FilterOptionsAdapter.create({
+        resolveClient: resolveClient
+          ? async (tenantId) => {
+              const client = await resolveClient(tenantId);
+              if (!client) throw new Error("ClickHouse client is not available");
+              return client;
+            }
+          : null,
+      }),
+      langWatchQL,
+    });
   }
 
-  private constructor(private readonly dependencies: AnalyticsAppDependencies) {}
+  #dependencies: AnalyticsAppDependencies;
+
+  private constructor(dependencies: AnalyticsAppDependencies) {
+    this.#dependencies = dependencies;
+  }
 
   /** The series behind every analytics chart and every dashboard graph card. */
   getTimeseries(
     input: AnalyticsTimeseriesInput,
     options?: AnalyticsTimeseriesReadOptions,
   ): Promise<AnalyticsTimeseriesResult> {
-    return this.dependencies.analytics.getTimeseries(input, options);
+    return this.#dependencies.analytics.getTimeseries(input, options);
   }
 
   /** The retrieval documents a project's traces cite most. */
   getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsResult> {
-    return this.dependencies.analytics.getTopUsedDocuments(input);
+    return this.#dependencies.analytics.getTopUsedDocuments(input);
   }
 
   /** The thumbs and comments left on the project's messages. */
   getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult> {
-    return this.dependencies.analytics.getFeedbacks(input);
+    return this.#dependencies.analytics.getFeedbacks(input);
   }
 
   /**
@@ -120,7 +193,7 @@ export class AnalyticsApp {
       Object.entries(request.filters ?? {}).filter(([name]) => name !== request.field),
     );
 
-    return this.dependencies.filterOptions.getFilterOptions({
+    return this.#dependencies.filterOptions.getFilterOptions({
       projectId: request.projectId,
       field: request.field,
       ...(request.query === undefined ? {} : { query: request.query }),
@@ -138,15 +211,15 @@ export class AnalyticsApp {
    * A deployment without one can still describe the catalogue, which is why
    * the workbench gates its navigation on this rather than on the schema.
    */
-  get langWatchQLAvailable(): boolean {
-    return this.dependencies.langWatchQL.available;
+  isLangWatchQLAvailable(): boolean {
+    return this.#dependencies.langWatchQL.available;
   }
 
   /** The datasets and columns one member's protections unlock. */
   describeLangWatchQLSchema(
     input: Readonly<{ protections: LangWatchQLProtections }>,
   ): LangWatchQLSchema {
-    return this.dependencies.langWatchQL.describeSchema(input);
+    return this.#dependencies.langWatchQL.describeSchema(input);
   }
 
   /**
@@ -157,6 +230,40 @@ export class AnalyticsApp {
    * second opinion could only ever disagree.
    */
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
-    return this.dependencies.langWatchQL.execute(input);
+    return this.#dependencies.langWatchQL.execute(input);
+  }
+
+  upsertEvaluationAnalytics(
+    input: Parameters<AnalyticsService["upsertEvaluationAnalytics"]>[0],
+  ): Promise<void> {
+    return this.#dependencies.analytics.upsertEvaluationAnalytics(input);
+  }
+
+  upsertEvaluationAnalyticsBatch(
+    input: Parameters<AnalyticsService["upsertEvaluationAnalyticsBatch"]>[0],
+  ): Promise<void> {
+    return this.#dependencies.analytics.upsertEvaluationAnalyticsBatch(input);
+  }
+
+  tryGetEvaluationAnalytics(
+    input: Parameters<AnalyticsService["tryGetEvaluationAnalytics"]>[0],
+  ): ReturnType<AnalyticsService["tryGetEvaluationAnalytics"]> {
+    return this.#dependencies.analytics.tryGetEvaluationAnalytics(input);
+  }
+
+  appendEvaluationAnalyticsRollup(
+    input: Parameters<AnalyticsService["appendEvaluationAnalyticsRollup"]>[0],
+  ): Promise<void> {
+    return this.#dependencies.analytics.appendEvaluationAnalyticsRollup(input);
+  }
+
+  appendEvaluationAnalyticsRollupBatch(
+    input: Parameters<AnalyticsService["appendEvaluationAnalyticsRollupBatch"]>[0],
+  ): Promise<void> {
+    return this.#dependencies.analytics.appendEvaluationAnalyticsRollupBatch(input);
+  }
+
+  validateLangWatchQL(input: Parameters<LangWatchQLService["validate"]>[0]): unknown {
+    return this.#dependencies.langWatchQL.validate(input);
   }
 }

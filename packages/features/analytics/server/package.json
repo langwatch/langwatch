@@ -21,7 +21,8 @@
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./dist/testing.d.ts"
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.ts"
     },
     "./api-trpc/analytics": {
       "types": "./dist/transport/api-trpc/analytics.api.d.ts",
@@ -45,8 +46,7 @@
     },
     "./api-rest/query": {
       "types": "./dist/transport/api-rest/query.api.d.ts",
-      "default": "./src/transport/api-rest/query.api.ts",
-      "default": "./src/testing.ts"
+      "default": "./src/transport/api-rest/query.api.ts"
     }
   },
   "scripts": {
@@ -56,6 +56,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
     "@clickhouse/client": "^1.23.0",
     "@clickhouse/parser": "0.3.0",
     "@langwatch/analytics-contract": "workspace:*",

@@ -32,7 +32,7 @@ import { zodErrorMessage } from "@langwatch/config";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import type { AnalyticsApp } from "#app/analytics.app";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { timeseriesResponseSchema, type AnalyticsTimeseriesRestBody } from "./analytics.api.ts";
 
 /** The two shapes this door answers a refusal in, as it has always sent them. */
@@ -57,7 +57,7 @@ export function createAnalyticsLegacyRestApp<
   TBodyRaw,
 >(options: {
   security: AppRestSecurity;
-  analytics: () => AnalyticsApp;
+  analytics: () => AnalyticsApi;
   /** The same body the canonical door takes, with its two accepted date spellings. */
   requestSchema: z.ZodType<TBody, TBodyRaw>;
 }): MountableRestApp {
