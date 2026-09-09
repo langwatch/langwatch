@@ -64,6 +64,7 @@ import {
   peopleRefused,
   personListingEvents,
 } from "./pullers/peopleListing";
+import { refusalFromThrown } from "./pullers/providerListing";
 import { ProviderSignInError } from "./pullers/pullerAdapter";
 import {
   type SourceCredentialContext,
@@ -249,77 +250,149 @@ export class PersonListingService {
 }
 
 /**
- * Turns any failure of the dispatch below into a refusal.
+ * The entry point the sync uses to ask one source for its people.
  *
- * Split from the dispatch so that adding a provider changes only which
- * credentials are needed, and never what a failure means to the caller. The
- * two answer different questions and are the two things most likely to be
- * edited by different people for unrelated reasons.
+ * A single wide `try` used to sit here and gave every throw the verdict
+ * "not configured", which was written for a config that no longer parses. A
+ * network drop inside a sign-in inherited that verdict, so an unreachable
+ * provider told an administrator to go re-enter a working secret. Each branch
+ * below now parses its config first and scopes its own `try` to the network
+ * calls alone, so a third provider or a fourth await inherits the safe default
+ * instead of the config verdict, without anyone remembering to.
  */
 async function listPeopleForSource(params: {
   context: SourceCredentialContext;
   signal?: AbortSignal;
 }): Promise<PeopleListing> {
-  try {
-    return await listPeopleFromProvider(params);
-  } catch (error) {
-    if (error instanceof ProviderSignInError) {
-      return peopleRefused(refusalFromSignIn(error));
-    }
-    // A config that no longer parses is the same thing to the caller as a
-    // credential that cannot sign in: the source is not set up to be asked.
-    // It is a refusal rather than a throw so one bad source in a list does not
-    // fail the whole sync.
-    return peopleRefused(NOT_CONFIGURED);
+  return await listPeopleFromProvider(params);
+}
+
+/**
+ * A throw from a provider turned into a refusal, without guessing.
+ *
+ * A deliberate sign-in verdict is kept as-is, so a genuinely missing or
+ * rejected credential still reads as a credential problem. Anything else
+ * reaching here came out of the transport, and {@link refusalFromThrown}
+ * decides on a constructor-set `name` rather than on message text.
+ *
+ * The default it lands on is `unreachable`, and that direction is the point.
+ * Telling someone to try again when their credential was wrong costs them one
+ * wasted retry. Telling someone their source holds no credential when a network
+ * was down sends them to re-enter a secret that was never at fault.
+ */
+function peopleRefusedFromThrow(error: unknown): PeopleListing {
+  if (error instanceof ProviderSignInError) {
+    return peopleRefused(refusalFromSignIn(error));
   }
+  return peopleRefused(refusalFromThrown(error));
 }
 
 /**
  * Dispatches to the provider that owns this source type.
  *
- * Throws on a failed sign-in or an unparseable config; the caller above turns
- * both into refusals.
+ * Every branch returns a refusal rather than throwing, so one bad source in a
+ * list never fails the whole sync. An unparseable config is decided before any
+ * request goes out, which is what keeps "not configured" meaning that and only
+ * that.
  */
-async function listPeopleFromProvider(params: {
+async function listPeopleFromProvider(
+  params: ProviderListingRequest,
+): Promise<PeopleListing> {
+  const { context } = params;
+
+  if (context.sourceType === ANTHROPIC_ADMIN_ADAPTER_ID) {
+    return await listFromAnthropic(params);
+  }
+  if (context.sourceType === OPENAI_ADMIN_ADAPTER_ID) {
+    return await listFromOpenAi(params);
+  }
+  if (context.sourceType === COPILOT_STUDIO_DATAVERSE_ADAPTER_ID) {
+    return await listFromCopilotStudio(params);
+  }
+  if (context.sourceType === DATABRICKS_GENIE_ADAPTER_ID) {
+    return await listFromDatabricksGenie(params);
+  }
+
+  return peopleRefused(NOT_CONFIGURED);
+}
+
+/**
+ * What one provider branch needs, named once.
+ *
+ * The four branches below take this type rather than each restating the shape.
+ * A hand-written copy per branch is a second description of a value that has
+ * only one, and the two drift apart silently: an optional field on the copy
+ * that the caller always supplies is never exercised as optional by a test.
+ */
+type ProviderListingRequest = {
   context: SourceCredentialContext;
   signal?: AbortSignal;
-}): Promise<PeopleListing> {
-  const { context, signal } = params;
+};
 
-  // Neither admin API has a sign-in step: the admin key IS the credential,
-  // and neither needs a field from the source's config, so neither config is
-  // parsed. A source with an odd config that still holds a working key can
-  // still answer.
-  if (context.sourceType === ANTHROPIC_ADMIN_ADAPTER_ID) {
-    const apiKey = context.credentials.token;
-    if (!apiKey) return peopleRefused(NOT_CONFIGURED);
+// Neither admin API has a sign-in step: the admin key IS the credential, and
+// neither needs a field from the source's config, so neither config is parsed.
+// A source with an odd config that still holds a working key can still answer.
+async function listFromAnthropic({
+  context,
+  signal,
+}: ProviderListingRequest): Promise<PeopleListing> {
+  const apiKey = context.credentials.token;
+  if (!apiKey) return peopleRefused(NOT_CONFIGURED);
+  try {
     return await listAnthropicPeople({ apiKey, signal });
+  } catch (error) {
+    return peopleRefusedFromThrow(error);
   }
+}
 
-  if (context.sourceType === OPENAI_ADMIN_ADAPTER_ID) {
-    const apiKey = context.credentials.token;
-    if (!apiKey) return peopleRefused(NOT_CONFIGURED);
+async function listFromOpenAi({
+  context,
+  signal,
+}: ProviderListingRequest): Promise<PeopleListing> {
+  const apiKey = context.credentials.token;
+  if (!apiKey) return peopleRefused(NOT_CONFIGURED);
+  try {
     return await listOpenAiPeople({ apiKey, signal });
+  } catch (error) {
+    return peopleRefusedFromThrow(error);
   }
+}
 
-  if (context.sourceType === COPILOT_STUDIO_DATAVERSE_ADAPTER_ID) {
-    const config: CopilotStudioDataverseConfig =
-      copilotStudioDataversePullConfigSchema.parse(context.config);
+async function listFromCopilotStudio({
+  context,
+  signal,
+}: ProviderListingRequest): Promise<PeopleListing> {
+  const parsed = copilotStudioDataversePullConfigSchema.safeParse(
+    context.config,
+  );
+  if (!parsed.success) return peopleRefused(NOT_CONFIGURED);
+  const config: CopilotStudioDataverseConfig = parsed.data;
+
+  try {
     const token = await resolveEnvironmentToken({
       credentials: context.credentials,
       environmentUrl: config.environmentUrl,
       // The directory lives on Graph, not on the environment. A token minted
-      // for Dataverse is refused by Graph, so this is a second sign-in
-      // rather than a reuse of the one the transcript read makes.
+      // for Dataverse is refused by Graph, so this is a second sign-in rather
+      // than a reuse of the one the transcript read makes.
       scope: MICROSOFT_GRAPH_SCOPE,
       signal,
     });
     return await listMicrosoftPeople({ token, signal });
+  } catch (error) {
+    return peopleRefusedFromThrow(error);
   }
+}
 
-  if (context.sourceType === DATABRICKS_GENIE_ADAPTER_ID) {
-    const config: DatabricksGeniePullConfig =
-      databricksGeniePullConfigSchema.parse(context.config);
+async function listFromDatabricksGenie({
+  context,
+  signal,
+}: ProviderListingRequest): Promise<PeopleListing> {
+  const parsed = databricksGeniePullConfigSchema.safeParse(context.config);
+  if (!parsed.success) return peopleRefused(NOT_CONFIGURED);
+  const config: DatabricksGeniePullConfig = parsed.data;
+
+  try {
     const token = await resolveWorkspaceToken({
       credentials: context.credentials,
       workspaceUrl: config.workspaceUrl,
@@ -330,9 +403,9 @@ async function listPeopleFromProvider(params: {
       token,
       signal,
     });
+  } catch (error) {
+    return peopleRefusedFromThrow(error);
   }
-
-  return peopleRefused(NOT_CONFIGURED);
 }
 
 const NOT_CONFIGURED: PeopleListingRefusal = {
