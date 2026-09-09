@@ -4,6 +4,26 @@ import { deriveSourceHealth } from "@ee/governance/services/pullers/sourceHealth
 import { CircleAlert, CircleCheck, CircleDashed, CircleX } from "lucide-react";
 
 /**
+ * Health is derived at read time from the failure count below, so it only
+ * changes when a pull actually runs — and pulls run on the server's own
+ * schedule, never in response to anything this page does. Without a periodic
+ * refetch the badge keeps whatever it had at mount, so an admin who has just
+ * repaired a source's credentials watches a red badge that is already stale,
+ * and a source that started failing while the tab was open never turns red at
+ * all.
+ *
+ * Background polling stays off, because that reader is the only one this is
+ * for: an inventory tab left open behind other windows would otherwise keep
+ * an org-wide health query running for nobody. Focus is the cheap catch-up
+ * for the interval the hidden tab skipped.
+ */
+export const SOURCE_HEALTH_REFRESH = {
+  refetchOnWindowFocus: true,
+  refetchInterval: 30_000,
+  refetchIntervalInBackground: false,
+} as const;
+
+/**
  * What the source badge says, on the inventory list and the detail header.
  *
  * Two different questions share one badge. Status is what an admin
@@ -23,13 +43,6 @@ import { CircleAlert, CircleCheck, CircleDashed, CircleX } from "lucide-react";
  * through to fix an outage and finds nothing wrong. Configuration wins here
  * because health is only interesting about a source we are asking to run.
  */
-/** Refresh visible source health after scheduled pulls, without polling hidden tabs. */
-export const SOURCE_HEALTH_REFRESH = {
-  refetchOnWindowFocus: true,
-  refetchInterval: 30_000,
-  refetchIntervalInBackground: false,
-} as const;
-
 export interface SourceBadge {
   icon: typeof CircleCheck;
   label: string;

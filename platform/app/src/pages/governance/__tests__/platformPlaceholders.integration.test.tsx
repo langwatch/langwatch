@@ -401,21 +401,6 @@ describe("given the Analytics screen", () => {
 
 describe("given a Platform screen a member can press things on", () => {
   /**
-   * Every control the screen offers, by accessible name, so the assertion
-   * below is about the WHOLE surface rather than the controls a test
-   * remembered to name. Buttons only: links carry an href a reader can see,
-   * and the tabs and selects are covered by the scenarios above.
-   */
-  const controlNames = (Page: React.ComponentType) => {
-    renderPage(Page);
-    const names = screen
-      .getAllByRole("button")
-      .map((button) => button.textContent?.trim() ?? "");
-    cleanup();
-    return names;
-  };
-
-  /**
    * A control is inert when it is offered, looks pressable, and answers a
    * press with nothing. That is a property of the SOURCE — a `<Button>` with
    * no `onClick` — so it is read there rather than inferred from a render:
