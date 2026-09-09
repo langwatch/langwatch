@@ -157,6 +157,63 @@ const AGENTS_STATUS_SENTINEL = 418;
 const PEOPLE_STATUS_SENTINEL = 451;
 const WITHHELD_SENTINEL = 90_210;
 
+/**
+ * Every span attribute the ingestion-pull commands are allowed to export,
+ * command by command. Read from the live `getSpanAttributes` accessors, not
+ * from the source text.
+ *
+ * This is a closed set on purpose. The commands themselves are enumerated
+ * from the module's exports, so a new command appears here as a failure the
+ * moment it exists, and stays failing until somebody writes down what it puts
+ * on a span. That pause is the feature: it is the point at which to ask who
+ * can read the sink.
+ *
+ * Adding a line here is a decision about reach, not a formality. Nothing goes
+ * on a span that the whole engineering org should not be able to read.
+ */
+const DECLARED_SPAN_ATTRIBUTES: Record<string, string[]> = {
+  ConfigureIngestionPullCommand: ["payload.source_id"],
+  DisableIngestionPullCommand: ["payload.source_id"],
+  RecordIngestionPullRunCompletedCommand: [
+    "payload.event_count",
+    "payload.run_id",
+    "payload.source_id",
+  ],
+  RecordIngestionPullRunFailedCommand: ["payload.run_id", "payload.source_id"],
+  RequestIngestionPullAgentsListingCommand: [
+    "payload.request_id",
+    "payload.source_id",
+  ],
+  RecordIngestionPullAgentsListedCommand: [
+    "payload.agent_count",
+    "payload.request_id",
+    "payload.source_id",
+  ],
+  RecordIngestionPullAgentsListingRefusedCommand: [
+    "payload.reason",
+    "payload.request_id",
+    "payload.source_id",
+  ],
+  RequestIngestionPullPeopleListingCommand: [
+    "payload.request_id",
+    "payload.source_id",
+  ],
+  // The directory count is here and the withheld count is deliberately not.
+  // The provider named the directory figure and our erasure does not move it;
+  // the withheld figure counts erasures and was live on this span until
+  // 6eed79100a removed it.
+  RecordIngestionPullPeopleListedCommand: [
+    "payload.directory_person_count",
+    "payload.request_id",
+    "payload.source_id",
+  ],
+  RecordIngestionPullPeopleListingRefusedCommand: [
+    "payload.reason",
+    "payload.request_id",
+    "payload.source_id",
+  ],
+};
+
 function stateWithSentinels(): IngestionPullRunStatusData {
   return {
     SourceId: "source-1",
@@ -250,9 +307,13 @@ describe("given the listing outcome columns exist", () => {
           "customer's eyes, and it arrives without anyone deciding it should.",
           "",
           "Two of these are operator-only HTTP statuses. The third is the count",
-          "of people this deployment does not hold: safe as one current figure,",
-          "never as a series, and putting it on a row that other code copies,",
-          "caches and exports is how it quietly becomes a series.",
+          "of people this deployment does not hold. THE TEST IS THE REACH, NOT",
+          "THE SHAPE: reducing it to a single current figure does not make this",
+          "row an acceptable home for it. Our own stores may keep it per run and",
+          "deliberately do -- the event log and the run status row both hold it",
+          "-- because their readers are the ones we granted this tenant's data",
+          "to. This row is copied, cached and exported outward, so the readers",
+          "are no longer that set. That is what rules it out here, at any shape.",
           "",
           `Mirror was: ${JSON.stringify(mirror)}`,
         ].join("\n"),
@@ -286,33 +347,52 @@ describe("given the listing outcome columns exist", () => {
      * on a span is already too far, and no amount of aggregating makes it
      * acceptable.
      *
-     * Scoped to the withheld count. The two HTTP statuses are operator-only,
-     * and a span is an operator surface, so a status there is allowed; it is
-     * the reach past our boundary that rules this one number out.
+     * WHY THIS ASSERTS AN EXACT KEY SET RATHER THAN AN ABSENCE. The risk
+     * direction is ADD. A guard that says "the forbidden keys are not present"
+     * passes forever while new attributes accumulate beside it, because the
+     * absence of the names we thought of is not the absence of the names we
+     * did not -- and the next leak will be a field nobody has imagined yet.
+     * Only an exact set fails when something appears. Note too that a VALUE
+     * check would not have caught the shipped leak: the key was the defect.
      *
-     * Every command in the pipeline is checked rather than the four listing
-     * ones, so a count copied onto an unrelated span is caught too.
+     * So every command's attribute keys are declared below, and a command that
+     * is not declared fails. That is deliberate friction. A new command cannot
+     * reach production until somebody writes down what it puts on a span,
+     * which is exactly the moment to ask whether it should.
+     *
+     * The commands are enumerated from the module's exports, never a
+     * hand-written array: a hand-written list means the fifth command, added
+     * next month with a leaky attribute, is simply not covered and the suite
+     * stays green by omission -- today's failure wearing a test's clothes.
      */
-    it("carries no withheld count on any command's span", () => {
-      const listingData = {
+    it("puts exactly the declared attributes on every command's span", () => {
+      // A payload populated for every command in the module, with the withheld
+      // count set to a sentinel: if any span ever carries it, the value is
+      // recognisable and not a coincidence.
+      const payload = {
         sourceId: "source-1",
+        runId: "run-1",
         requestId: "request-1",
         requestedAt: 1_000,
+        scheduledFor: 1_000,
+        occurredAt: 1_000,
+        eventCount: 3,
         agentCount: 7,
         directoryPersonCount: 30,
         withheldPersonCount: WITHHELD_SENTINEL,
         reason: "listing_failed",
         status: PEOPLE_STATUS_SENTINEL,
+        cron: "* * * * *",
+        cursor: "cursor-A",
+        error: "boom",
+        errorCode: "code",
       };
 
       // Every exported command that defines span attributes, discovered from
-      // the module rather than listed here: a new command gets this guard
-      // without anyone remembering to add it.
-      //
-      // The real attribute functions are EXECUTED. Reading the source for the
-      // string would pass just as happily against a dead code path, and it was
-      // running one of these that proved the original leak was live rather
-      // than vestigial.
+      // the module. The real attribute functions are EXECUTED: reading the
+      // source for a string would pass just as happily against a dead code
+      // path, and it was running one of these that proved the original leak
+      // was live rather than vestigial.
       const commands = Object.entries(pipelineCommands).filter(
         ([, value]) =>
           typeof (value as { getSpanAttributes?: unknown })
@@ -321,63 +401,54 @@ describe("given the listing outcome columns exist", () => {
 
       expect(
         commands.length,
-        "No command in the pipeline exposes span attributes. Either the module moved or the accessor was renamed; either way this guard is now scanning nothing.",
-      ).toBeGreaterThan(0);
+        "No command in the pipeline exposes span attributes. Either the module moved or the accessor was renamed -- note that the source writes `spanAttributes` while the built command exposes `getSpanAttributes` -- and either way this guard is now scanning nothing.",
+      ).toBe(Object.keys(DECLARED_SPAN_ATTRIBUTES).length);
 
       // Note the accessor name. An earlier draft of this test reached for a
       // property called `spanAttributes`, got `undefined`, defaulted to `{}`
       // and passed against a span that really was carrying the count. The
       // optional chaining turned the guard into decoration and nothing said
-      // so, which is why the filter above asserts a non-empty set rather than
-      // trusting that it found something.
-      const offenders: string[] = [];
+      // so, which is why the count above is asserted rather than assumed.
+      const actual: Record<string, string[]> = {};
       for (const [name, command] of commands) {
-        let attributes: unknown;
-        try {
-          attributes = command.getSpanAttributes?.(listingData as never);
-        } catch {
-          // A command whose attribute function cannot read this payload is not
-          // one that carries our field; only the people-listed data shape has
-          // a withheld count at all.
-          continue;
-        }
-        if (typeof attributes !== "object" || attributes === null) continue;
-
-        for (const [key, value] of Object.entries(attributes)) {
-          if (value === WITHHELD_SENTINEL || /withheld/i.test(key)) {
-            offenders.push(`${name}: ${key}=${String(value)}`);
-          }
-        }
+        const attributes = command.getSpanAttributes?.(payload as never);
+        actual[name] = Object.keys(attributes ?? {}).sort();
       }
 
       expect(
-        offenders,
+        actual,
         [
-          "A command puts the withheld people count on a telemetry span.",
+          "A command's span attributes are not the declared set.",
           "",
-          `Offending attributes: ${offenders.join(", ")}.`,
+          "If a key was ADDED: a span leaves over a plain exporter to a backend",
+          "with its own retention, readable by every engineer with a dashboard",
+          "login -- far wider than the set we granted this tenant's data to.",
+          "Whatever you just put there is now readable by all of them.",
           "",
-          "That number counts the people this deployment erased and does not",
-          "hold. A span leaves over a plain exporter to a backend with its own",
-          "retention and a reader set of every engineer with a dashboard login",
-          "-- readers far wider than the set we granted this tenant's data to.",
+          "`payload.withheld_person_count` is the one that has already escaped",
+          "this way, and it must never come back. That number counts the people",
+          "this deployment erased and does not hold. THE TEST IS THE REACH, NOT",
+          "THE SHAPE: keeping it per run inside our boundary is fine and we do",
+          "it deliberately -- the event log and the run status row both hold it,",
+          "because an operator entitled to it needs to see the count move.",
+          "Reducing it to a single current figure does NOT make a span",
+          "acceptable; crossing the boundary is the problem, so even one value",
+          "there is already too far. 'No names on spans' is not a sufficient",
+          "test for it either: the COUNT is the sensitive fact, because it",
+          "counts erasures. N to N+1 at a known moment says an erasure happened",
+          "then, and on a small tenant that identifies the person as surely as a",
+          "name would. `payload.directory_person_count` is fine and stays -- it",
+          "is what the provider named, which our erasure does not move.",
           "",
-          "THE TEST IS THE REACH, NOT THE SHAPE. Keeping it per run is fine",
-          "inside our boundary and we do it deliberately: the event log and the",
-          "run status row both hold it, because an operator entitled to it needs",
-          "to see the count move. Reducing it to a single current figure does",
-          "NOT make a span acceptable -- crossing the boundary is the problem,",
-          "so even one value there is already too far.",
+          "If a whole COMMAND is unlisted: say what it puts on a span by adding",
+          "it to DECLARED_SPAN_ATTRIBUTES above. That is the point of this",
+          "test, not an obstacle to it -- an exact set is the only kind that",
+          "fails when someone adds a field, and adding is the risk here.",
           "",
-          "'No names on spans' is not a sufficient test for this field. The",
-          "COUNT is the sensitive fact, because it counts erasures: N to N+1 at",
-          "a known moment says an erasure happened then, and on a small tenant",
-          "that identifies the person as surely as a name would.",
-          "",
-          "The directory count may stay -- it is what the provider named, which",
-          "our erasure does not move. Adding any new sink: ask who can read it.",
+          "Before declaring anything new, ask who can read the sink. If that is",
+          "anyone beyond the readers of this tenant's data, it does not go there.",
         ].join("\n"),
-      ).toEqual([]);
+      ).toEqual(DECLARED_SPAN_ATTRIBUTES);
     });
   });
 
