@@ -173,7 +173,7 @@ export type ApiResponsePrompt = z.infer<typeof apiResponsePromptWithVersionDataS
 /**
  * The prompt reads and writes this family makes.
  */
-export type PromptRestService = PromptApp["promptService"];
+export type PromptRestService = PromptApp;
 
 /**
  * The organization-wide guard a tag rename or delete must pass. The prompt

@@ -3,6 +3,7 @@
  */
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import {
+  PromptApi,
   hoistSystemMessage,
   PromptNotFoundError,
   PromptTagConflictError,
@@ -136,18 +137,16 @@ function asHandledTagError(error: unknown): never {
   throw error;
 }
 
-export class PromptApp {
+export class PromptApp implements PromptApi {
+  static readonly contract = PromptApi;
   static create(dependencies: PromptAppDependencies): PromptApp {
     return new PromptApp(dependencies);
   }
 
-  private constructor(private readonly dependencies: PromptAppDependencies) {}
+  #dependencies: PromptAppDependencies;
 
-  /**
-   * The prompt service in full, raw, for the credential-authenticated door.
-   */
-  get promptService(): PromptService {
-    return this.dependencies.prompts;
+  private constructor(dependencies: PromptAppDependencies) {
+    this.#dependencies = dependencies;
   }
 
   // -- the library -----------------------------------------------------------
@@ -158,7 +157,47 @@ export class PromptApp {
     organizationId?: string;
     version?: "latest" | "all";
   }): Promise<VersionedPrompt[]> {
-    return this.dependencies.prompts.getAllPrompts(input);
+    return this.#dependencies.prompts.getAllPrompts(input);
+  }
+
+  getAllPrompts(input: { projectId: string; organizationId?: string; version?: "latest" | "all" }) {
+    return this.#dependencies.prompts.getAllPrompts(input);
+  }
+
+  tryGetPromptByIdOrHandle(input: PromptReference & { organizationId?: string }) {
+    return this.#dependencies.prompts.tryGetPromptByIdOrHandle(input);
+  }
+
+  getAllVersions(input: { idOrHandle: string; projectId: string; organizationId?: string }) {
+    return this.#dependencies.prompts.getAllVersions(input);
+  }
+
+  createPrompt(input: CreatePromptCommand) {
+    return this.#dependencies.prompts.createPrompt(input);
+  }
+
+  updatePrompt(input: UpdatePromptCommand) {
+    return this.#dependencies.prompts.updatePrompt(input);
+  }
+
+  syncPrompt(input: Record<string, unknown>) {
+    return this.#dependencies.prompts.syncPrompt(input);
+  }
+
+  listTags(input: { organizationId: string }) {
+    return this.#dependencies.prompts.listTags(input);
+  }
+
+  createTag(input: { organizationId: string; name: string; createdById?: string }) {
+    return this.#dependencies.prompts.createTag(input);
+  }
+
+  renameTag(input: { organizationId: string; oldName: string; newName: string }) {
+    return this.#dependencies.prompts.renameTag(input);
+  }
+
+  tryDeleteTagByName(input: { organizationId: string; name: string }) {
+    return this.#dependencies.prompts.tryDeleteTagByName(input);
   }
 
   /** One prompt, or null when the project has none by that id or handle. */
@@ -166,7 +205,7 @@ export class PromptApp {
     input: PromptReference & { organizationId?: string },
   ): Promise<VersionedPrompt | null> {
     try {
-      return await this.dependencies.prompts.tryGetPromptByIdOrHandle(input);
+      return await this.#dependencies.prompts.tryGetPromptByIdOrHandle(input);
     } catch (error) {
       asHandledTagError(error);
     }
@@ -189,7 +228,7 @@ export class PromptApp {
     projectId: string;
     organizationId?: string;
   }): Promise<VersionedPrompt[]> {
-    return this.dependencies.prompts.getAllVersions(input);
+    return this.#dependencies.prompts.getAllVersions(input);
   }
 
   /** Whether a handle is still free in the project or its organization. */
@@ -198,7 +237,7 @@ export class PromptApp {
     projectId: string;
     scope: "PROJECT" | "ORGANIZATION";
   }): Promise<boolean> {
-    return this.dependencies.prompts.checkHandleUniqueness(input);
+    return this.#dependencies.prompts.checkHandleUniqueness(input);
   }
 
   /** Whether this prompt may be modified or deleted from this project. */
@@ -207,12 +246,12 @@ export class PromptApp {
     projectId: string;
     organizationId?: string;
   }): Promise<PromptModifyPermission> {
-    return this.dependencies.prompts.checkModifyPermission(input);
+    return this.#dependencies.prompts.checkModifyPermission(input);
   }
 
   /** Creates a prompt and its first version, attributed to its caller. */
   create(input: Omit<CreatePromptCommand, "authorId">, by: PromptCaller): Promise<VersionedPrompt> {
-    return this.dependencies.prompts.createPrompt({ ...input, authorId: by.id });
+    return this.#dependencies.prompts.createPrompt({ ...input, authorId: by.id });
   }
 
   /** Writes a new version of a prompt, attributed to its caller. */
@@ -222,7 +261,7 @@ export class PromptApp {
     },
     by: PromptCaller,
   ): Promise<VersionedPrompt> {
-    return this.dependencies.prompts.updatePrompt({
+    return this.#dependencies.prompts.updatePrompt({
       ...input,
       data: { ...input.data, authorId: by.id },
     });
@@ -232,15 +271,15 @@ export class PromptApp {
    * Changes only the handle and the scope.
    */
   updateHandle(input: UpdatePromptHandleCommand): Promise<VersionedPrompt> {
-    return this.dependencies.prompts.updateHandle(input);
+    return this.#dependencies.prompts.updateHandle(input);
   }
 
   /** Makes a stored version current again, attributed to its caller. */
   restoreVersion(
     input: { versionId: string; projectId: string; organizationId?: string },
-    by: PromptCaller,
+    by?: PromptCaller,
   ): Promise<VersionedPrompt> {
-    return this.dependencies.prompts.restoreVersion({ ...input, authorId: by.id });
+    return this.#dependencies.prompts.restoreVersion({ ...input, authorId: by?.id });
   }
 
   /** Removes a prompt from the project. */
@@ -249,23 +288,35 @@ export class PromptApp {
     projectId: string;
     organizationId?: string;
   }): Promise<PromptDeleteResult> {
-    return this.dependencies.prompts.deletePrompt(input);
+    return this.#dependencies.prompts.deletePrompt(input);
+  }
+
+  deletePrompt(input: { idOrHandle: string; projectId: string; organizationId?: string }) {
+    return this.delete(input);
   }
 
   // -- copies ----------------------------------------------------------------
 
   /** Every prompt copied from this one, across projects. */
   listCopies(input: { sourcePromptId: string }): Promise<PromptCopySummary[]> {
-    return this.dependencies.prompts.listCopies(input);
+    return this.#dependencies.prompts.listCopies(input);
   }
 
   /**
    * Where this prompt was copied from, refusing when it was not copied at all.
    */
   async getCopySource(input: { promptId: string }): Promise<PromptCopySource> {
-    const source = await this.dependencies.prompts.tryGetCopySource(input);
+    const source = await this.#dependencies.prompts.tryGetCopySource(input);
     if (!source) throw new PromptNotACopyError();
     return source;
+  }
+
+  getNamesByIds(input: { ids: string[]; projectId: string; organizationId: string }) {
+    return this.#dependencies.prompts.getNamesByIds(input);
+  }
+
+  getExistingIds(input: { ids: string[]; projectId: string; organizationId: string }) {
+    return this.#dependencies.prompts.getExistingIds(input);
   }
 
   /** Copies a prompt into another project, attributed to its caller. */
@@ -273,7 +324,7 @@ export class PromptApp {
     input: { idOrHandle: string; sourceProjectId: string; targetProjectId: string },
     by: PromptCaller,
   ): Promise<VersionedPrompt & { copiedFromPromptId: string }> {
-    return this.dependencies.prompts.copyPrompt({ ...input, authorId: by.id });
+    return this.#dependencies.prompts.copyPrompt({ ...input, authorId: by.id });
   }
 
   /** Duplicates a prompt inside its own project, attributed to its caller. */
@@ -281,7 +332,7 @@ export class PromptApp {
     input: { idOrHandle: string; projectId: string },
     by: PromptCaller,
   ): Promise<VersionedPrompt> {
-    return this.dependencies.prompts.duplicatePrompt({ ...input, authorId: by.id });
+    return this.#dependencies.prompts.duplicatePrompt({ ...input, authorId: by.id });
   }
 
   /**
@@ -302,7 +353,7 @@ export class PromptApp {
       messages: source.messages,
     });
 
-    return this.dependencies.prompts.updatePrompt({
+    return this.#dependencies.prompts.updatePrompt({
       idOrHandle: input.targetIdOrHandle,
       projectId: input.targetProjectId,
       data: {
@@ -356,14 +407,14 @@ export class PromptApp {
    * The organization's tag catalog, reached through the project the caller named.
    */
   async listTagsForProject(input: { projectId: string }): Promise<PromptTag[]> {
-    return this.dependencies.prompts.listTags({
-      organizationId: await this.organizationOf(input.projectId),
+    return this.#dependencies.prompts.listTags({
+      organizationId: await this.#organizationOf(input.projectId),
     });
   }
 
   /** Every tag currently assigned to one prompt's versions. */
   getTagsForConfig(input: { configId: string; projectId: string }): Promise<PromptTagAssignment[]> {
-    return this.dependencies.prompts.getTagsForConfig(input);
+    return this.#dependencies.prompts.getTagsForConfig(input);
   }
 
   /** Adds a custom tag to the organization's catalog, attributed to its caller. */
@@ -371,9 +422,9 @@ export class PromptApp {
     input: { projectId: string; name: string },
     by: PromptCaller,
   ): Promise<PromptTag> {
-    const organizationId = await this.organizationOf(input.projectId);
+    const organizationId = await this.#organizationOf(input.projectId);
     try {
-      return await this.dependencies.prompts.createTag({
+      return await this.#dependencies.prompts.createTag({
         organizationId,
         name: input.name,
         createdById: by.id,
@@ -389,8 +440,8 @@ export class PromptApp {
    * the set a caller has to be allowed to act on, not just the one they named.
    */
   async projectsSharingTagCatalog(input: { projectId: string }): Promise<string[]> {
-    const organizationId = await this.organizationOf(input.projectId);
-    return this.dependencies.projects.listIdsByOrganization({ organizationId });
+    const organizationId = await this.#organizationOf(input.projectId);
+    return this.#dependencies.projects.listIdsByOrganization({ organizationId });
   }
 
   /**
@@ -423,9 +474,9 @@ export class PromptApp {
     oldName: string;
     newName: string;
   }): Promise<PromptTag> {
-    const organizationId = await this.organizationOf(input.projectId);
+    const organizationId = await this.#organizationOf(input.projectId);
     try {
-      return await this.dependencies.prompts.renameTag({
+      return await this.#dependencies.prompts.renameTag({
         organizationId,
         oldName: input.oldName,
         newName: input.newName,
@@ -437,18 +488,15 @@ export class PromptApp {
 
   /** Deletes a tag definition, cascading to its assignments. */
   async deleteTagForProject(input: { projectId: string; name: string }): Promise<PromptTag> {
-    const organizationId = await this.organizationOf(input.projectId);
-    const deleted = await this.tryDeleteTag({ organizationId, name: input.name });
+    const organizationId = await this.#organizationOf(input.projectId);
+    const deleted = await this.#tryDeleteTag({ organizationId, name: input.name });
     if (!deleted) throw new PromptTagMissingError(input.name);
     return deleted;
   }
 
-  private async tryDeleteTag(input: {
-    organizationId: string;
-    name: string;
-  }): Promise<PromptTag | null> {
+  async #tryDeleteTag(input: { organizationId: string; name: string }): Promise<PromptTag | null> {
     try {
-      return await this.dependencies.prompts.tryDeleteTagByName(input);
+      return await this.#dependencies.prompts.tryDeleteTagByName(input);
     } catch (error) {
       asHandledTagError(error);
     }
@@ -456,17 +504,23 @@ export class PromptApp {
 
   /** Points a tag at one prompt version, attributed to its caller. */
   async assignTag(
-    input: { configId: string; versionId: string; tag: string; projectId: string },
-    by: PromptCaller,
+    input: {
+      configId: string;
+      versionId: string;
+      tag: string;
+      projectId: string;
+      organizationId?: string;
+    },
+    by?: PromptCaller,
   ): Promise<PromptTagAssignment> {
     try {
-      return await this.dependencies.prompts.assignTag({ ...input, userId: by.id });
+      return await this.#dependencies.prompts.assignTag({ ...input, userId: by?.id });
     } catch (error) {
       asHandledTagError(error);
     }
   }
 
-  private organizationOf(projectId: string): Promise<string> {
-    return this.dependencies.projects.getOrganizationId(projectId);
+  async #organizationOf(projectId: string): Promise<string> {
+    return this.#dependencies.projects.getOrganizationId(projectId);
   }
 }

@@ -3,9 +3,11 @@ export * from "./prompt.commands.ts";
 export * from "./prompt.trpc-schemas.ts";
 export * from "./prompt.errors.ts";
 export * from "./prompt.service.ts";
+export * from "./prompt.api.ts";
 export * from "./prompt.shorthand.ts";
 export * from "./prompt.tags.ts";
 export * from "./prompt.trace-reference.ts";
+export * from "./trace-prompt-reference.ts";
 export * from "./prompt.enums.ts";
 export {
   nodeDatasetSchema,

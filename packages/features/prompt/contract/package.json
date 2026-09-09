@@ -24,6 +24,7 @@
   "dependencies": {
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
