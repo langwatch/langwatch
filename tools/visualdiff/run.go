@@ -44,14 +44,15 @@ type Streams struct {
 // lets a test assert that teardown happened after a failed capture without
 // booting anything.
 type Deps struct {
-	Run       runner
-	Start     func(ctx context.Context, stack Stack, logDir string) (func(), error)
-	Wait      func(ctx context.Context, urls []string, timeout time.Duration) error
-	Seed      func(ctx context.Context, request SeedRequest) (SeedResult, error)
-	Capture   func(ctx context.Context, plan RunnerPlan, options CaptureOptions) (RunnerStream, error)
-	Listening func(port int) bool
-	Layout    func(dir string) (Layout, error)
-	Now       func() time.Time
+	Run           runner
+	Start         func(ctx context.Context, stack Stack, logDir string) (func(), error)
+	Wait          func(ctx context.Context, urls []string, timeout time.Duration) error
+	Seed          func(ctx context.Context, request SeedRequest) (SeedResult, error)
+	Capture       func(ctx context.Context, plan RunnerPlan, options CaptureOptions) (RunnerStream, error)
+	Listening     func(port int) bool
+	Layout        func(dir string) (Layout, error)
+	Now           func() time.Time
+	AllocateRedis func(ctx context.Context) (RedisAllocation, error)
 }
 
 // Request is everything Execute needs: what to run, what to render, and what
@@ -116,6 +117,9 @@ func (deps *Deps) fill() {
 	if deps.Start == nil {
 		deps.Start = StartStack
 	}
+	if deps.AllocateRedis == nil {
+		deps.AllocateRedis = ResolveRedisAllocation
+	}
 }
 
 func (options *Options) fill(now func() time.Time) {
@@ -160,6 +164,17 @@ func Execute(ctx context.Context, request Request, streams Streams) (Result, err
 		return result, fmt.Errorf("ports %s are already in use — another stack is up; pass -base-port to move both stacks",
 			renderPorts(held))
 	}
+
+	// Allocated last, right before anything boots: a dry run never reaches
+	// here, so it never opens a Redis connection or shells out to haven.
+	redisAllocation, err := deps.AllocateRedis(ctx)
+	if err != nil {
+		return result, fmt.Errorf("redis allocation: %w", err)
+	}
+	plan.Base.RedisDBIndex = strconv.Itoa(redisAllocation.Base)
+	plan.Candidate.RedisDBIndex = strconv.Itoa(redisAllocation.Candidate)
+	result.Plan = plan
+	fmt.Fprintf(streams.Err, "redis: base db %s, candidate db %s\n", plan.Base.RedisDBIndex, plan.Candidate.RedisDBIndex)
 
 	run := &session{request: request, streams: streams, plan: plan}
 	teardown := Teardown{Root: options.Root, Run: deps.Run, Listening: deps.Listening, Log: streams.Err, Keep: options.Keep}

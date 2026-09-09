@@ -92,6 +92,13 @@ type Refs struct {
 	Candidate string
 }
 
+// PendingRedisDBIndex is what a stack's RedisDBIndex reads as before the run
+// has allocated real ones - the dry-run preview never opens a Redis
+// connection, so it has nothing else to show. Execute overwrites both
+// stacks' RedisDBIndex with the outcome of AllocateRedisDBs before it boots
+// anything for real.
+const PendingRedisDBIndex = "auto"
+
 // PlanStacks allocates both stacks. The stride keeps every port distinct: no
 // derived port of one stack can equal a derived port of the other, because
 // the derivations are the same affine functions of two base ports that differ
@@ -103,7 +110,7 @@ func PlanStacks(basePort int, refs Refs, runDir string) (Stack, Stack) {
 		Dir:          filepath.Join(runDir, "base"),
 		BasePort:     basePort,
 		Ports:        PortsFor(basePort),
-		RedisDBIndex: "13",
+		RedisDBIndex: PendingRedisDBIndex,
 	}
 	candidate := Stack{
 		Name:         "candidate",
@@ -111,7 +118,7 @@ func PlanStacks(basePort int, refs Refs, runDir string) (Stack, Stack) {
 		Dir:          filepath.Join(runDir, "candidate"),
 		BasePort:     basePort + PortStride,
 		Ports:        PortsFor(basePort + PortStride),
-		RedisDBIndex: "12",
+		RedisDBIndex: PendingRedisDBIndex,
 	}
 	return base, candidate
 }

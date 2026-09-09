@@ -23,8 +23,12 @@ func TestPlanStacksAllocatesDistinctPorts(t *testing.T) {
 			seen[port] = name
 		}
 	}
-	if base.RedisDBIndex == candidate.RedisDBIndex {
-		t.Fatalf("both stacks would share redis database %s", base.RedisDBIndex)
+	// The real redis database indices are decided at run time by
+	// AllocateRedisDBs (see redis_allocation_test.go) and only written onto
+	// the plan right before a real run boots - PlanStacks itself only knows
+	// the placeholder both stacks start with.
+	if base.RedisDBIndex != PendingRedisDBIndex || candidate.RedisDBIndex != PendingRedisDBIndex {
+		t.Fatalf("PlanStacks should leave both stacks on the pending placeholder: %q, %q", base.RedisDBIndex, candidate.RedisDBIndex)
 	}
 }
 

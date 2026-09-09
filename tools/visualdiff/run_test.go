@@ -46,6 +46,9 @@ func passingDeps(fake *fakeRunner, captures []Capture, diffs []Diff) Deps {
 		Listening: func(int) bool { return false },
 		Layout:    func(string) (Layout, error) { return LayoutModular, nil },
 		Now:       func() time.Time { return time.Unix(0, 0).UTC() },
+		AllocateRedis: func(context.Context) (RedisAllocation, error) {
+			return RedisAllocation{Base: 3, Candidate: 4}, nil
+		},
 	}
 }
 
