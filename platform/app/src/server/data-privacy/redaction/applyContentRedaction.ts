@@ -17,6 +17,16 @@ const NATIVE_PII_ENTITY_SET: ReadonlySet<string> = new Set(
 );
 
 /**
+ * Attributes whose exact names describe non-credential Better Auth
+ * observability values. They bypass only the sensitive-name deny-list; their
+ * values still run through every secret and personal-data rule below.
+ */
+const SENSITIVE_NAME_RULE_EXEMPT_ATTRIBUTES: ReadonlySet<string> = new Set([
+  "better_auth.context",
+  "better_auth.hook.type",
+]);
+
+/**
  * The native essential identifiers a resolved policy redacts in-process:
  * `"all"` for the essential and strict levels (the full floor), the selected
  * native subset for custom, or `null` when PII is disabled. Identifiers the
@@ -157,8 +167,9 @@ export function isIdentifierAttributeName(key: string): boolean {
  * that go on shape alone.
  *
  * A name {@link isIdentifierAttributeName} accepts skips both the deny-list and
- * the shape-only value rules. Every other rule runs as it does on any other
- * attribute.
+ * the shape-only value rules. An exact name in
+ * {@link SENSITIVE_NAME_RULE_EXEMPT_ATTRIBUTES} skips only the deny-list; every
+ * value rule still runs. Every other attribute runs all rules.
  */
 export function redactAttributeNative({
   key,
@@ -174,10 +185,12 @@ export function redactAttributeNative({
   compiledPiiExceptions?: readonly RegExp[];
 }): { text: string; redactedCount: number } {
   const namesAnIdentifier = isIdentifierAttributeName(key);
+  const isExemptFromSensitiveNameRule =
+    namesAnIdentifier || SENSITIVE_NAME_RULE_EXEMPT_ATTRIBUTES.has(key);
   if (
     policy.secrets.enabled &&
     value.length > 0 &&
-    !namesAnIdentifier &&
+    !isExemptFromSensitiveNameRule &&
     isSensitiveAttributeKey(key)
   ) {
     return { text: SECRETS_REDACTION_MARKER, redactedCount: 1 };
