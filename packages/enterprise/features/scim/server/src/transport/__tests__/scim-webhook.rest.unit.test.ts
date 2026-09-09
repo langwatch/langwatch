@@ -1,19 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
+ * @vitest-environment node
  * @see packages/enterprise/features/scim/specs/scim.feature
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import { ScimService } from "@langwatch/enterprise-scim-contract";
 import { createHmac } from "node:crypto";
-import { Hono } from "hono";
-import type { ErrorHandler } from "hono";
+
+import { createRestRuntime } from "@langwatch/api/rest";
 import { describe, expect, it, vi } from "vitest";
 
-import { createScimWebhookRestApp } from "../scim-webhook-intake.api.ts";
-import { Temporal } from "@langwatch/time";
+import { scimWebhookRest } from "../scim-webhook.rest.ts";
+import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
 
 const SECRET = "deployment-shared-secret";
-const NOW = Temporal.Instant.from("2026-09-04T10:00:00.000Z");
 
 const createEvent = [
   {
@@ -23,58 +21,59 @@ const createEvent = [
   },
 ];
 
-class ScimServiceFake extends ScimService {
-  readonly verifyToken = vi.fn(async ({ token }: { token: string }) =>
-    token === "scim_token_attacker"
-      ? ({ status: "ok", organizationId: "org_attacker", connectionId: null } as const)
-      : token === "scim_token_victim"
-        ? ({ status: "ok", organizationId: "org_victim", connectionId: null } as const)
-        : ({ status: "invalid_token" } as const),
-  );
-  readonly createUser = vi.fn(async () => ({}) as never);
-  readonly tryFindOrganizationBySsoDomain = vi.fn(async () => ({ id: "org_victim" }));
-  readonly listUsers = vi.fn();
-  readonly deleteUser = vi.fn();
-  readonly generateToken = vi.fn();
-  readonly listTokens = vi.fn();
-  readonly revokeToken = vi.fn();
-  readonly revokeTokensForConnection = vi.fn();
-  readonly getUser = vi.fn();
-  readonly replaceUser = vi.fn();
-  readonly updateUser = vi.fn();
-  readonly listGroups = vi.fn();
-  readonly getGroup = vi.fn();
-  readonly createGroup = vi.fn();
-  readonly replaceGroup = vi.fn();
-  readonly updateGroup = vi.fn();
-  readonly deleteGroup = vi.fn();
+/** The two tokens this file presents, and the tenant each names. */
+const DIRECTORY_TOKENS: Readonly<Record<string, string>> = {
+  scim_token_attacker: "org_attacker",
+  scim_token_victim: "org_victim",
+};
+
+class DirectoryFake extends ScimServiceFake {
+  override readonly verifyToken = vi.fn(async ({ token }: { token: string }) => {
+    const organizationId = DIRECTORY_TOKENS[token];
+
+    return organizationId
+      ? ({ status: "ok", organizationId, connectionId: null } as const)
+      : ({ status: "invalid_token" } as const);
+  });
+  override readonly createUser = vi.fn(async () => ({}) as never);
+  override readonly tryFindOrganizationBySsoDomain = vi.fn(async () => ({ id: "org_victim" }));
 }
 
 function signature(body: string, options: { secret?: string; atSeconds?: number } = {}): string {
-  const t = options.atSeconds ?? Math.floor(NOW.epochMilliseconds / 1000);
+  const t = options.atSeconds ?? Math.floor(Date.now() / 1000);
   const digest = createHmac("sha256", options.secret ?? SECRET)
     .update(`${t}.${body}`)
     .digest("hex");
+
   return `t=${t},v1=${digest}`;
 }
 
 function mount(options: { secret?: string | undefined } = {}) {
-  const scim = new ScimServiceFake();
-  const hono = new Hono().route(
-    "/",
-    createScimWebhookRestApp({
-      security: passThroughSecurity(),
-      ports: {
-        scim: () => scim,
-        webhookSecret: () => ("secret" in options ? options.secret : SECRET),
-        now: () => NOW,
+  const scim = new DirectoryFake();
+  const { app } = scimTestApp({
+    scim,
+    webhookSecret: "secret" in options ? options.secret : SECRET,
+  });
+
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new Error("This family resolves its own credential.");
       },
-    }),
-  );
+    },
+  });
+
+  const hono = runtime.mount(scimWebhookRest.router(), {
+    app: () => app,
+    credential: "public",
+    onError: (error, context) => context.json({ error: String(error) }, 500),
+  });
+
   return {
     scim,
     post: (init: { body: unknown; headers?: Record<string, string> }) => {
       const body = JSON.stringify(init.body);
+
       return hono.fetch(
         new Request("http://api.test/api/webhooks/auth0-scim", {
           method: "POST",
@@ -83,35 +82,7 @@ function mount(options: { secret?: string | undefined } = {}) {
         }),
       );
     },
-    sign: signature,
   };
-}
-
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("This family resolves its own credential.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
 }
 
 describe("given the Auth0 SCIM webhook intake", () => {
@@ -130,6 +101,7 @@ describe("given the Auth0 SCIM webhook intake", () => {
       });
 
       expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ received: true });
       expect(api.scim.createUser).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: "org_attacker" }),
       );
@@ -149,6 +121,7 @@ describe("given the Auth0 SCIM webhook intake", () => {
       });
 
       expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
       expect(api.scim.createUser).not.toHaveBeenCalled();
     });
   });
@@ -202,7 +175,7 @@ describe("given the Auth0 SCIM webhook intake", () => {
         headers: {
           authorization: "Bearer scim_token_attacker",
           "x-langwatch-signature": signature(JSON.stringify(body), {
-            atSeconds: Math.floor(NOW.epochMilliseconds / 1000) - 3600,
+            atSeconds: Math.floor(Date.now() / 1000) - 3600,
           }),
         },
       });
@@ -220,6 +193,27 @@ describe("given the Auth0 SCIM webhook intake", () => {
       const response = await api.post({ body: createEvent });
 
       expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({ error: "Webhook not configured" });
+    });
+  });
+});
+
+describe("given the Auth0 SCIM webhook declaration", () => {
+  const declaration = scimWebhookRest.router();
+
+  describe("when its address and door are read", () => {
+    it("publishes the one literal path Auth0 holds, with no twin and no credential", () => {
+      expect(declaration.addressing).toBe("literal");
+      expect(declaration.v1Twin).toBe(false);
+      expect(declaration.routes.map((route) => `${route.method} ${route.path}`)).toEqual([
+        "post /api/webhooks/auth0-scim",
+      ]);
+      expect(declaration.routes[0]?.access?.kind).toBe("public");
+      // The HMAC is computed over these exact characters.
+      expect(declaration.routes[0]?.rawBody).toEqual({
+        form: "text",
+        mediaType: "application/json",
+      });
     });
   });
 });

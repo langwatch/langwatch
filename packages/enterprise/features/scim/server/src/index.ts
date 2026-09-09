@@ -1,26 +1,25 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The feature's application: the one typed thing its transports are given.
- * Every door reaches the same object, so a rule written on it is the rule
- * every door gets.
+ * The installer, the transport declarations a process mounts, and the two
+ * adapters that build what the installer's infrastructure asks for.
  */
 export {
-  ScimApp,
-  type IssuedScimToken,
-  type ScimAppDependencies,
+  scimServer,
+  type ScimInfrastructure,
+  type ScimManagementAuditPort,
   type ScimPlanProvider,
-} from "./app/scim.app.ts";
-// The tRPC transport is not exported: it still names the deleted legacy builder.
-export { createScimTokensRestApp } from "./transport/api-rest/scim.api.ts";
-// The SCIM 2.0 protocol family itself, and the Auth0 webhook intake beside it.
-// Both take the application as a provider rather than a request context, so a
-// process that composed no Enterprise SCIM cannot mount either by accident.
-export { createScimProtocolRestApp } from "./transport/api-rest/scim-protocol.api.ts";
+} from "./scim.server.ts";
+
+// The four declared doors: three REST families and one tRPC namespace, each
+// inert until a process mounts it on its own runtime.
+export { scimTokenRest, scimTokenRestActor } from "./transport/scim-token.rest.ts";
+export { scimTokenTrpcTransport } from "./transport/scim-token.trpc.ts";
 export {
-  createScimWebhookRestApp,
-  type ScimWebhookRestPorts,
-} from "./transport/api-rest/scim-webhook-intake.api.ts";
-export * from "./transport/api-rest/scim-openapi.api.ts";
-export { ScimWebhookApi } from "./transport/api-rest/scim-webhook.api.ts";
+  scimProtocolErrorHandler,
+  scimProtocolRest,
+} from "./transport/scim-protocol.rest.ts";
+export { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
+
 export { PostgresScimAdapter, type PostgresScimAdapterOptions } from "./adapters/scim.adapter.ts";
 export {
   ScimSyncLifecyclePort,

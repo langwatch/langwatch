@@ -5,7 +5,7 @@ import {
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ScimWebhookApi } from "../transport/api-rest/scim-webhook.api.ts";
+import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
 import { ScimDirectoryService } from "../services/scim-directory.service.ts";
 import { ScimGrantsService } from "../services/scim-grants.service.ts";
 import type { ScimDirectoryRepository } from "../services/scim-directory.service.ts";
@@ -128,8 +128,7 @@ describe("SCIM characterization: group PATCH membership and operation casing", (
 describe("SCIM characterization: Auth0 webhook", () => {
   it("parses create/deactivate events in Enterprise and leaves the app mount transport-only", async () => {
     const service = new ScimServiceFake();
-    await ScimWebhookApi.create().handle({
-      service,
+    await ScimDirectoryStreamService.create({ scim: service, webhookSecret: () => undefined }).relay({
       organizationId: "org_1",
       events: [
         {

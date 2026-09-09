@@ -1,25 +1,49 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * The SCIM feature's application: what its doors call.
+ * The SCIM feature's application: what its four doors call.
  *
  * Two of them mint and retire provisioning tokens — the settings page over
- * tRPC, and the management REST family an identity team scripts against — and
- * a third relays a directory's log stream. Before this, the tRPC door declared
- * `Readonly<{ scim: ScimService; planProvider: … }>` for itself while the REST
- * family took a `scim` resolver and the webhook took the service as a call
- * argument: three descriptions of one bag, none reachable from the others.
+ * tRPC, and the management REST family an identity team scripts against — a
+ * third speaks SCIM 2.0 to an identity provider, and a fourth relays a
+ * directory's log stream. Before this, the tRPC door declared a context slice
+ * for itself while the REST families took a `scim` resolver and the webhook
+ * took the service as a call argument: three descriptions of one bag, none
+ * reachable from the others.
  *
- * The token operations are the service's own and are reached through it. What
- * this object adds is that they are reached through ONE thing, so a rule about
- * minting a token — which connection it binds to, what is returned once and
- * never again — has one place to live rather than three.
- *
- * The webhook relay still takes the `ScimService` directly: it walks an Auth0
- * payload into four user-provisioning calls no other door reaches, and lifting
- * those onto this object is a separate move.
+ * The provisioning operations are the directory service's own and are reached
+ * through it. What this object adds is that they are reached through ONE
+ * thing, so a rule about minting a token — which connection it binds to, what
+ * is returned once and never again — and a rule about which tenant a push
+ * provisions have one place to live rather than four.
  */
-import type { ScimService, ScimTokenSummary } from "@langwatch/enterprise-scim-contract";
+import {
+  ENTERPRISE_FEATURE_ERRORS,
+  isEnterpriseTier,
+} from "@langwatch/enterprise-plan-gate";
+import {
+  ScimApi,
+  ScimProtocolError,
+  type IssuedScimToken,
+  type ScimApi as ScimApiContract,
+  type ScimCreateGroupRequest,
+  type ScimCreateUserRequest,
+  type ScimDirectoryScope,
+  type ScimError,
+  type ScimGroup,
+  type ScimListResponse,
+  type ScimPatchRequest,
+  type ScimReplaceGroupRequest,
+  type ScimService,
+  type ScimDeliveryAdmission,
+  type ScimTokenAuditEntry,
+  type ScimTokenEntitlement,
+  type ScimTokenSummary,
+  type ScimUser,
+} from "@langwatch/enterprise-scim-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+
+import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
 
 /**
  * The plan the organization is on, as the process resolves it. Structural: the
@@ -30,59 +54,235 @@ export type ScimPlanProvider = Readonly<{
   getActivePlan(input: { organizationId: string }): Promise<Readonly<{ type: string }>>;
 }>;
 
+/**
+ * The deployment's management-API audit ledger, described rather than
+ * imported: it is the process's, and this feature only ever appends the two
+ * entries its management door has always written.
+ */
+export type ScimManagementAuditPort = (entry: {
+  userId: string;
+  organizationId: string;
+  action: `management.${string}.${string}`;
+  args?: Record<string, unknown>;
+}) => void;
+
 /** What the process composes this feature's application from. */
-export interface ScimAppDependencies {
+export type ScimInfrastructure = Readonly<{
   scim: ScimService;
   planProvider: ScimPlanProvider;
-}
-
-/** A newly minted token: the one moment its value exists outside the database. */
-export interface IssuedScimToken {
-  token: string;
-  tokenId: string;
-  connectionId: string;
-}
-
-export class ScimApp {
-  static create(dependencies: ScimAppDependencies): ScimApp {
-    return new ScimApp(dependencies);
-  }
-
-  private constructor(private readonly dependencies: ScimAppDependencies) {}
-
-  /** The organization's tokens, described. Never a value or a hash. */
-  listTokens(input: { organizationId: string }): Promise<ScimTokenSummary[]> {
-    return this.dependencies.scim.listTokens(input);
-  }
-
   /**
-   * Mints a token for one directory connection.
-   *
-   * `connectionId` is the whole of the token's write authority, so it is named
-   * here rather than defaulted: the service refuses a token that binds to no
-   * connection, and that refusal is the one a caller can act on.
+   * The shared secret Auth0 signs its log stream with, or none. A function
+   * rather than a value, so a rotation without a restart works, and its
+   * absence is what makes the intake answer 404 rather than 401.
    */
+  webhookSecret: () => string | undefined;
+  managementAudit: ScimManagementAuditPort;
+}>;
+
+type ScimSetup = FeatureSetup<Record<never, never>, ScimInfrastructure, undefined>;
+
+/** The protocol's own document for one refusal, at one status. */
+function scimRefusal(status: number, detail: string): ScimProtocolError {
+  const response: ScimError = {
+    schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    status: String(status),
+    detail,
+  };
+
+  return new ScimProtocolError(response);
+}
+
+/** The bearer a request presented, or nothing where it presented none. */
+function findBearer(authorization: string | null): string | null {
+  if (!authorization?.startsWith("Bearer ")) return null;
+
+  const token = authorization.slice(7).trim();
+
+  return token.length > 0 ? token : null;
+}
+
+export class ScimApp implements ScimApiContract {
+  static readonly contract: typeof ScimApi = ScimApi;
+  static readonly dependencies: Readonly<Record<string, never>> = {};
+
+  readonly #scim: ScimService;
+  readonly #plans: ScimPlanProvider;
+  readonly #audit: ScimManagementAuditPort;
+  readonly #webhook: ScimDirectoryStreamService;
+
+  private constructor(infrastructure: ScimInfrastructure) {
+    this.#scim = infrastructure.scim;
+    this.#plans = infrastructure.planProvider;
+    this.#audit = infrastructure.managementAudit;
+    this.#webhook = ScimDirectoryStreamService.create({
+      scim: infrastructure.scim,
+      webhookSecret: infrastructure.webhookSecret,
+    });
+  }
+
+  static create({ infrastructure }: ScimSetup): ScimApp {
+    return new ScimApp(infrastructure);
+  }
+
+  // ── The organization's provisioning tokens ───────────────────────────────
+
+  listTokens(input: { organizationId: string }): Promise<ScimTokenSummary[]> {
+    return this.#scim.listTokens(input);
+  }
+
   generateToken(input: {
     organizationId: string;
-    connectionId?: string | null;
-    description?: string;
+    connectionId?: string | undefined;
+    description?: string | undefined;
   }): Promise<IssuedScimToken> {
-    return this.dependencies.scim.generateToken(input);
+    return this.#scim.generateToken(input);
   }
 
-  /** Retires one token. Idempotent from the caller's side. */
   revokeToken(input: { organizationId: string; tokenId: string }): Promise<{ success: true }> {
-    return this.dependencies.scim.revokeToken(input);
+    return this.#scim.revokeToken(input);
   }
 
-  /**
-   * The plan source, handed back to the process's own Enterprise gate.
-   *
-   * The gate is a port because whether an organization has bought Enterprise
-   * is the process's answer, not SCIM's; the provider it reads is held here so
-   * a door does not have to carry one of its own alongside the application.
-   */
-  get planProvider(): ScimPlanProvider {
-    return this.dependencies.planProvider;
+  async isEnterpriseEntitled(input: { organizationId: string }): Promise<boolean> {
+    const plan = await this.#plans.getActivePlan({ organizationId: input.organizationId });
+
+    return isEnterpriseTier(plan.type);
+  }
+
+  recordTokenAudit(entry: ScimTokenAuditEntry): void {
+    this.#audit({
+      userId: entry.actorId,
+      organizationId: entry.organizationId,
+      action: entry.action,
+      args: { ...entry.args },
+    });
+  }
+
+  // ── The directory credential ─────────────────────────────────────────────
+
+  async authenticateDirectory(input: {
+    authorization: string | null;
+  }): Promise<ScimDirectoryScope> {
+    const token = findBearer(input.authorization);
+
+    if (!token) throw scimRefusal(401, "Bearer token is required");
+
+    const entitlement = await this.#scim.verifyToken({ token });
+
+    if (entitlement.status === "invalid_token") {
+      throw scimRefusal(401, "Bearer token is not valid");
+    }
+
+    if (entitlement.status === "plan_not_entitled") {
+      throw scimRefusal(403, ENTERPRISE_FEATURE_ERRORS.SCIM);
+    }
+
+    return { organizationId: entitlement.organizationId };
+  }
+
+  verifyToken(input: { token: string }): Promise<ScimTokenEntitlement> {
+    return this.#scim.verifyToken(input);
+  }
+
+  // ── SCIM 2.0 users ───────────────────────────────────────────────────────
+
+  listUsers(input: {
+    organizationId: string;
+    filter?: string | undefined;
+    startIndex?: number | undefined;
+    count?: number | undefined;
+  }): Promise<ScimListResponse<ScimUser>> {
+    return this.#scim.listUsers(input);
+  }
+
+  createUser(input: {
+    organizationId: string;
+    request: ScimCreateUserRequest;
+  }): Promise<ScimUser> {
+    return this.#scim.createUser(input);
+  }
+
+  getUser(input: { organizationId: string; id: string }): Promise<ScimUser> {
+    return this.#scim.getUser(input);
+  }
+
+  replaceUser(input: {
+    organizationId: string;
+    id: string;
+    request: ScimCreateUserRequest;
+  }): Promise<ScimUser> {
+    return this.#scim.replaceUser(input);
+  }
+
+  updateUser(input: {
+    organizationId: string;
+    id: string;
+    patchRequest: ScimPatchRequest;
+  }): Promise<ScimUser> {
+    return this.#scim.updateUser(input);
+  }
+
+  deleteUser(input: { organizationId: string; id: string }): Promise<void> {
+    return this.#scim.deleteUser(input);
+  }
+
+  // ── SCIM 2.0 groups ──────────────────────────────────────────────────────
+
+  listGroups(input: {
+    organizationId: string;
+    filter?: string | undefined;
+    startIndex?: number | undefined;
+    count?: number | undefined;
+    excludeMembers?: boolean | undefined;
+  }): Promise<ScimListResponse<ScimGroup>> {
+    return this.#scim.listGroups(input);
+  }
+
+  createGroup(input: {
+    organizationId: string;
+    request: ScimCreateGroupRequest;
+  }): Promise<ScimGroup> {
+    return this.#scim.createGroup(input);
+  }
+
+  getGroup(input: {
+    organizationId: string;
+    externalScimId: string;
+    excludeMembers?: boolean | undefined;
+  }): Promise<ScimGroup> {
+    return this.#scim.getGroup(input);
+  }
+
+  replaceGroup(input: {
+    organizationId: string;
+    externalScimId: string;
+    request: ScimReplaceGroupRequest;
+  }): Promise<ScimGroup> {
+    return this.#scim.replaceGroup(input);
+  }
+
+  updateGroup(input: {
+    organizationId: string;
+    externalScimId: string;
+    patchRequest: ScimPatchRequest;
+  }): Promise<ScimGroup> {
+    return this.#scim.updateGroup(input);
+  }
+
+  deleteGroup(input: { organizationId: string; externalScimId: string }): Promise<void> {
+    return this.#scim.deleteGroup(input);
+  }
+
+  // ── The directory's log stream ───────────────────────────────────────────
+
+  admitDirectoryDelivery(delivery: {
+    body: string;
+    signature: string | null;
+    authorization: string | null;
+  }): Promise<ScimDeliveryAdmission> {
+    return this.#webhook.admit(delivery);
+  }
+
+  relayDirectoryEvents(input: { organizationId: string; events: unknown[] }): Promise<void> {
+    return this.#webhook.relay(input);
   }
 }

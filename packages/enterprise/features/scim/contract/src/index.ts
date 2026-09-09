@@ -1,4 +1,11 @@
 export * from "./scim.contract.ts";
+export {
+  ScimApi,
+  type ScimDeliveryAdmission,
+  type ScimDirectoryScope,
+  type ScimTokenAuditEntry,
+} from "./scim.api.ts";
+export { scimTokenTrpc } from "./scim-token.trpc.ts";
 export { ScimService } from "./scim.service.ts";
 export {
   ScimConnectionNotFoundError,
@@ -8,9 +15,13 @@ export {
   ScimWriteOutsideConnectionError,
 } from "./scim.errors.ts";
 export {
+  generateScimTokenSchema,
   issuedScimTokenSchema,
+  revokeScimTokenSchema,
   scimTokenRevokedSchema,
+  scimTokenScopeSchema,
   scimTokenSummarySchema,
+  type IssuedScimToken,
   type ScimTokenEntitlement,
   type ScimTokenRecord,
   type ScimTokenSummary,

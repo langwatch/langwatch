@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * The published operations for the SCIM 2.0 provisioning surface.
+ * The published documentation for the SCIM 2.0 provisioning surface.
  *
  * The reader here is an identity administrator wiring Okta, Entra ID or
  * OneLogin to LangWatch, so the descriptions say what this implementation
@@ -10,64 +10,21 @@
  * promise an equality filter on any attribute and send the reader looking for
  * a bug in their identity provider.
  *
- * Every operation names its `operationId`. Left to the generator they are
- * derived from the URL, which turns `GET /api/scim/v2/Users/{id}` into a
- * Python SDK function named after the path shape rather than the action.
+ * Three things the older `DescribeRouteOptions` set carried are gone, because
+ * the declaration now says them: the operation id is the second argument of
+ * the route, the security requirement follows the family's declared door, and
+ * the query parameters are the schemas the routes parse. What is left is the
+ * prose and the answer shapes, which no declaration can derive.
  *
- * Request bodies are absent from these operations. The write routes parse the
- * body with `safeParse` inside the handler rather than through a hono-openapi
- * `validator("json", ...)`, and the generator only derives a `requestBody`
- * from that middleware, so the document declares none. The body shapes an
- * identity provider sends are RFC 7643 core `User` and `Group` resources, and
- * each operation's `description` says which one it takes.
+ * Request bodies stay absent. The write routes parse the body inside the
+ * handler so a malformed document answers the protocol's own error rather than
+ * a validation envelope, and each operation's description says which RFC 7643
+ * resource it takes.
  */
-
-import type { DescribeRouteOptions, GenerateSpecOptions } from "hono-openapi";
-
-type ParameterSpec = NonNullable<DescribeRouteOptions["parameters"]>[number];
+import type { RestTransportDocs } from "@langwatch/api/rest";
 
 const SCIM_MEDIA_TYPE = "application/scim+json";
-const TAGS = ["SCIM"];
-
-/** The credential every provisioning operation carries. */
-const SCIM_SECURITY: DescribeRouteOptions["security"] = [{ scim_bearer: [] }];
-
-/**
- * No credential, said out loud. The document carries a root-level `security`
- * naming the project API key, and an operation that declares nothing inherits
- * it, so silence on a discovery endpoint would publish a requirement that does
- * not exist and that no reader could satisfy with a SCIM token. An empty
- * requirement list is how OpenAPI spells "this one takes no credential".
- */
-const NO_SECURITY: DescribeRouteOptions["security"] = [];
-
-/**
- * The bearer scheme itself, reaching the merged document through
- * `generateSpecs(scimApp, SCIM_SPEC_OPTIONS)`.
- *
- * It is a scheme of its own rather than a reuse of `admin_api_key`, because
- * the credential is a different thing: a SCIM token is minted per organization
- * for one directory connection, carries no RBAC permissions, and is refused
- * the moment the organization leaves Enterprise. Pointing the operations at
- * the admin key would tell an identity administrator to paste the wrong
- * secret.
- */
-export const SCIM_SPEC_OPTIONS: Partial<GenerateSpecOptions> = {
-  documentation: {
-    components: {
-      securitySchemes: {
-        scim_bearer: {
-          type: "http",
-          scheme: "bearer",
-          description:
-            "SCIM token for one organization's directory connection, created with POST /api/scim-tokens or in Settings > SCIM. It authenticates provisioning calls only, and stops working if the organization's Enterprise plan lapses.",
-        },
-      },
-    },
-  },
-};
-
-// ── Shared schemas ───────────────────────────────────────────────────────────
+const TAGS = ["SCIM"] as const;
 
 const SCHEMA_URNS = {
   type: "array" as const,
@@ -190,84 +147,48 @@ const RESOURCE_SCHEMA = {
   },
 };
 
-const scimApiDefinitions = {
-  listOf<T>(items: T) {
-    return {
-      type: "object" as const,
-      properties: {
-        schemas: SCHEMA_URNS,
-        totalResults: {
-          type: "integer" as const,
-          description: "How many resources match, before pagination.",
-        },
-        startIndex: { type: "integer" as const },
-        itemsPerPage: { type: "integer" as const },
-        Resources: { type: "array" as const, items },
+function listOf<T>(items: T) {
+  return {
+    type: "object" as const,
+    properties: {
+      schemas: SCHEMA_URNS,
+      totalResults: {
+        type: "integer" as const,
+        description: "How many resources match, before pagination.",
       },
-    };
-  },
+      startIndex: { type: "integer" as const },
+      itemsPerPage: { type: "integer" as const },
+      Resources: { type: "array" as const, items },
+    },
+  };
+}
 
-  scimResource<T>({ description, schema }: { description: string; schema: T }) {
-    return {
-      description,
-      content: { [SCIM_MEDIA_TYPE]: { schema } },
-    };
-  },
+function scimResource<T>({ description, schema }: { description: string; schema: T }) {
+  return { description, content: { [SCIM_MEDIA_TYPE]: { schema } } };
+}
 
-  discoveryResource<T>({ description, schema }: { description: string; schema: T }) {
-    return {
-      description,
-      content: { "application/json": { schema } },
-    };
-  },
+function discoveryResource<T>({ description, schema }: { description: string; schema: T }) {
+  return { description, content: { "application/json": { schema } } };
+}
 
-  /** The RFC 7644 error response carried by every SCIM refusal. */
-  scimErrorResponse(description: string) {
-    return {
-      description,
-      content: {
-        [SCIM_MEDIA_TYPE]: {
-          schema: {
-            type: "object" as const,
-            properties: {
-              schemas: SCHEMA_URNS,
-              status: {
-                type: "string" as const,
-                description: "The HTTP status, as a string.",
-              },
-              detail: { type: "string" as const },
-            },
+/** The RFC 7644 error response carried by every SCIM refusal. */
+function scimErrorResponse(description: string) {
+  return {
+    description,
+    content: {
+      [SCIM_MEDIA_TYPE]: {
+        schema: {
+          type: "object" as const,
+          properties: {
+            schemas: SCHEMA_URNS,
+            status: { type: "string" as const, description: "The HTTP status, as a string." },
+            detail: { type: "string" as const },
           },
         },
       },
-    };
-  },
-
-  idParameter(description: string): ParameterSpec {
-    return {
-      name: "id",
-      in: "path",
-      required: true,
-      schema: { type: "string" },
-      description,
-    };
-  },
-
-  filterParameter(attribute: string): ParameterSpec {
-    return {
-      name: "filter",
-      in: "query",
-      required: false,
-      schema: { type: "string" },
-      description: `A SCIM filter. Only \`${attribute} eq "..."\` is applied; anything else is ignored and the full page is returned.`,
-    };
-  },
-};
-
-const listOf = scimApiDefinitions.listOf;
-const scimResource = scimApiDefinitions.scimResource;
-const discoveryResource = scimApiDefinitions.discoveryResource;
-const scimErrorResponse = scimApiDefinitions.scimErrorResponse;
+    },
+  };
+}
 
 const UNAUTHORIZED = scimErrorResponse(
   "The Authorization header is missing, is not a bearer token, or names a token this deployment does not know.",
@@ -281,52 +202,18 @@ const INVALID_BODY = scimErrorResponse(
   "The request body is not JSON, or does not match the SCIM schema for this operation.",
 );
 
-const NO_CONTENT = { description: "Deprovisioned. No body." };
-
-// ── Shared parameters ────────────────────────────────────────────────────────
-
-const idParameter = scimApiDefinitions.idParameter;
-const filterParameter = scimApiDefinitions.filterParameter;
-
-const PAGINATION_PARAMETERS: ParameterSpec[] = [
-  {
-    name: "startIndex",
-    in: "query",
-    required: false,
-    schema: { type: "integer", default: 1 },
-    description:
-      "1-based index of the first resource to return. Anything that does not parse as a positive integer is read as 1.",
-  },
-  {
-    name: "count",
-    in: "query",
-    required: false,
-    schema: { type: "integer", default: 100, maximum: 100 },
-    description:
-      "How many resources to return, capped at 100 (the `filter.maxResults` ServiceProviderConfig publishes). Anything that does not parse as a positive integer is read as 100, and anything above 100 is served as 100.",
-  },
-];
-
-const EXCLUDED_ATTRIBUTES_PARAMETER: ParameterSpec = {
-  name: "excludedAttributes",
-  in: "query",
-  required: false,
-  schema: { type: "string" },
-  description:
-    "Comma-separated attribute names to leave out of the response. Only `members` is honoured, and it is what lets a directory page through groups without pulling every membership.",
-};
+/** A 204 carries no body, so it publishes no media type either. */
+const NO_CONTENT = { description: "Deprovisioned. No body.", content: {} };
 
 // ── Discovery ────────────────────────────────────────────────────────────────
 
-export const GET_SERVICE_PROVIDER_CONFIG: DescribeRouteOptions = {
-  operationId: "scimGetServiceProviderConfig",
+export const GET_SERVICE_PROVIDER_CONFIG: RestTransportDocs = {
   summary: "Get the SCIM service provider configuration",
   description:
     "What this SCIM implementation supports (RFC 7643 section 5), which is how an identity provider decides what it may call: PATCH and filtering are supported, bulk operations, sorting, ETags and password change are not. Unauthenticated, because a provider reads it while being configured, before a token exists.",
   tags: TAGS,
-  security: NO_SECURITY,
   responses: {
-    "200": discoveryResource({
+    200: discoveryResource({
       description: "The supported capabilities.",
       schema: {
         type: "object" as const,
@@ -369,30 +256,26 @@ export const GET_SERVICE_PROVIDER_CONFIG: DescribeRouteOptions = {
   },
 };
 
-export const LIST_RESOURCE_TYPES: DescribeRouteOptions = {
-  operationId: "scimListResourceTypes",
+export const LIST_RESOURCE_TYPES: RestTransportDocs = {
   summary: "List the SCIM resource types",
   description:
     "The resources this service provisions, User and Group, each naming the endpoint and the schema URN that serves it (RFC 7643 section 6). Unauthenticated, like the rest of SCIM discovery.",
   tags: TAGS,
-  security: NO_SECURITY,
   responses: {
-    "200": discoveryResource({
+    200: discoveryResource({
       description: "The User and Group resource types.",
       schema: listOf(RESOURCE_TYPE),
     }),
   },
 };
 
-export const LIST_SCHEMAS: DescribeRouteOptions = {
-  operationId: "scimListSchemas",
+export const LIST_SCHEMAS: RestTransportDocs = {
   summary: "List the SCIM resource schemas",
   description:
     "The attribute definitions for the User and Group resources (RFC 7643 section 7), which an identity provider reads to build its attribute mapping. A LangWatch group is an access group: its membership drives role bindings, and it is not a team. Unauthenticated, like the rest of SCIM discovery.",
   tags: TAGS,
-  security: NO_SECURITY,
   responses: {
-    "200": discoveryResource({
+    200: discoveryResource({
       description: "The User and Group schema definitions.",
       schema: listOf(RESOURCE_SCHEMA),
     }),
@@ -401,256 +284,172 @@ export const LIST_SCHEMAS: DescribeRouteOptions = {
 
 // ── Users ────────────────────────────────────────────────────────────────────
 
-export const LIST_USERS: DescribeRouteOptions = {
-  operationId: "scimListUsers",
+export const LIST_USERS: RestTransportDocs = {
   summary: "List provisioned users",
   description:
     'The members of the organization the token belongs to, as SCIM users. One filter expression is understood, `userName eq "someone@example.com"`, matched against the member\'s email without regard to case.',
   tags: TAGS,
-  security: SCIM_SECURITY,
-  parameters: [filterParameter("userName"), ...PAGINATION_PARAMETERS],
   responses: {
-    "200": scimResource({
+    200: scimResource({
       description: "A page of provisioned users.",
       schema: listOf(SCIM_USER),
     }),
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
   },
 };
 
-export const CREATE_USER: DescribeRouteOptions = {
-  operationId: "scimCreateUser",
+export const CREATE_USER: RestTransportDocs = {
   summary: "Provision a user",
   description:
     "Adds a member to the organization, creating the LangWatch account when the email is new. Someone who already has an account is added and reactivated rather than refused, which is what lets a directory sync be re-run without special-casing the people it already knows. New members join with the MEMBER role at organization scope. `costCenter` on the enterprise user extension assigns their department, creating that department on first use.",
   tags: TAGS,
-  security: SCIM_SECURITY,
   responses: {
-    "201": scimResource({
-      description: "The provisioned user.",
-      schema: SCIM_USER,
-    }),
-    "400": INVALID_BODY,
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
-    "409": scimErrorResponse("A member with this userName already exists in the organization."),
+    201: scimResource({ description: "The provisioned user.", schema: SCIM_USER }),
+    400: INVALID_BODY,
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
+    409: scimErrorResponse("A member with this userName already exists in the organization."),
   },
 };
 
-export const GET_USER: DescribeRouteOptions = {
-  operationId: "scimGetUser",
+export const GET_USER: RestTransportDocs = {
   summary: "Get a provisioned user",
   description:
     "Reads one member of the organization the token belongs to. An id that is not a member answers 404, whether or not it names a LangWatch account elsewhere.",
   tags: TAGS,
-  security: SCIM_SECURITY,
-  parameters: [idParameter("The LangWatch user id.")],
   responses: {
-    "200": scimResource({ description: "The user.", schema: SCIM_USER }),
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
-    "404": scimErrorResponse("No such member in this organization."),
+    200: scimResource({ description: "The user.", schema: SCIM_USER }),
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
+    404: scimErrorResponse("No such member in this organization."),
   },
 };
 
-export const REPLACE_USER: DescribeRouteOptions = {
-  operationId: "scimReplaceUser",
+export const REPLACE_USER: RestTransportDocs = {
   summary: "Replace a provisioned user",
   description:
     "Replaces the member's attributes with the body. It is a whole-resource write, so an attribute the identity provider leaves out is reset rather than kept: omitting `active` reactivates the member. Send PATCH instead to change one attribute.",
   tags: TAGS,
-  security: SCIM_SECURITY,
-  parameters: [idParameter("The LangWatch user id.")],
   responses: {
-    "200": scimResource({
-      description: "The updated user.",
-      schema: SCIM_USER,
-    }),
-    "400": INVALID_BODY,
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
-    "404": scimErrorResponse("No such member in this organization."),
+    200: scimResource({ description: "The updated user.", schema: SCIM_USER }),
+    400: INVALID_BODY,
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
+    404: scimErrorResponse("No such member in this organization."),
   },
 };
 
-export const PATCH_USER: DescribeRouteOptions = {
-  operationId: "scimPatchUser",
+export const PATCH_USER: RestTransportDocs = {
   summary: "Update a provisioned user",
   description:
     "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active` (deactivating or reactivating the account), of `userName`, and of `name.givenName` / `name.familyName`, written either as an operation path or as keys inside a value object; and `add`, `replace` or `remove` of the enterprise `costCenter`, which reassigns the member's department. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Replace` that Entra ID writes is accepted; any other name, or a missing or non-string one, is rejected with a 400. An understood operation aimed at anything not listed above is accepted and changes nothing.",
   tags: TAGS,
-  security: SCIM_SECURITY,
-  parameters: [idParameter("The LangWatch user id.")],
   responses: {
-    "200": scimResource({
-      description: "The updated user.",
-      schema: SCIM_USER,
-    }),
-    "400": INVALID_BODY,
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
-    "404": scimErrorResponse("No such member in this organization."),
+    200: scimResource({ description: "The updated user.", schema: SCIM_USER }),
+    400: INVALID_BODY,
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
+    404: scimErrorResponse("No such member in this organization."),
   },
 };
 
-export const DELETE_USER: DescribeRouteOptions = {
-  operationId: "scimDeleteUser",
+export const DELETE_USER: RestTransportDocs = {
   summary: "Deprovision a user",
   description:
     "Removes the member from the organization, drops the role bindings they held there, and deactivates their account. The LangWatch user record itself is kept, so past traces, evaluations and audit entries stay attributable.",
   tags: TAGS,
-  security: SCIM_SECURITY,
-  parameters: [idParameter("The LangWatch user id.")],
   responses: {
-    "204": NO_CONTENT,
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
-    "404": scimErrorResponse("No such member in this organization."),
+    204: NO_CONTENT,
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
+    404: scimErrorResponse("No such member in this organization."),
   },
 };
 
 // ── Groups ───────────────────────────────────────────────────────────────────
 
-export const LIST_GROUPS: DescribeRouteOptions = {
-  operationId: "scimListGroups",
+export const LIST_GROUPS: RestTransportDocs = {
   summary: "List provisioned groups",
   description:
     'The organization\'s SCIM-provisioned access groups. Groups created in LangWatch itself are not listed: the directory sees what it provisioned, and nothing else. One filter expression is understood, `displayName eq "Engineering"`, matched without regard to case.',
   tags: TAGS,
-  security: SCIM_SECURITY,
-  parameters: [
-    filterParameter("displayName"),
-    ...PAGINATION_PARAMETERS,
-    EXCLUDED_ATTRIBUTES_PARAMETER,
-  ],
   responses: {
-    "200": scimResource({
+    200: scimResource({
       description: "A page of provisioned groups.",
       schema: listOf(SCIM_GROUP),
     }),
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
   },
 };
 
-export const CREATE_GROUP: DescribeRouteOptions = {
-  operationId: "scimCreateGroup",
+export const CREATE_GROUP: RestTransportDocs = {
   summary: "Provision a group",
   description:
     "Creates an access group. Members are given as LangWatch user ids, the same ids the Users endpoints return; an id that is not a member of the organization is skipped rather than failing the call, so a group can be provisioned before everyone in it is. Granting the group access is a separate step: a group carries no permissions until a role binding is created for it.",
   tags: TAGS,
-  security: SCIM_SECURITY,
   responses: {
-    "201": scimResource({
-      description: "The provisioned group.",
-      schema: SCIM_GROUP,
-    }),
-    "400": INVALID_BODY,
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
-    "409": scimErrorResponse(
+    201: scimResource({ description: "The provisioned group.", schema: SCIM_GROUP }),
+    400: INVALID_BODY,
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
+    409: scimErrorResponse(
       "A provisioned group with this displayName already exists in the organization.",
     ),
   },
 };
 
-export const GET_GROUP: DescribeRouteOptions = {
-  operationId: "scimGetGroup",
+export const GET_GROUP: RestTransportDocs = {
   summary: "Get a provisioned group",
   description:
     "Reads one provisioned group and its members. A group that exists but was created in LangWatch rather than provisioned is not readable here.",
   tags: TAGS,
-  security: SCIM_SECURITY,
-  parameters: [idParameter("The LangWatch group id."), EXCLUDED_ATTRIBUTES_PARAMETER],
   responses: {
-    "200": scimResource({ description: "The group.", schema: SCIM_GROUP }),
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
-    "404": scimErrorResponse("No such group in this organization."),
+    200: scimResource({ description: "The group.", schema: SCIM_GROUP }),
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
+    404: scimErrorResponse("No such group in this organization."),
   },
 };
 
-export const REPLACE_GROUP: DescribeRouteOptions = {
-  operationId: "scimReplaceGroup",
+export const REPLACE_GROUP: RestTransportDocs = {
   summary: "Replace a provisioned group",
   description:
     "Replaces the group's display name and its membership with the body. Membership is a whole-resource write: a member absent from `members` is removed from the group, and omitting `members` empties it. Role bindings granted to the group are untouched.",
   tags: TAGS,
-  security: SCIM_SECURITY,
-  parameters: [idParameter("The LangWatch group id.")],
   responses: {
-    "200": scimResource({
-      description: "The updated group.",
-      schema: SCIM_GROUP,
-    }),
-    "400": INVALID_BODY,
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
-    "404": scimErrorResponse("No such group in this organization."),
+    200: scimResource({ description: "The updated group.", schema: SCIM_GROUP }),
+    400: INVALID_BODY,
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
+    404: scimErrorResponse("No such group in this organization."),
   },
 };
 
-export const PATCH_GROUP: DescribeRouteOptions = {
-  operationId: "scimPatchGroup",
+export const PATCH_GROUP: RestTransportDocs = {
   summary: "Update a provisioned group",
   description:
     "Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `add` of members, `remove` of members (named by a value filter on the path, as Entra ID writes it, or in the operation value), `replace` of `displayName`, and `replace` of the whole member list. `replace`, `add` and `remove` are the only operation names understood, read without regard to case, so the capitalized `Add` / `Remove` that Entra ID writes are accepted; any other name, or a missing or non-string one, is rejected with a 400. An `add` or a `remove` aimed at anything other than members is accepted and changes nothing. A `replace` that is not a `displayName` rename is treated as a replacement of the whole member list, so one that carries no members empties the group.",
   tags: TAGS,
-  security: SCIM_SECURITY,
-  parameters: [idParameter("The LangWatch group id.")],
   responses: {
-    "200": scimResource({
-      description: "The updated group.",
-      schema: SCIM_GROUP,
-    }),
-    "400": INVALID_BODY,
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
-    "404": scimErrorResponse("No such group in this organization."),
+    200: scimResource({ description: "The updated group.", schema: SCIM_GROUP }),
+    400: INVALID_BODY,
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
+    404: scimErrorResponse("No such group in this organization."),
   },
 };
 
-export const DELETE_GROUP: DescribeRouteOptions = {
-  operationId: "scimDeleteGroup",
+export const DELETE_GROUP: RestTransportDocs = {
   summary: "Deprovision a group",
   description:
     "Deletes the group along with its memberships and every role binding granted through it, so the access it carried is revoked with it. The members themselves keep their organization membership and any access they hold directly.",
   tags: TAGS,
-  security: SCIM_SECURITY,
-  parameters: [idParameter("The LangWatch group id.")],
   responses: {
-    "204": NO_CONTENT,
-    "401": UNAUTHORIZED,
-    "403": PLAN_NOT_ENTITLED,
-    "404": scimErrorResponse("No such group in this organization."),
+    204: NO_CONTENT,
+    401: UNAUTHORIZED,
+    403: PLAN_NOT_ENTITLED,
+    404: scimErrorResponse("No such group in this organization."),
   },
 };
-
-/** Class composition surface for the SCIM OpenAPI description set. */
-export class ScimApi {
-  private constructor() {}
-
-  static create(): ScimApi {
-    return new ScimApi();
-  }
-
-  readonly specOptions = SCIM_SPEC_OPTIONS;
-  readonly routes = {
-    getServiceProviderConfig: GET_SERVICE_PROVIDER_CONFIG,
-    listResourceTypes: LIST_RESOURCE_TYPES,
-    listSchemas: LIST_SCHEMAS,
-    listUsers: LIST_USERS,
-    createUser: CREATE_USER,
-    getUser: GET_USER,
-    replaceUser: REPLACE_USER,
-    patchUser: PATCH_USER,
-    deleteUser: DELETE_USER,
-    listGroups: LIST_GROUPS,
-    createGroup: CREATE_GROUP,
-    getGroup: GET_GROUP,
-    replaceGroup: REPLACE_GROUP,
-    patchGroup: PATCH_GROUP,
-    deleteGroup: DELETE_GROUP,
-  } as const;
-}
