@@ -165,6 +165,33 @@ interface CostFilters {
 }
 
 /**
+ * The screen's filter state, and the two ways it is allowed to change.
+ *
+ * The frame and the interval are not independent, which is why they move
+ * together here rather than at the call site. Narrowing the frame can leave
+ * the reader on an interval the new frame cannot draw — a quarter over three
+ * months is one bar wearing a chart's clothes. `chooseFrame` steps down to the
+ * widest interval that still fits, in one place so every governance page
+ * answers alike.
+ */
+function useCostFilters() {
+  const [filters, setFilters] = useState<CostFilters>({
+    department: ALL_DEPARTMENTS,
+    departmentName: null,
+    frame: DEFAULT_TIME_FRAME,
+    interval: DEFAULT_TIME_INTERVAL,
+  });
+  const patch = (next: Partial<CostFilters>) =>
+    setFilters((current) => ({ ...current, ...next }));
+  const chooseFrame = (frame: TimeFrame) =>
+    patch({
+      frame,
+      interval: coerceInterval({ interval: filters.interval, frame }),
+    });
+  return { filters, setFilters, patch, chooseFrame };
+}
+
+/**
  * Drops a department selection the current window no longer contains.
  *
  * A window can answer without the department the reader is standing on: it
@@ -246,26 +273,7 @@ function CostsPage() {
     redirectToProjectOnboarding: false,
   });
   const organizationId = organization?.id ?? "";
-  const [filters, setFilters] = useState<CostFilters>({
-    department: ALL_DEPARTMENTS,
-    departmentName: null,
-    frame: DEFAULT_TIME_FRAME,
-    interval: DEFAULT_TIME_INTERVAL,
-  });
-  const patch = (next: Partial<CostFilters>) =>
-    setFilters((current) => ({ ...current, ...next }));
-
-  /**
-   * Narrowing the frame can leave the reader on an interval the new frame
-   * cannot draw — a quarter over three months is one bar wearing a chart's
-   * clothes. The section-wide rule steps down to the widest that still fits,
-   * in one place so every governance page answers alike.
-   */
-  const chooseFrame = (frame: TimeFrame) =>
-    patch({
-      frame,
-      interval: coerceInterval({ interval: filters.interval, frame }),
-    });
+  const { filters, setFilters, patch, chooseFrame } = useCostFilters();
 
   const windowDays = windowDaysForFrame({ frame: filters.frame });
 

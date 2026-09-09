@@ -826,6 +826,39 @@ function reportUrl({
   return url;
 }
 
+/**
+ * Whether this run has spent the time it was given.
+ *
+ * A run with no deadline never has: `undefined` is "run until the window
+ * drains", not "stop now".
+ */
+function hasSpentDeadline(deadlineMs: number | undefined): boolean {
+  return deadlineMs !== undefined && Date.now() > deadlineMs;
+}
+
+/**
+ * The window start to save when a run stops before the window has drained.
+ *
+ * With a page token in hand, save the window start actually asked with, so
+ * that token is resumed against the same `starting_at` that minted it. With NO
+ * token there is nothing to resume and nothing requires the rewound value —
+ * and saving it would walk the cursor backwards, because `parseCursor` applies
+ * the look-back a second time to any cursor whose page is null. Save the
+ * position on record instead, which is the floor this cursor may never drop
+ * below.
+ */
+function unfinishedWindowStart({
+  page,
+  requestStart,
+  positionOnRecord,
+}: {
+  page: string | null;
+  requestStart: string;
+  positionOnRecord: string;
+}): string {
+  return page === null ? positionOnRecord : requestStart;
+}
+
 export class AnthropicAdminPuller
   implements PullerAdapter<AnthropicAdminPullConfig>
 {
@@ -882,21 +915,17 @@ export class AnthropicAdminPuller
     let newestEmitted = cursor.watermark;
 
     for (let pageCount = 0; pageCount < MAX_PAGES_PER_RUN; pageCount += 1) {
-      if (options.deadlineMs !== undefined && Date.now() > options.deadlineMs) {
+      if (hasSpentDeadline(options.deadlineMs)) {
         // Everything read so far is kept and the cursor says where to resume,
         // so a deadline costs latency rather than a window.
         return {
           events,
-          // With a page token in hand, save the window start actually asked
-          // with, so that token is resumed against the same `starting_at`
-          // that minted it. With NO token there is nothing to resume and
-          // nothing requires the rewound value — and saving it would walk
-          // the cursor backwards, because `parseCursor` applies the
-          // look-back a second time to any cursor whose page is null. Save
-          // the position on record instead, which is the floor this cursor
-          // may never drop below.
           cursor: encodeCursor({
-            startingAt: page === null ? positionOnRecord : requestStart,
+            startingAt: unfinishedWindowStart({
+              page,
+              requestStart,
+              positionOnRecord,
+            }),
             page,
             query,
             watermark,
