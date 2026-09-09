@@ -25,6 +25,7 @@ import {
   twoStepAccount,
 } from "~/server/app-layer/identity/runtime";
 import { prisma } from "~/server/db";
+import { parseTrustedProxyAddresses } from "~/utils/getClientIp";
 import { databaseHooks } from "./config/database-hooks";
 import { emailAndPassword } from "./config/email-and-password";
 import { models } from "./config/models";
@@ -129,17 +130,37 @@ export const auth = betterAuth({
   database: identityStorageAdapter(),
 
   /**
-   * Tell BetterAuth's rate limiter (and session IP tracking) which
-   * headers carry the real client IP. The default is `["x-forwarded-for"]`
-   * which works for most proxies, but behind Cloudflare the definitive
-   * header is `cf-connecting-ip` — it's always a single IP set by
-   * Cloudflare itself, not a forwarding chain. We list both so the
-   * setup works with and without Cloudflare. The order matters:
-   * BetterAuth takes the first header that has a valid IP.
+   * Which header carries the real client IP, and whose word we take for it.
+   *
+   * This value is the rate-limit bucket key, so whoever chooses it chooses
+   * how many attempts they get. That makes it a security control, not a
+   * telemetry nicety: it is what stands in front of the 50-per-15-minutes
+   * sign-in cap, the 5-per-hour reset caps that close the enumeration
+   * side-channel, and the two-factor plugin's 3-per-10-seconds rule — the
+   * only brute-force limit in front of a six-digit code.
+   *
+   * `cf-connecting-ip` and `x-real-ip` are deliberately NOT listed. Both are
+   * single-value headers, and better-auth's own documentation says it
+   * "cannot verify the direct sender": for a single-value header it returns
+   * the value verbatim, `trustedProxies` set or not. Anyone who can reach
+   * the origin could therefore mint a fresh bucket per request by varying
+   * the header, and every cap above would count to one forever.
+   *
+   * `x-forwarded-for` is the chain form, and it is the only one that can be
+   * checked: with `trustedProxies` set, better-auth walks the chain from the
+   * right, skips hops we vouch for, and takes the first address we do not.
+   * Behind Cloudflare that still yields the true client, because Cloudflare
+   * appends to this header too — its ranges just belong in the list.
+   *
+   * The list comes from `TRUSTED_PROXY_ADDRESSES`, the same setting the
+   * platform's own tRPC limiter resolves through `getClientIp`. One
+   * deployment fact, read once, so the two limiters cannot disagree about
+   * who the caller is.
    */
   advanced: {
     ipAddress: {
-      ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"],
+      ipAddressHeaders: ["x-forwarded-for"],
+      trustedProxies: [...parseTrustedProxyAddresses(env.TRUSTED_PROXY_ADDRESSES)],
     },
   },
 

@@ -37,12 +37,16 @@ export interface SessionMintingContext {
  * it is the whole of what the two callers do differently. This only answers
  * whether one could be opened, and it raises what it cannot do: a session
  * store that is down is a failure each caller degrades in its own words.
+ *
+ * With ONE refusal, which is not that decision: an account holding a second
+ * factor never gets a session from here. See {@link holdsSecondFactor}.
  */
 export class BetterAuthSessionMinter {
   /**
    * Opens the session and sets the cookie. Answers false, having done
    * nothing, when the context carries no adapter, when the account has gone,
-   * or when the store declined to make a session.
+   * when the account holds a second factor, or when the store declined to
+   * make a session.
    */
   async mint({
     ctx,
@@ -56,6 +60,7 @@ export class BetterAuthSessionMinter {
 
     const user = await adapter.findUserById(userId);
     if (!user) return false;
+    if (holdsSecondFactor(user)) return false;
 
     const session = await adapter.createSession(userId);
     if (!session) return false;
@@ -63,4 +68,41 @@ export class BetterAuthSessionMinter {
     await setSessionCookie(ctx as never, { session, user } as never);
     return true;
   }
+}
+
+/**
+ * Whether the account has finished enrolling a second factor.
+ *
+ * WHY MINTING STOPS HERE. Both doors open a session on the strength of a
+ * proved ADDRESS, and an address is exactly the thing a second factor exists
+ * to stop being sufficient. The plugin challenges `/sign-in/*`, and these two
+ * doors are not sign-in: they call `createSession` on the store directly, so
+ * no challenge is reachable from here — not by a matcher this could be added
+ * to, but by construction.
+ *
+ * Left unguarded, a password-reset link is a full session on an account with
+ * two-step verification, skipping the code the same person would have been
+ * asked for a second earlier at the sign-in screen. It also satisfies every
+ * organization that requires a second factor, because the requirement is met
+ * by enrolment rather than by anything the session proved.
+ *
+ * Refusing costs that person one screen: the reset succeeded, and they sign
+ * in — where they are challenged. Both callers already treat a false answer
+ * as "offer the way in", so nothing else has to change.
+ *
+ * The sign-up confirmation door cannot reach this today, since a newborn
+ * account has enrolled nothing. It is guarded anyway: the invariant belongs
+ * to minting, not to how each caller happens to be reached now.
+ *
+ * `User.twoFactorEnabled` is the two-factor plugin's own column and the one
+ * answer to "has this account finished a setup". Read structurally, like the
+ * rest of this file, so it does not track the adapter's type version to
+ * version.
+ */
+function holdsSecondFactor(user: unknown): boolean {
+  return (
+    typeof user === "object" &&
+    user !== null &&
+    (user as { twoFactorEnabled?: unknown }).twoFactorEnabled === true
+  );
 }
