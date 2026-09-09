@@ -86,6 +86,19 @@ export interface SourceTypeOption {
    */
   deprecated?: boolean;
   /**
+   * True when the thing this type reads is gone or was never worth reading,
+   * so no amount of work on our side would make it deliver data. Retired
+   * types are always deprecated too; the extra flag says WHY, and the why is
+   * load-bearing: a deprecated type that merely has not been finished is one
+   * we still owe a working configuration path, and the builder-coverage
+   * guard holds us to that. A retired one we owe nothing but a way to
+   * archive the rows already on it.
+   *
+   * Not a place to park a type that is broken. "Broken" is the case the
+   * guard exists to catch.
+   */
+  retired?: boolean;
+  /**
    * True when this type is left out of the sample Sources table, while
    * staying fully on offer everywhere else.
    *
@@ -157,6 +170,12 @@ export const SOURCE_TYPE_OPTIONS = [
     // Kept so existing rows keep their label and the guards below still
     // compile; filtered out of the picker by `gatedSourceTypeOptions`.
     deprecated: true,
+    // Retired rather than unfinished: directory audit has never carried a
+    // Copilot conversation, so there is no version of this source that
+    // works. Its setup form asks for an app registration the frozen adapter
+    // config cannot use either — and neither will be fixed, because the
+    // source that replaced it reads the conversations directly.
+    retired: true,
   },
   {
     value: "copilot_studio_dataverse",
@@ -191,13 +210,14 @@ export const SOURCE_TYPE_OPTIONS = [
     value: "claude_compliance",
     label: "Anthropic Claude Enterprise Compliance",
     mode: "pull",
-    blurb: "Not available. Choosing this source would never deliver any data.",
+    blurb: "Not offered for new sources.",
     icon: <Anthropic />,
-    // Same shape as the OpenAI entry above, with a known mechanism (#7583):
-    // the form collects a workspace API key that no pull-config builder ever
-    // puts where the adapter reads it, so every run authenticates with an
-    // unresolved template. Hiding it stops new sources being configured on
-    // that path; rows already on it are untouched.
+    // Not retired: the workspace key now reaches the adapter as the token it
+    // reads, so the path behind this type is whole. It stays out of the
+    // picker because nothing has yet pulled a real tenant's compliance log
+    // end to end, and offering it is a separate call from fixing it. The
+    // blurb no longer says a source here would never deliver data, because
+    // after the fix that is not true.
     deprecated: true,
   },
   {

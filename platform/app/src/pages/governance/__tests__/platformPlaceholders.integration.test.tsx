@@ -365,6 +365,21 @@ describe("given the Signals & Alerts screen", () => {
       screen.getByRole("link", { name: "model providers" }),
     ).toHaveAttribute("href", "/settings/model-providers");
   });
+
+  /** @scenario "The Signals header actions are offered disabled until they do something" */
+  it("offers both header actions disabled, and pressing them changes nothing", () => {
+    renderPage(SignalsPage);
+
+    const newAlert = screen.getByRole("button", { name: "New alert" });
+    const newSignal = screen.getByRole("button", { name: "New signal" });
+    expect(newAlert).toBeDisabled();
+    expect(newSignal).toBeDisabled();
+
+    const before = document.body.innerHTML;
+    fireEvent.click(newAlert);
+    fireEvent.click(newSignal);
+    expect(document.body.innerHTML).toBe(before);
+  });
 });
 
 describe("given the Analytics screen", () => {
@@ -407,8 +422,11 @@ describe("given a Platform screen a member can press things on", () => {
    * a render can only prove that the controls a test happened to name do
    * something, and the ones nobody named are exactly the ones that rot.
    *
-   * Signals is not scanned. Its two header actions are inert and are owned
-   * by the page-header restyle, not by this file.
+   * A disabled control is not inert: it is offered as not-yet-built and says
+   * so, which is the one honest way to draw a shape that has no backing. So
+   * the scan holds every ENABLED control to a handler. Signals used to be
+   * excluded from the scan entirely while its header was restyled, and its
+   * two actions stayed live and dead behind that exclusion.
    */
   const buttonTagsIn = (file: string) => {
     // Resolved from the package root (vitest's cwd), because under the
@@ -424,17 +442,40 @@ describe("given a Platform screen a member can press things on", () => {
     // match to the first ">" stops inside the very attribute being looked
     // for. Each element start is taken with the text that follows it, up to
     // the next element start, and `onClick=` is required somewhere in there.
-    const starts = [...source.matchAll(/<(?:Button|chakra\.button)\b/g)];
+    const starts = [
+      ...source.matchAll(
+        /<(?:Button|chakra\.button|PageLayout\.HeaderButton)\b/g,
+      ),
+    ];
     return starts.map((start, index) =>
       source.slice(start.index, starts[index + 1]?.index ?? source.length),
     );
   };
 
+  /**
+   * Read from the opening tag only — `[^>]*` stops at the first ">" — rather
+   * than from the whole window above, so a `disabled` belonging to some later
+   * element cannot excuse this one. An arrow handler's own ">" cuts the read
+   * short, which can only miss a `disabled`, never invent one: a control that
+   * carries both is held to its handler instead, and passes on that.
+   *
+   * Only the `disabled` PROP counts, so it must sit at a prop boundary
+   * (whitespace before it) and must not be spelled `disabled={false}`.
+   * `aria-disabled` and `data-disabled` announce a state without preventing
+   * a click, and a `false` value disables nothing; a control wearing either
+   * with no handler is still a dead control.
+   */
+  const isDisabled = (tag: string) =>
+    /^<[A-Za-z.]+\b[^>]*\sdisabled(?=[\s/>=])(?!\s*=\s*\{\s*false\s*\})/.test(
+      tag,
+    );
+
   /** @scenario "Every control the Platform screens offer does something when pressed" */
-  it("offers no control without a handler on Insights or Analytics", () => {
+  it("offers no enabled control without a handler on any Platform screen", () => {
     for (const page of [
       "src/pages/governance/insights.tsx",
       "src/pages/governance/analytics.tsx",
+      "src/pages/governance/signals.tsx",
       // The rail is where the Insights folder controls actually live, and it
       // is a component rather than the page file, so scanning the two pages
       // alone left its five controls unread.
@@ -444,9 +485,43 @@ describe("given a Platform screen a member can press things on", () => {
       // The guard against a vacuous pass: a scan that matched nothing would
       // otherwise report every page clean, including a page of dead buttons.
       expect(tags.length).toBeGreaterThan(0);
-      for (const tag of tags) {
+      for (const tag of tags.filter((tag) => !isDisabled(tag))) {
         expect(tag).toMatch(/onClick=/);
       }
+    }
+  });
+
+  /** @scenario "The Signals header actions are offered disabled until they do something" */
+  it("skips only controls that actually say they are disabled", () => {
+    // The self-check on the exemption above. Without it the filter could
+    // quietly match everything — an exemption that excuses every control is
+    // the same as no scan at all — so Signals is named as the page whose
+    // controls are ALL exempt, and Analytics as one where none is.
+    const signals = buttonTagsIn("src/pages/governance/signals.tsx");
+    expect(signals.length).toBeGreaterThanOrEqual(2);
+    expect(signals.filter(isDisabled)).toHaveLength(signals.length);
+
+    const analytics = buttonTagsIn("src/pages/governance/analytics.tsx");
+    expect(analytics.length).toBeGreaterThan(0);
+    expect(analytics.filter(isDisabled)).toHaveLength(0);
+
+    // Spellings that LOOK disabled and are not: none of them may excuse a
+    // control, or the exemption grows a hole the scan cannot see.
+    for (const tag of [
+      "<PageLayout.HeaderButton aria-disabled={true}>x",
+      "<PageLayout.HeaderButton data-disabled>x",
+      "<PageLayout.HeaderButton disabled={false}>x",
+      "<PageLayout.HeaderButton onClick={() => {}}>x",
+    ]) {
+      expect(isDisabled(tag)).toBe(false);
+    }
+    for (const tag of [
+      "<PageLayout.HeaderButton disabled>x",
+      "<PageLayout.HeaderButton disabled={true}>x",
+      "<PageLayout.HeaderButton disabled={isBusy}>",
+      "<Button size='sm' disabled/>",
+    ]) {
+      expect(isDisabled(tag)).toBe(true);
     }
   });
 

@@ -991,6 +991,39 @@ The match policy for `IdentityMatch`:
 - A collision-review screen is future work (Open questions), flagged per
   the framing ruling.
 
+**How the shipped code orders these checks.** The directory department sync
+is the first caller to apply this policy, and the order it applies it in is
+the intended reading of the rule above, recorded here so a second caller
+copies it rather than re-deriving it. `provenUserId`
+(`directoryDepartmentSync.service.ts:264-305`) decides which member — if any
+— a directory row proves, in four steps:
+
+1. **The conflict check runs first, before either identifier is chosen.**
+   `decideMatch` is called on the raw actor id, the row's address and any
+   open link, and a `suspend` outcome returns nothing at all (`:288-296`).
+   No department is assigned, from any source. "Conflicts always stop the
+   machine" is therefore ordered ahead of every other rule here, not
+   weighed against them.
+2. **An accepted link wins next** (`:298`). It is somebody's dated,
+   reviewable answer to "who is this?" — human-confirmed, or proved by an
+   address the account holder confirmed — and step 1 has just handed the
+   engine its chance to contradict it. A stale directory identifier naming a
+   different member must not quietly move a department off an accepted link.
+3. **A directory identifier resolving to exactly one member is used next**
+   (`:300-302`). Resolving to more than one assigns nothing: corroboration
+   pointing two ways corroborates nothing.
+4. **The engine's own `link` outcome stands last** (`:304`), reached only
+   when no directory identifier resolved.
+
+Two things this ordering is careful about. The directory identifier never
+overrides an accepted link, which is the sense in which it "strengthens a
+match but never stands alone" — it corroborates identity, and it is only
+allowed to decide a department when nothing better has answered. And a
+no-action result from the engine means "do not open an identity link", not
+"discard the directory's department": step 3 assigns a department without
+creating an `IdentityMatch` row, so nothing about this path merges two
+people automatically.
+
 Rejects: human-confirms-everything (a 500-person org gets a 500-click
 onboarding for matches the directory already proves, and until clicked
 all spend reads "unknown person"); auto-linking look-alikes (a wrong
@@ -1941,6 +1974,11 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
+- **v3.14 (2026-09-09).** Documentation only. §12 gains a note recording the
+  order the shipped code applies the match policy in — conflict, accepted
+  link, unique directory identifier, engine link
+  (`directoryDepartmentSync.service.ts:264-305`) — as the intended reading of
+  the precedence rule. No decision is taken and no behaviour changes.
 - **v3.13 (2026-09-09).** Documentation caught up with the code. No decision is
   taken, and no decision prose is rewritten — the §4 **diagram** is replaced and
   a marker above it says what it used to show.

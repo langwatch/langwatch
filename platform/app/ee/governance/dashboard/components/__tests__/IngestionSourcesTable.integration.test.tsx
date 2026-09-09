@@ -8,7 +8,8 @@
  *
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
  *       ("The sources table shows delivery as a column",
- *        "Row actions live in the overflow menu")
+ *        "Row actions live in the overflow menu",
+ *        "Archiving from the row asks the same question the detail page asks")
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -91,7 +92,19 @@ function renderTable({
   return handlers;
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+/**
+ * jsdom leaves `window.confirm` unimplemented — calling it throws "not
+ * implemented" rather than returning — so every test that reaches the archive
+ * action has to say what the admin answered.
+ */
+function stubConfirm(answer: boolean) {
+  return vi.spyOn(window, "confirm").mockReturnValue(answer);
+}
 
 describe("given the ingestion sources table", () => {
   describe("when the fleet mixes real-time and scheduled sources", () => {
@@ -153,6 +166,7 @@ describe("given the ingestion sources table", () => {
         await screen.findByRole("menuitem", { name: /Rotate secret/ }),
       ).toBeVisible();
       expect(screen.getByRole("menuitem", { name: /Edit/ })).toBeVisible();
+      stubConfirm(true);
       await user.click(screen.getByRole("menuitem", { name: /Archive/ }));
       expect(handlers.onArchive).toHaveBeenCalledWith("src-workato");
       // No inline buttons anywhere in the row.
@@ -177,6 +191,51 @@ describe("given the ingestion sources table", () => {
       expect(
         screen.queryByRole("menuitem", { name: /Rotate secret/ }),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when an admin picks Archive from a row", () => {
+    async function openArchive() {
+      const user = userEvent.setup();
+      const handlers = renderTable();
+      await user.click(
+        screen.getByRole("button", { name: "Actions for Workato prod" }),
+      );
+      const item = await screen.findByRole("menuitem", { name: /Archive/ });
+      return { user, handlers, item };
+    }
+
+    /** @scenario "Archiving from the row asks the same question the detail page asks" */
+    it("asks a question that names the source and what survives", async () => {
+      const confirmed = stubConfirm(false);
+      const { user, item } = await openArchive();
+
+      await user.click(item);
+
+      expect(confirmed).toHaveBeenCalledTimes(1);
+      const asked = confirmed.mock.calls[0]?.[0] ?? "";
+      expect(asked).toContain("Workato prod");
+      expect(asked).toContain("Historical events stay readable");
+    });
+
+    /** @scenario "Archiving from the row asks the same question the detail page asks" */
+    it("leaves the source alone when the admin declines", async () => {
+      stubConfirm(false);
+      const { user, handlers, item } = await openArchive();
+
+      await user.click(item);
+
+      expect(handlers.onArchive).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Archiving from the row asks the same question the detail page asks" */
+    it("archives once the admin confirms", async () => {
+      stubConfirm(true);
+      const { user, handlers, item } = await openArchive();
+
+      await user.click(item);
+
+      expect(handlers.onArchive).toHaveBeenCalledWith("src-workato");
     });
   });
 

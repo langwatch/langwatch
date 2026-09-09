@@ -57,6 +57,26 @@ Feature: Pulled provider usage becomes visible, attributed cost
     Then the reported cost reflects the corrected figure
     And the earlier figure is not added on top
 
+  @unit
+  Scenario: A refused Anthropic collision names the fields the two rows differed in
+    Given Anthropic's cost report answers with two rows for the same day,
+      workspace, model and description at different amounts
+    And the rows also differ in a field the key does not carry, such as
+      service tier, token type, context window or inference region
+    When the read runs
+    Then the page is refused and nothing from it is recorded
+    And the refusal names the key the rows share
+    And the refusal names the fields the two rows differed in
+    And the key the rows share is not changed to tell them apart
+    # The refusal already existed for two amounts under one key. It named
+    # the key and stopped there. The fields that would explain the
+    # collision were on the stored row all along; the guard never read
+    # them. Naming them turns a dead end into a lead. The guard is not widened: two rows
+    # alike in key and amount still merge, and a zero-amount repeat must
+    # not wedge the source over money that does not exist. The key is not
+    # widened either: it is what a re-read uses to replace an earlier
+    # figure in place, and changing it would record the same spend twice.
+
   # --- Money the provider reports as a credit ---
 
   @unit

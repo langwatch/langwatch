@@ -1,6 +1,6 @@
 ---
 title: Anomaly rules
-description: What the anomaly detector evaluates, what a rule is made of, and why rules cannot be created in the app today.
+description: What the anomaly detector evaluates, what a rule is made of, how a fired alert reaches you, and why rules cannot be created in the app today.
 sidebarTitle: Anomaly rules
 ---
 
@@ -8,7 +8,7 @@ sidebarTitle: Anomaly rules
 
 <Note>**Available on Enterprise plans.** See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
-<Warning>**Anomaly rules cannot be created or edited in LangWatch today.** There is no page for them and no public API, so this page describes what the detector does with a rule and what a rule is made of, not something you can set up right now. Rules that already exist are still evaluated, but no screen in the product lists the alerts they raise: the one place an alert reaches you is the [OCSF export](/ai-gateway/governance/ocsf-export), where a record linked to one carries its `anomalyAlertId`. To watch spend with a limit you can act on, use [Budgets](/ai-gateway/budgets), which enforce a hard limit and are available today.</Warning>
+<Warning>**Anomaly rules cannot be created or edited in LangWatch today, and the alerts they raise are not listed anywhere.** There is no page for them and no public API, so this page describes what the detector does with a rule and what a rule is made of, not something you can set up right now. Rules that already exist are still evaluated. When one fires, the one place the alert reaches you is a webhook, POSTed to whatever URL the rule's destination config names, so a rule with no destination fires into a record no screen displays. To watch spend with a limit you can act on, use [Budgets](/ai-gateway/budgets), which enforce a hard limit and are available today.</Warning>
 
 Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3-audit-log-ingest). A rule is a definition the [event-sourcing detector](/ai-gateway/governance/architecture) evaluates against incoming events, producing an `AnomalyAlert` row when a violation is detected.
 
@@ -37,17 +37,17 @@ If you need detection beyond `spend_spike` today, the recommended shape is one o
 
 ## What a `spend_spike` rule is made of
 
-These are the fields the detector reads, listed so the shape of a rule is known. They are not steps to follow: no page or API accepts them today.
+These are the fields a rule carries and the detector reads. No screen collects them today and no public API accepts them; they describe rules that already exist.
 
 | Field | Typical value | What it does |
 |-------|---------------|---------------|
-| **Name** | `Spend spike on Cowork prod` | Free-text label; identifies the rule on the alert it raises. |
-| **Severity** | `warning`, `critical` | Recorded on the alert, and will drive dispatch routing once C3 ships. |
+| **Name** | `Spend spike on production gateway` | Free-text label; identifies the rule on the alert it raises, and travels in the webhook payload. |
+| **Severity** | `warning`, `critical` | Recorded on the alert and carried in the webhook payload. It does not route: when the rule's destination configuration passes validation, every destination on it receives every alert the rule raises. A configuration that fails validation is quarantined and no request is sent to any of its destinations. |
 | **Rule type** | `spend_spike` | Pick exactly this, see coverage table above. |
 | **Scope** | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
 | **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID is in the URL of the per-source detail page under the inventory. |
 | **Threshold config** | (JSON object, see below) | The detector's per-rule-type tuning knobs. |
-| **Destination config** | `{}` (today) | Reserved for future Slack, PagerDuty, SIEM dispatch, see Dispatch coverage below. |
+| **Destination config** | `{"destinations": []}` | The webhook targets the alert is pushed to, see Dispatch coverage below. Empty for a rule that records alerts without pushing them anywhere. |
 
 ### Threshold config: `spend_spike`
 
@@ -85,28 +85,81 @@ Sensible starting values:
 | `team` | ⏳ Preview | Persisted but not filtered by the detector today. Don't rely on it. |
 | `project` | ⏳ Preview | Same. |
 
-## Dispatch coverage (C3 in flight)
+## Dispatch coverage
 
-A rule's **Destination config** holds a JSON object describing where to push the alert. Today the detector's dispatch path is **log-only**: the alert is recorded and carried on the OCSF export, but no Slack message, PagerDuty page or SIEM event is pushed anywhere.
-
-C3 (in flight on the [governance platform](https://github.com/langwatch/langwatch/pull/3524) branch) wires `triggerActionDispatch` so the destinationConfig values below start working:
+A rule's **Destination config** lists where to push the alert. **Webhook is the only destination type**, and it works today: when a rule fires, the alert row is written first, then POSTed to each destination on the rule.
 
 ```json
 {
-  "slack":     { "webhookUrl": "https://hooks.slack.com/services/..." },
-  "pagerduty": { "routingKey": "..." },
-  "webhook":   { "url": "https://your-siem.example.com/ingest", "secret": "..." },
-  "email":     { "addresses": ["sec-on-call@your-company.com"] }
+  "destinations": [
+    {
+      "type": "webhook",
+      "url": "https://your-siem.example.com/ingest",
+      "sharedSecret": "..."
+    }
+  ]
 }
 ```
 
-Until C3 lands, leave destinationConfig empty (`{}`). A real Slack webhook set today is stored and never called, so alerts look wired when they are not.
+| Field | Required | Meaning |
+|-------|----------|---------|
+| `type` | Yes | Must be `webhook`. No other destination type exists; Slack, PagerDuty and email are not implemented. |
+| `url` | Yes | An absolute `https` URL. Up to 10 destinations per rule. |
+| `sharedSecret` | No | When set, the request body is signed with HMAC-SHA256 and the signature travels as `X-LangWatch-Signature: sha256=<hex>`, so your receiver can verify the request came from LangWatch. |
+
+For Slack or PagerDuty, point a webhook at their own incoming-webhook or events endpoint and reshape the payload on your side.
+
+Leave `destinations` empty for a rule that records alerts without pushing them. A destination config that fails validation is quarantined: no request is sent, and the rule falls back to recording only.
+
+### What the webhook receives
+
+A POST with `Content-Type: application/json`, carrying the rule and the alert it raised:
+
+```json
+{
+  "ruleId": "...",
+  "ruleName": "Spend spike on production gateway",
+  "ruleType": "spend_spike",
+  "severity": "warning",
+  "organizationId": "...",
+  "alert": {
+    "id": "...",
+    "triggerWindowStartIso": "2026-01-08T00:00:00.000Z",
+    "triggerWindowEndIso": "2026-01-09T00:00:00.000Z",
+    "triggerSpendUsd": "42.00",
+    "triggerEventCount": null,
+    "detail": {
+      "baselineSpendUsd": 12,
+      "windowSec": 86400,
+      "reason": "...",
+      "dispatch": "pending"
+    },
+    "detectedAtIso": "2026-01-09T00:04:11.000Z"
+  }
+}
+```
+
+`detail.dispatch` reads `pending` in every payload, because the alert is written before delivery is attempted. The stored row is updated with the delivery outcome afterwards; the payload you receive is the pre-delivery snapshot.
+
+### Delivery guarantees
+
+Delivery is **best-effort, and the alert row is the authoritative signal**. Each destination gets up to three attempts with a five-second timeout each. A 5xx response is retried with exponential backoff; a 4xx fails immediately, on the reading that it is a configuration error rather than a transient one.
+
+A destination that never succeeds is logged and recorded on the alert. It does not fail the detector, and it does not block the other destinations.
+
+Requests go out through the same server-side-request-forgery guard the ingestion pullers use: the destination is resolved and its address pinned.
+
+A URL resolving to a private or link-local address is refused and recorded as a failed delivery when `BLOCK_LOCAL_HTTP_CALLS` is on, which it is on LangWatch Cloud. Self-hosted, that refusal only applies if you set the flag, and a host listed in `ALLOWED_PROXY_HOSTS` is allowed either way.
+
+The cloud metadata hostnames and addresses themselves are refused regardless of either setting and cannot be allow-listed. An allow-listed name is trusted as written, without a lookup of where it resolves, so only allow-list names you control.
 
 ## Where an existing rule's alerts go
 
 **In the app**: no screen lists them. Each fire is recorded as one alert keyed by `(ruleId, triggerWindowStart)`, so the detector does not raise a second alert for the same window, but the governance section has no page that reads those rows today.
 
-**In your SIEM**: the [OCSF export](/ai-gateway/governance/ocsf-export) is the one place an alert reaches you. A trace record linked to an alert carries that alert's `anomalyAlertId` and `severity_id` 4 (Medium); every other record carries `severity_id` 1 (Informational).
+**Over a webhook**: this is the one place an alert reaches you. Every fire is POSTed to each webhook destination on the rule, with the payload above. A rule with no destinations records the alert and sends no request.
+
+**Not in the OCSF export.** The [OCSF export](/ai-gateway/governance/ocsf-export) carries governance events, and no exported record is linked to an anomaly alert. Do not build a SIEM rule that waits for one. Point a webhook destination at your SIEM instead.
 
 **CLI**: `langwatch governance status` reports `hasAnomalyRules: true` once at least one rule exists. That confirms a rule is defined, not that one has fired.
 
@@ -116,7 +169,7 @@ End to end, for an organization that already has a rule:
 2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed), see [otel-generic, Test it now](/ai-governance/ingestion-sources/otel-generic#test-it-now-copy-paste-curl).
 3. Wait long enough for the baseline window to roll past the seed (default `windowSec: 86400` means 24h, so use the tighter values from the table above for fast iteration).
 4. Send a second event with `gen_ai.usage.cost_usd: 2.00` (the spike).
-5. Pull the [OCSF export](/ai-gateway/governance/ocsf-export) and look for a record carrying an `anomalyAlertId`.
+5. Watch your webhook receiver for the payload above. If the rule has no webhook destination, the alert is recorded and no request is sent.
 
 ## What's persisted vs what's evaluated
 
