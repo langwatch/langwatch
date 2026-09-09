@@ -426,6 +426,18 @@ Feature: The AI Governance Agents page
     And the line never falls, because an agent that registered stays registered
     And a row whose registration date was never measured is left off the line
 
+  # The headline counts every agent and the line beneath it counts only the
+  # dated ones, so on an organization with provider-found agents the two never
+  # meet. Unsaid, that reads as a broken card and a reader cannot tell which
+  # number to distrust. The caption states the gap so it becomes a fact.
+  @unit
+  Scenario: The fleet caption says which agents the line cannot include
+    Given a fleet holding an agent with no registration date
+    When the fleet summary is derived from it
+    Then the caption says how many agents the line excludes and why
+    And the sparkline's own description says the same
+    And the caption stays quiet when every agent carries a registration date
+
   @unit
   Scenario: The health card lists responding, idle and erroring separately
     Given sample agents in different health states
