@@ -4,11 +4,11 @@ description: What the anomaly detector evaluates, what a rule is made of, and wh
 sidebarTitle: Anomaly rules
 ---
 
-<Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).</Info>
+<Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules are meant to catch a pattern *before* a budget breach, though only the spend-spike type is evaluated today.</Info>
 
 <Note>**Available on Enterprise plans.** See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
-<Warning>**Anomaly rules cannot be created or edited in LangWatch today.** There is no page for them and no public API, so this page describes what the detector does with a rule and what a rule is made of, not something you can set up right now. Rules that already exist are still evaluated, and the alerts they raise still appear on `/governance`. To watch spend without a rule, use [Budgets](/ai-gateway/budgets), which enforce a hard limit and are available today.</Warning>
+<Warning>**Anomaly rules cannot be created or edited in LangWatch today.** There is no page for them and no public API, so this page describes what the detector does with a rule and what a rule is made of, not something you can set up right now. Rules that already exist are still evaluated, but no screen in the product lists the alerts they raise: the one place an alert reaches you is the [OCSF export](/ai-gateway/governance/ocsf-export), where a record linked to one carries its `anomalyAlertId`. To watch spend with a limit you can act on, use [Budgets](/ai-gateway/budgets), which enforce a hard limit and are available today.</Warning>
 
 Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3-audit-log-ingest). A rule is a definition the [event-sourcing detector](/ai-gateway/governance/architecture) evaluates against incoming events, producing an `AnomalyAlert` row when a violation is detected.
 
@@ -16,7 +16,7 @@ This page documents what the detector evaluates and what is preview-only, so tha
 
 ## Rule-type coverage
 
-The composer's rule-type dropdown surfaces every shape the schema can hold; the detector only evaluates one of them today.
+The schema holds every rule type below; the detector evaluates one of them today.
 
 | Rule type | Detector coverage | What it detects | Threshold config keys |
 |-----------|------------------|------------------|------------------------|
@@ -28,7 +28,7 @@ The composer's rule-type dropdown surfaces every shape the schema can hold; the 
 | `pii_leak` | ⏳ Preview | Outbound payload matches a PII regex set | (config schema TBD) |
 | `custom` | ⏳ Preview | User-defined CEL, SQL predicate | (config schema TBD) |
 
-**⏳ Preview** rules can be created and the row shows `active` in the list, but the detector logs `debug` and skips them, no AnomalyAlert is produced. Until the detector slice for each ships, treat them as "save the rule for the future, don't expect alerts."
+A **⏳ Preview** rule type is persisted and reads as `active`, but the detector logs `debug` and skips it, so no alert is produced. Until the detector slice for each ships, treat such a rule as stored for later rather than as watching anything.
 
 If you need detection beyond `spend_spike` today, the recommended shape is one of:
 
@@ -41,8 +41,8 @@ These are the fields the detector reads, listed so the shape of a rule is known.
 
 | Field | Typical value | What it does |
 |-------|---------------|---------------|
-| **Name** | `Spend spike on Cowork prod` | Free-text label; surfaces in `recentAnomalies` and the alert dispatch payload. |
-| **Severity** | `warning`, `critical` | Drives the `/governance` KPI breakdown (`anomalyBreakdown.{critical,warning,info}`) and downstream dispatch routing once C3 ships. |
+| **Name** | `Spend spike on Cowork prod` | Free-text label; identifies the rule on the alert it raises. |
+| **Severity** | `warning`, `critical` | Recorded on the alert, and will drive dispatch routing once C3 ships. |
 | **Rule type** | `spend_spike` | Pick exactly this, see coverage table above. |
 | **Scope** | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
 | **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID is in the URL of the per-source detail page under the inventory. |
@@ -87,7 +87,7 @@ Sensible starting values:
 
 ## Dispatch coverage (C3 in flight)
 
-The composer's **Destination config** field accepts a JSON object describing where to push the alert. Today the detector's dispatch path is **log-only**: alerts surface on the `/governance` dashboard's "Recent anomalies" section but no Slack message, PagerDuty page, SIEM event is generated.
+A rule's **Destination config** holds a JSON object describing where to push the alert. Today the detector's dispatch path is **log-only**: the alert is recorded and carried on the OCSF export, but no Slack message, PagerDuty page or SIEM event is pushed anywhere.
 
 C3 (in flight on the [governance platform](https://github.com/langwatch/langwatch/pull/3524) branch) wires `triggerActionDispatch` so the destinationConfig values below start working:
 
@@ -100,15 +100,15 @@ C3 (in flight on the [governance platform](https://github.com/langwatch/langwatc
 }
 ```
 
-Until C3 lands, leave destinationConfig empty (`{}`) and rely on the dashboard to surface alerts. A real Slack webhook set today is stored and never called, so alerts look wired when they are not.
+Until C3 lands, leave destinationConfig empty (`{}`). A real Slack webhook set today is stored and never called, so alerts look wired when they are not.
 
-## Where an existing rule's alerts show up
+## Where an existing rule's alerts go
 
-Two angles, same data:
+**In the app**: no screen lists them. Each fire is recorded as one alert keyed by `(ruleId, triggerWindowStart)`, so the detector does not raise a second alert for the same window, but the governance section has no page that reads those rows today.
 
-**Web**: open `/governance` and look for the rule's name in the "Recent anomalies" section. Each fire creates one row keyed by `(ruleId, triggerWindowStart)` so the detector doesn't double-alert on a single window.
+**In your SIEM**: the [OCSF export](/ai-gateway/governance/ocsf-export) is the one place an alert reaches you. A trace record linked to an alert carries that alert's `anomalyAlertId` and `severity_id` 4 (Medium); every other record carries `severity_id` 1 (Informational).
 
-**CLI**: `langwatch governance status` shows `hasAnomalyRules: true` once at least one rule exists. The `recentAnomalies` query is wired into the same `api.activityMonitor.recentAnomalies` tRPC procedure the dashboard reads.
+**CLI**: `langwatch governance status` reports `hasAnomalyRules: true` once at least one rule exists. That confirms a rule is defined, not that one has fired.
 
 End to end, for an organization that already has a rule:
 
@@ -116,8 +116,8 @@ End to end, for an organization that already has a rule:
 2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed), see [otel-generic, Test it now](/ai-governance/ingestion-sources/otel-generic#test-it-now-copy-paste-curl).
 3. Wait long enough for the baseline window to roll past the seed (default `windowSec: 86400` means 24h, so use the tighter values from the table above for fast iteration).
 4. Send a second event with `gen_ai.usage.cost_usd: 2.00` (the spike).
-5. Reload `/governance`, the alert should appear in "Recent anomalies" with `state: open` and a populated `detail.ratio`.
+5. Pull the [OCSF export](/ai-gateway/governance/ocsf-export) and look for a record carrying an `anomalyAlertId`.
 
 ## What's persisted vs what's evaluated
 
-A rule that's persisted but unevaluated is intentional, admins can pre-stage rules so when the detector slice ships, no rework. But it's a real failure mode if you don't know which is which. The two coverage tables above are the source of truth: **only `spend_spike` + (`organization` | `source_type` | `source`) actually fires today**. Everything else is preview state.
+A rule that is persisted but unevaluated is intentional: a rule can wait for the detector slice that will read it, so there is no rework when that slice ships. But it's a real failure mode if you don't know which is which. The two coverage tables above are the source of truth: **only `spend_spike` + (`organization` | `source_type` | `source`) actually fires today**. Everything else is preview state.
