@@ -57,3 +57,27 @@ Feature: Optional Haven hooks for coding agents
     Then the full width it divides among the runs in flight is that setting
     And unset, the full width is derived from the machine's memory and cores
     And "haven slot explain" prints the width and where it came from
+
+  @unit
+  Scenario: A command that only mentions a heavy tool is not gated
+    Given the gate classifies commands by what they actually invoke, not by substring
+    When a command only reads, searches or prints text that happens to name a heavy tool
+    Then it is not classed heavy, even when the words vitest, tsc, golangci-lint or typecheck appear in it
+    But a command that genuinely runs a heavy tool, however it is wrapped in cd, env, npx, pnpm or make, is still classed heavy
+
+  # A rewrite used to mask the real command from Claude Code's own permission
+  # rules: a prefix rule matches "haven run", so an allow rule over-admits and a
+  # deny rule never gets to see the command it was written to refuse. It also
+  # hid the real command from every log line and prompt. Gating now lives in
+  # the heavy tools themselves - the compiler/lint/format/test bin shims and
+  # package scripts, which already take a slot through `haven slot run` on
+  # their own - so the command the model asked for is exactly the command that
+  # runs.
+  @unit
+  Scenario: The gate never changes the command it admits
+    Given a heavy command and a command that is not heavy
+    When Claude Code's gate answers either one
+    Then the reply carries no updatedInput at all
+    And the command that reaches the tool is exactly the command the model asked for
+    And a heavy command still gets a system message describing what haven expects to happen
+    But only red memory pressure with no slot free produces an explicit deny

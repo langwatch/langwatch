@@ -35,40 +35,38 @@ var GatedTools = []string{"Bash", "Edit", "Write"}
 // Claude Code matches a tool name against it as an alternation.
 func HookMatcher() string { return strings.Join(GatedTools, "|") }
 
-// heavyCommands are the only commands worth gating. Everything else defers in
-// a few milliseconds, because a gate that thinks about `ls` is its own outage.
-//
-// Kept as a list of substrings rather than a clever matcher on purpose: a
-// classifier that is hard to predict is worse than one that occasionally lets
-// something through, since the failure mode of over-matching is a developer
-// wondering why a trivial command was queued.
-var heavyCommands = []string{
-	"vitest",
-	"test:unit",
-	"test:integration",
-	"typecheck",
-	"tsgo",
-	"lint",
-	"next build",
-	"go build",
-	"docker build",
+// heavyScripts are the pnpm script names and make targets that cost real
+// time, matched as a WHOLE WORD at the invocation's script/target position -
+// `pnpm [--filter X] [run] SCRIPT` or `make TARGET` - never as a substring of
+// a longer name or an unrelated path.
+var heavyScripts = []string{
+	"typecheck", "typecheck:one", "typecheck:all",
+	"lint", "lint:fix", "format",
+	"test", "test:unit", "test:integration",
+}
+
+// heavySubcommands are BINARY SUBCOMMAND pairs where the binary alone is used
+// for all kinds of cheap things (`go vet`, `docker ps`, `next dev`) and only
+// this exact next word costs real time.
+var heavySubcommands = map[string]string{
+	"go":     "build",
+	"docker": "build",
+	"next":   "build",
 }
 
 // heavyBinaries are heavy runs matched on the BINARY INVOKED rather than by
-// substring, and they are the TypeScript compiler's two names because "tsc"
-// cannot go in the list above: it is a substring of "tsconfig.json", so `cat
-// tsconfig.json` and every `-p tsconfig.tsgo.json` argument would class heavy.
-// That is precisely the over-match heavyCommands' comment warns about, and the
-// developer wondering why `cat` was queued would be right.
+// substring: the TypeScript compiler's two names, because "tsc" cannot be
+// matched as a substring of the whole command line (it is a substring of
+// "tsconfig.json", so `cat tsconfig.json` would class heavy), plus the other
+// tools that are reached directly as often as through a package script.
 //
 // Matching the last path segment of a word keeps the rule as predictable as a
 // substring while staying honest about a three-letter name:
 // `./node_modules/.bin/tsc`, `pnpm exec tsc` and `/x/lib/tsc --noEmit` all
 // count, `tsconfig.json`, `mytsc`, `tsclint` and the shim's own `tsc.real`
-// (already inside the queue) do not. `tsgo` is here too rather than only in
-// heavyCommands: one compiler, one rule. It stays in heavyCommands as well, so
-// nothing that classes heavy today stops doing so.
-var heavyBinaries = typeScriptCompilerBinaries
+// (already inside the queue) do not.
+var heavyBinaries = append(append([]string{}, typeScriptCompilerBinaries...),
+	"vitest", "golangci-lint", "oxlint", "oxfmt", "eslint")
 
 // integrationMarkers say a command drives the integration suite, which is never
 // narrowed: specs/setup/integration-file-serialism.feature owns its concurrency
@@ -85,21 +83,40 @@ var unitMarkers = []string{"test:unit", "vitest"}
 var workerFlags = []string{"--maxWorkers", "--max-workers", "VITEST_MAX_WORKERS"}
 
 // ClassifyCommand reports whether a command is heavy and, if so, what kind.
+//
+// Classification is by INVOCATION, not by substring: a command is heavy only
+// when one of its shell segments actually runs a heavy tool at the program
+// position, so `grep -rn vitest .` and `cat tsconfig.json` are never gated
+// merely for mentioning one. See DEFECT-2026-09-10 in the gate test for the
+// incident this replaced (two routine commands queued behind the machine-wide
+// slot for mentioning "vitest" and "golangci" in a grep pattern).
 func ClassifyCommand(command string) (RunKind, bool) {
+	kind, heavy, _ := classifyDetail(command)
+	return kind, heavy
+}
+
+// classifyDetail is ClassifyCommand plus the DurationKey bucket for a
+// single-process run, so the two never classify the same command two
+// different ways by drifting apart.
+func classifyDetail(command string) (kind RunKind, heavy bool, bucket string) {
 	if ungatedCommandMode(command) {
-		return SingleProcessRun, false
+		return SingleProcessRun, false, ""
 	}
-	if !containsAny(command, heavyCommands) && !invokesAny(command, heavyBinaries) {
-		return SingleProcessRun, false
+	for _, segment := range commandSegments(command) {
+		segmentBucket, ok := heavyInvocationBucket(segment)
+		if !ok {
+			continue
+		}
+		switch {
+		case containsAny(segment, integrationMarkers):
+			return IntegrationRun, true, segmentBucket
+		case containsAny(segment, unitMarkers):
+			return UnitRun, true, segmentBucket
+		default:
+			return SingleProcessRun, true, segmentBucket
+		}
 	}
-	switch {
-	case containsAny(command, integrationMarkers):
-		return IntegrationRun, true
-	case containsAny(command, unitMarkers):
-		return UnitRun, true
-	default:
-		return SingleProcessRun, true
-	}
+	return SingleProcessRun, false, ""
 }
 
 // Watches cannot hold a finite check slot for the lifetime of a dev session.
@@ -369,7 +386,7 @@ func BackgroundDescription(queueDepth int) string {
 // order key filed a ten-minute integration run under the unit bucket — and a
 // polluted estimate narrows a run that should have queued.
 func DurationKey(command string) string {
-	kind, heavy := ClassifyCommand(command)
+	kind, heavy, bucket := classifyDetail(command)
 	if !heavy {
 		return ""
 	}
@@ -380,20 +397,9 @@ func DurationKey(command string) string {
 		return "unit"
 	default:
 		// Single-process runs are not one population: a typecheck and a docker
-		// build differ by an order of magnitude, so each keeps its own bucket.
-		for _, marker := range heavyCommands {
-			if strings.Contains(command, marker) {
-				return marker
-			}
-		}
-		// A run reached only by binary name is the compiler, and the compiler
-		// is one population under both its names — a `tsc` run belongs in the
-		// same bucket its `tsgo` predecessor filled, not in no bucket at all
-		// (an unobserved command is treated as long, which disables narrowing).
-		if invokesAny(command, heavyBinaries) {
-			return TypeScriptCompilerClass
-		}
-		return ""
+		// build differ by an order of magnitude, so each keeps its own bucket,
+		// named after the invocation that made it heavy.
+		return bucket
 	}
 }
 
@@ -417,4 +423,275 @@ func containsAny(s string, needles []string) bool {
 		}
 	}
 	return false
+}
+
+// commandSegments splits a command into the pieces a shell would run one
+// after another: at unquoted ;, &&, || and | (also plain |, the same
+// boundary) and at newlines. Quotes and escapes are honored the way
+// ShellWords honors them, so an operator inside a quoted string, an awk
+// program, a grep pattern or a heredoc body never ends a segment.
+func commandSegments(command string) []string {
+	s := &segmentScanner{}
+	runes := []rune(command)
+	for i := 0; i < len(runes); i++ {
+		i += s.consume(runes, i)
+	}
+	s.flush()
+	return s.segments
+}
+
+// segmentScanner is commandSegments' state. A type rather than locals in a
+// loop, the same shape as shellScanner above, so each state gets its own
+// named method instead of one switch nested inside another.
+type segmentScanner struct {
+	segments []string
+	cur      strings.Builder
+	quote    rune
+	escaped  bool
+}
+
+// consume handles the rune at runes[i] and reports how many further runes,
+// beyond that one, it also consumed (a two-rune operator such as && or ||).
+func (s *segmentScanner) consume(runes []rune, i int) int {
+	r := runes[i]
+	switch {
+	case s.escaped:
+		s.cur.WriteRune(r)
+		s.escaped = false
+		return 0
+	case s.quote != 0:
+		s.quoted(r)
+		return 0
+	}
+	if extra, isBoundary := segmentBoundaryWidth(runes, i); isBoundary {
+		s.flush()
+		return extra
+	}
+	s.bare(r)
+	return 0
+}
+
+// quoted consumes a rune under an open quote. Only a double quote honors a
+// backslash escape - inside single quotes, everything up to the closing
+// quote is literal, matching shellScanner.quoted's own rule.
+func (s *segmentScanner) quoted(r rune) {
+	s.cur.WriteRune(r)
+	if r == s.quote {
+		s.quote = 0
+		return
+	}
+	s.escaped = s.quote == '"' && r == '\\'
+}
+
+// bare consumes a rune outside any quote or operator: it opens a quote,
+// marks an escape, or is written through as ordinary text.
+func (s *segmentScanner) bare(r rune) {
+	switch r {
+	case '\'', '"':
+		s.quote = r
+	case '\\':
+		s.escaped = true
+	}
+	s.cur.WriteRune(r)
+}
+
+// flush ends the current segment, even an empty one - two operators in a row
+// (";;", "&&  &&") name an empty command, which is what a shell would say too.
+func (s *segmentScanner) flush() {
+	s.segments = append(s.segments, s.cur.String())
+	s.cur.Reset()
+}
+
+// segmentBoundaryWidth reports whether the rune at runes[i] starts an
+// unquoted segment operator (;, &&, ||, | or a newline), and how many
+// further runes beyond it the operator also consumes.
+func segmentBoundaryWidth(runes []rune, i int) (extra int, isBoundary bool) {
+	switch runes[i] {
+	case '\n', ';':
+		return 0, true
+	case '|':
+		if i+1 < len(runes) && runes[i+1] == '|' {
+			return 1, true
+		}
+		return 0, true
+	case '&':
+		if i+1 < len(runes) && runes[i+1] == '&' {
+			return 1, true
+		}
+	}
+	return 0, false
+}
+
+// heavyInvocationBucket reports whether a shell segment actually invokes a
+// heavy tool at its program position, and if so, the DurationKey bucket it
+// belongs under. Only the program position counts, after stripping the shell
+// prefixes that shift where it sits (a leading cd is its own segment already,
+// split off by commandSegments) - a word inside quotes, an awk program, a
+// grep pattern or a heredoc body is never examined.
+func heavyInvocationBucket(segment string) (string, bool) {
+	words := programWords(ShellWords(segment))
+	if len(words) == 0 {
+		return "", false
+	}
+	switch words[0] {
+	case "npx":
+		return heavyBinaryBucket(words[1:])
+	case "pnpm":
+		return heavyPnpmBucket(words[1:])
+	case "make":
+		return heavyMakeBucket(words[1:])
+	}
+	if bucket, ok := heavyBinaryBucket(words); ok {
+		return bucket, true
+	}
+	return heavySubcommandBucket(words)
+}
+
+// programWords returns a segment's words starting at the position that
+// actually names what runs, skipping the shell prefixes that shift it: a
+// leading run of VAR=value assignments (HAVEN_AGENT=1 among them), and the
+// env / time / nice wrappers together with their own flags.
+func programWords(words []string) []string {
+	for len(words) > 0 {
+		rest, stripped := stripOneShellPrefix(words)
+		if !stripped {
+			return words
+		}
+		words = rest
+	}
+	return words
+}
+
+// stripOneShellPrefix removes one shell prefix from the front of words, if
+// present: a VAR=value assignment, or the env / time / nice wrapper together
+// with its own flags (and, for env, any assignments it carries too).
+func stripOneShellPrefix(words []string) (rest []string, stripped bool) {
+	switch {
+	case isAssignment(words[0]):
+		return words[1:], true
+	case words[0] == "env":
+		return stripLeadingFlags(words[1:], true), true
+	case words[0] == "time" || words[0] == "nice":
+		return stripLeadingFlags(words[1:], false), true
+	default:
+		return words, false
+	}
+}
+
+// stripLeadingFlags drops leading "-"-prefixed words, and, when
+// allowAssignments is set, leading VAR=value words too, stopping at the
+// first word that is neither.
+func stripLeadingFlags(words []string, allowAssignments bool) []string {
+	for len(words) > 0 && (strings.HasPrefix(words[0], "-") || (allowAssignments && isAssignment(words[0]))) {
+		words = words[1:]
+	}
+	return words
+}
+
+// isAssignment reports whether word is a shell VAR=value prefix - the form
+// both the hook's own env and the incident's own commands use
+// (HAVEN_AGENT=1 haven slot explain).
+func isAssignment(word string) bool {
+	name, _, found := strings.Cut(word, "=")
+	if !found || name == "" {
+		return false
+	}
+	for i, r := range name {
+		switch {
+		case r == '_' || unicode.IsUpper(r) || unicode.IsLower(r):
+			continue
+		case i > 0 && unicode.IsDigit(r):
+			continue
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// heavyBinaryBucket matches the first word's binary directly: the compiler
+// under either name, or one of the other tools invoked straight rather than
+// through a package script.
+func heavyBinaryBucket(words []string) (string, bool) {
+	if len(words) == 0 {
+		return "", false
+	}
+	base := binaryBase(words[0])
+	if isTypeScriptCompilerBinary(base) {
+		return TypeScriptCompilerClass, true
+	}
+	if slices.Contains(heavyBinaries, base) {
+		return base, true
+	}
+	return "", false
+}
+
+// heavyPnpmBucket handles `pnpm exec|dlx BINARY` (a binary invoked directly)
+// and `pnpm [--filter X] [run] SCRIPT` (a package script). The script name
+// has to match heavyScripts exactly - a script that merely contains "lint"
+// in a longer name is not this.
+func heavyPnpmBucket(words []string) (string, bool) {
+	if len(words) == 0 {
+		return "", false
+	}
+	if words[0] == "exec" || words[0] == "dlx" {
+		return heavyBinaryBucket(words[1:])
+	}
+	for len(words) > 0 {
+		rest, stripped := stripOnePnpmPrefixToken(words)
+		if !stripped {
+			break
+		}
+		words = rest
+	}
+	if len(words) > 0 && slices.Contains(heavyScripts, words[0]) {
+		return words[0], true
+	}
+	return "", false
+}
+
+// stripOnePnpmPrefixToken removes one token from before a pnpm script name:
+// --filter (with its value, whether attached or given as the next word),
+// "run", or any other flag.
+func stripOnePnpmPrefixToken(words []string) (rest []string, stripped bool) {
+	switch {
+	case words[0] == "--filter":
+		if len(words) > 1 {
+			return words[2:], true
+		}
+		return words[1:], true
+	case strings.HasPrefix(words[0], "--filter="):
+		return words[1:], true
+	case words[0] == "run":
+		return words[1:], true
+	case strings.HasPrefix(words[0], "-"):
+		return words[1:], true
+	default:
+		return words, false
+	}
+}
+
+// heavyMakeBucket matches `make TARGET`: the target is heavy only when it is
+// one of the same names a pnpm script is heavy under.
+func heavyMakeBucket(words []string) (string, bool) {
+	if len(words) == 0 {
+		return "", false
+	}
+	if slices.Contains(heavyScripts, words[0]) {
+		return words[0], true
+	}
+	return "", false
+}
+
+// heavySubcommandBucket matches BINARY SUBCOMMAND pairs: the binary alone is
+// used for all kinds of cheap things, so only this exact next word counts.
+func heavySubcommandBucket(words []string) (string, bool) {
+	if len(words) < 2 {
+		return "", false
+	}
+	base := binaryBase(words[0])
+	if sub, ok := heavySubcommands[base]; ok && words[1] == sub {
+		return base + " " + sub, true
+	}
+	return "", false
 }

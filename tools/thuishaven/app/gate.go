@@ -63,13 +63,11 @@ func deferReply() hookReply {
 }
 
 // autoApprovingModes are the permission modes where a session already approves
-// tool calls on its own.
-//
-// The gate may only REWRITE a command in one of these, because rewriting
-// requires returning "allow" (measured: updatedInput is applied with allow and
-// silently ignored with defer), and allow bypasses the permission system. In
-// any other mode, approving would hand out an approval the user did not give,
-// so the gate observes and may refuse but does not rewrite.
+// tool calls on its own. Only GateCodex still reads this: Codex's own
+// permission system does not have the prefix-matching hazard that made Claude's
+// gate stop rewriting (see decideHeavyMessage's doc comment), so Codex's
+// command is still rewritten, and only in a mode that can already carry an
+// "allow" it did not ask a human for.
 var autoApprovingModes = map[string]bool{
 	"bypassPermissions": true,
 	"acceptEdits":       true,
@@ -77,52 +75,204 @@ var autoApprovingModes = map[string]bool{
 	"dontAsk":           true,
 }
 
-// Gate reads one hook payload and writes one reply. It never returns an error:
-// there is no failure here worth blocking an agent for.
-func (o *Orchestrator) Gate(stdin io.Reader, stdout io.Writer) {
+// gateContext is what both wire formats need after decoding and classifying
+// one hook payload. Ready is false - and Early carries the whole answer  -
+// whenever there is nothing left to decide: a decode failure, a cache-cost
+// warning, a non-Bash tool, or a command that is not heavy or already wrapped.
+type gateContext struct {
+	payload hookPayload
+	command string
+	kind    domain.RunKind
+	ready   bool
+}
+
+// decodeGateContext reads and classifies one hook payload - the prefix Claude's
+// gate and Codex's gate both need before either decides anything, kept in one
+// place so the two wire formats cannot drift on what counts as heavy.
+func (o *Orchestrator) decodeGateContext(stdin io.Reader) (gateContext, hookReply) {
+	var p hookPayload
+	if json.NewDecoder(stdin).Decode(&p) != nil {
+		return gateContext{}, deferReply()
+	}
+	if warning := o.cacheCostWarning(p); warning != "" {
+		// The price is information, not a veto: this still carries no permission
+		// decision, same as deferReply, because pricing an action must never need
+		// an approval to ride on.
+		return gateContext{}, hookReply{SystemMessage: warning, Specific: hookSpecificOutput{
+			HookEventName: "PreToolUse",
+		}}
+	}
+	if p.ToolName != "Bash" {
+		return gateContext{}, deferReply()
+	}
+	command, _ := p.ToolInput["command"].(string)
+	if command == "" || domain.AlreadyWrapped(command) {
+		return gateContext{}, deferReply()
+	}
+	kind, heavy := domain.ClassifyCommand(command)
+	if !heavy {
+		return gateContext{}, deferReply()
+	}
+	return gateContext{payload: p, command: command, kind: kind, ready: true}, hookReply{}
+}
+
+// runGated answers one hook call under the same panic-recovery discipline
+// every entry point needs: a panic must not reach the runtime, which would
+// exit 2 and BLOCK the tool call. Recovering here converts any crash into
+// whatever `decide` had already written to reply (its zero value is
+// deferReply's own shape) - and logs what it caught, because a gate that
+// panics on every call would otherwise degrade to "defer" forever and nobody
+// would learn. The log goes nowhere near stdout, so saying so cannot affect
+// the decision.
+func (o *Orchestrator) runGated(stdout io.Writer, decide func() hookReply) {
 	reply := deferReply()
 	defer func() {
-		// A panic must not reach the runtime, which would exit 2 and block the
-		// call. Recovering here converts any crash into a defer — and logs what it
-		// caught, because a gate that panics on every call would otherwise degrade
-		// to "defer" forever and nobody would ever learn. The log goes nowhere near
-		// stdout, so saying so cannot affect the decision.
 		if r := recover(); r != nil {
 			o.log.Error("the gate panicked; deferring to the normal permission flow",
 				zap.Any("panic", r), zap.ByteString("stack", debug.Stack()))
 		}
 		_ = json.NewEncoder(stdout).Encode(reply)
 	}()
-
-	var p hookPayload
-	if json.NewDecoder(stdin).Decode(&p) != nil {
-		return
-	}
-	if warning := o.cacheCostWarning(p); warning != "" {
-		// The price is information, not a veto: this still carries no permission
-		// decision, same as deferReply, because pricing an action must never need
-		// an approval to ride on.
-		reply = hookReply{SystemMessage: warning, Specific: hookSpecificOutput{
-			HookEventName: "PreToolUse",
-		}}
-		return
-	}
-	if p.ToolName != "Bash" {
-		return
-	}
-	command, _ := p.ToolInput["command"].(string)
-	if command == "" || domain.AlreadyWrapped(command) {
-		return
-	}
-	kind, heavy := domain.ClassifyCommand(command)
-	if !heavy {
-		return
-	}
-
-	reply = o.decideHeavy(p, command, kind)
+	reply = decide()
 }
 
-// decideHeavy is the ladder for a command the gate has decided is heavy.
+// Gate reads one hook payload and writes one reply for Claude Code. It never
+// returns an error: there is no failure here worth blocking an agent for.
+//
+// It never rewrites the command it answers about. See decideHeavyMessage.
+func (o *Orchestrator) Gate(stdin io.Reader, stdout io.Writer) {
+	o.runGated(stdout, func() hookReply {
+		ctx, early := o.decodeGateContext(stdin)
+		if !ctx.ready {
+			return early
+		}
+		return o.decideHeavyMessage(ctx.payload, ctx.command, ctx.kind)
+	})
+}
+
+// decideHeavyMessage is Claude's ladder for a command decided heavy. It NEVER
+// rewrites tool_input.
+//
+// A rewrite used to mask the real command from three things at once: Claude
+// Code's own permission rules (a prefix rule matching "haven run" over-admits
+// an allow and a deny never gets to fire on the command it was written for),
+// every log line, and every prompt the agent or a human reads back. Gating now
+// lives in the heavy tools themselves - the compiler/lint/format/test bin
+// shims and package scripts, which already take a slot through
+// `haven slot run` on their own - so the command the model asked for is
+// exactly the command that runs, and this only classifies and reports.
+//
+// The only permission decision left is a deny under red memory pressure with
+// no slot free (domain.Refuse); everything else is a system message, silent
+// for a plain Admit, describing what the run is expected to do - a prediction
+// now, not an instruction, since nothing here enforces it any more.
+func (o *Orchestrator) decideHeavyMessage(p hookPayload, command string, kind domain.RunKind) hookReply {
+	caller := domain.CallerFromAgentID(p.AgentID, false)
+	level := domain.ReadPressure(o.readPressureRecord())
+	slots := o.slotState()
+	queueDepth := 0
+	if !slots.free() {
+		queueDepth = slots.position()
+	}
+
+	decision := domain.DecideAdmission(domain.AdmissionRequest{
+		Pressure:             level,
+		IsSlotFree:           slots.free(),
+		Caller:               caller,
+		Kind:                 kind,
+		ObservedDuration:     o.observedDuration(command),
+		HasCallerWorkerCount: domain.CallerSetWorkers(command),
+		EstimatedWait:        o.estimatedWait(queueDepth, command),
+		// Nothing is rewritten any more, so there is no detached form left to
+		// hand a wait too long to serve back to: that case is a Queue like any
+		// other, blocking on the caller's own ceiling rather than the hook's.
+		CanBackground: false,
+	})
+
+	if decision == domain.Refuse {
+		var hint *domain.RetryHint
+		if h, ok := domain.NewRetryHint(queueDepth, o.observedDuration(command), caller); ok {
+			hint = &h
+		}
+		return refuse(level, queueDepth, hint)
+	}
+
+	prediction := predictionRequest{decision: decision, queueDepth: queueDepth, workers: o.narrowedWidth(slots)}
+	if decision == domain.Queue {
+		prediction.wait, prediction.hasWait = o.queueEstimate(queueDepth, command)
+	}
+	message := predictiveMessage(prediction)
+	if message == "" {
+		return deferReply()
+	}
+	return hookReply{SystemMessage: message, Specific: hookSpecificOutput{HookEventName: "PreToolUse"}}
+}
+
+// predictionRequest is what predictiveMessage needs to describe one decision.
+type predictionRequest struct {
+	decision   domain.Admission
+	queueDepth int
+	workers    int
+	wait       time.Duration
+	hasWait    bool
+}
+
+// predictiveMessage is what Claude's gate says about a decision it is not
+// enforcing itself - the classification and the queue estimate, silent for
+// Admit, the same rule admissionMessage already keeps: a line worth printing
+// names something the caller did not already know and could act on.
+//
+// KNOWN GAP, not silently accepted: this is a PREDICTION now, not an
+// instruction, because nothing here rewrites the command any more. For a
+// command whose bin shim or package script already takes a slot on its own
+// (tsc, tsgo, typecheck, lint, format), the prediction and the enforcement
+// agree. For one that does not yet (a bare vitest invocation, golangci-lint),
+// the message can currently describe a queue or a narrower width that nothing
+// downstream applies - closing that gap means giving vitest and golangci-lint
+// their own slot-taking shim, tracked as follow-up work, not built here.
+func predictiveMessage(r predictionRequest) string {
+	switch r.decision {
+	case domain.Narrow:
+		return fmt.Sprintf("haven: narrowed to %d test workers - the machine is busy, so this runs at a width that fits", r.workers)
+	case domain.Queue:
+		return "haven: " + queueNote(r.queueDepth, r.wait, r.hasWait)
+	default:
+		return ""
+	}
+}
+
+// GateCodex shares admission decisions with Claude's gate and projects the
+// Codex wire format. Unlike Gate, it still rewrites the command through
+// `haven run`: Codex's own permission system does not match on a command
+// prefix the way Claude's does, so the hazard that made Claude's gate stop
+// rewriting does not apply here, and specs/setup/haven-agent-hooks.feature's
+// "Codex heavy commands use the existing Haven gate" scenario is unchanged.
+func (o *Orchestrator) GateCodex(stdin io.Reader, stdout io.Writer) {
+	o.runGated(stdout, func() hookReply {
+		ctx, early := o.decodeGateContext(stdin)
+		if !ctx.ready {
+			return early
+		}
+		reply := o.decideHeavy(ctx.payload, ctx.command, ctx.kind)
+		// Gate itself already leaves PermissionDecision unset for a neutral call -
+		// there is nothing left here to strip.
+		//
+		// Codex preserves execution options around the rewritten command. Claude's
+		// background/timeout fields are not part of its documented Bash rewrite.
+		if reply.Specific.UpdatedInput["run_in_background"] == true {
+			reply.SystemMessage = "haven: queued"
+		}
+		for field := range reply.Specific.UpdatedInput {
+			if field != "command" {
+				delete(reply.Specific.UpdatedInput, field)
+			}
+		}
+		return reply
+	})
+}
+
+// decideHeavy is Codex's ladder for a command decided heavy: it still
+// rewrites the command through `haven run`, carrying the decision with it.
 func (o *Orchestrator) decideHeavy(p hookPayload, command string, kind domain.RunKind) hookReply {
 	caller := domain.CallerFromAgentID(p.AgentID, false)
 	level := domain.ReadPressure(o.readPressureRecord())

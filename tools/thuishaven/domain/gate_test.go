@@ -73,6 +73,46 @@ func TestClassifyCommandGatesOnlyWhatIsHeavy(t *testing.T) {
 	})
 }
 
+// @scenario "A command that only mentions a heavy tool is not gated"
+func TestClassifyCommandGatesOnInvocationNotSubstring(t *testing.T) {
+	t.Run("given a command that only reads, searches or prints text naming a heavy tool", func(t *testing.T) {
+		// The 2026-09-10 incident: a status read piped through head and awk, and
+		// a grep for the classifier's own source, were both queued behind the
+		// machine-wide slot for tens of minutes because they mentioned "vitest",
+		// "tsc" and "golangci" as plain text, never as a program they ran.
+		for _, cmd := range []string{
+			`HAVEN_AGENT=1 haven slot explain 2>&1 | head -20; echo ---; ps -eo rss,comm | awk '$2 ~ /node|tsgo|tsc|golangci|vitest/ {n[$2]++} END {for (k in n) print k, n[k]}'`,
+			`grep -rn 'func.*[Cc]lassif\|"vitest"\|"tsc"\|"golangci' --include='*.go' domain app | grep -v _test`,
+			"grep -rn vitest.config .",
+			"cat vitest.config.ts",
+			"echo typecheck",
+		} {
+			t.Run(cmd, func(t *testing.T) {
+				if _, heavy := ClassifyCommand(cmd); heavy {
+					t.Fatalf("mentioning a heavy tool must not gate: %q", cmd)
+				}
+			})
+		}
+	})
+
+	t.Run("given a command that genuinely invokes a heavy tool, however it is wrapped", func(t *testing.T) {
+		for _, cmd := range []string{
+			"pnpm typecheck:one apps/api",
+			"cd tools && pnpm --filter @langwatch/ui test:unit src/x.test.ts",
+			"HAVEN_AGENT=1 pnpm exec vitest run src/x.test.ts",
+			"./node_modules/.bin/tsc --noEmit -p tsconfig.json",
+			"golangci-lint run ./tools/...",
+			"make typecheck",
+		} {
+			t.Run(cmd, func(t *testing.T) {
+				if _, heavy := ClassifyCommand(cmd); !heavy {
+					t.Fatalf("an actual invocation must still gate: %q", cmd)
+				}
+			})
+		}
+	})
+}
+
 // @scenario "An integration run is never narrowed"
 func TestClassifyCommandSeparatesIntegrationFromUnit(t *testing.T) {
 	t.Run("given an integration command", func(t *testing.T) {
