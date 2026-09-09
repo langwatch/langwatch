@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
 /**
  * The staff lists, per provider, and the one conversion they all feed.
  *
@@ -425,6 +427,65 @@ describe("the Databricks SCIM list", () => {
         },
       ],
     });
+  });
+
+  /**
+   * `count` is a requested MAXIMUM under SCIM, so a workspace may serve fewer
+   * rows than asked while more remain. Ending the walk on a short page drops
+   * those silently, and the omission is invisible: the result is a listing
+   * that looks like a complete directory.
+   */
+  it("keeps asking while the stated total says people remain", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        reply({
+          body: {
+            Resources: [{ id: "1", userName: "ada@example.com" }],
+            totalResults: 2,
+            itemsPerPage: 1,
+            startIndex: 1,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        reply({
+          body: {
+            Resources: [{ id: "2", userName: "grace@example.com" }],
+            totalResults: 2,
+            itemsPerPage: 1,
+            startIndex: 2,
+          },
+        }),
+      );
+
+    const listing = await listDatabricksPeople({
+      workspaceUrl: "https://dbc-1.cloud.databricks.com",
+      token: "workspace-token",
+    });
+
+    expect(listing.outcome).toBe("listed");
+    if (listing.outcome !== "listed") return;
+    expect(listing.items.map((p) => p.rawActorId)).toEqual([
+      "ada@example.com",
+      "grace@example.com",
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops on a page that named nobody, whatever total it claims", async () => {
+    // Otherwise a workspace overstating its total would be asked from the same
+    // index until the page budget ran out.
+    fetchMock.mockResolvedValue(
+      reply({ body: { Resources: [], totalResults: 500 } }),
+    );
+
+    const listing = await listDatabricksPeople({
+      workspaceUrl: "https://dbc-1.cloud.databricks.com",
+      token: "workspace-token",
+    });
+
+    expect(listing).toEqual({ outcome: "empty", items: [] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   /**
