@@ -67,6 +67,28 @@ export const recentItemSchema = z
 export type RecentItem = z.infer<typeof recentItemSchema>;
 
 /**
+ * How far a project has been set up. Nine of the eleven figures belong to
+ * other verticals and arrive already counted; the last two are the project's
+ * own columns, and every count reads as "more than none".
+ */
+export const integrationsCheckStatusSchema = z
+  .object({
+    workflows: z.number(),
+    customGraphs: z.number(),
+    datasets: z.number(),
+    onlineEvaluations: z.number(),
+    triggers: z.number(),
+    simulations: z.number(),
+    modelProviders: z.number(),
+    prompts: z.number(),
+    teamMembers: z.number(),
+    firstMessage: z.boolean(),
+    integrated: z.boolean(),
+  })
+  .strict();
+export type IntegrationsCheckStatus = z.infer<typeof integrationsCheckStatusSchema>;
+
+/**
  * One project, as the `/api/projects` management family answers it: the
  * identity, the two setup fields and the team it sits in. The stored row's
  * credential and its archive stamp are deliberately absent — the credential

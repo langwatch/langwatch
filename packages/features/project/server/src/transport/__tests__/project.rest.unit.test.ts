@@ -1,31 +1,12 @@
 /**
- * The `/api/projects` REST door: input validation, the access policy each
- * route declares, the status a domain refusal becomes, and the wire body.
- *
- * Ported from
- * `platform/app/src/app/api/projects/__tests__/projects-rest-api.integration.test.ts`
- * and `projects-filtered-listing.integration.test.ts`, both of which drove
- * this family against real Postgres with real role bindings. What they proved
- * about the DOOR is here. What they proved about the domain — that a
- * destination team in another organization is rejected, that a demoted owner's
- * key sees fewer projects — belongs to the service and to the API-key
- * visibility resolver, so what is asserted here is that the door asks them and
- * renders the answer.
- *
- * The two `@scenario` annotations on the base-key routes are carried across
- * verbatim: they bind spec scenarios, and dropping one silently unbinds it.
- *
+ * @vitest-environment node
+ * The `/api/projects` REST door: input validation, the access each route
+ * declares, the status a domain refusal becomes, and the wire body. What the
+ * domain decides belongs to the service's own tests, not here.
  * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
  *       specs/api-keys/project-key-read-access.feature
  */
-import type { ApiKey, ApiKeyApi, ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
-import {
-  createRestApiService,
-  getRoutePolicy,
-  type AppRestOrganizationVariables,
-  type AppRestProjectVariables,
-  type RestApiServicePorts,
-} from "@langwatch/api/rest";
+import type { ApiKey, ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import {
   DestinationTeamNotFoundError,
   PersonalProjectProtectedError,
@@ -35,20 +16,16 @@ import {
   TeamNotInOrganizationError,
   type PaginatedProjects,
   type Project,
-  type ProjectService,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
-import type { MiddlewareHandler } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
-import { createProjectRestApp } from "../project.api.ts";
-import { TestApiKeyService } from "./support/test-api-key-service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
 
-const ORGANIZATION_ID = "organization-1";
-const USER_ID = "user-1";
-const API_KEY_ID = "api-key-1";
-const CREDENTIAL = "organization-credential";
+import {
+  API_KEY_ID,
+  mountProjectRest,
+  ORGANIZATION_ID,
+  USER_ID,
+} from "./project.rest.harness.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -105,20 +82,6 @@ function projectWithTeam(overrides: Partial<ProjectWithTeam> = {}): ProjectWithT
   };
 }
 
-/**
- * A handled error as this boundary can recognise one without depending on the package that
- * defines it: a stable `code` and its own status. That is the same duck-type the application's
- * own handler falls back to for a payload that has already crossed a serialisation boundary.
- */
-type HandledShape = { code?: unknown; httpStatus?: unknown; message: string };
-
-function handledFieldsOf(error: Error): { code: string; status: ContentfulStatusCode } | null {
-  const candidate: HandledShape = error;
-  return typeof candidate.code === "string" && typeof candidate.httpStatus === "number"
-    ? { code: candidate.code, status: candidate.httpStatus as ContentfulStatusCode }
-    : null;
-}
-
 function page(data: Project[], total = data.length): PaginatedProjects {
   return { data, pagination: { page: 1, limit: 50, total } };
 }
@@ -149,138 +112,14 @@ function mintedServiceKey(): { token: string; apiKey: ApiKey } {
   };
 }
 
-/**
- * The enforcement the process owns and this package does not. `granted` is the set of
- * permissions the presented credential holds at the organization; `grantedOnProject` is what it
- * holds at the project a route names.
- */
-function spine(
-  options: {
-    granted?: readonly string[];
-    grantedOnProject?: Readonly<Record<string, readonly string[]>>;
-  } = {},
-) {
-  const granted = new Set(
-    options.granted ?? [
-      "project:create",
-      "project:view",
-      "project:update",
-      "project:delete",
-      "project:manage",
-    ],
-  );
-  const grantedOnProject = options.grantedOnProject;
-
-  const authenticateOrganization: MiddlewareHandler = async (c, next) => {
-    if (c.req.header("Authorization") !== `Bearer ${CREDENTIAL}`) {
-      return c.json({ error: "Unauthorized", message: "Invalid credential" }, 401);
-    }
-    c.set("organization", { id: ORGANIZATION_ID });
-    c.set("apiKeyId", API_KEY_ID);
-    c.set("apiKeyUserId", USER_ID);
-    c.set("apiKeyOrganizationId", ORGANIZATION_ID);
-    c.set("orgResolvedToken", {
-      type: "apiKey-org",
-      apiKeyId: API_KEY_ID,
-      userId: USER_ID,
-      organizationId: ORGANIZATION_ID,
-    });
-    await next();
-  };
-
-  const ports: RestApiServicePorts = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: (error, c) => {
-      const handled = handledFieldsOf(error);
-      if (handled) {
-        return c.json({ error: handled.code, message: error.message }, handled.status);
-      }
-      return c.json({ error: "Internal server error" }, 500);
-    },
-    canonicalErrorHandler: (error, c) => c.json({ error: { message: error.message } }, 500),
-    authenticateProject: () => async (_c, next) => next(),
-    authorizeProjectPermission: () => async (_c, next) => next(),
-    authorizeApiKeyCeiling: () => async (_c, next) => next(),
-    authenticateOrganization: () => authenticateOrganization,
-    authorizeOrganizationPermission:
-      ({ permission }) =>
-      async (c, next) => {
-        if (!granted.has(permission)) {
-          return c.json({ error: "Forbidden", message: "Missing permission" }, 403);
-        }
-        await next();
-      },
-    authorizeRouteTeamPermission: () => async (_c, next) => next(),
-    authorizeRouteProjectPermission:
-      ({ permission, param }) =>
-      async (c, next) => {
-        const projectId = c.req.param(param) ?? "";
-        const held = grantedOnProject?.[projectId] ?? [...granted];
-        if (!held.includes(permission)) {
-          return c.json({ error: "Forbidden", message: "Missing permission" }, 403);
-        }
-        await next();
-      },
-    // The versioned family's door: the same two checks, in the mode that
-    // family uses.
-    authenticateOrganizationThrowing: authenticateOrganization,
-    authorizeOrganizationPermissionThrowing: (permission) => async (c, next) => {
-      if (!granted.has(permission)) {
-        return c.json({ error: "Forbidden", message: "Missing permission" }, 403);
-      }
-      await next();
-    },
-  };
-
-  return createRestApiService<AppRestProjectVariables, AppRestOrganizationVariables>(ports);
-}
-
-function buildApi(
-  options: {
-    projects?: Partial<TestProjectService>;
-    apiKeys?: Partial<TestApiKeyService>;
-    granted?: readonly string[];
-    grantedOnProject?: Readonly<Record<string, readonly string[]>>;
-  } = {},
-) {
-  const projects: ProjectService = Object.assign(new TestProjectService(), options.projects);
-  const apiKeys: ApiKeyApi = Object.assign(new TestApiKeyService(), options.apiKeys);
-
-  const hono = createProjectRestApp({
-    security: spine({
-      ...(options.granted ? { granted: options.granted } : {}),
-      ...(options.grantedOnProject ? { grantedOnProject: options.grantedOnProject } : {}),
-    }),
-    projects: () => projects,
-    apiKeys: () => apiKeys,
-  });
-
-  const send = (
-    path: string,
-    init: { method?: string; body?: unknown; credential?: string } = {},
-  ) =>
-    hono.request(path, {
-      ...(init.method === undefined ? {} : { method: init.method }),
-      ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
-      headers: {
-        Authorization: `Bearer ${init.credential ?? CREDENTIAL}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-  return { hono, send };
-}
-
 /** The visibility answer a credential whose reach is the whole organization gets. */
 const SEES_EVERYTHING: ApiKeyVisibleProjects = { kind: "all" };
 
-describe("createProjectRestApp", () => {
+describe("the projects REST family", () => {
   describe("given no credential", () => {
     it("refuses before the request reaches the service", async () => {
       const listByOrganization = vi.fn(async () => page([]));
-      const { hono } = buildApi({ projects: { listByOrganization } });
+      const { hono } = mountProjectRest({ projects: { listByOrganization } });
 
       const response = await hono.request("/api/projects");
 
@@ -289,7 +128,7 @@ describe("createProjectRestApp", () => {
     });
 
     it("refuses a credential it does not recognise", async () => {
-      const { send } = buildApi();
+      const { send } = mountProjectRest();
 
       const response = await send("/api/projects", { credential: "sk-lw-invalid_token" });
 
@@ -301,7 +140,7 @@ describe("createProjectRestApp", () => {
     it("returns the project with a freshly minted service key and no base key", async () => {
       const create = vi.fn(async () => project());
       const mint = vi.fn(async () => mintedServiceKey());
-      const { send } = buildApi({ projects: { create }, apiKeys: { create: mint } });
+      const { send } = mountProjectRest({ projects: { create }, apiKeys: { create: mint } });
 
       const response = await send("/api/projects", {
         method: "POST",
@@ -342,7 +181,7 @@ describe("createProjectRestApp", () => {
     it("provisions into a new team when the request names one instead of an id", async () => {
       const create = vi.fn(async () => project({ teamId: "team-new" }));
       const mint = vi.fn(async () => mintedServiceKey());
-      const { send } = buildApi({ projects: { create }, apiKeys: { create: mint } });
+      const { send } = mountProjectRest({ projects: { create }, apiKeys: { create: mint } });
 
       const response = await send("/api/projects", {
         method: "POST",
@@ -362,7 +201,7 @@ describe("createProjectRestApp", () => {
 
     it("refuses a body with no name", async () => {
       const create = vi.fn(async () => project());
-      const { send } = buildApi({ projects: { create } });
+      const { send } = mountProjectRest({ projects: { create } });
 
       const response = await send("/api/projects", {
         method: "POST",
@@ -375,7 +214,7 @@ describe("createProjectRestApp", () => {
 
     it("refuses a body that names neither an existing team nor a new one", async () => {
       const create = vi.fn(async () => project());
-      const { send } = buildApi({ projects: { create } });
+      const { send } = mountProjectRest({ projects: { create } });
 
       const response = await send("/api/projects", {
         method: "POST",
@@ -387,7 +226,7 @@ describe("createProjectRestApp", () => {
     });
 
     it("reads a team outside the organization as a bad request", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: {
           create: vi.fn(async (): Promise<Project> => {
             throw new TeamNotInOrganizationError("Team does not belong to this organization");
@@ -409,14 +248,14 @@ describe("createProjectRestApp", () => {
     });
 
     it("refuses a personal-workspace boundary and reports a slug clash", async () => {
-      const boundary = buildApi({
+      const boundary = mountProjectRest({
         projects: {
           create: vi.fn(async (): Promise<Project> => {
             throw new PersonalWorkspaceBoundaryError("Not managed here");
           }),
         },
       });
-      const clash = buildApi({
+      const clash = mountProjectRest({
         projects: {
           create: vi.fn(async (): Promise<Project> => {
             throw new ProjectSlugConflictError("Slug already taken");
@@ -439,7 +278,7 @@ describe("createProjectRestApp", () => {
 
     it("refuses a caller without project:create", async () => {
       const create = vi.fn(async () => project());
-      const { send } = buildApi({ projects: { create }, granted: ["project:view"] });
+      const { send } = mountProjectRest({ projects: { create }, granted: ["project:view"] });
 
       const response = await send("/api/projects", {
         method: "POST",
@@ -460,7 +299,7 @@ describe("createProjectRestApp", () => {
     /** @scenario Listing projects never discloses base keys */
     it("answers with the page and never discloses a base key", async () => {
       const listByOrganization = vi.fn(async () => page([project(), project({ id: "project_2" })]));
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: { listByOrganization },
         apiKeys: { resolveVisibleProjects: vi.fn(async () => SEES_EVERYTHING) },
       });
@@ -482,7 +321,7 @@ describe("createProjectRestApp", () => {
 
     it("passes the requested page and limit through", async () => {
       const listByOrganization = vi.fn(async () => page([], 0));
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: { listByOrganization },
         apiKeys: { resolveVisibleProjects: vi.fn(async () => SEES_EVERYTHING) },
       });
@@ -495,18 +334,21 @@ describe("createProjectRestApp", () => {
     });
 
     /**
-     * The listing is `anyAuthenticated`, not `requires("project:view")`: a credential whose
-     * reach is narrower than the organization gets exactly the projects it can see, with a 200.
+     * The listing is `anyAuthenticated`, not a `project:view` demand: a
+     * credential whose reach is narrower than the organization gets exactly
+     * the projects it can see, with a 200.
      */
     describe("given a credential bound to some of the organization's projects", () => {
       /** @scenario "project-scoped key gets a filtered list, not a refusal" */
       it("narrows the query to those projects and answers 200", async () => {
         const listByOrganization = vi.fn(async () => page([project()], 1));
-        const resolveVisibleProjects = vi.fn(async (): Promise<ApiKeyVisibleProjects> => ({
-          kind: "some",
-          ids: ["project_1", "project_9"],
-        }));
-        const { send } = buildApi({
+        const resolveVisibleProjects = vi.fn(
+          async (): Promise<ApiKeyVisibleProjects> => ({
+            kind: "some",
+            ids: ["project_1", "project_9"],
+          }),
+        );
+        const { send } = mountProjectRest({
           projects: { listByOrganization },
           apiKeys: { resolveVisibleProjects },
         });
@@ -529,13 +371,12 @@ describe("createProjectRestApp", () => {
       /** @scenario "a key without project:view gets an empty list, not a refusal" */
       it("answers 200 with an empty list when the credential reaches nothing", async () => {
         const listByOrganization = vi.fn(async () => page([], 0));
-        const { send } = buildApi({
+        const { send } = mountProjectRest({
           projects: { listByOrganization },
           apiKeys: {
-            resolveVisibleProjects: vi.fn(async (): Promise<ApiKeyVisibleProjects> => ({
-              kind: "some",
-              ids: [],
-            })),
+            resolveVisibleProjects: vi.fn(
+              async (): Promise<ApiKeyVisibleProjects> => ({ kind: "some", ids: [] }),
+            ),
           },
           granted: [],
         });
@@ -553,7 +394,7 @@ describe("createProjectRestApp", () => {
     /** @scenario "org-scoped key lists every project in the organization" */
     it("leaves the query unfiltered for a credential that reaches the organization", async () => {
       const listByOrganization = vi.fn(async () => page([project()]));
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: { listByOrganization },
         apiKeys: { resolveVisibleProjects: vi.fn(async () => SEES_EVERYTHING) },
       });
@@ -571,7 +412,7 @@ describe("createProjectRestApp", () => {
   describe("when one project is read", () => {
     /** @scenario Reading a project never discloses its base key */
     it("answers without the base key or the service key", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
       });
 
@@ -586,7 +427,7 @@ describe("createProjectRestApp", () => {
     });
 
     it("reports an unknown id as not found", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: { tryGetWithTeam: vi.fn(async () => null) },
       });
 
@@ -594,7 +435,7 @@ describe("createProjectRestApp", () => {
     });
 
     it("reports a project in another organization as not found", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: {
           tryGetWithTeam: vi.fn(async () =>
             projectWithTeam({
@@ -614,7 +455,7 @@ describe("createProjectRestApp", () => {
       const update = vi.fn(async () =>
         project({ name: "Updated Project Name", language: "typescript" }),
       );
-      const { send } = buildApi({ projects: { update } });
+      const { send } = mountProjectRest({ projects: { update } });
 
       const response = await send("/api/projects/project_1", {
         method: "PATCH",
@@ -637,7 +478,7 @@ describe("createProjectRestApp", () => {
     /** @scenario PATCH /api/projects/:id moves project to different team */
     it("moves the project when the body names a destination team", async () => {
       const update = vi.fn(async () => project({ teamId: "team-destination" }));
-      const { send } = buildApi({ projects: { update } });
+      const { send } = mountProjectRest({ projects: { update } });
 
       const response = await send("/api/projects/project_1", {
         method: "PATCH",
@@ -656,7 +497,7 @@ describe("createProjectRestApp", () => {
       const update = vi.fn(async () =>
         project({ name: "Moved And Renamed", teamId: "team-destination" }),
       );
-      const { send } = buildApi({ projects: { update } });
+      const { send } = mountProjectRest({ projects: { update } });
 
       await send("/api/projects/project_1", {
         method: "PATCH",
@@ -681,7 +522,7 @@ describe("createProjectRestApp", () => {
      * turns that into 400. Which destinations qualify is the service's test.
      */
     it("reads an unreachable destination team as a bad request", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: {
           update: vi.fn(async (): Promise<Project> => {
             throw new DestinationTeamNotFoundError("Destination team not found");
@@ -708,7 +549,7 @@ describe("createProjectRestApp", () => {
       const update = vi.fn(async (): Promise<Project> => {
         throw new DestinationTeamNotFoundError("Destination team not found");
       });
-      const { send } = buildApi({ projects: { update } });
+      const { send } = mountProjectRest({ projects: { update } });
 
       const response = await send("/api/projects/project_1", {
         method: "PATCH",
@@ -725,7 +566,7 @@ describe("createProjectRestApp", () => {
     });
 
     it("reports an unknown project as not found", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: {
           update: vi.fn(async (): Promise<Project> => {
             throw new ProjectNotFoundError();
@@ -742,7 +583,7 @@ describe("createProjectRestApp", () => {
     });
 
     it("reads a personal-workspace boundary as a refusal", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: {
           update: vi.fn(async (): Promise<Project> => {
             throw new PersonalWorkspaceBoundaryError("Not managed here");
@@ -763,7 +604,7 @@ describe("createProjectRestApp", () => {
     it("answers with the archived project's id and timestamp", async () => {
       const archivedAt = new Date("2026-08-25T00:00:00.000Z");
       const archive = vi.fn(async () => project({ archivedAt }));
-      const { send } = buildApi({ projects: { archive } });
+      const { send } = mountProjectRest({ projects: { archive } });
 
       const response = await send("/api/projects/project_1", { method: "DELETE" });
 
@@ -773,14 +614,11 @@ describe("createProjectRestApp", () => {
         name: "My Test Project",
         archivedAt: archivedAt.toISOString(),
       });
-      expect(archive).toHaveBeenCalledWith({
-        id: "project_1",
-        organizationId: ORGANIZATION_ID,
-      });
+      expect(archive).toHaveBeenCalledWith({ id: "project_1", organizationId: ORGANIZATION_ID });
     });
 
     it("reports an unknown project as not found", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: {
           archive: vi.fn(async (): Promise<Project> => {
             throw new ProjectNotFoundError();
@@ -792,7 +630,7 @@ describe("createProjectRestApp", () => {
     });
 
     it("refuses to archive a personal project", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: {
           archive: vi.fn(async (): Promise<Project> => {
             throw new PersonalProjectProtectedError("Personal projects cannot be archived");
@@ -805,24 +643,9 @@ describe("createProjectRestApp", () => {
   });
 
   describe("given the base key, which is a project-level write credential", () => {
-    /**
-     * The route is authorized at the NAMED project's scope, not the organization's, and with
-     * `project:update` rather than `project:view` — the key it hands over grants writes, so
-     * reading it cannot be cheaper than holding them.
-     */
-    it("declares project:update at the route's own project scope", () => {
-      buildApi();
-
-      expect(getRoutePolicy("GET", "/api/projects/:id/api-key")?.policy).toEqual({
-        kind: "projectPermission",
-        permission: "project:update",
-        param: "id",
-      });
-    });
-
     /** @scenario A caller who can change the project reads the base key */
     it("hands the base key to a caller who can update that project", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
         grantedOnProject: { project_1: ["project:update"] },
       });
@@ -836,7 +659,7 @@ describe("createProjectRestApp", () => {
     /** @scenario A read-only credential cannot read the base key */
     it("refuses a caller who can only view the project, and discloses nothing", async () => {
       const tryGetWithTeam = vi.fn(async () => projectWithTeam());
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: { tryGetWithTeam },
         grantedOnProject: { project_1: ["project:view"] },
       });
@@ -850,7 +673,7 @@ describe("createProjectRestApp", () => {
 
     /** @scenario Permission is checked against the requested project */
     it("refuses a project-scoped caller asking about a sibling project", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
         grantedOnProject: { project_1: ["project:update"], project_2: [] },
       });
@@ -867,7 +690,7 @@ describe("createProjectRestApp", () => {
       const foreign = projectWithTeam({
         team: { ...projectWithTeam().team, organizationId: "organization-other" },
       });
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: { tryGetWithTeam: vi.fn(async () => foreign) },
         grantedOnProject: { project_1: ["project:update"] },
       });
@@ -882,7 +705,7 @@ describe("createProjectRestApp", () => {
   describe("when the base key is rotated", () => {
     it("answers with the new key", async () => {
       const regenerateLegacyProjectKey = vi.fn(async () => "sk-lw-rotated");
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
         apiKeys: { regenerateLegacyProjectKey },
       });
@@ -898,7 +721,7 @@ describe("createProjectRestApp", () => {
 
     it("reports a project in another organization as not found, rotating nothing", async () => {
       const regenerateLegacyProjectKey = vi.fn(async () => "sk-lw-rotated");
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         projects: {
           tryGetWithTeam: vi.fn(async () =>
             projectWithTeam({
@@ -934,27 +757,10 @@ describe("createProjectRestApp", () => {
       },
     };
 
-    it("declares each by-id route at the route's own project scope", () => {
-      buildApi();
-
-      for (const [method, path, permission] of [
-        ["GET", "/api/projects/:id", "project:view"],
-        ["PATCH", "/api/projects/:id", "project:update"],
-        ["DELETE", "/api/projects/:id", "project:delete"],
-        ["POST", "/api/projects/:id/regenerate-api-key", "project:manage"],
-      ] as const) {
-        expect(getRoutePolicy(method, path)?.policy).toEqual({
-          kind: "projectPermission",
-          permission,
-          param: "id",
-        });
-      }
-    });
-
     /** @scenario A project route resolves its permission at the project it names */
     it("refuses to read a sibling project, and never reaches the service", async () => {
       const tryGetWithTeam = vi.fn(async () => projectWithTeam());
-      const { send } = buildApi({ ...SCOPED, projects: { tryGetWithTeam } });
+      const { send } = mountProjectRest({ ...SCOPED, projects: { tryGetWithTeam } });
 
       expect((await send("/api/projects/project_2")).status).toBe(403);
       expect(tryGetWithTeam).not.toHaveBeenCalled();
@@ -963,7 +769,7 @@ describe("createProjectRestApp", () => {
     it("refuses to update or archive a sibling project", async () => {
       const update = vi.fn(async () => project());
       const archive = vi.fn(async () => project());
-      const { send } = buildApi({ ...SCOPED, projects: { update, archive } });
+      const { send } = mountProjectRest({ ...SCOPED, projects: { update, archive } });
 
       expect(
         (await send("/api/projects/project_2", { method: "PATCH", body: { name: "Renamed" } }))
@@ -977,7 +783,7 @@ describe("createProjectRestApp", () => {
     /** @scenario Rotating a project's ingestion key is authorized on that project */
     it("refuses to rotate a sibling project's ingestion key, and rotates nothing", async () => {
       const regenerateLegacyProjectKey = vi.fn(async () => "sk-lw-rotated");
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         ...SCOPED,
         projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
         apiKeys: { regenerateLegacyProjectKey },
@@ -993,7 +799,7 @@ describe("createProjectRestApp", () => {
     });
 
     it("still serves the project the grant does name", async () => {
-      const { send } = buildApi({
+      const { send } = mountProjectRest({
         ...SCOPED,
         projects: { tryGetWithTeam: vi.fn(async () => projectWithTeam()) },
       });

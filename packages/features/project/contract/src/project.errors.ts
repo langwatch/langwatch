@@ -111,6 +111,48 @@ export class CannotArchiveCurrentProjectError extends HandledError {
 }
 
 /**
+ * A create named neither an existing team nor a new one, so it names no scope
+ * the caller could be judged at. Refused before any standing is resolved.
+ */
+export class ProjectCreateTargetMissingError extends HandledError {
+  declare readonly code: "validation_error";
+
+  constructor() {
+    super("validation_error", "Either an existing team or a new team name must be given", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "ProjectCreateTargetMissingError";
+  }
+}
+
+/** The caller may not create a project at the tier they named. */
+export class ProjectCreateDeniedError extends HandledError {
+  declare readonly code: "permission_denied";
+
+  constructor() {
+    super("permission_denied", "You do not have permission to create a project here", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "ProjectCreateDeniedError";
+  }
+}
+
+/** The caller may update the project but not change who outside it can read. */
+export class TraceSharingDeniedError extends HandledError {
+  declare readonly code: "permission_denied";
+
+  constructor() {
+    super("permission_denied", "You do not have permission to change trace sharing settings", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "TraceSharingDeniedError";
+  }
+}
+
+/**
  * No caller identity reached a surface that needs one.
  *
  * Kept as a named refusal rather than a narrowing `throw` because the

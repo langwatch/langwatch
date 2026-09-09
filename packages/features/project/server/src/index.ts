@@ -24,9 +24,22 @@ export {
   ProjectKeyMapPort,
   ProjectStoredObjectsPort,
 } from "./ports/project.port.ts";
-export { createProjectRestApp } from "./transport/api-rest/project.api.ts";
-// The three tRPC transports are not exported: they still name the deleted
-// legacy builder.
+export {
+  ProjectManagementApi,
+  projectRest,
+  projectRestCredential,
+} from "./transport/project.rest.ts";
+export {
+  ProjectBrowserApi,
+  projectTrpcTransport,
+  type ProjectFieldProtections,
+  type ProjectPermissionScope,
+} from "./transport/project.trpc.ts";
+export { ProjectHomeApi, homeTrpcTransport } from "./transport/home.trpc.ts";
+export {
+  IntegrationsChecksApi,
+  integrationsChecksTrpcTransport,
+} from "./transport/integrations-checks.trpc.ts";
 export {
   GovernanceInternalProjectPort,
   GovernanceInternalProjectService,
