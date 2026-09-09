@@ -9,12 +9,14 @@
  * here is about the page saying what it STARTED and never what it found, and
  * about no unpressable state being silent about why.
  *
- * The other half is the empty table. An organization with a provider connected
- * and one with none have different moves available, and the page has to pick
- * the right sentence. It deliberately stops short of a third: whether a
- * connected provider answered "none" or refused to answer is not a distinction
- * this page can make yet, so nothing here asserts it and the copy claims
- * neither.
+ * The other half is the empty table, and it now has FOUR readings rather than
+ * two: no provider connected, none asked yet, every provider answered with
+ * none, and a provider that refused. The last pair is what this file guards
+ * hardest. A refusal and an empty tenant look identical on a page showing no
+ * agents and demand opposite things of the reader — one means nothing is
+ * wrong, the other means a credential is dead — so the assertions below are
+ * written to fail if the two panes ever converge, not merely to check that
+ * each exists.
  *
  * Only the boundaries are mocked: layout chrome, feature flag, toasts, and the
  * tRPC client.
@@ -138,16 +140,35 @@ import { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
 
 import AgentsPage from "../agents";
 
+/**
+ * `lastListing: null` is the deliberate default — no listing recorded — which
+ * is the state every assertion written before the outcome read existed was
+ * really describing. {@link listed} and {@link refused} move a fixture off it.
+ */
 const GENIE = {
   id: "src-genie",
   name: "Prod Genie",
   sourceType: "databricks_genie",
+  lastListing: null as unknown,
 };
 const COPILOT = {
   id: "src-copilot",
   name: "Copilot tenant",
   sourceType: "copilot_studio_dataverse",
+  lastListing: null as unknown,
 };
+
+/** A provider that answered. An empty list is still an answer. */
+const listed = <T extends object>(source: T) => ({
+  ...source,
+  lastListing: { outcome: "listed" },
+});
+
+/** A provider that would not answer, and what a person does about it. */
+const refused = <T extends object>(
+  source: T,
+  cause: "access" | "unreachable",
+) => ({ ...source, lastListing: { outcome: "refused", cause } });
 
 function renderAgents() {
   const router = createMemoryRouter(
@@ -395,6 +416,179 @@ describe("the agents page's empty table", () => {
 
       expect(screen.getByTestId("agents-empty")).toBeVisible();
       expect(screen.queryByTestId("agents-empty-unlisted")).toBeNull();
+    });
+  });
+});
+
+/**
+ * The distinction the whole listing outcome was built to carry, at the one
+ * place a customer meets it.
+ */
+describe("the agents page's empty table, once a provider has answered", () => {
+  const sourcesAre = (data: unknown[]) => {
+    harness.queryResults["governanceAgents.syncSources"] = { data };
+  };
+
+  describe("given a provider that refused to list its agents", () => {
+    /** @scenario "A provider that refused is never reported as an empty organization" */
+    it("says the provider refused rather than that the organization is empty", () => {
+      sourcesAre([refused(GENIE, "access")]);
+      renderAgents();
+
+      const empty = screen.getByTestId("agents-empty-refused");
+      expect(empty).toBeVisible();
+      expect(empty).toHaveTextContent("refused to answer");
+      expect(empty).toHaveTextContent("cannot say what it holds");
+      expect(empty).not.toHaveTextContent(/holds? no agents/);
+      expect(empty).not.toHaveTextContent("No agents yet");
+    });
+
+    /**
+     * THE ASSERTION THIS FILE EXISTS FOR. Both panes are rendered and their
+     * words compared, because "a refusal pane exists" and "a refusal pane says
+     * something different from the empty one" are not the same claim, and only
+     * the second one is the feature. A later edit that pointed both branches
+     * at one shared sentence would pass every other test here.
+     *
+     * The self-check comes first: comparing two empty strings would prove
+     * nothing at all.
+     */
+    /** @scenario "A provider that refused is never reported as an empty organization" */
+    it("says something different from the pane shown when a provider answered", () => {
+      sourcesAre([refused(GENIE, "access")]);
+      renderAgents();
+      const refusedWords =
+        screen.getByTestId("agents-empty-refused").textContent ?? "";
+      cleanup();
+
+      sourcesAre([listed(GENIE)]);
+      renderAgents();
+      const answeredWords =
+        screen.getByTestId("agents-empty-listed").textContent ?? "";
+
+      expect(refusedWords).not.toBe("");
+      expect(answeredWords).not.toBe("");
+      expect(refusedWords).not.toBe(answeredWords);
+      // And not merely different by a word: the two make opposite claims.
+      expect(answeredWords).toContain("no agents");
+      expect(refusedWords).not.toContain("no agents");
+    });
+
+    /**
+     * The status column is kept so an operator reading a support ticket can
+     * tell a 403 from a 500. A tenant admin shown either learns nothing they
+     * can act on, and the server never sends one.
+     */
+    /** @scenario "A refusal never shows the HTTP status behind it" */
+    it("shows no status code and no provider error text", () => {
+      sourcesAre([refused(GENIE, "access")]);
+      renderAgents();
+
+      const words =
+        screen.getByTestId("agents-empty-refused").textContent ?? "";
+      expect(words).not.toMatch(/\b[45]\d\d\b/);
+      expect(words).not.toMatch(/unauthorized|not_configured|HTTP/i);
+    });
+
+    /** @scenario "A refusal names which providers refused and what to do about it" */
+    it("names only the provider that refused", () => {
+      sourcesAre([refused(GENIE, "access"), listed(COPILOT)]);
+      renderAgents();
+
+      const empty = screen.getByTestId("agents-empty-refused");
+      expect(empty).toHaveTextContent("Prod Genie");
+      // Naming the provider that answered would send its owner to audit a
+      // credential that is working.
+      expect(empty).not.toHaveTextContent("Copilot tenant");
+    });
+
+    /** @scenario "A refusal names which providers refused and what to do about it" */
+    it("tells an administrator what to check", () => {
+      sourcesAre([refused(GENIE, "access")]);
+      renderAgents();
+
+      expect(screen.getByTestId("agents-empty-refused")).toHaveTextContent(
+        "Check that connection's credentials and permissions",
+      );
+    });
+
+    /**
+     * A rate limit is not a permission problem, and sending this reader to
+     * audit one costs them an afternoon looking for a fault that is not there.
+     */
+    /** @scenario "A refusal that was only unreachable says to ask again" */
+    it("says to ask again when the provider was merely unreachable", () => {
+      sourcesAre([refused(GENIE, "unreachable")]);
+      renderAgents();
+
+      const empty = screen.getByTestId("agents-empty-refused");
+      expect(empty).toHaveTextContent("did not answer");
+      expect(empty).toHaveTextContent("Ask again in a moment");
+      expect(empty).not.toHaveTextContent("credentials and permissions");
+    });
+
+    /**
+     * A refusal beside a clean answer still wins the pane: agents behind the
+     * refusing provider are missing from the list, so the quieter state would
+     * be overclaiming.
+     */
+    /** @scenario "A refusal names which providers refused and what to do about it" */
+    it("wins over a provider that answered cleanly", () => {
+      sourcesAre([listed(COPILOT), refused(GENIE, "access")]);
+      renderAgents();
+
+      expect(screen.getByTestId("agents-empty-refused")).toBeVisible();
+      expect(screen.queryByTestId("agents-empty-listed")).toBeNull();
+    });
+  });
+
+  describe("given a reader without the manage grant and a refusal", () => {
+    /** @scenario "A reader who cannot sync is told who can fix a refusal" */
+    it("names who can fix it rather than telling them to press", () => {
+      harness.permissions = VIEWER;
+      sourcesAre([refused(GENIE, "access")]);
+      renderAgents();
+
+      const empty = screen.getByTestId("agents-empty-refused");
+      expect(empty).toHaveTextContent(
+        "An administrator needs to check that connection's",
+      );
+      expect(empty).not.toHaveTextContent("then ask again");
+    });
+  });
+
+  describe("given every connected provider answered with no agents", () => {
+    /**
+     * The one branch on this page allowed to claim the organization has none,
+     * and it may only because every provider that could hold agents was asked
+     * and each returned an empty list.
+     */
+    /** @scenario "Every provider answering with none is the one time the page says so" */
+    it("says the organization has none and offers registration", () => {
+      sourcesAre([listed(GENIE), listed(COPILOT)]);
+      renderAgents();
+
+      const empty = screen.getByTestId("agents-empty-listed");
+      expect(empty).toHaveTextContent("Prod Genie and Copilot tenant");
+      expect(empty).toHaveTextContent("hold no agents");
+      expect(empty).toHaveTextContent("Register agent");
+    });
+  });
+
+  describe("given one provider answered and another was never asked", () => {
+    /**
+     * The unasked provider could be running a dozen, so the stronger claim is
+     * not available and the page falls back to what it actually knows.
+     */
+    /** @scenario "A provider answered and another unasked claims nothing about the tenant" */
+    it("keeps the weaker sentence rather than claiming the tenant is empty", () => {
+      sourcesAre([listed(GENIE), COPILOT]);
+      renderAgents();
+
+      const empty = screen.getByTestId("agents-empty-unlisted");
+      expect(empty).toHaveTextContent("no agent has been listed from them");
+      expect(empty).not.toHaveTextContent("hold no agents");
+      expect(screen.queryByTestId("agents-empty-listed")).toBeNull();
     });
   });
 });

@@ -271,35 +271,101 @@ Feature: The AI Governance Agents page
   # shared component cannot enforce this, because it cannot see WHY the list is
   # empty. Only the page knows, so the page decides.
   #
-  # THERE IS A NOTHING THIS PAGE CANNOT YET NAME, and the copy is written to
-  # stay out of its way. A provider answering "this tenant has no agents" and a
-  # provider refusing to answer are different facts, one about the tenant and
-  # one about the credential, and the listing keeps them apart in the log.
+  # THE PAGE CAN NAME ALL FOUR NOTHINGS NOW. A provider answering "this tenant
+  # has no agents" and a provider refusing to answer are different facts, one
+  # about the tenant and one about the credential, and they demand opposite
+  # things of the reader: an empty tenant means nothing is wrong, a refusal
+  # means somebody has to go and fix a permission or a credential. Showing one
+  # sentence for both is what left an admin believing they had no agents while
+  # a credential quietly failed.
   #
-  # THE GAP HAS MOVED, and this paragraph is kept rather than deleted because
-  # the constraint on the copy has not moved with it. The outcome is now
-  # FOLDED: the pull-run-status projection folds all four listing outcome
-  # events into eleven columns, so for every source the last listing's outcome,
-  # count, refusal reason and status are recorded and queryable. What is still
-  # missing is a READ — no repository method, service or procedure hands those
-  # columns to this screen — so the page has nothing to branch on and still
-  # cannot tell the two apart.
+  # THE READ EXISTS. `syncSources` carries, per connected source, how the last
+  # agents listing ended — narrowed on the server to the two things a person
+  # does differently about a refusal: fix an access problem, or wait and ask
+  # again. The HTTP status behind it does NOT come back. It is kept for an
+  # operator reading a support ticket; a tenant admin shown "403" learns
+  # nothing they can act on, and the branching that would need it happens
+  # server-side in `ee/governance/services/pullers/`.
   #
-  # So an empty table with a provider connected says only what is known — these
-  # providers are connected, nothing has been listed from them — and offers the
-  # ask. It must not claim the tenant is empty, because on a refusal that would
-  # be the exact collapse the three-outcome listing was built to prevent. That
-  # holds until the read exists, not until the fold does.
+  # WHICH NOTHING WINS. A refusal beats every other reading, even beside a
+  # provider that answered cleanly — agents behind the refusing provider are
+  # missing from the list, so any quieter pane would be overclaiming. Saying
+  # the organization has no agents needs EVERY connected provider to have
+  # answered; one answering "none" while another was never asked leaves the
+  # weaker sentence, because the unasked one could be running a dozen.
   # ---------------------------------------------------------------------------
 
   @integration
   Scenario: An empty table with a provider connected says which and offers the ask
     Given an organization with providers that can list agents and no agents
+    And no listing has been recorded for any of them
     When an administrator opens the Agents page
     Then the empty state names the connected providers
     And it says nothing has been listed from them yet
     And it does not claim the organization has no agents
     And the way out is asking them, not registering one from code
+
+  @unit
+  Scenario: The last listing outcome is read only from this organizations own records
+    Given two organizations each with a connected provider
+    When the page reads how the last listing of each ended
+    Then it sees only the outcome recorded under its own organization
+
+  @unit
+  Scenario: A source nobody has asked reports nothing known rather than an answer
+    Given a connected provider that has never been asked to list its agents
+    When the page reads how its last listing ended
+    Then it is told nothing is known, not that the provider holds none
+
+  @integration
+  Scenario: A provider that refused is never reported as an empty organization
+    Given an organization with a provider that refused to list its agents
+    When an administrator opens the Agents page
+    Then the empty state says the provider refused
+    And it does not say the organization has no agents
+    And its words differ from the pane shown when a provider answered with none
+
+  @integration
+  Scenario: A refusal names which providers refused and what to do about it
+    Given one provider refused for a credential problem and another answered
+    When an administrator opens the Agents page
+    Then the empty state names only the provider that refused
+    And it says the page cannot say what that provider holds
+    And it tells the administrator to check that connection
+
+  @integration
+  Scenario: A refusal that was only unreachable says to ask again
+    Given an organization with a provider that could not be reached
+    When an administrator opens the Agents page
+    Then the empty state says to ask again rather than to check a permission
+
+  @integration
+  Scenario: A refusal never shows the HTTP status behind it
+    Given an organization with a provider that refused to list its agents
+    When an administrator opens the Agents page
+    Then the empty state shows no status code and no provider error text
+
+  @integration
+  Scenario: A reader who cannot sync is told who can fix a refusal
+    Given a reader without the governance manage grant
+    And a provider that refused to list its agents
+    When they open the Agents page
+    Then the empty state says an administrator needs to check that connection
+    And it does not tell them to ask again
+
+  @integration
+  Scenario: Every provider answering with none is the one time the page says so
+    Given every connected provider was asked and holds no agents
+    When an administrator opens the Agents page
+    Then the empty state says the organization has no agents
+    And the way out is registering one from code
+
+  @integration
+  Scenario: A provider answered and another unasked claims nothing about the tenant
+    Given one provider answered with no agents and another was never asked
+    When an administrator opens the Agents page
+    Then the empty state says nothing has been listed from them yet
+    And it does not claim the organization has no agents
 
   @integration
   Scenario: Every empty state on the page carries a way out

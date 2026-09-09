@@ -1,13 +1,23 @@
-import { Bot, SearchX } from "lucide-react";
+import type { AgentsListingRefusalCause } from "@ee/governance/services/pullers/agentsListingOutcome";
+import { Bot, SearchX, TriangleAlert } from "lucide-react";
 import type { ComponentType } from "react";
 
 import { spokenList } from "./agentSummary";
 
 /**
  * The words this page shows when it has nothing to show, held apart from the
- * thing that renders them. Two states, because there are two ways for this
- * page to be empty and they must never borrow each other's sentences: nothing
- * has registered, and everything is filtered out of view.
+ * thing that renders them. FIVE states, because there are five ways for this
+ * page to be empty and none of them may borrow another's sentences: nothing is
+ * connected, providers are connected and none has been asked, every provider
+ * answered and holds none, a provider refused to answer, and everything is
+ * filtered out of view.
+ *
+ * The pair that matters most is the third and the fourth. A provider answering
+ * "none" and a provider refusing to answer both leave a page with no agents on
+ * it, and they ask opposite things of the reader: one means nothing is wrong,
+ * the other means somebody has to go and fix a credential. One sentence for
+ * both left an admin believing they had no agents while a credential quietly
+ * failed, which is the defect these words exist to end.
  *
  * The shared governance empty state that renders them lives at
  * ~/components/governance/empty. It was built once, by the inventory page,
@@ -77,31 +87,25 @@ export const AGENTS_EMPTY_COPY: GovernanceEmptyStateCopy = {
 };
 
 /**
- * Providers that can list agents are connected, and the page holds none.
+ * Providers that can list agents are connected, and NOBODY HAS ASKED THEM YET.
  *
- * A THIRD nothing, and the reason it earns its own words is that the page
- * cannot yet tell the two possibilities apart. A provider that answered "this
- * tenant has no agents" and a provider that refused to answer are different
- * facts, one about the tenant and one about the credential.
+ * A THIRD nothing, and now the narrowest of the three. It used to cover every
+ * organization with a provider connected, because the page could not tell an
+ * empty tenant from a refused credential and had to write one sentence that
+ * would be true either way. The read exists now — `syncSources` carries the
+ * last listing outcome per source — so this state has handed both of those
+ * cases to {@link agentsListedEmptyCopy} and {@link agentsRefusedCopy} and
+ * kept only what it was always describing honestly: no listing has been
+ * recorded, so nothing is known about what these providers hold.
  *
- * WHERE THAT STANDS NOW. The gap is no longer in the log or the fold.
- * `IngestionPullRunStatusFoldProjection` folds all four listing outcome events
- * — agents listed, agents refused, people listed, people refused — into eleven
- * columns on the pull-run-status row, so for each source the last agents
- * listing's outcome, count, reason and status are recorded and queryable.
+ * It also covers the mixed case where SOME provider has answered and another
+ * has never been asked. "Nothing has been listed from them yet" stays true of
+ * the set, where the stronger claim that the organization holds no agents
+ * would not be: an unasked provider could be running a dozen.
  *
- * The remaining gap is THIS PAGE, and precisely one thing: nothing reads those
- * columns. No repository method, service or tRPC procedure returns
- * `LastAgentsListingOutcome` and its siblings, so `governanceAgents` has no
- * read to hand the screen and the screen has nothing to branch on. Until a
- * read exists, the copy still says only what is known — these providers are
- * connected, nothing has been listed from them — and offers the ask rather
- * than asserting the tenant is empty. Claiming emptiness on a refusal would be
- * exactly the collapse the three-outcome listing was built to prevent.
- *
- * When that read lands, this state splits: a listed-empty arm may say the
- * tenant has none, and a refused arm names the credential and what to do about
- * it. Neither may be written before the page can tell which it is looking at.
+ * It still claims nothing about the tenant. That constraint outlived the gap
+ * that created it — an unasked provider is not an empty one, and saying so
+ * would be the same collapse the three-outcome listing was built to prevent.
  *
  * A factory rather than a constant, because the sentence names the providers
  * and a fixed string would either omit them or invent them.
@@ -141,6 +145,152 @@ export function agentsUnlistedCopy({
     // has to look like the header's action. Drawn primary, this pane put the
     // outlined house button on a sync while the header put it on Register
     // agent, so the same press had two weights on one screen.
+    emphasis: "secondary",
+  };
+}
+
+/**
+ * Every connected provider answered, and between them they hold no agents.
+ *
+ * THE ONLY STATE ON THIS PAGE ALLOWED TO SAY THE ORGANIZATION HAS NONE, and
+ * it may say it only because every provider that could have agents was asked
+ * and each one returned an empty list. An empty list is a real answer from a
+ * working credential — the log records it as `listed` with a count of zero,
+ * deliberately, so that it can never be confused with a refusal.
+ *
+ * The gate is EVERY provider, not any. One provider answering "none" while
+ * another has never been asked does not make the organization empty, so that
+ * case stays with {@link agentsUnlistedCopy} and its weaker sentence. The page
+ * owns that gate, because only the page can see the whole set.
+ *
+ * The action is registering rather than asking again. There is nothing left to
+ * ask: the providers have answered, and ADR-128 makes an agent register itself
+ * from the process that runs it, so writing that registration is the one move
+ * that changes this screen. That is also why the weight is primary here and
+ * secondary on the two states whose action is a sync — this one creates
+ * something of the organization's own.
+ */
+export function agentsListedEmptyCopy({
+  providerNames,
+}: {
+  providerNames: readonly string[];
+}): GovernanceEmptyStateCopy {
+  const one = providerNames.length === 1;
+  return {
+    icon: Bot,
+    headline: "No agents yet",
+    description: `${spokenList([...providerNames])} ${one ? "was" : "were"} asked and ${one ? "holds" : "hold"} no agents, and nothing has registered itself here from code. An agent registers itself from the process that runs it.`,
+    actionLabel: "Register agent",
+    emphasis: "primary",
+  };
+}
+
+/**
+ * A provider was asked and would not answer.
+ *
+ * THE STATE THIS WHOLE FEATURE EXISTS FOR. A refusal and an empty tenant look
+ * identical on a page that shows no agents, and they demand opposite things of
+ * the reader: an empty tenant means nothing is wrong, a refusal means somebody
+ * has to go fix something before this page can be trusted at all. Showing one
+ * set of words for both left an admin believing they had no agents while a
+ * credential quietly failed.
+ *
+ * IT NEVER CLAIMS A COUNT. Not "no agents", not "some agents" — the provider
+ * refused, so the honest statement is that this page cannot say what it holds.
+ * Any agent behind that provider is missing from the list above and there is
+ * no number to put on it.
+ *
+ * AND IT NEVER SHOWS THE STATUS. The run-status row keeps the provider's HTTP
+ * status for an operator reading a support ticket; a tenant admin shown "403"
+ * learns nothing they can act on. The server has already narrowed it to the
+ * two things a person does differently — fix an access problem, or wait and
+ * ask again — and only that lands here.
+ *   `access`      — a credential, a permission or a connection's configuration
+ *                   is wrong. Asking again changes nothing until it is fixed.
+ *   `unreachable` — the provider did not answer or answered badly. Asking
+ *                   again later is the whole remedy, and telling this reader
+ *                   to audit their permissions would send them to look for a
+ *                   fault that is not there.
+ *
+ * THE LAST SENTENCE CHANGES WITH THE GRANT, as in {@link agentsUnlistedCopy}:
+ * a reader who cannot press the sync control is told who can, not told to
+ * press it. The action stays the sync in both arms — it is the header's own
+ * control repeated, so it is drawn ghost — and it is the right press once the
+ * access problem is fixed, which is why the access arm names the fix first and
+ * the ask second.
+ */
+/**
+ * One voice per cause, as data rather than as nested conditionals.
+ *
+ * The two arms differ in three places at once — the headline, the verb in the
+ * middle of the sentence, and the whole remedy — and expressing that as
+ * ternaries put the two halves of each arm in different parts of the function,
+ * where a later edit could easily give the unreachable arm the access arm's
+ * instruction. Keyed by cause, each arm reads as one thing.
+ *
+ * `Record` rather than a partial map, so a third cause added to
+ * `AgentsListingRefusalCause` is a compile error here rather than an
+ * `undefined` rendering as a blank pane.
+ */
+const REFUSAL_VOICE: Record<
+  AgentsListingRefusalCause,
+  {
+    headlineOne: string;
+    headlineMany: string;
+    /** What the providers did, dropped into the middle of the sentence. */
+    verb: string;
+    remedy: (args: { canAsk: boolean; connection: string }) => string;
+  }
+> = {
+  access: {
+    headlineOne: "A provider refused to answer",
+    headlineMany: "Providers refused to answer",
+    verb: "refused to answer",
+    remedy: ({ canAsk, connection }) =>
+      canAsk
+        ? `Check ${connection} credentials and permissions, then ask again.`
+        : `An administrator needs to check ${connection} credentials and permissions.`,
+  },
+  unreachable: {
+    headlineOne: "A provider did not answer",
+    headlineMany: "Providers did not answer",
+    verb: "did not answer",
+    // No connection to check: nothing about the credential is known to be
+    // wrong, and naming one would send this reader hunting a fault that is
+    // not there.
+    remedy: ({ canAsk }) =>
+      canAsk
+        ? "Ask again in a moment."
+        : "Only an administrator can ask again.",
+  },
+};
+
+export function agentsRefusedCopy({
+  providerNames,
+  cause,
+  canAsk,
+}: {
+  /** Only the providers that refused. Naming one that answered would blame it. */
+  providerNames: readonly string[];
+  cause: AgentsListingRefusalCause;
+  /** Whether this reader holds the grant that makes the sync control pressable. */
+  canAsk: boolean;
+}): GovernanceEmptyStateCopy {
+  const one = providerNames.length === 1;
+  const voice = REFUSAL_VOICE[cause];
+  const refusal = `${spokenList([...providerNames])} ${voice.verb}, so this page cannot say ${one ? "what it holds" : "what they hold"}.`;
+  const remedy = voice.remedy({
+    canAsk,
+    connection: one ? "that connection's" : "those connections'",
+  });
+  return {
+    icon: TriangleAlert,
+    headline: one ? voice.headlineOne : voice.headlineMany,
+    description: `${refusal} ${remedy}`,
+    actionLabel: "Sync agents",
+    // Ghost, for the reason `agentsUnlistedCopy` gives: this is the header's
+    // own sync control repeated in the pane, and the same press must not have
+    // two weights on one screen.
     emphasis: "secondary",
   };
 }

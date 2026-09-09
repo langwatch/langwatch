@@ -35,6 +35,12 @@ import {
   agentListingRequests,
   listableAgentSources,
 } from "./logic/agentListingRequest";
+import {
+  type AgentsListingOutcome,
+  type AgentsListingSummary,
+  agentsListingOutcome,
+} from "./pullers/agentsListingOutcome";
+import { PrismaIngestionPullRunProjectionRepository } from "./pullers/repositories/ingestion-pull-run-projection.prisma.repository";
 
 const logger = createLogger("langwatch:governance:agent-sync");
 
@@ -48,6 +54,20 @@ export interface AgentSyncSource {
   id: string;
   name: string;
   sourceType: string;
+}
+
+/**
+ * A source the screen may name, plus how the last ask of it ended.
+ *
+ * A separate type from {@link AgentSyncSource} rather than an optional field
+ * on it, because the two are read by callers with different needs and an
+ * optional `lastListing` would be indistinguishable at the call site from a
+ * source that has never been listed. {@link AgentListingRequestResult} names
+ * what a press asked, which has no outcome yet by definition.
+ */
+export interface AgentSyncSourceListing extends AgentSyncSource {
+  /** `null` when no listing has been recorded for this source. */
+  lastListing: AgentsListingOutcome | null;
 }
 
 export interface AgentListingRequestResult {
@@ -133,6 +153,58 @@ export class GovernanceAgentSyncService {
       id: source.id,
       name: source.name,
       sourceType: source.sourceType,
+    }));
+  }
+
+  /**
+   * The same sources, each carrying how the last ask of it ended.
+   *
+   * A DECORATOR over {@link listableSources}, never a second query that
+   * decides the set for itself. Which providers can be asked about agents is
+   * one question with one answer, and two reads of it are how the button ends
+   * up asking a set the sentence beside it does not describe.
+   *
+   * WHY THE SCREEN NEEDS THIS AT ALL. An empty agents table has three
+   * possible readings and the page cannot tell them apart without this:
+   * nobody has asked yet, a provider answered and holds none, or a provider
+   * refused to answer. The first two mean nothing is wrong; the third means
+   * somebody has to go fix a credential. Showing one sentence for all three
+   * was the defect.
+   *
+   * An organization with no governance project has never ingested anything,
+   * so there is no run-status row to read and every source correctly reports
+   * no listing. That is the same reading as a source whose row exists and
+   * whose listing columns are null, which is why it needs no branch of its own
+   * downstream.
+   *
+   * On the view grant like {@link listableSources}, because a reader who
+   * cannot press the button is the one most in need of being told that the
+   * emptiness in front of them is a refusal rather than an answer.
+   */
+  async listableSourcesWithLastListing({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<AgentSyncSourceListing[]> {
+    const sources = await this.listableSources({ organizationId });
+    if (sources.length === 0) return [];
+
+    const projectId = await resolveGovProjectId({
+      prisma: this.prisma,
+      organizationId,
+    });
+    const listings: Map<string, AgentsListingSummary> = projectId
+      ? await new PrismaIngestionPullRunProjectionRepository(
+          this.prisma,
+        ).findAgentsListings({
+          sourceIds: sources.map((source) => source.id),
+          projectId,
+        })
+      : new Map();
+
+    return sources.map((source) => ({
+      ...source,
+      lastListing: agentsListingOutcome(listings.get(source.id)),
     }));
   }
 
