@@ -353,6 +353,27 @@ func (s *Store) HeavyRuns() int {
 // cannot hold a slot for a working day.
 const HeavyRunClaimTTL = 6 * time.Hour
 
+// heavyRunClaim is one heavy-run marker's payload - enough to say what it is
+// and how long it has been running.
+type heavyRunClaim struct {
+	Command string    `json:"command"`
+	At      time.Time `json:"at"`
+}
+
+// readHeavyRunClaim reads and parses one marker. ok is false when the file
+// cannot be read or parsed - the caller decides what that means for liveness.
+func readHeavyRunClaim(path string) (heavyRunClaim, bool) {
+	b, err := os.ReadFile(path) // #nosec G304 -- path is built from haven's own home dir
+	if err != nil {
+		return heavyRunClaim{}, false
+	}
+	var rec heavyRunClaim
+	if json.Unmarshal(b, &rec) != nil || rec.At.IsZero() {
+		return heavyRunClaim{}, false
+	}
+	return rec, true
+}
+
 // heavyRunExpired reads the claim's own timestamp. A marker that cannot be read
 // or parsed has not expired: the pid check already said something is alive
 // there, and inventing an expiry from an unreadable file would free a slot that
@@ -363,18 +384,39 @@ const HeavyRunClaimTTL = 6 * time.Hour
 // or one corrupt record holding machine-wide capacity for as long as it likes.
 // The same rule as domain.LiveSpawns, for the same reason.
 func (s *Store) heavyRunExpired(path string) bool {
-	b, err := os.ReadFile(path) // #nosec G304 -- path is built from haven's own home dir
-	if err != nil {
-		return false
-	}
-	var rec struct {
-		At time.Time `json:"at"`
-	}
-	if json.Unmarshal(b, &rec) != nil || rec.At.IsZero() {
+	rec, ok := readHeavyRunClaim(path)
+	if !ok {
 		return false
 	}
 	age := time.Since(rec.At)
 	return age < 0 || age > HeavyRunClaimTTL
+}
+
+// HeavyRunSnapshots lists the heavy runs currently holding a slot, across
+// every worktree and terminal, with what a wait estimate needs: which command
+// and when it started. Same liveness and expiry rule as HeavyRuns; a marker
+// this cannot parse still counts there but is skipped here, since there is
+// nothing to report about it.
+func (s *Store) HeavyRunSnapshots() []app.HeavyRunSnapshot {
+	entries, err := os.ReadDir(s.heavyRunsDir())
+	if err != nil {
+		return nil
+	}
+	var out []app.HeavyRunSnapshot
+	for _, e := range entries {
+		pid, err := strconv.Atoi(strings.TrimSuffix(e.Name(), ".json"))
+		if err != nil {
+			continue
+		}
+		path := filepath.Join(s.heavyRunsDir(), e.Name())
+		if !processAlive(pid) || s.heavyRunExpired(path) {
+			continue
+		}
+		if rec, ok := readHeavyRunClaim(path); ok {
+			out = append(out, app.HeavyRunSnapshot{Command: rec.Command, StartedAt: rec.At})
+		}
+	}
+	return out
 }
 
 // ClaimHeavyRun records this process as holding a heavy slot.
@@ -551,4 +593,84 @@ func (s *Store) ReapEvents() []domain.ReapEvent {
 		return nil
 	}
 	return events
+}
+
+// runHistoryPath is beside the semaphore's home, one JSON object per line so
+// a crash mid-append leaves only the last line to lose rather than the file.
+func (s *Store) runHistoryPath() string { return filepath.Join(s.home, "run-history.jsonl") }
+
+// AppendRunHistory records one completed heavy run, capped at
+// domain.RunHistoryCap (oldest dropped). Best-effort: the caller must not
+// fail a real run over a history write, so every error here is returned for
+// the caller to log rather than to act on.
+func (s *Store) AppendRunHistory(rec domain.RunRecord) error {
+	if err := os.MkdirAll(s.home, 0o750); err != nil {
+		return err
+	}
+	release, err := s.lockRunHistory()
+	if err != nil {
+		return err
+	}
+	defer release()
+
+	all := append(s.readRunHistory(), rec)
+	if len(all) > domain.RunHistoryCap {
+		all = all[len(all)-domain.RunHistoryCap:]
+	}
+	return s.writeRunHistory(all)
+}
+
+// RunHistory reads the recent history newest-last. Absent or unreadable is an
+// empty history — every caller already treats that as "cannot estimate"
+// rather than an error.
+func (s *Store) RunHistory() []domain.RunRecord { return s.readRunHistory() }
+
+func (s *Store) readRunHistory() []domain.RunRecord {
+	b, err := os.ReadFile(s.runHistoryPath())
+	if err != nil {
+		return nil
+	}
+	var out []domain.RunRecord
+	for _, line := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		if line == "" {
+			continue
+		}
+		var rec domain.RunRecord
+		if json.Unmarshal([]byte(line), &rec) == nil {
+			out = append(out, rec)
+		}
+	}
+	return out
+}
+
+func (s *Store) writeRunHistory(records []domain.RunRecord) error {
+	var b strings.Builder
+	for _, rec := range records {
+		line, err := json.Marshal(rec)
+		if err != nil {
+			continue
+		}
+		b.Write(line)
+		b.WriteByte('\n')
+	}
+	return writeFileAtomic(s.runHistoryPath(), []byte(b.String()), 0o644)
+}
+
+// lockRunHistory takes the exclusive lock guarding the history file, the same
+// pattern as lockDurations and for the same reason: the writer renames a
+// fresh file over the path, so the lock has to be its own file rather than
+// one on an inode a concurrent writer is about to replace.
+func (s *Store) lockRunHistory() (func(), error) {
+	f, err := os.OpenFile(s.runHistoryPath()+".lock", os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		_ = f.Close()
+		return nil, err
+	}
+	return func() {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		_ = f.Close()
+	}, nil
 }

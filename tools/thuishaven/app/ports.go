@@ -96,6 +96,18 @@ type Store interface {
 	// ObserveDuration records how long a run actually took, so the next one can
 	// be decided on evidence rather than a default.
 	ObserveDuration(command string, took time.Duration)
+	// HeavyRunSnapshots lists the heavy runs currently holding a slot, with
+	// what a wait estimate needs: each one's own command and when it started.
+	// Same liveness and expiry as HeavyRuns - every run this lists is one
+	// HeavyRuns counts.
+	HeavyRunSnapshots() []HeavyRunSnapshot
+	// AppendRunHistory records one completed heavy run - kind, when it
+	// started, how long it took, how it exited - for the wait estimate.
+	// Best-effort: an unwritable history must never fail the run it documents.
+	AppendRunHistory(domain.RunRecord) error
+	// RunHistory reads the recent history the estimate is built from, capped
+	// at domain.RunHistoryCap by AppendRunHistory itself.
+	RunHistory() []domain.RunRecord
 	// AppendReapEvent records one daemon reclamation (bounded ring, oldest
 	// dropped) and ReapEvents reads the record newest-last — the hub's "what
 	// has the reaper been doing" feed. Append failures are the daemon's to
@@ -441,4 +453,12 @@ type DaemonInfo struct {
 	PID  int    `json:"pid"`
 	Port int    `json:"port"`
 	URL  string `json:"url"`
+}
+
+// HeavyRunSnapshot is one heavy run currently holding a slot: its own
+// command and when it started - the raw material a wait estimate classifies
+// into a domain.HeldRun.
+type HeavyRunSnapshot struct {
+	Command   string
+	StartedAt time.Time
 }

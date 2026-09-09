@@ -459,3 +459,23 @@ Feature: Machine-wide slots for whole-repo checks
     When it runs "pnpm typecheck"
     Then it passes CHECK_SLOTS=0 to that run
     And the run is counted once, by haven's slot
+
+  # --- How long the wait actually is ---
+
+  # haven keeps a short history of completed heavy runs (kind, started at,
+  # duration, exit status) beside the semaphore, so a queued run can be told
+  # roughly how long the wait is instead of only how many runs are ahead.
+
+  @unit
+  Scenario: A queued run says roughly how long the wait is
+    Given recent history for a kind of run, and a run of that kind already holding the only slot
+    When another run of that kind is queued behind it
+    Then it reports being queued behind 1 run
+    And it reports roughly how long that wait is expected to be
+
+  @unit
+  Scenario: With no history the gate does not guess
+    Given no run of any kind has ever been recorded
+    When a run is queued behind another
+    Then it reports being queued behind 1 run
+    And it says nothing about how long the wait might be, exactly as before the estimate existed

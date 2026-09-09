@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"sync/atomic"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -81,14 +84,37 @@ func (o *Orchestrator) RunHeavy(ctx context.Context, r HeavyRun) error {
 		env = append(env, "VITEST_MAX_WORKERS="+strconv.Itoa(r.Workers))
 	}
 	err = o.sup.RunOnce(ctx, "heavy", r.Dir, r.Shell, env)
+	took := o.sys.Now().Sub(started)
 	if err == nil {
 		// Only a completed run is evidence of how long this kind of command takes.
 		// A suite that died after two seconds would otherwise file two seconds
 		// against the key, and the next caller would be narrowed on the strength
 		// of a crash.
-		o.store.ObserveDuration(key, o.sys.Now().Sub(started))
+		o.store.ObserveDuration(key, took)
+	}
+	// The wait estimate's history keeps a failed run too (its exit status is
+	// part of the record), unlike the narrowing estimate above - best effort,
+	// since a history write must never be why a real run fails.
+	if histErr := o.store.AppendRunHistory(domain.RunRecord{
+		Kind: domain.ClassifyHistoryKind(r.Shell), StartedAt: started, Duration: took, ExitCode: exitCodeOf(err),
+	}); histErr != nil {
+		o.log.Warn("could not record run history", zap.Error(histErr))
 	}
 	return err
+}
+
+// exitCodeOf reads a completed run's exit status out of the error RunOnce
+// returned: 0 for success, the process's own code when it ran and failed, -1
+// when it could not be determined (it never started, or was killed by signal).
+func exitCodeOf(err error) int {
+	if err == nil {
+		return 0
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode()
+	}
+	return -1
 }
 
 // waiter is who is asking for a slot and what for: the caller kind picks the

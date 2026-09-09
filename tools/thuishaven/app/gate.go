@@ -157,13 +157,17 @@ func (o *Orchestrator) decideHeavy(p hookPayload, command string, kind domain.Ru
 		if !autoApprovingModes[p.PermissionMode] {
 			return deferReply()
 		}
-		return o.rewrap(rewrapRequest{
+		req := rewrapRequest{
 			command:    command,
 			decision:   decision,
 			queueDepth: queueDepth,
 			agentID:    p.AgentID,
 			slots:      slots,
-		})
+		}
+		if decision == domain.Queue || decision == domain.Background {
+			req.estimatedWait, req.hasWaitEstimate = o.queueEstimate(queueDepth, command)
+		}
+		return o.rewrap(req)
 	default:
 		return deferReply()
 	}
@@ -191,6 +195,12 @@ type rewrapRequest struct {
 	queueDepth int
 	agentID    string
 	slots      slotState
+	// estimatedWait and hasWaitEstimate are queueNote's coarse figure for a
+	// Queue or Background decision. hasWaitEstimate false means there is no
+	// history to estimate from, and the message says nothing about time at
+	// all - exactly what it said before this existed.
+	estimatedWait   time.Duration
+	hasWaitEstimate bool
 }
 
 // rewrap rewrites the command to run under haven's slot, carrying the decision
@@ -242,9 +252,9 @@ func admissionMessage(r rewrapRequest, workers int) string {
 	case domain.Narrow:
 		return fmt.Sprintf("haven: narrowed to %d test workers - the machine is busy, so this runs at a width that fits", workers)
 	case domain.Queue:
-		return "haven: " + queueNote(r.queueDepth)
+		return "haven: " + queueNote(r.queueDepth, r.estimatedWait, r.hasWaitEstimate)
 	case domain.Background:
-		return "haven: backgrounded, " + queueNote(r.queueDepth) + " - the result arrives as a notification"
+		return "haven: backgrounded, " + queueNote(r.queueDepth, r.estimatedWait, r.hasWaitEstimate) + " - the result arrives as a notification"
 	case domain.Refuse:
 		return "haven: refused"
 	case domain.Admit:
@@ -253,17 +263,24 @@ func admissionMessage(r rewrapRequest, workers int) string {
 	return ""
 }
 
-// queueNote spells the wait a caller is about to have, in runs rather than in
-// seconds: how long each one takes is the one thing nobody can predict, and a
-// count is a number the reader can check against their own machine.
-func queueNote(depth int) string {
+// queueNote spells the wait a caller is about to have, in runs ahead plus - when
+// recent history says enough to guess - roughly how long that is. With no
+// history at all it says only the count, exactly as it always has: a comfortable
+// guess is worse than none.
+func queueNote(depth int, wait time.Duration, hasWait bool) string {
+	var base string
 	switch {
 	case depth <= 0:
-		return "queued for the machine-wide slot"
+		base = "queued for the machine-wide slot"
 	case depth == 1:
-		return "queued behind 1 run"
+		base = "queued behind 1 run"
+	default:
+		base = fmt.Sprintf("queued behind %d runs", depth)
 	}
-	return fmt.Sprintf("queued behind %d runs", depth)
+	if hasWait {
+		base += ", " + domain.FormatWait(wait)
+	}
+	return base
 }
 
 // havenPath is haven's own absolute path, because `make haven install` is
@@ -381,4 +398,25 @@ func (o *Orchestrator) estimatedWait(queueDepth int, command string) time.Durati
 		return 0
 	}
 	return wait
+}
+
+// queueEstimate is the coarse figure queueNote adds to a Queue or Background
+// message: each run currently visible as holding a slot contributes its own
+// time left, and anything queued beyond what is visible falls back to the
+// median for the command now asking. ok is false with no history at all,
+// which is what keeps today's message unchanged when nothing has ever run.
+func (o *Orchestrator) queueEstimate(queueDepth int, command string) (time.Duration, bool) {
+	if queueDepth <= 0 {
+		return 0, false
+	}
+	now := o.sys.Now()
+	var held []domain.HeldRun
+	for _, snap := range o.store.HeavyRunSnapshots() {
+		held = append(held, domain.NewHeldRun(snap.Command, snap.StartedAt, now))
+	}
+	if len(held) > queueDepth {
+		held = held[:queueDepth]
+	}
+	req := domain.QueuedWaitRequest{Held: held, AheadBeyond: queueDepth - len(held), OwnKind: domain.ClassifyHistoryKind(command)}
+	return domain.EstimateQueuedWait(req, o.store.RunHistory())
 }

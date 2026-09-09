@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/system"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -63,6 +64,7 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		}
 		width, widthSource := domain.UnitTestFullWidth(system.New().TotalMemory(), runtime.NumCPU(), os.Getenv("HAVEN_TEST_WORKERS"))
 		fmt.Printf("unit_test_full_width=%d source=%s\n", width, widthSource)
+		explainHolders(fileregistry.New(havenHome()))
 		return nil
 	case "run":
 		label, argv, err := parseSlotRun(inv.raw[1:])
@@ -83,6 +85,33 @@ func runSlot(ctx context.Context, _ deps, inv invocation) error {
 		return nil
 	default:
 		return fmt.Errorf("unknown slot subcommand %q — use `slot run -- <cmd>` or `slot explain`", inv.raw[0])
+	}
+}
+
+// explainHolders prints who currently holds a heavy slot: each holder's kind,
+// how long it has held the slot, and roughly how much longer it has left -
+// then, below them, what a run queued behind all of them right now should
+// expect to wait. Silent about time wherever there is no history to guess from.
+func explainHolders(store *fileregistry.Store) {
+	holders := store.HeavyRunSnapshots()
+	if len(holders) == 0 {
+		fmt.Println("holders: none")
+		return
+	}
+	history := store.RunHistory()
+	now := time.Now()
+	held := make([]domain.HeldRun, 0, len(holders))
+	for _, h := range holders {
+		run := domain.NewHeldRun(h.Command, h.StartedAt, now)
+		held = append(held, run)
+		line := fmt.Sprintf("holder: %s, held %s", run.Kind, formatSlotWait(run.Elapsed))
+		if left := domain.DescribeTimeLeft(run.Kind, run.Elapsed, history); left != "" {
+			line += ", " + left
+		}
+		fmt.Println(line)
+	}
+	if wait, ok := domain.EstimateQueuedWait(domain.QueuedWaitRequest{Held: held}, history); ok {
+		fmt.Printf("estimated_wait_if_queued_now=%s\n", domain.FormatWait(wait))
 	}
 }
 

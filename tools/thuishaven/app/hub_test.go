@@ -29,6 +29,9 @@ type fakeStore struct {
 	heavyRuns          int
 	observed           map[string]time.Duration
 	reapEvents         []domain.ReapEvent
+	heavyRunSnapshots  []HeavyRunSnapshot
+	runHistory         []domain.RunRecord
+	appendHistoryErr   error
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -114,6 +117,16 @@ func (f *fakeStore) AppendReapEvent(ev domain.ReapEvent) error {
 	return nil
 }
 func (f *fakeStore) ReapEvents() []domain.ReapEvent { return f.reapEvents }
+
+func (f *fakeStore) HeavyRunSnapshots() []HeavyRunSnapshot { return f.heavyRunSnapshots }
+func (f *fakeStore) AppendRunHistory(rec domain.RunRecord) error {
+	if f.appendHistoryErr != nil {
+		return f.appendHistoryErr
+	}
+	f.runHistory = append(f.runHistory, rec)
+	return nil
+}
+func (f *fakeStore) RunHistory() []domain.RunRecord { return f.runHistory }
 
 // fakeClaudeSettings records what `haven setup` asked to install.
 type fakeClaudeSettings struct {
