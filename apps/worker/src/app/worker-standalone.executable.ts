@@ -1,4 +1,5 @@
 import process from "node:process";
+import { processFailureLine } from "@langwatch/observability";
 import { WorkerExecutable, type WorkerExecutableHost } from "../worker.executable.ts";
 import { WorkerStandaloneComposition } from "./worker-standalone.composition.ts";
 
@@ -55,15 +56,9 @@ export async function startStandaloneWorker(
     );
     return worker;
   } catch (error) {
-    host.write(`[langwatch:worker] fatal boot failure: ${describeWorkerFailure(error)}\n`);
+    host.write(processFailureLine({ service: "langwatch-worker", event: "fatal boot failure", error }));
     throw error;
   }
-}
-
-/** Renders a failure with its message first, so a truncated log still names it. */
-export function describeWorkerFailure(error: unknown): string {
-  if (!(error instanceof Error)) return String(error);
-  return error.stack ? `${error.message}\n${error.stack}` : error.message;
 }
 
 function nodeWorkerProcessHost(): WorkerExecutableProcessHost {

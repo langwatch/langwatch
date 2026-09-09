@@ -111,7 +111,6 @@ export {
 export { ApiInstanceAdminKeyAdapter } from "./app/api-instance-admin-key.adapter.ts";
 export { ApiStandaloneComposition } from "./app/api-standalone.composition.ts";
 export {
-  describeApiFailure,
   startStandaloneApi,
   WrittenApiBootFailure,
   type ApiExecutableHost,

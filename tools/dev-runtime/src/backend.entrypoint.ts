@@ -2,6 +2,7 @@
 import "@langwatch/time/polyfill";
 
 import process from "node:process";
+import { processFailureLine } from "@langwatch/observability";
 import { startStandaloneApi } from "@langwatch/platform-api";
 import { startStandaloneWorker } from "@langwatch/worker";
 import { drainBackend, startBackend, type BackendHalves } from "./backend.process.ts";
@@ -24,13 +25,16 @@ const SHUTDOWN_DEADLINE_MS = 20_000;
 
 const write = (line: string): void => void process.stderr.write(line);
 
+/** The service name the launcher's own fatal records carry. */
+const BACKEND_SERVICE = "langwatch-backend";
+
 let halves: BackendHalves | undefined;
 let stopping: Promise<void> | undefined;
 
 const stop = (code: number): Promise<void> => {
   stopping ??= (async () => {
     const deadline = setTimeout(() => {
-      write("[langwatch:backend] shutdown outlived its deadline; exiting\n");
+      write(processFailureLine({ service: BACKEND_SERVICE, event: "shutdown outlived its deadline; exiting" }));
       process.exit(1);
     }, SHUTDOWN_DEADLINE_MS);
     deadline.unref();
@@ -38,7 +42,7 @@ const stop = (code: number): Promise<void> => {
       if (halves) await drainBackend(halves);
       process.exitCode = code;
     } catch (error) {
-      write(`[langwatch:backend] shutdown failed: ${String(error)}\n`);
+      write(processFailureLine({ service: BACKEND_SERVICE, event: "shutdown failed", error }));
       process.exitCode = 1;
     } finally {
       clearTimeout(deadline);
@@ -54,11 +58,11 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
 }
 
 process.on("uncaughtException", (error) => {
-  write(`[langwatch:backend] uncaught exception: ${String(error.stack ?? error)}\n`);
+  write(processFailureLine({ service: BACKEND_SERVICE, event: "uncaught exception", error }));
   void stop(1);
 });
 process.on("unhandledRejection", (reason) => {
-  write(`[langwatch:backend] unhandled rejection: ${String(reason)}\n`);
+  write(processFailureLine({ service: BACKEND_SERVICE, event: "unhandled rejection", error: reason }));
   void stop(1);
 });
 

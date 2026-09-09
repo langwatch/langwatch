@@ -41,5 +41,10 @@ export {
   type ValidationIssueMeta,
   type ValidationMeta,
 } from "./validation/validationMeta.ts";
-export { runScript, scriptFailureRecord, writeScriptWarning } from "./run-script.ts";
+export {
+  processFailureLine,
+  runScript,
+  scriptFailureRecord,
+  writeScriptWarning,
+} from "./run-script.ts";
 export { createWarnThrottle, type WarnThrottle } from "./warn-throttle.ts";

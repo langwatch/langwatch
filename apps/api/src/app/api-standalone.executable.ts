@@ -1,5 +1,6 @@
 import process from "node:process";
 import type { ProcessObservabilityOptions } from "@langwatch/observability/node";
+import { processFailureLine } from "@langwatch/observability";
 import { ApiBootFailurePort, startApiExecutable } from "../api.executable.ts";
 import type { ApiRuntimeBootstrap } from "../api.main.ts";
 import type { ApiShutdownSignal, ApiSignalHost } from "../api.signal-handlers.ts";
@@ -99,23 +100,20 @@ export class WrittenApiBootFailure extends ApiBootFailurePort {
   }
 
   report(error: unknown): void {
-    this.host.write(`[langwatch:api] fatal boot failure: ${describeApiFailure(error)}\n`);
+    this.host.write(processFailureLine({ service: API_SERVICE, event: "fatal boot failure", error }));
   }
 }
 
-/** Renders a failure with its message first, so a truncated log still names it. */
-export function describeApiFailure(error: unknown): string {
-  if (!(error instanceof Error)) return String(error);
-  return error.stack ? `${error.message}\n${error.stack}` : error.message;
-}
+/** The service name the fatal records carry, the same one the logger uses. */
+const API_SERVICE = "langwatch-api";
 
 function installFatalHandlers(host: ApiExecutableHost): void {
   host.on("uncaughtException", (error) => {
-    host.write(`[langwatch:api] uncaught exception: ${describeApiFailure(error)}\n`);
+    host.write(processFailureLine({ service: API_SERVICE, event: "uncaught exception", error }));
     host.exit(1);
   });
   host.on("unhandledRejection", (reason) => {
-    host.write(`[langwatch:api] unhandled rejection: ${describeApiFailure(reason)}\n`);
+    host.write(processFailureLine({ service: API_SERVICE, event: "unhandled rejection", error: reason }));
     host.exit(1);
   });
 }

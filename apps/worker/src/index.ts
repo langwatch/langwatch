@@ -144,7 +144,6 @@ export {
 } from "./worker.executable.ts";
 export { WorkerStandaloneComposition } from "./app/worker-standalone.composition.ts";
 export {
-  describeWorkerFailure,
   startStandaloneWorker,
   type WorkerExecutableProcessHost,
   type WorkerStandaloneExecutableOptions,

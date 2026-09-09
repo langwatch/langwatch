@@ -105,3 +105,40 @@ export function scriptFailureRecord({
     },
   };
 }
+
+/**
+ * The one line a long-running process writes when it cannot boot or is
+ * crashing: level fatal, the event and the error's message as `msg`, and the
+ * trace as one `stack` string, so a supervisor renders it as one record with
+ * the trace indented under it rather than as a stack frame per line with no
+ * level at all. Written by the caller, synchronously, on its way out.
+ */
+export function processFailureLine({
+  service,
+  event,
+  error,
+}: {
+  service: string;
+  event: string;
+  error?: unknown;
+}): string {
+  const failure = error instanceof Error ? error : void 0;
+  const code = failure === void 0 ? void 0 : (failure as { code?: unknown }).code;
+  const message = failure?.message ?? (error === void 0 ? void 0 : String(error));
+  return `${JSON.stringify({
+    level: "fatal",
+    time: new Date().toISOString(),
+    service,
+    msg: message === void 0 ? event : `${event}: ${message}`,
+    ...(error === void 0
+      ? {}
+      : {
+          error: {
+            type: failure?.name ?? typeof error,
+            message: message ?? "",
+            ...(typeof code === "string" ? { code } : {}),
+          },
+        }),
+    ...(typeof failure?.stack === "string" ? { stack: failure.stack } : {}),
+  })}\n`;
+}

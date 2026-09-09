@@ -172,3 +172,13 @@ Feature: One log format across every dev lane
     Then one structured line is written, naming the error and its code
     And the stack is left off unless the process asked for debug
     And the script exits unsuccessfully
+
+  # The api's boot failure was written as text with Node's trace under it, so
+  # the supervisor printed twelve lines with no level, one per frame.
+  @unit
+  Scenario: A process that cannot boot prints one fatal record with its stack
+    Given a long-running process whose boot throws
+    When it reports the failure
+    Then one structured line is written at level fatal, naming the event and the error
+    And the trace travels in that record as one string, so the renderer indents it under the message
+    And an uncaught exception or unhandled rejection is written the same way
