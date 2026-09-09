@@ -76,7 +76,7 @@ var autoApprovingModes = map[string]bool{
 }
 
 // gateContext is what both wire formats need after decoding and classifying
-// one hook payload. Ready is false - and Early carries the whole answer  -
+// one hook payload. Ready is false - and Early carries the whole answer -
 // whenever there is nothing left to decide: a decode failure, a cache-cost
 // warning, a non-Bash tool, or a command that is not heavy or already wrapped.
 type gateContext struct {
