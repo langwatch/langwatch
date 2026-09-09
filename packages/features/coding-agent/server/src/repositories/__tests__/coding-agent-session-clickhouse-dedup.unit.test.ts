@@ -140,7 +140,7 @@ function tiedVersions(
 }
 
 const read = (client: CodingAgentClickHouseClient) =>
-  makeRepository(client).tryFindBySessionIdWithApplied({
+  makeRepository(client).findBySessionIdWithApplied({
     tenantId: "tenant-1",
     sessionId: "sess-1",
   });

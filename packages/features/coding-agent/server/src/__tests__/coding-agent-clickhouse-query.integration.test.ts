@@ -112,7 +112,7 @@ describe("Coding Agent ClickHouse query contract", () => {
     if (request === undefined) throw new Error("session projection did not write");
     endpoint.queryRows.push([z.record(z.string(), z.unknown()).parse(JSON.parse(request.body))]);
 
-    const found = await service.tryGetBySessionId({
+    const found = await service.findBySessionId({
       projectId: "project-1",
       sessionId: "round-trip",
     });

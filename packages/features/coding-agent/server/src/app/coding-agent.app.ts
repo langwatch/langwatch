@@ -81,7 +81,7 @@ export interface CodingAgentScopePorts {
    * Derived here rather than taken from the client, so a caller cannot ask
    * about another tenant's pull requests by naming its id.
    */
-  tryResolveOrganizationForProject(projectId: string): Promise<string | undefined>;
+  findOrganizationForProject(projectId: string): Promise<string | undefined>;
   /**
    * The organization's projects split by what one caller may do with each.
    *
@@ -212,12 +212,12 @@ export class CodingAgentApp implements CodingAgentApi {
     return this.#codingAgents.buildTranscript(input);
   }
 
-  tryGetBySessionId(input: CodingAgentSessionLookupInput) {
-    return this.#codingAgents.tryGetBySessionId(input);
+  findBySessionId(input: CodingAgentSessionLookupInput) {
+    return this.#codingAgents.findBySessionId(input);
   }
 
-  tryGetSessionForTrace(input: { projectId: string; traceId: string }) {
-    return this.#codingAgents.tryGetSessionForTrace(input);
+  findSessionForTrace(input: { projectId: string; traceId: string }) {
+    return this.#codingAgents.findSessionForTrace(input);
   }
 
   linkTraceSessionsToPullRequests(
@@ -303,8 +303,8 @@ export class CodingAgentApp implements CodingAgentApi {
   }
 
   /** The organization a project belongs to, or undefined for an orphan. */
-  tryResolveOrganizationForProject(projectId: string): Promise<string | undefined> {
-    return this.#scope.tryResolveOrganizationForProject(projectId);
+  findOrganizationForProject(projectId: string): Promise<string | undefined> {
+    return this.#scope.findOrganizationForProject(projectId);
   }
 
   /** Reads pull-request usage across the caller's permitted projects. */
@@ -390,7 +390,7 @@ export class CodingAgentApp implements CodingAgentApi {
     input: { projectId: string },
     by: CodingAgentCaller,
   ): Promise<CodingAgentPersonalPullRequestUsage & { connection: CodingAgentGithubConnection }> {
-    const organizationId = await this.#scope.tryResolveOrganizationForProject(input.projectId);
+    const organizationId = await this.#scope.findOrganizationForProject(input.projectId);
     const scope = organizationId
       ? await this.#scope.resolveCallerProjectScope({
           caller: { kind: "user", userId: by.id },
@@ -452,7 +452,7 @@ export class CodingAgentApp implements CodingAgentApi {
 
   /** Resolves a pull-request project's organization or preserves the old error. */
   private async requireOrganizationFor(pullRequest: CodingAgentPullRequestRef): Promise<string> {
-    const organizationId = await this.#scope.tryResolveOrganizationForProject(
+    const organizationId = await this.#scope.findOrganizationForProject(
       pullRequest.projectId,
     );
     if (organizationId) return organizationId;

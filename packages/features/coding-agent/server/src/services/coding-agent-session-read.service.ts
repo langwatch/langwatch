@@ -93,7 +93,7 @@ export class CodingAgentSessionReadService {
     });
   }
 
-  async tryGetBySessionId(input: {
+  async findBySessionId(input: {
     projectId: string;
     sessionId: string;
     startedAtMs?: number;
@@ -104,14 +104,14 @@ export class CodingAgentSessionReadService {
         ? undefined
         : CodingAgentSessionReadService.readWindowAround(parsed.startedAtMs);
     const row =
-      (await this.dependencies.sessions.tryFindBySessionId({
+      (await this.dependencies.sessions.findBySessionId({
         tenantId: parsed.projectId,
         sessionId: parsed.sessionId,
         window,
       })) ??
       (window === undefined
         ? null
-        : await this.dependencies.sessions.tryFindBySessionId({
+        : await this.dependencies.sessions.findBySessionId({
             tenantId: parsed.projectId,
             sessionId: parsed.sessionId,
           }));
@@ -124,12 +124,12 @@ export class CodingAgentSessionReadService {
     return overlaid ?? row;
   }
 
-  async tryGetSessionForTrace(input: {
+  async findSessionForTrace(input: {
     projectId: string;
     traceId: string;
   }): Promise<CodingAgentSession | null> {
     const parsed = codingAgentTraceSessionLookupInputSchema.parse(input);
-    const mapping = await this.dependencies.traceSessions.tryFindByTraceId({
+    const mapping = await this.dependencies.traceSessions.findByTraceId({
       tenantId: parsed.projectId,
       traceId: parsed.traceId,
     });
@@ -137,7 +137,7 @@ export class CodingAgentSessionReadService {
       return null;
     }
 
-    return this.tryGetBySessionId({
+    return this.findBySessionId({
       projectId: parsed.projectId,
       sessionId: mapping.sessionId,
       startedAtMs: mapping.occurredAtMs,
@@ -196,7 +196,7 @@ export class CodingAgentSessionReadService {
     projectId: string;
     sessionId: string;
   }): Promise<{ fromMs: number; toMs: number } | undefined> {
-    const row = await this.dependencies.sessions.tryFindBySessionId({
+    const row = await this.dependencies.sessions.findBySessionId({
       tenantId: input.projectId,
       sessionId: input.sessionId,
     });

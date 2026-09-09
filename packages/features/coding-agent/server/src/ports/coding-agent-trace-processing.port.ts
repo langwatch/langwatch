@@ -13,7 +13,7 @@ export abstract class CodingAgentTraceProcessingPort {
     instrumentationScope: OtlpInstrumentationScope | null;
   }): NormalizedSpan;
 
-  abstract tryGetNormalizedSpan(input: {
+  abstract findNormalizedSpan(input: {
     tenantId: string;
     traceId: string;
     spanId: string;

@@ -10,7 +10,7 @@ export abstract class CodingAgentSessionContextMemoPort {
     return `coding-agent:session-context:${tenantId}:${sessionId}`;
   }
 
-  abstract tryGet(params: {
+  abstract find(params: {
     tenantId: string;
     sessionId: string;
   }): Promise<SessionWorkingContext | null>;

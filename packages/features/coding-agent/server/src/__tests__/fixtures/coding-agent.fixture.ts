@@ -267,7 +267,7 @@ export class TestSessions extends CodingAgentSessionRepository {
     this.storedBatches.push(rows);
   }
 
-  async tryFindBySessionId(input: {
+  async findBySessionId(input: {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
@@ -281,7 +281,7 @@ export class TestSessions extends CodingAgentSessionRepository {
     );
   }
 
-  async tryFindBySessionIdWithApplied(): Promise<{
+  async findBySessionIdWithApplied(): Promise<{
     row: CodingAgentSession;
     appliedEventIds: string[];
   } | null> {
@@ -327,7 +327,7 @@ export class TestTraceSessions extends CodingAgentTraceSessionRepository {
 
   async ensure(): Promise<void> {}
 
-  async tryFindByTraceId(input: {
+  async findByTraceId(input: {
     tenantId: string;
     traceId: string;
   }): Promise<CodingAgentTraceSessionRecord | null> {

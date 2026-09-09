@@ -4,7 +4,7 @@ import type { CodingAgentTraceSessionRecord } from "@langwatch/coding-agent-cont
 export abstract class CodingAgentTraceSessionRepository {
   abstract ensure(records: CodingAgentTraceSessionRecord[], retentionDays: number): Promise<void>;
 
-  abstract tryFindByTraceId(input: {
+  abstract findByTraceId(input: {
     tenantId: string;
     traceId: string;
   }): Promise<CodingAgentTraceSessionRecord | null>;
@@ -13,7 +13,7 @@ export abstract class CodingAgentTraceSessionRepository {
 export class NullCodingAgentTraceSessionRepository extends CodingAgentTraceSessionRepository {
   async ensure(): Promise<void> {}
 
-  async tryFindByTraceId(): Promise<CodingAgentTraceSessionRecord | null> {
+  async findByTraceId(): Promise<CodingAgentTraceSessionRecord | null> {
     return null;
   }
 }

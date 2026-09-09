@@ -213,7 +213,7 @@ function makeSubscriber(
       );
     }
 
-    tryGetNormalizedSpan(params: {
+    getNormalizedSpan(params: {
       tenantId: string;
       traceId: string;
       spanId: string;

@@ -474,7 +474,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
   }
 
   /** One session by its key, or null. */
-  async tryFindBySessionId(params: {
+  async findBySessionId(params: {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
@@ -488,7 +488,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
    * One ClickHouse read — the same query as `findBySessionId` — with the
    * watermark carried alongside the mapped row rather than inside it.
    */
-  async tryFindBySessionIdWithApplied(params: {
+  async findBySessionIdWithApplied(params: {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };

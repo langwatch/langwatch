@@ -144,7 +144,7 @@ describe("Coding Agent session reads", () => {
     };
     const service = serviceWith({ sessions, traceSessions });
 
-    const resolved = await service.tryGetSessionForTrace({
+    const resolved = await service.findSessionForTrace({
       projectId: PROJECT,
       traceId: TRACE,
     });
@@ -161,7 +161,7 @@ describe("Coding Agent session reads", () => {
     sessions.missWhenWindowed = true;
     const service = serviceWith({ sessions });
 
-    const found = await service.tryGetBySessionId({
+    const found = await service.findBySessionId({
       projectId: PROJECT,
       sessionId: SESSION,
       startedAtMs: TEST_NOW_MS,
@@ -182,7 +182,7 @@ describe("Coding Agent session reads", () => {
     const service = serviceWith({ sessions });
 
     await expect(
-      service.tryGetSessionForTrace({ projectId: PROJECT, traceId: TRACE }),
+      service.findSessionForTrace({ projectId: PROJECT, traceId: TRACE }),
     ).resolves.toBeNull();
 
     expect(sessions.findInputs).toEqual([]);
@@ -444,7 +444,7 @@ describe("Coding Agent session reads", () => {
       };
       const service = serviceWith({ sessions, traceSessions });
 
-      const found = await service.tryGetSessionForTrace({ projectId: PROJECT, traceId: TRACE });
+      const found = await service.findSessionForTrace({ projectId: PROJECT, traceId: TRACE });
 
       expect(found?.sessionId).toBe(SESSION);
       expect(found?.modelCalls).toBe(3);
@@ -461,7 +461,7 @@ describe("Coding Agent session reads", () => {
         sessions.missWhenWindowed = true;
         const service = serviceWith({ sessions });
 
-        const found = await service.tryGetBySessionId({
+        const found = await service.findBySessionId({
           projectId: PROJECT,
           sessionId: SESSION,
           startedAtMs: row.startedAtMs,
@@ -482,7 +482,7 @@ describe("Coding Agent session reads", () => {
       sessions.rows = [session()];
       const service = serviceWith({ sessions });
 
-      const found = await service.tryGetSessionForTrace({ projectId: PROJECT, traceId: TRACE });
+      const found = await service.findSessionForTrace({ projectId: PROJECT, traceId: TRACE });
 
       expect(found).toBeNull();
     });
@@ -535,7 +535,7 @@ describe("Coding Agent session reads", () => {
       ];
       const service = serviceWith({ sessions, metricSeries: metrics });
 
-      const found = await service.tryGetBySessionId({ projectId: PROJECT, sessionId: SESSION });
+      const found = await service.findBySessionId({ projectId: PROJECT, sessionId: SESSION });
 
       expect(found?.inputTokens).toBe(500);
       expect(found?.costUsd).toBe(2.5);

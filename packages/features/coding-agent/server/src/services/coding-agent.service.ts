@@ -123,14 +123,14 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
     return this.collaborators.sessionReads.getSessionEvents(input);
   }
 
-  tryGetBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null> {
-    return this.collaborators.sessionReads.tryGetBySessionId(input);
+  findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null> {
+    return this.collaborators.sessionReads.findBySessionId(input);
   }
 
-  tryGetSessionForTrace(
+  findSessionForTrace(
     input: CodingAgentTraceSessionLookupInput,
   ): Promise<CodingAgentSession | null> {
-    return this.collaborators.sessionReads.tryGetSessionForTrace(input);
+    return this.collaborators.sessionReads.findSessionForTrace(input);
   }
 
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]> {

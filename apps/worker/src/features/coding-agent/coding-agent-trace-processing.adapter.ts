@@ -48,12 +48,12 @@ export class WorkerCodingAgentTraceProcessingAdapter extends CodingAgentTracePro
     );
   }
 
-  tryGetNormalizedSpan(input: {
+  findNormalizedSpan(input: {
     tenantId: string;
     traceId: string;
     spanId: string;
     occurredAtMs: number;
   }): Promise<NormalizedSpan | null> {
-    return this.spans.tryGetNormalizedSpan(input);
+    return this.spans.findNormalizedSpan(input);
   }
 }

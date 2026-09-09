@@ -89,7 +89,7 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
    * The mapping row for one trace. IN-tuple dedup (max(UpdatedAt) per key), never FINAL.
    * The closing `ORDER BY` is not decoration (ADR-071 sequencing step 4). A
    */
-  async tryFindByTraceId({
+  async findByTraceId({
     tenantId,
     traceId,
   }: {

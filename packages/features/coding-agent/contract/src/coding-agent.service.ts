@@ -62,11 +62,11 @@ export abstract class CodingAgentService {
     nextCursor: CodingAgentSessionCursor | null;
   }>;
 
-  abstract tryGetBySessionId(
+  abstract findBySessionId(
     input: CodingAgentSessionLookupInput,
   ): Promise<CodingAgentSession | null>;
 
-  abstract tryGetSessionForTrace(
+  abstract findSessionForTrace(
     input: CodingAgentTraceSessionLookupInput,
   ): Promise<CodingAgentSession | null>;
 

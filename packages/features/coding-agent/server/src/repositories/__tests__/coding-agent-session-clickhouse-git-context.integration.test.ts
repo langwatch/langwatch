@@ -91,7 +91,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round
     });
     await sessions.upsert(row, 30, []);
 
-    const read = await sessions.tryFindBySessionId({
+    const read = await sessions.findBySessionId({
       tenantId,
       sessionId: `${tag}-rt`,
       window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
@@ -150,12 +150,12 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round
       [],
     );
 
-    const windowed = await sessions.tryFindBySessionId({
+    const windowed = await sessions.findBySessionId({
       tenantId,
       sessionId: drifted,
       window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
-    const unwindowed = await sessions.tryFindBySessionId({ tenantId, sessionId: drifted });
+    const unwindowed = await sessions.findBySessionId({ tenantId, sessionId: drifted });
 
     expect(windowed).toBeNull();
     expect(unwindowed?.costUsd).toBeCloseTo(2);
@@ -198,12 +198,12 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round
     const row = session({ tenantId, sessionId: `${tag}-applied`, startedAtMs: baseMs });
     await sessions.upsert(row, 30, ["ev-1", "ev-2"]);
 
-    const withApplied = await sessions.tryFindBySessionIdWithApplied({
+    const withApplied = await sessions.findBySessionIdWithApplied({
       tenantId,
       sessionId: `${tag}-applied`,
       window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
     });
-    const direct = await sessions.tryFindBySessionId({
+    const direct = await sessions.findBySessionId({
       tenantId,
       sessionId: `${tag}-applied`,
       window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
@@ -219,7 +219,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round
     const row = session({ tenantId, sessionId: `${tag}-noapplied`, startedAtMs: baseMs });
     await sessions.upsert(row, 30, []);
 
-    const withApplied = await sessions.tryFindBySessionIdWithApplied({
+    const withApplied = await sessions.findBySessionIdWithApplied({
       tenantId,
       sessionId: `${tag}-noapplied`,
       window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
@@ -247,7 +247,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round
       format: "JSONEachRow",
     });
 
-    const withApplied = await sessions.tryFindBySessionIdWithApplied({
+    const withApplied = await sessions.findBySessionIdWithApplied({
       tenantId,
       sessionId,
       window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
@@ -273,7 +273,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round
       format: "JSONEachRow",
     });
 
-    const read = await sessions.tryFindBySessionId({
+    const read = await sessions.findBySessionId({
       tenantId,
       sessionId,
       window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
@@ -299,7 +299,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round
     });
     await sessions.upsert(row, 30, []);
 
-    const read = await sessions.tryFindBySessionId({
+    const read = await sessions.findBySessionId({
       tenantId,
       sessionId: `${tag}-git`,
       window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
@@ -337,7 +337,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round
       format: "JSONEachRow",
     });
 
-    const read = await sessions.tryFindBySessionId({
+    const read = await sessions.findBySessionId({
       tenantId,
       sessionId,
       window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
@@ -368,7 +368,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_sessions git context round
     });
     await sessions.upsert(row, 30, []);
 
-    const read = await sessions.tryFindBySessionId({
+    const read = await sessions.findBySessionId({
       tenantId,
       sessionId: `${tag}-branches`,
       window: { fromMs: baseMs - 60_000, toMs: baseMs + 60_000 },
@@ -505,7 +505,7 @@ describe.skipIf(clickHouseUrl === null)("coding_agent_trace_sessions map", () =>
       30,
     );
 
-    const mapping = await traceSessions.tryFindByTraceId({
+    const mapping = await traceSessions.findByTraceId({
       tenantId,
       traceId: `${tag}-trace-x`,
     });

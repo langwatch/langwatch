@@ -84,7 +84,7 @@ describe("Coding Agent session ClickHouse repository", () => {
       },
     ]);
 
-    const found = await repository.tryFindBySessionIdWithApplied({
+    const found = await repository.findBySessionIdWithApplied({
       tenantId: "project-1",
       sessionId: "session-a",
     });
@@ -198,7 +198,7 @@ describe("Coding Agent session ClickHouse repository", () => {
           },
         ]);
 
-        const found = await repository.tryFindBySessionIdWithApplied({
+        const found = await repository.findBySessionIdWithApplied({
           tenantId: "tenant-1",
           sessionId: "sess-1",
         });
@@ -226,7 +226,7 @@ describe("Coding Agent session ClickHouse repository", () => {
           },
         ]);
 
-        const found = await repository.tryFindBySessionIdWithApplied({
+        const found = await repository.findBySessionIdWithApplied({
           tenantId: "tenant-1",
           sessionId: "sess-1",
         });

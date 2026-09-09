@@ -341,7 +341,7 @@ async function resolveClaimCheck(
   ref: SpanReferencedPayload,
   deps: { traces: CodingAgentTraceProcessingPort },
 ): Promise<ContributeSpanFactsCommandData> {
-  const span = await deps.traces.tryGetNormalizedSpan({
+  const span = await deps.traces.findNormalizedSpan({
     tenantId: ref.tenantId,
     traceId: ref.data.traceId,
     spanId: ref.data.spanId,

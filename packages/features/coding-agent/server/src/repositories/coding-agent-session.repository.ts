@@ -19,13 +19,13 @@ export abstract class CodingAgentSessionRepository {
     }>,
   ): Promise<void>;
 
-  abstract tryFindBySessionId(input: {
+  abstract findBySessionId(input: {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
   }): Promise<CodingAgentSession | null>;
 
-  abstract tryFindBySessionIdWithApplied(input: {
+  abstract findBySessionIdWithApplied(input: {
     tenantId: string;
     sessionId: string;
     window?: { fromMs: number; toMs: number };
@@ -70,11 +70,11 @@ export class NullCodingAgentSessionRepository extends CodingAgentSessionReposito
 
   async upsertBatch(): Promise<void> {}
 
-  async tryFindBySessionId(): Promise<CodingAgentSession | null> {
+  async findBySessionId(): Promise<CodingAgentSession | null> {
     return null;
   }
 
-  async tryFindBySessionIdWithApplied(): Promise<{
+  async findBySessionIdWithApplied(): Promise<{
     row: CodingAgentSession;
     appliedEventIds: string[];
   } | null> {

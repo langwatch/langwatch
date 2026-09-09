@@ -99,7 +99,7 @@ export class CodingAgentProjectionPersistenceAdapter extends CodingAgentProjecti
     row: CodingAgentSession;
     appliedEventIds: string[];
   } | null> {
-    return this.repositories.sessions.tryFindBySessionIdWithApplied(input);
+    return this.repositories.sessions.findBySessionIdWithApplied(input);
   }
 
   appendTraceSessions(

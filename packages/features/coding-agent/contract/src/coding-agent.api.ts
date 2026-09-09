@@ -58,8 +58,8 @@ export interface CodingAgentApi {
     spans: SpanDetail[];
     logs: TranscriptLogRecord[];
   }): CodingAgentTranscript;
-  tryGetBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null>;
-  tryGetSessionForTrace(input: {
+  findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null>;
+  findSessionForTrace(input: {
     projectId: string;
     traceId: string;
   }): Promise<CodingAgentSession | null>;
@@ -85,7 +85,7 @@ export interface CodingAgentApi {
   /** Records who read an answer that names people. */
   recordPullRequestUsageRead(read: CodingAgentPullRequestUsageRead): Promise<void>;
   githubWebBase(): string;
-  tryResolveOrganizationForProject(projectId: string): Promise<string | undefined>;
+  findOrganizationForProject(projectId: string): Promise<string | undefined>;
   getPullRequestUsage(
     pullRequest: {
       projectId: string;

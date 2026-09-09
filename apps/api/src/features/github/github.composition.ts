@@ -26,7 +26,7 @@ export function composeGithubTrpcRouter(options: {
     // directory, which is the one application that already answers it, so the
     // live pull-request read and its linkage cannot disagree about the tenant.
     findOrganizationForProject: (projectId) =>
-      ctx.app.codingAgentApp.tryResolveOrganizationForProject(projectId),
+      ctx.app.codingAgentApp.findOrganizationForProject(projectId),
     recordAudit: async (entry) => {
       await infrastructure.audit?.record({
         actorId: entry.userId,
