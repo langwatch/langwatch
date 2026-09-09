@@ -1,4 +1,4 @@
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   OrganizationGrantCachePort,
@@ -12,7 +12,7 @@ import { OrganizationMembershipService } from "../services/organization-membersh
 export interface PostgresOrganizationMembershipAdapterOptions {
   database: PrismaClient;
   /** The grant ledger every membership write states its access on. */
-  grants: AuthzGrantsService;
+  grants: AuthzApi;
   prompts: OrganizationPromptSeedPort;
   seats: OrganizationSeatLicensePort;
   sessions: OrganizationSessionRevocationPort;

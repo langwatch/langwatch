@@ -4,7 +4,7 @@
  * them, and a project that is not a personal one is refused rather than quietly edited.
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { AuthzLedgerUnavailableError, type AuthzGrantsService } from "@langwatch/authz-contract";
+import { AuthzLedgerUnavailableError, type AuthzApi } from "@langwatch/authz-contract";
 import {
   PersonalProjectOwnerMismatchError,
   findPersonalWorkspaceInputSchema,
@@ -42,7 +42,7 @@ const ALL_PERSONAL_FEATURES_ENABLED: PersonalFeatures = {
 type PersonalWorkspaceOptions = {
   repository: OrganizationRepository;
   identities: PersonalWorkspaceIdentityPort;
-  grants: AuthzGrantsService;
+  grants: AuthzApi;
   diagnostics: PersonalWorkspaceDiagnosticsPort | undefined;
 };
 

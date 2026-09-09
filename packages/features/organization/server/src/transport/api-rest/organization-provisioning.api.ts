@@ -3,7 +3,7 @@
  */
 import { timingSafeEqual } from "node:crypto";
 
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import type { Context, Next } from "hono";
 import { z } from "zod";
@@ -151,7 +151,7 @@ export function createOrganizationsRestApp(options: {
    * what lets the OpenAPI spec generator build this app with none.
    */
   organizations: () => OrganizationProvisioningPort;
-  apiKeys: () => ApiKeyService;
+  apiKeys: () => ApiKeyApi;
   /** The configured instance credential, or undefined when unset or blank. */
   instanceAdminKey: () => string | undefined;
   /** Whether this deployment is the hosted product rather than self-hosted. */
@@ -191,7 +191,7 @@ export function createOrganizationsRestApp(options: {
       ...(input.slug !== undefined ? { slug: input.slug } : {}),
     });
 
-    let adminKey: Awaited<ReturnType<ApiKeyService["create"]>>;
+    let adminKey: Awaited<ReturnType<ApiKeyApi["create"]>>;
     let summary: OrganizationProvisioningSummary | null;
     try {
       // The bootstrap credential: an org-scoped service key with an explicit

@@ -9,7 +9,11 @@ import type {
   AuthzPermission,
   TeamUserRole,
 } from "@langwatch/authz-contract";
-import { type Organization, type OrganizationInvite } from "@langwatch/organization-contract";
+import {
+  type Organization,
+  type OrganizationInvite,
+  type TeamUser,
+} from "@langwatch/organization-contract";
 import {
   organizationApiAcceptInviteInputSchema,
   organizationApiAuditLogsInputSchema,
@@ -42,7 +46,7 @@ import {
   type TRPCRuntimeConfigOptions,
 } from "@trpc/server";
 import { z } from "zod";
-import type { OrganizationApp } from "#app/organization.app";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 
 /**
  * The display status the invitation list renders per row. `WAITING_APPROVAL`
@@ -79,7 +83,7 @@ type OrganizationTrpcSessionUser = Readonly<{
 
 /** The process supplies authentication; authorization arrives as `policy`. */
 export type OrganizationTrpcContext = Readonly<{
-  app: Readonly<{ organizations: OrganizationApp }>;
+  app: Readonly<{ organizations: OrganizationApi }>;
   session: Readonly<{ user: OrganizationTrpcSessionUser }> | null;
 }>;
 
@@ -170,8 +174,8 @@ export type OrganizationTrpcPorts<TSignUpDataSchema extends z.ZodTypeAny = z.Zod
           role: TeamUserRole;
           assignedRoleId: string | null;
           assignedRole?: unknown;
-          createdAt: Date;
-          updatedAt: Date;
+          createdAt: TeamUser["createdAt"];
+          updatedAt: TeamUser["updatedAt"];
         }[];
         projects: { id: string }[];
       },

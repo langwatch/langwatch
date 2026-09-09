@@ -12,6 +12,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "files": [
+    "./src/behavior/personal-workspace-features-api.ts",
     "./src/surfaces/department-picker/index.ts",
     "./src/screens/drawers.ts",
     "./src/ui/sections/project-drawers.ts",

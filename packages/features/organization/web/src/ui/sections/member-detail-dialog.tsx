@@ -121,10 +121,9 @@ export function MemberDetailDialog({
       (row) => !pendingBindingRemovals.has(row.id) && bindingKey(row) === bindingKey(binding),
     );
     if (alreadyHeld) return;
-    setPendingBindingAdditions((prev) => {
-      const isAlreadyStaged = prev.some((staged) => bindingKey(staged) === bindingKey(binding));
-      return isAlreadyStaged ? prev : [...prev, binding];
-    });
+    setPendingBindingAdditions((prev) =>
+      prev.some((staged) => bindingKey(staged) === bindingKey(binding)) ? prev : [...prev, binding],
+    );
   };
 
   // Picking a Lite Member seat rewrites the staged rows the way the save
@@ -303,99 +302,96 @@ export function MemberDetailDialog({
                   Access
                 </Text>
 
-                {directBindings.isLoading && <Spinner size="sm" />}
-                {!directBindings.isLoading &&
-                  userDirectBindings.length === 0 &&
-                  pendingBindingAdditions.length === 0 && (
-                    <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-                      No access configured.
-                    </Text>
-                  )}
-                {!directBindings.isLoading &&
-                  (userDirectBindings.length > 0 || pendingBindingAdditions.length > 0) && (
-                    <VStack gap={2} align="stretch">
-                      {userDirectBindings.map((b) => {
-                        const markedForRemoval = pendingBindingRemovals.has(b.id);
-                        return (
-                          <HStack
-                            key={b.id}
-                            px={3}
-                            py={2}
-                            bg="bg.muted"
-                            borderRadius="md"
-                            fontSize="sm"
-                            opacity={markedForRemoval ? 0.4 : 1}
-                            transition="opacity 0.15s"
-                          >
-                            <Badge
-                              colorPalette={roleBadgeColor(b.role)}
-                              size="sm"
-                              textDecoration={markedForRemoval ? "line-through" : undefined}
-                            >
-                              {b.customRoleName ?? b.role}
-                            </Badge>
-                            <Text color="fg.muted">on</Text>
-                            <Badge
-                              colorPalette="purple"
-                              size="sm"
-                              textDecoration={markedForRemoval ? "line-through" : undefined}
-                            >
-                              {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
-                            </Badge>
-                            <Spacer />
-                            {b.scopeType !== RoleBindingScopeType.PROJECT && !mirrorsTheSeat(b) && (
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                color={markedForRemoval ? "blue.500" : "fg.muted"}
-                                aria-label={markedForRemoval ? "Undo removal" : "Remove binding"}
-                                onClick={() =>
-                                  setPendingBindingRemovals((prev) => {
-                                    const next = new Set(prev);
-                                    next.has(b.id) ? next.delete(b.id) : next.add(b.id);
-                                    return next;
-                                  })
-                                }
-                              >
-                                <X size={14} />
-                              </Button>
-                            )}
-                          </HStack>
-                        );
-                      })}
-                      {pendingBindingAdditions.map((b, i) => (
+                {directBindings.isLoading ? (
+                  <Spinner size="sm" />
+                ) : userDirectBindings.length === 0 && pendingBindingAdditions.length === 0 ? (
+                  <Text fontSize="sm" color="fg.muted" fontStyle="italic">
+                    No access configured.
+                  </Text>
+                ) : (
+                  <VStack gap={2} align="stretch">
+                    {userDirectBindings.map((b) => {
+                      const markedForRemoval = pendingBindingRemovals.has(b.id);
+                      return (
                         <HStack
-                          key={i}
+                          key={b.id}
                           px={3}
                           py={2}
                           bg="bg.muted"
                           borderRadius="md"
                           fontSize="sm"
-                          opacity={0.7}
+                          opacity={markedForRemoval ? 0.4 : 1}
+                          transition="opacity 0.15s"
                         >
-                          <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
+                          <Badge
+                            colorPalette={roleBadgeColor(b.role)}
+                            size="sm"
+                            textDecoration={markedForRemoval ? "line-through" : undefined}
+                          >
                             {b.customRoleName ?? b.role}
                           </Badge>
                           <Text color="fg.muted">on</Text>
-                          <Badge colorPalette="purple" size="sm">
+                          <Badge
+                            colorPalette="purple"
+                            size="sm"
+                            textDecoration={markedForRemoval ? "line-through" : undefined}
+                          >
                             {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
                           </Badge>
                           <Spacer />
-                          <Button
-                            size="xs"
-                            variant="ghost"
-                            color="fg.muted"
-                            aria-label="Undo add"
-                            onClick={() =>
-                              setPendingBindingAdditions((prev) => prev.filter((_, j) => j !== i))
-                            }
-                          >
-                            <X size={14} />
-                          </Button>
+                          {b.scopeType !== RoleBindingScopeType.PROJECT && !mirrorsTheSeat(b) && (
+                            <Button
+                              size="xs"
+                              variant="ghost"
+                              color={markedForRemoval ? "blue.500" : "fg.muted"}
+                              aria-label={markedForRemoval ? "Undo removal" : "Remove binding"}
+                              onClick={() =>
+                                setPendingBindingRemovals((prev) => {
+                                  const next = new Set(prev);
+                                  next.has(b.id) ? next.delete(b.id) : next.add(b.id);
+                                  return next;
+                                })
+                              }
+                            >
+                              <X size={14} />
+                            </Button>
+                          )}
                         </HStack>
-                      ))}
-                    </VStack>
-                  )}
+                      );
+                    })}
+                    {pendingBindingAdditions.map((b, i) => (
+                      <HStack
+                        key={i}
+                        px={3}
+                        py={2}
+                        bg="bg.muted"
+                        borderRadius="md"
+                        fontSize="sm"
+                        opacity={0.7}
+                      >
+                        <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
+                          {b.customRoleName ?? b.role}
+                        </Badge>
+                        <Text color="fg.muted">on</Text>
+                        <Badge colorPalette="purple" size="sm">
+                          {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
+                        </Badge>
+                        <Spacer />
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          color="fg.muted"
+                          aria-label="Undo add"
+                          onClick={() =>
+                            setPendingBindingAdditions((prev) => prev.filter((_, j) => j !== i))
+                          }
+                        >
+                          <X size={14} />
+                        </Button>
+                      </HStack>
+                    ))}
+                  </VStack>
+                )}
 
                 <BindingInputRow
                   ref={bindingInputRef}
@@ -412,13 +408,13 @@ export function MemberDetailDialog({
               <Text fontSize="sm" fontWeight="semibold" mb={3}>
                 Group access
               </Text>
-              {memberGroups.isLoading && <Spinner size="sm" />}
-              {!memberGroups.isLoading && !memberGroups.data?.length && (
+              {memberGroups.isLoading ? (
+                <Spinner size="sm" />
+              ) : !memberGroups.data?.length ? (
                 <Text fontSize="sm" color="fg.muted" fontStyle="italic">
                   Not a member of any groups.
                 </Text>
-              )}
-              {!memberGroups.isLoading && !!memberGroups.data?.length && (
+              ) : (
                 <VStack gap={2} align="stretch">
                   {memberGroups.data.map((group) =>
                     group.bindings.length === 0 ? (

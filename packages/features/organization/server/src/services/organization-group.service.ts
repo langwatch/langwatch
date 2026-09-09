@@ -1,7 +1,6 @@
 import {
   DuplicateBindingError,
-  type AuthzGrantsService,
-  type AuthzService,
+  type AuthzApi,
 } from "@langwatch/authz-contract";
 import {
   GroupBindingAlreadyExistsError,
@@ -45,8 +44,8 @@ export type OrganizationGroupDependencies = {
   groups: GroupRepository;
   groupIdentities: GroupIdentityPort;
   teams: TeamRepository;
-  authz: AuthzService;
-  grants: AuthzGrantsService;
+  authz: AuthzApi;
+  grants: AuthzApi;
 };
 
 import { OrganizationGroupBindingService } from "./organization-group-binding.service.ts";
@@ -74,11 +73,11 @@ export class OrganizationGroupService {
     return this.dependencies.teams;
   }
 
-  private get authz(): AuthzService {
+  private get authz(): AuthzApi {
     return this.dependencies.authz;
   }
 
-  private get grants(): AuthzGrantsService {
+  private get grants(): AuthzApi {
     return this.dependencies.grants;
   }
 

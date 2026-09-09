@@ -1,7 +1,7 @@
 /**
  * The organization management REST family: profile, members, invites, no {orgId} segment since
- * it's implied by the credential. Uses the raw service, not {@link OrganizationApp}, since every
- * write here is attributed to an optional `apiKeyUserId` the application's ops can't express.
+ * it's implied by the credential. Its narrow service boundary keeps the REST credential principal
+ * separate from the request payload while forwarding that actor to the organization application.
  */
 import {
   roleBindingScopeTypeSchema,
@@ -49,9 +49,9 @@ export interface OrganizationRestMemberSummary {
   userId: string;
   organizationId: string;
   role: OrganizationApiMemberRole;
-  disabledAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  disabledAt: OrganizationUser["disabledAt"];
+  createdAt: OrganizationUser["createdAt"];
+  updatedAt: OrganizationUser["updatedAt"];
   user: { id: string; name: string | null; email: string | null };
 }
 
@@ -85,26 +85,30 @@ export interface OrganizationRestService {
     organizationId: string;
     userId: string;
   }): Promise<OrganizationRestMemberSummary & { teams: OrganizationRestMemberTeamBinding[] }>;
-  changeMemberRole(input: {
-    organizationId: string;
-    userId: string;
-    role: OrganizationApiMemberRole;
-    /** Null when the actor is a service credential; self checks never match. */
-    currentUserId: string | null;
-    planUser?: { id: string };
-  }): Promise<{ teamsLeftWithoutAdmin: { id: string; name: string }[] }>;
-  setMemberDisabled(input: {
-    organizationId: string;
-    userId: string;
-    disabled: boolean;
-    /** The user the credential acts as; null (a service key) skips the self-guard. */
-    actingUser?: { id: string } | null;
-  }): Promise<void>;
-  deleteMember(input: {
-    organizationId: string;
-    userId: string;
-    actingUserId?: string | null;
-  }): Promise<void>;
+  changeMemberRole(
+    input: {
+      organizationId: string;
+      userId: string;
+      role: OrganizationApiMemberRole;
+      planUser?: { id: string };
+    },
+    by: { id: string } | null,
+  ): Promise<{ teamsLeftWithoutAdmin: { id: string; name: string }[] }>;
+  setMemberDisabled(
+    input: {
+      organizationId: string;
+      userId: string;
+      disabled: boolean;
+    },
+    by: { id: string } | null,
+  ): Promise<void>;
+  deleteMember(
+    input: {
+      organizationId: string;
+      userId: string;
+    },
+    by: { id: string } | null,
+  ): Promise<void>;
 }
 
 /** The three invitation operations this family makes. */
@@ -523,13 +527,15 @@ export function createOrganizationRestApp(options: {
     actorUserId: string | null;
   }): Promise<Array<{ id: string; name: string }> | undefined> => {
     try {
-      const result = await organizationService.changeMemberRole({
-        organizationId,
-        userId,
-        role,
-        currentUserId: actorUserId,
-        ...(actorUserId ? { planUser: { id: actorUserId } } : {}),
-      });
+      const result = await organizationService.changeMemberRole(
+        {
+          organizationId,
+          userId,
+          role,
+          ...(actorUserId ? { planUser: { id: actorUserId } } : {}),
+        },
+        actorUserId ? { id: actorUserId } : null,
+      );
       return result.teamsLeftWithoutAdmin.length > 0 ? result.teamsLeftWithoutAdmin : undefined;
     } catch (error) {
       return ports.rethrowSeatLimit(error);
@@ -551,12 +557,14 @@ export function createOrganizationRestApp(options: {
     actorUserId: string | null;
   }): Promise<void> => {
     try {
-      await organizationService.setMemberDisabled({
-        organizationId,
-        userId,
-        disabled,
-        actingUser: actorUserId ? { id: actorUserId } : null,
-      });
+      await organizationService.setMemberDisabled(
+        {
+          organizationId,
+          userId,
+          disabled,
+        },
+        actorUserId ? { id: actorUserId } : null,
+      );
     } catch (error) {
       ports.rethrowSeatLimit(error);
     }
@@ -610,11 +618,14 @@ export function createOrganizationRestApp(options: {
     input: z.infer<typeof userIdParamsSchema>,
   ) => {
     const organization = organizationOf(c);
-    await c.get("organizations").deleteMember({
-      organizationId: organization.id,
-      userId: input.userId,
-      actingUserId: actorUserIdOf(c),
-    });
+    const actorUserId = actorUserIdOf(c);
+    await c.get("organizations").deleteMember(
+      {
+        organizationId: organization.id,
+        userId: input.userId,
+      },
+      actorUserId ? { id: actorUserId } : null,
+    );
     emitManagementAudit({
       c,
       audit,

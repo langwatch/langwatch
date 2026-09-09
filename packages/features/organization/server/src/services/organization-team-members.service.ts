@@ -8,8 +8,7 @@ import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   DuplicateBindingError,
   type AuthzAccessBinding,
-  type AuthzGrantsService,
-  type AuthzService,
+  type AuthzApi,
 } from "@langwatch/authz-contract";
 import {
   CannotRemoveSelfAsLastAdminError,
@@ -52,8 +51,8 @@ import {
 } from "../rules/team-membership-plan.rules.ts";
 
 type OrganizationTeamMembersOptions = {
-  authz: AuthzService;
-  grants: AuthzGrantsService;
+  authz: AuthzApi;
+  grants: AuthzApi;
   groups: GroupRepository;
   teams: TeamRepository;
   teamIdentities: TeamIdentityPort;

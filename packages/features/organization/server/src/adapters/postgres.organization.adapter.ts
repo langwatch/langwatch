@@ -1,5 +1,5 @@
 import type { OrganizationService as OrganizationServiceContract } from "@langwatch/organization-contract";
-import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   GroupIdentityPort,
@@ -20,8 +20,8 @@ export interface PostgresOrganizationAdapterOptions {
   identities: PersonalWorkspaceIdentityPort;
   teamIdentities: TeamIdentityPort;
   groupIdentities: GroupIdentityPort;
-  authz: AuthzService;
-  grants: AuthzGrantsService;
+  authz: AuthzApi;
+  grants: AuthzApi;
   settingsSecrets: OrganizationSettingsSecretPort;
   diagnostics?: PersonalWorkspaceDiagnosticsPort;
 }

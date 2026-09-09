@@ -1,4 +1,4 @@
-import { type AuthzGrantsService, type AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   OrganizationService as OrganizationServiceContract,
@@ -90,8 +90,8 @@ export class OrganizationService extends OrganizationServiceContract {
     private readonly identities: PersonalWorkspaceIdentityPort,
     private readonly teamIdentities: TeamIdentityPort,
     private readonly groupIdentities: GroupIdentityPort,
-    private readonly authz: AuthzService,
-    private readonly grants: AuthzGrantsService,
+    private readonly authz: AuthzApi,
+    private readonly grants: AuthzApi,
     private readonly diagnostics: PersonalWorkspaceDiagnosticsPort | undefined,
   ) {
     super();
@@ -196,8 +196,8 @@ export class OrganizationService extends OrganizationServiceContract {
     identities: PersonalWorkspaceIdentityPort;
     teamIdentities: TeamIdentityPort;
     groupIdentities: GroupIdentityPort;
-    authz: AuthzService;
-    grants: AuthzGrantsService;
+    authz: AuthzApi;
+    grants: AuthzApi;
     diagnostics?: PersonalWorkspaceDiagnosticsPort;
   }): OrganizationService {
     return new OrganizationService(

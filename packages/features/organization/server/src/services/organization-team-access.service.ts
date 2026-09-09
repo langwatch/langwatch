@@ -3,7 +3,7 @@
  * with the people and groups bound to it, and every project under it with the bindings that
  * grant access — whether through the team or straight to the project.
  */
-import type { AuthzAccessBinding, AuthzService } from "@langwatch/authz-contract";
+import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
 import {
   listOrganizationTeamAccessInputSchema,
   type ListOrganizationTeamAccessInput,
@@ -18,7 +18,7 @@ import type { TeamRepository } from "../repositories/team.repository.ts";
 import { TEAM_ROLE_PRIORITY } from "../rules/team-membership-plan.rules.ts";
 
 type OrganizationTeamAccessOptions = {
-  authz: AuthzService;
+  authz: AuthzApi;
   groups: GroupRepository;
   teams: TeamRepository;
 };

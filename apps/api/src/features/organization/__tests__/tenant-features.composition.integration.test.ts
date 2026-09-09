@@ -8,7 +8,8 @@ import type {
   AuthzService,
   PermissionDecision,
 } from "@langwatch/authz-contract";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -16,11 +17,9 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import { EventEmitter } from "node:events";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ApiApplication,
-  MissingAgentService,
-} from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import { composeAutomationFeature } from "../../automation/automation.composition.ts";
 import { composeCodingAgentFeature } from "../../coding-agent/coding-agent.composition.ts";
@@ -173,7 +172,7 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
     infrastructure,
     peers: {
       projects,
-      apiKeys: {} as unknown as ApiKeyService,
+      apiKeys: {} as unknown as ApiKeyApi,
       share: {} as unknown as ShareApi,
       topics: {
         getClusteringStatus: vi.fn(async () => ({ isRunInFlight: false })),
@@ -233,7 +232,7 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({

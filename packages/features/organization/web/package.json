@@ -8,6 +8,15 @@
   ],
   "type": "module",
   "exports": {
+    "./organization-client": {
+      "langwatch-declaration-source": "./src/organization-client.ts",
+      "types": "./dist/organization-client.d.ts",
+      "default": "./src/organization-client.ts"
+    },
+    "./personal-workspace-features": {
+      "types": "./dist/behavior/personal-workspace-features-api.d.ts",
+      "default": "./src/behavior/personal-workspace-features-api.ts"
+    },
     "./surfaces/department-picker": {
       "types": "./dist/surfaces/department-picker/index.d.ts",
       "default": "./src/surfaces/department-picker/index.ts"
@@ -31,17 +40,15 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-web": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
-    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
-    "@langwatch/api": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
-    "@langwatch/workflow-web": "workspace:*",
     "lodash-es": "^4.17.21",
     "lucide-react": "^1.22.0",
     "papaparse": "^5.5.3",

@@ -5,8 +5,9 @@
  */
 import { OrganizationApi, OrganizationGroupService } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { UserApi } from "@langwatch/user-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   AddOrganizationGroupBindingInput,
@@ -64,7 +65,7 @@ import type {
   PersonalWorkspaceIdentityPort,
   TeamIdentityPort,
 } from "../ports/organization.port.ts";
-import type {
+import {
   OrganizationGrantCachePort,
   OrganizationPromptSeedPort,
   OrganizationSeatLicensePort,
@@ -145,15 +146,13 @@ export interface ServerOrganizationAppDependencies {
 }
 
 type OrganizationSetup = FeatureSetup<
-  { projects: typeof ProjectApi },
+  { projects: typeof ProjectApi; permissions: typeof AuthzApi; users: typeof UserApi },
   OrganizationInfrastructure,
   undefined
 >;
 
 export type OrganizationInfrastructure = Readonly<{
   database: PrismaClient;
-  authz: AuthzService;
-  grants: AuthzGrantsService;
   identities: PersonalWorkspaceIdentityPort;
   teamIdentities: TeamIdentityPort;
   groupIdentities: GroupIdentityPort;
@@ -161,13 +160,15 @@ export type OrganizationInfrastructure = Readonly<{
   diagnostics?: PersonalWorkspaceDiagnosticsPort;
   prompts: OrganizationPromptSeedPort;
   seats: OrganizationSeatLicensePort;
-  sessions: OrganizationSessionRevocationPort;
-  grantCache: OrganizationGrantCachePort;
 }>;
 
 export class ServerOrganizationApp implements OrganizationApi {
   static readonly contract = OrganizationApi;
-  static readonly dependencies = { projects: ProjectApi };
+  static readonly dependencies = {
+    projects: ProjectApi,
+    permissions: AuthzApi,
+    users: UserApi,
+  };
   #dependencies: ServerOrganizationAppDependencies;
 
   static create(setup: OrganizationSetup): ServerOrganizationApp {
@@ -176,18 +177,18 @@ export class ServerOrganizationApp implements OrganizationApi {
       identities: setup.infrastructure.identities,
       teamIdentities: setup.infrastructure.teamIdentities,
       groupIdentities: setup.infrastructure.groupIdentities,
-      authz: setup.infrastructure.authz,
-      grants: setup.infrastructure.grants,
+      authz: setup.dependencies.permissions,
+      grants: setup.dependencies.permissions,
       settingsSecrets: setup.infrastructure.settingsSecrets,
       diagnostics: setup.infrastructure.diagnostics,
     }).build();
     const membership = PostgresOrganizationMembershipAdapter.create({
       database: setup.infrastructure.database,
-      grants: setup.infrastructure.grants,
+      grants: setup.dependencies.permissions,
       prompts: setup.infrastructure.prompts,
       seats: setup.infrastructure.seats,
-      sessions: setup.infrastructure.sessions,
-      grantCache: setup.infrastructure.grantCache,
+      sessions: UserApiOrganizationSessionRevocation.create(setup.dependencies.users),
+      grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
     }).build();
     return new ServerOrganizationApp({
       organizations,
@@ -472,6 +473,12 @@ export class ServerOrganizationApp implements OrganizationApi {
     return this.#dependencies.organizations.getTeamBySlugForMember({ ...input, userId: by.id });
   }
 
+  listTeams(
+    input: import("@langwatch/organization-contract").ListOrganizationTeamsInput,
+  ): Promise<import("@langwatch/organization-contract").OrganizationTeamPage> {
+    return this.#dependencies.organizations.listTeams(input);
+  }
+
   /** One team's members, filtered against what the caller may see. */
   getTeamWithMembers(
     input: Omit<GetOrganizationTeamWithMembersInput, "callerUserId">,
@@ -692,6 +699,34 @@ export class ServerOrganizationApp implements OrganizationApi {
   /** The projects that live in one team. */
   listProjectsByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
     return this.#dependencies.projects.listByTeam(input);
+  }
+}
+
+class UserApiOrganizationSessionRevocation extends OrganizationSessionRevocationPort {
+  static create(users: import("@langwatch/user-contract").UserApi): UserApiOrganizationSessionRevocation {
+    return new UserApiOrganizationSessionRevocation(users);
+  }
+
+  private constructor(private readonly users: import("@langwatch/user-contract").UserApi) {
+    super();
+  }
+
+  revokeAllBrowserSessions(input: { userId: string }): Promise<void> {
+    return this.users.revokeAllBrowserSessions(input);
+  }
+}
+
+class AuthzApiOrganizationGrantCache extends OrganizationGrantCachePort {
+  static create(authz: import("@langwatch/authz-contract").AuthzApi): AuthzApiOrganizationGrantCache {
+    return new AuthzApiOrganizationGrantCache(authz);
+  }
+
+  private constructor(private readonly authz: import("@langwatch/authz-contract").AuthzApi) {
+    super();
+  }
+
+  invalidateOrganization(input: { organizationId: string }): Promise<void> {
+    return this.authz.invalidateOrganization(input);
   }
 }
 

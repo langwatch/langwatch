@@ -38,8 +38,10 @@ import type {
   GetOrganizationTeamInput,
   GetOrganizationTeamWithMembersInput,
   ListOrganizationTeamAccessInput,
+  ListOrganizationTeamsInput,
   ListOrganizationTeamsWithMembersInput,
   OrganizationTeam,
+  OrganizationTeamPage,
   OrganizationTeamAccess,
   OrganizationTeamWithMembers,
   RemoveOrganizationTeamMemberInput,
@@ -145,6 +147,7 @@ export interface OrganizationApi {
   getSettings(input: {
     organizationId: string;
   }): Promise<import("./organization.ts").OrganizationSettings>;
+  listTeams(input: ListOrganizationTeamsInput): Promise<OrganizationTeamPage>;
   listMembers(input: {
     organizationId: string;
     includeDisabled?: boolean;
