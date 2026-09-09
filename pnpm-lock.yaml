@@ -12054,6 +12054,9 @@ importers:
 
   tools/dev-runtime:
     dependencies:
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
       '@langwatch/platform-api':
         specifier: workspace:*
         version: link:../../apps/api

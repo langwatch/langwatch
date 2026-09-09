@@ -83,3 +83,24 @@ describe("given a process that passes span processors of its own", () => {
     });
   });
 });
+
+describe("given a caller sharing an already-built observability graph", () => {
+  describe("when a second application composes its observability", () => {
+    /** @scenario "A shared observability handle is returned as-is, without a second SDK setup" */
+    it("returns the same handle and never calls the SDK again", () => {
+      const shared = createProcessObservability({
+        serviceName: "langwatch-worker",
+        setup: { langwatch: "disabled" },
+      });
+      setupObservability.mockClear();
+
+      const reused = createProcessObservability({
+        serviceName: "langwatch-api",
+        sharedHandle: shared,
+      });
+
+      expect(reused).toBe(shared);
+      expect(setupObservability).not.toHaveBeenCalled();
+    });
+  });
+});

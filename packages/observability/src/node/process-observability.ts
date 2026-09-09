@@ -53,6 +53,12 @@ export interface ProcessObservabilityOptions {
    * such as continuous profiling.
    */
   flushers?: readonly ProcessObservabilityFlusher[];
+  /**
+   * A graph another caller in this process already built. When set, it is
+   * returned unchanged — the SDK's tracer provider can be set up only once
+   * per process, so a launcher hosting several graphs builds it once here.
+   */
+  sharedHandle?: ProcessObservability;
 }
 
 /**
@@ -66,6 +72,8 @@ export interface ProcessObservabilityOptions {
 export function createProcessObservability(
   options: ProcessObservabilityOptions,
 ): ProcessObservability {
+  if (options.sharedHandle) return options.sharedHandle;
+
   const logger = createLogger(options.loggerName ?? `langwatch:${options.serviceName}`);
   const sdkLogger = createSdkLogger(logger);
   const sdkHandle = setupObservability({

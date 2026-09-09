@@ -1,4 +1,5 @@
 import process from "node:process";
+import type { ProcessObservabilityOptions } from "@langwatch/observability/node";
 import { ApiBootFailurePort, startApiExecutable } from "../api.executable.ts";
 import type { ApiRuntimeBootstrap } from "../api.main.ts";
 import type { ApiShutdownSignal, ApiSignalHost } from "../api.signal-handlers.ts";
@@ -37,7 +38,15 @@ export type ApiExecutableHost = Readonly<{
  * selecting a different graph. Only `host` belongs to the executable itself.
  */
 export type ApiStandaloneExecutableOptions = Readonly<
-  { host?: ApiExecutableHost } & ApiProductionCompositionOptions
+  {
+    host?: ApiExecutableHost;
+    /**
+     * Reuses an observability graph another application in this process
+     * already built. A launcher hosting several graphs (`tools/dev-runtime`)
+     * passes `{ sharedHandle }`; a standalone deployment never sets this.
+     */
+    observability?: Omit<ProcessObservabilityOptions, "serviceName" | "loggerName">;
+  } & ApiProductionCompositionOptions
 >;
 
 /**
@@ -61,7 +70,7 @@ export type ApiStandaloneExecutableOptions = Readonly<
 export async function startStandaloneApi(
   options: ApiStandaloneExecutableOptions = {},
 ): Promise<ApiRuntimeBootstrap> {
-  const { host: injectedHost, ...composition } = options;
+  const { host: injectedHost, observability, ...composition } = options;
   const host = injectedHost ?? nodeApiExecutableHost();
   installFatalHandlers(host);
   return startApiExecutable({
@@ -69,6 +78,7 @@ export async function startStandaloneApi(
     composition: ApiStandaloneComposition.create(composition),
     failures: WrittenApiBootFailure.create(host),
     signals: { host: signalHostOf(host), exit: (code) => host.exit(code) },
+    observability,
   });
 }
 

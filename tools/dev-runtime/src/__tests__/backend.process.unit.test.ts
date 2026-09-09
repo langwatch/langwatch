@@ -1,3 +1,7 @@
+import {
+  createProcessObservability,
+  type ProcessObservability,
+} from "@langwatch/observability/node";
 import { describe, expect, it, vi } from "vitest";
 import { embeddedBackendHost } from "../backend.host.ts";
 import {
@@ -6,6 +10,10 @@ import {
   type BackendApiHalf,
   type BackendWorkerHalf,
 } from "../backend.process.ts";
+
+// A real graph that records spans and exports nothing, the shape of every local lane.
+const fakeObservability = (): ProcessObservability =>
+  createProcessObservability({ serviceName: "dev-runtime-test", setup: { langwatch: "disabled" } });
 
 function halfSpies(order: string[]) {
   const api: BackendApiHalf = {
@@ -17,6 +25,7 @@ function halfSpies(order: string[]) {
     close: vi.fn(async () => {
       order.push("worker.close");
     }),
+    observability: fakeObservability(),
   };
   return { api, worker };
 }
@@ -44,6 +53,25 @@ describe("given the backend process hosts both applications", () => {
 
       expect(order).toEqual(["worker.start", "api.start"]);
       expect(halves).toEqual({ api, worker });
+    });
+
+    /** @scenario "One observability graph is set up and shared by both applications" */
+    it("hands the API the exact observability graph the worker built", async () => {
+      const { api, worker } = halfSpies([]);
+      let receivedByApi: unknown;
+
+      await startBackend({
+        env: {},
+        write: () => void 0,
+        fail: () => void 0,
+        startWorker: async () => worker,
+        startApi: async (_host, observability) => {
+          receivedByApi = observability;
+          return api;
+        },
+      });
+
+      expect(receivedByApi).toBe(worker.observability);
     });
 
     /** @scenario "A half-started backend drains what it did start" */
@@ -85,6 +113,7 @@ describe("given the backend process hosts both applications", () => {
         close: async () => {
           throw new Error("queue wedged");
         },
+        observability: fakeObservability(),
       };
 
       await expect(drainBackend({ api, worker })).rejects.toThrow("queue wedged");

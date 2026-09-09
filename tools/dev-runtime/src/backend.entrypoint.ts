@@ -69,8 +69,15 @@ void startBackend({
   // It reaches the one shutdown this process owns instead of ending the
   // process underneath the other half.
   fail: (code) => void stop(code === 0 ? 1 : code),
-  startWorker: (host) => startStandaloneWorker({ host }),
-  startApi: (host) => startStandaloneApi({ host }),
+  startWorker: async (host) => {
+    const worker = await startStandaloneWorker({ host });
+    return { close: () => worker.close(), observability: worker.worker.observability };
+  },
+  // Reuses the worker's already-built observability graph: setting the SDK
+  // up a second time in this one process is what prints the "OpenTelemetry
+  // is already set up" error.
+  startApi: (host, observability) =>
+    startStandaloneApi({ host, observability: { sharedHandle: observability } }),
 })
   .then((started) => {
     halves = started;

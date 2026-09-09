@@ -1,17 +1,17 @@
+import type { ProcessObservability } from "@langwatch/observability/node";
 import type { ApiRuntime } from "@langwatch/platform-api/runtime";
 import type { WorkerRuntime } from "@langwatch/worker/runtime";
 import { embeddedBackendHost, type BackendEmbeddedHost } from "./backend.host.ts";
 
 /**
  * The two halves of the backend process, taken from each application's own
- * runtime construction entry point rather than restated here.
- *
- * Only `close` is named: starting is each application's own executable's job,
- * and shutdown ordering is the one thing this process owns that neither half
- * can know about.
+ * boot entry point. The worker half also carries the observability graph it
+ * built first, which this process hands to the API instead of duplicating.
  */
 export type BackendApiHalf = Pick<ApiRuntime<unknown, unknown>, "close">;
-export type BackendWorkerHalf = Pick<WorkerRuntime, "close">;
+export type BackendWorkerHalf = Pick<WorkerRuntime, "close"> & {
+  readonly observability: ProcessObservability;
+};
 
 export type BackendHalves = {
   api: BackendApiHalf;
@@ -41,7 +41,10 @@ export type BackendStartOptions = {
   env: Readonly<Record<string, unknown>>;
   write: (line: string) => void;
   fail: (code: number) => void;
-  startApi: (host: BackendEmbeddedHost) => Promise<BackendApiHalf>;
+  startApi: (
+    host: BackendEmbeddedHost,
+    observability: ProcessObservability,
+  ) => Promise<BackendApiHalf>;
   startWorker: (host: BackendEmbeddedHost) => Promise<BackendWorkerHalf>;
 };
 
@@ -66,7 +69,9 @@ export async function startBackend(options: BackendStartOptions): Promise<Backen
   });
   const worker = await options.startWorker(host);
   try {
-    const api = await options.startApi(host);
+    // The SDK's tracer provider can be set up only once per process, so the
+    // API reuses the worker's already-built graph instead of its own.
+    const api = await options.startApi(host, worker.observability);
     return { api, worker };
   } catch (error) {
     await worker.close();

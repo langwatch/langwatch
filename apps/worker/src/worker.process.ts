@@ -131,7 +131,12 @@ export class WorkerProcess {
   private constructor(
     readonly config: WorkerConfig,
     private readonly resources: ResourceScope,
-    private readonly observability: ProcessObservability,
+    /**
+     * Public so a launcher hosting several application graphs in one process
+     * (`tools/dev-runtime`) can hand this graph's already-built observability
+     * to the others, rather than each one setting the SDK up again.
+     */
+    readonly observability: ProcessObservability,
     readonly application: WorkerApplicationPort,
   ) {}
 

@@ -51,7 +51,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project packages/observability/tsconfig.json && tsc --noEmit",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
     "test": "vitest",
     "test:unit": "vitest run"
   },
