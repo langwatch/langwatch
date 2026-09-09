@@ -127,6 +127,46 @@ function unreachableClickHouse(): Promise<EvaluationClickHouseClient> {
   return Promise.reject(new Error("This test composed no ClickHouse connection."));
 }
 
+/**
+ * The collaborators the public evaluation doors reach. A test that exercises a
+ * door names the one it needs; every other one refuses by name rather than
+ * answering a fake row.
+ */
+function unreachable(what: string): () => never {
+  return () => {
+    throw new Error(`This test composed no ${what}.`);
+  };
+}
+
+export function createEvaluationTestDoorInfrastructure(): Pick<
+  EvaluationInfrastructure,
+  "experiments" | "experimentRuns" | "slugs" | "savedEvaluators" | "models" | "ledger" | "runner"
+> {
+  return {
+    experiments: {
+      findOrCreate: unreachable("experiment directory"),
+      findBySlug: unreachable("experiment directory"),
+    },
+    experimentRuns: {
+      startRun: unreachable("experiment run writer"),
+      recordTargetResult: unreachable("experiment run writer"),
+      recordEvaluatorResult: unreachable("experiment run writer"),
+      completeRun: unreachable("experiment run writer"),
+    },
+    slugs: {
+      findMonitorBySlug: unreachable("monitor directory"),
+      findDatasetBySlug: unreachable("dataset directory"),
+    },
+    savedEvaluators: { resolveForExecution: unreachable("saved evaluator directory") },
+    models: { findModelForFeature: async () => null },
+    ledger: {
+      recordCost: unreachable("cost ledger"),
+      recordDatasetRow: unreachable("cost ledger"),
+    },
+    runner: { runEvaluation: unreachable("evaluator runtime") },
+  };
+}
+
 export function createEvaluationTestInfrastructure(
   overrides: Partial<EvaluationInfrastructure> = {},
 ): EvaluationInfrastructure {
@@ -141,6 +181,7 @@ export function createEvaluationTestInfrastructure(
     warmup: new TestEvaluationWarmup(),
     analytics: new TestEvaluationRunAnalytics(),
     report: new TestEvaluationReport(),
+    ...createEvaluationTestDoorInfrastructure(),
     ...overrides,
   };
 }

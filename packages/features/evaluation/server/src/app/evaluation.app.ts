@@ -4,15 +4,28 @@ import {
   EvaluationApi,
   isAzureEvaluatorType,
   type CustomEvaluator,
+  type DatasetEvaluationRow,
   type EvaluationApi as EvaluationApiContract,
+  type EvaluationCostRecord,
+  type EvaluationModelLookup,
+  type EvaluationMonitorSummary,
   type EvaluationProjectScope,
   type EvaluationRunOutcome,
+  type EvaluationSlugLookup,
+  type EvaluationSlugMatch,
+  type ReportEvaluationCommandData,
+  type RunEvaluatorInput,
+  type SavedEvaluatorLookup,
+  type SavedEvaluatorResolution,
   type EvaluationWarmup,
   type EvaluatorCatalogue,
   type RunTraceEvaluationInput,
   type WarmupEvaluatorsInput,
 } from "@langwatch/evaluation-contract";
-import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
+import {
+  AVAILABLE_EVALUATORS,
+  type SingleEvaluationResult,
+} from "@langwatch/evaluator-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -38,6 +51,12 @@ import type {
 import { ClickHouseEvaluationRepository } from "../repositories/clickhouse/evaluation.repository.ts";
 import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/monitor-performance.repository.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
+import {
+  EvaluationBatchLogService,
+  type EvaluationExperimentDirectory,
+  type EvaluationExperimentRunWriter,
+} from "../services/evaluation-batch-log.service.ts";
+import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
 import { EvaluatorAvailabilityService } from "../services/evaluator-availability.service.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
 
@@ -52,7 +71,48 @@ export type EvaluationInfrastructure = Readonly<{
   warmup: EvaluationWarmupPort;
   analytics: EvaluationRunAnalyticsPort;
   report: EvaluationReportPort;
+  // What the public evaluation doors reach beyond the module: the experiment
+  // an SDK batch is written into, the rows a slug names, the saved-evaluator
+  // directory, the model cascade, the cost ledger and the evaluator runtime.
+  experiments: EvaluationExperimentDirectory;
+  experimentRuns: EvaluationExperimentRunWriter;
+  slugs: EvaluationSlugDirectory;
+  savedEvaluators: EvaluationSavedEvaluatorDirectory;
+  models: EvaluationModelCascade;
+  ledger: EvaluationLedger;
+  runner: EvaluationRunner;
 }>;
+
+/** The monitors and datasets an evaluate call addresses by slug. */
+export interface EvaluationSlugDirectory {
+  findMonitorBySlug(input: EvaluationSlugLookup): Promise<EvaluationMonitorSummary | null>;
+  findDatasetBySlug(input: EvaluationSlugLookup): Promise<EvaluationSlugMatch | null>;
+}
+
+/** The saved-evaluator directory the `evaluators/{slug|id}` form resolves on. */
+export interface EvaluationSavedEvaluatorDirectory {
+  resolveForExecution(input: SavedEvaluatorLookup): Promise<SavedEvaluatorResolution>;
+}
+
+/**
+ * The project's model cascade. Null rather than a thrown "not configured": the
+ * caller's only answer to an unconfigured cascade is the evaluator's own
+ * default, so the exception the cascade raises has no consumer on this path.
+ */
+export interface EvaluationModelCascade {
+  findModelForFeature(input: EvaluationModelLookup): Promise<string | null>;
+}
+
+/** Where a run's cost and a dataset evaluation's rows are written. */
+export interface EvaluationLedger {
+  recordCost(input: EvaluationCostRecord): Promise<EvaluationSlugMatch>;
+  recordDatasetRow(input: DatasetEvaluationRow): Promise<void>;
+}
+
+/** The one evaluator runtime this process composed. */
+export interface EvaluationRunner {
+  runEvaluation(input: RunEvaluatorInput): Promise<SingleEvaluationResult>;
+}
 
 type EvaluationSetup = FeatureSetup<
   typeof EvaluationApp.dependencies,
@@ -99,6 +159,14 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #warmup: EvaluationWarmupPort;
   readonly #analytics: EvaluationRunAnalyticsPort;
   readonly #report: EvaluationReportPort;
+  readonly #batchLog: EvaluationBatchLogService;
+  readonly #autoslug: EvaluationNameAutoslugService;
+  readonly #experiments: EvaluationExperimentDirectory;
+  readonly #slugs: EvaluationSlugDirectory;
+  readonly #savedEvaluators: EvaluationSavedEvaluatorDirectory;
+  readonly #models: EvaluationModelCascade;
+  readonly #ledger: EvaluationLedger;
+  readonly #runner: EvaluationRunner;
 
   private constructor(
     service: EvaluationService,
@@ -113,6 +181,18 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#warmup = infrastructure.warmup;
     this.#analytics = infrastructure.analytics;
     this.#report = infrastructure.report;
+    this.#experiments = infrastructure.experiments;
+    this.#slugs = infrastructure.slugs;
+    this.#savedEvaluators = infrastructure.savedEvaluators;
+    this.#models = infrastructure.models;
+    this.#ledger = infrastructure.ledger;
+    this.#runner = infrastructure.runner;
+    this.#autoslug = EvaluationNameAutoslugService.create();
+    this.#batchLog = EvaluationBatchLogService.create({
+      experiments: infrastructure.experiments,
+      runs: infrastructure.experimentRuns,
+      report: infrastructure.report,
+    });
   }
 
   static create({ infrastructure, dependencies }: EvaluationSetup): EvaluationApp {
@@ -155,6 +235,31 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#service.tryGetInputs(input);
   getMonitorPerformance: EvaluationApiContract["getMonitorPerformance"] = (input) =>
     this.#service.getMonitorPerformance(input);
+
+  logBatchEvaluation: EvaluationApiContract["logBatchEvaluation"] = (input) =>
+    this.#batchLog.log(input);
+  runEvaluator: EvaluationApiContract["runEvaluator"] = (input) =>
+    this.#runner.runEvaluation(input);
+  resolveSavedEvaluator: EvaluationApiContract["resolveSavedEvaluator"] = (input) =>
+    this.#savedEvaluators.resolveForExecution(input);
+  findMonitorBySlug: EvaluationApiContract["findMonitorBySlug"] = (input) =>
+    this.#slugs.findMonitorBySlug(input);
+  findDatasetBySlug: EvaluationApiContract["findDatasetBySlug"] = (input) =>
+    this.#slugs.findDatasetBySlug(input);
+  findExperimentBySlug: EvaluationApiContract["findExperimentBySlug"] = (input) =>
+    this.#experiments.findBySlug(input);
+  findModelForFeature: EvaluationApiContract["findModelForFeature"] = (input) =>
+    this.#models.findModelForFeature(input);
+  recordEvaluationCost: EvaluationApiContract["recordEvaluationCost"] = (input) =>
+    this.#ledger.recordCost(input);
+  recordDatasetEvaluationRow: EvaluationApiContract["recordDatasetEvaluationRow"] = (input) =>
+    this.#ledger.recordDatasetRow(input);
+  deriveEvaluatorId: EvaluationApiContract["deriveEvaluatorId"] = (name) =>
+    this.#autoslug.derive(name);
+
+  async reportEvaluation(data: ReportEvaluationCommandData): Promise<void> {
+    await this.#report.reportEvaluation(data);
+  }
 
   async listEvaluators(input: EvaluationProjectScope): Promise<EvaluatorCatalogue> {
     // Azure Safety evaluators resolve their credentials solely from the

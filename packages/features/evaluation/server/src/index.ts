@@ -126,20 +126,8 @@ export {
 } from "./adapters/otel.evaluation-execution-metrics.adapter.ts";
 export { DirectEvaluationExecutionReceiptAdapter } from "./adapters/direct.evaluation-execution-receipt.adapter.ts";
 
-// --------------------------------------------------------------------------- The legacy
-// evaluation REST doors The evaluator catalogue, the batch result log and the four evaluate
-// paths. The catalogue needs nothing; the other two halves take what they cannot own as port
-// groups, so a process mounts the ones its own graph can answer.
+// --------------------------------------------------------------------------- The public
+// evaluation REST doors: the evaluator catalogue, the batch result log, the three evaluate
+// paths and the dataset evaluation, as one declaration the process mounts.
 // ---------------------------------------------------------------------------
-export {
-  createEvaluationsLegacyRestApp,
-  type DataForEvaluation,
-  type EvaluationBatchExperimentPort,
-  type EvaluationBatchRestPorts,
-  type EvaluationRunCustomEvaluator,
-  type EvaluationRunMonitor,
-  type EvaluationRunRestPorts,
-  type EvaluationsLegacyCredential,
-  type EvaluationsLegacyCredentialPort,
-  type EvaluationsLegacyRestPorts,
-} from "./transport/api-rest/evaluations-legacy.api.ts";
+export { evaluationsLegacyRest } from "./transport/evaluations-legacy.rest.ts";

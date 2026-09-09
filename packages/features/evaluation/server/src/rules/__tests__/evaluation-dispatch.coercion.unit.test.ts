@@ -1,15 +1,11 @@
 /**
- * Regression: workbench live-execute of an evaluator-as-target into a
- * downstream string-input scorer used to reject boolean/number/object outputs
- * with "Validation error: Expected string, received boolean at output".
- *
- * Covers the REST schema path (getEvaluatorDataForParams →
- * defaultEvaluatorInputSchema.parse) for the source types listed in
- * specs/experiments-v3/evaluator-as-target.feature.
+ * Regression: a non-string target output reaching a string-input scorer used to
+ * be rejected outright.
+ * @see specs/experiments-v3/evaluator-as-target.feature
  */
 import { describe, expect, it } from "vitest";
 
-import { getEvaluatorDataForParams } from "../evaluations-legacy.api.ts";
+import { getEvaluatorDataForParams } from "../evaluation-dispatch.rules.ts";
 
 const evaluate = (params: Record<string, unknown>) =>
   getEvaluatorDataForParams("langevals/exact_match", params);

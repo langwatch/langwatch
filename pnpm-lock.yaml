@@ -4049,9 +4049,15 @@ importers:
 
   packages/features/auth/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../identity/contract
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../runtime-composition
@@ -4107,6 +4113,9 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../../redis-client
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../runtime-composition
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../time
@@ -5472,6 +5481,9 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
+      '@langwatch/experiment-contract':
+        specifier: workspace:*
+        version: link:../../experiment/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error
