@@ -48,6 +48,8 @@ function commandsStub(
   return {
     recordRunCompleted: vi.fn(),
     recordRunFailed: vi.fn(),
+    recordAgentsListed: vi.fn(),
+    recordAgentsListingRefused: vi.fn(),
     ...overrides,
   };
 }
@@ -56,6 +58,7 @@ describe("ingestion pull outbox effect", () => {
   it("records a durable completion with the returned cursor", async () => {
     const recordRunCompleted = vi.fn();
     const handler = createIngestionPullRunHandler({
+      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
       runPort: {
         run: vi
           .fn()
@@ -79,6 +82,7 @@ describe("ingestion pull outbox effect", () => {
   it("reports the errors a partly-succeeded run stepped over", async () => {
     const recordRunCompleted = vi.fn();
     const handler = createIngestionPullRunHandler({
+      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
       runPort: {
         run: vi.fn().mockResolvedValue({
           nextCursor: "cursor-2",
@@ -97,6 +101,7 @@ describe("ingestion pull outbox effect", () => {
 
   it("rethrows before the final attempt so the outbox retries", async () => {
     const handler = createIngestionPullRunHandler({
+      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
       runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
       commands: () => commandsStub(),
     });
@@ -106,6 +111,7 @@ describe("ingestion pull outbox effect", () => {
   it("records a durable failure on the final attempt", async () => {
     const recordRunFailed = vi.fn();
     const handler = createIngestionPullRunHandler({
+      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
       runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
       commands: () => commandsStub({ recordRunFailed }),
       clock: () => 200,
@@ -127,6 +133,7 @@ describe("ingestion pull outbox effect", () => {
   it("does not translate a completion-command failure into a pull failure", async () => {
     const recordRunFailed = vi.fn();
     const handler = createIngestionPullRunHandler({
+      agentListingPort: { list: () => Promise.reject(new Error("unused")) },
       runPort: {
         run: vi.fn().mockResolvedValue({ nextCursor: null, eventCount: 1 }),
       },
@@ -156,6 +163,7 @@ describe("pull outcome metrics (ADR-054)", () => {
         },
       });
       const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
         runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
         commands: () => commandsStub(),
         clock: () => 200,
@@ -188,6 +196,7 @@ describe("pull outcome metrics (ADR-054)", () => {
         },
       });
       const handler = createIngestionPullRunHandler({
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
         runPort: { run: vi.fn().mockRejectedValue(new Error("provider down")) },
         commands: () => commandsStub(),
         clock: () => 200,

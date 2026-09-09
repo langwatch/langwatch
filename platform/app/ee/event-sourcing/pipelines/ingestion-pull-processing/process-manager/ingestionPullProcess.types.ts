@@ -12,6 +12,8 @@ export const INGESTION_PULL_PROCESS_INTENT_TYPES = {
    * so the short name stays unambiguous.
    */
   RUN: "run",
+  /** List the source's agents once, for one request. */
+  LIST_AGENTS: "listAgents",
 } as const;
 
 export const ingestionPullRunIntentSchema = z.object({
@@ -24,10 +26,29 @@ export type IngestionPullRunIntent = z.infer<
   typeof ingestionPullRunIntentSchema
 >;
 
+/**
+ * Carries no cursor: a listing is a question about the present, not a window
+ * to resume, so there is nothing durable for it to advance. It also carries
+ * no organization id — the executor's port resolves that from the source, the
+ * same way the pull's port does, which keeps tenancy out of the process state
+ * and out of the content boundary.
+ */
+export const ingestionPullAgentListingIntentSchema = z.object({
+  sourceId: z.string(),
+  requestId: z.string(),
+  requestedAt: z.number(),
+});
+export type IngestionPullAgentListingIntent = z.infer<
+  typeof ingestionPullAgentListingIntentSchema
+>;
+
 /** The intents this process may emit; typed so handlers get `ctx.intents.run`. */
 export type IngestionPullIntents = {
   [INGESTION_PULL_PROCESS_INTENT_TYPES.RUN]: IntentSpec<
     typeof ingestionPullRunIntentSchema
+  >;
+  [INGESTION_PULL_PROCESS_INTENT_TYPES.LIST_AGENTS]: IntentSpec<
+    typeof ingestionPullAgentListingIntentSchema
   >;
 };
 
@@ -39,6 +60,17 @@ export interface IngestionPullProcessState {
   currentRun: {
     runId: string;
     scheduledFor: number;
+    startedAt: number;
+  } | null;
+  /**
+   * The listing in flight, if any. Present so a second request arriving while
+   * one is still running is dropped rather than spending another provider
+   * call: an admin pressing a button twice means "did that work", not "ask
+   * twice". Absent on every state written before listings existed, so the
+   * handlers read it as optional.
+   */
+  currentAgentsListing?: {
+    requestId: string;
     startedAt: number;
   } | null;
 }
@@ -54,6 +86,15 @@ export const ingestionPullProcessEventViewSchema = z.object({
   cron: z.string().nullable(),
   cursor: z.string().nullable(),
   runId: z.string().nullable(),
+  /**
+   * An identity, like `runId` — never a provider payload.
+   *
+   * Defaulted rather than required, unlike its siblings: those have been in
+   * the view since the first event, and this one has not. A payload built
+   * before listings existed carries no such key, and reading its absence as
+   * "no request" is right for that history — there were no requests to name.
+   */
+  requestId: z.string().nullable().default(null),
 });
 export type IngestionPullProcessEventView = z.infer<
   typeof ingestionPullProcessEventViewSchema
