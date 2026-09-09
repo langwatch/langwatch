@@ -967,7 +967,7 @@ export function createWebhookRestApp(options: {
       MANAGEMENT_API_VERSION,
       async (c: WebhookContext, input: { id: string }) => {
         const organization = organizationOf(c);
-        const event = await webhooks().requireEvents().tryGetEmittedEventById({
+        const event = await webhooks().requireEvents().findEmittedEventById({
           organizationId: organization.id,
           id: input.id,
         });

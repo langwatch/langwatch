@@ -15,7 +15,7 @@ export abstract class WebhookEventsRepositoryPort {
     types?: string[];
   }): Promise<WebhookEventsPage>;
 
-  abstract tryReadEmittedEventById(input: {
+  abstract findEmittedEventById(input: {
     tenantIds: string[];
     id: string;
   }): Promise<WebhookSpendEventRow | null>;

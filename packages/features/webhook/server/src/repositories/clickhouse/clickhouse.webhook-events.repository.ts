@@ -125,11 +125,11 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepositoryPo
     return encodeCursor(cursor);
   }
 
-  static tryDecodeCursor(encoded: string): WebhookEventsCursor | null {
+  static findCursor(encoded: string): WebhookEventsCursor | null {
     return decodeCursor(encoded);
   }
 
-  static tryParseEventId(id: string): { gatewayRequestId: string; statuses: string[] } | null {
+  static findEventId(id: string): { gatewayRequestId: string; statuses: string[] } | null {
     return parseEventId(id);
   }
 
@@ -192,7 +192,7 @@ export class WebhookEventsClickHouseRepository extends WebhookEventsRepositoryPo
     };
   }
 
-  async tryReadEmittedEventById(input: {
+  async findEmittedEventById(input: {
     tenantIds: string[];
     id: string;
   }): Promise<WebhookSpendEventRow | null> {

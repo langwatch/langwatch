@@ -27,7 +27,7 @@ export abstract class WebhookEndpointService {
 }
 
 export abstract class WebhookEventsService {
-  abstract tryGetEmittedEventById(input: {
+  abstract findEmittedEventById(input: {
     organizationId: string;
     id: string;
   }): Promise<import("./webhook.ts").WebhookEnvelope | null>;

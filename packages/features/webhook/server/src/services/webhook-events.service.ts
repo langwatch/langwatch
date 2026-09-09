@@ -66,11 +66,11 @@ export class WebhookEventsService extends WebhookEventsServiceContract {
     return new WebhookEventsService(options);
   }
 
-  async tryGetEmittedEventById(input: {
+  async findEmittedEventById(input: {
     organizationId: string;
     id: string;
   }): Promise<WebhookEnvelope | null> {
-    const row = await this.options.events.tryReadEmittedEventById({
+    const row = await this.options.events.findEmittedEventById({
       tenantIds: await this.options.tenants.tenantIdsForOrganization(input.organizationId),
       id: input.id,
     });

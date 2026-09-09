@@ -164,7 +164,7 @@ class FakeWebhookEventsRepository extends WebhookEventsRepositoryPort {
     return { rows, nextCursor: null };
   }
 
-  async tryReadEmittedEventById(input: {
+  async findEmittedEventById(input: {
     tenantIds: string[];
     id: string;
   }): Promise<WebhookSpendEventRow | null> {

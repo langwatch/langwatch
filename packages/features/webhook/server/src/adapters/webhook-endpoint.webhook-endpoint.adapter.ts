@@ -51,7 +51,7 @@ export interface WebhookEndpointRuntime {
   enable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
   disable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
   archive(input: { organizationId: string; endpointId: string }): Promise<void>;
-  tryGetDeliverable(input: {
+  findDeliverable(input: {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointView | null>;
@@ -65,7 +65,7 @@ export interface WebhookEndpointRuntime {
     endpointId: string;
     now?: Instant;
   }): Promise<string[]>;
-  tryGetStatusSnapshot(input: {
+  findStatusSnapshot(input: {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointStatusSnapshot | null>;

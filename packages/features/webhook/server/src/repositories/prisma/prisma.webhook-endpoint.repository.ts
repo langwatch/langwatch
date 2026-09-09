@@ -345,7 +345,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
    * deliverable (ACTIVE, not archived, owned by the org), else null. The
    * liveness predicate lives here and only here.
    */
-  async tryGetDeliverable(params: {
+  async findDeliverable(params: {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointView | null> {
@@ -429,7 +429,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
    * last-outcome stamps. Includes disabled and failing endpoints, which is
    * exactly what a health surface must show.
    */
-  async tryGetStatusSnapshot(params: { organizationId: string; endpointId: string }): Promise<{
+  async findStatusSnapshot(params: { organizationId: string; endpointId: string }): Promise<{
     status: "ACTIVE" | "DISABLED";
     disabledReason: string | null;
     failingSince: Instant | null;
@@ -824,7 +824,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
     // an endpoint that can deliver. Operator opt-in for local development and
     // internal receivers relaxes the origin here exactly as it relaxes the
     // local-address fence on the send.
-    const problem = destinations.tryInspectUrl(url, configuration.allowInsecureLocalUrls);
+    const problem = destinations.findUrlProblem(url, configuration.allowInsecureLocalUrls);
     if (problem) {
       throw new WebhookEndpointValidationError(URL_PROBLEM_MESSAGES[problem]);
     }
@@ -833,7 +833,7 @@ export class PrismaWebhookEndpointRepository extends WebhookEndpointServiceContr
   /** Where an endpoint delivers, in one line, for a log or a notification. */
   private static toSqsView(endpoint: WebhookEndpoint): SqsDestinationView | null {
     if (endpoint.destinationKind !== "sqs" || !endpoint.sqsQueueUrl) return null;
-    const parsed = destinations.tryParseSqsQueueUrl(endpoint.sqsQueueUrl);
+    const parsed = destinations.findSqsQueueUrl(endpoint.sqsQueueUrl);
     return {
       queueUrl: endpoint.sqsQueueUrl,
       // Every stored queue URL passed admission, so the parse succeeds. The

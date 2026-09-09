@@ -31,7 +31,7 @@ export interface WebhookApi {
   enable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
   disable(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
   archive(input: { organizationId: string; endpointId: string }): Promise<void>;
-  tryGetDeliverable(input: {
+  findDeliverable(input: {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointView | null>;
@@ -44,7 +44,7 @@ export interface WebhookApi {
   }): Promise<WebhookDeliveryLog>;
   getHealth(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointHealth>;
   getEmittedEvents(input: ListWebhookEventsQuery): Promise<ListWebhookEventsResult>;
-  tryGetEmittedEventById(input: {
+  findEmittedEventById(input: {
     organizationId: string;
     id: string;
   }): Promise<WebhookEnvelope | null>;

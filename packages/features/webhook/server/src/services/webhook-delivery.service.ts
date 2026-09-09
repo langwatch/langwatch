@@ -290,7 +290,7 @@ export class WebhookDeliveryService {
    */
   runFlushEndpoint(): IntentExecutor<FlushEndpointPayload> {
     return async (payload: FlushEndpointPayload, _context: IntentContext): Promise<void> => {
-      const endpoint = await this.deps.endpoints.tryGetDeliverable({
+      const endpoint = await this.deps.endpoints.findDeliverable({
         organizationId: payload.organizationId,
         endpointId: payload.endpointId,
       });
@@ -378,7 +378,7 @@ export class WebhookDeliveryService {
       sourceEventId: sourceEventId ?? null,
       expectedRevision: existing?.revision ?? 0,
       state: { pending: remaining },
-      nextWakeAt: planner.tryNextWakeAt({ remaining, inFlight, now }),
+      nextWakeAt: planner.findNextWakeAt({ remaining, inFlight, now }),
       messages,
       now,
     });

@@ -34,7 +34,7 @@ export class WebhookBatchSendService {
       // The service's deliverable read owns the liveness predicate. A deleted
       // or disabled endpoint drains its queue without delivering: the spend
       // record keeps the events, re-enable plus replay covers the gap.
-      const endpoint = await this.deps.endpoints.tryGetDeliverable({
+      const endpoint = await this.deps.endpoints.findDeliverable({
         organizationId: payload.organizationId,
         endpointId: payload.endpointId,
       });

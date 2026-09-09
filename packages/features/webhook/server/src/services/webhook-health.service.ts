@@ -22,7 +22,7 @@ const RATE_WINDOW_MS = 60 * 60 * 1000;
 const LATENCY_SAMPLE_LIMIT = 500;
 
 export interface WebhookEndpointHealthSource {
-  tryGetStatusSnapshot(input: { organizationId: string; endpointId: string }): Promise<{
+  findStatusSnapshot(input: { organizationId: string; endpointId: string }): Promise<{
     status: "ACTIVE" | "DISABLED";
     disabledReason: string | null;
     failingSince: Instant | null;
@@ -78,7 +78,7 @@ export class WebhookHealthService extends WebhookHealthServiceContract {
     endpointId: string;
   }): Promise<WebhookEndpointHealth> {
     const now = (this.deps.now ?? Date.now)();
-    const endpoint = await this.deps.endpoints.tryGetStatusSnapshot({
+    const endpoint = await this.deps.endpoints.findStatusSnapshot({
       organizationId: params.organizationId,
       endpointId: params.endpointId,
     });

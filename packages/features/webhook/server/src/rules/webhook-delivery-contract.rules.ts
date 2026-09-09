@@ -111,7 +111,7 @@ export type WebhookDispatchResult = {
 
 export interface WebhookDeliveryEndpointService {
   getActiveByOrganization(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
-  tryGetDeliverable(input: {
+  findDeliverable(input: {
     organizationId: string;
     endpointId: string;
   }): Promise<WebhookEndpointView | null>;

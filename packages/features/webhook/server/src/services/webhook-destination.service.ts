@@ -35,7 +35,7 @@ export class WebhookDestinationService {
     return new WebhookDestinationService();
   }
 
-  tryInspectUrl(url: string, allowInsecureLocal: boolean): WebhookUrlProblemCode | null {
+  findUrlProblem(url: string, allowInsecureLocal: boolean): WebhookUrlProblemCode | null {
     let parsed: URL;
     try {
       parsed = new URL(url);
@@ -90,7 +90,7 @@ export class WebhookDestinationService {
     };
   }
 
-  tryParseSqsQueueUrl(queueUrl: string): ParsedSqsQueueUrl | null {
+  findSqsQueueUrl(queueUrl: string): ParsedSqsQueueUrl | null {
     const result = this.inspectSqsQueueUrl(queueUrl);
 
     return result.ok ? result.parsed : null;

@@ -79,8 +79,8 @@ export class WebhookApp implements WebhookApiContract {
   enable: WebhookApiContract["enable"] = (input) => this.#dependencies.endpoints.enable(input);
   disable: WebhookApiContract["disable"] = (input) => this.#dependencies.endpoints.disable(input);
   archive: WebhookApiContract["archive"] = (input) => this.#dependencies.endpoints.archive(input);
-  tryGetDeliverable: WebhookApiContract["tryGetDeliverable"] = (input) =>
-    this.#dependencies.endpoints.tryGetDeliverable(input);
+  findDeliverable: WebhookApiContract["findDeliverable"] = (input) =>
+    this.#dependencies.endpoints.findDeliverable(input);
   getDeliveries: WebhookApiContract["getDeliveries"] = (input) =>
     this.#dependencies.endpoints.getDeliveries(input);
   getHealth: WebhookApiContract["getHealth"] = (input) => this.#dependencies.health.health(input);
@@ -88,8 +88,8 @@ export class WebhookApp implements WebhookApiContract {
     this.#dependencies.assertEndpointsEntitled(organizationId);
   getEmittedEvents: WebhookApiContract["getEmittedEvents"] = (input) =>
     this.requireEvents().getEmittedEvents(input);
-  tryGetEmittedEventById: WebhookApiContract["tryGetEmittedEventById"] = (input) =>
-    this.requireEvents().tryGetEmittedEventById(input);
+  findEmittedEventById: WebhookApiContract["findEmittedEventById"] = (input) =>
+    this.requireEvents().findEmittedEventById(input);
 
   /**
    * Reuses this process's endpoint, event and delivery graph with its

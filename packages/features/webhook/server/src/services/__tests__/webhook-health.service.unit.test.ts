@@ -28,7 +28,7 @@ const snapshot = {
 
 function serviceReporting(stats: { attempted: number; delivered: number; latencies: number[] }) {
   const endpoints: WebhookEndpointHealthSource = {
-    tryGetStatusSnapshot: async () => snapshot,
+    findStatusSnapshot: async () => snapshot,
     getDeliveryStats: async () => stats,
   };
   const processStore = {
@@ -106,7 +106,7 @@ describe("WebhookHealthService.health", () => {
     it("refuses rather than reporting a healthy one", async () => {
       const service = WebhookHealthService.create({
         endpoints: {
-          tryGetStatusSnapshot: async () => null,
+          findStatusSnapshot: async () => null,
           getDeliveryStats: async () => ({ attempted: 0, delivered: 0, latencies: [] }),
         },
         processStore: {} as unknown as ProcessStore,

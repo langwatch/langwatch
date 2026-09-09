@@ -19,13 +19,13 @@ describe("WebhookDestinationService", () => {
   describe("given an HTTP destination", () => {
     describe("when it is an ordinary https endpoint", () => {
       it("admits it", () => {
-        expect(destinations.tryInspectUrl("https://example.test/hook", false)).toBeNull();
+        expect(destinations.findUrlProblem("https://example.test/hook", false)).toBeNull();
       });
     });
 
     describe("when it carries credentials in the URL", () => {
       it("refuses it, because those would be stored and replayed on every send", () => {
-        expect(destinations.tryInspectUrl("https://user:pass@example.test/hook", false)).toBe(
+        expect(destinations.findUrlProblem("https://user:pass@example.test/hook", false)).toBe(
           "credentials",
         );
       });
@@ -33,7 +33,7 @@ describe("WebhookDestinationService", () => {
       it("refuses it even where local destinations are allowed", () => {
         // The operator opt-in relaxes the origin, never the credential rule —
         // the check runs ahead of the scheme and port checks for that reason.
-        expect(destinations.tryInspectUrl("http://user:pass@localhost/hook", true)).toBe(
+        expect(destinations.findUrlProblem("http://user:pass@localhost/hook", true)).toBe(
           "credentials",
         );
       });
@@ -41,27 +41,27 @@ describe("WebhookDestinationService", () => {
 
     describe("when it is not https", () => {
       it("refuses it by default", () => {
-        expect(destinations.tryInspectUrl("http://example.test/hook", false)).toBe("scheme");
+        expect(destinations.findUrlProblem("http://example.test/hook", false)).toBe("scheme");
       });
 
       it("admits it once an operator has opted into local destinations", () => {
-        expect(destinations.tryInspectUrl("http://localhost:3000/hook", true)).toBeNull();
+        expect(destinations.findUrlProblem("http://localhost:3000/hook", true)).toBeNull();
       });
     });
 
     describe("when it names a port other than 443", () => {
       it("refuses it by default", () => {
-        expect(destinations.tryInspectUrl("https://example.test:8443/hook", false)).toBe("port");
+        expect(destinations.findUrlProblem("https://example.test:8443/hook", false)).toBe("port");
       });
 
       it("admits 443 written out", () => {
-        expect(destinations.tryInspectUrl("https://example.test:443/hook", false)).toBeNull();
+        expect(destinations.findUrlProblem("https://example.test:443/hook", false)).toBeNull();
       });
     });
 
     describe("when it is not a URL at all", () => {
       it("says so rather than throwing", () => {
-        expect(destinations.tryInspectUrl("not a url", false)).toBe("invalid_url");
+        expect(destinations.findUrlProblem("not a url", false)).toBe("invalid_url");
       });
     });
   });
