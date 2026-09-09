@@ -13,10 +13,28 @@
 -- behind holding its money with nothing to say it was superseded. Read across
 -- the day, the one bill is then counted twice.
 --
--- This table closes that hole by remembering the cell a key was filed under.
--- Before writing an observation, the puller looks the key up here; a key that
--- turns up under a different cell means the charge is a reissue, and a
--- `lw.obs.pulled_usage.retracted` event is emitted for the old cell first.
+-- This table exists to close that hole, and TODAY IT ONLY HOLDS THE EVIDENCE --
+-- it does not yet close anything. Read what is actually built before relying
+-- on any of it:
+--
+--   * Written: a key's row records the cell it was FIRST filed under. The
+--     write path skips any key it has already filed, so a row never moves.
+--   * Read: by nothing except that same write path's own duplicate check.
+--   * NOT built: the reissue detector. No code compares an incoming key's cell
+--     against the recorded one, and no `lw.obs.pulled_usage.retracted` event is
+--     ever constructed in production. The fold that would apply one exists and
+--     is tested; nothing emits it.
+--
+-- So the double-counted day described above is still double-counted. The
+-- machinery that would fix it is here and correct; the step that would fire it
+-- is not written.
+--
+-- WHEN THE DETECTOR IS BUILT, write-once is the first thing that has to go.
+-- An index that never moves would keep pointing at the original cell forever
+-- and re-emit a retraction against an already-zeroed cell on every later pull.
+-- That change is not incidental: a bound test pins the current behaviour by
+-- asserting a single row after three events share one key, so moving the row
+-- makes it two and the test must be re-settled deliberately.
 --
 -- Written by the rollup store in the SAME write as the cell and derived from
 -- the same event, so it is a consequence of the event history exactly like the
@@ -39,9 +57,14 @@
 -- held and matches `governance_cost_rollup_1d`'s, so an index row never
 -- outlives the cell it points at.
 --
--- Reads must be replacement-aware (argMax over EventTimestamp, per ADR-015):
--- this is a ReplacingMergeTree and its dedup runs in background merges, so
--- between two writes of one key both versions are in the table.
+-- Reads must be replacement-aware (argMax over EventTimestamp, per ADR-015)
+-- once a key can be written twice. It cannot today: the write path files a key
+-- once and skips it thereafter, so no key has two versions, the background
+-- merge has nothing to collapse, and the EventTimestamp version column is
+-- inert. The engine is declared this way for the moving-key future above, not
+-- for anything happening now. Do not read the current single-row-per-key
+-- behaviour as proof a plain read is safe -- it is safe only while write-once
+-- holds, and the detector is what ends that.
 -- ============================================================================
 
 -- +goose StatementBegin
@@ -91,9 +114,10 @@ SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- loss. To roll back, uncomment and run manually.
 --
 -- The rows are rebuildable -- this table is written from the same events the
--- cost summary is folded from -- but only by a full replay, so an unattended
--- `goose down` leaves every reissue undetectable until someone runs that
--- replay, and a day silently carries its bill twice in the meantime.
+-- cost summary is folded from -- but only by a full replay. While no detector
+-- reads it, dropping it costs a replay and nothing else. Once one does, an
+-- unattended `goose down` leaves every reissue undetectable until that replay
+-- runs, and a day silently carries its bill twice in the meantime.
 
 -- +goose StatementBegin
 -- DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.governance_cost_rollup_restatement_index;
