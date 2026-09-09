@@ -251,6 +251,16 @@ var table = []commandSpec{
 		},
 	},
 	{
+		name:    "destroy",
+		summary: "stop a stack by slug and DROP its databases - the data goes with it",
+		args:    "<slug>",
+		maxArgs: 1,
+		flags: []flagSpec{
+			{long: "--yes", summary: "confirm a reset without prompting (required in agent mode)"},
+		},
+		run: runDestroy,
+	},
+	{
 		name:    "restart",
 		summary: "bounce one supervised service (or all) without tearing the stack down",
 		args:    "[service]",

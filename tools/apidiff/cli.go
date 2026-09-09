@@ -91,12 +91,16 @@ const usage = `apidiff — live two-instance API behavior diff
 usage:
   apidiff run   [-main-ref REF] [-branch-dir DIR] [-work-root DIR]
                 [-keep] [-reuse-worktrees] [-skip-install] [-boot-timeout DUR]
-                [-pg-url URL -ch-url URL -redis-url URL] [-compose-project NAME]
-                [probe flags...]
+                [-no-haven] [-pg-url URL -ch-url URL -redis-url URL]
+                [-compose-project NAME] [probe flags...]
   apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
                 [-timeout DUR] [-settle-timeout DUR] [-path-prefix P] [-method M]
                 [-exclude-prefix P]... [-max-ops N] [-json] [-report FILE]
                 [-ledger FILE] [-ledger-baseline FILE]
+
+Each run instance is a haven stack under its own run-scoped slug wherever
+haven is installed, so a run never reaches the datastores your own stack uses.
+-no-haven boots the old way, on compose or on the three named servers.
 
 exit codes: 0 no behavioral differences, 1 differences found, 2 error.
 `
@@ -156,10 +160,22 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 	flags.StringVar(&boot.CHURL, "ch-url", "", "external ClickHouse server URL")
 	flags.StringVar(&boot.RedisURL, "redis-url", "", "external redis server URL")
 	flags.StringVar(&boot.ComposeProject, "compose-project", "apidiff", "compose project name for the managed infra stack")
+	noHaven := false
+	flags.BoolVar(&noHaven, "no-haven", false, "do not boot the instances as haven stacks; provision compose or the -pg-url/-ch-url/-redis-url servers instead")
 	envFile := ""
-	flags.StringVar(&envFile, "env-file", "", "dotenv file whose DATABASE_URL, CLICKHOUSE_URL and REDIS_URL fill an empty -pg-url, -ch-url and -redis-url (never printed)")
+	flags.StringVar(&envFile, "env-file", "", "dotenv file whose DATABASE_URL, CLICKHOUSE_URL and REDIS_URL fill an empty -pg-url, -ch-url and -redis-url (never printed); not usable with the haven path")
 	registerProbeFlags(flags, probe)
 	if err := flags.Parse(args); err != nil {
+		return exitError
+	}
+	external, err := externalInfra(boot)
+	if err != nil {
+		fmt.Fprintln(out.stderr, err)
+		return exitError
+	}
+	boot.UseHaven = havenSelected(havenOnPath(), noHaven, external)
+	if boot.UseHaven && envFile != "" {
+		fmt.Fprintln(out.stderr, "-env-file and the haven path are exclusive: -env-file points the instances at the servers that dotenv names, which is the developer's own stack, and haven exists so a run never reaches it. Pass -no-haven to boot on those servers.")
 		return exitError
 	}
 	if envFile != "" {
@@ -178,6 +194,13 @@ func runBootSubcommand(ctx context.Context, args []string, out streams) int {
 
 	probe.a = booted.A.URL
 	probe.b = booted.B.URL
+	if boot.UseHaven {
+		// The SCIM token and the permission-probe projects are inserted with
+		// SQL, and the haven path runs none: a stack's database belongs to
+		// haven. Both sides are missing the same fixtures, so those operations
+		// still compare like against like - unauthorized against unauthorized.
+		fmt.Fprintln(out.stderr, "haven path: SCIM and permission-probe fixtures are not provisioned; those operations compare unauthorized on both sides")
+	}
 	// Run mode injected a throwaway instance admin key into both instances,
 	// seeded a fixed SCIM token, and provisioned the permission-probe
 	// fixtures; default the probe credentials to them.

@@ -241,6 +241,11 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // specs/tooling/visual-diff.feature are asserted by these Go tests and by
   // nothing else. Its Playwright half binds from the TS roots below.
   "tools/visualdiff",
+  // apidiff: how it boots its two instances - one haven stack per instance
+  // under its own run-scoped slug, and a teardown that can only reach the
+  // slugs it started (specs/tooling/apidiff-on-haven.feature) - is asserted by
+  // these Go tests and by nothing else.
+  "tools/apidiff",
 ];
 
 /**

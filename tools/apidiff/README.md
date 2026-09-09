@@ -13,8 +13,8 @@ state never produces false diffs.
 ```text
 apidiff run   [-main-ref REF] [-branch-dir DIR] [-work-root DIR]
               [-keep] [-reuse-worktrees] [-skip-install] [-boot-timeout DUR]
-              [-pg-url URL -ch-url URL -redis-url URL] [-compose-project NAME]
-              [probe flags...]
+              [-no-haven] [-pg-url URL -ch-url URL -redis-url URL]
+              [-compose-project NAME] [probe flags...]
 
 apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
               [-scim-key KEY] [-project-key-b KEY] [-project-key-c KEY]
@@ -38,7 +38,18 @@ the machine report with `-json` (optionally to `-report FILE`).
 
 ## Boot details
 
-- Each worktree boots through a detected profile: `apps/api`
+- **Each instance is a haven stack** wherever `haven` is on PATH, under its own
+  run-scoped slug (`apidiff-<run>-branch`, `apidiff-<run>-main`). haven gives
+  each slug its own Postgres and ClickHouse database and its own Redis logical
+  database, allocated against the ones live stacks hold, and does the install,
+  codegen, migrate and seed itself - so `apidiff run` provisions nothing and a
+  run can never reach the datastores the stack you are using sits on. Readiness
+  is `haven status --json` reporting the stack's backend lane listening, and the
+  instance is addressed on the API port haven allocated. Teardown is
+  `haven destroy <slug>` for exactly those two slugs. `-no-haven` boots the old
+  way; `-env-file` is refused alongside haven, because pointing the instances at
+  the servers a dotenv names is the thing haven exists to stop.
+- The paths below describe `-no-haven`. Each worktree boots through a detected profile: `apps/api`
   (`@langwatch/platform-api`) is the **modular** layout (root migrate/seed
   scripts, `API_PORT` on process env — node `--env-file` never overrides it);
   `platform/app` (`@langwatch/web`) is the **monolith** layout (ClickHouse

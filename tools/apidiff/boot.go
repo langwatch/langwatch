@@ -76,6 +76,10 @@ type BootConfig struct {
 	CHURL          string
 	RedisURL       string
 	ComposeProject string
+	// UseHaven boots each instance as a haven stack under its own run-scoped
+	// slug instead of provisioning infrastructure here. Default wherever haven
+	// is installed; see haven.go for why.
+	UseHaven bool
 }
 
 // Instance is one booted API copy.
@@ -349,6 +353,20 @@ type bootState struct {
 	infra     infraURLs
 	ownsMain  bool
 	processes []*exec.Cmd
+	// havenSlugs are the stacks this run started, in order. The teardown
+	// destroys these and nothing else.
+	havenSlugs []string
+	// inherit overrides the process environment the child commands are
+	// composed from; nil means os.Environ(). Tests supply their own.
+	inherit []string
+}
+
+// environ is the environment child commands inherit.
+func (state *bootState) environ() []string {
+	if state.inherit != nil {
+		return state.inherit
+	}
+	return os.Environ()
 }
 
 type infraURLs struct {
@@ -388,6 +406,15 @@ func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
 	}
 	booted.Teardown = state.teardown
 
+	if state.cfg.UseHaven {
+		if err := state.prepareHavenInstances(booted); err != nil {
+			return booted, err
+		}
+		if err := state.bootThroughHaven(ctx, booted); err != nil {
+			return booted, err
+		}
+		return booted, nil
+	}
 	if err := state.prepareInstances(booted); err != nil {
 		return booted, err
 	}
@@ -412,6 +439,15 @@ func (state *bootState) prepareLayout() error {
 		return err
 	}
 	state.runID = RunID(state.workRoot)
+	if state.cfg.UseHaven {
+		// haven allocates this stack's Redis logical database against the ones
+		// live stacks hold. Deriving one here is what collided with a
+		// developer's own stack in the first place, so the haven path derives
+		// nothing.
+		state.logf("work root: %s (run %s, haven stacks %s / %s)",
+			state.workRoot, state.runID, HavenSlug(state.runID, "branch"), HavenSlug(state.runID, "main"))
+		return nil
+	}
 	branchRedis, mainRedis, err := RedisIndices(state.runID)
 	if err != nil {
 		return err
@@ -1044,7 +1080,17 @@ func (state *bootState) teardown() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	if state.cfg.Keep {
+		if state.cfg.UseHaven {
+			state.logf("teardown: -keep set, leaving the stacks up - `haven destroy %s` when you are done",
+				strings.Join(state.havenSlugs, "` and `haven destroy "))
+			return
+		}
 		state.logf("teardown: -keep set, leaving infra, databases and worktree in place")
+		return
+	}
+	if state.cfg.UseHaven {
+		state.destroyHavenStacks(ctx)
+		state.removeMainWorktree(ctx)
 		return
 	}
 	state.killAPIProcesses()
@@ -1062,10 +1108,17 @@ func (state *bootState) teardown() {
 			state.logf("teardown: flush redis: %v", err)
 		}
 	}
-	if state.ownsMain {
-		if err := state.runHost(ctx, "git", "worktree", "remove", "--force", state.mainDir); err != nil {
-			state.logf("teardown: worktree remove: %v", err)
-		}
+	state.removeMainWorktree(ctx)
+}
+
+// removeMainWorktree removes the base-ref worktree this run added, if it added
+// one. The branch checkout is the developer's own and is never touched.
+func (state *bootState) removeMainWorktree(ctx context.Context) {
+	if !state.ownsMain {
+		return
+	}
+	if err := state.runHost(ctx, "git", "worktree", "remove", "--force", state.mainDir); err != nil {
+		state.logf("teardown: worktree remove: %v", err)
 	}
 }
 
@@ -1097,7 +1150,7 @@ func (state *bootState) dropDatabases(ctx context.Context) {
 // allowedCommands are the only executables the boot orchestration runs; every
 // commandSpec in this package is built from these constants, and the
 // allowlist proves subprocess names are never tainted input.
-var allowedCommands = map[string]bool{"git": true, "docker": true, "pnpm": true, "psql": true}
+var allowedCommands = map[string]bool{"git": true, "docker": true, "pnpm": true, "psql": true, havenCommand: true}
 
 // execRunner runs one command, streaming output to log.
 func execRunner(ctx context.Context, spec commandSpec, log io.Writer) error {

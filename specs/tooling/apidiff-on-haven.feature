@@ -58,9 +58,9 @@ Feature: apidiff boots its instances through haven
 
     @unit
     Scenario: The instance URL is the stack's API address
-      Given haven status reports the branch stack's app URL
+      Given haven status reports the branch stack
       When the instance is addressed
-      Then its base URL is that app URL with /api appended
+      Then its base URL is the API address haven allocated for that stack, which serves the /api prefix every probed path already carries
       And no ephemeral port is allocated by apidiff
 
     @unit
