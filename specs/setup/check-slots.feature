@@ -1,42 +1,35 @@
 Feature: Machine-wide slots for whole-repo checks
   As a developer whose laptop runs several worktrees and agents at once
-  I want `pnpm typecheck` and `pnpm lint` to queue instead of piling up
+  I want opted-in agent checks and explicit Haven runs to queue instead of piling up
   So that N parallel checks never take the machine down, and a slow one
   explains itself instead of looking hung
 
-  # Both checks saturate the machine on purpose. A typecheck peaks around 3 to 4
-  # GiB and uses every core; a whole-tree lint over 6,800 files spends 38 CPU-seconds
-  # in 4 seconds of wall clock. That is the right trade for one run, and capping
-  # either tool's threads only stretches the same CPU cost over 5x the wall
-  # clock. Three or four at once, which is the normal state of a laptop driving
-  # several worktrees or agents, is what makes the machine unusable, and neither
-  # command knew another was already running.
-  #
-  # The repository's typecheck, lint and format scripts run through
-  # dev/scripts/check-queue.mjs, a thin wrapper that takes a machine-wide
-  # slot, runs the real command, and releases. ONE counter covers all of them,
-  # because they compete for the same cores. The state is a directory of
-  # per-run JSON entries (pid, arrival sequence, label, state) under the
-  # system temp dir, so every worktree, terminal and agent on the machine
-  # counts against the same total. Waiters are served in arrival order.
-  #
-  # The wrapper is deliberately boring on the happy path: with a free slot it
-  # prints nothing at all and passes stdio, exit code and signals straight
-  # through. It only speaks when a run has to wait, which is exactly when an
-  # agent needs to know that the extra minutes were queueing rather than a
-  # hung tool.
-  #
-  # Knobs, all optional:
-  #   CHECK_SLOTS=N            how many may run at once (0 disables the gate,
-  #                            from a person's shell; agent shells cannot)
-  #   CHECK_PRESSURE=<level>   force the memory-pressure level (green/amber/red)
-  #   CHECK_QUEUE_DIR=<path>   where the shared state lives
-  #   CHECK_QUEUE_POLL_MS=N    how often a waiter re-checks
-  #   CHECK_QUEUE_HEARTBEAT_MS how often a waiting run repeats itself
-  #   CHECK_QUEUE_MAX_WAIT_MS  after this, run anyway rather than hang
-  #
-  # `haven typecheck` keeps its own RAM slot (ADR-064) and turns this gate off
-  # for the run it spawns, so a run is never counted by both.
+  # Optional Haven hooks own agent admission (haven-agent-hooks.feature).
+  # Repository scripts and pnpm-generated tool launchers run directly.
+  # `haven slot run -- <command>` provides explicit terminal admission;
+  # check-queue.mjs remains a legacy entrypoint with a JS fallback.
+  # Flock waiters retry every 100 ms without changing capacity or memory limits.
+
+  @unit
+  Scenario: Installing dependencies retires automatic bin shims
+    Given the bin entries contain legacy queue shims and their original launchers
+    When the postinstall cleanup runs
+    Then the original executable launchers are restored
+    And repeating cleanup leaves them unchanged
+
+  @unit
+  Scenario: Cleanup preserves a newly generated launcher
+    Given pnpm has replaced a legacy shim with a fresh launcher
+    And an older launcher backup remains
+    When the postinstall cleanup runs
+    Then the fresh launcher remains in place
+
+  @unit
+  Scenario: Cleanup reports an incomplete legacy installation
+    Given a legacy shim has no original launcher backup
+    When the postinstall cleanup runs
+    Then it reports that restoration failed
+    And it preserves the current entry
 
   # --- The happy path stays invisible ---
 
@@ -312,24 +305,9 @@ Feature: Machine-wide slots for whole-repo checks
     Then the interrupt reaches the command
     And the check still reports how the command ended
 
-  # --- The bin shims: the package scripts are not the only way in ---
-
-  # Wrapping the scripts left every other route to the binary uncounted, and
-  # they get used: `pnpm exec tsc --noEmit -p tsconfig.tsgo.json`,
-  # `./node_modules/.bin/tsc`, and the standing advice to iterate with
-  # targeted checks, widened to the whole project. Observed in the wild as
-  # three compiler processes on an 18 GB laptop with the limit set to 2, one of
-  # them started from the same worktree as a properly queued run.
-  #
-  # The compiler answers to two names — typescript@7 installs it as `tsc`,
-  # @typescript/native-preview as `tsgo` — so the shims cover both and so does
-  # haven's gate (ADR-095).
-  #
-  # dev/scripts/install-check-shims.mjs makes the workspace root's bin entries
-  # themselves the boundary, so the route into the tool stops mattering. Only
-  # the root's: sdks/typescript's build runs `tsc --noEmit` on the way to
-  # `pnpm dev`, and a dev server that waits for a typecheck slot before it
-  # boots is not an improvement.
+  # Explicit legacy shim installation remains available for existing users.
+  # The following scenarios apply after manually running the legacy installer;
+  # postinstall now removes those shims instead of installing them.
 
   @unit
   Scenario: A whole-project run counts however it was started
@@ -379,13 +357,13 @@ Feature: Machine-wide slots for whole-repo checks
   @unit
   Scenario: Reinstalling leaves the tools working
     Given the bin entries already route whole-project runs through the queue
-    When "pnpm install" runs again
+    When the legacy installer runs again
     Then the tools still run, and still count the same runs
 
   @unit
   Scenario: A fresh install restores the counting pnpm overwrote
     Given "pnpm install" has replaced the bin entries with its own
-    When the postinstall step runs
+    When the legacy installer runs
     Then whole-project runs count again
 
   # Otherwise a fix to how runs are classified would never reach a checkout
@@ -393,13 +371,13 @@ Feature: Machine-wide slots for whole-repo checks
   @unit
   Scenario: An earlier version of the routing is brought up to date
     Given the bin entries were routed through the queue by an earlier version of the installer
-    When the postinstall step runs
+    When the legacy installer runs
     Then they are replaced with the current one, and the tools still run
 
   @unit
   Scenario: An install that cannot write leaves the tool working
     Given the bin directory cannot be written to
-    When the postinstall step runs
+    When the legacy installer runs
     Then the tool still runs, because losing the count is survivable and losing the tool is not
 
   # The shims are a laptop concern, and neither environment below is a laptop.
@@ -410,13 +388,13 @@ Feature: Machine-wide slots for whole-repo checks
   @unit
   Scenario: CI installs are left alone
     Given CI is set to anything but "0" or "false"
-    When the postinstall step runs
+    When the legacy installer runs
     Then it changes nothing, and says which environment it stood down for
 
   @unit
   Scenario: Production installs are left alone
     Given NODE_ENV is production
-    When the postinstall step runs
+    When the legacy installer runs
     Then it changes nothing
 
   # --- The queue lives inside haven ---

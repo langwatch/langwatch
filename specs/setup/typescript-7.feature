@@ -13,6 +13,49 @@ Feature: TypeScript 7 is the compiler
   ADR: dev/docs/adr/099-typescript-7-is-the-compiler.md
 
   @unit
+  Scenario: Application checks can run together or individually
+    Given the API, worker, and UI have their own TypeScript configurations
+    When a contributor runs typecheck with application names
+    Then only the selected applications are checked sequentially
+    And the selected checks run under the machine-wide queue and memory policy
+    And compiler flags and failed exit statuses are preserved
+    And omitting the names checks all three applications
+    But an unknown application is rejected before any check starts
+
+  @unit
+  Scenario: Fast application checks exclude test entrypoints
+    Given API, worker, and UI each have production and full-check configurations
+    When a contributor runs typecheck:fast with application names
+    Then only the selected applications' production entrypoints are checked
+    And test directories and colocated test files are excluded as entrypoints
+    And a test imported by production still receives typechecking
+    And typecheck continues to include tests with a separate incremental cache
+
+  @unit
+  Scenario: Adopted packages are checked before applications consume their declarations
+    Given packages participate in the declaration build solution
+    When an application typecheck runs
+    Then the adopted packages are checked and their declarations are refreshed first
+    And the application resolves their public entries to declarations rather than implementation source
+    And invalid consumer arguments still produce type errors
+    But a failed package build stops the application check
+
+  @unit
+  Scenario: Source imports work without generated artifacts
+    Given a worktree has no declaration build output
+    When the editor or runtime resolves an adopted package without the declaration condition
+    Then it resolves the package source
+
+  @unit
+  Scenario: Declaration output and build state belong to one worktree
+    Given two worktrees share installed dependencies but have different package source
+    When each builds declarations
+    Then each produces its own declarations and incremental state outside node_modules
+    And rebuilding changed source in one does not modify the other's output
+    And invalid source is rejected without publishing new declarations
+    And declaration output changes do not restart the development application
+
+  @unit
   Scenario: The compiler API is only reached through its unstable export
     Given a file that needs a TypeScript AST
     When it imports the compiler

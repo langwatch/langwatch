@@ -154,16 +154,25 @@ Feature: haven service selection
       And the status line names each one with the exact "+svc" that adds it
 
     Scenario: Adding both developer tools is one command and it sticks
-      When the developer runs "haven up +storybook +mail"
-      Then the Storybook lane and the mail studio lane start as part of this stack
+      When the developer runs "haven up +design-system +mail-room"
+      Then the design-system lane and the mail-room lane start as part of this stack
       And a later plain "haven up" in this worktree still runs both
+
+    # The lanes used to be called "storybook" and "mail"; the old names are
+    # refused by name, naming the flag that replaced each one, the same way
+    # "haven up ±workers" is refused.
+    Scenario: A renamed developer-tool lane is refused by its old name
+      When the developer runs "haven up +storybook"
+      Then the command is refused, naming "+design-system" as the replacement
+      When the developer runs "haven up +mail"
+      Then the command is refused, naming "+mail-room" as the replacement
 
     Scenario: A selected developer tool is reached by hostname
       Given a worktree running both developer tools
-      Then the Storybook is served at "design.<slug>.langwatch.localhost"
-      And the mail studio is served at "mail.<slug>.langwatch.localhost"
+      Then the Storybook is served at "design-system.<slug>.langwatch.localhost"
+      And the mail studio is served at "mail-room.<slug>.langwatch.localhost"
       And each is healthy once its root answers
-      And "haven logs storybook" shows that lane's own output
+      And "haven logs design-system" shows that lane's own output
 
     # The application already frames the Storybook at /design-system and starts
     # one itself on the first visit unless something already answers on the port
@@ -182,3 +191,13 @@ Feature: haven service selection
       When a reader asks which Node lanes the stack supervises
       Then the answer is still ui, api and workers
       And neither developer tool appears among them
+
+    # A worktree's .haven.json may predate the rename and still carry the old
+    # "storybook" / "mail" keys. Losing that on read would silently turn a lane
+    # back off for every worktree that had turned it on. Bound by
+    # adapters/fileregistry/store_test.go.
+    Scenario: A stored old-name developer-tool selection migrates on load
+      Given a worktree's selection file states "storybook" and "mail" from before the rename
+      When haven reads the worktree's selection
+      Then both developer tools read back on
+      And the next write replaces the old keys with "design-system" and "mail-room"

@@ -236,22 +236,89 @@ Feature: Composing a process from feature installers
       And there is no withoutOutput or validation flag escape hatch
 
     @unimplemented @integration
-    Scenario: The parsed output is the only payload emitted
+    Scenario: Valid output retains its declared transforms and field removal
       Given an output schema that transforms a field and removes undeclared fields
       And a handler returning a valid value with an extra private field
       When the framework sends the response
       Then the client receives the transformed field
       And the private field is absent
-      When the handler returns a value rejected by the output schema
-      Then no successful or partial payload is emitted
 
     @unimplemented @integration
-    Scenario: A malformed stream item is rejected before delivery
-      Given a streaming handler with an item output schema
-      When it yields an invalid item after a valid item
-      Then the valid item has been delivered once
-      And the invalid item is never delivered
-      And the framework closes the stream through its declared error lifecycle
+    Scenario: Unexpected output is diagnosed without failing the response
+      Given an endpoint whose declared output requires an object with a numeric count
+      And an unexpected runtime result contains a string count
+      When REST or tRPC emits the result
+      Then the original result is sent with the declared success status
+      And a validation error with endpoint and request metadata is logged
+      And output validation alone does not throw or suppress the response
+
+    @unimplemented @unit
+    Scenario: Output diagnostics never disclose response content
+      Given invalid output contains a secret in a value and a dynamic record key
+      And a custom schema error message repeats that secret
+      When output validation logs the failure
+      Then the log identifies the issue code and safe schema details
+      And the secret is absent from every serialized log argument
+      And the response body and raw validation error are not attached to the log
+
+    @unimplemented @typecheck @architecture
+    Scenario Outline: Ordinary handlers cannot construct special responses
+      Given a governed endpoint with an inline handler
+      When the handler attempts to return <result>
+      Then the declaration fails type checking or architecture lint
+      And guidance names the explicit framework integration for special protocols
+
+      Examples:
+        | result                  |
+        | a text string           |
+        | a raw Response          |
+        | an SSE stream           |
+        | a NO_CONTENT sentinel   |
+        | an app.text() response  |
+
+    @unimplemented @typecheck @unit
+    Scenario: Void cannot discard a handler's actual return type
+      Given an endpoint declares a void output schema
+      When its handler returns an object directly or through a promise
+      Then type checking rejects the handler
+      And a handler returning nothing emits the declared empty response
+
+    @unimplemented @architecture
+    Scenario: The complete handler remains visible in its fluent declaration
+      Given an endpoint declares its verb, path, permission and schemas
+      When its handler is supplied as a detached function, factory or bound method
+      Then architecture lint requests an inline inferred handler beside those declarations
+
+    @unimplemented @typecheck @unit
+    Scenario: Middleware facts are parsed trailing arguments
+      Given two middleware declarations with distinct output schemas
+      When both middleware results pass parsing
+      Then the handler receives the two inferred values as trailing arguments in declaration order
+      And its input contains only the parsed endpoint input
+      And omitting a middleware removes its argument from the handler type
+
+    @unimplemented @integration
+    Scenario: Malformed middleware facts never reach a handler
+      Given authentication middleware declares a tenant identity output schema
+      When its result does not match that schema
+      Then the handler is not invoked
+      And no domain write occurs
+
+    @unimplemented @typecheck @architecture @unit
+    Scenario: Middleware cannot smuggle transport objects into domain input
+      Given middleware reads a SCIM credential or verifies a webhook signature
+      When it supplies facts to a governed handler
+      Then only parsed semantic facts are supplied as trailing arguments
+      And headers, credentials, request and response objects remain inaccessible
+      And aliases and nested input properties do not bypass that boundary
+      And the facts cannot replace the authorized principal or tenant target
+
+    @unimplemented @integration
+    Scenario: Special response protocols have explicit framework contracts
+      Given an endpoint needs SSE, a download or a text protocol
+      When the endpoint is installed
+      Then its framework integration owns framing, content type, status and response lifecycle
+      And ordinary JSON handlers retain no raw response capability
 
     @unimplemented @integration
     Scenario: Compatibility aliases preserve the complete guarded operation
@@ -494,6 +561,23 @@ Feature: Composing a process from feature installers
       When installation has returned
       Then registering another service is rejected
       And allocations acquired during startup can still register cleanup
+
+  Rule: the API bootstrap honours feature service lifecycle during the composition cutover
+
+    @unit
+    Scenario: Subscription readiness gates the API listener
+      Given the API composition registered a subscription service without starting it
+      When API startup waits for its subscription acknowledgement
+      Then the listener has not started
+      And a subscription startup failure stops attempted services and releases resources
+
+    @unit
+    Scenario: The API drains registered services before releasing their infrastructure
+      Given the API started its registered feature services and listener
+      When the process closes
+      Then the listener closes before registered services drain
+      And services drain before telemetry and infrastructure close
+      And a drain failure does not skip infrastructure cleanup
 
   Rule: a blocking migration gates readiness, and resumable work resumes
 

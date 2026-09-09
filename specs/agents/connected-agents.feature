@@ -387,7 +387,7 @@ Feature: Connected agents
     Given an instance that registered agent A only
     When a call for agent B is routed at that instance
     Then the call is not sent to it
-    And the call fails for that instance with "agent_disconnected"
+    And the unauthorized session leaves the call and its delivery result unchanged
 
   @unit
   Scenario: A call envelope carries only the contract fields
@@ -765,3 +765,26 @@ Feature: Connected agents
       When a process of another project polls with the same instance id
       Then the poll answers with no frame
       And the parked call is still waiting and carries no result
+
+  Rule: Connected session protocols do not expose raw HTTP capabilities
+
+    @unit
+    Scenario: A connected protocol forwards only its declared credential facts
+      Given a connected frame request with an additional secret header
+      When the framework invokes the connected protocol
+      Then the App receives parsed frame input and the declared credential facts separately
+      And the additional header and raw request and response are absent
+
+    @unit
+    Scenario: A malformed protocol output preserves the response without logging its content
+      Given the App returns an invalid accepted count containing a secret marker
+      When the protocol serializes the response
+      Then the caller receives the original response with its declared protocol status
+      And an error log names the endpoint and validation failure
+      And no serialized log argument contains the secret marker
+
+    @unit
+    Scenario: Application instances do not share presence write throttle state
+      Given two independently composed Agent applications
+      When both refresh the same agent at the same time
+      Then each application records its own first presence write

@@ -8,10 +8,10 @@
 # differently the first time one copy changes.
 #
 # The feature's App implements a callable API while keeping services and ports
-# private. It reaches a handler as `c.app`. Who is
-# calling reaches it as `c.auth`. Both are typed from what the composition root
-# supplied, so a handler cannot read something the process never provided, and
-# cannot believe a shape nobody wrote down.
+# private. Governed handlers receive the explicit app, actor and scope facts
+# described in ADR-133, never the raw transport context. Parsed middleware
+# results are trailing arguments and never modify the endpoint input.
+# See composition-spec.feature for handler authoring and validation behavior.
 #
 # Endpoints are declared, never assembled: a builder takes the input schema,
 # the output schema and the access policy, and then the handler. Anything the
@@ -64,24 +64,24 @@ Feature: The feature application and its transports
   # ─── The typed context ──────────────────────────────────────────────────
 
   @unit
-  Scenario: The context exposes the application the composition root supplied
+  Scenario: Handler arguments expose the application the composition root supplied
     Given a transport composed with a feature application
-    When a handler reads the application off its context
+    When a handler reads its explicit app argument
     Then the type it sees is the callable API that was supplied
     And an operation the application does not expose fails to compile
 
   @unimplemented @unit
-  Scenario: The context exposes the caller as the authentication resolved them
+  Scenario: Handler arguments expose the authenticated portable caller
     Given a request authenticated by the process's own authentication
-    When a handler reads the caller off its context
-    Then the type it sees is what that authentication resolves to
-    And it is not a shape restated anywhere downstream
+    When a handler reads its actor argument
+    Then it receives the framework's parsed portable principal
+    And session, credentials and raw request properties are absent
 
   @unimplemented @unit
   Scenario: A handler cannot reach request state by name
     Given a handler in a feature package
-    When it needs the project, the caller or a service
-    Then it reads them from the typed context
+    When it needs the authorized project, caller or app operation
+    Then it uses the explicit scope, actor and app arguments
     And no string-keyed lookup is available to it
 
   # ─── Declaring an endpoint ──────────────────────────────────────────────
