@@ -18,7 +18,7 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
 }));
 
 // The redacted marker itself (`RedactedInline`) still reads scope through the
-// trace-scoped host — it is only ever rendered inside a trace screen.
+// trace-scoped host - it is only ever rendered inside a trace screen.
 vi.mock("../../../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1" },
