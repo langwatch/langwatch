@@ -212,6 +212,10 @@ const applyResponseCookies = (
  * signup, or a migration leftover. Whether an OAuth callback may CLAIM one of
  * these is the whole subject of `specs/auth/sso-orphan-user-linking.feature`.
  */
+/** One table of the memory adapter's database, absent reading as empty. */
+const rowsIn = (db: MemoryDb, table: string): Record<string, unknown>[] =>
+  db[table] ?? [];
+
 const orphanUser = ({ emailVerified }: { emailVerified: boolean }) => ({
   id: `orphan-${randomUUID()}`,
   email: USERINFO_EMAIL,
@@ -461,11 +465,11 @@ describe("given a User row that holds no linked accounts", () => {
       expect(response.headers.get("location")).not.toContain("error=");
       // The SAME row, not a second one: the point of linking is that the
       // invite they were sent and the account they signed into are one.
-      expect(db.user).toHaveLength(1);
-      expect(db.account).toHaveLength(1);
-      expect(db.account[0]?.userId).toBe(orphan.id);
-      expect(db.session).toHaveLength(1);
-      expect(db.session[0]?.userId).toBe(orphan.id);
+      expect(rowsIn(db, "user")).toHaveLength(1);
+      expect(rowsIn(db, "account")).toHaveLength(1);
+      expect(rowsIn(db, "account")[0]?.userId).toBe(orphan.id);
+      expect(rowsIn(db, "session")).toHaveLength(1);
+      expect(rowsIn(db, "session")[0]?.userId).toBe(orphan.id);
     });
 
     /** @scenario "Unverified orphan User cannot be hijacked via OAuth" */
@@ -490,11 +494,11 @@ describe("given a User row that holds no linked accounts", () => {
       expect(response.status).toBe(302);
       expect(response.headers.get("location")).toContain("error=");
       expect(
-        db.account.filter((row) => row.userId === orphan.id),
+        rowsIn(db, "account").filter((row) => row.userId === orphan.id),
       ).toHaveLength(0);
-      expect(db.session.filter((row) => row.userId === orphan.id)).toHaveLength(
-        0,
-      );
+      expect(
+        rowsIn(db, "session").filter((row) => row.userId === orphan.id),
+      ).toHaveLength(0);
     });
   });
 });
