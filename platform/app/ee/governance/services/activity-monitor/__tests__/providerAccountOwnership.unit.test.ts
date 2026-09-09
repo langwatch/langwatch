@@ -29,8 +29,8 @@ import { describe, expect, it, vi } from "vitest";
 // Not yet implemented: the provider-account arm of the
 // one-connection-per-account rule, plus the save-time account lookup it calls.
 import {
-  type ProviderAccountReader,
   assertProviderAccountIsFree,
+  type ProviderAccountReader,
 } from "../providerAccountOwnership";
 
 const ACCOUNT = "org_test_anthropic_0001";
@@ -65,14 +65,12 @@ const configCarrying = (apiKey: string, report: "usage" | "cost") => ({
  * organisation" — which is the case comparing keys to each other misses.
  */
 const providerSaying = (byKey: Record<string, string>) =>
-  vi.fn(
-    async ({ parserConfig }: { parserConfig: Record<string, unknown> }) => {
-      const credentials = parserConfig.credentials as { apiKey: string };
-      const account = byKey[credentials.apiKey];
-      if (!account) throw new Error("unknown key in this fixture");
-      return account;
-    },
-  );
+  vi.fn(async ({ parserConfig }: { parserConfig: Record<string, unknown> }) => {
+    const credentials = parserConfig.credentials as { apiKey: string };
+    const account = byKey[credentials.apiKey];
+    if (!account) throw new Error("unknown key in this fixture");
+    return account;
+  });
 
 describe("given a connection already reading a provider account through an administrator key", () => {
   describe("when the admin saves another connection carrying that same key for that same report", () => {

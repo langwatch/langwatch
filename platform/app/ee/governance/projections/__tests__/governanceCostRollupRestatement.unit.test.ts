@@ -23,8 +23,8 @@ import {
 } from "../governanceCostRollup.constants";
 import {
   GovernanceCostRollupFoldProjection,
-  governanceCostRollupKey,
   type GovernanceCostRollupState,
+  governanceCostRollupKey,
   governanceCostRollupTotals,
 } from "../governanceCostRollup.foldProjection";
 import {

@@ -24,8 +24,8 @@ import { describe, expect, it } from "vitest";
 // rule. Lives beside `azureBillOwnership.ts` rather than inside it, because an
 // environment is not an Azure bill and the module is named after what it owns.
 import {
-  type EnvironmentReader,
   assertEnvironmentNotAlreadyClaimed,
+  type EnvironmentReader,
 } from "../environmentOwnership";
 
 const ENVIRONMENT = "https://orgtest01.crm4.dynamics.com";

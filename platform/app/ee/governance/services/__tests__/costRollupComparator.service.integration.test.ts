@@ -26,8 +26,8 @@ import {
 } from "../../projections/governanceCostRollup.constants";
 import {
   GovernanceCostRollupFoldProjection,
-  governanceCostRollupKey,
   type GovernanceCostRollupState,
+  governanceCostRollupKey,
 } from "../../projections/governanceCostRollup.foldProjection";
 import { projectGovernanceCostRollupStateToRow } from "../../projections/governanceCostRollup.store";
 import {
@@ -148,7 +148,6 @@ async function writeSummary(amountNanoUsd: number): Promise<void> {
     }),
   );
 }
-
 
 /** One pulled observation's payload, as the puller worker writes it. */
 function observedData({

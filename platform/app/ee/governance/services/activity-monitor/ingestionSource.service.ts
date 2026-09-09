@@ -981,31 +981,47 @@ export class IngestionSourceService {
   // Writes
   // ---------------------------------------------------------------------
 
+  /**
+   * Defense-in-depth plan gate. Non-enterprise orgs can create up to
+   * NON_ENTERPRISE_INGESTION_SOURCE_CAP active sources (composer separately
+   * restricts source TYPE to otel_generic for them). This catches non-tRPC
+   * callers (background workers, webhook adapters) so the cap can't be
+   * bypassed regardless of entry point. Enterprise orgs are unbounded.
+   * Spec: specs/ai-gateway/license-gate-governance.feature.
+   *
+   * Its own method rather than a block inside `createSource` because it
+   * answers a different question from the rest of that function: whether this
+   * org may have another source at all, versus how this particular source is
+   * built and stored. The two get edited by different people for unrelated
+   * reasons -- a pricing change touches only this.
+   */
+  private async assertAnotherSourceIsAllowed({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<void> {
+    const plan = await getApp().planProvider.getActivePlan({ organizationId });
+    if (isEnterpriseTier(plan.type)) return;
+
+    const existing = await this.prisma.ingestionSource.count({
+      where: { organizationId, archivedAt: null },
+    });
+    if (existing >= NON_ENTERPRISE_INGESTION_SOURCE_CAP) {
+      throw new IngestionSourceCapReachedError(
+        NON_ENTERPRISE_INGESTION_SOURCE_CAP,
+      );
+    }
+  }
+
   async createSource(
     input: CreateIngestionSourceInput,
   ): Promise<CreatedIngestionSource> {
     if (input.pullSchedule !== null && input.pullSchedule !== undefined) {
       assertPullSchedule(input.pullSchedule);
     }
-    // Defense-in-depth plan gate. Non-enterprise orgs can create up to
-    // NON_ENTERPRISE_INGESTION_SOURCE_CAP active sources (composer
-    // separately restricts source TYPE to otel_generic for them). This
-    // catches non-tRPC callers (background workers, webhook adapters)
-    // so the cap can't be bypassed regardless of entry point. Enterprise
-    // orgs are unbounded. Spec: specs/ai-gateway/license-gate-governance.feature.
-    const plan = await getApp().planProvider.getActivePlan({
+    await this.assertAnotherSourceIsAllowed({
       organizationId: input.organizationId,
     });
-    if (!isEnterpriseTier(plan.type)) {
-      const existing = await this.prisma.ingestionSource.count({
-        where: { organizationId: input.organizationId, archivedAt: null },
-      });
-      if (existing >= NON_ENTERPRISE_INGESTION_SOURCE_CAP) {
-        throw new IngestionSourceCapReachedError(
-          NON_ENTERPRISE_INGESTION_SOURCE_CAP,
-        );
-      }
-    }
 
     if (!SUPPORTED_SOURCE_TYPES.includes(input.sourceType)) {
       // The router's zod enum catches this before the service sees it; a
