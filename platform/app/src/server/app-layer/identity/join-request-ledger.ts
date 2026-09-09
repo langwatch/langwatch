@@ -37,10 +37,25 @@ import {
   type ConvergentLedgerSpec,
   type StagedSenderPort,
 } from "./staged-ledger-writer";
+import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 
-/** The read-your-writes window, the identity ledger's convergence shape. */
-export const JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS = 2_000;
-export const JOIN_REQUEST_CONVERGENCE_POLL_MS = 25;
+/**
+ * Submitting a request, and an administrator answering one, are both a person
+ * waiting on a response, so this takes the interactive window.
+ *
+ * The expiry wake is the exception — it is a process-manager job with nobody
+ * watching, and it would be the one caller here that wanted the longer,
+ * background window. It does not get one, because under ADR-135 it stops
+ * reading this ledger's return value at all: it reads the recorded state
+ * instead, which is right regardless of whether the wait converged. A window
+ * that only mattered to a caller that no longer depends on it is not worth
+ * splitting this ledger over.
+ *
+ * The values used to be stated here, and identically in three sibling ledgers;
+ * see `_shared/read-your-writes-window.ts` for why one number could not have
+ * been right for all five callers.
+ */
+const JOIN_REQUEST_CONVERGENCE = INTERACTIVE_READ_YOUR_WRITES;
 
 const JOIN_REQUEST_LEDGER_SPEC: ConvergentLedgerSpec<
   JoinRequestCommand,
@@ -85,10 +100,7 @@ export class JoinRequestLedgerWriter
     super({
       spec: JOIN_REQUEST_LEDGER_SPEC,
       projectionStore: deps.projectionStore,
-      convergence: deps.convergence ?? {
-        timeoutMs: JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS,
-        pollMs: JOIN_REQUEST_CONVERGENCE_POLL_MS,
-      },
+      convergence: deps.convergence ?? JOIN_REQUEST_CONVERGENCE,
       eventStore: deps.eventStore,
       stagedSender: deps.stagedSender,
     });

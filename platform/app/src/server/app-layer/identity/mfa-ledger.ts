@@ -42,10 +42,16 @@ import {
   type ConvergentLedgerSpec,
   type StagedSenderPort,
 } from "./staged-ledger-writer";
+import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 
-/** The read-your-writes window, the identity ledger's convergence shape. */
-export const MFA_CONVERGENCE_TIMEOUT_MS = 2_000;
-export const MFA_CONVERGENCE_POLL_MS = 25;
+/**
+ * Enrolling in two-step verification, confirming a code, spending a backup
+ * code: a person is waiting on every one of these, so it takes the interactive
+ * window. The values used to be stated here, and identically in three sibling
+ * ledgers; see `_shared/read-your-writes-window.ts` for why one number could
+ * not have been right for all five callers.
+ */
+const MFA_CONVERGENCE = INTERACTIVE_READ_YOUR_WRITES;
 
 const MFA_LEDGER_SPEC: ConvergentLedgerSpec<MfaCommand, MfaEvent, MfaFactInput> =
   {
@@ -90,10 +96,7 @@ export class MfaLedgerWriter
     super({
       spec: MFA_LEDGER_SPEC,
       projectionStore: deps.projectionStore,
-      convergence: deps.convergence ?? {
-        timeoutMs: MFA_CONVERGENCE_TIMEOUT_MS,
-        pollMs: MFA_CONVERGENCE_POLL_MS,
-      },
+      convergence: deps.convergence ?? MFA_CONVERGENCE,
       eventStore: deps.eventStore,
       stagedSender: deps.stagedSender,
     });

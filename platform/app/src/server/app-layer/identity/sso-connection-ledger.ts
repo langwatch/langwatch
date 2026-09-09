@@ -46,10 +46,16 @@ import {
   type ConvergentLedgerSpec,
   type StagedSenderPort,
 } from "./staged-ledger-writer";
+import { INTERACTIVE_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 
-/** The read-your-writes window, the identity ledger's convergence shape. */
-export const SSO_CONNECTION_CONVERGENCE_TIMEOUT_MS = 2_000;
-export const SSO_CONNECTION_CONVERGENCE_POLL_MS = 25;
+/**
+ * An administrator is configuring a connection and watching the form, so this
+ * takes the interactive window. The values used to be stated here, and
+ * identically in three sibling ledgers; see
+ * `_shared/read-your-writes-window.ts` for why one number could not have been
+ * right for all five callers.
+ */
+const SSO_CONNECTION_CONVERGENCE = INTERACTIVE_READ_YOUR_WRITES;
 
 const SSO_CONNECTION_LEDGER_SPEC: ConvergentLedgerSpec<
   SsoConnectionCommand,
@@ -103,10 +109,7 @@ export class SsoConnectionLedgerWriter
     super({
       spec: SSO_CONNECTION_LEDGER_SPEC,
       projectionStore: deps.projectionStore,
-      convergence: deps.convergence ?? {
-        timeoutMs: SSO_CONNECTION_CONVERGENCE_TIMEOUT_MS,
-        pollMs: SSO_CONNECTION_CONVERGENCE_POLL_MS,
-      },
+      convergence: deps.convergence ?? SSO_CONNECTION_CONVERGENCE,
       eventStore: deps.eventStore,
       stagedSender: deps.stagedSender,
     });
