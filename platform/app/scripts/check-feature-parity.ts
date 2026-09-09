@@ -750,13 +750,11 @@ const LEGACY_PARTIAL: string[] = [
   "specs/monitors/online-evaluator-loop-prevention.feature",
   "specs/navigation/shared-section-navigation-layout.feature",
   "specs/npx-installer/07-lean-install.feature",
-  // Reason: became partially tagged after this list was seeded (#7932 added
-  // three @unit metric scenarios and correctly retired the file's LEGACY_INERT
-  // entry). Its eight untagged scenarios describe alert rules, their delivery
-  // and dashboards, which ADR-054 keeps in a separate infrastructure
-  // repository — so whether each is implemented cannot be established from
-  // here, and tagging them either way would assert what this repo cannot
-  // check. Per-scenario audit tracked by #8024.
+  // Reason: arrived partially tagged when #7932 added three @unit metric
+  // scenarios and retired its LEGACY_INERT entry. The eight untagged ones
+  // describe alert rules, their delivery and dashboards, which ADR-054 keeps
+  // in a separate infrastructure repository, so their status cannot be
+  // established here. Per-scenario audit tracked by #8024.
   "specs/observability/process-substrate-alerting.feature",
   "specs/ops/internal-feature-flags.feature",
   "specs/optimization-studio/component-execution.feature",
