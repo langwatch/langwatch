@@ -14,7 +14,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
-import { WebhookApp, WebhookEndpointAdapter } from "@langwatch/enterprise-webhook-server";
+import { WebhookApp, WebhookEndpointAdapter } from "@langwatch/webhook-server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { composeApiIdempotency } from "../../app/api-idempotency.composition.ts";

@@ -26,6 +26,9 @@
     },
     {
       "path": "../../../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../runtime-composition/tsconfig.build.json"
     }
   ]
 }

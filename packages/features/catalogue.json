@@ -402,8 +402,8 @@
     },
     {
       "id": "audit-log",
-      "root": "packages/enterprise/features/audit-log",
-      "classification": "enterprise",
+      "root": "packages/features/audit-log",
+      "classification": "core",
       "subjects": [
         "audit-log"
       ]
@@ -489,8 +489,8 @@
     },
     {
       "id": "webhook",
-      "root": "packages/enterprise/features/webhook",
-      "classification": "enterprise",
+      "root": "packages/features/webhook",
+      "classification": "core",
       "subjects": [
         "webhook"
       ]
