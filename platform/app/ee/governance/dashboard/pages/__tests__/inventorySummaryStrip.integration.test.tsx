@@ -55,7 +55,11 @@ describe("given an admin on the Inventory page", () => {
       renderScreen();
       await openTab(/Sources/);
       expect(screen.queryByText("Connectors")).toBeNull();
-      expect(screen.queryByText(/\d+ sources · \d+ active/)).toBeNull();
+      // The count line the strip now owns. Matched as one string across the
+      // pane's text rather than as a single node: the heading drew the figures
+      // and the words in separate nodes, so a node-wise regex matched nothing
+      // and passed whether or not the heading was still there.
+      expect(document.body.textContent).not.toMatch(/\d+ sources · \d+ active/);
     });
   });
 
@@ -88,9 +92,12 @@ describe("given an admin on the Inventory page", () => {
       harness.tools = { data: undefined, isLoading: true, error: null };
       renderScreen();
 
-      const strip = screen.getByTestId("inventory-summary");
-      expect(within(strip).getByText("—")).toBeInTheDocument();
-      expect(within(strip).queryByText(/^0 tools/)).toBeNull();
+      // Scoped to the tools figure. Asserted against the whole strip, the
+      // dash could have come from any pane and `/^0 tools/` matched no node at
+      // all, because the figure and its label are separate text nodes.
+      const tools = screen.getByTestId("inventory-summary-tools");
+      expect(within(tools).getByText("—")).toBeInTheDocument();
+      expect(within(tools).queryByText("0")).toBeNull();
       // The tab badge is the same claim in a smaller place.
       expect(screen.getByRole("tab", { name: /^Catalog/ }).textContent).toBe(
         "Catalog",
@@ -109,11 +116,14 @@ describe("given an admin on the Inventory page", () => {
       harness.sources = { data: undefined, isLoading: true, error: null };
       renderScreen();
 
-      const strip = screen.getByTestId("inventory-summary");
-      expect(within(strip).queryByText(/^0 discovered/)).toBeNull();
-      expect(strip.textContent).not.toMatch(/0environments/);
-      // Both halves of the derivation say the same thing.
-      expect(within(strip).getAllByText("—").length).toBeGreaterThanOrEqual(2);
+      // Both halves of the derivation, each read where it is drawn rather
+      // than counted across the strip: two dashes anywhere would also be
+      // satisfied by two panes that are not these.
+      const environments = screen.getByTestId("inventory-summary-environments");
+      const sources = screen.getByTestId("inventory-summary-sources");
+      expect(within(environments).getByText("—")).toBeInTheDocument();
+      expect(within(sources).getByText("—")).toBeInTheDocument();
+      expect(within(environments).queryByText("0")).toBeNull();
       // And the tab badge agrees with the tab beside it.
       expect(
         screen.getByRole("tab", { name: /^Environments/ }).textContent,
@@ -132,9 +142,9 @@ describe("given an admin on the Inventory page", () => {
       };
       renderScreen();
 
-      const strip = screen.getByTestId("inventory-summary");
-      expect(strip.textContent).not.toMatch(/0environments/);
-      expect(within(strip).queryByText(/^0 discovered/)).toBeNull();
+      const environments = screen.getByTestId("inventory-summary-environments");
+      expect(within(environments).getByText("—")).toBeInTheDocument();
+      expect(within(environments).queryByText("0")).toBeNull();
     });
   });
 });

@@ -1076,6 +1076,27 @@ describe("the summary strip above the tabs", () => {
       // that did not rather than about the strip giving up.
       expect(summaryFigure("people")).toBe("1");
     });
+
+    /** @scenario "A summary figure the page cannot measure reads as an em dash" */
+    it("draws an em dash for a read that was never made, not only one still running", () => {
+      // The harder half, and the one a loading flag cannot catch. The spend
+      // read is skipped outright for a reader without `activityMonitor:view`
+      // and for a non-Enterprise organization, so it is never loading and
+      // never will be. Counting the identity half alone would have printed a
+      // confident population directly under the permission notice on the
+      // table below.
+      harness.answers["governancePeople.list"] = { data: [] };
+      harness.answers["departments.list"] = { data: [] };
+      // No entry at all for the spend read: the shape a disabled query has.
+      delete harness.answers["activityMonitor.spendByUser"];
+      renderPeopleAt(["/governance/people"]);
+
+      expect(summaryFigure("people")).toBe("—");
+      expect(summaryFigure("unmatched")).toBe("—");
+      // The department read did answer and is counted, so the dashes above
+      // are about the skipped read rather than the strip refusing everything.
+      expect(summaryFigure("departments")).toBe("0");
+    });
   });
 
   describe("when the reader has turned the sample data on", () => {

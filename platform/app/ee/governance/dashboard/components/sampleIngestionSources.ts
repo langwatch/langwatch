@@ -20,7 +20,7 @@ import {
  *
  * THE MENU AND THIS TABLE ARE NOT THE SAME LIST, and the difference is
  * deliberate. `sampleSourceTypeOptions` is the menu's list minus the types
- * flagged `omitFromSample` — held back from the mock-up while staying fully on
+ * flagged `shouldOmitFromSample` — held back from the mock-up while staying fully on
  * offer. That flag lives on the catalog entry rather than in an exclusion list
  * here, so the reason travels with the type; a bare list of keys in this file
  * would be a second place the two lists could drift apart, which is the exact

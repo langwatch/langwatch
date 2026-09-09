@@ -685,6 +685,12 @@ describe("the agents filter chips", () => {
         </ChakraProvider>,
       );
       const orangeBadge = screen.getByText("reference orange badge").className;
+      // Take the class and take the reference down. Leaving it mounted put a
+      // second React root in the same body, so every `screen.*` query below
+      // spanned both trees — working here only because "reference orange
+      // badge" and "Unclaimed" happen not to collide, which is not a property
+      // anyone maintaining this file would know they were relying on.
+      cleanup();
 
       renderAgentsAt();
       await pickFilter("Ownership", "Unclaimed only");

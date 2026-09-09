@@ -101,6 +101,14 @@ Feature: The Inventory catalog is the tools the organization runs
     When its card renders in sample mode
     Then the seats row says it is billed on consumption
     And it does not read as a seat count of zero
+    # SAMPLE MODE ONLY, and the one place the two surfaces differ. A sample
+    # card's rows are hand-authored, and these two keep a seats row carrying a
+    # sentence instead of dropping it: "billed on consumption" is the answer a
+    # buyer arrives with, and an absent row would let them assume nobody
+    # looked. A REGISTERED tool's rows are derived instead, and there the seats
+    # row is genuinely absent — see "A consumption-billed tool carries the
+    # token count it is billed on" below, which is the rule for that path and
+    # does not contradict this one.
 
   # ===========================================================================
   # Which rows a tool has

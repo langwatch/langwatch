@@ -178,10 +178,12 @@ Feature: Governance home — route, nav promotion, persona detection
   # The default is Catalog for every reader. It used to be
   # permission-sensitive — Catalog for aiTools:manage holders, Sources for
   # everyone else — because Catalog was then the tool-tiles editor, which
-  # only those holders could use. The tiles left this page, and the pane
-  # that replaced them is built from the same source list the Sources tab
-  # reads, so there is no longer a reason for one bare link to open two
-  # different panes for two recipients.
+  # only those holders could use. The pane that replaced them still reads
+  # the tool registry and is still gated on aiTools:manage, so what changed
+  # is not the grant but what a reader without it meets: the pane names the
+  # grant instead of silently sending them somewhere else. Routing one bare
+  # link to two different panes for two recipients hid the grant behind a
+  # redirect, which is the thing that was wrong with it.
   # ---------------------------------------------------------------------------
 
   @bdd @ui @governance-home @inventory-tabs @integration

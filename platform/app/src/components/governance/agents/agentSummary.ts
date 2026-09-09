@@ -159,7 +159,12 @@ function summarizeFleet(rows: readonly GovernanceAgentRow[]): AgentFleetCount {
     count: rows.length,
     unit: rows.length === 1 ? "agent" : "agents",
     registrations: registrationCurve(rows),
-    registrationsLabel: `Agents registered over the last ${REGISTRATION_MONTHS} months`,
+    // Says cumulative out loud, because the series is. The first point counts
+    // every agent registered by then, including ones from long before this
+    // window, so "agents registered over the last twelve months" would name a
+    // different and smaller number than the line draws. This is the sparkline's
+    // only description for a reader who cannot see it.
+    registrationsLabel: `Total agents registered, by month over the last ${REGISTRATION_MONTHS} months`,
     caption: `${arrivals} · registered over time`,
   };
 }

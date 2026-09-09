@@ -90,7 +90,10 @@ export function ToolCatalogEditor({
    * import stay here: this is the only screen that has either.
    */
   const catalog = useAiToolCatalog({ organizationId });
-  const { pendingDelete, setPendingDelete } = catalog;
+  const { entries, isLoading, pendingDelete, setPendingDelete } = catalog;
+  // Only for the `setData` write below, which needs the router's own payload
+  // type. Reading `data` or `isLoading` off it again would be the second copy
+  // the hook exists to prevent.
   const adminListQuery = catalog.query;
 
   const departmentsQuery = api.departments.list.useQuery(
@@ -107,7 +110,7 @@ export function ToolCatalogEditor({
       void utils.aiTools.list.invalidate({ organizationId });
     },
     onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tiles" }),
+      showErrorToast({ error: err, fallbackTitle: "Couldn't reorder tools" }),
   });
 
   const importStarterPackMutation = api.aiTools.importStarterPack.useMutation({
@@ -118,10 +121,10 @@ export function ToolCatalogEditor({
         title:
           created === 0
             ? "Starter pack already published"
-            : `Imported ${created} ${created === 1 ? "tile" : "tiles"}`,
+            : `Imported ${created} ${created === 1 ? "tool" : "tools"}`,
         description:
           skipped > 0
-            ? `${skipped} ${skipped === 1 ? "tile was" : "tiles were"} already published and skipped.`
+            ? `${skipped} ${skipped === 1 ? "tool was" : "tools were"} already published and skipped.`
             : "Coding assistants and model providers are now visible to your team on /me.",
         type: "success",
       });
@@ -151,7 +154,7 @@ export function ToolCatalogEditor({
     .filter((t) => !unchecked[t.slug])
     .map((t) => t.slug);
 
-  if (adminListQuery.isLoading) {
+  if (isLoading) {
     return (
       <HStack padding={6} justifyContent="center">
         <Spinner size="sm" />
@@ -161,8 +164,6 @@ export function ToolCatalogEditor({
       </HStack>
     );
   }
-
-  const entries = (adminListQuery.data ?? []) as unknown as AiToolEntry[];
 
   const grouped: Record<AiToolEntry["type"], AiToolEntry[]> = {
     coding_assistant: [],
@@ -261,9 +262,9 @@ export function ToolCatalogEditor({
                 {isCatalogEmpty
                   ? "Pick the tools to publish at org scope so every member " +
                     "sees them on /me. You can rename, reorder, disable, or " +
-                    "remove individual tiles afterwards. Re-running is safe; " +
+                    "remove individual tools afterwards. Re-running is safe; " +
                     "only new slugs get added."
-                  : "Adds starter tiles the catalog never had. Tiles already " +
+                  : "Adds starter tools the catalog never had. Tools already " +
                     "present, archived ones included, are skipped."}
               </Text>
               <VStack align="start" gap={2} paddingTop={1} width="full">

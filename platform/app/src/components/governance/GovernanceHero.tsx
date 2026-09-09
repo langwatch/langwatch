@@ -1,9 +1,8 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { SourceTypeIconGlyph } from "@ee/governance/dashboard/components/ingestionSourceCatalog";
 import type { SourceType } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { Building2 } from "lucide-react";
+import { Bot, Building2, PackageOpen, Settings2 } from "lucide-react";
 import type React from "react";
-import { LuBot, LuPackageOpen, LuSettings2 } from "react-icons/lu";
 import { AskChip } from "~/components/home/AskChip";
 import { HeroAskField } from "~/components/home/HeroAskField";
 import { HeroLeadPill } from "~/components/home/HeroLeadPill";
@@ -114,13 +113,13 @@ const LEAD_CHIPS: ReadonlyArray<{
     key: "agent",
     label: "Add agent",
     href: ADD_AGENT_HREF,
-    icon: <LuBot size={12} />,
+    icon: <Bot size={12} />,
   },
   {
     key: "tool",
     label: "Add tool",
     href: ADD_TOOL_HREF,
-    icon: <LuPackageOpen size={12} />,
+    icon: <PackageOpen size={12} />,
   },
 ];
 
@@ -251,7 +250,7 @@ function AddSourcePill() {
             color="fg.muted"
             _hover={{ textDecoration: "none" }}
           >
-            <LuSettings2 size={14} />
+            <Settings2 size={14} />
             <Text textStyle="xs" fontWeight="500">
               Configure sources
             </Text>

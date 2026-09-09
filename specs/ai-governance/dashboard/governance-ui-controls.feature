@@ -221,8 +221,8 @@ Feature: The controls every AI Governance page renders the same way
   # governance section — the screenshot they sent back was the Inventory page
   # header drawn solid, and they named the empty states separately — so the
   # create action is now the house header button: outline, small, with a
-  # leading plus glyph. That is `PageLayout.HeaderButton`
-  # (src/components/ui/layouts/PageLayout.tsx:98), which renders
+  # leading plus glyph. That is the `HeaderButton` in
+  # `src/components/ui/layouts/PageLayout.tsx`, which renders
   # `<Button variant="outline" size="sm">` and is what /settings/api-keys and
   # /settings/model-providers already use. Solid orange is gone from
   # governance BUTTONS entirely.
@@ -242,16 +242,17 @@ Feature: The controls every AI Governance page renders the same way
   # them. It reaches PAGE-HEADER CREATE ACTIONS and EMPTY-STATE ACTIONS, which
   # is what the product owner pointed at. It reaches nothing else.
   #
-  #   ORANGE AS A STATUS MARK IS NOT A BUTTON. `AgentCard.tsx:63` draws an
-  #   "Unclaimed" agent as `variant="subtle" colorPalette="orange"`, and
-  #   `EnvironmentsTab.tsx:246`, `TraceDestinationField.tsx:58` and
-  #   `ToolCatalogCards.tsx:154` are the same shape. Each states a fact about
+  #   ORANGE AS A STATUS MARK IS NOT A BUTTON. The "Unclaimed" badge in
+  #   `src/components/governance/agents/AgentCard.tsx` — and the same badge in
+  #   `AgentsTable.tsx` beside it — is `variant="subtle" colorPalette="orange"`,
+  #   and the badges in `EnvironmentsTab.tsx`, `TraceDestinationField.tsx` and
+  #   `ToolCatalogCards.tsx` are the same shape. Each states a fact about
   #   a thing rather than offering a press. The section's colour rules further
   #   down govern marks and badges; this one governs controls.
   #
   #   A DRAWER FOOTER SUBMIT STAYS SOLID, and this was decided rather than
   #   overlooked. It is the app-wide convention outside governance too —
-  #   `src/components/settings/DepartmentEditDrawer.tsx:100` pairs a ghost
+  #   `src/components/settings/DepartmentEditDrawer.tsx` pairs a ghost
   #   Cancel with a solid orange Save changes, and the governance drawers
   #   match it. A footer submit is not competing with a page's create action
   #   for the reader's eye, because the drawer is the only thing on screen
@@ -262,7 +263,7 @@ Feature: The controls every AI Governance page renders the same way
   #
   # The "at rest" qualifier below is load-bearing, and it was missing on the
   # first attempt. The kit renders the toggle `active ? "subtle" : "ghost"`
-  # (SampleDataControls.tsx:45), so a page whose samples are showing draws a
+  # (`SampleDataControls.tsx`), so a page whose samples are showing draws a
   # subtle toggle and is doing nothing wrong. A flat "is ghost" clause failed
   # Agents, which opens with samples on, while passing People, which opens
   # with them off — a rule that graded pages on their default state rather

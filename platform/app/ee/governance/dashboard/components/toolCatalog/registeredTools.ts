@@ -169,6 +169,34 @@ export interface RegisteredTool {
   config: Record<string, unknown>;
 }
 
+/**
+ * Whether this tool's own traffic is real per-token money.
+ *
+ * A coding assistant normally rides a flat plan, so its list-price token cost
+ * is theoretical and the cost-attribution policy stamps its direct usage
+ * non-billable. An admin who unticks "Bundled subscription" is saying the
+ * opposite about that same tool, and the receiver believes them: from then on
+ * its tokens are spend. Without this the catalog contradicted the entry it is
+ * a summary of — a Claude Code tile with the box unticked was labelled
+ * Subscription, carried a subscriptions row, and hid the token count that had
+ * just become the interesting figure on it.
+ *
+ * A SECOND FACT, not a replacement. The plan or the seats are still bought;
+ * unticking the box does not refund them. So this adds the metered row and
+ * badge alongside the contract's, the way a seat-billed tool that also meters
+ * credits carries both.
+ *
+ * Only an explicit `false` counts. The field is optional and the ingest path
+ * defaults it to true, so an entry nobody has opened must not read as metered.
+ *
+ * Scoped to coding assistants because that is the only type the policy reads.
+ * A model provider is already consumption-billed, and gateway traffic is
+ * billed per token whatever any tile says — it never reaches this path.
+ */
+function isMeteredPerToken(tool: RegisteredTool): boolean {
+  return tool.type === "coding_assistant" && tool.config.bundledPlan === false;
+}
+
 /** How this tool is paid for, from what the registry entry actually says. */
 export function billingForTool(tool: RegisteredTool): ToolBilling {
   if (tool.type === "model_provider") return "consumption";
@@ -192,6 +220,8 @@ export function applicableRowsForTool(
 ): readonly ToolCardRow[] {
   const rows = new Set<ToolCardRow>([
     ...BILLING_ROWS[billingForTool(tool)],
+    // The admin's explicit override, on top of what the kind implies.
+    ...(isMeteredPerToken(tool) ? BILLING_ROWS.consumption : []),
     ...ACTIVITY_ROWS,
     // `?? []` because this lookup is NOT total, however much the type says it
     // is. `type` is a bare String column, the payload reaches us through a
@@ -229,16 +259,23 @@ export function vendorForTool(tool: RegisteredTool): string {
  * loudest thing on a card that has nothing to report.
  */
 export function badgesForTool(tool: RegisteredTool): ToolCardBadge[] {
-  switch (billingForTool(tool)) {
-    case "seat":
-      return ["seatsAndLicences", "billed"];
-    case "subscription":
-      return ["subscription"];
-    case "consumption":
-      return ["metered"];
-    case "unknown":
-      return [];
-  }
+  const contract = ((): ToolCardBadge[] => {
+    switch (billingForTool(tool)) {
+      case "seat":
+        return ["seatsAndLicences", "billed"];
+      case "subscription":
+        return ["subscription"];
+      case "consumption":
+        return ["metered"];
+      case "unknown":
+        return [];
+    }
+  })();
+  // Deduped rather than appended blindly: a consumption-billed tool already
+  // wears this mark, and saying it twice reads as two different facts.
+  return isMeteredPerToken(tool)
+    ? [...new Set<ToolCardBadge>([...contract, "metered"])]
+    : contract;
 }
 
 /**

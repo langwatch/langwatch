@@ -633,16 +633,22 @@ function PeopleSummaryStrip({
   // once both halves of the population have come back: the money the gateway
   // metered, and the people the connected providers named.
   //
-  // Success, not the absence of loading. A tRPC query that was never enabled
-  // is not loading and never will be, so `!isLoading` reads a skipped read as
-  // a finished one: the spend read is off for a reader without
+  // An answer arrived, not merely "is not loading". A tRPC query that was
+  // never enabled is not loading and never will be, so `!isLoading` reads a
+  // skipped read as a finished one: the spend read is off for a reader without
   // `activityMonitor:view` and off again for a non-Enterprise organization,
   // and the departments read is off until `orgId` arrives. Each of those would
   // have printed a confident population counted from the identity half alone,
   // directly under a table showing that same reader a permission notice.
+  //
+  // `data !== undefined` rather than `isSuccess`, which is the same test the
+  // catalog hook's `loaded` flag already makes, for the same reason: it asks
+  // whether there is something to count instead of trusting a status enum.
   const peopleMeasured =
-    sampleActive || (reads.spend.isSuccess && reads.people.isSuccess);
-  const departmentsMeasured = sampleActive || reads.departments.isSuccess;
+    sampleActive ||
+    (reads.spend.data !== undefined && reads.people.data !== undefined);
+  const departmentsMeasured =
+    sampleActive || reads.departments.data !== undefined;
 
   const summary = summarizePeople({
     rows,

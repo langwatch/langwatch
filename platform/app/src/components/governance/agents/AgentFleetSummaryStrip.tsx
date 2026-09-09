@@ -8,7 +8,40 @@ import {
   GovernanceSummaryStatusRow,
 } from "~/components/governance/summary";
 
-import type { AgentFleetSummary } from "./agentSummary";
+import type { AgentFleetSummary, AgentStatusLine } from "./agentSummary";
+
+/**
+ * A card that is a list of counted states — Health and Ownership both.
+ *
+ * The two differ in their heading and their test id and in nothing else, and
+ * they are meant to: a reader scanning the strip reads the second the way they
+ * read the first, so the day one of them grows a divider or a tooltip both
+ * should get it. Two copies is how that stops being true.
+ */
+function AgentStatusLaneCard({
+  eyebrow,
+  testId,
+  lines,
+}: {
+  eyebrow: string;
+  testId: string;
+  lines: AgentStatusLine[];
+}) {
+  return (
+    <GovernanceSummaryCard eyebrow={eyebrow} testId={testId}>
+      <VStack align="stretch" gap={1}>
+        {lines.map((line) => (
+          <GovernanceSummaryStatusRow
+            key={line.key}
+            tone={line.tone}
+            value={line.count}
+            label={line.label}
+          />
+        ))}
+      </VStack>
+    </GovernanceSummaryCard>
+  );
+}
 
 /**
  * The four cards the Agents page opens with: how many agents there are, how
@@ -70,34 +103,17 @@ export function AgentFleetSummaryStrip({
         </Text>
       </GovernanceSummaryCard>
 
-      <GovernanceSummaryCard eyebrow="Health" testId="agents-summary-health">
-        <VStack align="stretch" gap={1}>
-          {health.map((line) => (
-            <GovernanceSummaryStatusRow
-              key={line.key}
-              tone={line.tone}
-              value={line.count}
-              label={line.label}
-            />
-          ))}
-        </VStack>
-      </GovernanceSummaryCard>
+      <AgentStatusLaneCard
+        eyebrow="Health"
+        testId="agents-summary-health"
+        lines={health}
+      />
 
-      <GovernanceSummaryCard
+      <AgentStatusLaneCard
         eyebrow="Ownership"
         testId="agents-summary-ownership"
-      >
-        <VStack align="stretch" gap={1}>
-          {ownership.map((line) => (
-            <GovernanceSummaryStatusRow
-              key={line.key}
-              tone={line.tone}
-              value={line.count}
-              label={line.label}
-            />
-          ))}
-        </VStack>
-      </GovernanceSummaryCard>
+        lines={ownership}
+      />
 
       <GovernanceSummaryCard
         eyebrow="Top spenders"

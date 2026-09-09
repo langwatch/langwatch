@@ -103,6 +103,55 @@ describe("given a registered tool", () => {
     });
   });
 
+  describe("when an administrator has unticked its bundled subscription", () => {
+    // The two entries differ in one field. Everything the kind implies is
+    // identical, so anything that differs below is the override being read.
+    const bundled: RegisteredTool = {
+      ...assistant("claude_code"),
+      config: { assistantKind: "claude_code", bundledPlan: true },
+    };
+    const metered: RegisteredTool = {
+      ...assistant("claude_code"),
+      config: { assistantKind: "claude_code", bundledPlan: false },
+    };
+
+    /** @scenario "A consumption-billed tool carries the token count it is billed on" */
+    it("carries the token count, which the receiver has started billing", () => {
+      expect(applicableRowsForTool(bundled)).not.toContain("tokens30Days");
+      expect(applicableRowsForTool(metered)).toContain("tokens30Days");
+    });
+
+    /** @scenario "A consumption-billed tool carries the token count it is billed on" */
+    it("keeps the plan it is still bought on, rather than trading one for the other", () => {
+      // Unticking the box does not refund the subscription. Both facts hold,
+      // so both are said.
+      expect(applicableRowsForTool(metered)).toContain("subscriptions");
+      expect(badgesForTool(metered)).toContain("subscription");
+      expect(badgesForTool(metered)).toContain("metered");
+      expect(badgesForTool(bundled)).not.toContain("metered");
+    });
+
+    /** @scenario "A consumption-billed tool carries the token count it is billed on" */
+    it("reads an absent flag as bundled, the way the ingest path defaults it", () => {
+      // `bundledPlan` is optional. An entry nobody has opened must not start
+      // claiming its tokens are money.
+      const untouched = assistant("claude_code");
+      expect(untouched.config.bundledPlan).toBeUndefined();
+      expect(applicableRowsForTool(untouched)).not.toContain("tokens30Days");
+      expect(badgesForTool(untouched)).not.toContain("metered");
+    });
+
+    /** @scenario "A consumption-billed tool carries the token count it is billed on" */
+    it("says metered once on a tool that was already consumption-billed", () => {
+      const alreadyMetered: RegisteredTool = {
+        ...assistant("opencode"),
+        config: { assistantKind: "opencode", bundledPlan: false },
+      };
+      const badges = badgesForTool(alreadyMetered);
+      expect(badges.filter((badge) => badge === "metered")).toHaveLength(1);
+    });
+  });
+
   describe("when it is a tool the organization built itself", () => {
     /** @scenario "An in-house tool carries its agents and its conversations" */
     it("has agents and conversations and no payment row at all", () => {

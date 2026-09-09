@@ -63,6 +63,10 @@ Feature: The governance overview opens with a hero and nothing else
   # it actually opens.
   @integration
   Scenario: The hero offers four ways in, three to add and one to configure
+    # The fourth way in is a row of the "Add source" menu, and that menu is
+    # only drawn for a holder of this grant. Without it here the scenario asked
+    # for a menu row that cannot exist for the Background's reader.
+    Given I also hold `ingestionSources:manage`
     When the overview renders
     Then the shortcut row offers "Add department", "Add agent" and "Add tool", in that order
     And no other shortcut is offered beside them

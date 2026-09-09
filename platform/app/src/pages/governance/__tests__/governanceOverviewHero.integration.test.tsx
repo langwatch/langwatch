@@ -696,7 +696,7 @@ describe("governance overview", () => {
     });
   });
 
-  describe("the measure the field is set to", () => {
+  describe("when the ask field renders", () => {
     /** @scenario "The field is the width the project home sets its own field to" */
     it("matches the project home field, and stays inside the wider page column", async () => {
       const { container } = renderPage();
@@ -724,7 +724,7 @@ describe("governance overview", () => {
     });
   });
 
-  describe("the ground the hero stands on", () => {
+  describe("when the hero renders its lit ground", () => {
     /** @scenario "The hero stands on the same lit ground as the project home" */
     it("is decoration: hidden from assistive technology and untouchable", () => {
       const { container } = renderPage();

@@ -85,11 +85,15 @@ function CatalogTabs({
  * NOT MOUNTED ANYWHERE TODAY, and what is left for it to own has narrowed.
  * The Inventory page's Catalog pane lists the same registry again and opens
  * the same `AiToolEntryDrawer` to register and edit an entry, so this
- * composition is no longer the only way to reach a tile. What it still owns
- * and the Inventory pane deliberately does not are the two ARRANGING jobs —
- * drag-to-reorder, which sets the order the personal portal renders in, and
- * the starter-pack import — plus the read-only ingestion-template catalog. An
- * inventory is read, not arranged, which is why those stayed here.
+ * composition is no longer the only way to reach a tile.
+ *
+ * This file itself owns the read-only ingestion-template catalog, the grant
+ * check and the tab strip, and nothing else. The two ARRANGING jobs the
+ * Inventory pane deliberately does not offer — drag-to-reorder, which sets the
+ * order the personal portal renders in, and the starter-pack import — are
+ * wired in `ToolCatalogEditor`, which this panel mounts and which is where
+ * every `aiTools` mutation on this route lives. An inventory is read, not
+ * arranged, which is why that composition stayed here.
  *
  * Kept rather than deleted until it is given a home of its own (Settings, or
  * the AI Gateway, where the tile's gateway-versus-direct choice actually

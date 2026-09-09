@@ -103,7 +103,7 @@ describe("given the Sources tab in sample mode", () => {
       expect(cowork).toBeDefined();
 
       // Held back from the mock-up...
-      expect(cowork?.omitFromSample).toBe(true);
+      expect(cowork?.shouldOmitFromSample).toBe(true);
       expect(
         SAMPLE_INGESTION_SOURCES.some(
           (source) => source.sourceType === "claude_cowork",
@@ -144,7 +144,12 @@ describe("given the Sources tab in sample mode", () => {
       );
 
       expect(drawn).toEqual(
-        new Set(["Active", "Pulls failing", "Awaiting first event", "Disabled"]),
+        new Set([
+          "Active",
+          "Pulls failing",
+          "Awaiting first event",
+          "Disabled",
+        ]),
       );
       // Arrival times spread rather than clustering on one timestamp. Not
       // asserted as all-distinct: there are more rows than states, so the

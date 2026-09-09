@@ -90,7 +90,20 @@ export function GovernanceSummaryBar({
         columns={{ base: 1, sm: 2, lg: items.length }}
       >
         {items.map((item) => (
-          <VStack key={item.key} gap={1} align="center" textAlign="center">
+          <VStack
+            key={item.key}
+            // Each figure addressable on its own, because the figure and its
+            // label are separate text nodes: a test asserting "not 0 tools"
+            // against the whole strip matches no single node and passes
+            // whatever the tools figure says, and one asserting an em dash
+            // anywhere in the strip is satisfied by a dash belonging to a
+            // different pane. Both were live here. A caller that gives the
+            // strip no test id gets no per-item ones either.
+            data-testid={testId ? `${testId}-${item.key}` : undefined}
+            gap={1}
+            align="center"
+            textAlign="center"
+          >
             <HStack gap={2} alignItems="baseline">
               <Text
                 fontSize="2xl"

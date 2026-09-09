@@ -43,10 +43,6 @@ Feature: The resume every AI Governance page pins above its content
   # to draw both weights correctly without a page being rendered to find out.
   # The rule they answer to is the sibling's.
   #
-  #   STILL STALE ELSEWHERE, recorded rather than quietly edited around.
-  #   people-tabs.feature:134 says Add department is "solid, in the section's
-  #   orange". That file belongs to the People page and is theirs to correct.
-  #
   # BINDING. Every scenario below carries @integration and is bound by a
   # component test that renders the real component. The annotation must share
   # the line with the JSDoc opener — `/** @scenario "…" */` — because an
@@ -126,7 +122,7 @@ Feature: The resume every AI Governance page pins above its content
 
   @integration @regression
   Scenario: An empty pane action is drawn as the outline house button
-    Given an empty pane offering the action that creates the page own thing
+    Given an empty pane offering the action that creates the page's own thing
     When the pane renders
     Then that action is drawn as the section house button, which is outline
     And it is not drawn as a solid fill

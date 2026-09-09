@@ -102,7 +102,7 @@ export interface SourceTypeOption {
    * about this deployment rather than as an example can be held back
    * without being withdrawn from the product.
    */
-  omitFromSample?: boolean;
+  shouldOmitFromSample?: boolean;
 }
 
 // `satisfies` (not a type annotation) so each entry's `value` keeps its
@@ -137,7 +137,7 @@ export const SOURCE_TYPE_OPTIONS = [
     // a name the product uses nowhere, and the owner read the mock-up as a
     // claim that this deployment had such a connection. Keeping it off the
     // sample settles that without touching what customers can configure.
-    omitFromSample: true,
+    shouldOmitFromSample: true,
   },
   {
     value: "workato",
@@ -329,13 +329,15 @@ export function offeredSourceTypeOptions(): SourceTypeOption[] {
  *
  * A strict subset of {@link offeredSourceTypeOptions}: derived from it, so a
  * type can never reach the sample without being on offer, and narrowed by
- * `omitFromSample` so a type can be held back from the mock-up while staying
+ * `shouldOmitFromSample` so a type can be held back from the mock-up while staying
  * in the Add source menu. Read this from the sample and the wider helper from
  * the menu — the gap between the two is the point, and collapsing them would
  * put a held-back type back on screen.
  */
 export function sampleSourceTypeOptions(): SourceTypeOption[] {
-  return offeredSourceTypeOptions().filter((option) => !option.omitFromSample);
+  return offeredSourceTypeOptions().filter(
+    (option) => !option.shouldOmitFromSample,
+  );
 }
 
 export interface GatedSourceTypeOption extends SourceTypeOption {

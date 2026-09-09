@@ -6067,13 +6067,6 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description No process is holding the connected agent right now */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
         };
     };
     callConnectedAgent: {

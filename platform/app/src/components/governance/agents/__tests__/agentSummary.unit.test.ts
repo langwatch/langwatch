@@ -68,8 +68,12 @@ describe("summarizeAgentFleet", () => {
         ...summary.ownership.map((line) => line.label),
       ].join(" ");
 
-      for (const abbreviation of [" d ", " req", " mo ", "agts", "unclm"]) {
-        expect(words).not.toContain(abbreviation);
+      // Whole words, not substrings. `" req"` is a prefix of `" requests"`,
+      // so the substring form would have failed the day a label said the word
+      // this rule is asking for — a check that fires on the correct change is
+      // worse than no check.
+      for (const abbreviation of ["d", "req", "mo", "agts", "unclm"]) {
+        expect(words).not.toMatch(new RegExp(`\\b${abbreviation}\\b`));
       }
       expect(summary.fleet.caption).toContain("days");
     });
@@ -243,6 +247,25 @@ describe("summarizeAgentFleet", () => {
 
     /** @scenario "Top spenders rank by share of the spend we actually measured" */
     it("ranks nobody rather than dividing by zero", () => {
+      expect(summary.topSpenders).toEqual([]);
+    });
+  });
+
+  describe("when every agent measured zero spend", () => {
+    // A different branch from the one above, and the one the divisor guard is
+    // actually for: null is filtered out before the sum, so the null case
+    // never reaches the division at all. These rows do — they are measurements
+    // — and they sum to zero, which is why the guard reads `total <= 0` rather
+    // than checking for an empty set.
+    const summary = summarizeAgentFleet({
+      rows: [
+        agentRow({ id: "quiet-a", name: "quiet-a", costUsd30d: 0 }),
+        agentRow({ id: "quiet-b", name: "quiet-b", costUsd30d: 0 }),
+      ],
+    });
+
+    /** @scenario "Top spenders rank by share of the spend we actually measured" */
+    it("ranks nobody, rather than giving everyone an equal share of nothing", () => {
       expect(summary.topSpenders).toEqual([]);
     });
   });
