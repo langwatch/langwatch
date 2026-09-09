@@ -100,7 +100,9 @@ export function createVoiceSessionPortsFromServices({
       // The status decides whether a retried finish short-circuits (terminal)
       // or re-drives a half-written run (non-terminal, #7973). The persisted
       // source and recording let a terminal retry report the original run's
-      // transcript origin and Play control (AC14).
+      // transcript origin and Play control (AC14). The persisted audioUrl is
+      // already the same-origin proxy URL the transport wrote (fetchCallRecord
+      // sets it from audioProxyUrl), so it is returned as-is.
       return {
         agentId: typeof agentId === "string" ? agentId : null,
         status: run.status,

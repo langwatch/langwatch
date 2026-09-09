@@ -311,7 +311,8 @@ describe("finishVoiceSession", () => {
               agentId: "agent_existing",
               status: ScenarioRunStatus.SUCCESS,
               source: "browser" as const,
-              audioUrl: "https://example.test/rec.mp3",
+              // Same-origin proxy URL the transport wrote, read back verbatim.
+              audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
             })),
           },
         });
@@ -325,7 +326,9 @@ describe("finishVoiceSession", () => {
         expect(writeCallRun).not.toHaveBeenCalled();
         expect(result.source).toBe("browser");
         expect(result.hasAudio).toBe(true);
-        expect(result.audioUrl).toBe("https://example.test/rec.mp3");
+        expect(result.audioUrl).toBe(
+          "/api/voice/session/conv_1/audio?projectId=p1",
+        );
       });
 
       /** @scenario "A retried hang-up leaves a terminal run untouched" */
