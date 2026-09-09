@@ -15,15 +15,20 @@
  * runs the real role bag, so a grant missing from it fails these tests rather
  * than shipping a screen nobody can open.
  *
- * THE MOCKS LIVE HERE, WHICH PUTS ONE OBLIGATION ON EVERY SUITE THAT IMPORTS
- * IT: nothing imported above this module may reach a module mocked below.
- * `vi.mock` is hoisted within the file that writes it, so these registrations
- * happen when this module is evaluated — an import placed earlier in a suite
- * that transitively pulls `~/utils/api` would bind the real client, and the
- * failure would look like a missing tRPC provider rather than an import order.
- * Today no suite does (`~/components/governance/sample`, the only non-harness
- * import above it, reaches none of them). Keep it that way, or move the import
- * below this one.
+ * THE MOCKS LIVE HERE, WHICH IS A DIVERGENCE, AND IT IS PAID FOR.
+ * The house rule is that `vi.mock` stays in each test file, because it has to
+ * hoist above that file's own imports (`src/components/settings/__tests__/
+ * modelProviderDrawerHarness.tsx` says so and keeps to it). Five suites here
+ * would mean five copies of the ninety lines below, which is the duplication
+ * the split existed to remove, and it would put the largest suite back over
+ * the size limit the split existed to satisfy.
+ *
+ * The rule guards against one thing: an import placed ABOVE the harness that
+ * transitively reaches a mocked module would bind the real one, and the
+ * failure would read as a missing tRPC provider rather than as an import
+ * order. So this file re-exports everything the five suites need — see the
+ * bottom — and none of them imports anything but this and the test libraries.
+ * There is no line above the harness for the hazard to live on.
  *
  * The page is the right level for these assertions rather than the panes: two
  * of the rules under test — where the actions sit, and that no native select
@@ -148,62 +153,11 @@ vi.mock("~/utils/api", () => {
 
 import { AddIngestionSourceMenu } from "../../components/AddIngestionSourceMenu";
 import InventoryPage from "../inventory";
+import { CONNECTED_SOURCES } from "./inventoryFixtures";
 
 /** The real org-admin bag, not a hand-written list that could drift from it. */
 export const ORG_ADMIN_PERMISSIONS =
   getOrganizationRolePermissions("ADMIN").slice();
-
-/**
- * A Genie source and a Copilot Studio one: between them they cover a card with
- * a licence read, a card without, and two different environment addresses.
- */
-export const CONNECTED_SOURCES = [
-  {
-    id: "src-genie",
-    organizationId: "org-1",
-    teamId: null,
-    name: "Warehouse questions",
-    description: null,
-    sourceType: "databricks_genie",
-    parserConfig: { workspaceUrl: "https://example-workspace.cloud.test/" },
-    status: "active",
-    errorCount: 0,
-    lastSuccessAt: null,
-    lastEventAt: null,
-    traceProjectId: null,
-    traceProjectArchived: false,
-    archivedAt: null,
-    createdAt: new Date("2026-04-02T10:00:00.000Z"),
-    updatedAt: new Date("2026-04-02T10:00:00.000Z"),
-    createdById: null,
-    hasPollerCursor: false,
-    pullSchedule: null,
-  },
-  {
-    id: "src-copilot",
-    organizationId: "org-1",
-    teamId: null,
-    name: "Assistant transcripts",
-    description: null,
-    sourceType: "copilot_studio_dataverse",
-    parserConfig: {
-      environmentUrl: "https://example-env.crm.test",
-      readSeats: true,
-    },
-    status: "active",
-    errorCount: 0,
-    lastSuccessAt: null,
-    lastEventAt: null,
-    traceProjectId: null,
-    traceProjectArchived: false,
-    archivedAt: null,
-    createdAt: new Date("2026-05-11T08:30:00.000Z"),
-    updatedAt: new Date("2026-05-11T08:30:00.000Z"),
-    createdById: null,
-    hasPollerCursor: false,
-    pullSchedule: null,
-  },
-];
 
 export function renderScreen() {
   return render(
@@ -322,3 +276,13 @@ export function connectTools() {
   };
   hoistedHarness.health = { data: [{ id: "src-genie", eventsLast24h: 1234 }] };
 }
+
+/*
+ * Re-exported so no suite has to import them itself. Every import a suite
+ * writes above this one is a chance to bind a module before the mocks above
+ * register; giving the suites a single door removes the chance rather than
+ * documenting it.
+ */
+export { findNativeSelects } from "~/components/governance/filters";
+export { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
+export { CONNECTED_SOURCES } from "./inventoryFixtures";

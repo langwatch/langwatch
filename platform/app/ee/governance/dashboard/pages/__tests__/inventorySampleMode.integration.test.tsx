@@ -15,9 +15,12 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
-
-import { harness, openTab, renderScreen } from "./inventoryScreenHarness";
+import {
+  harness,
+  openTab,
+  renderScreen,
+  SAMPLE_CHOICE_KEY,
+} from "./inventoryScreenHarness";
 
 describe("given an admin on the Inventory page", () => {
   describe("when sample mode is explicitly enabled", () => {

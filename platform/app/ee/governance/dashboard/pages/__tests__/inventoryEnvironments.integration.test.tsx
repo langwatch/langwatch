@@ -15,9 +15,11 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
-
-import { openTab, renderScreen } from "./inventoryScreenHarness";
+import {
+  openTab,
+  renderScreen,
+  SAMPLE_CHOICE_KEY,
+} from "./inventoryScreenHarness";
 
 describe("given an admin on the Inventory page", () => {
   describe("when nothing is connected and samples are turned off", () => {
