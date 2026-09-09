@@ -22,9 +22,13 @@
  * compaction is forced here and the same question asked on both sides of it.
  *
  * The payloads come from the production seat-event builder
- * (`microsoftSeatEvents`), so the bag the counts travel in is the real one.
- * Only the OCSF envelope around it is rebuilt locally: the puller worker's
- * mapper is module-private, and the envelope has its own coverage in
+ * (`microsoftSeatEvents`), so the bag the counts travel in is the real one,
+ * and the actor is placed by the production `ocsfActorFields` rather than
+ * assigned to a column here. A licence pool names no person, so today that
+ * places an empty string whichever way it is written; what it buys is that
+ * this fixture cannot drift into disagreeing with the mapper about which
+ * column an actor string belongs in. The rest of the OCSF envelope is rebuilt
+ * locally; it has its own coverage in
  * pullers/__tests__/pullerWorker.ocsfMapping.unit.test.ts.
  *
  * Spec: specs/governance/governance-cost-screen.feature
@@ -55,6 +59,7 @@ import {
   SEAT_REPORT_ACTION,
   type SubscribedSku,
 } from "../pullers/microsoftGraphSeats";
+import { ocsfActorFields } from "../pullers/ocsfPullEventMapping";
 
 const TABLE = "governance_ocsf_events";
 const SOURCE_TYPE = "copilot_studio";
@@ -136,8 +141,7 @@ function seatRowsFor({
       activityId: OCSF_ACTIVITY.INVOKE,
       severityId: OCSF_SEVERITY.INFO,
       eventTime: new Date(event.event_timestamp),
-      actorUserId: "",
-      actorEmail: event.actor,
+      ...ocsfActorFields(event.actor),
       actorEnduserId: "",
       actionName: event.action,
       targetName: event.target,

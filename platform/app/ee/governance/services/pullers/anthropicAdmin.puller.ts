@@ -387,6 +387,15 @@ const costResultSchema = z
     cost_type: z.string().nullable().default(null),
     model: z.string().nullable().default(null),
   })
+  // Coordinates the cost key does NOT carry (context_window, service_tier,
+  // token_type, inference_geo, and whatever the provider adds next) ride
+  // through here under the provider's own names into `raw_payload`. They are
+  // deliberately NOT declared: a declaration narrows the accepted contract,
+  // so one unexpected value type would throw out of `bucketEvents` and wedge
+  // the whole run, and a `.default(null)` would write keys into `raw_payload`
+  // that the provider never sent. `assertRowsAreDistinguishable` names them
+  // from the stored payload when two rows collide, which is all they are for.
+  // They never widen the key, which is the restatement identity.
   .passthrough();
 
 /**
@@ -442,25 +451,6 @@ const pageSchema = z.object({
 });
 
 /**
- * The newest bucket start in one page.
- *
- * NOT the last element of the array. Anthropic does not promise an order
- * within a page, and reading the last bucket as the newest is only correct
- * while the page happens to ascend. On an out-of-order page it hands back an
- * earlier instant than one already emitted, so the watermark it mints re-reads
- * the window. Under an unchanged query that re-read restates rather than
- * duplicating — the ids carry the bucket and its dimensions — and the cost is
- * a window that stops advancing; it becomes duplicated spend on the usage
- * report only once a query change moves the keys (see `cursorSchema`). The
- * maximum is the only value every bucket on the page is at or behind, which is
- * exactly what a watermark has to mean.
- *
- * Instants that do not parse are ignored rather than compared as strings: a
- * value we cannot order cannot be certified as a resume point. A page where
- * none parse yields null, and null resumes from the window start — a re-read,
- * never a skip.
- */
-/**
  * The later of two instants, ignoring one that cannot be parsed.
  *
  * `newestBucketStart` orders a page against itself. Anthropic promises no
@@ -479,6 +469,25 @@ function laterInstant(a: string | null, b: string | null): string | null {
   return bMs > aMs ? b : a;
 }
 
+/**
+ * The newest bucket start in one page.
+ *
+ * NOT the last element of the array. Anthropic does not promise an order
+ * within a page, and reading the last bucket as the newest is only correct
+ * while the page happens to ascend. On an out-of-order page it hands back an
+ * earlier instant than one already emitted, so the watermark it mints re-reads
+ * the window. Under an unchanged query that re-read restates rather than
+ * duplicating — the ids carry the bucket and its dimensions — and the cost is
+ * a window that stops advancing; it becomes duplicated spend on the usage
+ * report only once a query change moves the keys (see `cursorSchema`). The
+ * maximum is the only value every bucket on the page is at or behind, which is
+ * exactly what a watermark has to mean.
+ *
+ * Instants that do not parse are ignored rather than compared as strings: a
+ * value we cannot order cannot be certified as a resume point. A page where
+ * none parse yields null, and null resumes from the window start — a re-read,
+ * never a skip.
+ */
 function newestBucketStart(
   buckets: z.infer<typeof bucketSchema>[],
 ): string | null {
@@ -579,9 +588,12 @@ function amountSignature(event: NormalizedPullEvent): string {
  * A plain `Error`, not a `HandledError`: there is no named cause a caller can
  * act on, only a provider contract we did not anticipate.
  *
- * The message carries the count and the dimension NAMES. Never the values —
- * workspace ids and free-text descriptions are customer billing coordinates,
- * and this string travels into logs and the source's error state.
+ * The message carries the count, the dimension NAMES, and the names of the
+ * fields the colliding rows actually disagree on. Never the values — workspace
+ * ids and free-text descriptions are customer billing coordinates, and this
+ * string travels into logs and the source's error state. Naming the fields is
+ * what turns "something outside the key" into a lead: the operator reads which
+ * coordinate the provider split the row by without seeing whose spend it was.
  */
 function assertRowsAreDistinguishable({
   events,
@@ -590,22 +602,102 @@ function assertRowsAreDistinguishable({
   events: NormalizedPullEvent[];
   report: AnthropicAdminPullConfig["report"];
 }): void {
+  const colliding = collidingRowsByKey(events);
+  if (colliding.size === 0) return;
+  const dimensionNames = Object.keys(emittedHint(events[0]!)?.dimensions ?? {});
+  // Per key, never across keys: rows under two different keys differ in the
+  // dimensions BY DESIGN, and naming those would report the key as its own
+  // explanation.
+  const differingNames = new Set<string>();
+  for (const rows of colliding.values()) {
+    for (const name of differingFieldNames(rows)) differingNames.add(name);
+  }
+  const differingClause =
+    differingNames.size === 0
+      ? ""
+      : `; the colliding rows differ in ${[...differingNames].sort().join(", ")}`;
+  throw new Error(
+    `anthropic ${report}_report returned one page holding ${colliding.size} restatement key(s) shared by rows reporting different amounts; the key is built from ${dimensionNames.join(", ")}, so the provider is distinguishing these rows by something outside it and recording the page would drop spend${differingClause}`,
+  );
+}
+
+/**
+ * The rows behind each key that two or more of them report different amounts
+ * under. Keys whose rows agree are not here: a provider repeating a row costs
+ * nothing, whichever copy survives the upsert.
+ */
+function collidingRowsByKey(
+  events: NormalizedPullEvent[],
+): Map<string, NormalizedPullEvent[]> {
+  const rowsByKey = new Map<string, NormalizedPullEvent[]>();
   const amountByKey = new Map<string, string>();
   const collidingKeys = new Set<string>();
   for (const event of events) {
+    const key = event.source_event_id;
+    const group = rowsByKey.get(key);
+    if (group) group.push(event);
+    else rowsByKey.set(key, [event]);
     const amount = amountSignature(event);
-    const seen = amountByKey.get(event.source_event_id);
-    if (seen === undefined) {
-      amountByKey.set(event.source_event_id, amount);
-      continue;
-    }
-    if (seen !== amount) collidingKeys.add(event.source_event_id);
+    const seen = amountByKey.get(key);
+    if (seen === undefined) amountByKey.set(key, amount);
+    else if (seen !== amount) collidingKeys.add(key);
   }
-  if (collidingKeys.size === 0) return;
-  const dimensionNames = Object.keys(emittedHint(events[0]!)?.dimensions ?? {});
-  throw new Error(
-    `anthropic ${report}_report returned one page holding ${collidingKeys.size} restatement key(s) shared by rows reporting different amounts; the key is built from ${dimensionNames.join(", ")}, so the provider is distinguishing these rows by something outside it and recording the page would drop spend`,
+  return new Map(
+    [...collidingKeys].map((key) => [key, rowsByKey.get(key) ?? []]),
   );
+}
+
+/**
+ * The provider field NAMES on which rows sharing one key disagree.
+ *
+ * Read off `raw_payload`, which is the parsed provider row — the only place
+ * the coordinates outside the key survive, since the dimensions are exactly
+ * what the key already carries. `amount` will normally be among them: that is
+ * the premise of the refusal rather than noise, and listing it costs a word
+ * where suppressing it would need a hardcoded list of money fields to drift.
+ *
+ * A payload that does not parse into an object is skipped rather than guessed
+ * at — an unnameable field is better than a wrong name, and the refusal
+ * already stands on the key alone.
+ */
+function differingFieldNames(events: NormalizedPullEvent[]): string[] {
+  const rows = events
+    .map(parsedRawPayload)
+    .filter((row): row is Record<string, unknown> => row !== null);
+  const first = rows[0];
+  if (first === undefined) return [];
+  const names = new Set<string>();
+  for (const row of rows.slice(1)) {
+    for (const name of new Set([...Object.keys(first), ...Object.keys(row)])) {
+      // Compared by serialized content rather than by identity, so a nested
+      // object (the usage report's `cache_creation`) counts as equal when it
+      // holds the same keys in the same order. Key order is not normalized:
+      // a reordered-but-equal object would be named as differing, which only
+      // adds a word to a message the amount mismatch already justified.
+      // `undefined` and an explicit null are the same absence here.
+      if (
+        JSON.stringify(first[name] ?? null) !==
+        JSON.stringify(row[name] ?? null)
+      ) {
+        names.add(name);
+      }
+    }
+  }
+  return [...names];
+}
+
+/** The parsed provider row an event carries, or null if it is not an object. */
+function parsedRawPayload(
+  event: NormalizedPullEvent,
+): Record<string, unknown> | null {
+  try {
+    const value: unknown = JSON.parse(event.raw_payload);
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

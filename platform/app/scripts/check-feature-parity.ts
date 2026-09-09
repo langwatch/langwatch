@@ -314,7 +314,6 @@ const LEGACY_INERT: string[] = [
   "specs/ai-gateway/governance/routing-policy-scope-cascade.feature",
   "specs/ai-gateway/governance/self-hosted-setup.feature",
   "specs/ai-gateway/governance/sessions-and-devices.feature",
-  "specs/ai-gateway/governance/siem-export.feature",
   "specs/ai-gateway/governance/template-cross-bind-guard.feature",
   "specs/ai-gateway/governance/template-ottl-authoring.feature",
   "specs/ai-gateway/governance/template-ottl-principal-guard.feature",
@@ -683,6 +682,11 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-gateway/governance/ingestion-sources.feature",
   "specs/ai-gateway/governance/ingestion-templates-catalog.feature",
   "specs/ai-gateway/governance/my-usage-dashboard.feature",
+  // Reason: #8041 tagged and bound two scenarios (opaque id placement on
+  // export, and the drop of an opaque email beside a user id) and retired
+  // its LEGACY_INERT entry. The eleven untagged scenarios describe the wider
+  // SIEM export surface and were not audited by that issue.
+  "specs/ai-gateway/governance/siem-export.feature",
   "specs/ai-gateway/governance/ui-contract.feature",
   "specs/ai-gateway/model-provider-scoping.feature",
   "specs/ai-gateway/openai-param-compat.feature",

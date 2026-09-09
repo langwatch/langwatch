@@ -1208,6 +1208,72 @@ describe("the Anthropic Admin puller", () => {
       }
     });
 
+    /** @scenario "A refused Anthropic collision names the fields the two rows differed in" */
+    it("names the field outside the key that the two rows differed in", async () => {
+      // Same day, workspace, description and model — so the same key — and a
+      // different amount, so the guard already refuses. What the operator
+      // could not see was WHY the provider split the row: the tier sat on
+      // the stored row all along, and the message never named it.
+      fetchMock.mockResolvedValue(
+        jsonResponse(
+          pageWith([
+            { ...COST_ROW, service_tier: "standard" },
+            {
+              ...COST_ROW,
+              service_tier: "priority",
+              amount: "10000.000000",
+            },
+          ]),
+        ),
+      );
+
+      let error: unknown;
+      let run: unknown;
+      try {
+        run = await new AnthropicAdminPuller().runOnce(RUN_OPTIONS, config);
+      } catch (thrown) {
+        error = thrown;
+      }
+
+      // Refused, and nothing from the page recorded: the run never returns a
+      // result, so no event reaches the sink.
+      expect(error).toBeInstanceOf(Error);
+      expect(run).toBeUndefined();
+
+      const message = (error as Error).message;
+      // The lead: the provider's own name for the coordinate it split on.
+      expect(message).toContain("service_tier");
+      // The key it already named is still there — this adds to the message,
+      // it does not replace it.
+      expect(message).toContain("1 restatement key");
+      expect(message).toContain("workspaceId");
+      expect(message).toContain("costType");
+      // Names only. The tier VALUES are provider billing coordinates and this
+      // string reaches logs and the source's error state.
+      for (const value of ["standard", "priority", "ws_1", "Claude usage"]) {
+        expect(message).not.toContain(value);
+      }
+    });
+
+    it("leaves the key alone when a row carries the differing field", async () => {
+      // The refusal names the field; it must not be answered by widening the
+      // key. A key that carried the tier would re-key every cost cell already
+      // stored, so a later correction would land beside the figure it
+      // corrects instead of replacing it.
+      async function keyForTier(tier: string): Promise<string> {
+        fetchMock.mockResolvedValue(
+          jsonResponse(pageWith([{ ...COST_ROW, service_tier: tier }])),
+        );
+        const run = await new AnthropicAdminPuller().runOnce(
+          RUN_OPTIONS,
+          config,
+        );
+        return run.events[0]!.source_event_id;
+      }
+
+      expect(await keyForTier("standard")).toBe(await keyForTier("priority"));
+    });
+
     it("accepts a row the provider repeated with the same amount", async () => {
       fetchMock.mockResolvedValue(jsonResponse(pageWith([COST_ROW, COST_ROW])));
 
