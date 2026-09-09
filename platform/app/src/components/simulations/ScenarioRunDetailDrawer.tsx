@@ -438,6 +438,12 @@ function ClassicScenarioRunDetailDrawer({
                         streamingMessages={streamingMessages}
                         variant="drawer"
                         projectId={project?.id ?? ""}
+                        // A voice "Call it myself" caller is a real person, so
+                        // their turns read as "You", not "User Simulator" (#8020).
+                        isHumanCaller={
+                          scenarioState.metadata?.langwatch?.callerKind ===
+                          "human"
+                        }
                       />
                     </ConversationExpandContext.Provider>
                   </RunDetailSection>

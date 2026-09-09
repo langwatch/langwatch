@@ -69,6 +69,7 @@ describe("writeVoiceCallRun", () => {
           agentRowId: "agent_1",
           agentDisplayName: "Support Bot",
           record: fakeRecord({ isCutAtLimit: true }),
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
           turnTraceIds: [],
         });
 
@@ -98,6 +99,7 @@ describe("writeVoiceCallRun", () => {
           agentRowId: "agent_1",
           agentDisplayName: "Support Bot",
           record,
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
           turnTraceIds: ["trace_0"],
         };
 
@@ -123,6 +125,7 @@ describe("writeVoiceCallRun", () => {
           agentRowId: "agent_1",
           agentDisplayName: "Support Bot",
           record,
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
           turnTraceIds: ["trace_0", "trace_0"],
         };
 
@@ -157,6 +160,7 @@ describe("writeVoiceCallRun", () => {
           agentDisplayName: "Support Bot",
           record,
           // Both turns are one exchange, so they share the trace id.
+          scenario: { scenarioId: "scenario_1", scenarioSetId: "set_x" },
           turnTraceIds: ["trace_a", "trace_a"],
         });
 

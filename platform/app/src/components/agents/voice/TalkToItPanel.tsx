@@ -13,7 +13,6 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { z } from "zod";
 
 import {
-  VOICE_CALL_SCENARIO_SET_ID,
   VOICE_TRANSPORTS,
   type VoiceTransport,
 } from "~/server/agents/voice/voice-agent.config";
@@ -122,7 +121,12 @@ function createTalkRefs(agentRowId: string | undefined): TalkRefs {
   };
 }
 
-/** The run link the done view offers, or undefined until a run exists. */
+/**
+ * The run link the done view offers, or undefined when there is no run to link.
+ * Only a "Call it myself" call writes a run (#8020), and that path always
+ * learns its set from the finish response, so a run id without a set never
+ * occurs; a drawer call has an empty run id and links nowhere.
+ */
 function runHrefOf({
   state,
   runSetId,
@@ -132,10 +136,10 @@ function runHrefOf({
   runSetId: string | undefined;
   projectSlug: string;
 }): string | undefined {
-  if (state.kind !== "done" || !state.runId) return undefined;
-  return `/${projectSlug}/simulations/${
-    runSetId ?? VOICE_CALL_SCENARIO_SET_ID
-  }/${encodeURIComponent(state.runId)}`;
+  if (state.kind !== "done" || !state.runId || !runSetId) return undefined;
+  return `/${projectSlug}/simulations/${runSetId}/${encodeURIComponent(
+    state.runId,
+  )}`;
 }
 
 function stopTick(refs: TalkRefs): void {
