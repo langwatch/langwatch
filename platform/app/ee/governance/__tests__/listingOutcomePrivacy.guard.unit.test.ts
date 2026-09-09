@@ -330,8 +330,6 @@ describe("given the listing outcome columns exist", () => {
 
   describe("when a command exports a telemetry span", () => {
     /**
-     * @scenario "The erasure count never rides a span"
-     *
      * This block exists because this exact leak SHIPPED. The people-listed
      * command carried `payload.withheld_person_count`, and a person reading the
      * file caught it -- the rule was written down in four places and enforced
@@ -365,6 +363,7 @@ describe("given the listing outcome columns exist", () => {
      * next month with a leaky attribute, is simply not covered and the suite
      * stays green by omission -- today's failure wearing a test's clothes.
      */
+    /** @scenario "The erasure count never rides a span" */
     it("puts exactly the declared attributes on every command's span", () => {
       // A payload populated for every command in the module, with the withheld
       // count set to a sentinel: if any span ever carries it, the value is
