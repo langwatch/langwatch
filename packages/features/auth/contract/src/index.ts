@@ -5,6 +5,7 @@ export * from "./cli-session-keys.ts";
 export * from "./front-door.responses.ts";
 export * from "./front-door.schemas.ts";
 export { frontDoorTrpc } from "./front-door.trpc.ts";
+export { publicEnvTrpc } from "./public-env.trpc.ts";
 export * from "./public-env.trpc.ts";
 export * from "./sso-matching.ts";
 export * from "./sso-path-gate.ts";
