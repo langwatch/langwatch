@@ -39,6 +39,7 @@ type TokenVariant =
 
 const BASE_URL = "http://localhost:3000";
 const PROVIDER_ID = "auth0";
+const USERINFO_EMAIL = "sam@acme.test";
 const CLIENT_ID = "auth0-client";
 const codes = new Map<string, { nonce: string; variant: TokenVariant }>();
 const authorizationResponseSchema = z.object({ url: z.string().url() });
@@ -144,7 +145,7 @@ const startIdentityProvider = async (): Promise<void> => {
     if (url.pathname === "/userinfo") {
       json(response, {
         sub: "auth0|sam",
-        email: "sam@acme.test",
+        email: USERINFO_EMAIL,
         email_verified: true,
         name: "Sam",
       });
@@ -206,12 +207,38 @@ const applyResponseCookies = (
   return [...jar].map(([name, value]) => `${name}=${value}`).join("; ");
 };
 
-const buildHarness = () => {
-  const db: MemoryDb = { user: [], session: [], account: [], verification: [] };
+/**
+ * A User row with no Account rows: a pre-seeded invite, a half-finished legacy
+ * signup, or a migration leftover. Whether an OAuth callback may CLAIM one of
+ * these is the whole subject of `specs/auth/sso-orphan-user-linking.feature`.
+ */
+const orphanUser = ({ emailVerified }: { emailVerified: boolean }) => ({
+  id: `orphan-${randomUUID()}`,
+  email: USERINFO_EMAIL,
+  name: "Sam",
+  emailVerified,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
+
+const buildHarness = ({
+  users = [],
+}: { users?: Record<string, unknown>[] } = {}) => {
+  const db: MemoryDb = {
+    user: [...users],
+    session: [],
+    account: [],
+    verification: [],
+  };
   const auth = betterAuth({
     baseURL: BASE_URL,
     secret: "test-secret-test-secret-test-secret",
     database: memoryAdapter(db),
+    // Mirrors `better-auth/config/models.ts`. Linking is ENABLED in
+    // production, so a test that left it off would prove nothing about the
+    // deployment it claims to describe — the hijack question only exists
+    // because linking is on.
+    account: { accountLinking: { enabled: true } },
     plugins: [
       genericOAuth({
         config: [
@@ -394,5 +421,80 @@ describe("generic OAuth's verified ID-token boundary", () => {
     expect(replayed.headers.get("location")).toContain("error=");
     expect(db.account).toHaveLength(1);
     expect(db.session).toHaveLength(1);
+  });
+});
+
+/**
+ * The orphan-linking rule, against the library that actually decides it.
+ *
+ * `specs/auth/sso-orphan-user-linking.feature` describes a security property
+ * that no code of ours implements: whether an OAuth callback may claim an
+ * existing User row that holds no Account rows. `accountLinking.enabled` is
+ * ON in production — deliberately, so an invited person is not locked out of
+ * their own account — and what stops that same setting from being a hijack is
+ * better-auth's own refusal to link into a row whose `emailVerified` is false.
+ *
+ * That refusal lived in a code COMMENT and in nothing else: the spec was
+ * untagged, so the parity gate reported it green while binding nothing, and a
+ * better-auth upgrade or a stray `trustedProviders` entry could have opened
+ * the hijack with every test still passing. These two bind it to behaviour.
+ */
+describe("given a User row that holds no linked accounts", () => {
+  describe("when an OAuth callback returns that row's address", () => {
+    /** @scenario "Orphan User row from a prior invite is auto-linked on first SSO sign-in" */
+    it("links a verified orphan rather than locking them out", async () => {
+      const orphan = orphanUser({ emailVerified: true });
+      const { auth, db } = buildHarness({ users: [orphan] });
+      const flow = await beginCallback({
+        auth,
+        variant: "valid",
+        assertStarted: ({ status, state, nonce }) => {
+          expect(status).toBe(200);
+          expect(state).toBeTruthy();
+          expect(nonce).toBeTruthy();
+        },
+      });
+
+      const response = await flow.callback();
+
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).not.toContain("error=");
+      // The SAME row, not a second one: the point of linking is that the
+      // invite they were sent and the account they signed into are one.
+      expect(db.user).toHaveLength(1);
+      expect(db.account).toHaveLength(1);
+      expect(db.account[0]?.userId).toBe(orphan.id);
+      expect(db.session).toHaveLength(1);
+      expect(db.session[0]?.userId).toBe(orphan.id);
+    });
+
+    /** @scenario "Unverified orphan User cannot be hijacked via OAuth" */
+    it("refuses an unverified orphan, so the address alone claims nothing", async () => {
+      const orphan = orphanUser({ emailVerified: false });
+      const { auth, db } = buildHarness({ users: [orphan] });
+      const flow = await beginCallback({
+        auth,
+        variant: "valid",
+        assertStarted: ({ status, state, nonce }) => {
+          expect(status).toBe(200);
+          expect(state).toBeTruthy();
+          expect(nonce).toBeTruthy();
+        },
+      });
+
+      const response = await flow.callback();
+
+      // THE ASSERTION A HIJACK WOULD FAIL. The identity provider asserting an
+      // address is one side of the evidence; the row holding it verified is
+      // the other. With only the first, nothing may attach to this person.
+      expect(response.status).toBe(302);
+      expect(response.headers.get("location")).toContain("error=");
+      expect(
+        db.account.filter((row) => row.userId === orphan.id),
+      ).toHaveLength(0);
+      expect(db.session.filter((row) => row.userId === orphan.id)).toHaveLength(
+        0,
+      );
+    });
   });
 });

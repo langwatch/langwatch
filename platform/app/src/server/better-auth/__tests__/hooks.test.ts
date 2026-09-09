@@ -639,6 +639,7 @@ describe("beforeAccountCreate", () => {
   });
 
   describe("when a NEW user's email domain matches an SSO-enforced org with WRONG provider", () => {
+    /** @scenario "SSO-domain guard still blocks the wrong provider" */
     it("hard-blocks by throwing SSO_PROVIDER_NOT_ALLOWED", async () => {
       const prisma = makePrismaMock({
         user: {
