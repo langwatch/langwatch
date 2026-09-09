@@ -3,9 +3,9 @@
  * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
  */
 
+import type { TimeInput } from "@langwatch/time";
 import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type {
-  opsBugReportTrpc,
   opsDashboardTrpc,
   opsEventLogTrpc,
   opsPlatformTrpc,
@@ -31,6 +31,55 @@ export type OpsOrganizationGraph = {
  * Procedures other features own. Organization belongs to a separate feature,
  * not yet split. SSO connections are enterprise-only, imported through composition.
  */
+/** One report in the issue inbox's listing. */
+export type BugReportListingRow = {
+  id: string;
+  createdAt: TimeInput;
+  source: string;
+  kind: string;
+  title: string;
+  agent: string | null;
+  linkedProjectId: string | null;
+  contactEmail: string | null;
+};
+
+/** One report opened in full, transcript included. */
+export type BugReportDetail = BugReportListingRow & {
+  summary: string | null;
+  cliVersion: string | null;
+  sessionData: string | null;
+  sessionTruncated: boolean;
+};
+
+/**
+ * One SSO connection as the back office reads it.
+ */
+export type BackofficeSsoConnection = Readonly<{
+  connectionId: string;
+  organizationId: string;
+  organizationName: string | null;
+  type: string;
+  state: string;
+  claimedDomains: string[];
+  approvedDomains: string[];
+  verifiedDomains: string[];
+  domainVerifications: {
+    domain: string;
+    method: string;
+    actorId: string | null;
+    verifiedAtMs: number;
+  }[];
+  providerId: string;
+  issuer: string | null;
+  allowsJit: boolean;
+  source: string;
+  testLoginAccountId: string | null;
+  rejection: { domain: string; note: string } | null;
+  pendingVerificationDomain: string | null;
+  createdAtMs: number;
+  updatedAtMs: number;
+}>;
+
 type BorrowedProcedures = {
   organization: {
     /**
@@ -39,14 +88,25 @@ type BorrowedProcedures = {
      */
     getAll: { query: { input: { isDemo: boolean }; output: OpsOrganizationGraph[] } };
   };
+  bugReports: {
+    getAll: {
+      query: {
+        input: { page: number; pageSize: number; search?: string };
+        output: { reports: BugReportListingRow[]; total: number };
+      };
+    };
+    getById: { query: { input: { id: string }; output: BugReportDetail } };
+  };
   ssoConnections: {
     getAll: {
       query: {
         input: { page: number; pageSize: number; search?: string };
-        output: { connections: unknown[]; total: number };
+        output: { connections: BackofficeSsoConnection[]; total: number };
       };
     };
-    getById: { query: { input: { connectionId: string }; output: unknown } };
+    getById: {
+      query: { input: { connectionId: string }; output: BackofficeSsoConnection | null };
+    };
     approveDomainClaim: {
       mutation: {
         input: { organizationId: string; connectionId: string; domain: string };
@@ -98,7 +158,6 @@ export type OpsApiMap = ContractApiMap<typeof opsDashboardTrpc> &
   ContractApiMap<typeof opsPlatformTrpc> &
   ContractApiMap<typeof opsProcessTrpc> &
   ContractApiMap<typeof opsQueueTrpc> &
-  ContractApiMap<typeof opsBugReportTrpc> &
   ContractApiMap<typeof promptTrpc> &
   BorrowedProcedures;
 
