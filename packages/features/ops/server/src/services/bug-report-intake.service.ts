@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { redactReportText, redactSessionJsonl } from "@langwatch/redaction";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { BugReportRepositoryPort } from "../ports/bug-report.port.ts";
 import type { BugReportNotifierPort } from "../ports/bug-report-notifier.port.ts";
 import type { BugReportRateLimiterPort } from "../ports/bug-report-rate-limiter.port.ts";
@@ -72,7 +72,7 @@ export class BugReportIntakeService {
     callerKey: string;
     apiToken?: string;
     projectIdHint?: string | null;
-    apiKeys?: ApiKeyService;
+    apiKeys?: ApiKeyApi;
   }): Promise<{ id: string }> {
     const limit = await this.deps.rateLimiter.consume({
       key: `bug-report:${callerKey}`,
@@ -168,14 +168,14 @@ async function resolveLinkedProjectId({
 }: {
   apiToken?: string;
   projectIdHint?: string | null;
-  apiKeys?: ApiKeyService;
+  apiKeys?: ApiKeyApi;
 }): Promise<string | null> {
   if (!apiToken || !apiKeys) {
     return null;
   }
 
   try {
-    const resolved = await apiKeys.tryResolveToken({
+    const resolved = await apiKeys.findResolvedToken({
       token: apiToken,
       projectId: projectIdHint ?? null,
     });

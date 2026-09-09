@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
 import {
   NoopSchedulerWakeService,
@@ -12,8 +13,7 @@ import { SchedulerOpsService } from "../scheduler-ops.service.ts";
 const NOW = new Date("2026-08-11T12:00:00.000Z");
 const at = (offsetMs: number) => new Date(NOW.getTime() + offsetMs);
 
-const projects: ProjectService = Object.create(ProjectService.prototype);
-projects.listNamesByIds = async () => [];
+const projects = createApiFixture<ProjectApi>({ listNamesByIds: async () => [] });
 
 const record = (over: Partial<ScheduledJobRecord> = {}): ScheduledJobRecord => ({
   id: "sched_1",

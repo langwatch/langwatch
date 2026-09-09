@@ -232,7 +232,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
       const app = mountApp({
         apiKeys: () =>
           ({
-            tryResolveToken: async ({ token }: { token: string }) =>
+            findResolvedToken: async ({ token }: { token: string }) =>
               token === legacyApiKey ? { project: { id: projectId } } : null,
           }) as never,
       });
@@ -250,7 +250,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
     /** @scenario "Reports with an invalid API key are still accepted, unlinked" */
     it("still accepts the report, unlinked", async () => {
       const app = mountApp({
-        apiKeys: () => ({ tryResolveToken: async () => null }) as never,
+        apiKeys: () => ({ findResolvedToken: async () => null }) as never,
       });
       const response = await postReport(
         baseReport(),

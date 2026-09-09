@@ -9,7 +9,7 @@ import {
   MANAGEMENT_API_VERSION,
   type MountableRestApp,
 } from "@langwatch/api/rest";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { Context } from "hono";
 import { z } from "zod";
@@ -46,7 +46,7 @@ export type BugReportRestPorts = Readonly<{
    * to resolve it through. Absent means every report files unlinked, which is
    * the same degradation an invalid key already produces.
    */
-  apiKeys?: (() => ApiKeyService) | undefined;
+  apiKeys?: (() => ApiKeyApi) | undefined;
 }>;
 
 const bugReportBodySchema = z

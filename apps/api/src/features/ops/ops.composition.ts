@@ -31,6 +31,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { UserService } from "@langwatch/user-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { ResourceScope } from "@langwatch/runtime-composition";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiAuditPort } from "../../api-request.policy.ts";
@@ -54,6 +55,8 @@ export type OpsFeatureCollaborators = Readonly<{
   prisma: ApiTrpcInfrastructure["prisma"];
   featureFlags: ApiTrpcInfrastructure["featureFlags"];
   audit: ApiAuditPort | undefined;
+  /** The shared audit log every operator act is recorded on. */
+  auditLog: ApiTrpcInfrastructure["auditLog"];
   users: UserService;
   auth: AuthService;
   projects: ProjectService;
@@ -119,6 +122,7 @@ export function composeOpsFeature(options: {
     prisma: options.infrastructure.prisma,
     featureFlags: options.infrastructure.featureFlags,
     audit: options.infrastructure.audit,
+    auditLog: options.infrastructure.auditLog,
     users: options.peers.users,
     auth: options.peers.auth,
     projects: options.peers.projects,
@@ -199,42 +203,55 @@ function composeOps(options: OpsFeatureCollaborators, logger: Logger): OpsApp {
     logger.error({ error }, "failed to start the ops snapshot reader");
   });
 
-  const operations = PostgresOpsAdapter.create({
-    adminEmails: options.adminEmails,
-    // Once the connection projection decides sign-in, editing the legacy
-    // `ssoDomain`/`ssoProvider` strings changes nothing a person experiences,
-    // so the backoffice refuses rather than accepting a no-op (ADR-117 §5).
-    // The flip is one value in one place, which is what makes it reversible in
-    // a hurry.
-    legacySsoStringWritesRetired: process.env.SSOCONN_ROUTING === "enforce",
-    database: options.prisma,
-    audit: new ApiOpsAuditSink(options.audit, logger),
-    users: options.users,
-    auth: options.auth,
-    scheduler: {
-      repository: new PrismaScheduledJobStore(options.prisma),
-      // The scheduler's own polling backstop preserves correctness without a
-      // wake, which is what makes the noop the package's answer rather than a
-      // degradation this root invented.
-      wake: NoopSchedulerWakeService.create(),
-      projects: options.projects,
-    },
-  }).build();
-
   return OpsApp.create({
-    ops: Object.assign(operations, {
-      eventExplorer: composeEventExplorer(options),
-      managerExplorer: composeManagerExplorer(options),
-      replay: unavailableOperatorRuntime<OpsReplayRunner>("the projection replay runner"),
-      // Read-only here: the worker holds the lease and writes the artifact, and
-      // a second writer would publish a second answer for one fleet.
-      snapshots,
-    }) as OpsCapability,
-    featureFlags: options.featureFlags,
-    projects: options.projects,
-    eventingIntrospection: EventingOpsIntrospectionAdapter.create(
-      () => options.eventing?.definitions ?? [],
-    ),
+    dependencies: {
+      users: options.users,
+      auth: options.auth,
+      projects: options.projects,
+      auditLog: options.auditLog,
+    },
+    infrastructure: {
+      createCapability: (peers): OpsCapability => {
+        const operations = PostgresOpsAdapter.create({
+          adminEmails: options.adminEmails,
+          // Once the connection projection decides sign-in, editing the legacy
+          // `ssoDomain`/`ssoProvider` strings changes nothing a person experiences,
+          // so the backoffice refuses rather than accepting a no-op (ADR-117 §5).
+          // The flip is one value in one place, which is what makes it reversible in
+          // a hurry.
+          legacySsoStringWritesRetired: process.env.SSOCONN_ROUTING === "enforce",
+          database: options.prisma,
+          audit: new ApiOpsAuditSink(options.audit, logger),
+          auditLog: peers.auditLog,
+          users: peers.users,
+          auth: peers.auth,
+          scheduler: {
+            repository: new PrismaScheduledJobStore(options.prisma),
+            // The scheduler's own polling backstop preserves correctness without a
+            // wake, which is what makes the noop the package's answer rather than a
+            // degradation this root invented.
+            wake: NoopSchedulerWakeService.create(),
+            projects: peers.projects,
+          },
+        }).build();
+
+        return {
+          ...operations,
+          eventExplorer: composeEventExplorer(options),
+          managerExplorer: composeManagerExplorer(options),
+          replay: unavailableOperatorRuntime<OpsReplayRunner>("the projection replay runner"),
+          // Read-only here: the worker holds the lease and writes the artifact, and
+          // a second writer would publish a second answer for one fleet.
+          snapshots,
+        };
+      },
+      featureFlags: options.featureFlags,
+      eventingIntrospection: EventingOpsIntrospectionAdapter.create(
+        () => options.eventing?.definitions ?? [],
+      ),
+    },
+    config: undefined,
+    resources: new ResourceScope(),
   });
 }
 
@@ -263,7 +280,7 @@ function composeManagerExplorer(options: OpsFeatureCollaborators): OpsProcessExp
   return ManagerExplorerService.create({
     store: PrismaProcessStore.create({ database: options.prisma }),
     fleet: ProcessOpsPrismaRepository.create({ prisma: options.prisma }),
-    audit: ProcessAuditRepository.create({ prisma: options.prisma }),
+    audit: ProcessAuditRepository.create({ prisma: options.prisma, auditLog: options.auditLog }),
     introspection: EventingOpsIntrospectionAdapter.create(
       () => options.eventing?.definitions ?? [],
     ),

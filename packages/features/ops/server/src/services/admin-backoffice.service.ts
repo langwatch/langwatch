@@ -5,8 +5,8 @@ import {
   type AdminOperationResult,
   type AdminOperationParams,
 } from "@langwatch/ops-contract";
-import type { AuthService } from "@langwatch/auth-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
 import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository.ts";
@@ -17,8 +17,8 @@ const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "d
 
 export interface AdminBackofficeServiceOptions {
   repository: AdminBackofficeRepository;
-  users: UserService;
-  auth: AuthService;
+  users: UserApi;
+  auth: AuthApi;
   audit: AdminAuditSink;
   /** True once the connection projection decides sign-in (`SSOCONN_ROUTING=enforce`). */
   legacySsoStringWritesRetired?: boolean | undefined;
@@ -28,8 +28,8 @@ export interface AdminBackofficeServiceOptions {
 export class AdminBackofficeService {
   private constructor(
     private readonly repository: AdminBackofficeRepository,
-    private readonly users: UserService,
-    private readonly auth: AuthService,
+    private readonly users: UserApi,
+    private readonly auth: AuthApi,
     private readonly audit: AdminAuditSink,
     private readonly legacySsoStringWritesRetired: boolean,
   ) {}

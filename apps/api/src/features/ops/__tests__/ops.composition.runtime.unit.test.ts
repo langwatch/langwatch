@@ -3,6 +3,8 @@
  * fleet over its own Postgres, and the ops snapshot over its own Redis
  * (specs/ops/process-manager-visibility.feature, specs/ops/shared-ops-snapshot.feature).
  */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuthService } from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -61,6 +63,7 @@ function compose(options: { prisma: PrismaClient; redis?: RedisConnection | null
       featureFlags: {} as unknown as FeatureFlagApi,
       saasBilling: false,
       audit: undefined,
+      auditLog: createApiFixture<AuditLogApi>(),
     },
     peers: {
       users: {} as unknown as UserService,
@@ -98,7 +101,7 @@ describe("given the API process composes the operator back office", () => {
       });
       const { feature } = compose({ prisma });
 
-      const fleet = await feature.app.processes.getFleetSummary();
+      const fleet = await feature.app.getFleetSummary();
 
       expect(queryRaw).toHaveBeenCalledTimes(2);
       expect(fleet).toEqual([

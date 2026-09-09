@@ -12,7 +12,7 @@ import {
   ScheduleRunInProgressError,
   ScheduleSlotNotStaleError,
 } from "@langwatch/ops-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { SchedulerAuditSinkPort } from "../ports/scheduler-audit-sink.port.ts";
 import type {
   SchedulerOpsRepository,
@@ -28,14 +28,14 @@ export class SchedulerOpsService {
     private readonly repository: SchedulerOpsRepository,
     private readonly audit: SchedulerAuditSinkPort,
     private readonly wake: SchedulerWakePort,
-    private readonly projects: ProjectService,
+    private readonly projects: ProjectApi,
   ) {}
 
   static create(input: {
     repository: SchedulerOpsRepository;
     audit: SchedulerAuditSinkPort;
     wake: SchedulerWakePort;
-    projects: ProjectService;
+    projects: ProjectApi;
   }): SchedulerOpsService {
     return new SchedulerOpsService(input.repository, input.audit, input.wake, input.projects);
   }

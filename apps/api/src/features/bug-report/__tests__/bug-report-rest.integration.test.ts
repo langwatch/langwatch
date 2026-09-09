@@ -140,7 +140,7 @@ function mount(options: {
     credentials: options.credentials ?? (() => null),
     apiKeys: () =>
       ({
-        tryResolveToken: async () => ({ project: { id: "project_1" } }),
+        findResolvedToken: async () => ({ project: { id: "project_1" } }),
       }) as never,
   };
 

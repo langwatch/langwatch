@@ -19,6 +19,7 @@ import { PrismaMigrationMembershipRepository } from "../repositories/prisma/pris
 import { PrismaUserTenantSourceRepository } from "../repositories/prisma/prisma.user-tenant-source.repository.ts";
 import { RedisMigrationLeaseRepository } from "../repositories/redis/redis.migration-lease.repository.ts";
 import { PrismaOrganizationTenantSourceRepository } from "../repositories/prisma/prisma.organization-tenant-source.repository.ts";
+import { PrismaProjectTenantSourceRepository } from "../repositories/prisma/prisma.project-tenant-source.repository.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../repositories/prisma/prisma.system-migration-state.repository.ts";
 
@@ -59,6 +60,7 @@ export type PostgresSystemMigrationsAdapterOptions = Readonly<{
   isSaaS: () => boolean;
   /** The organization-rooted migrations this installation registered. */
   migrations: () => readonly SystemMigration[];
+  tenantAxis?: "organization" | "project";
   /**
    * The USER-rooted migrations this installation registered (ADR-101 §6),
    * driven as a second leg of the same pass over the same lease and state
@@ -180,10 +182,24 @@ export class PostgresSystemMigrationsAdapter {
       (migration) =>
         executionMode === void 0 || (migration.executionMode ?? "background") === executionMode,
     );
-    const cohort = await this.cohort({ isSaaS, enrollments, migrations });
-    const tenants = PrismaOrganizationTenantSourceRepository.create({
-      prisma: this.options.database,
-    });
+    const organizationCohort = await this.cohort({ isSaaS, enrollments, migrations });
+    const projectTenants =
+      this.options.tenantAxis === "project"
+        ? PrismaProjectTenantSourceRepository.create(this.options.database)
+        : null;
+    const cohort: MigrationCohort =
+      projectTenants && isSaaS
+        ? async ({ tenantId, migrationName }) =>
+            organizationCohort({
+              tenantId: await projectTenants.getOrganizationId(tenantId),
+              migrationName,
+            })
+        : organizationCohort;
+    const tenants =
+      projectTenants ??
+      PrismaOrganizationTenantSourceRepository.create({
+        prisma: this.options.database,
+      });
     return {
       state,
       lease,
