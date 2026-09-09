@@ -10,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, "../../../../..");
+const REPO_ROOT = path.resolve(__dirname, "../../../..");
 const SOURCE = path.join(REPO_ROOT, "feature-map.json");
 const OUT = path.join(
   REPO_ROOT,

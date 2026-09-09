@@ -25,7 +25,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { runScript } from "@langwatch/observability";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, "../../../../..");
+const REPO_ROOT = path.resolve(__dirname, "../../../..");
 const SKILLS_DIR = path.join(REPO_ROOT, "skills/_compiled/native");
 const OUT = path.join(
   REPO_ROOT,
