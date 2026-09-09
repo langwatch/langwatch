@@ -5,6 +5,7 @@ import {
   belongsToSomebody,
   PasskeySignUpAddressTakenError,
 } from "~/server/users/credential-user";
+import { withSerializationRetry } from "./serializable-retry";
 import type {
   CreatedCredentialUser,
   CredentialAccountRecordsPort,
@@ -159,20 +160,28 @@ export class PrismaCredentialAccountRepository
     userId: string;
     accountId: string;
   }): Promise<UnlinkAttempt> {
-    return await this.prisma.$transaction(
-      async (tx): Promise<UnlinkAttempt> => {
-        const accounts = await tx.account.count({ where: { userId } });
-        if (accounts <= 1) return "would_strand_user";
+    // Retried, because Serializable answers a lost race by refusing to
+    // commit: without this the loser of two overlapping unlinks reached the
+    // caller as a raw write-conflict rather than the refusal the guard above
+    // had already decided. The winner committed, so the retry re-reads and
+    // decides again — which is the answer a click a moment later would get.
+    return await withSerializationRetry(
+      async () =>
+        await this.prisma.$transaction(
+          async (tx): Promise<UnlinkAttempt> => {
+            const accounts = await tx.account.count({ where: { userId } });
+            if (accounts <= 1) return "would_strand_user";
 
-        const account = await tx.account.findFirst({
-          where: { id: accountId, userId },
-        });
-        if (!account) return "no_such_account";
+            const account = await tx.account.findFirst({
+              where: { id: accountId, userId },
+            });
+            if (!account) return "no_such_account";
 
-        await tx.account.delete({ where: { id: accountId } });
-        return "deleted";
-      },
-      { isolationLevel: "Serializable" },
+            await tx.account.delete({ where: { id: accountId } });
+            return "deleted";
+          },
+          { isolationLevel: "Serializable" },
+        ),
     );
   }
 
