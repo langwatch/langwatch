@@ -496,21 +496,26 @@ function selectCallRecord({
   endedAt: number;
   isCutAtLimit: boolean;
 }): CallRecord {
-  const providerRecordHasTurns =
+  const hasProviderTurns =
     providerRecord !== null && providerRecord.turns.length > 0;
-  const useBrowserTranscript =
-    (!providerRecord || !providerRecordHasTurns) && transcript.length > 0;
-  if (providerRecord && !useBrowserTranscript) {
+  const shouldUseBrowserTranscript =
+    (!providerRecord || !hasProviderTurns) && transcript.length > 0;
+  if (providerRecord && !shouldUseBrowserTranscript) {
     return { ...providerRecord, isCutAtLimit };
   }
-  return browserTranscriptToCallRecord({
-    conversationId,
-    transport,
-    transcript,
-    startedAt,
-    endedAt,
-    isCutAtLimit,
-  });
+  return {
+    ...browserTranscriptToCallRecord({
+      conversationId,
+      transport,
+      transcript,
+      startedAt,
+      endedAt,
+      isCutAtLimit,
+    }),
+    // The turns come from the browser, but a recording the provider already
+    // returned is still this call's audio.
+    ...(providerRecord?.audioUrl ? { audioUrl: providerRecord.audioUrl } : {}),
+  };
 }
 
 /**

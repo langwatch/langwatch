@@ -894,8 +894,6 @@ describe("the wide run detail drawer", () => {
     );
   });
 
-  // --- The cut-at-limit marker ---
-
   /** @scenario "A voice run stops at the maximum call duration and is marked as cut at the limit" */
   it("marks a run that was cut at the call limit in the header band", () => {
     setRunState(

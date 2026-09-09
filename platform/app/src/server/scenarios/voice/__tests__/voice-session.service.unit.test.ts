@@ -592,6 +592,53 @@ describe("finishVoiceSession", () => {
         expect(written.record.source).toBe("browser");
         expect(result.source).toBe("browser");
       });
+
+      /** @scenario "A finished provider record with no turns keeps the live transcript" */
+      it("keeps the provider's recording even when the turns come from the browser", async () => {
+        const runner = fakeRunner({
+          fetchCallRecord: vi.fn(
+            async (): Promise<CallRecord> => ({
+              conversationId: "conv_1",
+              transport: "elevenlabs_convai",
+              agentExternalId: "agent_xyz",
+              startedAt: 1000,
+              endedAt: 2000,
+              durationMs: 1000,
+              turns: [],
+              isCutAtLimit: false,
+              source: "provider",
+              audioUrl: "https://example.test/rec.mp3",
+            }),
+          ),
+        });
+        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+          async () => {},
+        );
+        const ports = fakePorts({ runner, over: { writeCallRun } });
+
+        const result = await finishVoiceSession({
+          ports,
+          ...FINISH_BASE,
+          transcript: [
+            { role: "caller" as const, text: "hi" },
+            { role: "agent" as const, text: "hello" },
+          ],
+          token: { ...TOKEN, agentId: "agent_row" },
+        });
+
+        const written = writeCallRun.mock.calls[0]?.[0] as {
+          record: CallRecord;
+        };
+        expect(written.record.turns).toEqual([
+          { role: "caller", text: "hi" },
+          { role: "agent", text: "hello" },
+        ]);
+        expect(written.record.source).toBe("browser");
+        expect(written.record.audioUrl).toBe("https://example.test/rec.mp3");
+        expect(result.source).toBe("browser");
+        expect(result.hasAudio).toBe(true);
+        expect(result.audioUrl).toBe("https://example.test/rec.mp3");
+      });
     });
 
     describe("when the provider record is not ready (a failed status)", () => {

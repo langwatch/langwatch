@@ -137,8 +137,9 @@ async function requireProject({
 secured
   .access(
     handlerManagedAuth({
-      reason: "browser session validated in-handler via getServerAuthSession",
-      permissions: ["scenarios:create"],
+      reason:
+        "browser session validated in-handler via getServerAuthSession; evaluations:manage only when the call creates an agent",
+      permissions: ["scenarios:create", "evaluations:manage"],
       credential: "session",
     }),
   )
@@ -182,8 +183,9 @@ secured
 secured
   .access(
     handlerManagedAuth({
-      reason: "browser session validated in-handler via getServerAuthSession",
-      permissions: ["scenarios:create"],
+      reason:
+        "browser session validated in-handler via getServerAuthSession; evaluations:manage only when the call creates an agent",
+      permissions: ["scenarios:create", "evaluations:manage"],
       credential: "session",
     }),
   )
