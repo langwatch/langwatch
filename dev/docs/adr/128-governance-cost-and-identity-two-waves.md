@@ -1062,12 +1062,15 @@ SCIM degrade to "unassigned", never break.
 ### §15. Restated bills: recompute, plus a visible marker
 
 When a provider restates history, the affected day's number updates (bill
-is truth) and the row keeps a marker: **"revised [date], was $X."** Cheap
+is truth) and the row keeps a marker: **"revised [date], was X"** — where
+X is one figure per currency the day was billed in, never a single
+converted total (see the EVENT DRIVEN block at the end of this section
+for the exact definition and the code that holds it). Cheap
 because append-only events already hold both versions (the `argMax`
 pattern); the fold projection sets two extra fields when a correction
 touches an old day. The marker is a **convenience for the summary row
 and holds only the latest revision**: a day restated twice shows only
-the most recent "was $X" — the full chain is recoverable from the event
+the most recent "was" — the full chain is recoverable from the event
 log, never from the rollup row. This is a deliberate, stated exception
 to the resolve-at-read philosophy (a denormalized display hint, not
 derived truth). Exports and API responses carry the revised flag so
@@ -1142,6 +1145,59 @@ for Anthropic only.** Azure's and Databricks' restatement windows have
 not been probed, so `SETTLING_WINDOW_DAYS` stays a provisional constant
 for those sources until they are — the per-source override exists
 precisely so measuring one does not require re-deciding the others.
+
+**What the "was" figure is, exactly — EVENT DRIVEN, checked against the
+code.** The prose above says "was $X" and means a single dollar number.
+That is not what ships, and the difference is not cosmetic. Three rules
+settle it, each one written here because a reader who assumed the
+obvious reading would get a wrong number.
+
+- **A day's prior total is the sum of each cell's amount as it stood
+  immediately before that day's LATEST revision** — not before every
+  revision the day has ever had. A day restated twice reports what it
+  held between the two, which is the only version a reader can check
+  against the provider's own console today. The whole chain stays in the
+  event log; the rollup answers one question and says which.
+- **There is no single prior dollar figure.** A day billed in more than
+  one currency gets **one line per currency, in that currency's own
+  minor unit** (`sumDaysByLane`'s `byCurrency`,
+  `governanceCostRollup.clickhouse.repository.ts:655-664`). §3's rule
+  that figures never sum across currencies applies to the "was" exactly
+  as it applies to the "is"; a single dollar prior total could only be
+  produced by the conversion §3 forbids. Cells whose prior contribution
+  cannot be stated in dollars are counted
+  (`cellsWithoutPreviousAmount`), and above zero the dollar "was" is
+  withheld rather than understated.
+- **A cell that came into existence at the revision contributes zero to
+  the prior total, and the discriminator is a business instant, not a
+  fold-time one.** `CreatedAt` is stamped by the fold's base class at
+  wall-clock time, so for any cell built from real events it lands days
+  or months after the business day and therefore after every revision of
+  it. Compared naively, **every folded cell would land in the created
+  bucket and every restated day would report having previously held
+  nothing.** The comparison is therefore only applied when the creation
+  stamp falls inside the business day it belongs to; outside it, the
+  stamp says nothing about business order and the cell falls through to
+  the untouched arm (`:749-751`, with the reasoning in the comment
+  above it).
+
+Related, and load-bearing for the same reads: **a cell billed in dollars
+whose amount was withdrawn may not be rescued by its minor-unit column.**
+For a dollar cell the minor unit IS the dollar figure, so it keeps
+holding the number the provider took back; reading it would resurrect
+retracted money. Only a cell billed in some other currency carries an
+amount the dollar column never held. The rule lives in ONE constant,
+`HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL` (`:204`), applied by all five
+reads that count unpriced cells (`:737`, `:887`, `:956`, `:1022`,
+`:1171`) — kept in one place because the screen puts two of those counts
+side by side and a reader adding the bars up would otherwise find them
+short of a total nobody withheld.
+
+None of the above adds a scheduler. The prior total is computed at read
+from rows a fold already wrote; the fold is driven by the pull process's
+existing `settle()` wake and the outbox drain, and this batch introduces
+no interval, no repeatable job, no scheduled-job row and no cron
+expression.
 
 ### §16. Idle seats split across the waves (FR3)
 
@@ -1974,6 +2030,34 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
+- **v3.15 (2026-09-09).** Documentation caught up with the code, plus one
+  correction. No new decision is taken; what changes is that §15's prose
+  stopped describing what ships.
+  - **§15's "was $X" was wrong, not merely imprecise.** It promised a single
+    dollar prior figure. A single dollar prior total across a multi-currency
+    day could only be produced by the conversion §3 forbids, so the shipped
+    read gives **one line per currency in that currency's own minor unit**
+    (`governanceCostRollup.clickhouse.repository.ts:655-664`) and withholds
+    the dollar "was" when any cell's prior contribution cannot be stated in
+    dollars. The section header sentence and the new closing block both say
+    so now.
+  - **§15 gains an EVENT DRIVEN block** stating the prior total's exact
+    definition — *the sum of each cell's amount as it stood immediately
+    before that day's latest revision* — and the two rules that make it
+    computable: a cell created at the revision contributes zero, and the
+    created/untouched discriminator is a business instant, because
+    `CreatedAt` is stamped at fold time and comparing it naively would put
+    **every** folded cell in the created bucket and report **every** restated
+    day as having previously held nothing (`:749-751`). Both were live
+    defects found and fixed in the implementation PR, not hypotheticals.
+  - **The unpriced-rescue rule is recorded with its location.** A dollar cell
+    whose amount was withdrawn must not be rescued by its minor-unit column,
+    which still holds the retracted figure. One constant,
+    `HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL` (`:204`), applied by the five reads
+    that count unpriced cells (`:737`, `:887`, `:956`, `:1022`, `:1171`).
+  - **No-scheduler claim restated where the reads live.** The prior total is
+    computed at read from rows the fold already wrote; the batch adds no
+    interval, repeatable job, scheduled-job row or cron expression.
 - **v3.14 (2026-09-09).** Documentation only. §12 gains a note recording the
   order the shipped code applies the match policy in — conflict, accepted
   link, unique directory identifier, engine link
