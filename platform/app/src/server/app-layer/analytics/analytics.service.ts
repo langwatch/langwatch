@@ -187,9 +187,7 @@ export class AnalyticsService {
    */
   private assertSeriesAggregationsAllowed(input: TimeseriesInputType): void {
     for (const series of input.series) {
-      const metric = getMetric(series.metric) as
-        | ReturnType<typeof getMetric>
-        | undefined;
+      const metric = getMetric(series.metric);
       if (!metric) {
         throw new ValidationError(
           `Metric "${series.metric}" is not defined in the analytics registry`,

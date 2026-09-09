@@ -243,6 +243,31 @@ describe("AnalyticsService", () => {
       expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
     });
 
+    // Unlike an unknown metric within a known group, an unknown GROUP means
+    // `analyticsMetrics[group]` itself is undefined — indexing straight into
+    // that (no optional chaining) throws a raw TypeError before the
+    // ValidationError guard ever runs. Same crash shape as #8009, different
+    // trigger.
+    it("rejects a series naming a metric group absent from the registry", async () => {
+      const { deps, spies } = makeDeps();
+
+      await expect(
+        new AnalyticsService(deps).getTimeseries({
+          ...input,
+          series: [
+            {
+              metric: "a_group_removed_from_the_registry.some_metric" as never,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        }),
+      ).rejects.toThrow(/a_group_removed_from_the_registry/);
+
+      expect(spies.runLegacy).not.toHaveBeenCalled();
+      expect(spies.runRollupTimeseries).not.toHaveBeenCalled();
+      expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
+    });
+
     describe("when the tripwire flag is ON", () => {
       beforeEach(() => enableTripwire());
 
