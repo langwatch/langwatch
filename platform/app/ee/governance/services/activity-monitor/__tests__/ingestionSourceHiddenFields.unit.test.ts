@@ -150,8 +150,8 @@ describe("given a source whose stored config holds fields no client is shown", (
      * the secret intact — the exact end state the refusal exists to prevent,
      * reached by way of an error message.
      *
-     * @scenario "A secret cannot be kept while the destination is changed"
      */
+    /** @scenario "A secret cannot be kept while the destination is changed" */
     it("writes nothing at all, so the source still points where it did", async () => {
       const { service, update } = serviceWith({ ...genieConfig });
 

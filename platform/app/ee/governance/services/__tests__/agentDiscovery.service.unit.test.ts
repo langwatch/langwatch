@@ -229,6 +229,111 @@ describe("AgentDiscoveryService.syncFromSource", () => {
       });
     });
   });
+
+  /**
+   * These three exist because the opposite shipped, and because the test that
+   * was supposed to cover it could not have caught it.
+   *
+   * The sign-in call sits one `await` before the listing call. The listing
+   * call classifies its own failures; the sign-in call did not, and it used to
+   * run inside a `try` whose catch was written for a broken config. So every
+   * transport failure during sign-in came out as `not_configured`, which the
+   * page renders as "check that connection's credentials and permissions".
+   * A dropped network told an administrator to go audit access control.
+   *
+   * The page test for this asserted on a refusal handed straight to the
+   * fixture, so it passed the whole time without ever running the code that
+   * decides the cause. THE FAILURE HAS TO BE THROWN BY THE TRANSPORT, not
+   * named by the test, or the test is only checking itself.
+   */
+  describe("given the network drops while signing in", () => {
+    /** @scenario "A refusal that was only unreachable says to ask again" */
+    it("reports unreachable rather than an unconfigured source", async () => {
+      // What `fetch` does when a name does not resolve: a plain Error, with
+      // no provider status and nothing to distinguish it by except its type.
+      fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+      const { prisma, sightings } = fakePrisma({
+        ...genieSource,
+        parserConfig: {
+          ...genieSource.parserConfig,
+          credentials: { clientId: "id", clientSecret: "secret" },
+        },
+      });
+
+      const result = await AgentDiscoveryService.create(prisma).syncFromSource({
+        organizationId,
+        ingestionSourceId,
+        now,
+      });
+
+      expect(result).toEqual({
+        outcome: "refused",
+        refusal: { reason: "unreachable", status: null },
+      });
+      // A refusal is not evidence an agent stopped existing.
+      expect(sightings).toEqual([]);
+    });
+  });
+
+  describe("given the sign-in times out", () => {
+    /** @scenario "A refusal that was only unreachable says to ask again" */
+    it("reports unreachable, because an abort is not a permission problem", async () => {
+      // `AbortSignal.timeout` rejects with a DOMException, not an Error
+      // subclass anyone here declared. It must not need declaring: the point
+      // of the default is that a failure nobody anticipated lands safe.
+      const timeout = new DOMException(
+        "The operation timed out.",
+        "TimeoutError",
+      );
+      fetchMock.mockRejectedValueOnce(timeout);
+      const { prisma } = fakePrisma({
+        ...genieSource,
+        parserConfig: {
+          ...genieSource.parserConfig,
+          credentials: { clientId: "id", clientSecret: "secret" },
+        },
+      });
+
+      const result = await AgentDiscoveryService.create(prisma).syncFromSource({
+        organizationId,
+        ingestionSourceId,
+        now,
+      });
+
+      expect(result).toEqual({
+        outcome: "refused",
+        refusal: { reason: "unreachable", status: null },
+      });
+    });
+  });
+
+  describe("given the stored config no longer matches its schema", () => {
+    it("still reports not_configured, which is the one case that verdict was written for", async () => {
+      // The fix narrowed the catch to transport failures. This is the case it
+      // was narrowed AWAY from, and it has to keep its original answer: a
+      // config that will not parse really is a source nobody can ask, and
+      // sending that reader to check the connection is correct.
+      const { prisma } = fakePrisma({
+        ...genieSource,
+        parserConfig: {
+          ...genieSource.parserConfig,
+          workspaceUrl: undefined,
+        },
+      });
+
+      const result = await AgentDiscoveryService.create(prisma).syncFromSource({
+        organizationId,
+        ingestionSourceId,
+        now,
+      });
+
+      expect(result).toEqual({
+        outcome: "refused",
+        refusal: { reason: "not_configured", status: null },
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("withSourceCredentials", () => {
