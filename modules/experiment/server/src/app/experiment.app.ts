@@ -11,6 +11,7 @@ import {
   type Experiment,
   type ExperimentDspyStep,
   type ExperimentDspyStepLookup,
+  type ExperimentDspyStepSummary,
   type ExperimentDspyStepsLookup,
   type ExperimentLookup,
   type ExperimentPage,
@@ -19,15 +20,17 @@ import {
   type ExperimentRunAggregate,
   type ExperimentRunListInput,
   type ExperimentRunLookup,
+  type ExperimentRunPageInput,
   type ExperimentRunSlugPageInput,
   type ExperimentRunWithItems,
-  ExperimentService,
   type ExperimentSlugLookup,
   type ExperimentType,
+  type FindOrCreateWorkflowExperimentInput,
   type GetWorkbenchStateInput,
   type ListWorkbenchVersionsInput,
   type RecordEvaluatorResultInput,
   type RecordTargetResultInput,
+  type RecordWorkbenchRunResultsInput,
   type RestoreWorkbenchVersionInput,
   type SaveExperimentInput,
   type SaveWorkbenchStateInput,
@@ -38,6 +41,7 @@ import {
   type WorkbenchVersionsPage,
 } from "@langwatch/experiment-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { ExperimentService } from "../services/experiment.service.ts";
 import {
   WorkflowNotFoundError,
   type WorkflowService,
@@ -191,6 +195,13 @@ export class ExperimentApp implements ExperimentApi {
     return this.#dependencies.experiments.save(input);
   }
 
+  /** Finds the experiment a workflow already saved evaluations into, or starts one. */
+  findOrCreateForWorkflow(
+    input: FindOrCreateWorkflowExperimentInput,
+  ): Promise<{ id: string; slug: string }> {
+    return this.#dependencies.experiments.findOrCreateForWorkflow(input);
+  }
+
   /**
    * Archives an experiment, and with it the workflow it wrote versions into and
    * the monitor it was published as.
@@ -225,6 +236,20 @@ export class ExperimentApp implements ExperimentApi {
   /** One run of one experiment. A missing run reads as null. */
   tryGetRun(input: ExperimentRunLookup): Promise<ExperimentRunWithItems | null> {
     return this.#dependencies.experiments.tryGetRun(input);
+  }
+
+  /** The runs of each named experiment, keyed by experiment id, with their aggregate. */
+  getRunAggregates(
+    input: ExperimentRunListInput,
+  ): Promise<Record<string, ExperimentRunAggregate>> {
+    return this.#dependencies.experiments.getRunAggregates(input);
+  }
+
+  /** One page of an experiment's runs, addressed by id. */
+  getRunsPage(
+    input: ExperimentRunPageInput,
+  ): Promise<{ runs: ExperimentRun[]; totalHits: number }> {
+    return this.#dependencies.experiments.getRunsPage(input);
   }
 
   /**
@@ -299,6 +324,16 @@ export class ExperimentApp implements ExperimentApi {
     return this.#dependencies.experiments.getDspyStep(input);
   }
 
+  /** Records one optimization step. */
+  upsertDspyStep(input: ExperimentDspyStep): Promise<void> {
+    return this.#dependencies.experiments.upsertDspyStep(input);
+  }
+
+  /** Every optimization step recorded against one experiment run. */
+  listDspySteps(input: ExperimentDspyStepsLookup): Promise<ExperimentDspyStepSummary[]> {
+    return this.#dependencies.experiments.listDspySteps(input);
+  }
+
   // ── Workbench ──────────────────────────────────────────────────
 
   /** The workbench state a page opens on. */
@@ -359,6 +394,13 @@ export class ExperimentApp implements ExperimentApi {
       ...input,
       actor: ExperimentApp.actorFor(by),
     });
+  }
+
+  /** Records a run's cell results directly against the workbench state. */
+  recordWorkbenchRunResults(
+    input: RecordWorkbenchRunResultsInput,
+  ): Promise<WorkbenchSaveResult> {
+    return this.#dependencies.experiments.recordWorkbenchRunResults(input);
   }
 
   // ── Workflows ──────────────────────────────────────────────────

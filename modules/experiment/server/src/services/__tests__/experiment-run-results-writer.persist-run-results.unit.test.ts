@@ -4,7 +4,8 @@
  * @see specs/experiments-v3/workbench-versioning.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { EvaluationV3Event, ExperimentService } from "@langwatch/experiment-contract";
+import type { EvaluationV3Event } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "../experiment.service.ts";
 import { applyRunEvent, emptyRunResultsDraft } from "@langwatch/experiment-contract";
 import { ExperimentRunResultsWriterService } from "../experiment-run-results-writer.service.ts";
 

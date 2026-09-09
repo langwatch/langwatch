@@ -13,7 +13,7 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { EventSourcing } from "@langwatch/eventing";
-import type { ExperimentService, TargetConfig } from "@langwatch/experiment-contract";
+import type { TargetConfig } from "@langwatch/experiment-contract";
 import {
   ExperimentEventingAdapter,
   ExperimentConnectedAgentOwnershipPort,
@@ -21,6 +21,7 @@ import {
   type ExperimentConnectedAgentSubject,
   ExperimentEvaluationReportingPort,
   ExperimentModelCostPort,
+  type ExperimentService,
   ExperimentSandboxCredentialPort,
   ExperimentStudioDispatchPort,
   ExperimentTargetEntityNamesPort,

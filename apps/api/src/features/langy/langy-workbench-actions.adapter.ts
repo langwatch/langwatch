@@ -5,10 +5,12 @@
  * SAVED-document half an away page is stood in for by. Both live here, the one
  * place that may hold the Langy channel and the experiment run loop at once.
  */
-import { ExperimentSavedStateExecutionService } from "@langwatch/experiment-server";
+import {
+  ExperimentSavedStateExecutionService,
+  type ExperimentService,
+} from "@langwatch/experiment-server";
 import {
   type ExecutionScope,
-  type ExperimentService,
   projectWorkbenchState,
   runPayloadSchema,
   scopeFromRunPayload,

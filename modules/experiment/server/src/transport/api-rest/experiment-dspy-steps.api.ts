@@ -31,7 +31,7 @@ import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
-import type { ExperimentService } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "../../services/experiment.service.ts";
 import type { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
 import { nowInstant } from "@langwatch/time";
 

@@ -8,7 +8,6 @@ import {
   type EvaluationsV3State,
   type ExecutionScope,
   ExperimentNotFoundError,
-  type ExperimentService,
   InvalidExperimentConfigurationError,
   persistedEvaluationsV3StateSchema,
   planBoardCarryOver,
@@ -22,6 +21,7 @@ import {
   type ExecutionDataServices,
   ExperimentExecutionDataService,
 } from "./experiment-execution-data.service.ts";
+import type { ExperimentService } from "./experiment.service.ts";
 
 type LoadedExecutionData = Extract<
   Awaited<ReturnType<typeof ExperimentExecutionDataService.loadExecutionData>>,

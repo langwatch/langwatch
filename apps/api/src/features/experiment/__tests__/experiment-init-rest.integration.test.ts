@@ -2,8 +2,11 @@
  * `POST /api/experiment/init`, driven through the real Hono app the API process mounts.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";
-import { ExperimentFindOrCreateService } from "@langwatch/experiment-server";
+import type { Experiment } from "@langwatch/experiment-contract";
+import {
+  ExperimentFindOrCreateService,
+  type ExperimentService,
+} from "@langwatch/experiment-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 

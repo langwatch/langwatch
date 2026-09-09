@@ -1,7 +1,8 @@
 /**
  * The rule that turns an SDK's `experiment_slug` into an experiment row.
  */
-import type { Experiment, ExperimentService, ExperimentType } from "@langwatch/experiment-contract";
+import type { Experiment, ExperimentType } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "./experiment.service.ts";
 import { nanoid } from "nanoid";
 import originalSlugify from "slugify";
 

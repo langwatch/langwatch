@@ -4,7 +4,6 @@ import {
   type DatasetReference,
   type EvaluationsV3State,
   extractPersistedState,
-  type ExperimentService,
   type FindOrCreateWorkflowExperimentInput,
   type TargetConfig,
 } from "@langwatch/experiment-contract";
@@ -18,6 +17,7 @@ import type { ExperimentRunErrorReportingPort } from "../ports/experiment-run-er
 import type { ExperimentRunProgressPort } from "../ports/experiment-run-progress.port.ts";
 import type { ExperimentWorkflowDslPort } from "../ports/experiment-workflow-dsl.port.ts";
 import type { ExperimentRunPorts } from "../rules/experiment-run-input.rules.ts";
+import type { ExperimentService } from "./experiment.service.ts";
 import type {
   ExecutionDataServices,
   LoadedExecutionData,

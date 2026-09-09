@@ -1,4 +1,11 @@
 export * from "./adapters/postgres.experiment.adapter.ts";
+/**
+ * The persistence-and-orchestration service, folded out of the contract
+ * package (ADR-133: no standalone contract-service class). Peer compositions
+ * that still call the full surface directly (dataset find-or-create,
+ * evaluation reporting) import the type from here now.
+ */
+export { ExperimentService, type ExperimentServiceOptions } from "./services/experiment.service.ts";
 export { ExperimentDspyRetentionPort } from "./ports/experiment-dspy-retention.port.ts";
 export { ExperimentWorkbenchUpdatesPort } from "./ports/experiment-workbench-updates.port.ts";
 export {

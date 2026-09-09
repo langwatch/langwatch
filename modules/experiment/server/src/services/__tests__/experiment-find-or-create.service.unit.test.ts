@@ -8,7 +8,8 @@
  * is TAKEN BACK rather than duplicated, which is what makes repeated runs
  * group together.
  */
-import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";
+import type { Experiment } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "../experiment.service.ts";
 import { describe, expect, it, vi } from "vitest";
 
 import { ExperimentFindOrCreateService } from "../experiment-find-or-create.service.ts";

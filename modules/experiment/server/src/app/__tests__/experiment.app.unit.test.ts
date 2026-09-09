@@ -5,7 +5,8 @@
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
-import type { Experiment, ExperimentService } from "@langwatch/experiment-contract";
+import type { Experiment } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "../../services/experiment.service.ts";
 import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ExperimentApp } from "../experiment.app.ts";

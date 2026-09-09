@@ -223,10 +223,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "experiment|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "experiment|installer-not-booted",
       "measured": "2026-09-08"
     },

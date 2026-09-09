@@ -9,8 +9,8 @@ import type {
   EvaluationsV3State,
   ExecutionCell,
   ExecutionScope,
-  ExperimentService,
 } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "../services/experiment.service.ts";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type {
   Agent as TypedAgent,

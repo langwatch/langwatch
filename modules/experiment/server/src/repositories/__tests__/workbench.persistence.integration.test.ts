@@ -2,7 +2,6 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import { DatasetService } from "@langwatch/dataset-contract";
 import { EvaluatorService } from "@langwatch/evaluator-contract";
 import {
-  type ExperimentService as ExperimentServiceContract,
   type PersistedEvaluationsV3State,
 } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -23,7 +22,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import { PrismaExperimentRepository } from "../prisma/prisma.experiment.repository.ts";
-import { ExperimentService } from "../../services/experiment.service.ts";
+import { ExperimentService, type ExperimentService as ExperimentServiceContract } from "../../services/experiment.service.ts";
 import { UnavailableExperimentExecutionAdapter } from "../../adapters/unavailable-experiment-execution.adapter.ts";
 import { NoopExperimentWorkbenchUpdatesAdapter } from "../../adapters/noop-experiment-workbench-updates.adapter.ts";
 

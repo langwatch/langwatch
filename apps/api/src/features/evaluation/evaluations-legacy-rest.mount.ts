@@ -10,8 +10,10 @@ import {
   type EvaluationsLegacyCredentialPort,
 } from "@langwatch/evaluation-server";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import type { ExperimentService } from "@langwatch/experiment-contract";
-import type { ExperimentFindOrCreateService } from "@langwatch/experiment-server";
+import type {
+  ExperimentFindOrCreateService,
+  ExperimentService,
+} from "@langwatch/experiment-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 

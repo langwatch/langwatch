@@ -6,7 +6,6 @@ import {
   experimentDspyStepsLookupSchema,
   ExperimentDspyStepNotFoundError,
   ExperimentNotFoundError,
-  ExperimentService as ExperimentServiceContract,
   experimentLookupSchema,
   experimentPageInputSchema,
   experimentSlugLookupSchema,
@@ -83,7 +82,15 @@ export type ExperimentServiceOptions = {
   updates: ExperimentWorkbenchUpdatesPort;
 };
 
-export class ExperimentService extends ExperimentServiceContract {
+/**
+ * The experiment feature's persistence-and-orchestration service: the full
+ * surface `ExperimentApp` forwards from and a handful of peer compositions
+ * (dataset find-or-create, evaluation reporting) still call directly. Folded
+ * out of the contract package per ADR-133 (was the `experiment.service.ts`
+ * abstract class under `contract/src`, the flagged "contract-service"
+ * shape) - this class is now the sole definition of the surface, server-side.
+ */
+export class ExperimentService {
   static create(options: ExperimentServiceOptions): ExperimentService {
     return new ExperimentService(options);
   }
@@ -95,7 +102,6 @@ export class ExperimentService extends ExperimentServiceContract {
   private readonly workbench: ExperimentWorkbenchService;
 
   private constructor(private readonly options: ExperimentServiceOptions) {
-    super();
     this.execution = options.execution;
     this.updates = options.updates;
     this.slugs = ExperimentSlugService.create({

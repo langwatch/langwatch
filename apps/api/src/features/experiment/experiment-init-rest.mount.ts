@@ -30,11 +30,11 @@
  */
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { ExperimentService } from "@langwatch/experiment-contract";
 import {
   ExperimentFindOrCreateService,
   createExperimentInitRestApp,
   type ExperimentInitRestCredential,
+  type ExperimentService,
 } from "@langwatch/experiment-server";
 
 import type { HandlerManagedCredential } from "../../app/api-handler-managed-credential.ts";

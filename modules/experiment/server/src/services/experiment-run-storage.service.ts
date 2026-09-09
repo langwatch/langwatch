@@ -12,8 +12,8 @@ import {
   type EvaluationV3Event,
   type ESBatchEvaluationTarget,
   type ExecutionCell,
-  type ExperimentService,
 } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "./experiment.service.ts";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { ExperimentEvaluationReportingPort } from "../ports/experiment-evaluation-reporting.port.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";

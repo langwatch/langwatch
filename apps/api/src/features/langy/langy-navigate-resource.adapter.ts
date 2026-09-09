@@ -12,7 +12,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import type { ExperimentService } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "@langwatch/experiment-server";
 import { type LangyNavigateResourceKind, LangyNavigateResourcePort } from "@langwatch/langy-server";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
