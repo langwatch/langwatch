@@ -240,11 +240,11 @@ where the fold promised nine: **DECISION D-o.**
 
 | Round three B: `withAddressing("literal")`, `{ generation }`, `session` and `instanceAdminKey` doors, `optionalCredential`, `deferredScope`, `withMultipart`, two 2xx in `responds`, `withRateLimit`/`withCache` with mount-supplied stores, method guards recognised by `assertEveryRouteDeclared` | `3f7db75a6b` |
 
-`runtime.ts` is 3,733 lines after round three B. **D-o is overdue**: the cut is
-`declaration.ts` (builder and declaration-time asserts, ~1,600 lines, where every
-capability lands), `addressing.ts` (~600), `runtime.ts` (mount and execution,
-~1,200), the registry into `security.ts`, idempotency out of `request.ts`. Ten
-files. Recommendation: approve and run the split before Part C.
+D-o landed 09-09 14:5x: `runtime.ts` is 1,645 lines (mount and execution),
+`declaration.ts` 1,723 (declaration types, `defineRestRouter`, the declaration-time
+asserts), `addressing.ts` 363, `idempotency.ts` 817, the registry in `security.ts`.
+One type-only edge runs `addressing.ts` → `declaration.ts`; the value graph is
+one-directional. Part C is next.
 
 QUEUED: **round three, part C** (tRPC: anonymous procedure, session row id,
 caller address, AND-composed permission) plus one REST decision, **D-q**: agent's
@@ -342,7 +342,7 @@ Ordered by what they unblock.
 - **D-l. Better Auth's user directory** is typed `UserService` and calls operations `UserApi` does not offer. `UserApi` grows them, or auth owns a port.
 - **D-m. Role behaviour changes to confirm.** Custom-role create/update/assign answered 503 on every deployment (no plan gate was ever composed) and now work under the Enterprise gate; `removeExclusiveApiKeyRoles` deleted as uncalled (Kimi's api-key retirement may want it).
 - **D-n. `AuditLogApi` widening, OSS audit log, ClickHouse persistence, the feature-catalogue split, org-door and agent-server brief pastes** (the five from 09-08 morning, still open).
-- **D-o. `packages/api/src/rest` at ten files, not nine.** Round two's cut splits `runtime.ts` (2,520 lines) into declaration, runtime and addressing and moves the registry into `security.ts` and idempotency out of `request.ts`. Either the nine-file promise moves to ten, or `request.ts` and `response.ts` merge to pay for it. Round three grows the file further until this is decided.
+- **D-o. TAKEN 09-09 14:5x ("keep driving").** `packages/api/src/rest` is ten files: `runtime.ts` 3,736 → 1,645, `declaration.ts` 1,723, `addressing.ts` 363, `idempotency.ts` 817 out of `request.ts` (1,809 → 1,005), the route registry in `security.ts`. Landed `bc2a49abdf`; Part C unblocked.
 - **D-q. An access kind for a handler-validated credential** (agent-connect's protocol frames): `handlerAuthenticated({ reason })` recording the family's credential class, or fold into `deferredScope`.
 - **Lint D1 to D7** (section 7's review): parity tool Go or TS; `expires` enforced or shrink-only; the 26 web-package cycles; comment-block ratchet beside the oxlint rule; the 17 untested policies; where the oxlint baseline check lives; refuse `screens/*` spellings now or after the drive.
 
