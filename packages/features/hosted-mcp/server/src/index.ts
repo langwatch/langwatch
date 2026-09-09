@@ -23,3 +23,5 @@ export {
   type McpAuthorizeRestPorts,
   type McpAuthorizeSession,
 } from "./transport/api-rest/mcp-authorize.api.ts";
+export { hostedMcpServer } from "./hosted-mcp.server.ts";
+export type { HostedMcpConfig, HostedMcpInfrastructure } from "./hosted-mcp.server.ts";
