@@ -57,6 +57,9 @@ const appStub = {
     messageSnapshot: vi.fn(async () => {}),
     finishRun: vi.fn(async () => {}),
   },
+  // No-op span recording: a finish records one trace per exchange before the
+  // run write; the authz tests only care about who is let in.
+  traces: { recordSpan: vi.fn(async () => {}) },
 };
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => appStub,

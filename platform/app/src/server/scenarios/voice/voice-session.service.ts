@@ -214,6 +214,17 @@ export interface VoiceSessionPorts {
     transport: VoiceTransport;
     agentId: string;
   }): Promise<{ id: string }>;
+  /** Record one trace per exchange of the call, before the run is written, and
+   *  return the per-turn trace ids (one per `record.turns[i]`, in order) so the
+   *  run write links each message to its exchange's trace. Best effort: a
+   *  recording failure is swallowed and the ids are still returned (decision 7).
+   *  Re-run on a re-drive — the ids are deterministic, so the fold dedupes. */
+  recordCallTraces(input: {
+    projectId: string;
+    record: CallRecord;
+    scenario?: { scenarioId: string; scenarioSetId: string };
+    scenarioRunId: string;
+  }): Promise<{ turnTraceIds: string[] }>;
   /** Write the call down as a run the results pages render. When `scenario`
    *  is given the run lands under that scenario (a "Call it myself" run);
    *  otherwise it lands in the voice-call set (a drawer call). */
@@ -224,6 +235,7 @@ export interface VoiceSessionPorts {
     agentDisplayName: string;
     record: CallRecord;
     scenario?: { scenarioId: string; scenarioSetId: string };
+    turnTraceIds: readonly string[];
   }): Promise<void>;
   /** The set a scenario's runs are listed under, so a "Call it myself" run
    *  lands beside that scenario's simulated runs. Null when the scenario is
@@ -650,12 +662,24 @@ export async function finishVoiceSession(input: {
     isCutAtLimit: input.isCutAtLimit,
   });
 
+  // Record one trace per exchange before the run is written, so every message
+  // links to its exchange's trace (decision 1). Best effort: recording failures
+  // are swallowed inside the port, and the ids come back regardless (decision
+  // 7). Re-run on a re-drive — the ids are deterministic, so the fold dedupes.
+  const { turnTraceIds } = await ports.recordCallTraces({
+    projectId: input.projectId,
+    record,
+    scenarioRunId,
+    ...(scenarioContext ? { scenario: scenarioContext } : {}),
+  });
+
   await ports.writeCallRun({
     projectId: input.projectId,
     scenarioRunId,
     agentRowId,
     agentDisplayName,
     record,
+    turnTraceIds,
     ...(scenarioContext ? { scenario: scenarioContext } : {}),
   });
 

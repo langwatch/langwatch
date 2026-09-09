@@ -713,3 +713,23 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Given a run whose metadata marks it cut at the call limit
     When the run header renders
     Then it shows the "Cut at the call limit" marker
+
+  # ---------------------------------------------------------------------------
+  # Every browser voice call writes a trace (3a)
+  # ---------------------------------------------------------------------------
+
+  # 3a AC1
+  @unit @regression
+  Scenario: A finished browser call writes one trace per exchange and every message links to its exchange's trace
+    Given a finished call whose turns group into exchanges
+    When the call is finished
+    Then one trace is recorded per exchange before the run is written
+    And every message carries the trace id of the exchange it belongs to
+    And a trace recording failure does not block the run write
+
+  # 3a AC2
+  @unit @regression
+  Scenario: A re-driven finish writes the same trace ids
+    Given a half-written run is re-driven for the same conversation
+    When the call is finished again
+    Then the recomputed trace ids are identical to the first attempt
