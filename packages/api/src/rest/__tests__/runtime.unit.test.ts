@@ -506,6 +506,44 @@ describe("defineRestRouter", () => {
 
       expect(router().withAddressing("dated", { v1Twin: false })).toBeDefined();
     });
+
+    /** @scenario "A family publishing its paths literally may answer at the root" */
+    it("takes a one-segment path from a literal family that says it answers at the root", () => {
+      const api = featureApi<{ ping(): Promise<void> }>("ops");
+
+      const declaration = defineRestRouter(api)
+        .withNamespace("root-discovery")
+        .withVersion("2026-08-07")
+        .withAddressing("literal", { v1Twin: false, root: true })
+        .get("/llms.txt", "readIndex")
+        .withAccess(publicRoute({ reason: "the index of a public API" }))
+        .withRawResponse({ produces: "text/plain" })
+        .handle(() => new Response("# LangWatch"))
+        .build()
+        .router();
+
+      expect(declaration.routes[0]?.path).toBe("/llms.txt");
+    });
+
+    /** @scenario "A family publishing its paths literally may answer at the root" */
+    it("refuses a root path from a family that declared no root, and a root that claims a twin", () => {
+      const api = featureApi<{ ping(): Promise<void> }>("ops");
+
+      const router = () =>
+        defineRestRouter(api).withNamespace("root-discovery").withVersion("2026-08-07");
+
+      expect(() =>
+        router().withAddressing("literal", { v1Twin: false }).get("/llms.txt", "readIndex"),
+      ).toThrow(/must be the whole address it answers at, from the root/);
+
+      expect(() => router().withAddressing("literal", { root: true })).toThrow(
+        /must declare \{ v1Twin: false \}/,
+      );
+
+      expect(() => router().withAddressing("dated", { root: true })).toThrow(
+        /answers at no root path/,
+      );
+    });
   });
 });
 

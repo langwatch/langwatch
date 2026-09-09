@@ -84,11 +84,15 @@ describe("given the API process's discovery locations", () => {
     /** @scenario "A discovery location answers only GET" */
     // The declared runtime answers a wrong method with 405 and an `Allow`,
     // where the deleted builder registered nothing and let the 404 stand.
-    // `/llms.txt` rejoins this list when root-discovery converts.
     it("refuses a POST to a document location, saying what the location does answer", async () => {
       const api = await startApi();
 
-      for (const path of ["/api/gateway/v1/openapi.json", "/api/openapi.json"]) {
+      for (const path of [
+        "/api/gateway/v1/openapi.json",
+        "/api/openapi.json",
+        "/.well-known/openapi",
+        "/llms.txt",
+      ]) {
         const res = await api.fetch(path, { method: "POST" });
         expect(res.status).toBe(405);
         expect(res.headers.get("allow")).toBe("GET, HEAD");

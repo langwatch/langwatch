@@ -1,7 +1,7 @@
 /**
  * `GET /api/openapi.json` — the same description as the gateway location, from
  * a path that does not read as AI-Gateway-only. The root-level locations live
- * in `./root-discovery-rest.ts`. @see packages/api/specs/api-discovery.feature
+ * in `./root-discovery.rest.ts`. @see packages/api/specs/api-discovery.feature
  */
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";

@@ -57,6 +57,7 @@ import type { ApiWorkflowRunRestCollaborators } from "../features/workflow/workf
 import { mountAnnotationRest } from "../features/annotation/annotation-rest.mount.ts";
 import { mountApiDiscoveryRest } from "../features/discovery/api-discovery-rest.mount.ts";
 import { mountGatewayOpenApiRest } from "../features/discovery/gateway-openapi-rest.mount.ts";
+import { mountRootDiscoveryRest } from "../features/discovery/root-discovery-rest.mount.ts";
 import {
   mountImageProxyRest,
   type ImageProxyRestPorts,
@@ -384,7 +385,6 @@ export type ApiProcessRestFamilyName =
   | "playground"
   | "prompts"
   | "query"
-  | "root-discovery"
   | "scenario-generate"
   | "scenario-run-export"
   | "scim"
@@ -432,9 +432,8 @@ export function createApiProcessRestFeatures(options: {
   // shadow it.
   features.push(mountGatewayOpenApiRest());
   features.push(mountApiDiscoveryRest());
-  // The root-level locations. Their transport is still written against the
-  // deleted REST builders, so the family is not mounted and is named at boot.
-  mount("root-discovery", null);
+  // The root-level locations, at both spellings of each path.
+  features.push(mountRootDiscoveryRest());
   // The browser's own telemetry intake, over the process's ONE counter.
   features.push(mountRumRest({ rateLimit: ports.rateLimit }));
 

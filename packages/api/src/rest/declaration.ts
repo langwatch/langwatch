@@ -1156,6 +1156,7 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
   readonly routes: RestTransportRoute<Api>[] = [];
   private addressing: RestAddressing = "dated";
   private v1Twin = true;
+  private root = false;
   private generation = DEFAULT_GENERATION;
   private deprecated: RestDeprecation | undefined;
 
@@ -1187,6 +1188,7 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
 
     router.addressing = this.addressing;
     router.v1Twin = this.v1Twin;
+    router.root = this.root;
     router.generation = this.generation;
     router.deprecated = this.deprecated;
 
@@ -1210,6 +1212,7 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
 
     this.addressing = addressing;
     this.v1Twin = options.v1Twin ?? true;
+    this.root = options.root ?? false;
     this.generation = options.generation ?? DEFAULT_GENERATION;
 
     return this;
@@ -1245,31 +1248,56 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "projectKey"> {
   }
 
   get<Path extends string>(path: Path, operation: string): OpenRoute<Api, "get", Path, Door> {
-    assertSupportedPath({ path, addressing: this.addressing, namespace: this.namespace });
+    assertSupportedPath({
+      path,
+      addressing: this.addressing,
+      root: this.root,
+      namespace: this.namespace,
+    });
 
     return new RouteBuilder(this, "get", path, operation);
   }
 
   patch<Path extends string>(path: Path, operation: string): OpenRoute<Api, "patch", Path, Door> {
-    assertSupportedPath({ path, addressing: this.addressing, namespace: this.namespace });
+    assertSupportedPath({
+      path,
+      addressing: this.addressing,
+      root: this.root,
+      namespace: this.namespace,
+    });
 
     return new RouteBuilder(this, "patch", path, operation);
   }
 
   post<Path extends string>(path: Path, operation: string): OpenRoute<Api, "post", Path, Door> {
-    assertSupportedPath({ path, addressing: this.addressing, namespace: this.namespace });
+    assertSupportedPath({
+      path,
+      addressing: this.addressing,
+      root: this.root,
+      namespace: this.namespace,
+    });
 
     return new RouteBuilder(this, "post", path, operation);
   }
 
   put<Path extends string>(path: Path, operation: string): OpenRoute<Api, "put", Path, Door> {
-    assertSupportedPath({ path, addressing: this.addressing, namespace: this.namespace });
+    assertSupportedPath({
+      path,
+      addressing: this.addressing,
+      root: this.root,
+      namespace: this.namespace,
+    });
 
     return new RouteBuilder(this, "put", path, operation);
   }
 
   delete<Path extends string>(path: Path, operation: string): OpenRoute<Api, "delete", Path, Door> {
-    assertSupportedPath({ path, addressing: this.addressing, namespace: this.namespace });
+    assertSupportedPath({
+      path,
+      addressing: this.addressing,
+      root: this.root,
+      namespace: this.namespace,
+    });
 
     return new RouteBuilder(this, "delete", path, operation);
   }
@@ -1336,10 +1364,12 @@ function assertPathParameters(path: string, schema: z.ZodObject): void {
 function assertSupportedPath({
   path,
   addressing,
+  root,
   namespace,
 }: {
   path: string;
   addressing: RestAddressing;
+  root: boolean;
   namespace: string;
 }): void {
   if (/:[A-Za-z0-9_]+[?+*]/.test(path)) {
@@ -1350,10 +1380,12 @@ function assertSupportedPath({
 
   // A literal family owns no prefix, so its routes ARE their addresses. A path
   // of one segment is the relative one a namespaced family would have written,
-  // and here it would hang the route off the root of the process.
+  // and here it would hang the route off the root of the process — which is
+  // exactly what a family that declared `root` means to do.
   const segments = path.split("/").filter((segment) => segment.length > 0);
+  const shortest = root ? 1 : 2;
 
-  if (!path.startsWith("/") || segments.length < 2) {
+  if (!path.startsWith("/") || segments.length < shortest) {
     throw new Error(
       `REST "${namespace}" publishes its paths literally, so "${path}" must be the whole ` +
         "address it answers at, from the root",

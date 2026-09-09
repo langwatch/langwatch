@@ -236,10 +236,15 @@ export type RestAddressing = "dated" | "v1-only" | "v1-in-path" | "literal";
 
 /**
  * What a family may say about its addresses: `v1Twin: false` for one whose
- * paths were never aliased, and the `generation` a `v1-in-path` family names
- * in its own path, for a protocol whose generation is not ours to choose.
+ * paths were never aliased, the `generation` a `v1-in-path` family names in its
+ * own path, for a protocol whose generation is not ours to choose, and `root`
+ * for a literal family whose addresses sit outside `/api` altogether.
  */
-export type RestAddressingOptions = Readonly<{ v1Twin?: boolean; generation?: string }>;
+export type RestAddressingOptions = Readonly<{
+  v1Twin?: boolean;
+  generation?: string;
+  root?: boolean;
+}>;
 
 /** The generation a family names in its own path, when it names one: `v2`. */
 export const DEFAULT_GENERATION = "v1";
@@ -260,6 +265,20 @@ export function assertAddressingOptions({
     throw new Error(
       `REST "${namespace}" addresses itself "${addressing}", which names its ` +
         "generation in the path and so has no /api/v1 twin to declare",
+    );
+  }
+
+  if (options.root !== void 0 && addressing !== "literal") {
+    throw new Error(
+      `REST "${namespace}" addresses itself "${addressing}", which hangs every route off a ` +
+        "namespace under /api, so it answers at no root path",
+    );
+  }
+
+  if (options.root === true && options.v1Twin !== false) {
+    throw new Error(
+      `REST "${namespace}" answers at the root, where a path carries no /api prefix for ` +
+        "/api/v1 to alias, so it must declare { v1Twin: false }",
     );
   }
 

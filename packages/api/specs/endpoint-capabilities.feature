@@ -208,3 +208,12 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     And the body the handler opened is closed rather than left for a collector
     And the published document lists the endpoint under both methods
     And declaring a body beside a method that carries none refuses to build
+
+  @unit
+  Scenario: A family publishing its paths literally may answer at the root
+    Given a family that publishes its paths literally declares that it answers at the root
+    When one of its paths is a single segment outside the API namespace
+    Then the declaration is accepted, because that path is the whole address it answers at
+    And the same path from a literal family that declared no root is refused
+    And a family answering at the root that does not disclaim the /api/v1 twin is refused
+    And a family that hangs its routes off a namespace may not declare a root at all
