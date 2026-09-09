@@ -1,29 +1,7 @@
-import { lintBoundarySignatureMirrors } from "./boundary-signature-mirrors.ts";
 import { relative, resolve } from "node:path";
-import { lintApplicationBoundaries } from "./application-boundaries.ts";
-import { lintApiTransportBoundaries } from "./api-transport-boundaries.ts";
-import { lintApiTransportFramework } from "./api-transport-framework.ts";
-import { lintArchitectureRecords } from "./architecture-records.ts";
-import { lintCycles } from "./cycles.ts";
-import { changedSourceFiles } from "./comment-blocks.ts";
-import { lintStrictContractBuildConfigs } from "./contract-build-config.ts";
-import { lintDeclarations } from "./declarations.ts";
-import { lintDeclarationProjectReferences } from "./declaration-project-references.ts";
-import { lintEventingRoles } from "./eventing-roles.ts";
-import { lintFeatureConfiguration } from "./feature-configuration.ts";
-import { lintEnterpriseSourceLicense } from "./enterprise-source-license.ts";
-import { lintFeatureLayouts } from "./feature-layout.ts";
-import { lintFeatureShape } from "./feature-shape.ts";
-import { lintSourceFolderShape } from "./source-folder-shape.ts";
-import { lintPrismaTableOwnership } from "./prisma-table-ownership.ts";
-import { declaredWebDependencyPairs, lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
-import { lintGlobalAppAccess } from "./global-app-access.ts";
-import { lintLegacyFeatureFragments } from "./legacy-feature-fragments.ts";
-import { lintManifests } from "./manifests.ts";
-import { lintStrictPortModules } from "./port-modules.ts";
-import { lintServiceCeilings } from "./service-ceilings.ts";
-import { lintServiceProjectionBoundaries } from "./service-projection-boundaries.ts";
-import { lintTestQuality } from "./test-quality.ts";
+import { changedSourceFiles } from "./policies/quality/comment-blocks.ts";
+import { POLICIES } from "./policies/index.ts";
+import type { PolicyDefinition } from "./policies/index.ts";
 import type { ArchitectureViolation, LintWorkspaceOptions } from "./types.ts";
 import { buildWorkspaceSnapshot } from "./workspace/snapshot.ts";
 
@@ -37,20 +15,22 @@ export type {
   LintWorkspaceOptions,
   PackageKind,
 } from "./types.ts";
-export { readFeatureCatalogue } from "./feature-catalogue.ts";
-export { lintFeatureConfiguration } from "./feature-configuration.ts";
+export type { PolicyDefinition } from "./policies/index.ts";
+export { definePolicy, POLICIES } from "./policies/index.ts";
+export { readFeatureCatalogue } from "./workspace/feature-catalogue.ts";
+export { lintFeatureConfiguration } from "./policies/feature-configuration.ts";
 export {
   BOUNDARY_EDGE_BASELINE,
   boundaryEdgeBaselineFile,
   boundaryEdgesFromViolations,
   filterBaselinedBoundaryEdges,
   lintBoundaryEdgeBaseline,
-} from "./boundary-edge-baseline.ts";
+} from "./policies/boundaries/boundary-edge-baseline.ts";
 export type {
   BoundaryEdge,
   BoundaryEdgeBaselineCheck,
   BoundaryEdgeKind,
-} from "./boundary-edge-baseline.ts";
+} from "./policies/boundaries/boundary-edge-baseline.ts";
 export {
   BASELINE_VERSION,
   baselinePath,
@@ -64,52 +44,56 @@ export {
   staleRows,
 } from "./baseline.ts";
 export type { Baseline, BaselineEntry, BaselinePolicy } from "./baseline.ts";
-export { lintApiTransportBoundaries } from "./api-transport-boundaries.ts";
-export {
-  apiTransportFrameworkFindings,
-  featureServerTransportFindings,
-  lintApiTransportFramework,
-} from "./api-transport-framework.ts";
+export { lintApiTransportBoundaries, lintApiTransportFramework } from "./policies/api-transport.ts";
 export {
   COMMENT_BLOCK_ROOTS_BASELINE,
   changedSourceFiles,
   lintCommentBlocks,
   lintCommentBlockRoots,
-} from "./comment-blocks.ts";
+} from "./policies/quality/comment-blocks.ts";
 export type {
   CommentBlockLintOptions,
   CommentBlockLintResult,
   CommentBlockReview,
   CommentBlockRootsBaselineCheck,
-} from "./comment-blocks.ts";
+} from "./policies/quality/comment-blocks.ts";
 export type {
   LegacyApplicationBoundaryEdge,
   LegacyApplicationBoundaryKind,
-} from "./application-boundaries.ts";
+} from "./policies/boundaries/application-boundaries.ts";
 export {
   collectLegacyApplicationBoundaryEdges,
   formatLegacyApplicationBoundaryBaseline,
-} from "./application-boundaries.ts";
+} from "./policies/boundaries/application-boundaries.ts";
 export type {
   LegacyFeatureFragment,
   LegacyFeatureFragmentKind,
-} from "./legacy-feature-fragments.ts";
+} from "./policies/legacy-feature-fragments.ts";
 export {
   collectLegacyFeatureFragments,
   formatLegacyFeatureFragmentBaseline,
-} from "./legacy-feature-fragments.ts";
+} from "./policies/legacy-feature-fragments.ts";
 export { buildWorkspaceSnapshot, discoverClassifiedPackages } from "./workspace/snapshot.ts";
 export type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 import type { WorkspaceSnapshot } from "./workspace/snapshot.ts";
 export { walkFiles } from "./workspace/layout.ts";
-export { lintFeatureLayouts } from "./feature-layout.ts";
-export { lintFeatureSetupInfrastructure } from "./feature-setup-infrastructure.ts";
-export { lintManifests } from "./manifests.ts";
-export { lintServiceCeilings, lintServiceCeilingsFile } from "./service-ceilings.ts";
-export { lintServiceProjectionBoundaries } from "./service-projection-boundaries.ts";
-export { lintStrictContractBuildConfigs } from "./contract-build-config.ts";
-export { lintDeclarationProjectReferences } from "./declaration-project-references.ts";
-export { declaredWebDependencyPairs, lintFrontendUiBoundaries } from "./frontend-ui-boundaries.ts";
+export { lintFeatureLayouts } from "./policies/feature-layout.ts";
+export {
+  lintFeatureAppContracts,
+  lintFeatureSetupInfrastructure,
+} from "./policies/feature-app.ts";
+export { lintManifests } from "./policies/boundaries/manifests.ts";
+export {
+  lintServiceCeilings,
+  lintServiceCeilingsFile,
+} from "./policies/quality/service-ceilings.ts";
+export { lintServiceProjectionBoundaries } from "./policies/quality/service-projection-boundaries.ts";
+export { lintStrictContractBuildConfigs } from "./policies/quality/contract-build-config.ts";
+export { lintDeclarationProjectReferences } from "./policies/quality/declaration-project-references.ts";
+export {
+  declaredWebDependencyPairs,
+  lintFrontendUiBoundaries,
+} from "./policies/frontend/frontend-ui-boundaries.ts";
 export type {
   ModuleImport,
   PackageManifestRecord,
@@ -128,21 +112,21 @@ export {
   valueImports,
   walkValueImportGraph,
 } from "./workspace/module-graph.ts";
-export { lintTestQuality } from "./test-quality.ts";
-export type { TestQualityLintOptions } from "./test-quality.ts";
+export { lintTestQuality } from "./policies/test-quality.ts";
+export type { TestQualityLintOptions } from "./policies/test-quality.ts";
 export {
   collectGlobalAppAccesses,
   formatGlobalAppAccessBaseline,
   lintGlobalAppAccess,
-} from "./global-app-access.ts";
+} from "./policies/global-app-access.ts";
 export {
   collectFeatureShapeBaseline,
   collectFeatureShapeFindings,
   FEATURE_SHAPE_BASELINE,
   FEATURE_SHAPE_LEGACY_KINDS,
   lintFeatureShape,
-} from "./feature-shape.ts";
-export type { FeatureShapeFinding, FeatureShapeLegacyKind } from "./feature-shape.ts";
+} from "./policies/feature-shape.ts";
+export type { FeatureShapeFinding, FeatureShapeLegacyKind } from "./policies/feature-shape.ts";
 export {
   collectSourceFolderShapeBaseline,
   collectSourceFolderShapeFindings,
@@ -151,9 +135,12 @@ export {
   lintSourceFolderShape,
   SOURCE_FOLDER_SHAPE_BASELINE,
   SOURCE_FOLDER_SHAPE_KINDS,
-} from "./source-folder-shape.ts";
-export type { SourceFolderShapeFinding, SourceFolderShapeKind } from "./source-folder-shape.ts";
-export { lintStrictPortModules } from "./port-modules.ts";
+} from "./policies/source-folder-shape.ts";
+export type {
+  SourceFolderShapeFinding,
+  SourceFolderShapeKind,
+} from "./policies/source-folder-shape.ts";
+export { lintStrictPortModules } from "./policies/boundaries/port-modules.ts";
 export {
   COMPOSED_EXPORTS_BASELINE,
   collectComposedExportSubjects,
@@ -163,68 +150,100 @@ export {
   lintComposedExportsBaseline,
   reachableFiles,
   serverPackageIndexes,
-} from "./composed-exports.ts";
-export type { ComposedExportSubject } from "./composed-exports.ts";
+} from "./policies/quality/composed-exports.ts";
+export type { ComposedExportSubject } from "./policies/quality/composed-exports.ts";
 export {
   OXLINT_BASELINE,
   lintOxlintBaseline,
   oxlintBaselineFile,
   readOxlintBaseline,
-} from "./oxlint-baseline-check.ts";
+} from "./policies/quality/oxlint-baseline-check.ts";
 export {
   applyFilenameMigration,
   collectFilenameMigrationMappings,
   planFilenameMigration,
-} from "./filename-migration.ts";
-export type { FilenameMigrationPlan, FilenameRename } from "./filename-migration.ts";
+} from "./tools/filename-migration.ts";
+export type { FilenameMigrationPlan, FilenameRename } from "./tools/filename-migration.ts";
+
+/**
+ * The registry ids a `false` option means "do not compute at all", because
+ * disabling them once meant skipping their own call outright and every one
+ * of their findings shares that one option — running them just to discard
+ * the result is not free. `declarations` alone compiles a TypeScript
+ * program per package to emit its `.d.ts` output; that is minutes, not
+ * milliseconds, wasted for a caller who asked to skip it.
+ */
+const DECLARATIONS_POLICY = "declarations";
+const LEGACY_FEATURE_FRAGMENTS_POLICY = "legacy-feature-fragments";
+
+/** The registry entries `lintWorkspace` (and the CLI's check mode) actually calls, given its options. */
+export function enabledPolicies(
+  options: Pick<LintWorkspaceOptions, "declarations" | "legacyFeatureFragments"> = {},
+): readonly PolicyDefinition[] {
+  const skipped = new Set<string>();
+
+  if (options.declarations === false) skipped.add(DECLARATIONS_POLICY);
+
+  if (options.legacyFeatureFragments === false) skipped.add(LEGACY_FEATURE_FRAGMENTS_POLICY);
+
+  return skipped.size === 0 ? POLICIES : POLICIES.filter((policy) => !skipped.has(policy.id));
+}
+
+/**
+ * `application-boundaries` mixes edges the legacy-migration option can turn
+ * off (`application-migration`, `application-migration-baseline`) with ones
+ * it cannot (`application-boundary`), and the legacy checks are cheap
+ * (no TypeScript program), so unlike the two above it always runs; a
+ * `false` option only drops the findings its own `policy` field names.
+ */
+export function excludedPolicyIds(
+  options: Pick<LintWorkspaceOptions, "legacyApplicationMigration">,
+): ReadonlySet<string> {
+  const excluded = new Set<string>();
+
+  if (options.legacyApplicationMigration === false) {
+    excluded.add("application-migration-baseline");
+    excluded.add("application-migration");
+  }
+
+  return excluded;
+}
 
 export function lintWorkspace(options: LintWorkspaceOptions): ArchitectureViolation[] {
   const root = resolve(options.root);
+  const snapshot = buildWorkspaceSnapshot({
+    root,
+    changedFiles: options.changedFiles ?? changedSourceFiles(root),
+  });
+  const excluded = excludedPolicyIds(options);
 
-  return lintSnapshot(
-    buildWorkspaceSnapshot({
-      root,
-      changedFiles: options.changedFiles ?? changedSourceFiles(root),
-    }),
-    options,
+  return lintPolicies(snapshot, enabledPolicies(options)).filter(
+    (violation) => !excluded.has(violation.policy),
   );
 }
 
-/** The same run against a snapshot the caller already built, so a run reads the tree once. */
-export function lintSnapshot(
+/**
+ * The same run against a snapshot the caller already built, so a run reads
+ * the tree once. Iterates the policy registry and nothing else — a library
+ * caller of `lintSnapshot`/`lintWorkspace` and `pnpm lint` see the same set
+ * of policies run. A caller after a subset calls `lintPolicies` with a
+ * filtered registry (`enabledPolicies`) instead of discarding findings
+ * after the fact, so an expensive policy asked to be skipped never runs.
+ */
+export function lintSnapshot(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
+  return lintPolicies(snapshot, POLICIES);
+}
+
+/** `lintSnapshot` against one registry, so a caller can run a chosen subset. */
+export function lintPolicies(
   snapshot: WorkspaceSnapshot,
-  options: Omit<LintWorkspaceOptions, "root" | "changedFiles"> = {},
+  policies: readonly PolicyDefinition[],
 ): ArchitectureViolation[] {
   const root = snapshot.root;
 
   const violations = [
     ...snapshot.discoveryViolations,
-    ...lintBoundarySignatureMirrors(snapshot),
-    ...lintEnterpriseSourceLicense(snapshot),
-    ...lintFeatureLayouts(snapshot),
-    ...lintFeatureShape(snapshot),
-    ...lintSourceFolderShape(snapshot),
-    ...lintFeatureConfiguration(snapshot),
-    ...lintPrismaTableOwnership(snapshot),
-    ...lintFrontendUiBoundaries(snapshot),
-    ...lintGlobalAppAccess(snapshot),
-    ...(options.legacyFeatureFragments === false ? [] : lintLegacyFeatureFragments(snapshot)),
-    ...lintEventingRoles(snapshot),
-    ...lintArchitectureRecords(snapshot),
-    ...lintStrictContractBuildConfigs(snapshot),
-    ...lintDeclarationProjectReferences(snapshot),
-    ...lintStrictPortModules(snapshot),
-    ...lintManifests(snapshot, declaredWebDependencyPairs(snapshot)),
-    ...lintApplicationBoundaries(snapshot, {
-      legacyMigration: options.legacyApplicationMigration !== false,
-    }),
-    ...lintApiTransportBoundaries(snapshot),
-    ...lintApiTransportFramework(snapshot),
-    ...lintServiceProjectionBoundaries(snapshot),
-    ...lintServiceCeilings(snapshot),
-    ...lintCycles(snapshot),
-    ...lintTestQuality(snapshot),
-    ...(options.declarations === false ? [] : lintDeclarations(snapshot)),
+    ...policies.flatMap((policy) => policy.run(snapshot)),
   ];
 
   return violations

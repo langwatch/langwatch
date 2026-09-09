@@ -4,6 +4,31 @@ Executable package-boundary policies for the LangWatch monorepo. `pnpm --filter
 @langwatch/architecture-lint lint` checks the workspace; the report is described
 in `specs/lint-report.feature`.
 
+## The policy registry
+
+Every policy is one `definePolicy({ id, spec, baseline?, run(snapshot) })` entry
+in `src/policies/index.ts`. `lintSnapshot` (and the CLI's check mode) fold that
+registry and nothing else, so a library caller of `lintWorkspace()`/
+`lintSnapshot()` and `pnpm lint` run the same set of policies. `--list-policies`
+prints the registry: each id, the spec its scenarios live in, and its baseline
+file, if it has one.
+
+Source lives under `src/policies/`, one file per policy (`feature-app.ts` and
+`api-transport.ts` are the two exceptions: each folds a small family of
+functions that share one concept into one file, still one registered entry
+per function). Shared tree-reading lives in `src/workspace/` (the snapshot,
+the module graph, the repository layout); one-shot migration tools that are
+not policies live in `src/tools/`.
+
+A `false` CLI/library option that used to skip a policy's own call still
+does: `enabledPolicies()` drops the whole registry entry for `declarations`
+and `legacy-feature-fragments` before running (declarations alone compiles a
+TypeScript program per package — running it just to discard the result costs
+minutes, not milliseconds). `application-boundaries` mixes findings the
+legacy-migration option can turn off with ones it cannot, and the legacy
+checks are cheap, so it always runs; `excludedPolicyIds()` drops only the
+findings its own `policy` field names.
+
 ## Baselines
 
 A baseline is a policy's inventory of what already offended when the policy

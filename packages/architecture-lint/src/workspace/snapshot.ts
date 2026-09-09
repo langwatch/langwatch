@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { readFeatureCatalogue } from "../feature-catalogue.ts";
+import { readFeatureCatalogue } from "./feature-catalogue.ts";
 import { walkFiles } from "./layout.ts";
 import { createWorkspaceModuleResolver, type WorkspaceModuleResolver } from "./module-graph.ts";
 import type {

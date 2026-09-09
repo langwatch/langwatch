@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { lintFeatureConfiguration } from "../src/feature-configuration.ts";
+import { lintFeatureConfiguration } from "../src/policies/feature-configuration.ts";
 import type { FeatureCatalogueEntry } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
 

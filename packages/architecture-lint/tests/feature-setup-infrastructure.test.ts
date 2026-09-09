@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createWorkspaceModuleResolver } from "../src/workspace/module-graph.ts";
-import { lintFeatureSetupInfrastructure } from "../src/feature-setup-infrastructure.ts";
+import { lintFeatureSetupInfrastructure } from "../src/policies/feature-app.ts";
 import type { ClassifiedPackage, FeatureCatalogueEntry } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
 

@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { lintPrismaTableOwnership } from "../src/prisma-table-ownership.ts";
+import { lintPrismaTableOwnership } from "../src/policies/persistence/prisma-table-ownership.ts";
 import type { FeatureCatalogueEntry } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
 

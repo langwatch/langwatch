@@ -12,7 +12,7 @@ import {
   apiTransportFrameworkFindings,
   featureServerTransportFindings,
   lintApiTransportFramework,
-} from "../src/api-transport-framework.ts";
+} from "../src/policies/api-transport.ts";
 
 const CONVERTED_REST = `
 import { createRestService } from "@langwatch/api/rest";

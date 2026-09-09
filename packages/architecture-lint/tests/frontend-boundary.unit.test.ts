@@ -26,7 +26,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { browserOnlyPackage } from "../src/browser-packages.ts";
+import { browserOnlyPackage } from "../src/policies/frontend/browser-packages.ts";
 import { walkFiles } from "../src/workspace/layout.ts";
 import {
   chainsToSeeds,

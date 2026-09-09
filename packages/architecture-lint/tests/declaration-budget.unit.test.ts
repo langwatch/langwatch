@@ -4,7 +4,7 @@ import {
   readDeclarationBudgets,
   readFileCount,
   type DeclarationBudget,
-} from "../src/declaration-budget.ts";
+} from "../src/tools/declaration-budget.ts";
 
 const budget: DeclarationBudget = {
   directory: "apps/ui",

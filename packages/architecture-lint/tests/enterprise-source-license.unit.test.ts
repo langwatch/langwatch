@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import { lintEnterpriseSourceLicense } from "../src/enterprise-source-license.ts";
+import { lintEnterpriseSourceLicense } from "../src/policies/boundaries/enterprise-source-license.ts";
 import { snapshotOf } from "./workspace.ts";
 
 let root = "";

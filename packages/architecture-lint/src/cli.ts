@@ -5,20 +5,23 @@ import {
   buildWorkspaceSnapshot,
   changedSourceFiles,
   declaredWebDependencyPairs,
+  enabledPolicies,
+  excludedPolicyIds,
   filterBaselinedBoundaryEdges,
   lintBoundaryEdgeBaseline,
   lintCommentBlocks,
   lintCommentBlockRoots,
-  lintComposedExports,
   lintComposedExportsBaseline,
   lintFeatureLayouts,
   lintManifests,
   lintOxlintBaseline,
+  lintPolicies,
   lintServiceCeilings,
-  lintSnapshot,
   lintStrictPortModules,
   lintTestQuality,
+  POLICIES,
   type ArchitectureViolation,
+  type PolicyDefinition,
   type WorkspaceSnapshot,
 } from "./index.ts";
 import { buildReport, formatReport } from "./report.ts";
@@ -27,6 +30,7 @@ const USAGE = `architecture-lint [options]
 
   --root <path>                    workspace root (default: the current directory)
   --all                            print every finding, not the first 25 per policy
+  --list-policies                  print the policy registry (id, spec, baseline) and exit
   --review-comment-blocks          print the comment-block review list; never fails
   --all-comment-blocks             review every file, not only the changed ones
   --review-test-quality            run the test-quality policy alone
@@ -52,6 +56,7 @@ const VALUE_FLAGS = new Set([
 
 const BOOLEAN_FLAGS = new Set([
   "--all",
+  "--list-policies",
   "--review-comment-blocks",
   "--all-comment-blocks",
   "--review-test-quality",
@@ -82,6 +87,7 @@ type CliOptions = {
 type ParseResult =
   | { kind: "run"; options: CliOptions }
   | { kind: "help" }
+  | { kind: "list-policies" }
   | { kind: "usage-error"; message: string };
 
 type Arguments = { values: Map<string, string>; flags: Set<string> };
@@ -130,6 +136,8 @@ export function parseArgv(argv: readonly string[]): ParseResult {
   const wantsHelp = flags.has("--help") || flags.has("-h");
 
   if (wantsHelp) return { kind: "help" };
+
+  if (flags.has("--list-policies")) return { kind: "list-policies" };
 
   return {
     kind: "run",
@@ -213,17 +221,26 @@ function shrinkFindings(options: CliOptions, snapshot: WorkspaceSnapshot): Shrin
   return { findings, bootstrapped };
 }
 
+/**
+ * `--no-declarations` and `--no-legacy-feature-fragments` share
+ * `enabledPolicies` with `lintWorkspace`, so the CLI never runs a policy it
+ * was asked to skip; `--no-composed-exports` is CLI-only, the same way.
+ */
+function cliEnabledPolicies(options: CliOptions): readonly PolicyDefinition[] {
+  const policies = enabledPolicies(options);
+
+  return options.composedExports ? policies : policies.filter((policy) => policy.id !== "composed-exports");
+}
+
 function checkFindings(
   options: CliOptions,
   snapshot: WorkspaceSnapshot,
 ): ArchitectureViolation[] {
   const { root } = options;
-
-  const workspace = lintSnapshot(snapshot, {
-    declarations: options.declarations,
-    legacyApplicationMigration: options.legacyApplicationMigration,
-    legacyFeatureFragments: options.legacyFeatureFragments,
-  });
+  const excluded = excludedPolicyIds(options);
+  const workspace = lintPolicies(snapshot, cliEnabledPolicies(options)).filter(
+    (violation) => !excluded.has(violation.policy),
+  );
 
   // `lintWorkspace` already relativized `file`, so its cross-feature and
   // private-runtime-export violations are the current edges as-is.
@@ -233,13 +250,7 @@ function checkFindings(
     boundaryEdgeReference(options),
   );
 
-  return [
-    ...filterBaselinedBoundaryEdges(workspace, boundaryEdges.entries),
-    ...commentBlockRootsFindings(options),
-    ...boundaryEdges.violations,
-    ...lintOxlintBaseline(root).violations,
-    ...(options.composedExports ? lintComposedExports(snapshot) : []),
-  ];
+  return [...filterBaselinedBoundaryEdges(workspace, boundaryEdges.entries), ...boundaryEdges.violations];
 }
 
 /** The review tier: blocks worth a second look. Printed only when asked for, never a refusal. */
@@ -321,10 +332,21 @@ function describeCrash(error: unknown): string {
   return String(error);
 }
 
+/** One line per registered policy: its id, the spec its scenarios live in, and its baseline file, if it has one. */
+function formatPolicyList(): string {
+  const rows = POLICIES.map(
+    (policy) => `${policy.id}\n  spec: ${policy.spec}\n  baseline: ${policy.baseline ?? "none"}`,
+  );
+
+  return `architecture-lint: ${POLICIES.length} registered polic${POLICIES.length === 1 ? "y" : "ies"}\n\n${rows.join("\n")}\n`;
+}
+
 const parsed = parseArgv(process.argv.slice(2));
 
 if (parsed.kind === "help") {
   process.stdout.write(USAGE);
+} else if (parsed.kind === "list-policies") {
+  process.stdout.write(formatPolicyList());
 } else if (parsed.kind === "usage-error") {
   process.stderr.write(`architecture-lint: ${parsed.message}\n\n${USAGE}`);
   process.exitCode = 2;

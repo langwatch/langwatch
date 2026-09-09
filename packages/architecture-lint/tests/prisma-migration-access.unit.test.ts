@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { lintPrismaMigrationAccess } from "../src/prisma-migration-access.ts";
+import { lintPrismaMigrationAccess } from "../src/policies/persistence/prisma-migration-access.ts";
 
 const roots: string[] = [];
 const featureRoot = "packages/enterprise/features/audit-log";

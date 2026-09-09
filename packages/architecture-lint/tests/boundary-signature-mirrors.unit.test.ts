@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import { lintBoundarySignatureMirrors } from "../src/boundary-signature-mirrors.ts";
+import { lintBoundarySignatureMirrors } from "../src/policies/boundaries/boundary-signature-mirrors.ts";
 import { snapshotOf } from "./workspace.ts";
 
 let root = "";
