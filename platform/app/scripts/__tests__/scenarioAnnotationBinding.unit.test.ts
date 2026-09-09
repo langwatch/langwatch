@@ -53,6 +53,27 @@ const APP_ROOT = resolve(HERE, "../..");
  * failure, which is how a guard gets deleted rather than fixed. These are the
  * directories where the governance work lives and where the real instance was
  * found.
+ *
+ * WHAT A GREEN RUN HERE DOES NOT MEAN. Running this same predicate over the
+ * whole app at the time of writing returned 98 dangling annotations across
+ * 3,582 test files, none of them under these three trees. A second session
+ * measured the same population with a blunter instrument and got 113, which it
+ * withdrew as an upper bound once it found a prose fragment among its titles.
+ * Either way the order is the same and the debt is real.
+ *
+ * Some of it is not hygiene. These four requirements had a passing test and
+ * nothing bound to them:
+ *
+ *   - "Cross-tenant event_log read is structurally denied"
+ *   - "An api key's ceiling cannot be dropped by its caller"
+ *   - "A pass that loses the marker publishes neither the count nor the drift"
+ *   - "Migration never silently drops a concurrent write"
+ *
+ * They are recorded here rather than fixed because widening this guard to
+ * cover them lands it red on 98 offenders, and a guard that is red on arrival
+ * gets its scope cut instead of its findings fixed — which would leave the
+ * narrow case certified forever and the wide one silent again. The scope is a
+ * deliberate limit, not a claim about the rest of the repository.
  */
 const SCANNED_TREES = [
   "ee/governance",
@@ -110,8 +131,8 @@ function danglingAnnotations(
   return dangling;
 }
 
-describe("scenario annotations that bind nothing", () => {
-  it("does not let a well-formed annotation go nowhere without saying so", () => {
+describe("scenario annotations that bind nothing, in the governance trees", () => {
+  it("does not let a governance annotation go nowhere without saying so", () => {
     const files = scannedTestFiles();
 
     // A zero from an empty walk proves nothing, and this guard's whole
