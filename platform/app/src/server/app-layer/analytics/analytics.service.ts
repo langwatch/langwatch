@@ -25,7 +25,10 @@
 import { ValidationError } from "@langwatch/handled-error";
 import { createHash } from "crypto";
 import { getLangWatchTracer } from "langwatch";
-import { getMetric, type TimeseriesInputType } from "~/server/analytics/registry";
+import {
+  getMetric,
+  type TimeseriesInputType,
+} from "~/server/analytics/registry";
 import type {
   AnalyticsBackend,
   FeedbacksResult,
@@ -116,30 +119,7 @@ export class AnalyticsService {
         // way to refuse an aggregation, it just emits SQL for it, and
         // ClickHouse is the only thing left to say no (see #8009: "sum" on
         // evaluation_runs, a String column, crashes with a raw type error).
-        for (const series of input.series) {
-          const metric = getMetric(series.metric) as
-            | ReturnType<typeof getMetric>
-            | undefined;
-          if (!metric) {
-            throw new ValidationError(
-              `Metric "${series.metric}" is not defined in the analytics registry`,
-              { meta: { metric: series.metric } },
-            );
-          }
-          if (!metric.allowedAggregations.includes(series.aggregation)) {
-            throw new ValidationError(
-              `Metric "${series.metric}" does not support aggregation "${series.aggregation}" ` +
-                `(allowed: ${metric.allowedAggregations.join(", ")})`,
-              {
-                meta: {
-                  metric: series.metric,
-                  aggregation: series.aggregation,
-                  allowedAggregations: metric.allowedAggregations,
-                },
-              },
-            );
-          }
-        }
+        this.assertSeriesAggregationsAllowed(input);
 
         const hash = createHash("sha256")
           // `options` is part of the cache identity, not a side channel: a
@@ -197,6 +177,39 @@ export class AnalyticsService {
         return routedResult;
       },
     );
+  }
+
+  /**
+   * Throws `ValidationError` for the first series naming a metric absent
+   * from the registry, or an aggregation that metric doesn't declare in
+   * `allowedAggregations`. Split out of `getTimeseries` to keep that
+   * function's cognitive complexity under the house lint cap.
+   */
+  private assertSeriesAggregationsAllowed(input: TimeseriesInputType): void {
+    for (const series of input.series) {
+      const metric = getMetric(series.metric) as
+        | ReturnType<typeof getMetric>
+        | undefined;
+      if (!metric) {
+        throw new ValidationError(
+          `Metric "${series.metric}" is not defined in the analytics registry`,
+          { meta: { metric: series.metric } },
+        );
+      }
+      if (!metric.allowedAggregations.includes(series.aggregation)) {
+        throw new ValidationError(
+          `Metric "${series.metric}" does not support aggregation "${series.aggregation}" ` +
+            `(allowed: ${metric.allowedAggregations.join(", ")})`,
+          {
+            meta: {
+              metric: series.metric,
+              aggregation: series.aggregation,
+              allowedAggregations: metric.allowedAggregations,
+            },
+          },
+        );
+      }
+    }
   }
 
   async getFeedbacks(
