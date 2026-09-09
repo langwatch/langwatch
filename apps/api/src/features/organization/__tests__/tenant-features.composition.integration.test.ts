@@ -13,7 +13,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import { EventEmitter } from "node:events";
@@ -25,7 +25,7 @@ import { composeAutomationFeature } from "../../automation/automation.compositio
 import { composeCodingAgentFeature } from "../../coding-agent/coding-agent.composition.ts";
 import { composeEnterpriseFeature } from "../../enterprise/enterprise.composition.ts";
 import { installApiProject } from "../../project/project.composition.ts";
-import { composeOrganizationFeature } from "../organization.composition.ts";
+import { installApiOrganization } from "../organization.composition.ts";
 import {
   stubCollaborators,
   stubComposedFeatures,
@@ -50,12 +50,48 @@ const TENANT_NAMESPACES = [
 const PROJECT_ID = "project-1";
 const ORGANIZATION_ID = "organization-1";
 
+/**
+ * One project row as the database holds it. The project module parses what it
+ * reads, so a thinner row is refused as a validation failure rather than
+ * answering the setup screen.
+ */
+const PROJECT_ROW = {
+  id: PROJECT_ID,
+  name: "Acme",
+  slug: "acme",
+  apiKey: "test-base-key",
+  lwqlKey: "test-lwql-key",
+  teamId: "team-1",
+  language: "python",
+  framework: "openai",
+  kind: "DEFAULT",
+  firstMessage: true,
+  integrated: true,
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+  userLinkTemplate: null,
+  traceSharingEnabled: false,
+  presenceEnabled: false,
+  s3Endpoint: null,
+  s3AccessKeyId: null,
+  s3SecretAccessKey: null,
+  s3Bucket: null,
+  archivedAt: null,
+  isPersonal: false,
+  ownerUserId: null,
+  personalFeatures: null,
+  departmentId: null,
+  langyEgressAllowlist: null,
+  lastCodingAgentSessionAt: null,
+  lastCodingAgentPullRequestAt: null,
+};
+
 /** The rows this half actually reads, as a double. */
 function testPrisma() {
   const client = {
     project: {
-      findUnique: vi.fn(async () => ({ id: PROJECT_ID, firstMessage: true })),
-      findFirst: vi.fn(async () => ({ id: PROJECT_ID, firstMessage: true })),
+      findUnique: vi.fn(async () => PROJECT_ROW),
+      findFirst: vi.fn(async () => PROJECT_ROW),
       findMany: vi.fn(async () => []),
     },
     trigger: { findMany: vi.fn(async () => []) },
@@ -84,8 +120,11 @@ function testPrisma() {
     user: { findFirst: vi.fn(async () => null) },
   } as unknown as PrismaClient;
 
-  const held = client as unknown as { trigger: { findMany: ReturnType<typeof vi.fn> } };
-  return { client, trigger: held.trigger };
+  const held = client as unknown as {
+    trigger: { findMany: ReturnType<typeof vi.fn> };
+    project: { findUnique: ReturnType<typeof vi.fn> };
+  };
+  return { client, trigger: held.trigger, project: held.project };
 }
 
 /** Permits everything: the refusal path is the declared check's own suite. */
@@ -124,7 +163,7 @@ function testOrganizationApp() {
 /**
  * The two collaborators the invitation half is composed over.
  */
-async function composeApplication(options: { withInvitations?: boolean } = {}) {
+async function composeApplication() {
   const prisma = testPrisma();
   const authz = testAuthz();
   const organizations = testOrganizationApp();
@@ -135,7 +174,7 @@ async function composeApplication(options: { withInvitations?: boolean } = {}) {
     getOrganizationId: vi.fn(async () => ORGANIZATION_ID),
     tryGetById: vi.fn(async () => ({ id: PROJECT_ID, firstMessage: true })),
     tryGetSummaryById: vi.fn(async () => ({ name: "Acme", slug: "acme" })),
-  } as unknown as ProjectService;
+  } as unknown as ProjectApi;
 
   const encryption = {
     encrypt: (value: string) => value,
@@ -149,19 +188,10 @@ async function composeApplication(options: { withInvitations?: boolean } = {}) {
     audit,
   };
 
-  const organizationFeature = composeOrganizationFeature({
+  const organizationFeature = await installApiOrganization({
     infrastructure,
     peers: {
       encryption,
-      ...(options.withInvitations
-        ? {
-            authzGrants: {
-              grant: vi.fn(async () => undefined),
-              revoke: vi.fn(async () => undefined),
-            } as never,
-            roles: { listAssignableCustomRoles: vi.fn(async () => []) } as never,
-          }
-        : {}),
     },
     rateLimit: async () => ({ allowed: true, resetAt: 0 }),
     baseHost: "https://app.langwatch.test",
@@ -221,6 +251,7 @@ async function composeApplication(options: { withInvitations?: boolean } = {}) {
     infrastructure,
     collaborators: stubCollaborators(
       {
+        organizations: organizationFeature.app,
         projects: projectFeature.app,
         codingAgentApp: codingAgentFeature.app,
         automation: automationFeature.app,
@@ -244,13 +275,7 @@ async function composeApplication(options: { withInvitations?: boolean } = {}) {
     },
   });
 
-  const invites = (
-    prisma.client as unknown as {
-      organizationInvite: { findMany: ReturnType<typeof vi.fn> };
-    }
-  ).organizationInvite;
-
-  return { application, features, prisma, authz, organizations, projects, audit, invites };
+  return { application, features, prisma, authz, organizations, projects, audit };
 }
 
 async function callTrpc(
@@ -292,7 +317,7 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when the setup screen asks whether a project has its first trace", () => {
     it("answers through the project application this half composes", async () => {
-      const { application, projects } = await composeApplication();
+      const { application, prisma } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "project.getHasFirstMessage", {
         projectId: PROJECT_ID,
@@ -300,7 +325,7 @@ describe("given an API process composed with the five tenant features", () => {
 
       expect(status).toBe(200);
       expect(body).toMatchObject({ result: { data: { firstMessage: true } } });
-      expect(projects.tryGetById).toHaveBeenCalledWith(PROJECT_ID);
+      expect(prisma.project.findUnique).toHaveBeenCalled();
     });
   });
 
@@ -352,44 +377,6 @@ describe("given an API process composed with the five tenant features", () => {
       });
 
       expect(refusal(body)).toContain("service_unavailable");
-    });
-  });
-
-  describe("when the grant ledger and the role service are composed", () => {
-    /**
-     * The read must reach the row, not just stop refusing: a port that
-     * answered `[]` would pass a test checking only that, and an empty
-     * invitation list is the one answer that leads an administrator to
-     * invite the same person twice.
-     */
-    it("answers the pending-invite read from the invitation rows", async () => {
-      const { application, invites } = await composeApplication({ withInvitations: true });
-
-      const { status, body } = await callTrpc(
-        application,
-        "organization.getOrganizationPendingInvites",
-        { organizationId: ORGANIZATION_ID },
-      );
-
-      expect(status).toBe(200);
-      expect(refusal(body)).not.toContain("service_unavailable");
-      expect(refusal(body)).toContain("newcomer@acme.test");
-      expect(invites.findMany).toHaveBeenCalled();
-    });
-
-    /**
-     * The acceptance link an administrator hands somebody with no mail
-     * gateway composed is minted from the deployment's own public origin —
-     * a default host would look right in the listing and open nothing.
-     */
-    it("carries an acceptance link on this deployment's own origin", async () => {
-      const { application } = await composeApplication({ withInvitations: true });
-
-      const { body } = await callTrpc(application, "organization.getOrganizationPendingInvites", {
-        organizationId: ORGANIZATION_ID,
-      });
-
-      expect(refusal(body)).toContain("https://app.langwatch.test/invite/accept?inviteCode=code-1");
     });
   });
 

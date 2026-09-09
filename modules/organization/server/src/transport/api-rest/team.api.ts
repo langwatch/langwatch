@@ -9,7 +9,7 @@ import {
   organizationTeamRestSchema,
   organizationTeamRoleSchema,
 } from "@langwatch/organization-contract";
-import { projectSchema, type ProjectService } from "@langwatch/project-contract";
+import { projectSchema, type ProjectApi } from "@langwatch/project-contract";
 import type { Context } from "hono";
 import { z } from "zod";
 
@@ -77,7 +77,7 @@ export function createTeamsRestApp(options: {
    */
   organizations: () => OrganizationService;
   permissions: () => AuthzService;
-  projects: () => ProjectService;
+  projects: () => ProjectApi;
   /** Who a REST write is attributed to in the grants ledger (ADR-092). */
   ledgerActor: (c: Context<any>) => OrganizationLedgerActor;
 }): MountableRestApp {

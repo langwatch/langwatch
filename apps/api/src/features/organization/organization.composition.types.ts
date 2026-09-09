@@ -5,8 +5,10 @@ import type {
   OrganizationRestService,
 } from "@langwatch/organization-server";
 
-/** The slice and the two REST objects. The five tRPC namespaces are not here:
- * their transports are unconverted. */
+import type { ApiTrpcContext, ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { createOrganizationTrpcRouters } from "./organization-trpc.mount.ts";
+
+/** The six namespaces, the `ctx.app.organizations` slice, and the two REST objects. */
 export type ComposedOrganizationFeature = Readonly<{
   /** The `ctx.app.organizations` slice. */
   app: OrganizationApi;
@@ -20,4 +22,7 @@ export type ComposedOrganizationFeature = Readonly<{
    * The same object again, in the shape `/api/organizations` takes.
    */
   provisioning: (OrganizationService & OrganizationProvisioningPort) | undefined;
+  routers(
+    mount: ApiTrpcFeatureMount,
+  ): ReturnType<typeof createOrganizationTrpcRouters<ApiTrpcContext>>;
 }>;

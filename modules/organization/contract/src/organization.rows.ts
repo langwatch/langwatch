@@ -37,8 +37,7 @@ export const RoleBindingScopeType = {
   TEAM: "TEAM",
   PROJECT: "PROJECT",
 } as const;
-export type RoleBindingScopeType =
-  (typeof RoleBindingScopeType)[keyof typeof RoleBindingScopeType];
+export type RoleBindingScopeType = (typeof RoleBindingScopeType)[keyof typeof RoleBindingScopeType];
 
 export const PricingModel = { TIERED: "TIERED", SEAT_EVENT: "SEAT_EVENT" } as const;
 export type PricingModel = (typeof PricingModel)[keyof typeof PricingModel];
@@ -53,8 +52,7 @@ export const InviteStatus = {
 export type InviteStatus = (typeof InviteStatus)[keyof typeof InviteStatus];
 
 export const OrganizationCurrency = { USD: "USD", EUR: "EUR" } as const;
-export type OrganizationCurrency =
-  (typeof OrganizationCurrency)[keyof typeof OrganizationCurrency];
+export type OrganizationCurrency = (typeof OrganizationCurrency)[keyof typeof OrganizationCurrency];
 
 export type Organization = {
   id: string;

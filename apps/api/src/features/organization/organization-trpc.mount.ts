@@ -1,115 +1,54 @@
 /**
- * App-process transport mounts for the organization vertical: the organization
- * itself with its membership and invitations, the sign-up ceremony that
- * creates the first of each, plus the group and join-request surfaces.
+ * Binds the organization module's six declared namespaces to this process's
+ * execution path: the organization itself with its membership and invitations,
+ * the sign-up ceremony that creates the first of each, the teams and groups
+ * that carve it up, the join requests waiting on it, and the personal
+ * workspace's own switches.
  *
- * Behaviour is package-owned (`@langwatch/organization-server`); this supplies
- * the process's root, authenticated procedure, policy chain, and the
- * application ports the organization package does not own — the invitation
- * service, the licence seat guards, the Enterprise plan gate, the identity
- * ledger behind invitation matching, and the join-request service the process
- * composes over the identity ledger, the membership writer and the mailer.
+ * One fact travels with three of them: the signed-in person as the session
+ * carries them. The plan provider, the seat guard and the disable guard each
+ * identify the operator by more than their id, and a handler may not reach for
+ * the request itself.
  */
-import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
+import { bindTrpcFact, type TrpcRuntime } from "@langwatch/api/trpc";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
-  GroupTrpcApi,
-  JoinRequestTrpcApi,
-  OnboardingTrpcApi,
-  OrganizationTrpcApi,
-  PersonalWorkspaceFeaturesTrpcApi,
-  TeamTrpcApi,
-  type PersonalWorkspaceFeaturesTrpcContext,
-  type GroupTrpcContext,
-  type GroupTrpcPorts,
-  type JoinRequestTrpcContext,
-  type JoinRequestTrpcPorts,
-  type OnboardingTrpcContext,
-  type OnboardingTrpcPorts,
-  type OrganizationTrpcContext,
-  type OrganizationTrpcPorts,
-  type TeamTrpcContext,
-  type TeamTrpcPorts,
+  groupTrpcTransport,
+  joinRequestTrpcTransport,
+  onboardingTrpcTransport,
+  organizationSessionPersonFact,
+  organizationTrpcTransport,
+  personalWorkspaceFeaturesTrpcTransport,
+  teamTrpcTransport,
 } from "@langwatch/organization-server";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
-import type { z } from "zod";
 
-/**
- * The audit-log read's own `kind: "custom"` check, as the process built it.
- * It authorizes at the organization tier the query is anchored on and, when a
- * project filter is present, at the project tier too — a rule no declaration
- * kind can describe, so the middleware itself travels.
- */
-type OrganizationAuditLogCheck = Readonly<{ auditLogCheck: unknown }>;
+/** The one slice of the process context these six namespaces read. */
+export interface OrganizationHostContext {
+  app: Readonly<{ organizations: OrganizationApi }>;
+  session?: Readonly<{ user: Readonly<{ name?: string | null; email?: string | null }> }> | null;
+}
 
-/** Mounts `organization.*` on the app process's tRPC root. */
-export function createOrganizationTrpcRouter<
-  TContext extends OrganizationTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TSignUpDataSchema extends z.ZodTypeAny,
->(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> &
-    OrganizationAuditLogCheck &
-    TrpcApiPorts<OrganizationTrpcPorts<TSignUpDataSchema>>,
+/** Mounts all six namespaces on the app process's declared tRPC runtime. */
+export function createOrganizationTrpcRouters<TContext extends OrganizationHostContext>(
+  runtime: TrpcRuntime<TContext>,
 ) {
-  const service = createTrpcApiService(mount);
-  const procedures = { ...service, auditLogPolicy: service.custom(mount.auditLogCheck) };
+  const organizations = (ctx: TContext) => ctx.app.organizations;
+  const person = {
+    facts: [
+      bindTrpcFact(organizationSessionPersonFact, (ctx: TContext) =>
+        ctx.session?.user
+          ? { name: ctx.session.user.name ?? null, email: ctx.session.user.email ?? null }
+          : null,
+      ),
+    ],
+  };
 
-  return OrganizationTrpcApi.create(mount.root, procedures, mount.ports);
-}
-
-/** Mounts `onboarding.*` on the app process's tRPC root. */
-export function createOnboardingTrpcRouter<
-  TContext extends OnboardingTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-  TSignUpDataSchema extends z.ZodTypeAny,
->(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> &
-    TrpcApiPorts<OnboardingTrpcPorts<TSignUpDataSchema>>,
-) {
-  return OnboardingTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
-}
-
-/** Mounts `group.*` on the app process's tRPC root. */
-export function createGroupTrpcRouter<
-  TContext extends GroupTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<GroupTrpcPorts>) {
-  return GroupTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
-}
-
-/** Mounts `joinRequests.*` on the app process's tRPC root. */
-export function createJoinRequestTrpcRouter<
-  TContext extends JoinRequestTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<JoinRequestTrpcPorts>) {
-  return JoinRequestTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
-}
-
-/** Mounts `personalWorkspaceFeatures.*` on the app process's tRPC root. */
-export function createPersonalWorkspaceFeaturesTrpcRouter<
-  TContext extends PersonalWorkspaceFeaturesTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot>) {
-  return PersonalWorkspaceFeaturesTrpcApi.create(mount.root, createTrpcApiService(mount));
-}
-
-/**
- * Mounts `team.*` on the app process's tRPC root.
- *
- * Two ports, and both are the deployment's rather than the team's: whether the
- * caller may administer the organization — which widens or narrows what each
- * member row shows rather than gating the read — and the Enterprise plan gate a
- * member list assigning a custom role has to clear.
- */
-export function createTeamTrpcRouter<
-  TContext extends TeamTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<TeamTrpcPorts>) {
-  return TeamTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
+  return {
+    organization: runtime.mount(organizationTrpcTransport, organizations, person),
+    onboarding: runtime.mount(onboardingTrpcTransport, organizations, person),
+    team: runtime.mount(teamTrpcTransport, organizations),
+    group: runtime.mount(groupTrpcTransport, organizations),
+    joinRequests: runtime.mount(joinRequestTrpcTransport, organizations),
+    personalWorkspaceFeatures: runtime.mount(personalWorkspaceFeaturesTrpcTransport, organizations),
+  };
 }

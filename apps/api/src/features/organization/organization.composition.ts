@@ -3,13 +3,8 @@
  * its invitations — composed as its own feature. Three groups of answers, and the split
  * is the point.
  */
-import type { AuthService } from "@langwatch/auth-contract";
-import {
-  declareAuthzMiddleware,
-  type AuthzBindingForSynthesis,
-  type AuthzGrantsService,
-  type AuthzService,
-} from "@langwatch/authz-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
+import { AuthzApi, type AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   ENTERPRISE_FEATURE_ERRORS,
   assertEnterprisePlanType,
@@ -39,65 +34,50 @@ import {
   PrismaJoinSettingsAdapter,
 } from "@langwatch/identity-server";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { createApp } from "@langwatch/runtime-composition";
 import { toDate } from "@langwatch/time";
-import {
-  INVITE_ALREADY_ACCEPTED_MESSAGE,
-  INVITE_NOT_READY_MESSAGE,
-  InviteExpiredError,
-  InviteNotFoundError,
-  InviteWrongAccountError,
-  OrganizationNotFoundError,
-  type OrganizationApi,
-  type OrganizationService,
+import type {
+  OrganizationApi,
+  OrganizationInvite,
+  OrganizationListedInvite,
+  OrganizationService,
 } from "@langwatch/organization-contract";
 import {
-  LITE_MEMBER_VIEWER_ONLY_ERROR,
-  MemberSeatLimitReachedError,
-  PersonalTeamScopeService,
-  PostgresPersonalTeamScopeAdapter,
   buildInviteAcceptUrl,
-  isCustomRole,
-  isTeamRoleAllowedForOrganizationRole,
-  OrganizationMembershipService,
   PersonalWorkspaceDiagnosticsAdapter,
   resolveInviteDisplayStatus,
-  ServerOrganizationApp,
-  OrganizationGrantCachePort,
   OrganizationPromptSeedPort,
   OrganizationSeatLicensePort,
-  OrganizationSessionRevocationPort,
   GroupIdentityAdapter,
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
-  type GroupTrpcPorts,
-  type JoinRequestTrpcPorts,
-  type OnboardingTrpcPorts,
   type OrganizationPlanUser,
   type OrganizationProvisioningPort,
   type OrganizationRestService,
-  type OrganizationTrpcPorts,
-  type TeamRoleValue,
-  type TeamTrpcPorts,
+  organizationServer,
+  type OrganizationCeremony,
+  type OrganizationDemoProject,
+  type OrganizationInvitations,
+  type OrganizationJoinRequests,
+  type OrganizationPlanGate,
+  type OrganizationInvitesCreated,
+  type OrganizationInviteWithOrganization,
+  type OrganizationSignals,
 } from "@langwatch/organization-server";
-import {
-  RoleBindingScopeType,
-  type OrganizationUserRole,
-  type PrismaClient,
-} from "@langwatch/prisma-client/generated";
-import type { ProjectApi, ProjectService } from "@langwatch/project-contract";
+import type { OrganizationUserRole, PrismaClient } from "@langwatch/prisma-client/generated";
+import { ProjectApi } from "@langwatch/project-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import type { UserApp } from "@langwatch/user-server";
+import { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
 
 import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import { createOrganizationTrpcRouters } from "./organization-trpc.mount.ts";
 import { ApiOrganizationSettingsSecretAdapter } from "../../app/api-organization-settings-secret.adapter.ts";
-import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
-import { composeApiOrganizationInvites } from "../../app/api-organization-invites.composition.ts";
 import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
 import type { ApiEnterpriseApplicationPort } from "../enterprise/enterprise.composition.ts";
+import type { ComposedOrganizationFeature } from "./organization.composition.types.ts";
 
 /**
  * The questionnaire the sign-up form collects, as the ceremony forwards it. Opaque to the
@@ -107,32 +87,62 @@ import type { ApiEnterpriseApplicationPort } from "../enterprise/enterprise.comp
 export const signUpDataSchema = z.object({}).passthrough();
 
 /**
- * The platform application's licence-limit copy, stated here. The message a member reads
- * when an organization is out of full seats. Stated rather than imported because the
- * licence-enforcement vertical has not moved, and the words are what a customer sees.
- */
-const FULL_MEMBER_LIMIT_MESSAGE = "Cannot complete action: full member limit reached";
-
-/**
  * The invitation half of `organization.*`, for a deployment that composed one.
  */
 export abstract class ApiOrganizationInvitePort {
-  /** Everything `organization.*` asks the invitation service. */
-  abstract readonly ports: Pick<
-    OrganizationTrpcPorts<never>,
-    | "createInvites"
-    | "revokeInvite"
-    | "assertInviteSendAllowed"
-    | "resendInvite"
-    | "listInvites"
-    | "matchInviteToAcceptor"
-    | "maskInvitedAddress"
-    | "applyInvite"
-    | "tryFindLandingProjectSlug"
-    | "resolveJoinRequestByInvitation"
-    | "withdrawJoinRequestOnInvitationAccepted"
-  >;
+  /**
+   * Everything the organization application asks the invitation service. The
+   * first argument every member takes is the request context the deleted
+   * transport used to carry; it is unread, and the next pass drops it.
+   */
+  abstract readonly ports: ApiOrganizationInvitePorts;
 }
+
+/** The eleven answers an invitation service gives this process. */
+export type ApiOrganizationInvitePorts = Readonly<{
+  createInvites(
+    context: never,
+    input: Readonly<{ organizationId: string; invites: readonly unknown[] }>,
+  ): Promise<OrganizationInvitesCreated>;
+  revokeInvite(
+    context: never,
+    input: Readonly<{ organizationId: string; inviteId: string }>,
+  ): Promise<void>;
+  assertInviteSendAllowed(context: never, input: Readonly<{ inviteId: string }>): Promise<void>;
+  resendInvite(
+    context: never,
+    input: Readonly<{ organizationId: string; inviteId: string }>,
+  ): Promise<Readonly<{ invite: OrganizationInvite; emailNotSent: boolean }>>;
+  listInvites(
+    context: never,
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<readonly OrganizationListedInvite[]>;
+  matchInviteToAcceptor(
+    context: never,
+    input: Readonly<{ inviteEmail: string; sessionEmail: string; userId: string }>,
+  ): Promise<Readonly<{ matches: boolean; viaIdentifierId?: string | null }>>;
+  maskInvitedAddress(email: string): string;
+  applyInvite(
+    context: never,
+    input: Readonly<{
+      userId: string;
+      invite: OrganizationInviteWithOrganization;
+      viaIdentifierId?: string | null;
+    }>,
+  ): Promise<void>;
+  tryFindLandingProjectSlug(
+    context: never,
+    input: Readonly<{ invite: OrganizationInviteWithOrganization }>,
+  ): Promise<string | null>;
+  resolveJoinRequestByInvitation(
+    context: never,
+    input: Readonly<{ userId: string; organizationId: string; inviteId: string }>,
+  ): Promise<void>;
+  withdrawJoinRequestOnInvitationAccepted(
+    context: never,
+    input: Readonly<{ userId: string; organizationId: string }>,
+  ): Promise<void>;
+}>;
 
 /** The other services and deployment facts `organization.*` reaches. */
 export type OrganizationPeers = Readonly<{
@@ -165,20 +175,25 @@ export type OrganizationPeers = Readonly<{
 export type OrganizationMembershipPeers = Readonly<{
   /** The same organization service the REST doors and the AuthZ graph serve from. */
   organizations: OrganizationService;
-  /** The same project service the tenancy graph composed. */
-  projects: ProjectService;
-  /** The complete project feature API used by organization-owned workflows. */
-  projectApi: ProjectApi;
+  /** The project application this process installed, one graph for every door. */
+  projects: ProjectApi;
+  /**
+   * The one authorization application this process serves every decision from.
+   * The module's own doors ask it directly now: the redaction in
+   * `organization.getAll` and the two member reads are permission questions,
+   * and a second copy of the answer would redact differently.
+   */
+  permissions: AuthzApi;
   /** The grant ledger every membership write states its access on. */
   grants: AuthzGrantsService;
   /** The Auth service a disabled membership's browser sessions are revoked through. */
-  auth: AuthService;
+  auth: BrowserSessionApi;
   /**
    * The signed-in person's application, for the personal workspace the sign-up
    * ceremony provisions. The SAME one `user.*` answers from: a second would
    * provision a workspace for somebody the /me screens do not know.
    */
-  users: Pick<UserApp, "ensurePersonalWorkspace">;
+  users: Pick<UserApi, "ensurePersonalWorkspace">;
   /** The event stack the join-request ledger appends and stages through. */
   eventing: IdentityEventingPort;
   /** The messages this half sends, where the deployment composed a gateway. */
@@ -187,10 +202,9 @@ export type OrganizationMembershipPeers = Readonly<{
   processName: string;
 }>;
 
-import type { ComposedOrganizationFeature } from "./organization.composition.types.ts";
 
-/** Composes `organization.*` over this process's own graph. */
-export function composeOrganizationFeature(options: {
+/** Installs the six organization surfaces over this process's own graph. */
+export async function installApiOrganization(options: {
   infrastructure: ApiTrpcInfrastructure;
   peers: OrganizationPeers;
   /**
@@ -205,28 +219,29 @@ export function composeOrganizationFeature(options: {
   baseHost: string;
   /** The demo project every caller may read, where a deployment names one. */
   demoProject: Readonly<{ userId: string; projectId: string }>;
-}): ComposedOrganizationFeature {
+}): Promise<ComposedOrganizationFeature> {
   const logger = createLogger("langwatch:api:organization");
-  const membership = options.peers.membership
-    ? composeMembershipHalf({
-        prisma: options.infrastructure.prisma,
-        plans: options.infrastructure.plans,
-        peers: options.peers.membership,
-        permissions: options.infrastructure.authz,
-        rateLimit: (input) => options.rateLimit(input),
-        logger,
-        encryption: options.peers.encryption,
-        baseHost: options.baseHost,
-      })
-    : undefined;
 
-  // The five namespaces, their forty-six ports, the team ports and the
-  // audit-log check went with the transports that took them; they return with
-  // the converted ones.
+  if (!options.peers.membership) return refusingOrganizationFeature();
+
+  const membership = await composeMembershipHalf({
+    prisma: options.infrastructure.prisma,
+    plans: options.infrastructure.plans,
+    peers: options.peers.membership,
+    invites: options.peers.invites,
+    enterprise: options.peers.enterprise,
+    rateLimit: (input) => options.rateLimit(input),
+    logger,
+    encryption: options.peers.encryption,
+    baseHost: options.baseHost,
+    demoProject: options.demoProject,
+  });
+
   return {
-    app: membership?.app ?? refusingServerOrganizationApp(),
-    rest: membership?.rest,
-    provisioning: membership?.provisioning,
+    app: membership.app,
+    rest: membership.rest,
+    provisioning: membership.provisioning,
+    routers: (mount) => createOrganizationRouters(mount),
   };
 }
 
@@ -236,64 +251,15 @@ export function composeOrganizationFeature(options: {
  * cannot answer rather than shown an organization with no members in it.
  */
 export function refusingOrganizationFeature(): ComposedOrganizationFeature {
-  return { app: refusingServerOrganizationApp(), rest: undefined, provisioning: undefined };
-}
-
-
-/** What a `kind: "custom"` check is handed on this process's root. */
-type ScopeCheckParams<TInput> = {
-  ctx: { actor(): { id: string }; permissionChecked?: boolean };
-  input: TInput;
-  next(): unknown;
-};
-
-/** The caller of one request, as the ports above read it. */
-const actorId = (ctx: unknown): string => (ctx as ApiTrpcPortsContext).actor().id;
-
-/**
- * Runs one asynchronous read over a list, a few at a time. Bounded rather than a fan-out:
- * an organization's project list can be long, and one decision per project opened at once
- * would starve the same connection pool the request itself is running on.
- */
-const PERMISSION_PROBE_CONCURRENCY = 8;
-
-async function mapWithConcurrency<TItem, TResult>(
-  items: readonly TItem[],
-  run: (item: TItem) => Promise<TResult>,
-): Promise<TResult[]> {
-  const results: TResult[] = new Array<TResult>(items.length);
-  let next = 0;
-  const workers = Array.from(
-    { length: Math.min(PERMISSION_PROBE_CONCURRENCY, items.length) },
-    async () => {
-      while (next < items.length) {
-        const index = next++;
-        results[index] = await run(items[index] as TItem);
-      }
-    },
-  );
-  await Promise.all(workers);
-  return results;
-}
-
-function decryptStoredSecret(encryption: SecretEncryptionPort | undefined, value: string): string {
-  if (!encryption) {
-    throw new ApiOrganizationUnavailableError(
-      "stored-secret key, so it cannot read this organization's stored settings",
-    );
-  }
-  return encryption.decrypt(value);
-}
-
-/**
- * An invited address, masked, for a deployment with no invitation service. The same shape
- * the invitation service produces: enough of the address for the person holding the link
- * to recognise whether it is theirs, and not enough to learn somebody else's.
- */
-function maskAddress(email: string): string {
-  const [local = "", domain = ""] = email.split("@");
-  const head = local.slice(0, 1);
-  return `${head}${"*".repeat(Math.max(local.length - 1, 1))}@${domain}`;
+  return {
+    app: refusingServerOrganizationApp(),
+    rest: undefined,
+    provisioning: undefined,
+    // The six namespaces mount either way, so a client's inferred types never
+    // depend on the deployment shape; every call then refuses by name instead
+    // of showing an organization with nobody in it.
+    routers: (mount) => createOrganizationRouters(mount),
+  };
 }
 
 /** A capability this deployment did not compose, refused by name. */
@@ -323,28 +289,21 @@ type OrganizationMembership = Readonly<{
   rest: OrganizationRestService;
   provisioning: OrganizationProvisioningPort &
     Pick<OrganizationService, "getBillingProfile" | "claimBillingCustomerId">;
-  ports: MembershipPorts;
 }>;
-
-/** The three port groups the membership namespaces are built on. */
-type MembershipPorts = Readonly<{
-  group: GroupTrpcPorts;
-  joinRequests: JoinRequestTrpcPorts;
-  onboarding: OnboardingTrpcPorts<typeof signUpDataSchema>;
-}>;
-
-
 
 /**
  * Composes the membership half over this process's own graph. The organization service,
  * the project service, the grant ledger and the user directory all arrive already
  * composed.
  */
-function composeMembershipHalf(options: {
+async function composeMembershipHalf(options: {
   prisma: PrismaClient;
   plans: Pick<PlanProvider, "getActivePlan">;
   peers: OrganizationMembershipPeers;
-  permissions: AuthzService;
+  /** The invitation service, where the deployment composed one. */
+  invites: ApiOrganizationInvitePort | undefined;
+  /** The Enterprise application, where the deployment composed one. */
+  enterprise: ApiEnterpriseApplicationPort | undefined;
   rateLimit(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
   ): Promise<Readonly<{ allowed: boolean; resetAt: number }>>;
@@ -352,9 +311,11 @@ function composeMembershipHalf(options: {
   encryption: SecretEncryptionPort;
   /** This deployment's public origin, for a lapsed requester's personal project link. */
   baseHost: string;
-}): OrganizationMembership {
+  /** The demo project every caller may read, where a deployment names one. */
+  demoProject: OrganizationDemoProject;
+}): Promise<OrganizationMembership> {
   const { prisma, plans, peers, logger, baseHost, encryption } = options;
-  const { projects, projectApi, grants, auth, users, eventing, mail, processName } = peers;
+  const { projects, grants, users, eventing, mail, processName } = peers;
   const unavailable = (capability: string) => new ApiOrganizationUnavailableError(capability);
 
   const prompts = LoggedApiOrganizationPromptSeed.create({ processName, logger });
@@ -362,8 +323,6 @@ function composeMembershipHalf(options: {
     plans,
     memberships: PrismaUsageMembershipRepository.create(prisma),
   });
-  const sessions = AuthServiceOrganizationSessionRevocation.create(auth);
-  const grantCache = AuthzOrganizationGrantCache.create(grants);
   const identityEmails = PostgresIdentityEmailAdapter.create({ database: prisma }).build();
 
   function notifyNothing(what: string): void {
@@ -430,25 +389,51 @@ function composeMembershipHalf(options: {
     return row?.emailVerified ? (row.email ?? null) : null;
   };
 
-  const app = ServerOrganizationApp.create({
-    infrastructure: {
-      database: prisma,
-      identities: PersonalWorkspaceIdentityAdapter.create(),
-      teamIdentities: TeamIdentityAdapter.create(),
-      groupIdentities: GroupIdentityAdapter.create(),
-      settingsSecrets: ApiOrganizationSettingsSecretAdapter.create({ encryption }),
-      diagnostics: PersonalWorkspaceDiagnosticsAdapter.create(logger),
-      prompts,
-      seats,
-    },
-    dependencies: {
-      projects: projectApi,
-      permissions: options.permissions,
-      users,
-    },
-    config: undefined,
-    resources: new ResourceScope(),
-  });
+  /**
+   * The display names a pending list renders. Names only: the local part of a
+   * requester's address is not the organization's business until they are a
+   * member of it.
+   */
+  const listUserNames = ({ userIds }: { userIds: readonly string[] }) =>
+    prisma.user.findMany({
+      where: { id: { in: [...userIds] } },
+      select: { id: true, name: true },
+    });
+
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma })
+    .withInfrastructure({})
+    .withProvided(ProjectApi, projects)
+    .withProvided(AuthzApi, peers.permissions)
+    .withProvided(UserApi, users as UserApi)
+    .withModule(organizationServer, {
+      infrastructure: {
+        database: prisma,
+        identities: PersonalWorkspaceIdentityAdapter.create(),
+        teamIdentities: TeamIdentityAdapter.create(),
+        groupIdentities: GroupIdentityAdapter.create(),
+        settingsSecrets: ApiOrganizationSettingsSecretAdapter.create({ encryption }),
+        diagnostics: PersonalWorkspaceDiagnosticsAdapter.create(logger),
+        prompts,
+        seats,
+        invitations: apiOrganizationInvitations({
+          invites: options.invites,
+          prisma,
+          baseHost: options.baseHost,
+          enterprise: options.enterprise,
+          logger,
+        }),
+        joinRequests: apiOrganizationJoinRequests({ joinRequests, invites: options.invites }),
+        plans: apiOrganizationPlanGate({ plans, unavailable }),
+        signals: apiOrganizationSignals(logger),
+        ceremony: apiOrganizationCeremony({ projects, unavailable }),
+        directory: { findVerifiedEmail: verifiedEmailFor, listUserNames },
+        demoProject: options.demoProject,
+      },
+    })
+    .boot({ role: "api" });
+
+  const app = runtime.module(organizationServer).provided;
   const rest: OrganizationRestService = {
     getSettings: (input) => app.getSettings(input),
     updateSettings: (input) => app.updateSettings(input),
@@ -496,87 +481,213 @@ function composeMembershipHalf(options: {
 
   return {
     app,
-    // The SAME merged object `ServerOrganizationApp` reads, published so the
+    // The SAME merged object the application reads, published so the
     // management REST family serves from it too. A second service over the
     // same rows would let `/api/organization/members` and the members screen
     // disagree about who is in an organization.
     rest,
     provisioning,
-    ports: {
-      group: {
-        /**
-         * Groups arrive with SCIM, which is an Enterprise capability read per
-         * organization out of a billing store this process does not hold.
-         */
-        assertScimAllowed: () =>
-          Promise.reject(
-            unavailable(
-              "Enterprise plan store, so it cannot confirm this organization carries SCIM",
-            ),
-          ),
-      },
-
-      joinRequests: {
-        lookup: (_ctx, input) => joinRequests.lookup(input),
-        pendingForUser: (_ctx, input) => joinRequests.pendingForUser(input),
-        request: (_ctx, input) => joinRequests.request(input),
-        withdraw: (_ctx, input) => joinRequests.withdraw(input),
-        pendingForOrganization: (_ctx, input) => joinRequests.pendingForOrganization(input),
-        approve: (_ctx, input) => joinRequests.approve(input),
-        reject: (_ctx, input) => joinRequests.reject(input),
-        readJoining: (_ctx, input) => joinRequests.readJoining(input),
-        setJoining: (_ctx, input) => joinRequests.setJoining(input),
-        tryResolveVerifiedEmail: (_ctx, input) => verifiedEmailFor(input),
-        listUserNames: (_ctx, { userIds }: Readonly<{ userIds: readonly string[] }>) =>
-          prisma.user.findMany({
-            where: { id: { in: [...userIds] } },
-            select: { id: true, name: true },
-          }),
-      },
-
-      onboarding: {
-        signUpDataSchema,
-        /**
-         * The standard AI-tool catalogue is an Enterprise governance capability.
-         * Non-fatal at the call site — the portal's own read provisions the same
-         * set — so this refuses by name and the ceremony carries on.
-         */
-        ensureDefaultAiToolCatalog: () =>
-          Promise.reject(
-            unavailable(
-              "Enterprise governance service, so it seeded no standard AI tool catalogue",
-            ),
-          ),
-        ensurePersonalWorkspace: (_ctx, input) => users.ensurePersonalWorkspace(input),
-        /**
-         * The first project. It goes through the project service this process
-         * composed rather than a second creation path, so it writes the same
-         * rows the project surface writes.
-         */
-        createProject: async (_ctx, input) => {
-          const project = await projects.create({
-            organizationId: input.organizationId,
-            teamId: input.teamId,
-            name: input.name,
-            language: input.language,
-            framework: input.framework,
-          });
-          return { success: true, projectSlug: project.slug };
-        },
-        // The deployment's marketing traffic. Fire-and-forget by construction:
-        // a sign-up that could not be announced still created the organization.
-        sendSlackSignupEvent: async () => notifyNothing("somebody signed up"),
-        sendHubspotSignupForm: async () => notifyNothing("somebody signed up"),
-        fireSignupNurturing: () => notifyNothing("somebody signed up"),
-        recordIntegrationMethod: () => notifyNothing("somebody chose an integration method"),
-        reportError: (error: unknown, context: unknown) => {
-          logger.error({ error, context }, "Onboarding step failed");
-        },
-      },
-    } as MembershipPorts,
   };
 }
 
+// ---------------------------------------------------------------------------
+// The process capabilities the organization module is composed over
+// ---------------------------------------------------------------------------
+
+/** Mounts the module's six namespaces on this process's tRPC runtime. */
+function createOrganizationRouters(mount: ApiTrpcFeatureMount) {
+  return createOrganizationTrpcRouters(mount.runtime);
+}
+
+/**
+ * The invitations this deployment administers. The SAME service the management
+ * REST family serves from, so an administrator and a provisioning tool see one
+ * set of invitations with one acceptance link each. A deployment that composed
+ * none gets `null`, and the application refuses each invitation door by name.
+ */
+function apiOrganizationInvitations(options: {
+  invites: ApiOrganizationInvitePort | undefined;
+  prisma: PrismaClient;
+  baseHost: string;
+  enterprise: ApiEnterpriseApplicationPort | undefined;
+  logger: Logger;
+}): OrganizationInvitations | null {
+  const invites = options.invites;
+  if (!invites) return null;
+
+  const ports = invites.ports;
+
+  return {
+    create: (input) => ports.createInvites(undefined as never, input as never) as never,
+    revoke: (input) => ports.revokeInvite(undefined as never, input),
+    assertSendAllowed: (input) => ports.assertInviteSendAllowed(undefined as never, input),
+    resend: (input) => ports.resendInvite(undefined as never, input),
+    list: (input) => ports.listInvites(undefined as never, input) as never,
+    /**
+     * A row read, so it is answered here rather than behind the injected
+     * service: the code in the link addresses one invitation, and reading it is
+     * what tells a signed-in person which organization they were asked to join.
+     */
+    findByCode: ({ inviteCode }) =>
+      options.prisma.organizationInvite.findUnique({
+        where: { inviteCode },
+        include: { organization: true },
+      }) as never,
+    matchToAcceptor: (input) => ports.matchInviteToAcceptor(undefined as never, input),
+    apply: (input) => ports.applyInvite(undefined as never, input as never),
+    findLandingProjectSlug: (input) =>
+      ports.tryFindLandingProjectSlug(undefined as never, input as never),
+    acceptUrl: (inviteCode) => buildInviteAcceptUrl(options.baseHost, inviteCode),
+    maskAddress: (email) => ports.maskInvitedAddress(email),
+    displayStatus: (invite) => resolveInviteDisplayStatus(invite as never),
+    notifySeatLimitReached: async (input) => {
+      const usageLimits = options.enterprise?.usageLimits;
+      if (!usageLimits) {
+        options.logger.debug(
+          { organizationId: input.organizationId, limitType: input.limitType },
+          "no Enterprise usage-limit store is composed: the seat-limit notification for this organization is not sent",
+        );
+        return;
+      }
+      await usageLimits.notifyResourceLimitReached(input as never);
+    },
+    findUserIdByEmail: async ({ email }) => {
+      const row = await options.prisma.user.findFirst({ where: { email }, select: { id: true } });
+      return row?.id ?? null;
+    },
+  };
+}
+
+/**
+ * Asking to join, and answering. The two invitation-side tidies go through the
+ * SAME invitation service, because it is the one that knows which request an
+ * invitation answers.
+ */
+function apiOrganizationJoinRequests(options: {
+  joinRequests: JoinRequestsService;
+  invites: ApiOrganizationInvitePort | undefined;
+}): OrganizationJoinRequests {
+  const { joinRequests, invites } = options;
+  const unavailable = (): Promise<never> =>
+    Promise.reject(new ApiOrganizationUnavailableError("organization invitation service"));
+
+  return {
+    lookup: (input) => joinRequests.lookup(input),
+    pendingForUser: (input) => joinRequests.pendingForUser(input),
+    pendingForOrganization: (input) => joinRequests.pendingForOrganization(input),
+    request: (input) => joinRequests.request(input),
+    withdraw: (input) => joinRequests.withdraw(input),
+    approve: (input) => joinRequests.approve(input),
+    reject: (input) => joinRequests.reject(input),
+    readJoining: (input) => joinRequests.readJoining(input),
+    setJoining: (input) => joinRequests.setJoining({ ...input, domains: [...input.domains] }),
+    resolveByInvitation: (input) =>
+      invites
+        ? invites.ports.resolveJoinRequestByInvitation(undefined as never, input)
+        : unavailable(),
+    withdrawOnInvitationAccepted: (input) =>
+      invites
+        ? invites.ports.withdrawJoinRequestOnInvitationAccepted(undefined as never, input)
+        : unavailable(),
+  };
+}
+
+/**
+ * Both Enterprise plan gates, over the ONE plan provider this process resolves
+ * every allowance through. SCIM and the seat guard are read out of stores this
+ * process does not hold, so both refuse by name.
+ */
+function apiOrganizationPlanGate(options: {
+  plans: Pick<PlanProvider, "getActivePlan">;
+  unavailable(capability: string): ApiOrganizationUnavailableError;
+}): OrganizationPlanGate {
+  const assertPlan = async (organizationId: string, errorMessage: string) => {
+    const plan = await options.plans.getActivePlan({ organizationId } as never);
+    assertEnterprisePlanType({ planType: plan.type, errorMessage });
+  };
+
+  return {
+    assertCustomRolesAllowed: ({ organizationId }) =>
+      assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.RBAC),
+    assertAuditLogsAllowed: ({ organizationId }) =>
+      assertPlan(organizationId, ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS),
+    assertScimAllowed: () =>
+      Promise.reject(
+        options.unavailable(
+          "Enterprise plan store, so it cannot confirm this organization carries SCIM",
+        ),
+      ),
+    assertTeamRoleChangeWithinSeatLimits: () =>
+      Promise.reject(
+        options.unavailable("Enterprise seat licence, so it cannot authorize a member role change"),
+      ),
+  };
+}
+
+/**
+ * The trail a sign-up, an invitation and a chosen integration leave outside
+ * this feature. This process composes no product-analytics sink and no
+ * marketing gateway, so each one says so once, at debug, and carries on.
+ */
+function apiOrganizationSignals(logger: Logger): OrganizationSignals {
+  const unsent = (what: string) =>
+    logger.debug(
+      { signal: what },
+      `no product-analytics sink is composed: ${what} is not recorded`,
+    );
+
+  return {
+    trackServerEvent: (input) => unsent(`the organization event "${input.event}"`),
+    fireTeamMemberInvitedNurturing: () => unsent("a team member being invited"),
+    fireInviteAcceptedNurturing: () => unsent("an invitation being accepted"),
+    fireSignupNurturing: () => unsent("somebody signing up"),
+    sendSlackSignupEvent: async () => unsent("a sign-up announcement"),
+    sendHubspotSignupForm: async () => unsent("a sign-up form"),
+    recordIntegrationMethod: () => unsent("a chosen integration method"),
+    reportError: (error) => {
+      logger.error({ error }, "an organization surface failed");
+    },
+  };
+}
+
+/**
+ * The parts of the sign-up ceremony that belong to other features. The first
+ * project goes through the project application this process composed rather
+ * than a second creation path, so it writes the same rows the project surface
+ * writes.
+ */
+function apiOrganizationCeremony(options: {
+  projects: ProjectApi;
+  unavailable(capability: string): ApiOrganizationUnavailableError;
+}): OrganizationCeremony {
+  return {
+    /**
+     * The standard AI-tool catalogue is an Enterprise governance capability.
+     * Non-fatal at the call site - the portal's own read provisions the same
+     * set - so this refuses by name and the ceremony carries on.
+     */
+    ensureDefaultAiToolCatalog: () =>
+      Promise.reject(
+        options.unavailable(
+          "Enterprise governance service, so it seeded no standard AI tool catalogue",
+        ),
+      ),
+    createProject: async (input) => {
+      const project = await options.projects.create(
+        {
+          organizationId: input.organizationId,
+          teamId: input.teamId,
+          name: input.name,
+          language: input.language,
+          framework: input.framework,
+        },
+        { id: input.userId },
+      );
+
+      return { success: true, projectSlug: project.slug };
+    },
+  };
+}
 
 /** The `ctx.app.organizations` slice on a process with no membership graph. */
 function refusingServerOrganizationApp(): OrganizationApi {
@@ -711,36 +822,6 @@ export class ApiOrganizationSeatLicense extends OrganizationSeatLicensePort {
     return resource === "members"
       ? this.options.memberships.getMemberCount(organizationId)
       : this.options.memberships.getMembersLiteCount(organizationId);
-  }
-}
-
-/** Session revocation, over the Auth service this process already composed. */
-class AuthServiceOrganizationSessionRevocation extends OrganizationSessionRevocationPort {
-  static create(auth: AuthService): AuthServiceOrganizationSessionRevocation {
-    return new AuthServiceOrganizationSessionRevocation(auth);
-  }
-
-  private constructor(private readonly auth: AuthService) {
-    super();
-  }
-
-  async revokeAllBrowserSessions(input: { userId: string }): Promise<void> {
-    await this.auth.revokeAllBrowserSessions(input);
-  }
-}
-
-/** The authorization snapshot cache, over the grant ledger this process serves. */
-class AuthzOrganizationGrantCache extends OrganizationGrantCachePort {
-  static create(grants: AuthzGrantsService): AuthzOrganizationGrantCache {
-    return new AuthzOrganizationGrantCache(grants);
-  }
-
-  private constructor(private readonly grants: AuthzGrantsService) {
-    super();
-  }
-
-  async invalidateOrganization(input: { organizationId: string }): Promise<void> {
-    await this.grants.invalidateOrganization(input);
   }
 }
 

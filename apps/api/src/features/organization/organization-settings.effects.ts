@@ -10,12 +10,12 @@
  */
 
 import type { UpdateOrganizationSettingsResult } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 
 export async function revokeTraceSharesAfterOrganizationSettingsUpdate(
   shares: ShareApi,
-  projects: ProjectService,
+  projects: ProjectApi,
   organizationId: string,
   result: UpdateOrganizationSettingsResult,
 ): Promise<void> {

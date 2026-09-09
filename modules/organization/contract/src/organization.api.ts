@@ -58,6 +58,28 @@ import type {
   User,
 } from "./organization.rows.ts";
 import type {
+  JoinRequestFiled,
+  JoinRequestJoining,
+  JoinRequestJoiningChanged,
+  JoinRequestMine,
+  JoinRequestPending,
+} from "./join-request.responses.ts";
+import type { OnboardingInitializeOrganizationInput } from "./onboarding.trpc.ts";
+import type { OrganizationInitialized } from "./onboarding.responses.ts";
+import type {
+  OrganizationInviteAccepted,
+  OrganizationInviteCreated,
+  OrganizationInviteResent,
+  OrganizationListedInvite,
+} from "./organization.responses.ts";
+import type {
+  OrganizationApiCreateInvitesInput,
+  OrganizationApiInviteScope,
+  OrganizationApiUpdateTeamMemberRoleInput,
+} from "./organization.trpc-schemas.ts";
+import type { GroupDetail, GroupListItem, GroupMembershipView } from "./group.responses.ts";
+import type { TeamWithProjects } from "./team.responses.ts";
+import type {
   FindPersonalWorkspaceInput,
   EnsuredPersonalWorkspace,
   PersonalFeatures,
@@ -226,6 +248,9 @@ export interface OrganizationApi {
     }>,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }>;
   getBillingProfile(input: GetOrganizationBillingProfileInput): Promise<OrganizationBillingProfile>;
+  claimBillingCustomerId(
+    input: Readonly<{ organizationId: string; billingCustomerId: string }>,
+  ): Promise<boolean>;
   getTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam>;
   createTeam(input: CreateOrganizationTeamInput): Promise<OrganizationTeam>;
   addTeamMember(input: AddOrganizationTeamMemberInput): Promise<void>;
@@ -306,6 +331,141 @@ export interface OrganizationApi {
   listProjectsByTeam(
     input: Readonly<{ organizationId: string; teamId: string }>,
   ): Promise<Project[]>;
+
+  // -- the doors ------------------------------------------------------------
+  //
+  // What each tRPC namespace calls once its transport has stated access. The
+  // orchestration these carry - per-viewer redaction, the invitation
+  // ceremony, the seat and plan guards - used to sit in the transport, where
+  // it could not be tested without a router.
+
+  /** Every organization the caller can reach, redacted for them. */
+  listVisibleOrganizations(
+    input: Readonly<{ isDemo: boolean }>,
+    by: OrganizationCaller,
+  ): Promise<FullyLoadedOrganization[]>;
+  /** One organization with its members, addresses redacted for a non-administrator. */
+  getOrganizationWithMembersForPicker(
+    input: Readonly<{ organizationId: string; includeDeactivated: boolean }>,
+    by: OrganizationCaller,
+  ): Promise<OrganizationWithMembersAndTheirTeams>;
+  /** One member's full record, refused by name where there is none. */
+  getMemberOrRefuse(
+    input: Readonly<{ organizationId: string; userId: string }>,
+    by: OrganizationCaller,
+  ): Promise<OrganizationMemberWithUser>;
+
+  createInvitations(
+    input: OrganizationApiCreateInvitesInput,
+    by: OrganizationCaller,
+  ): Promise<OrganizationInviteCreated[]>;
+  revokeInvitation(input: OrganizationApiInviteScope): Promise<void>;
+  resendInvitation(input: OrganizationApiInviteScope): Promise<OrganizationInviteResent>;
+  listPendingInvitations(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationListedInvite[]>;
+  acceptInvitation(
+    input: Readonly<{ inviteCode: string }>,
+    by: OrganizationCaller,
+  ): Promise<OrganizationInviteAccepted>;
+
+  /** One team-role change, with the personal-team, plan and seat guards. */
+  changeTeamMemberRole(
+    input: OrganizationApiUpdateTeamMemberRoleInput,
+    by: OrganizationCaller,
+  ): Promise<void>;
+  /** The audit trail, once the plan and the project filter have been cleared. */
+  readAuditLogs(
+    input: Readonly<{
+      organizationId: string;
+      projectId?: string;
+      userId?: string;
+      pageOffset: number;
+      pageSize: number;
+      action?: string;
+      startDate?: number;
+      endDate?: number;
+      targetKind?: string;
+      targetId?: string;
+    }>,
+    by: OrganizationCaller,
+  ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }>;
+
+  listTeamsWithProjects(
+    input: Readonly<{ organizationId: string }>,
+    by: OrganizationCaller,
+  ): Promise<TeamWithProjects[]>;
+  listTeamAccessMatrix(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationTeamAccess[]>;
+  getTeamWithProjects(
+    input: Readonly<{ organizationId: string; slug: string }>,
+    by: OrganizationCaller,
+  ): Promise<TeamWithProjects>;
+  updateTeamMembers(
+    input: Omit<UpdateOrganizationTeamWithMembersInput, "actor">,
+    by: OrganizationCaller,
+  ): Promise<void>;
+  createTeamWithGatedMembers(
+    input: Omit<CreateOrganizationTeamWithMembersInput, "actor">,
+    by: OrganizationCaller,
+  ): Promise<OrganizationTeam>;
+  archiveTeamById(input: Readonly<{ teamId: string }>): Promise<void>;
+  removeTeamMemberById(
+    input: Readonly<{ teamId: string; userId: string }>,
+    by: OrganizationCaller,
+  ): Promise<void>;
+
+  listGroupsWithScopeNames(input: Readonly<{ organizationId: string }>): Promise<GroupListItem[]>;
+  getGroupWithScopeNames(input: GetOrganizationGroupInput): Promise<GroupDetail>;
+  createLicensedGroup(
+    input: Omit<CreateOrganizationGroupInput, "actor">,
+    by: OrganizationCaller,
+  ): Promise<OrganizationGroup>;
+  listMemberGroupsWithScopeNames(
+    input: ListMemberOrganizationGroupsInput,
+  ): Promise<GroupMembershipView[]>;
+
+  lookupJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown>;
+  listOwnJoinRequests(input: Readonly<{ userId: string }>): Promise<JoinRequestMine>;
+  fileJoinRequest(
+    input: Readonly<{ userId: string; organizationId: string }>,
+  ): Promise<JoinRequestFiled>;
+  withdrawJoinRequest(input: Readonly<{ joinRequestId: string; userId: string }>): Promise<void>;
+  listPendingJoinRequests(input: Readonly<{ organizationId: string }>): Promise<JoinRequestPending>;
+  approveJoinRequest(
+    input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
+  ): Promise<void>;
+  rejectJoinRequest(
+    input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
+  ): Promise<void>;
+  readJoiningPolicy(input: Readonly<{ organizationId: string }>): Promise<JoinRequestJoining>;
+  setJoiningPolicy(
+    input: Readonly<{
+      organizationId: string;
+      domainJoin: JoinRequestJoining["domainJoin"];
+      domains: readonly string[];
+    }>,
+  ): Promise<JoinRequestJoiningChanged>;
+
+  initializeOrganization(
+    input: OnboardingInitializeOrganizationInput,
+    by: OrganizationCaller,
+  ): Promise<OrganizationInitialized>;
+  recordIntegrationMethod(input: Readonly<{ userId: string; selection: string }>): void;
+
+  readPersonalWorkspaceFeatures(
+    input: Readonly<{ projectId: string }>,
+    by: OrganizationCaller,
+  ): Promise<PersonalFeatures>;
+  enablePersonalWorkspaceFeatures(
+    input: Readonly<{ projectId: string }>,
+    by: OrganizationCaller,
+  ): Promise<PersonalFeatures>;
+  disablePersonalWorkspaceFeatures(
+    input: Readonly<{ projectId: string }>,
+    by: OrganizationCaller,
+  ): Promise<PersonalFeatures>;
 }
 
 export const OrganizationApi = moduleApi<OrganizationApi>("organization");

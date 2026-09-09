@@ -55,6 +55,39 @@ export class AlreadyOrganizationMemberError extends HandledError {
  * an expired invitation is recoverable — the inviter resends it in one click (D11) — so the
  * person holding the link gets told to ask for a fresh one instead of a dead end.
  */
+/**
+ * The invitation has already been spent. The client turns this into a redirect
+ * into the organization rather than an error page: being already in is not a
+ * failure, it is the outcome the person wanted, arrived at earlier.
+ */
+export class InviteAlreadyAcceptedError extends HandledError {
+  declare readonly code: "invite_already_accepted";
+
+  constructor() {
+    super("invite_already_accepted", INVITE_ALREADY_ACCEPTED_MESSAGE, {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "InviteAlreadyAcceptedError";
+  }
+}
+
+/**
+ * The invitation exists and is neither spent nor expired, but is waiting on
+ * something else - an approval, or a payment - so it cannot be spent yet.
+ */
+export class InviteNotReadyForAcceptanceError extends HandledError {
+  declare readonly code: "invite_not_ready";
+
+  constructor() {
+    super("invite_not_ready", INVITE_NOT_READY_MESSAGE, {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "InviteNotReadyForAcceptanceError";
+  }
+}
+
 export class InviteExpiredError extends HandledError {
   declare readonly code: "invite_expired";
 

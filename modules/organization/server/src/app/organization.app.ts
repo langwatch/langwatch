@@ -3,11 +3,19 @@
  * `group.*`, the personal-workspace nav predicate) call. What lives here is cross-door shared
  * logic; most operations are the services' own, via {@link organizations} and {@link projects}.
  */
-import { OrganizationApi, OrganizationGroupService } from "@langwatch/organization-contract";
+import {
+  isOrganizationApiCustomRole,
+  LiteMemberViewerOnlyError,
+  OrganizationApi,
+  OrganizationCapabilityUnavailableError,
+  OrganizationGroupService,
+  OrganizationNotFoundForTeamError,
+} from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { UserApi } from "@langwatch/user-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { HandledError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   AddOrganizationGroupBindingInput,
@@ -83,7 +91,30 @@ import type {
   User,
 } from "@langwatch/organization-contract";
 import type { PaginatedProjects, Project } from "@langwatch/project-contract";
+import type {
+  GroupDetail,
+  GroupListItem,
+  GroupMembershipView,
+  TeamWithProjects,
+} from "@langwatch/organization-contract";
+import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
+import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
+import { OrganizationJoinDoorService } from "../services/organization-join-door.service.ts";
+import { OrganizationOnboardingService } from "../services/organization-onboarding.service.ts";
+import { OrganizationVisibilityService } from "../services/organization-visibility.service.ts";
+import { PersonalTeamScopeService } from "../services/personal-team-scope.service.ts";
+import { PostgresPersonalTeamScopeAdapter } from "../adapters/postgres.personal-team-scope.adapter.ts";
+import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
+import type {
+  OrganizationCeremony,
+  OrganizationDemoProject,
+  OrganizationDirectory,
+  OrganizationInvitations,
+  OrganizationJoinRequests,
+  OrganizationPlanGate,
+  OrganizationSignals,
+} from "./organization.infrastructure.ts";
 import {
   organizationMemberDatesFromDate,
   organizationProvisioningSummaryFromDate,
@@ -143,6 +174,8 @@ export interface ServerOrganizationAppDependencies {
   membership: OrganizationMembershipService;
   groups: OrganizationGroupService;
   projects: OrganizationProjectApi;
+  /** The one permission service every door on this application asks. */
+  permissions: AuthzApi;
 }
 
 type OrganizationSetup = FeatureSetup<
@@ -160,7 +193,59 @@ export type OrganizationInfrastructure = Readonly<{
   diagnostics?: PersonalWorkspaceDiagnosticsPort;
   prompts: OrganizationPromptSeedPort;
   seats: OrganizationSeatLicensePort;
+  /** The invitations this deployment administers, or none. */
+  invitations: OrganizationInvitations | null;
+  /** The join-request ledger, or none. */
+  joinRequests: OrganizationJoinRequests | null;
+  plans: OrganizationPlanGate;
+  signals: OrganizationSignals;
+  ceremony: OrganizationCeremony;
+  directory: OrganizationDirectory;
+  /** The demo organization's person and project, or empty strings when unset. */
+  demoProject: OrganizationDemoProject;
 }>;
+
+/** The page size the two project lookups read an organization at. */
+const TEAM_PROJECT_PAGE = { page: 1, limit: 1_000 } as const;
+
+/** The page size the group list is read at. */
+const GROUP_PAGE = { page: 1, limit: 1_000 } as const;
+
+/**
+ * The caller may not read this organization's audit trail through the project
+ * they filtered it by. Separate from the organization-tier refusal the
+ * declaration already made, and the same code, so the customer reads one
+ * sentence either way.
+ */
+class AuditTrailDeniedError extends HandledError {
+  declare readonly code: "permission_denied";
+
+  constructor() {
+    super("permission_denied", "You do not have permission to read this audit trail", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "AuditTrailDeniedError";
+  }
+}
+
+/**
+ * A door this deployment composed nothing behind. Every member REJECTS rather
+ * than throwing: each one is declared as answering a promise, and a caller
+ * that awaits must not have to guard the call itself as well.
+ */
+function refusing<T>(capability: string): T {
+  return new Proxy(
+    {},
+    {
+      get:
+        () =>
+        (): Promise<never> =>
+          Promise.reject(new OrganizationCapabilityUnavailableError(capability)),
+      has: () => true,
+    },
+  ) as T;
+}
 
 export class ServerOrganizationApp implements OrganizationApi {
   static readonly contract = OrganizationApi;
@@ -190,19 +275,155 @@ export class ServerOrganizationApp implements OrganizationApi {
       sessions: UserApiOrganizationSessionRevocation.create(setup.dependencies.users),
       grantCache: AuthzApiOrganizationGrantCache.create(setup.dependencies.permissions),
     }).build();
-    return new ServerOrganizationApp({
+    const groups = OrganizationGroupScopeService.create({
       organizations,
-      membership,
-      groups: OrganizationGroupScopeService.create({
-        organizations,
-        projects: setup.dependencies.projects,
-      }),
       projects: setup.dependencies.projects,
     });
+    const application = new ServerOrganizationApp({
+      organizations,
+      membership,
+      groups,
+      projects: setup.dependencies.projects,
+      permissions: setup.dependencies.permissions,
+    });
+
+    application.#infrastructure = setup.infrastructure;
+    application.#visibility = OrganizationVisibilityService.create({
+      reader: {
+        getAllForUser: (input) => membership.getAllForUser(input),
+        tryGetOrganizationWithMembers: (input) => membership.tryGetOrganizationWithMembers(input),
+        tryGetMemberById: (input) => membership.tryGetMemberById(input),
+      },
+      permissions: setup.dependencies.permissions,
+      secrets: setup.infrastructure.settingsSecrets,
+      demoProject: setup.infrastructure.demoProject,
+    });
+    application.#personalTeamScope = PersonalTeamScopeService.create(
+      PostgresPersonalTeamScopeAdapter.create({ database: setup.infrastructure.database }),
+    );
+    application.#invitationDoor = setup.infrastructure.invitations
+      ? OrganizationInvitationDoorService.create({
+          invitations: setup.infrastructure.invitations,
+          joinRequests: setup.infrastructure.joinRequests,
+          plans: setup.infrastructure.plans,
+          signals: setup.infrastructure.signals,
+          ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
+        })
+      : null;
+    application.#joinDoor = setup.infrastructure.joinRequests
+      ? OrganizationJoinDoorService.create({
+          joinRequests: setup.infrastructure.joinRequests,
+          directory: setup.infrastructure.directory,
+        })
+      : null;
+    application.#onboarding = OrganizationOnboardingService.create({
+      ceremony: setup.infrastructure.ceremony,
+      signals: setup.infrastructure.signals,
+      createAndAssign: (input, by) => application.createAndAssign(input, by),
+      ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
+    });
+
+    return application;
+  }
+
+  /**
+   * Test-only construction over stub services, wired the way `create` wires a
+   * booted one: the door services close over the application, so a suite that
+   * built it by hand would drive an application whose doors were never attached.
+   *
+   * Only the infrastructure a suite names is supplied; every other member refuses
+   * by name, which is what a deployment that composed none of it does.
+   */
+  static createForTesting(setup: {
+    dependencies: Omit<ServerOrganizationAppDependencies, "groups"> & {
+      groups?: OrganizationGroupService;
+    };
+    infrastructure?: Partial<OrganizationInfrastructure>;
+  }): ServerOrganizationApp {
+    const { groups, ...dependencies } = setup.dependencies;
+    const application = new ServerOrganizationApp({
+      ...dependencies,
+      groups:
+        groups ??
+        OrganizationGroupScopeService.create({
+          organizations: dependencies.organizations,
+          projects: dependencies.projects,
+        }),
+    });
+    const infrastructure = {
+      plans: refusing<OrganizationPlanGate>("organization plan gate"),
+      signals: refusing<OrganizationSignals>("organization signals"),
+      ceremony: refusing<OrganizationCeremony>("sign-up ceremony"),
+      directory: refusing<OrganizationDirectory>("identity directory"),
+      settingsSecrets: refusing<OrganizationSettingsSecretPort>("settings cipher"),
+      demoProject: { userId: "", projectId: "" },
+      invitations: null,
+      joinRequests: null,
+      ...setup.infrastructure,
+    } as OrganizationInfrastructure;
+
+    application.#infrastructure = infrastructure;
+    application.#visibility = OrganizationVisibilityService.create({
+      reader: {
+        getAllForUser: (input) => dependencies.membership.getAllForUser(input),
+        tryGetOrganizationWithMembers: (input) =>
+          dependencies.membership.tryGetOrganizationWithMembers(input),
+        tryGetMemberById: (input) => dependencies.membership.tryGetMemberById(input),
+      },
+      permissions: dependencies.permissions,
+      secrets: infrastructure.settingsSecrets,
+      demoProject: infrastructure.demoProject,
+    });
+    application.#personalTeamScope = PersonalTeamScopeService.create(
+      PostgresPersonalTeamScopeAdapter.create({ database: infrastructure.database }),
+    );
+    application.#invitationDoor = infrastructure.invitations
+      ? OrganizationInvitationDoorService.create({
+          invitations: infrastructure.invitations,
+          joinRequests: infrastructure.joinRequests,
+          plans: infrastructure.plans,
+          signals: infrastructure.signals,
+          ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
+        })
+      : null;
+    application.#joinDoor = infrastructure.joinRequests
+      ? OrganizationJoinDoorService.create({
+          joinRequests: infrastructure.joinRequests,
+          directory: infrastructure.directory,
+        })
+      : null;
+    application.#onboarding = OrganizationOnboardingService.create({
+      ceremony: infrastructure.ceremony,
+      signals: infrastructure.signals,
+      createAndAssign: (input, by) => application.createAndAssign(input, by),
+      ensurePersonalWorkspace: (input, by) => application.ensurePersonalWorkspace(input, by),
+    });
+
+    return application;
   }
 
   private constructor(dependencies: ServerOrganizationAppDependencies) {
     this.#dependencies = dependencies;
+  }
+
+  // Assigned once by `create`, immediately after the constructor: the door
+  // services close over the application itself, which the constructor cannot
+  // hand them.
+  #infrastructure!: OrganizationInfrastructure;
+  #visibility!: OrganizationVisibilityService;
+  #personalTeamScope!: PersonalTeamScopeService;
+  #invitationDoor!: OrganizationInvitationDoorService | null;
+  #joinDoor!: OrganizationJoinDoorService | null;
+  #onboarding!: OrganizationOnboardingService;
+
+  /** The invitation ceremony, or the refusal a deployment without one answers. */
+  get #invitations(): OrganizationInvitationDoorService {
+    return this.#invitationDoor ?? refusing("organization invitation service");
+  }
+
+  /** The join-request ledger, or the refusal a deployment without one answers. */
+  get #joinRequests(): OrganizationJoinDoorService {
+    return this.#joinDoor ?? refusing("join-request ledger");
   }
 
   /** The ledger actor a write is recorded under — one spelling, shared by every door. */
@@ -436,6 +657,18 @@ export class ServerOrganizationApp implements OrganizationApi {
     input: Parameters<OrganizationMembershipPort["getAuditLogs"]>[0],
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     return this.#dependencies.membership.getAuditLogs(input);
+  }
+
+  /**
+   * Claims the payment provider's customer id for this organization, once.
+   * Beside the profile read because they are the same row: the provisioning
+   * door reads one and writes the other.
+   */
+  claimBillingCustomerId(input: {
+    organizationId: string;
+    billingCustomerId: string;
+  }): Promise<boolean> {
+    return this.#dependencies.organizations.claimBillingCustomerId(input);
   }
 
   /** The billing-facing profile, which is also where the display name lives. */
@@ -696,6 +929,433 @@ export class ServerOrganizationApp implements OrganizationApi {
     return this.#dependencies.projects.listByOrganization(input);
   }
 
+  // -- the doors -------------------------------------------------------------
+  //
+  // What each namespace calls once its transport has stated access. The
+  // orchestration below used to live in the transports, where nothing could
+  // reach it without a router.
+
+  /** Every organization the caller can reach, redacted for them. */
+  listVisibleOrganizations(
+    input: Readonly<{ isDemo: boolean }>,
+    by: OrganizationCaller,
+  ): Promise<FullyLoadedOrganization[]> {
+    return this.#visibility.listVisible(input, by);
+  }
+
+  getOrganizationWithMembersForPicker(
+    input: Readonly<{ organizationId: string; includeDeactivated: boolean }>,
+    by: OrganizationCaller,
+  ): Promise<OrganizationWithMembersAndTheirTeams> {
+    return this.#visibility.getWithMembersForPicker(input, by);
+  }
+
+  getMemberOrRefuse(
+    input: Readonly<{ organizationId: string; userId: string }>,
+    by: OrganizationCaller,
+  ): Promise<OrganizationMemberWithUser> {
+    return this.#visibility.getMemberOrRefuse(input, by);
+  }
+
+  createInvitations(
+    input: Parameters<OrganizationInvitationDoorService["create"]>[0],
+    by: OrganizationCaller,
+  ): ReturnType<OrganizationInvitationDoorService["create"]> {
+    return this.#invitations.create(input, by);
+  }
+
+  revokeInvitation(input: Readonly<{ organizationId: string; inviteId: string }>): Promise<void> {
+    return this.#invitations.revoke(input);
+  }
+
+  resendInvitation(
+    input: Readonly<{ organizationId: string; inviteId: string }>,
+  ): ReturnType<OrganizationInvitationDoorService["resend"]> {
+    return this.#invitations.resend(input);
+  }
+
+  listPendingInvitations(
+    input: Readonly<{ organizationId: string }>,
+  ): ReturnType<OrganizationInvitationDoorService["list"]> {
+    return this.#invitations.list(input);
+  }
+
+  acceptInvitation(
+    input: Readonly<{ inviteCode: string }>,
+    by: OrganizationCaller,
+  ): ReturnType<OrganizationInvitationDoorService["accept"]> {
+    return this.#invitations.accept(input, by);
+  }
+
+  /**
+   * One team-role change, with three guards ahead of it: a personal team is
+   * never role-administered from here, a custom role needs the plan that
+   * carries custom roles, and a Lite Member seat allows the Viewer role only.
+   */
+  async changeTeamMemberRole(
+    input: Readonly<{ teamId: string; userId: string; role: string; customRoleId?: string }>,
+    by: OrganizationCaller,
+  ): Promise<void> {
+    await this.#personalTeamScope.assertNoPersonalTeamScope({
+      scopes: [{ scopeType: "TEAM", scopeId: input.teamId }],
+    });
+
+    const organizationId = await this.#dependencies.organizations.tryGetOrganizationIdByTeamId({
+      teamId: input.teamId,
+    });
+    if (!organizationId) throw new OrganizationNotFoundForTeamError(input.teamId);
+
+    if (isOrganizationApiCustomRole(input.role)) {
+      if (input.customRoleId) {
+        await this.#infrastructure.plans.assertCustomRolesAllowed({ organizationId });
+      }
+    } else {
+      await this.#assertBuiltInTeamRoleAllowed({ organizationId, input });
+    }
+
+    await this.updateTeamMemberRole(input, by);
+  }
+
+  /**
+   * The audit trail. `auditLog:view` was asked at the organization tier by the
+   * declaration; a project FILTER earns the same question at the project tier,
+   * so a project-scoped grant cannot widen a read to rows outside it.
+   */
+  async readAuditLogs(
+    input: Parameters<OrganizationMembershipPort["getAuditLogs"]>[0],
+    by: OrganizationCaller,
+  ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
+    await this.#infrastructure.plans.assertAuditLogsAllowed({
+      organizationId: input.organizationId,
+    });
+
+    if (input.projectId) {
+      const permitted = await this.#dependencies.permissions.hasPermission({
+        userId: by.id,
+        permission: "auditLog:view",
+        projectId: input.projectId,
+      });
+      if (!permitted) throw new AuditTrailDeniedError();
+    }
+
+    return this.getAuditLogs(input);
+  }
+
+  // -- the team doors --------------------------------------------------------
+
+  /** Every team the caller can see, each with the projects that sit in it. */
+  async listTeamsWithProjects(
+    input: Readonly<{ organizationId: string }>,
+    by: OrganizationCaller,
+  ): Promise<TeamWithProjects[]> {
+    const callerCanManage = await this.#canManage({ organizationId: input.organizationId, by });
+    const [teams, projects] = await Promise.all([
+      this.listTeamsWithMembers({ organizationId: input.organizationId, callerCanManage }, by),
+      this.listProjectsByOrganization({
+        organizationId: input.organizationId,
+        ...TEAM_PROJECT_PAGE,
+      }),
+    ]);
+
+    return teams.map((team) => ({
+      ...team,
+      projects: projects.data.filter((project) => project.teamId === team.id),
+    })) as TeamWithProjects[];
+  }
+
+  /** The access matrix an administrator edits: who holds what, and through what. */
+  async listTeamAccessMatrix(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationTeamAccess[]> {
+    const projects = await this.listProjectsByOrganization({
+      organizationId: input.organizationId,
+      ...TEAM_PROJECT_PAGE,
+    });
+
+    return this.listTeamAccess({
+      organizationId: input.organizationId,
+      projects: projects.data.map(({ id, name, teamId }) => ({ id, name, teamId })),
+    });
+  }
+
+  async getTeamWithProjects(
+    input: Readonly<{ organizationId: string; slug: string }>,
+    by: OrganizationCaller,
+  ): Promise<TeamWithProjects> {
+    const callerCanManage = await this.#canManage({ organizationId: input.organizationId, by });
+    const team = await this.getTeamWithMembers({ ...input, callerCanManage }, by);
+    const projects = await this.listProjectsByTeam({
+      organizationId: input.organizationId,
+      teamId: team.id,
+    });
+
+    return { ...team, projects } as TeamWithProjects;
+  }
+
+  async updateTeamMembers(
+    input: Omit<UpdateOrganizationTeamWithMembersInput, "actor">,
+    by: OrganizationCaller,
+  ): Promise<void> {
+    const team = await this.getTeamById({ teamId: input.teamId });
+    await this.#assertMemberRolesLicensed({
+      organizationId: team.organizationId,
+      members: input.members,
+    });
+
+    await this.updateTeamWithMembers(input, by);
+  }
+
+  async createTeamWithGatedMembers(
+    input: Omit<CreateOrganizationTeamWithMembersInput, "actor">,
+    by: OrganizationCaller,
+  ): Promise<OrganizationTeam> {
+    await this.#assertMemberRolesLicensed({
+      organizationId: input.organizationId,
+      members: input.members,
+    });
+
+    return this.createTeamWithMembers(input, by);
+  }
+
+  async archiveTeamById(input: Readonly<{ teamId: string }>): Promise<void> {
+    const team = await this.getTeamById(input);
+
+    await this.archiveTeam({ teamId: team.id, organizationId: team.organizationId });
+  }
+
+  async removeTeamMemberById(
+    input: Readonly<{ teamId: string; userId: string }>,
+    by: OrganizationCaller,
+  ): Promise<void> {
+    const team = await this.getTeamById({ teamId: input.teamId });
+
+    await this.removeTeamMember({ ...input, organizationId: team.organizationId }, by);
+  }
+
+  // -- the group doors -------------------------------------------------------
+
+  /** Every group, each binding carrying the scope name an administrator reads. */
+  async listGroupsWithScopeNames(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<GroupListItem[]> {
+    await this.#infrastructure.plans.assertScimAllowed(input);
+
+    const page = await this.listGroups({ ...input, ...GROUP_PAGE });
+    const scopeNames = await this.resolveBindingScopeNames({
+      organizationId: input.organizationId,
+      bindings: page.data.flatMap(({ bindings }) => bindings),
+    });
+
+    return page.data.map((group) => ({
+      id: group.id,
+      name: group.name,
+      slug: group.slug,
+      externalId: group.externalId,
+      scimSource: group.scimSource,
+      memberCount: group.memberCount,
+      bindings: group.bindings.map((binding) => ({
+        ...binding,
+        scopeName: scopeNames.get(binding.scopeId) ?? null,
+      })),
+      createdAt: group.createdAt,
+    })) as GroupListItem[];
+  }
+
+  async getGroupWithScopeNames(input: GetOrganizationGroupInput): Promise<GroupDetail> {
+    const group = await this.getGroup(input);
+    const scopeNames = await this.resolveBindingScopeNames({
+      organizationId: input.organizationId,
+      bindings: group.bindings,
+    });
+
+    return {
+      id: group.id,
+      name: group.name,
+      slug: group.slug,
+      externalId: group.externalId,
+      scimSource: group.scimSource,
+      bindings: group.bindings.map((binding) => ({
+        ...binding,
+        scopeName: scopeNames.get(binding.scopeId) ?? null,
+      })),
+      members: group.members,
+    } as GroupDetail;
+  }
+
+  async createLicensedGroup(
+    input: Omit<CreateOrganizationGroupInput, "actor">,
+    by: OrganizationCaller,
+  ): Promise<OrganizationGroup> {
+    await this.#infrastructure.plans.assertScimAllowed({ organizationId: input.organizationId });
+
+    return this.createGroup(input, by);
+  }
+
+  /** Which groups one person is in, as the member drawer renders them. */
+  async listMemberGroupsWithScopeNames(
+    input: ListMemberOrganizationGroupsInput,
+  ): Promise<GroupMembershipView[]> {
+    const groups = await this.listGroupsForMember(input);
+    const scopeNames = await this.resolveBindingScopeNames({
+      organizationId: input.organizationId,
+      bindings: groups.flatMap(({ bindings }) => bindings),
+    });
+
+    return groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      scimSource: group.scimSource,
+      bindings: group.bindings.map((binding) => ({
+        id: binding.id,
+        role: binding.role,
+        customRoleName: binding.customRoleName,
+        scopeType: binding.scopeType,
+        scopeName: scopeNames.get(binding.scopeId) ?? binding.scopeId,
+      })),
+    })) as GroupMembershipView[];
+  }
+
+  // -- the join-request doors ------------------------------------------------
+
+  lookupJoinableOrganizations(input: Readonly<{ userId: string }>): Promise<unknown> {
+    return this.#joinRequests.lookup(input);
+  }
+
+  listOwnJoinRequests(
+    input: Readonly<{ userId: string }>,
+  ): ReturnType<OrganizationJoinDoorService["listOwn"]> {
+    return this.#joinRequests.listOwn(input);
+  }
+
+  fileJoinRequest(
+    input: Readonly<{ userId: string; organizationId: string }>,
+  ): ReturnType<OrganizationJoinDoorService["file"]> {
+    return this.#joinRequests.file(input);
+  }
+
+  withdrawJoinRequest(input: Readonly<{ joinRequestId: string; userId: string }>): Promise<void> {
+    return this.#joinRequests.withdraw(input);
+  }
+
+  listPendingJoinRequests(
+    input: Readonly<{ organizationId: string }>,
+  ): ReturnType<OrganizationJoinDoorService["listPending"]> {
+    return this.#joinRequests.listPending(input);
+  }
+
+  approveJoinRequest(
+    input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
+  ): Promise<void> {
+    return this.#joinRequests.approve(input);
+  }
+
+  rejectJoinRequest(
+    input: Readonly<{ joinRequestId: string; organizationId: string; adminUserId: string }>,
+  ): Promise<void> {
+    return this.#joinRequests.reject(input);
+  }
+
+  readJoiningPolicy(
+    input: Readonly<{ organizationId: string }>,
+  ): ReturnType<OrganizationJoinDoorService["readJoining"]> {
+    return this.#joinRequests.readJoining(input);
+  }
+
+  setJoiningPolicy(
+    input: Parameters<OrganizationJoinDoorService["setJoining"]>[0],
+  ): ReturnType<OrganizationJoinDoorService["setJoining"]> {
+    return this.#joinRequests.setJoining(input);
+  }
+
+  // -- the sign-up ceremony --------------------------------------------------
+
+  initializeOrganization(
+    input: Parameters<OrganizationOnboardingService["initialize"]>[0],
+    by: OrganizationCaller,
+  ): ReturnType<OrganizationOnboardingService["initialize"]> {
+    return this.#onboarding.initialize(input, by);
+  }
+
+  recordIntegrationMethod(input: Readonly<{ userId: string; selection: string }>): void {
+    this.#onboarding.recordIntegrationMethod(input);
+  }
+
+  // -- the personal workspace's own switches, as the door names them ---------
+
+  readPersonalWorkspaceFeatures(
+    input: Readonly<{ projectId: string }>,
+    by: OrganizationCaller,
+  ): Promise<PersonalFeatures> {
+    return this.getPersonalWorkspaceFeatures(input, by);
+  }
+
+  enablePersonalWorkspaceFeatures(
+    input: Readonly<{ projectId: string }>,
+    by: OrganizationCaller,
+  ): Promise<PersonalFeatures> {
+    return this.enableAllPersonalWorkspaceFeatures(input, by);
+  }
+
+  disablePersonalWorkspaceFeatures(
+    input: Readonly<{ projectId: string }>,
+    by: OrganizationCaller,
+  ): Promise<PersonalFeatures> {
+    return this.disableAllPersonalWorkspaceFeatures(input, by);
+  }
+
+  #canManage(input: { organizationId: string; by: OrganizationCaller }): Promise<boolean> {
+    return this.#dependencies.permissions.hasPermission({
+      userId: input.by.id,
+      permission: "organization:manage",
+      organizationId: input.organizationId,
+    });
+  }
+
+  /** Refuses a member list that assigns a custom role the plan does not carry. */
+  async #assertMemberRolesLicensed(input: {
+    organizationId: string;
+    members: readonly Readonly<{ role: string }>[];
+  }): Promise<void> {
+    if (!input.members.some((member) => isOrganizationApiCustomRole(member.role))) return;
+
+    await this.#infrastructure.plans.assertCustomRolesAllowed({
+      organizationId: input.organizationId,
+    });
+  }
+
+  /**
+   * A Lite Member seat allows the Viewer team role only, and moving one off
+   * Viewer costs a full seat. Both are asked here, in that order, because the
+   * first is a rule and the second is a licence.
+   */
+  async #assertBuiltInTeamRoleAllowed(params: {
+    organizationId: string;
+    input: Readonly<{ teamId: string; userId: string; role: string }>;
+  }): Promise<void> {
+    const { organizationId, input } = params;
+    const organizationRole = await this.#dependencies.membership.tryGetUserOrgRoleByTeamId({
+      userId: input.userId,
+      teamId: input.teamId,
+    });
+
+    if (organizationRole !== "EXTERNAL") return;
+
+    if (
+      !isTeamRoleAllowedForOrganizationRole({
+        organizationRole: "EXTERNAL",
+        teamRole: input.role as TeamRoleValue,
+      })
+    ) {
+      throw new LiteMemberViewerOnlyError();
+    }
+
+    await this.#infrastructure.plans.assertTeamRoleChangeWithinSeatLimits({
+      organizationId,
+      teamId: input.teamId,
+      userId: input.userId,
+    });
+  }
+
   /** The projects that live in one team. */
   listProjectsByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
     return this.#dependencies.projects.listByTeam(input);
@@ -703,11 +1363,13 @@ export class ServerOrganizationApp implements OrganizationApi {
 }
 
 class UserApiOrganizationSessionRevocation extends OrganizationSessionRevocationPort {
-  static create(users: import("@langwatch/user-contract").UserApi): UserApiOrganizationSessionRevocation {
+  static create(
+    users: UserApi,
+  ): UserApiOrganizationSessionRevocation {
     return new UserApiOrganizationSessionRevocation(users);
   }
 
-  private constructor(private readonly users: import("@langwatch/user-contract").UserApi) {
+  private constructor(private readonly users: UserApi) {
     super();
   }
 
@@ -717,37 +1379,15 @@ class UserApiOrganizationSessionRevocation extends OrganizationSessionRevocation
 }
 
 class AuthzApiOrganizationGrantCache extends OrganizationGrantCachePort {
-  static create(authz: import("@langwatch/authz-contract").AuthzApi): AuthzApiOrganizationGrantCache {
+  static create(authz: AuthzApi): AuthzApiOrganizationGrantCache {
     return new AuthzApiOrganizationGrantCache(authz);
   }
 
-  private constructor(private readonly authz: import("@langwatch/authz-contract").AuthzApi) {
+  private constructor(private readonly authz: AuthzApi) {
     super();
   }
 
   invalidateOrganization(input: { organizationId: string }): Promise<void> {
     return this.authz.invalidateOrganization(input);
   }
-}
-
-/** Test-only construction over stub services without weakening the production factory. */
-export function createOrganizationAppForTesting(setup: {
-  infrastructure: Omit<ServerOrganizationAppDependencies, "groups"> & {
-    groups?: OrganizationGroupService;
-  };
-  [key: string]: unknown;
-}): ServerOrganizationApp {
-  const { groups, ...dependencies } = setup.infrastructure;
-  const Constructor = ServerOrganizationApp as unknown as new (
-    dependencies: ServerOrganizationAppDependencies,
-  ) => ServerOrganizationApp;
-  return new Constructor({
-    ...dependencies,
-    groups:
-      groups ??
-      OrganizationGroupScopeService.create({
-        organizations: dependencies.organizations,
-        projects: dependencies.projects,
-      }),
-  });
 }

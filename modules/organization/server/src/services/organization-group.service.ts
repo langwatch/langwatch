@@ -1,7 +1,4 @@
-import {
-  DuplicateBindingError,
-  type AuthzApi,
-} from "@langwatch/authz-contract";
+import { DuplicateBindingError, type AuthzApi } from "@langwatch/authz-contract";
 import {
   GroupBindingAlreadyExistsError,
   GroupBindingNotFoundError,

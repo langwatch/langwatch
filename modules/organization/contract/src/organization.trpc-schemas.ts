@@ -36,6 +36,15 @@ export const organizationApiCustomTeamRoleSchema = z
   .regex(/^custom:[a-zA-Z0-9_-]+$/, "Custom role must be in format 'custom:{roleId}'");
 
 /**
+ * Whether a role string names one an organization defined for itself. A naming
+ * convention on a stored string, not an entitlement, so the contract can say
+ * it and every writer reads the same answer.
+ */
+export function isOrganizationApiCustomRole(role: string): boolean {
+  return role.startsWith("custom:");
+}
+
+/**
  * The built-in team roles an invitation or a role change may name. `CUSTOM` is
  * deliberately absent: a custom role arrives as the `custom:<id>` form below.
  */
@@ -149,16 +158,37 @@ export type OrganizationApiUpdateMemberRoleInput = z.infer<
 >;
 
 /**
- * The fields of one team-role change. The refinement that pairs `role` with
- * `customRoleId` is applied by the transport, because what counts as a custom
- * role is the process's answer rather than the contract's.
+ * One team-role change. `customRoleId` travels with a custom role and with
+ * nothing else: the pairing is part of what a caller has to send, so it is
+ * stated here rather than re-derived by whichever transport carries it.
  */
-export const organizationApiUpdateTeamMemberRoleInputSchema = z.object({
-  teamId: z.string(),
-  userId: z.string(),
-  role: organizationApiTeamRoleSchema,
-  customRoleId: z.string().optional(),
-});
+export const organizationApiUpdateTeamMemberRoleInputSchema = z
+  .object({
+    teamId: z.string(),
+    userId: z.string(),
+    role: organizationApiTeamRoleSchema,
+    customRoleId: z.string().optional(),
+  })
+  .superRefine((data, issues) => {
+    if (isOrganizationApiCustomRole(data.role)) {
+      if (!data.customRoleId || data.customRoleId.trim() === "") {
+        issues.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "customRoleId is required when using a custom role",
+          path: ["customRoleId"],
+        });
+      }
+      return;
+    }
+
+    if (data.customRoleId !== undefined) {
+      issues.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "customRoleId must not be provided when using a built-in role",
+        path: ["customRoleId"],
+      });
+    }
+  });
 export type OrganizationApiUpdateTeamMemberRoleInput = z.infer<
   typeof organizationApiUpdateTeamMemberRoleInputSchema
 >;

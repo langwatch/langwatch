@@ -84,7 +84,7 @@ export {
   type OrganizationCaller,
   type OrganizationWithMembersAndTheirTeams,
 } from "./app/organization.app.ts";
-export { organizationFeature } from "./organization.server.ts";
+export { organizationServer } from "./organization.server.ts";
 export {
   createOrganizationRestApp,
   type OrganizationRestInviteService,
@@ -93,8 +93,27 @@ export {
   type OrganizationRestPorts,
   type OrganizationRestService,
 } from "./transport/api-rest/organization.api.ts";
-// The six tRPC transports are not exported: they still name the deleted legacy
-// builder.
+export { groupTrpcTransport } from "./transport/group.trpc.ts";
+export { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
+export { onboardingTrpcTransport } from "./transport/onboarding.trpc.ts";
+export {
+  organizationSessionPersonFact,
+  organizationTrpcTransport,
+} from "./transport/organization.trpc.ts";
+export { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-workspace-features.trpc.ts";
+export { teamTrpcTransport } from "./transport/team.trpc.ts";
+export type {
+  OrganizationCeremony,
+  OrganizationDemoProject,
+  OrganizationDirectory,
+  OrganizationInvitations,
+  OrganizationInviteWithOrganization,
+  OrganizationInvitesCreated,
+  OrganizationJoinRequests,
+  OrganizationJoinRequestState,
+  OrganizationPlanGate,
+  OrganizationSignals,
+} from "./app/organization.infrastructure.ts";
 export { createGroupRestApp } from "./transport/api-rest/group.api.ts";
 export {
   createOrganizationsRestApp,

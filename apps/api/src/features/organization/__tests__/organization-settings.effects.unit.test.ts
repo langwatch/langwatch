@@ -1,5 +1,5 @@
 import type { ShareApi } from "@langwatch/share-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 import { revokeTraceSharesAfterOrganizationSettingsUpdate } from "../organization-settings.effects.ts";
 
@@ -13,7 +13,7 @@ describe("revokeTraceSharesAfterOrganizationSettingsUpdate", () => {
     } as unknown as ShareApi;
     const projects = {
       listIdsByOrganization: vi.fn().mockResolvedValue(["project-a", "project-b"]),
-    } as unknown as ProjectService;
+    } as unknown as ProjectApi;
 
     await expect(
       revokeTraceSharesAfterOrganizationSettingsUpdate(shares, projects, "organization", {

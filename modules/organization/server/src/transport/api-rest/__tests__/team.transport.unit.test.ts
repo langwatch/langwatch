@@ -15,7 +15,7 @@ import type {
   OrganizationLedgerActor,
   OrganizationService,
 } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -121,7 +121,7 @@ function buildApi(
     }),
     organizations: () => organizations,
     permissions: () => ({}) as AuthzService,
-    projects: () => ({}) as ProjectService,
+    projects: () => ({}) as ProjectApi,
     ledgerActor: () => LEDGER_ACTOR,
   });
 

@@ -1,4 +1,4 @@
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { RoleApi } from "@langwatch/role-contract";
@@ -104,8 +104,12 @@ export type InviteServiceDependencies = Readonly<{
   seats: OrganizationInviteSeatCensusPort;
   /** Which plan the organization is on, and therefore how many seats it holds. */
   plans: PlanProvider;
-  /** The ledger the accepted invitation's grants are written through. */
-  grants: AuthzGrantsService;
+  /**
+   * The ledger the accepted invitation's grants are written through. The whole
+   * authorization application rather than its grant half: acceptance attaches
+   * and revokes BINDINGS, which the grant commands alone cannot express.
+   */
+  grants: AuthzApi;
   /**
    * Where assignability is defined. Required rather than optional: an
    * invitation validated against a different rule than `applyInvite` applies

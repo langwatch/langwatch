@@ -1,9 +1,10 @@
 /**
  * The person-shaped features of the packaged tRPC record, served by the API process.
  */
-import type { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type {
+  AuthzApi,
   AuthzGetDecisionInput,
   AuthzGrantsService,
   AuthzScopeLineageResult,
@@ -22,7 +23,7 @@ import {
 } from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi, ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication } from "../../../api.application.ts";
@@ -32,7 +33,7 @@ import { ApiAuditPort } from "../../../api-request.policy.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import type { ApiTrpcInfrastructure } from "../../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { installApiUser } from "../../user/user.composition.ts";
-import { composeOrganizationFeature } from "../organization.composition.ts";
+import { installApiOrganization } from "../organization.composition.ts";
 import {
   stubCollaborators,
   stubComposedFeatures,
@@ -151,7 +152,7 @@ async function composePersonFeatures(
       organizations: {
         getSettings: async () => ({ supportContact: null }),
       } as unknown as OrganizationService,
-      projects: { tryGetIdentity: async () => null },
+      projects: { findIdentity: async () => null },
       resolveAuthProvider: async () => "email",
     },
     eventing,
@@ -162,7 +163,7 @@ async function composePersonFeatures(
     processName: "langwatch-api",
   });
 
-  const organization = composeOrganizationFeature({
+  const organization = await installApiOrganization({
     infrastructure: {
       ...stubInfrastructureEntitlements(),
       plans,
@@ -176,10 +177,10 @@ async function composePersonFeatures(
         organizations: {
           getSettings: async () => ({ supportContact: null }),
         } as unknown as OrganizationService,
-        projects: { create: async () => ({ slug: "acme-1" }) } as unknown as ProjectService,
-        projectApi: {} as unknown as ProjectApi,
+        projects: { create: async () => ({ slug: "acme-1" }) } as unknown as ProjectApi,
+        permissions: { ...testAuthz(), ...grants } as unknown as AuthzApi,
         grants,
-        auth: {} as unknown as AuthService,
+        auth: {} as unknown as BrowserSessionApi,
         users: user.app,
         eventing,
         processName: "langwatch-api",
@@ -321,9 +322,14 @@ async function composeSeatLicence(options: {
 }) {
   const prisma = seatPrisma(options.members);
   const { grants } = testGrants();
-  const { organization } = await composePersonFeatures(prisma.client, grants, new SilentEventing(), {
-    getActivePlan: async () => ({ type: "LAUNCH", free: false, ...options.plan }),
-  } as never);
+  const { organization } = await composePersonFeatures(
+    prisma.client,
+    grants,
+    new SilentEventing(),
+    {
+      getActivePlan: async () => ({ type: "LAUNCH", free: false, ...options.plan }),
+    } as never,
+  );
   const organizations = organization.rest;
   if (!organizations) throw new Error("the organization feature composed no membership half");
 
