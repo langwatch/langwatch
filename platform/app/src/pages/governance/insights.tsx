@@ -20,6 +20,7 @@ import {
   DEFAULT_INSIGHTS_SETTINGS,
   InsightsSetupDrawer,
 } from "~/components/governance/platform/InsightsSetupDrawer";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { LangyPanelSurface } from "~/features/asaplangy/components/LangyPanelSurface";
@@ -147,11 +148,31 @@ function InboxEmptyBrief({
             A couple of things worth acting on each day, never a feed of
             fifteen. Nothing has been filed here yet.
           </Text>
+          {/* An empty pane's two ways out. Neither is solid, per the rule.
+
+              Set up data takes the house header button, but be clear about
+              what it does today: onSetup opens InsightsSetupDrawer, and that
+              drawer's Save calls back into local useState on this page. There
+              is no mutation behind it and nothing survives a reload. The
+              drawer's model row does read live data over tRPC, which makes it
+              look more finished than it is. So the most prominent action on
+              this empty pane does not yet do what its label promises.
+
+              It keeps the heavier weight regardless, for two reasons:
+              demoting it would leave the pane with no primary way out, which
+              is worse than one that is ahead of its backend; and this is the
+              action that will fill the inbox once the mutation lands. The
+              weight anticipates that rather than describing the present.
+
+              Open Langy is ghost because it only changes what is on screen.
+              That distinction is thinner than it looks right now, since
+              neither button persists anything — it rests on what Set up data
+              is for, not on what it currently achieves. */}
           <HStack gap={2} marginTop={6}>
-            <Button size="sm" colorPalette="orange" onClick={onSetup}>
+            <PageLayout.HeaderButton onClick={onSetup}>
               Set up data
-            </Button>
-            <Button size="sm" variant="subtle" onClick={onOpenLangy}>
+            </PageLayout.HeaderButton>
+            <Button size="sm" variant="ghost" onClick={onOpenLangy}>
               Open Langy
             </Button>
           </HStack>

@@ -31,6 +31,26 @@ export const AGENT_SOURCE_LABELS: Record<AgentSource, string> = {
   copilot_studio: "Copilot Studio",
 };
 
+/**
+ * What an agent is doing right now, as one of three words.
+ *
+ * Stored rather than derived. "Responding" and "idle" could be read off
+ * `lastActiveMinutesAgo`, but "erroring" cannot — an agent that answered a
+ * minute ago and failed every one of those answers is recently active and
+ * unhealthy at the same time — and a field that is half derived and half
+ * stored is a field two readers disagree about. One source, so the three words
+ * always agree with each other.
+ */
+export const AGENT_HEALTH_STATES = ["responding", "idle", "erroring"] as const;
+export type AgentHealth = (typeof AGENT_HEALTH_STATES)[number];
+
+/** Spelled out, never abbreviated — the words the summary strip says. */
+export const AGENT_HEALTH_LABELS: Record<AgentHealth, string> = {
+  responding: "responding",
+  idle: "idle",
+  erroring: "erroring",
+};
+
 export interface GovernanceAgentRow {
   id: string;
   name: string;
@@ -49,6 +69,22 @@ export interface GovernanceAgentRow {
    * starts reading as an outage.
    */
   lastActiveMinutesAgo: number | null;
+  /**
+   * See `AgentHealth`. `null` is an agent whose health nothing has measured,
+   * which is a different fact from being idle and is counted as neither — so
+   * the strip's three health counts need not add up to the fleet.
+   */
+  health: AgentHealth | null;
+  /**
+   * Days since the agent registered, or `null` if the registration moment was
+   * never recorded. Days rather than a date for the same reason
+   * `lastActiveMinutesAgo` is minutes: a fixed date in invented data goes
+   * stale the week after it is written.
+   *
+   * The fleet card draws its registration line from this, so the read that
+   * one day fills this shape fills the line with it.
+   */
+  registeredDaysAgo: number | null;
 }
 
 /**
@@ -77,6 +113,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     costUsd30d: 4182.4,
     requests30d: 128400,
     lastActiveMinutesAgo: 4,
+    health: "responding",
+    registeredDaysAgo: 320,
   },
   {
     id: "sample-checkout-agent",
@@ -88,6 +126,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     costUsd30d: 2640.15,
     requests30d: 86200,
     lastActiveMinutesAgo: 12,
+    health: "responding",
+    registeredDaysAgo: 295,
   },
   {
     id: "sample-genie-revenue",
@@ -99,6 +139,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     costUsd30d: 1975.8,
     requests30d: 9450,
     lastActiveMinutesAgo: 55,
+    health: "responding",
+    registeredDaysAgo: 210,
   },
   {
     id: "sample-fraud-triage",
@@ -110,6 +152,11 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     costUsd30d: 1150.9,
     requests30d: 44300,
     lastActiveMinutesAgo: 30,
+    // The case that proves health is stored rather than read off the clock:
+    // active half an hour ago and failing, which no rule over
+    // `lastActiveMinutesAgo` could ever tell apart from the two above.
+    health: "erroring",
+    registeredDaysAgo: 260,
   },
   {
     id: "sample-genie-supply",
@@ -121,6 +168,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     costUsd30d: 612.3,
     requests30d: 3110,
     lastActiveMinutesAgo: 260,
+    health: "idle",
+    registeredDaysAgo: 150,
   },
   {
     id: "sample-churn-predictor",
@@ -132,6 +181,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     costUsd30d: 455.7,
     requests30d: 5200,
     lastActiveMinutesAgo: 180,
+    health: "idle",
+    registeredDaysAgo: 120,
   },
   {
     id: "sample-hr-helpdesk",
@@ -143,6 +194,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     costUsd30d: null,
     requests30d: 21800,
     lastActiveMinutesAgo: 95,
+    health: "responding",
+    registeredDaysAgo: 88,
   },
   {
     id: "sample-it-triage",
@@ -161,6 +214,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     costUsd30d: null,
     requests30d: 15600,
     lastActiveMinutesAgo: 1500,
+    health: "idle",
+    registeredDaysAgo: 74,
   },
   {
     id: "sample-docs-rag",
@@ -172,6 +227,8 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     costUsd30d: 71.42,
     requests30d: 2040,
     lastActiveMinutesAgo: 2880,
+    health: "idle",
+    registeredDaysAgo: 45,
   },
   {
     // The never-run case. It is deliberately an agent no other page bills for:
@@ -185,6 +242,14 @@ export const SAMPLE_AGENT_ROWS: GovernanceAgentRow[] = [
     costUsd30d: null,
     requests30d: null,
     lastActiveMinutesAgo: null,
+    // Never run, so nothing has measured its health. Not idle: idle is a
+    // measurement of an agent that has run and stopped. It is the row that
+    // keeps the strip's three health counts from adding up to the fleet, which
+    // is the honest arithmetic rather than a rounding error.
+    health: null,
+    // It still registered, and recently — the one agent behind the fleet
+    // card's "in the last thirty days".
+    registeredDaysAgo: 11,
   },
 ];
 

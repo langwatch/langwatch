@@ -2,15 +2,20 @@
  * @vitest-environment jsdom
  *
  * The People page: one table of everyone, two tabs, and the section's shared
- * controls. The selected tab, the time frame, the department and the sort are
- * all part of the address, so every test mounts the real page in a memory
- * router and asserts against the same address the user sees.
+ * controls. The selected tab, the department and the sort are all part of the
+ * address, so every test mounts the real page in a memory router and asserts
+ * against the same address the user sees.
  *
  * Only the boundaries are mocked - layout chrome, the feature flag, the plan,
- * the compat router, and the tRPC client, which answers per procedure from the
- * harness and records what each read was asked for. The permission decision is
- * the real one: `hasAnyPermission` runs the same `hasPermissionWithHierarchy`
- * the server uses.
+ * the compat router, the drawer navigation, and the tRPC client, which answers
+ * per procedure from the harness and records what each read was asked for. The
+ * permission decision is the real one: `hasAnyPermission` runs the same
+ * `hasPermissionWithHierarchy` the server uses.
+ *
+ * The create-department drawer is mounted by `CurrentDrawer` at the app root,
+ * not by this page, so what this file can prove about it is that the page asks
+ * for it - by the header action and by the deep link. The drawer's own
+ * behaviour is `addDepartmentDrawer.integration.test.tsx`.
  *
  * Spec: specs/ai-governance/dashboard/people-tabs.feature
  * Spec: specs/ai-governance/dashboard/governance-ui-controls.feature
@@ -50,6 +55,8 @@ const harness = vi.hoisted(() => ({
   answers: {} as Record<string, QueryAnswer>,
   /** Every mutation call, so a header action can be proven to reach one. */
   mutations: [] as Array<{ path: string; input: unknown }>,
+  /** Every drawer the page asked for, and with what. */
+  openedDrawers: [] as Array<{ drawer: string; props: unknown }>,
 }));
 
 /** The org-member floor, the governance product grant, and the spend read. */
@@ -102,8 +109,21 @@ vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: {},
     pathname: "/governance/people",
+    asPath: "/governance/people",
     push: vi.fn(),
     replace: vi.fn(),
+  }),
+}));
+
+// Drawers are URL-routed singletons mounted by `CurrentDrawer` outside this
+// page, so the honest thing to assert here is the navigation the page asks
+// for. See dev/docs/best_practices/drawers.md, "Testing".
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({
+    openDrawer: (drawer: string, props?: unknown) =>
+      harness.openedDrawers.push({ drawer, props }),
+    closeDrawer: vi.fn(),
+    goBack: vi.fn(),
   }),
 }));
 
@@ -230,6 +250,7 @@ beforeEach(() => {
   harness.inputs = {};
   harness.answers = {};
   harness.mutations = [];
+  harness.openedDrawers = [];
 });
 
 afterEach(() => cleanup());
@@ -435,8 +456,8 @@ describe("the one people table", () => {
 
 describe("the filter row", () => {
   describe("when the page renders", () => {
-    /** @scenario "Time frame, department and sort are chips in one row under the header" */
-    it("holds the time frame, the department and the sort, and no native select", () => {
+    /** @scenario "Department and sort are chips in one row under the header" */
+    it("holds the department and the sort, and offers no time frame", () => {
       harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
       const { container } = render(
         <ChakraProvider value={defaultSystem}>
@@ -450,12 +471,15 @@ describe("the filter row", () => {
       );
 
       const row = screen.getByTestId("people-filter-row");
-      expect(within(row).getByText("Time frame")).toBeInTheDocument();
       expect(within(row).getByText("Department")).toBeInTheDocument();
       expect(within(row).getByText("Sort")).toBeInTheDocument();
       // Nothing that changes the table lives anywhere else on the page.
       expect(screen.getAllByText("Sort")).toHaveLength(1);
       expect(findNativeSelects(container)).toHaveLength(0);
+      // The guard would pass on a page with no chips at all, so it is worth
+      // saying out loud that the row it just read does hold controls.
+      expect(within(row).queryByText("Time frame")).not.toBeInTheDocument();
+      expect(screen.queryByText("Last 12 months")).not.toBeInTheDocument();
     });
   });
 
@@ -546,9 +570,9 @@ describe("the filter row", () => {
     });
   });
 
-  describe("when the address already names a frame, a department and a sort", () => {
-    /** @scenario "The chosen time frame, department and sort are part of the address" */
-    it("reads all three back from the address", () => {
+  describe("when the address already names a department and a sort", () => {
+    /** @scenario "The chosen department and sort are part of the address" */
+    it("reads both back from the address and asks for the fixed window", () => {
       harness.answers["activityMonitor.spendByUser"] = { data: [JANE, SAM] };
       harness.answers["departments.list"] = {
         data: [{ id: "dept-1", name: "Engineering" }],
@@ -568,37 +592,22 @@ describe("the filter row", () => {
         },
       };
       renderPeopleAt([
-        "/governance/people?frame=last_3_months&department=Engineering&sort=requests",
+        "/governance/people?department=Engineering&sort=requests",
       ]);
 
       const row = screen.getByTestId("people-filter-row");
-      expect(within(row).getByText("Last 3 months")).toBeInTheDocument();
       expect(within(row).getByText("Engineering")).toBeInTheDocument();
       expect(within(row).getByText("Requests")).toBeInTheDocument();
       expect(harness.inputs["activityMonitor.spendByUser"]).toMatchObject({
-        windowDays: 90,
+        windowDays: 365,
         sortBy: "requests",
       });
     });
   });
 
-  describe("when the reader picks a frame from the chip", () => {
-    it("writes the choice to the address", async () => {
-      harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
-      const router = renderPeopleAt(["/governance/people"]);
-
-      await userEvent.click(screen.getByRole("button", { name: /Time frame/ }));
-      await userEvent.click(await screen.findByText("Last 3 months"));
-
-      await waitFor(() =>
-        expect(router.state.location.search).toContain("frame=last_3_months"),
-      );
-    });
-  });
-
-  describe("when the reader picks the longest frame", () => {
-    /** @scenario "A time frame longer than the spend read accepts is asked for at the read's limit" */
-    it("asks the spend read for the longest window it accepts", () => {
+  describe("when a frame is left over in the address from an older link", () => {
+    /** @scenario "The spend window is fixed and stated, not chosen" */
+    it("ignores it, reads a year, and says so under the table", () => {
       harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
       renderPeopleAt(["/governance/people?frame=last_2_years"]);
 
@@ -606,7 +615,43 @@ describe("the filter row", () => {
         windowDays: 365,
       });
       expect(
-        screen.getByText(/longest window this read answers/),
+        screen.getByText(/measured over the last 12 months/),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Time frame/ }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the sort chip is on screen", () => {
+    /** @scenario "The page says how far the sort reaches" */
+    it("says under the table which rows the ranking reaches", () => {
+      harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
+      harness.answers["governancePeople.list"] = {
+        data: [
+          discovered({
+            displayText: "Named Only",
+            rawActorId: "named.only@example.com",
+          }),
+        ],
+      };
+      renderPeopleAt(["/governance/people?sort=lastActivity"]);
+
+      const note = screen.getByText(/Sorting ranks the people/);
+      expect(note).toHaveTextContent(
+        "Sorting ranks the people with measured spend",
+      );
+      expect(note).toHaveTextContent(
+        "anyone a connected source named but nothing measured follows, most recently seen first",
+      );
+      // The limit is stated, not worked around: the chip is still offered and
+      // the unrankable rows are still on the table. Hiding either would trade
+      // an honest limitation for a worse one.
+      expect(
+        within(screen.getByTestId("people-filter-row")).getByText("Sort"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("row", { name: /Named Only/ }),
       ).toBeInTheDocument();
     });
   });
@@ -719,7 +764,7 @@ describe("the page header", () => {
     });
 
     /** @scenario "Primary page actions sit top-right in the page header" */
-    it("puts them last in the header, with only the create action solid", () => {
+    it("puts them last in the header, with only the create action outlined", () => {
       harness.permissions = MANAGER_PERMISSIONS;
       // The toggle is drawn ghost at rest and subtle while pressed, so the
       // state is seeded rather than assumed: this test is about the rest half.
@@ -749,28 +794,33 @@ describe("the page header", () => {
         ).toBeTruthy();
         expect(group).toContainElement(action);
       }
-      // Exactly one, not "at most one": a header where nothing is solid reads
-      // as a header with no primary action, which is the drift this rule
-      // exists to catch.
+      // Exactly one, not "at most one": a header where nothing is outlined
+      // reads as a header with no primary action, which is the drift this rule
+      // exists to catch. Nothing here is filled at all any more, so the
+      // outline is what carries the distinction.
       expect(
-        actions.filter((action) => action.className === solidSmall),
+        actions.filter((action) => action.className === outlineSmall),
       ).toHaveLength(1);
       // Adding a department is the only action here that creates something of
-      // the organization's own, so it is the solid one.
-      expect(
-        within(header).getByRole("button", { name: /Add department/ })
-          .className,
-      ).toBe(solidSmall);
+      // the organization's own, so it is the outlined one — and it carries the
+      // leading plus glyph that goes with the house header button.
+      const create = within(header).getByRole("button", {
+        name: /Add department/,
+      });
+      expect(create.className).toBe(outlineSmall);
+      expect(create.querySelector("svg")).not.toBeNull();
+      // Everything beside it is ghost, and nothing in the row is filled.
       expect(
         within(header).getByRole("button", { name: "Run match pass" })
           .className,
-      ).toBe(outlineSmall);
-      // Ghost rather than outline, because it changes what the page shows
-      // rather than anything about the organization.
+      ).toBe(ghostSmall);
       expect(
         within(header).getByRole("button", { name: /See sample data/ })
           .className,
       ).toBe(ghostSmall);
+      expect(
+        actions.filter((action) => action.className === solidSmall),
+      ).toHaveLength(0);
     });
 
     /** @scenario "Primary page actions sit top-right in the page header" */
@@ -789,7 +839,7 @@ describe("the page header", () => {
 
       // The toggle changes how it is drawn once it is pressed, and that is the
       // kit's business. What this page owes the section is that pressing it
-      // never produces a second solid button competing with Add department.
+      // never produces a filled button competing with Add department.
       const pressed = within(header).getByRole("button", {
         name: /sample data/i,
       });
@@ -848,7 +898,7 @@ describe("sample data", () => {
       ).toBeInTheDocument();
     });
 
-    /** @scenario "Turning sample data off on an empty page says nobody was active" */
+    /** @scenario "Turning sample data off on an empty page accounts for both halves of the table" */
     it("says nobody was active once the reader turns the samples off", async () => {
       answerEverythingEmpty();
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
@@ -860,7 +910,7 @@ describe("sample data", () => {
 
       expect(
         await screen.findByText(
-          "No one has used AI through a connected source in the last 12 months.",
+          "No one has used AI through a connected source, and no connected source has named anyone.",
         ),
       ).toBeInTheDocument();
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
@@ -917,7 +967,7 @@ describe("sample data", () => {
   });
 
   describe("when nobody was active and the reader has turned samples off", () => {
-    /** @scenario "Nobody active in the window" */
+    /** @scenario "Nobody metered and nobody named" */
     it("says so in the People tab", async () => {
       answerEverythingEmpty();
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
@@ -925,17 +975,118 @@ describe("sample data", () => {
 
       expect(
         await screen.findByText(
-          "No one has used AI through a connected source in the last 12 months.",
+          "No one has used AI through a connected source, and no connected source has named anyone.",
         ),
       ).toBeInTheDocument();
     });
   });
 });
 
+/**
+ * The strip renders each figure as a number beside its label, so a figure is
+ * read through the label it belongs to rather than by hunting for a bare
+ * number that any other part of the page could also be showing.
+ */
+const summaryFigure = (label: string) => {
+  const strip = screen.getByTestId("people-summary-strip");
+  return within(strip).getByText(label).previousElementSibling?.textContent;
+};
+
+describe("the summary strip above the tabs", () => {
+  describe("when every read has answered", () => {
+    /** @scenario "The People page opens with a summary strip above its tabs" */
+    it("counts the people, the departments and the two gaps worth acting on", () => {
+      harness.answers["activityMonitor.spendByUser"] = { data: [JANE, SAM] };
+      harness.answers["governancePeople.list"] = {
+        data: [
+          discovered({
+            displayText: "Named Only",
+            rawActorId: "named.only@example.com",
+          }),
+        ],
+      };
+      harness.answers["departments.list"] = {
+        data: [
+          { id: "dept-1", name: "Engineering" },
+          { id: "dept-2", name: "Finance" },
+        ],
+      };
+      harness.answers["departments.assignments"] = {
+        data: {
+          users: [
+            {
+              id: "user-1",
+              name: "Jane Doe",
+              email: "jane.doe@example.com",
+              departmentId: "dept-1",
+            },
+          ],
+          teams: [],
+          projects: [],
+        },
+      };
+      renderPeopleAt(["/governance/people"]);
+
+      // Two spenders plus the person a provider named and nothing metered.
+      expect(summaryFigure("people")).toBe("3");
+      expect(summaryFigure("departments")).toBe("2");
+      // Everyone but the member the assignment names.
+      expect(summaryFigure("unmatched")).toBe("2");
+      expect(summaryFigure("without a department")).toBe("2");
+    });
+
+    /** @scenario "The summary strip sits above the tabs" */
+    it("puts the strip before the tab list in the document", () => {
+      harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
+      renderPeopleAt(["/governance/people"]);
+
+      const strip = screen.getByTestId("people-summary-strip");
+      const tabs = screen.getByRole("tab", { name: "People" });
+      expect(
+        strip.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+  });
+
+  describe("when a read the strip depends on has not answered", () => {
+    /** @scenario "A summary figure the page cannot measure reads as an em dash" */
+    it("draws an em dash for it rather than a zero", () => {
+      harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
+      harness.answers["governancePeople.list"] = { data: [] };
+      harness.answers["departments.list"] = { isLoading: true };
+      renderPeopleAt(["/governance/people"]);
+
+      expect(summaryFigure("departments")).toBe("—");
+      // The half that did answer still reports, so the dash is about the read
+      // that did not rather than about the strip giving up.
+      expect(summaryFigure("people")).toBe("1");
+    });
+  });
+
+  describe("when the reader has turned the sample data on", () => {
+    /** @scenario "In sample mode the summary strip counts the sample rows" */
+    it("counts the invented rows, under the page's sample banner", () => {
+      answerEverythingEmpty();
+      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
+      renderPeopleAt(["/governance/people"]);
+
+      expect(summaryFigure("people")).toBe("6");
+      expect(summaryFigure("departments")).toBe("4");
+      // The disclaimer is read before the figures it covers.
+      const banner = screen.getByRole("status");
+      const strip = screen.getByTestId("people-summary-strip");
+      expect(
+        banner.compareDocumentPosition(strip) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+  });
+});
+
 describe("the Departments tab", () => {
-  describe("when a manager adds a department", () => {
-    /** @scenario "Adding a department is a dialog, not a box wedged into the header" */
-    it("opens a dialog with a named field and a primary Create", async () => {
+  describe("when a manager presses Add department", () => {
+    /** @scenario "Adding a department opens the create-department drawer" */
+    it("navigates to the drawer instead of mounting a dialog", async () => {
       harness.permissions = MANAGER_PERMISSIONS;
       harness.answers["departments.list"] = { data: [] };
       renderPeopleAt(["/governance/people?tab=departments"]);
@@ -944,26 +1095,70 @@ describe("the Departments tab", () => {
         screen.getByRole("button", { name: /Add department/ }),
       );
 
-      const dialog = await screen.findByRole("dialog");
-      const field = within(dialog).getByRole("textbox", {
-        name: "Department name",
-      });
-      // Let the dialog claim focus first, then take it. It moves focus to its
-      // own content as it opens, and a click that lands before that move is
-      // undone by it, leaving the keystrokes to fall on the floor.
-      await waitFor(() => expect(dialog).toHaveFocus());
-      await userEvent.click(field);
-      await waitFor(() => expect(field).toHaveFocus());
-      await userEvent.type(field, "Engineering");
-      await waitFor(() => expect(field).toHaveValue("Engineering"));
-      await userEvent.click(
-        within(dialog).getByRole("button", { name: "Create" }),
-      );
+      expect(harness.openedDrawers.map((entry) => entry.drawer)).toEqual([
+        "addDepartment",
+      ]);
+      // Nothing is mounted from here: the page hands the drawer to the shell
+      // and the shell owns the mount.
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+  });
 
-      expect(harness.mutations).toContainEqual({
-        path: "departments.create",
-        input: { organizationId: "org-1", name: "Engineering" },
-      });
+  describe("when the address asks for the create-department drawer", () => {
+    /** @scenario "The departments address can ask for the create-department drawer" */
+    it("selects the Departments tab and asks for the drawer once", async () => {
+      harness.permissions = MANAGER_PERMISSIONS;
+      harness.answers["departments.list"] = { data: [] };
+      renderPeopleAt(["/governance/people?tab=departments&add=1"]);
+
+      expect(screen.getByRole("tab", { name: "Departments" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+      await waitFor(() =>
+        expect(harness.openedDrawers.map((entry) => entry.drawer)).toEqual([
+          "addDepartment",
+        ]),
+      );
+    });
+
+    /**
+     * The state one navigation later, with the drawer already named in the
+     * address. Written as its own entry rather than as a second act of the
+     * test above, because the drawer navigation is mocked here: the real
+     * `openDrawer` is what puts `drawer.open` in the address, so the only
+     * honest way to reach this state in this file is to start in it.
+     */
+    /** @scenario "The request to add a department leaves the address once the drawer has it" */
+    it("clears the request and leaves the tab and the drawer in place", async () => {
+      harness.permissions = MANAGER_PERMISSIONS;
+      harness.answers["departments.list"] = { data: [] };
+      const router = renderPeopleAt([
+        "/governance/people?tab=departments&add=1&drawer.open=addDepartment",
+      ]);
+
+      await waitFor(() =>
+        expect(router.state.location.search).not.toContain("add=1"),
+      );
+      expect(router.state.location.search).toContain("tab=departments");
+      expect(router.state.location.search).toContain(
+        "drawer.open=addDepartment",
+      );
+      // Already open: asking again would push a second entry onto the stack.
+      expect(harness.openedDrawers).toEqual([]);
+    });
+
+    /** @scenario "A viewer without the manage grant is not offered the create-department drawer" */
+    it("opens nothing for a viewer who cannot create one", async () => {
+      harness.answers["departments.list"] = { data: [] };
+      const router = renderPeopleAt([
+        "/governance/people?tab=departments&add=1",
+      ]);
+
+      await waitFor(() =>
+        expect(router.state.location.search).not.toContain("add=1"),
+      );
+      expect(harness.openedDrawers).toEqual([]);
     });
   });
 

@@ -1,8 +1,9 @@
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import { SourceTypeIconGlyph } from "@ee/governance/dashboard/components/ingestionSourceCatalog";
 import type { SourceType } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { Building2 } from "lucide-react";
 import type React from "react";
-import { LuBot, LuPackageOpen, LuUsers } from "react-icons/lu";
+import { LuBot, LuPackageOpen, LuSettings2 } from "react-icons/lu";
 import { AskChip } from "~/components/home/AskChip";
 import { HeroAskField } from "~/components/home/HeroAskField";
 import { HeroLeadPill } from "~/components/home/HeroLeadPill";
@@ -15,32 +16,45 @@ import { useRouter } from "~/utils/compat/next-router";
  * The governance overview's opening, the same shape the project home opens
  * with: a greeting, one field, and the short ways in. The field is the
  * command palette mounted inline, the pill is the one action a governance
- * admin takes first (connect a vendor), and the chips under it are the three
- * things they add next — people, an agent, a tool.
+ * admin takes first (connect a vendor), and the chips under it are the things
+ * they set up next — a department, an agent, a tool — plus the way through to
+ * the whole source catalog.
  *
  * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
  */
 
 /**
- * The reading measure the whole overview is set to: the field, the ways in
- * under it, and the two lists below all take this width and centre on it, so
- * the sections' outer edges land on the field's own. Exported for the page,
- * which wraps hero and sections in one column of it.
+ * The field's reading measure, and the measure of the pill and chips that
+ * hang off it.
+ *
+ * It is the SAME question in the same words as the project home's field, so
+ * it is set to the same width: the two screens sit one click apart in the
+ * rail, and a field that changed size between them read as two different
+ * controls.
+ *
+ * Source of truth is `ASK_MEASURE` in `~/components/home/LangyHomeHero`,
+ * where it is private to that module. Restated here rather than imported so
+ * this hero does not pull the project home's hero in behind it; lifting the
+ * one value into a module both can import is the standing follow-up.
+ */
+const ASK_MEASURE = "680px";
+
+/**
+ * The measure the overview PAGE is set to: the header row above the hero, the
+ * hero's lit ground, and the two lists below it.
+ *
+ * Wider than the field on purpose. The lists are a two-column grid whose rows
+ * each carry a badge, a headline and a date, and at the field's own width
+ * those columns stop being scannable. So the lists no longer begin and end on
+ * the field's edges — the field is narrower, centred inside them. Exported
+ * for the page, which wraps the whole column in it.
  */
 export const HOME_MEASURE = "900px";
 
 export const INVENTORY_SOURCES_HREF = "/governance/inventory?tab=sources";
-export const PEOPLE_HREF = "/governance/people?tab=people";
+export const ADD_DEPARTMENT_HREF = "/governance/people?tab=departments&add=1";
 export const ADD_AGENT_HREF = "/governance/agents?tab=agents&add=1";
-/**
- * The inventory's bare address, which opens on the Catalog pane. Bare rather
- * than `?tab=catalog` because that page keeps its default tab out of the
- * address, and bare rather than the `?tab=anomaly-rules` this shortcut used to
- * carry: anomaly rules stopped being an inventory tab, so that address
- * degraded to this same pane and the shortcut delivered the tool catalog under
- * a rule's name.
- */
-export const INVENTORY_CATALOG_HREF = "/governance/inventory";
+export const ADD_TOOL_HREF = "/governance/inventory?tab=catalog&add=1";
 
 /**
  * The vendors the pill leads with, in the order the menu offers them. Each
@@ -60,15 +74,20 @@ export const addSourceHref = (sourceType: SourceType) =>
   `${INVENTORY_SOURCES_HREF}&add=${sourceType}`;
 
 /**
- * The three ways in under the pill, in the order they are offered: add
- * someone, give them an agent, then register the tools they run. That is the
- * order a surface is set up in, rather than the order the pages sit in the
- * rail.
+ * The ways in under the pill. The first three are the order a surface is set
+ * up in: the group people belong to, the agents that group runs, then the
+ * tools those agents reach. The fourth is a different kind of thing and sits
+ * last for that reason — it opens the full list of everything the product can
+ * pull from, which is the answer to "my vendor is not one of the three on the
+ * pill". It is the move the model picker makes with its own "Configure
+ * available models" row at the foot of the menu.
  *
  * Every href here that carries a `?tab=` must name a tab its page actually
- * has. A page degrades an unknown tab to its default pane rather than
- * refusing it, so a stale tab name is a silent wrong destination — which is
- * what the third chip was until it stopped naming a retired tab.
+ * has, and every `&add=1` must name a pane that opens something on arrival. A
+ * page degrades an unknown tab to its default pane rather than refusing it,
+ * and ignores an `?add=` the pane does not honour, so either mistake is a
+ * silent wrong destination — which is what the first and third chips were
+ * until they named a pane that opens a drawer.
  */
 const LEAD_CHIPS: ReadonlyArray<{
   key: string;
@@ -77,10 +96,10 @@ const LEAD_CHIPS: ReadonlyArray<{
   icon: React.ReactNode;
 }> = [
   {
-    key: "people",
-    label: "Add people",
-    href: PEOPLE_HREF,
-    icon: <LuUsers size={12} />,
+    key: "department",
+    label: "Add department",
+    href: ADD_DEPARTMENT_HREF,
+    icon: <Building2 size={12} />,
   },
   {
     key: "agent",
@@ -91,8 +110,14 @@ const LEAD_CHIPS: ReadonlyArray<{
   {
     key: "tool",
     label: "Add tool",
-    href: INVENTORY_CATALOG_HREF,
+    href: ADD_TOOL_HREF,
     icon: <LuPackageOpen size={12} />,
+  },
+  {
+    key: "configure-sources",
+    label: "Configure sources",
+    href: INVENTORY_SOURCES_HREF,
+    icon: <LuSettings2 size={12} />,
   },
 ];
 
@@ -113,7 +138,7 @@ export function GovernanceHero({
         </Text>
       </VStack>
 
-      <VStack align="center" gap={3} width="full" maxWidth={HOME_MEASURE}>
+      <VStack align="center" gap={3} width="full" maxWidth={ASK_MEASURE}>
         <HeroAskField
           placeholder={
             canAsk
@@ -145,7 +170,21 @@ export function GovernanceHero({
  * arrives with are named up front, each opening the inventory's Sources tab
  * on that vendor's add flow. The rest of the catalog is not repeated here —
  * the Sources tab's own Add source menu is the full list, and a hero that
- * offered both would be asking the reader to choose between two menus.
+ * offered both would be asking the reader to choose between two menus. The
+ * "Configure sources" chip under the pill is how a reader whose vendor is not
+ * one of these three reaches that list.
+ *
+ * OUTLINE, NOT FILLED. Everything in this section that creates something is
+ * an outline control, so the one on the overview cannot be the exception —
+ * the filled orange treatment (`prominent`) would make this the loudest
+ * create button in a section where every other one is quiet. The project
+ * home still leads with the filled pill, which is why that presentation stays
+ * on `HeroLeadPill`.
+ *
+ * It still reads as the main way in, because the hierarchy here is not
+ * colour: the pill sits on a raised muted ground with a stronger border and a
+ * shadow, and it carries three vendor tiles and a caret, against chips that
+ * are flat, unshadowed and hold one glyph each.
  *
  * Only drawn for a reader holding `ingestionSources:manage`, because the
  * inventory drops an `?add=` it arrives without that grant: an ungated pill
@@ -157,8 +196,7 @@ function AddSourcePill() {
     <Menu.Root positioning={{ placement: "bottom", gutter: 6 }}>
       <Menu.Trigger asChild>
         <HeroLeadPill
-          prominent
-          label="Add Source"
+          label="Add source"
           glyphs={LEAD_SOURCE_VENDORS.map((vendor) => ({
             key: vendor.sourceType,
             icon: (

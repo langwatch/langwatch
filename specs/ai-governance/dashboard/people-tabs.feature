@@ -1,9 +1,11 @@
 Feature: The People page is two tabs, People and Departments
   The People page under AI Governance answers two questions an admin asks
   together: who is using AI through the connected sources, and which
-  department each person belongs to. It opens on one table of people and
-  keeps the department list, its add-department dialog and the assignment
-  guide on a second tab, so neither crowds the other.
+  department each person belongs to. It opens on a summary strip, then one
+  table of people, and keeps the department list and the assignment guide on
+  a second tab, so neither crowds the other. Creating a department is the
+  section's ordinary right-side drawer, reachable from the header and by
+  address.
 
   Background:
     Given the AI Governance product is enabled for the organization
@@ -27,8 +29,17 @@ Feature: The People page is two tabs, People and Departments
   #
   # The controls follow the section rulebook,
   # specs/ai-governance/dashboard/governance-ui-controls.feature: one filter row
-  # under the header holding time frame, department and sort; the page's actions
-  # top-right; sample data behind the same toggle every governance page has.
+  # under the header holding department and sort; the page's actions top-right;
+  # sample data behind the same toggle every governance page has.
+  #
+  # NO TIME FRAME. The row used to open with one, and it did not correlate to
+  # what the table shows. Half these rows come from the identity feed, which
+  # carries no window at all, so narrowing the frame moved the metered people
+  # and left everyone a provider merely named exactly where they were — a
+  # control that appeared to filter the table and filtered half of it. The
+  # spend read still needs a window and has no unbounded mode, so it is asked
+  # for a fixed year and the page states that year in words. A window nobody
+  # can change is at least a window nobody has to guess at.
   # ---------------------------------------------------------------------------
 
   @integration
@@ -97,26 +108,41 @@ Feature: The People page is two tabs, People and Departments
   # ── The controls ──────────────────────────────────────────────────────────
 
   @integration
-  Scenario: Time frame, department and sort are chips in one row under the header
+  Scenario: Department and sort are chips in one row under the header
     When sam opens the People page
-    Then a single filter row under the header holds the time frame, the department and the sort
+    Then a single filter row under the header holds the department and the sort
+    And no time frame is offered anywhere on the page
     And no filter is rendered anywhere else on the page
     And the page renders no native select element
 
   @integration
-  Scenario: The chosen time frame, department and sort are part of the address
-    When sam picks a time frame, a department and a sort
+  Scenario: The chosen department and sort are part of the address
+    When sam picks a department and a sort
     Then each choice is written to the address
     And opening that address again reads back the same choices
 
   @integration
-  Scenario: A time frame longer than the spend read accepts is asked for at the read's limit
-    Given the reader picks the longest time frame
-    When the table is requested
-    Then the window asked for is the longest the spend read accepts
-    # The spend read takes a window in days and refuses more than a year. The
-    # chip still offers two years, because clamping is honest where a missing
-    # option is not — the page shows the frame it actually read.
+  Scenario: The spend window is fixed and stated, not chosen
+    Given an address left over from before the time frame was removed
+    When sam opens the People page at it
+    Then the spend read is asked for a year regardless of what the address names
+    And the page says under the table that spend and requests cover the last 12 months
+    And no control offers to change that window
+
+  @integration
+  Scenario: The page says how far the sort reaches
+    When sam opens the People page
+    Then the page says under the table that sorting ranks the people with measured spend
+    And it says the people a connected source named but nothing measured follow, most recently seen first
+    # The other half of what the time frame got wrong, and it is still on
+    # screen. The sort chip drives the spend read, so it ranks the rows that
+    # read returned; everybody a provider merely named keeps their own order
+    # however the chip is set. Ranking both halves needs a read that measures
+    # both, which is not this screen's to build — so the limit is made visible
+    # rather than hidden, because a reader who sets "Sort · Last active" and
+    # watches a third of the rows stay put would otherwise conclude the control
+    # is broken. The chip is not hidden and the table is not narrowed to
+    # rankable rows: either would trade an honest limitation for a worse one.
 
   @integration
   Scenario: The department chip filters the table to that department
@@ -131,14 +157,17 @@ Feature: The People page is two tabs, People and Departments
     When alice opens the People page
     Then the sample-data toggle, Run match pass and Add department sit at the top right of the header
     And each is rendered at the small size
-    And Add department is solid, in the section's orange
-    And Run match pass is outline
+    And Add department is the house header button, outline with a leading plus glyph
+    And it is the only outlined control in that row
+    And Run match pass is ghost
     And the sample-data toggle is ghost at rest and subtle once pressed, never solid
-    # Add department is the solid one because a department is the only thing on
-    # this screen that exists because somebody made it: a person arrives here
-    # because a provider named them, and Run match pass recomputes over what is
-    # already there. Orange rather than the default grey, so it matches the
-    # Inventory page's Add tool. Rulebook: governance-ui-controls.feature.
+    And nothing in that row is solid, in the section's orange or in any other colour
+    # Add department is the marked-out one because a department is the only
+    # thing on this screen that exists because somebody made it: a person
+    # arrives here because a provider named them, and Run match pass recomputes
+    # over what is already there. It is marked out by the outline rather than
+    # by a fill — the section has no filled buttons at all any more.
+    # Rulebook: governance-ui-controls.feature.
 
   @integration
   Scenario: Run match pass is a header action, not a panel's own button
@@ -157,10 +186,13 @@ Feature: The People page is two tabs, People and Departments
     And the banner says nothing on the page is real
 
   @integration
-  Scenario: Turning sample data off on an empty page says nobody was active
+  Scenario: Turning sample data off on an empty page accounts for both halves of the table
     Given every read has answered and none of them holds a row
     When sam turns the sample data off
-    Then the People tab says no one has used AI through a connected source in the window
+    Then the People tab says no one has used AI through a connected source and no connected source has named anyone
+    # Both halves or it is a half-truth. The sentence used to name only the
+    # time frame the reader had picked, which was true of the metered half and
+    # said nothing at all about the people a provider named.
 
   @integration
   Scenario: Sample data steps aside once real people arrive
@@ -190,19 +222,126 @@ Feature: The People page is two tabs, People and Departments
     # the real ones failed: the reader cannot act on either half of that.
 
   @integration
-  Scenario: Nobody active in the window
-    Given nobody used AI through a connected source in the window
+  Scenario: Nobody metered and nobody named
+    Given nobody used AI through a connected source
+    And no connected source has named anybody
     And the reader has turned the sample data off
     When sam opens the People page
-    Then the People tab says no one has used AI through a connected source in the window
+    Then the People tab says no one has used AI through a connected source and no connected source has named anyone
 
-  # ── Departments tab ───────────────────────────────────────────────────────
+  # ── The summary strip ─────────────────────────────────────────────────────
+  #
+  # Above the tabs, so it answers "what is on this page" before the reader has
+  # picked one. It is the section's shared strip, not a second one built here:
+  # every figure is counted off the rows the table already holds, so the
+  # summary and the table can never disagree, and a reader has no way to tell
+  # which of two disagreeing counts is the wrong one.
+  #
+  # A figure nothing measured reads as an em dash. Never a zero: an
+  # organization that has not been counted must not be reported as an
+  # organization with nobody in it.
 
   @integration
-  Scenario: Adding a department is a dialog, not a box wedged into the header
+  Scenario: The People page opens with a summary strip above its tabs
+    Given two people used AI through a connected source
+    And a connected source named a third person nothing metered
+    And the organization has two departments, one of which a member is assigned to
+    When sam opens the People page
+    Then the strip says three people
+    And it says two departments
+    And it says two people are unmatched
+    And it says two people are without a department
+
+  @integration
+  Scenario: The summary strip sits above the tabs
+    When sam opens the People page
+    Then the strip comes before the tab list
+
+  @integration
+  Scenario: A summary figure the page cannot measure reads as an em dash
+    Given the department list has not answered yet
+    When sam opens the People page
+    Then the department figure reads as an em dash rather than zero
+    And the people figure still reports what the answered reads hold
+
+  @integration
+  Scenario: In sample mode the summary strip counts the sample rows
+    Given the reader has turned the sample data on
+    When sam opens the People page
+    Then the strip counts the invented people and the invented departments
+    And the banner saying nothing is real comes before the strip
+
+  # ── Creating a department ─────────────────────────────────────────────────
+  #
+  # A drawer, not a modal, because a drawer is what this app has: URL-routed,
+  # mounted once by the drawer shell, deep-linkable from a paste and closed by
+  # the browser's own back button. The page never mounts it — it navigates to
+  # it (dev/docs/best_practices/drawers.md).
+  #
+  # ONE FIELD, and that is the model rather than a shortcut. A Department
+  # stores an identifier, the organization it belongs to, a name, its two
+  # timestamps and the moment it was archived. Nothing else is a person's to
+  # set at creation: there is no description, no parent department, no cost
+  # centre and no owner. If the model grows one, the drawer grows a field for
+  # it in the same change.
+
+  @integration
+  Scenario: Adding a department opens the create-department drawer
     When alice presses Add department
-    Then a dialog offers a text field for the name and a primary Create
-    And creating one closes the dialog and adds it to the list
+    Then the page navigates to the create-department drawer
+    And the page itself mounts no dialog for it
+
+  @integration
+  Scenario: The create-department drawer collects every field the department model has
+    When alice opens the create-department drawer
+    Then it offers a named field for the department name and a Create action
+    And it offers no field the department record does not store
+
+  @integration
+  Scenario: Creating a department from the drawer records it and closes
+    Given alice has the create-department drawer open
+    When she names it and presses Create
+    Then the name is recorded without its surrounding spaces
+    And the drawer closes
+    And the department list is read again
+
+  @integration
+  Scenario: A department with no name is refused at the field
+    Given alice has the create-department drawer open
+    When she presses Create with the name empty
+    Then the refusal is shown beside the name field
+    And nothing is sent to the server
+    # A rejected submission belongs next to the field that caused it. A toast
+    # makes the reader hunt for what to change and is gone by the time they
+    # find it.
+
+  @integration
+  Scenario: A viewer who reaches the create-department drawer is told which grant it needs
+    When sam opens the create-department drawer by address
+    Then the drawer names the governance:manage grant
+    And it offers no name field and no Create action
+
+  @integration
+  Scenario: The departments address can ask for the create-department drawer
+    When alice opens the People page with tab set to departments and add set to 1
+    Then the Departments tab is selected
+    And the page navigates to the create-department drawer
+
+  @integration
+  Scenario: The request to add a department leaves the address once the drawer has it
+    Given the address names the departments tab, the add request and the open drawer
+    When alice opens the People page at it
+    Then the add request is taken out of the address
+    And the tab and the open drawer stay in it
+    And no second drawer is asked for
+
+  @integration
+  Scenario: A viewer without the manage grant is not offered the create-department drawer
+    When sam opens the People page with tab set to departments and add set to 1
+    Then the add request is taken out of the address
+    And no drawer is asked for
+
+  # ── Departments tab ───────────────────────────────────────────────────────
 
   @integration
   Scenario: The Departments tab offers no controls to a viewer without the manage grant

@@ -9,6 +9,7 @@
  */
 export { AgentCard } from "./AgentCard";
 export { AgentFilterBar } from "./AgentFilterBar";
+export { AgentFleetSummaryStrip } from "./AgentFleetSummaryStrip";
 export {
   AGENT_SORT_LABELS,
   AGENT_SORTS,
@@ -29,13 +30,23 @@ export {
   useAgentFilters,
 } from "./agentFilters";
 export {
+  AGENT_HEALTH_LABELS,
+  AGENT_HEALTH_STATES,
   AGENT_SOURCE_LABELS,
   AGENT_SOURCES,
+  type AgentHealth,
   type AgentSource,
   formatLastActive,
   type GovernanceAgentRow,
   SAMPLE_AGENT_ROWS,
 } from "./agentRows";
+export {
+  type AgentFleetCount,
+  type AgentFleetSummary,
+  type AgentSpendLine,
+  type AgentStatusLine,
+  summarizeAgentFleet,
+} from "./agentSummary";
 export {
   AGENTS_EMPTY_COPY,
   APPLICATIONS_EMPTY_COPY,

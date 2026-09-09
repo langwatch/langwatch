@@ -213,8 +213,52 @@ Feature: The controls every AI Governance page renders the same way
   # page drew Add tool solid orange — the same slot, the same kind of action,
   # two different buttons, which is the drift the rulebook exists to stop. It
   # also said "the rest outline" while the bound test asserted the sample
-  # toggle is ghost. Both are fixed below: the page's own create action is
-  # solid, always, and the sample toggle is named for what it is.
+  # toggle is ghost. Both were fixed by naming ONE treatment and applying it
+  # everywhere, rather than by bounding how many treatments were allowed.
+  #
+  # THAT TIGHTENING STILL STANDS. What changed underneath it is only WHICH
+  # treatment was chosen. The product owner rejected solid orange across the
+  # governance section — the screenshot they sent back was the Inventory page
+  # header drawn solid, and they named the empty states separately — so the
+  # create action is now the house header button: outline, small, with a
+  # leading plus glyph. That is `PageLayout.HeaderButton`
+  # (src/components/ui/layouts/PageLayout.tsx:98), which renders
+  # `<Button variant="outline" size="sm">` and is what /settings/api-keys and
+  # /settings/model-providers already use. Solid orange is gone from
+  # governance BUTTONS entirely.
+  #
+  # READ THE PARAGRAPH ABOVE BEFORE LOOSENING THIS ONE. The reason "at most
+  # one" failed was that it counted treatments instead of naming one, and a
+  # rule that now said only "everything is outline" would fail the same way
+  # from the other end: it would grade a page green while the create action,
+  # the sample toggle and a filter reset all looked identical, which is the
+  # drift by a different route. So the create action is still singled out, and
+  # by three things that survive the loss of the fill — it sits in the header,
+  # it carries the plus glyph, and it is the ONLY outlined control in that
+  # row. Everything beside it is ghost.
+  #
+  # WHAT THIS RULE REACHES, stated because two things that are still orange
+  # are orange on purpose and the next reader finishing the job would strip
+  # them. It reaches PAGE-HEADER CREATE ACTIONS and EMPTY-STATE ACTIONS, which
+  # is what the product owner pointed at. It reaches nothing else.
+  #
+  #   ORANGE AS A STATUS MARK IS NOT A BUTTON. `AgentCard.tsx:63` draws an
+  #   "Unclaimed" agent as `variant="subtle" colorPalette="orange"`, and
+  #   `EnvironmentsTab.tsx:246`, `TraceDestinationField.tsx:58` and
+  #   `ToolCatalogCards.tsx:154` are the same shape. Each states a fact about
+  #   a thing rather than offering a press. The section's colour rules further
+  #   down govern marks and badges; this one governs controls.
+  #
+  #   A DRAWER FOOTER SUBMIT STAYS SOLID, and this was decided rather than
+  #   overlooked. It is the app-wide convention outside governance too —
+  #   `src/components/settings/DepartmentEditDrawer.tsx:100` pairs a ghost
+  #   Cancel with a solid orange Save changes, and the governance drawers
+  #   match it. A footer submit is not competing with a page's create action
+  #   for the reader's eye, because the drawer is the only thing on screen
+  #   when it is shown; the pair of buttons at its foot has to say which one
+  #   commits, and the fill is how every drawer in this product says it.
+  #   Draining it here would leave governance's drawers looking unlike the
+  #   rest of the app to buy consistency the reader never sees.
   #
   # The "at rest" qualifier below is load-bearing, and it was missing on the
   # first attempt. The kit renders the toggle `active ? "subtle" : "ghost"`
@@ -232,10 +276,13 @@ Feature: The controls every AI Governance page renders the same way
     When the page renders
     Then those actions sit at the top right of the page header
     And each is rendered at the small size
-    And the action that creates the page's own thing is solid
-    And every other action beside it is outline
+    And the action that creates the page's own thing is the house header button, which is outline and carries a leading plus glyph
+    And it is the only outlined control in that row, which is what marks it out now that nothing is filled
+    And every other action beside it is ghost, apart from the sample-data toggle while it is pressed
+    And no action in that row is solid, in the brand orange or in any other colour
     And the sample-data toggle is ghost at rest, because it changes what is shown rather than the org
     And the sample-data toggle is subtle while pressed, and never solid in either state
+    And an orange status badge, such as the one marking an agent unclaimed, is untouched by this rule, because a badge states a fact rather than offering a press
 
   # ===========================================================================
   # Create on top, and never nothing below
@@ -329,13 +376,28 @@ Feature: The controls every AI Governance page renders the same way
   # BUTTON. The clause above now says that, and both pages behave that way:
   # Agents repeats Register agent, Inventory repeats Add tool and Add source.
 
+  # THE DISTINCTION SURVIVED THE LOSS OF THE FILL, which is the only thing
+  # worth checking when a treatment changes. This rule used to read "drawn
+  # solid" against "drawn quieter than solid", and the pair moved together
+  # when solid orange left the section: the create action is now the house
+  # header button and the quieter way out is ghost — the same weight the
+  # section already gives its sample-data toggle at rest, and for the same
+  # reason, since clearing a filter and showing samples both change what is on
+  # screen rather than what the organization has.
+  #
+  # Restating the clause as "at the same weight as the page's create action"
+  # rather than naming a variant is deliberate. That phrasing was already in
+  # the old rule and it is what kept the pane and the header honest through
+  # this change: an empty pane repeating the header's action must look like
+  # the header's action, whatever the section decides that looks like next.
   @integration
   Scenario: An empty pane's action is weighted by what it does
     Given a pane with nothing to list, offering a way out in its empty state
     When that way out creates something of the organization's own
-    Then it is drawn solid, at the same weight as the page's create action
+    Then it is drawn as the house header button, at the same weight as the page's create action
     And a way out that only changes what is shown, such as clearing a filter,
-      is drawn quieter than solid
+      is drawn ghost, quieter than the house header button
+    And neither of them is solid
     # Weight is part of a state's voice, so it is declared beside that state's
     # words rather than at the call site, where the next state added is the one
     # that forgets it.

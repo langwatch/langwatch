@@ -48,10 +48,14 @@ describe("given an admin on the Inventory page", () => {
     });
 
     // Nine digits against a short label cannot be compared card to card.
+    // The consumption-billed tool, because it is the one that HAS a token
+    // row: tokens are the unit its bill is computed from. On a tool paid for
+    // per seat or per plan the token count is the dollar figure told twice,
+    // so that card carries no such row to shorten.
     /** @scenario "A count of a million or more is shortened on the card" */
     it("shortens a nine-digit token count", () => {
       renderScreen();
-      const card = screen.getByTestId("tool-card-sample-claude-code");
+      const card = screen.getByTestId("tool-card-sample-custom-agents");
       expect(within(card).getByText("412.9M")).toBeInTheDocument();
       expect(within(card).queryByText("412,900,000")).toBeNull();
     });
@@ -59,7 +63,7 @@ describe("given an admin on the Inventory page", () => {
     /** @scenario "A shortened count keeps its exact value on hover" */
     it("still carries the exact token count as the row's accessible name", () => {
       renderScreen();
-      const card = screen.getByTestId("tool-card-sample-claude-code");
+      const card = screen.getByTestId("tool-card-sample-custom-agents");
       expect(
         within(card).getByLabelText("Tokens · 30 days: 412,900,000"),
       ).toBeInTheDocument();
@@ -72,14 +76,16 @@ describe("given an admin on the Inventory page", () => {
       expect(within(card).getByText("22,180")).toBeInTheDocument();
     });
 
+    // The seat-licensed tool, because it is the one carrying both a money row
+    // and a seat sentence on the same card.
     /** @scenario "Money and prose rows are never shortened" */
     it("leaves money and the seat sentence exactly as written", () => {
       renderScreen();
-      const card = screen.getByTestId("tool-card-sample-claude-code");
+      const card = screen.getByTestId("tool-card-sample-github-copilot");
       // Money reads fine at four digits, and shortening it would be worse:
-      // "$3.3K" hides the detail of the reported usage amount.
-      expect(within(card).getByText("$3,268")).toBeInTheDocument();
-      expect(within(card).getByText("44 of 60 assigned")).toBeInTheDocument();
+      // "$6.5K" hides the detail of the reported usage amount.
+      expect(within(card).getByText("$6,460")).toBeInTheDocument();
+      expect(within(card).getByText("310 of 340 assigned")).toBeInTheDocument();
     });
 
     /** @scenario "A failed read raises no alert while sample mode is on" */

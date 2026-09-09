@@ -203,15 +203,19 @@ Feature: Governance home — route, nav promotion, persona detection
     When they open "/governance/inventory"
     Then the Catalog tab is selected, the same pane the admin lands on
     And the address carries no "tab" parameter
-    And the sources list is read, since the catalog is built from it
 
   @bdd @ui @governance-home @inventory-tabs @integration
-  Scenario: A reader without ingestionSources:view meets the grant, not an empty catalog
-    Given a reader holding governance:view but NOT ingestionSources:view
+  Scenario: A reader without the registry grant meets the grant, not an empty catalog
+    Given a reader holding governance:view but NOT aiTools:manage
     When they open "/governance/inventory"
     Then the Catalog tab is still selected and still listed
-    And the pane names ingestionSources:view rather than reporting that
+    And the pane names aiTools:manage rather than reporting that
       no tools are registered
+    # The catalog reads the tool registry, not the ingestion sources, so
+    # aiTools:manage is the grant that genuinely gates it. Naming the source
+    # grant would name one that would not unblock this reader if granted.
+    And the Catalog tab carries no count, because a count of zero would be
+      the same wrong answer said in a badge
 
   @bdd @ui @governance-home @inventory-tabs @integration
   Scenario: An unknown tab value falls back to the default

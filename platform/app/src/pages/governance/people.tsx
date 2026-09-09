@@ -21,22 +21,20 @@ import {
   Pencil,
   Plus,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
-import { timeFrameLabel } from "~/components/governance/filters";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import {
   departmentNameForActor,
   EnterpriseLockedLine,
   sourceForTarget,
 } from "~/components/governance/PeopleTable";
-import { AddDepartmentDialog } from "~/components/governance/people/AddDepartmentDialog";
 import { AssignDepartmentDialog } from "~/components/governance/people/AssignDepartmentDialog";
 import { PeopleFilterBar } from "~/components/governance/people/PeopleFilterBar";
 import {
-  isFrameClamped,
-  spendWindowDays,
+  SPEND_WINDOW_DAYS,
+  SPEND_WINDOW_LABEL,
   usePeopleFilters,
 } from "~/components/governance/people/peopleFilters";
 import {
@@ -45,6 +43,7 @@ import {
   mergePeopleRows,
   type PeopleRow,
 } from "~/components/governance/people/peopleRows";
+import { summarizePeople } from "~/components/governance/people/peopleSummary";
 import {
   SAMPLE_DEPARTMENTS,
   samplePeopleRows,
@@ -55,8 +54,10 @@ import {
   SampleDataToggle,
   useSampleMode,
 } from "~/components/governance/sample";
+import { GovernanceSummaryBar } from "~/components/governance/summary";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import { DepartmentEditDrawer } from "~/components/settings/DepartmentEditDrawer";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -68,6 +69,7 @@ import {
   showErrorToast,
 } from "~/features/errors";
 import { useActivePlan } from "~/hooks/useActivePlan";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSpendSortParam } from "~/hooks/useSpendSortParam";
 import { api, type RouterOutputs } from "~/utils/api";
@@ -111,8 +113,7 @@ const isPeopleTab = (value: string | null): value is PeopleTab =>
 /**
  * A selected non-default tab is part of the address; the default stays out
  * of it, and an unknown value degrades to the default instead of a blank
- * pane. Every other parameter (the sort, the frame, the department) is
- * preserved.
+ * pane. Every other parameter (the sort, the department) is preserved.
  */
 function usePeopleTab() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -129,6 +130,54 @@ function usePeopleTab() {
       { replace: true },
     );
   return { tab, selectTab };
+}
+
+/** The address that opens the create-department drawer on arrival. */
+const ADD_DEPARTMENT_PARAM = "add";
+
+/**
+ * The deep link that arrives asking for a department:
+ * `/governance/people?tab=departments&add=1`, which is how another screen sends
+ * a reader here to create one.
+ *
+ * The parameter is a request, not state. It is honoured once, and then cleared
+ * from the address on the render after the drawer has landed in it — reading
+ * `drawer.open` rather than latching a flag, so the clear cannot run before the
+ * open it is waiting for. A reader without the manage grant has the parameter
+ * cleared and no drawer, because the create mutation would only refuse them.
+ */
+function useAddDepartmentDeepLink({ canManage }: { canManage: boolean }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { openDrawer } = useDrawer();
+
+  const requested = searchParams.get(ADD_DEPARTMENT_PARAM) === "1";
+  const drawerOpen = searchParams.get("drawer.open");
+  const opened = useRef(false);
+
+  useEffect(() => {
+    if (!requested) {
+      opened.current = false;
+      return;
+    }
+
+    const clear = () =>
+      setSearchParams(
+        (previous) => {
+          const params = new URLSearchParams(previous);
+          params.delete(ADD_DEPARTMENT_PARAM);
+          return params;
+        },
+        { replace: true },
+      );
+
+    if (!canManage || drawerOpen === "addDepartment") {
+      clear();
+      return;
+    }
+    if (opened.current) return;
+    opened.current = true;
+    openDrawer("addDepartment");
+  }, [requested, drawerOpen, canManage, openDrawer, setSearchParams]);
 }
 
 /**
@@ -206,11 +255,12 @@ function usePeopleReads({
 /**
  * Everything the page has to settle before it can render anything: which
  * organization is being read, what the reader is allowed to see of it, what
- * they have filtered and sorted to, and the reads that all of that decides.
+ * they have filtered and sorted to, the reads that all of that decides, and the
+ * rows those reads come out as.
  *
- * Gathered here because the answers depend on one another — the window comes
- * from the frame, the reads come from the window and the grants — and reading
- * the page body should not mean reading that chain first.
+ * Gathered here because the answers depend on one another — the reads come from
+ * the grants and the sort, the rows come from the reads and the sample choice —
+ * and reading the page body should not mean reading that chain first.
  */
 function usePeopleScreen() {
   const { organization, hasAnyPermission } = useOrganizationTeamProject({
@@ -228,33 +278,52 @@ function usePeopleScreen() {
 
   const reads = usePeopleReads({
     orgId,
-    windowDays: spendWindowDays({ frame: filters.frame }),
+    // Fixed, because the page no longer offers the reader a window to pick and
+    // the read has no unbounded mode. The table says which window it read.
+    windowDays: SPEND_WINDOW_DAYS,
     sortBy: spendSort.sortBy,
     canReadActivity,
     canReadSources,
   });
 
-  return { orgId, canReadActivity, canManage, spendSort, filters, reads };
-}
-
-function PeoplePage() {
-  const { tab, selectTab } = usePeopleTab();
-  const { orgId, canReadActivity, canManage, spendSort, filters, reads } =
-    usePeopleScreen();
-
-  const { refreshDepartments, refreshIdentity, refreshAssignments } =
-    usePeopleRefreshers({ orgId });
-
-  const runMatch = useRunMatchPass({ orgId, onFinished: refreshIdentity });
+  const refreshers = usePeopleRefreshers({ orgId });
+  const runMatch = useRunMatchPass({
+    orgId,
+    onFinished: refreshers.refreshIdentity,
+  });
   const sample = useSampleMode();
-
-  const [addingDepartment, setAddingDepartment] = useState(false);
-  const [assigning, setAssigning] = useState<PeopleRow | null>(null);
+  useAddDepartmentDeepLink({ canManage });
 
   const departmentTab = departmentTabRows({
     sampleActive: sample.active,
     reads,
   });
+  // The table's rows are built once, here, so the strip above the tabs and the
+  // table inside them can never report different populations.
+  const allRows = usePeopleTableRows({ sampleActive: sample.active, reads });
+
+  return {
+    orgId,
+    canReadActivity,
+    canManage,
+    spendSort,
+    filters,
+    reads,
+    refreshers,
+    runMatch,
+    sample,
+    departmentTab,
+    allRows,
+  };
+}
+
+function PeoplePage() {
+  const { tab, selectTab } = usePeopleTab();
+  const screen = usePeopleScreen();
+  const { canManage, runMatch, sample, departmentTab, allRows, reads } = screen;
+  const { openDrawer } = useDrawer();
+
+  const [assigning, setAssigning] = useState<PeopleRow | null>(null);
 
   return (
     <GovernanceLayout pageTitle="People · AI Governance · LangWatch">
@@ -265,61 +334,35 @@ function PeoplePage() {
           canManage={canManage}
           isRunningMatch={runMatch.isRunning}
           onRunMatch={runMatch.run}
-          onAddDepartment={() => setAddingDepartment(true)}
+          onAddDepartment={() => openDrawer("addDepartment")}
         />
 
         <PeopleSampleBanner active={sample.active} />
 
-        <Tabs.Root
-          value={tab}
-          onValueChange={({ value }) => selectTab(value)}
-          variant="line"
-          lazyMount
-          unmountOnExit
-        >
-          <PeopleTabsList />
-          <Tabs.Content value="people" paddingTop={4}>
-            <PeopleTabPane
-              orgId={orgId}
-              reads={reads}
-              sampleActive={sample.active}
-              canReadActivity={canReadActivity}
-              canManage={canManage}
-              frame={filters.frame}
-              onFrameChange={filters.setFrame}
-              department={filters.department}
-              onDepartmentChange={filters.setDepartment}
-              sortBy={spendSort.sortBy}
-              onSortChange={spendSort.setSortBy}
-              onAssignDepartment={setAssigning}
-              onSuggestionsChanged={refreshIdentity}
-            />
-          </Tabs.Content>
-          <Tabs.Content value="departments" paddingTop={4}>
-            <DepartmentsTabPane
-              orgId={orgId}
-              departments={departmentTab.departments}
-              observed={departmentTab.observed}
-              isLoading={!sample.active && reads.departments.isLoading}
-              error={sample.active ? null : reads.departments.error}
-              // Invented rows carry no record to rename or archive.
-              canManage={canManage && !sample.active}
-              canManageGrant={canManage}
-              onChanged={refreshDepartments}
-            />
-          </Tabs.Content>
-        </Tabs.Root>
+        <PeopleSummaryStrip
+          rows={allRows}
+          departmentCount={departmentTab.departments.length}
+          sampleActive={sample.active}
+          reads={reads}
+        />
+
+        <PeopleTabsSection
+          tab={tab}
+          onSelectTab={selectTab}
+          screen={screen}
+          onAssignDepartment={setAssigning}
+        />
       </VStack>
 
-      <PeopleDialogs
-        orgId={orgId}
-        addingDepartment={addingDepartment}
-        onCloseAddDepartment={() => setAddingDepartment(false)}
-        onDepartmentCreated={refreshDepartments}
-        assigning={assigning}
-        onCloseAssign={() => setAssigning(null)}
-        onAssigned={refreshAssignments}
+      <AssignDepartmentDialog
+        orgId={screen.orgId}
+        personName={assigning?.displayName ?? ""}
+        userId={assigning?.linkedUserId ?? null}
+        currentDepartmentId={null}
         departments={reads.departments.data ?? []}
+        open={assigning !== null}
+        onClose={() => setAssigning(null)}
+        onAssigned={screen.refreshers.refreshAssignments}
       />
     </GovernanceLayout>
   );
@@ -357,6 +400,83 @@ function useRunMatchPass({
     isRunning: mutation.isPending,
     run: () => mutation.mutate({ organizationId: orgId }),
   };
+}
+
+/**
+ * The tab shell and both panes.
+ *
+ * It takes the settled screen whole rather than fifteen separate props: every
+ * one of them would be passed straight through unchanged, and a wrapper that
+ * restates its argument list adds a place for the two to drift apart without
+ * adding anything a reader learns from.
+ *
+ * The panes are lazily mounted and unmounted on exit, so the pane the reader is
+ * not looking at holds no table and runs no render.
+ */
+function PeopleTabsSection({
+  tab,
+  onSelectTab,
+  screen,
+  onAssignDepartment,
+}: {
+  tab: PeopleTab;
+  onSelectTab: (next: string) => void;
+  screen: ReturnType<typeof usePeopleScreen>;
+  onAssignDepartment: (row: PeopleRow) => void;
+}) {
+  const {
+    orgId,
+    canReadActivity,
+    canManage,
+    spendSort,
+    filters,
+    reads,
+    refreshers,
+    sample,
+    departmentTab,
+    allRows,
+  } = screen;
+
+  return (
+    <Tabs.Root
+      value={tab}
+      onValueChange={({ value }) => onSelectTab(value)}
+      variant="line"
+      lazyMount
+      unmountOnExit
+    >
+      <PeopleTabsList />
+      <Tabs.Content value="people" paddingTop={4}>
+        <PeopleTabPane
+          orgId={orgId}
+          reads={reads}
+          allRows={allRows}
+          sampleActive={sample.active}
+          canReadActivity={canReadActivity}
+          canManage={canManage}
+          department={filters.department}
+          onDepartmentChange={filters.setDepartment}
+          sortBy={spendSort.sortBy}
+          onSortChange={spendSort.setSortBy}
+          onAssignDepartment={onAssignDepartment}
+          onSuggestionsChanged={refreshers.refreshIdentity}
+        />
+      </Tabs.Content>
+      <Tabs.Content value="departments" paddingTop={4}>
+        <DepartmentsTabPane
+          orgId={orgId}
+          departments={departmentTab.departments}
+          observed={departmentTab.observed}
+          isLoading={!sample.active && reads.departments.isLoading}
+          error={sample.active ? null : reads.departments.error}
+          // Invented rows carry no record to rename or archive.
+          canManage={canManage && !sample.active}
+          canManageGrant={canManage}
+          onChanged={refreshers.refreshDepartments}
+        />
+      </Tabs.Content>
+    </Tabs.Root>
+  );
 }
 
 /**
@@ -467,12 +587,89 @@ function PeopleSampleBanner({ active }: { active: boolean }) {
 }
 
 /**
+ * The resume above the tabs: what this page holds, in four figures, before the
+ * reader has picked a tab.
+ *
+ * Every figure is counted off rows the page has already read — the merged
+ * table and the department list — so the strip can never disagree with what is
+ * underneath it. None of them is a guess: a read that has not answered leaves
+ * its figure unmeasured and the shared strip draws an em dash, because a zero
+ * would tell an organization it has nobody when the truth is that we have not
+ * looked yet.
+ *
+ * In sample mode the figures count the invented rows, and the page's sample
+ * banner sits directly above this strip — so the disclaimer is read before the
+ * numbers it covers, and no real reading is ever mixed in with them.
+ */
+function PeopleSummaryStrip({
+  rows,
+  departmentCount,
+  sampleActive,
+  reads,
+}: {
+  rows: PeopleRow[];
+  departmentCount: number;
+  sampleActive: boolean;
+  reads: ReturnType<typeof usePeopleReads>;
+}) {
+  // Invented rows are complete by construction. Real ones are only complete
+  // once both halves of the population have come back: the money the gateway
+  // metered, and the people the connected providers named.
+  const peopleMeasured =
+    sampleActive || (!reads.spend.isLoading && !reads.people.isLoading);
+  const departmentsMeasured = sampleActive || !reads.departments.isLoading;
+
+  const summary = summarizePeople({
+    rows,
+    departmentCount,
+    peopleMeasured,
+    departmentsMeasured,
+  });
+
+  return (
+    <GovernanceSummaryBar
+      testId="people-summary-strip"
+      items={[
+        {
+          key: "people",
+          value: summary.people,
+          label: "people",
+          hint: "Metered by the gateway or named by a connected source",
+        },
+        {
+          key: "departments",
+          value: summary.departments,
+          label: "departments",
+          hint: "Spend rolls up by these",
+        },
+        {
+          key: "unmatched",
+          value: summary.unmatched,
+          label: "unmatched",
+          hint: "No account of yours is tied to them yet",
+        },
+        {
+          key: "unassigned",
+          value: summary.unassigned,
+          label: "without a department",
+          hint: "Their spend rolls up under Unassigned",
+        },
+      ]}
+    />
+  );
+}
+
+/**
  * The page title and the actions that belong to the whole screen rather than to
  * either tab, so that switching tabs never moves them.
  *
  * The match pass and Add department appear only for a manager: the identity
  * half of this page is read on `governance:view` and written on
  * `governance:manage`.
+ *
+ * One outlined control, everything else ghost. Add department is the outlined
+ * one because it is the only action here that creates something; the section
+ * has no filled buttons at all, so the outline is what marks it out.
  */
 function PeoplePageHeader({
   sampleActive,
@@ -506,77 +703,31 @@ function PeoplePageHeader({
         />
         {canManage && (
           <>
+            {/* Ghost, so the one outlined control in this row is the create
+                action beside it. */}
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
               loading={isRunningMatch}
               onClick={onRunMatch}
             >
               Run match pass
             </Button>
-            {/* Solid, because it is the one action here that creates
-                something of the organization's own. A person arrives on
-                this page because a provider named them and a match pass
-                recomputes over what is already there; a department exists
-                only because somebody made it. Orange rather than the
-                default grey, matching Inventory's Add tool, so the
-                section's create actions look like one another. */}
-            <Button size="sm" colorPalette="orange" onClick={onAddDepartment}>
+            {/* The house header button: outline, small, leading plus. It is
+                the one action here that creates something of the
+                organization's own — a person arrives on this page because a
+                provider named them and a match pass recomputes over what is
+                already there, while a department exists only because somebody
+                made it — and being the only outlined control in the row is
+                what marks it out now that nothing in the section is filled.
+                Rulebook: governance-ui-controls.feature. */}
+            <PageLayout.HeaderButton onClick={onAddDepartment}>
               <Plus size={14} /> Add department
-            </Button>
+            </PageLayout.HeaderButton>
           </>
         )}
       </HStack>
     </HStack>
-  );
-}
-
-/**
- * The two dialogs the header and the table open. They live outside the tabs,
- * because a dialog mounted inside a tab pane would be torn down the moment the
- * reader switched tabs underneath it.
- *
- * Which person is being assigned is the open/closed state as well: a row picked
- * means the dialog is open, and no row means it is not.
- */
-function PeopleDialogs({
-  orgId,
-  addingDepartment,
-  onCloseAddDepartment,
-  onDepartmentCreated,
-  assigning,
-  onCloseAssign,
-  onAssigned,
-  departments,
-}: {
-  orgId: string;
-  addingDepartment: boolean;
-  onCloseAddDepartment: () => void;
-  onDepartmentCreated: () => Promise<void>;
-  assigning: PeopleRow | null;
-  onCloseAssign: () => void;
-  onAssigned: () => Promise<void>;
-  departments: Department[];
-}) {
-  return (
-    <>
-      <AddDepartmentDialog
-        orgId={orgId}
-        open={addingDepartment}
-        onClose={onCloseAddDepartment}
-        onCreated={onDepartmentCreated}
-      />
-      <AssignDepartmentDialog
-        orgId={orgId}
-        personName={assigning?.displayName ?? ""}
-        userId={assigning?.linkedUserId ?? null}
-        currentDepartmentId={null}
-        departments={departments}
-        open={assigning !== null}
-        onClose={onCloseAssign}
-        onAssigned={onAssigned}
-      />
-    </>
   );
 }
 
@@ -587,11 +738,10 @@ function PeopleDialogs({
 function PeopleTabPane({
   orgId,
   reads,
+  allRows,
   sampleActive,
   canReadActivity,
   canManage,
-  frame,
-  onFrameChange,
   department,
   onDepartmentChange,
   sortBy,
@@ -601,11 +751,11 @@ function PeopleTabPane({
 }: {
   orgId: string;
   reads: ReturnType<typeof usePeopleReads>;
+  /** Every row the page built, before this pane's department filter. */
+  allRows: PeopleRow[];
   sampleActive: boolean;
   canReadActivity: boolean;
   canManage: boolean;
-  frame: Parameters<typeof timeFrameLabel>[0];
-  onFrameChange: (next: Parameters<typeof timeFrameLabel>[0]) => void;
   department: string | null;
   onDepartmentChange: (next: string | null) => void;
   sortBy: ReturnType<typeof useSpendSortParam>["sortBy"];
@@ -613,8 +763,6 @@ function PeopleTabPane({
   onAssignDepartment: (row: PeopleRow) => void;
   onSuggestionsChanged: () => Promise<void>;
 }) {
-  const allRows = usePeopleTableRows({ sampleActive, reads });
-
   const departments = departmentsPresent(allRows);
   const rows = filterByDepartment({ rows: allRows, department });
   const suggestions = sampleActive ? [] : (reads.suggestions.data ?? []);
@@ -633,8 +781,6 @@ function PeopleTabPane({
   return (
     <VStack align="stretch" gap={4} width="full">
       <PeopleFilterBar
-        frame={frame}
-        onFrameChange={onFrameChange}
         department={department}
         departments={departments}
         onDepartmentChange={onDepartmentChange}
@@ -647,7 +793,6 @@ function PeopleTabPane({
       <PeopleTableSection
         rows={rows}
         isLoading={isLoading}
-        frame={frame}
         department={department}
         sources={sampleActive ? undefined : reads.sources.data}
         canManage={canManage}
@@ -753,11 +898,14 @@ function PeopleReadIssues({
  * Separate from the pane because those three are one decision about the same
  * piece of the screen, and the pane's job is the arrangement of the pieces
  * rather than what any one of them turns out to be.
+ *
+ * The window note is printed under every one of them. The page offers no time
+ * control any more, so the only way a reader can know how far back the money
+ * was measured is for the page to say it.
  */
 function PeopleTableSection({
   rows,
   isLoading,
-  frame,
   department,
   sources,
   canManage,
@@ -765,7 +913,6 @@ function PeopleTableSection({
 }: {
   rows: PeopleRow[];
   isLoading: boolean;
-  frame: Parameters<typeof timeFrameLabel>[0];
   department: string | null;
   sources: Parameters<typeof sourceForTarget>[0]["sources"];
   canManage: boolean;
@@ -781,16 +928,19 @@ function PeopleTableSection({
 
   if (rows.length === 0) {
     return (
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        padding={6}
-        color="fg.muted"
-        fontSize="sm"
-      >
-        {emptyPeopleLine({ frame, department })}
-      </Box>
+      <>
+        <Box
+          borderWidth="1px"
+          borderColor="border.muted"
+          borderRadius="md"
+          padding={6}
+          color="fg.muted"
+          fontSize="sm"
+        >
+          {emptyPeopleLine({ department })}
+        </Box>
+        <TableScopeNote />
+      </>
     );
   }
 
@@ -803,30 +953,53 @@ function PeopleTableSection({
       />
       <Text fontSize="xs" color="fg.muted">
         {rows.length} {rows.length === 1 ? "person" : "people"} shown.
-        {isFrameClamped({ frame })
-          ? " Spend and requests are measured over the last 365 days, the longest window this read answers."
-          : ""}
       </Text>
+      <TableScopeNote />
     </>
   );
 }
 
 /**
- * Why the table is empty, said in the reader's own terms: a filtered view names
- * the department it filtered by, because "nobody used AI" is alarming and wrong
- * when the truth is that nobody in Finance did.
+ * The two limits of this table, said out loud: how far back the money was
+ * measured, and how far the sort reaches.
+ *
+ * Both are here for the same reason. The page used to answer the first with a
+ * chip the reader could change, and the chip was a fiction — only the metered
+ * half of the table moved with it. The sort chip has the same shape of problem
+ * and it is still on screen: it drives the spend read, so it ranks the people
+ * that read returned, and everybody a connected source merely named keeps their
+ * own order however the chip is set. That limit is real and this change does
+ * not fix it; ranking both halves needs a read that measures both, which is not
+ * this screen's to build. What this screen owes the reader in the meantime is
+ * the truth about what they are looking at, so a reader who sets
+ * "Sort · Last active" and watches a third of the rows stay put learns why here
+ * instead of concluding the control is broken.
  */
-function emptyPeopleLine({
-  frame,
-  department,
-}: {
-  frame: Parameters<typeof timeFrameLabel>[0];
-  department: string | null;
-}) {
-  const frameLabel = timeFrameLabel(frame).toLowerCase();
+function TableScopeNote() {
+  return (
+    <Text fontSize="xs" color="fg.subtle">
+      Spend and requests are measured over the {SPEND_WINDOW_LABEL}; everything
+      else covers the whole record. Sorting ranks the people with measured spend
+      — anyone a connected source named but nothing measured follows, most
+      recently seen first.
+    </Text>
+  );
+}
+
+/**
+ * Why the table is empty, said in the reader's own terms.
+ *
+ * Both halves of the table have to be accounted for or the sentence is a
+ * half-truth: the money comes from the gateway and the names come from the
+ * connected providers, so a screen with no rows means neither of them has
+ * anybody. A filtered view names the department it filtered by, because
+ * "nobody used AI" is alarming and wrong when the truth is that nobody in
+ * Finance did.
+ */
+function emptyPeopleLine({ department }: { department: string | null }) {
   return department !== null
-    ? `Nobody in ${department} used AI through a connected source in the ${frameLabel}.`
-    : `No one has used AI through a connected source in the ${frameLabel}.`;
+    ? `No one in ${department} has used AI through a connected source, and no connected source has named anyone in ${department}.`
+    : "No one has used AI through a connected source, and no connected source has named anyone.";
 }
 
 /*

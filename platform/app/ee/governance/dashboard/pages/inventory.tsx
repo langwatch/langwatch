@@ -24,10 +24,7 @@ import {
   EnvironmentsTab,
   environmentRows,
 } from "@ee/governance/dashboard/components/environments/EnvironmentsTab";
-import {
-  ConnectorsHeader,
-  IngestionSourcesTable,
-} from "@ee/governance/dashboard/components/IngestionSourcesTable";
+import { IngestionSourcesTable } from "@ee/governance/dashboard/components/IngestionSourcesTable";
 import {
   gatedSourceTypeOptions,
   routesConversations,
@@ -39,9 +36,14 @@ import {
 import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
 import { PullCadenceField } from "@ee/governance/dashboard/components/PullCadenceField";
 import { TraceDestinationField } from "@ee/governance/dashboard/components/TraceDestinationField";
-import { SAMPLE_TOOL_CARDS } from "@ee/governance/dashboard/components/toolCatalog/sampleToolCards";
+import { ToolCardMenu } from "@ee/governance/dashboard/components/toolCatalog/ToolCardMenu";
 import type { ToolCatalogLayout } from "@ee/governance/dashboard/components/toolCatalog/ToolCatalogCards";
-import { ToolCatalogTab } from "@ee/governance/dashboard/components/toolCatalog/ToolCatalogTab";
+import {
+  catalogCards,
+  ToolCatalogTab,
+} from "@ee/governance/dashboard/components/toolCatalog/ToolCatalogTab";
+import type { ToolCard } from "@ee/governance/dashboard/components/toolCatalog/toolCards";
+import { inventorySummaryItems } from "@ee/governance/dashboard/logic/inventorySummary";
 import {
   composerCadenceError,
   PULL_ADAPTER_FOR_SOURCE,
@@ -75,7 +77,11 @@ import {
   SampleDataToggle,
   useSampleMode,
 } from "~/components/governance/sample";
+import { GovernanceSummaryBar } from "~/components/governance/summary";
+import type { AiToolEntry } from "~/components/me/tiles/types";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
+import { AiToolEntryDrawer } from "~/components/settings/governance/AiToolEntryDrawer";
+import { useAiToolCatalog } from "~/components/settings/governance/useAiToolCatalog";
 import {
   DialogBody,
   DialogCloseTrigger,
@@ -87,6 +93,7 @@ import {
 } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
 import { SegmentedControl } from "~/components/ui/segmented-control";
 import { Switch } from "~/components/ui/switch";
@@ -318,10 +325,16 @@ function IngestionSourceList({
    */
   createAction?: ReactNode;
 }) {
-  // Only claim "none connected" (and only count) when we actually know: on
-  // a load failure the alert below says what went wrong instead, and a
-  // header reading "0 sources" off an empty `?? []` would tell an admin
-  // their entire ingest fleet is gone when all that happened was a 403.
+  // Only claim "none connected" when we actually know: on a load failure the
+  // alert below says what went wrong instead, and an empty table read off an
+  // empty `?? []` would tell an admin their entire ingest fleet is gone when
+  // all that happened was a 403.
+  //
+  // THE "CONNECTORS · N SOURCES · N ACTIVE" HEADING THAT USED TO SIT HERE IS
+  // GONE. Both of its figures are now in the page's resume strip above the tab
+  // strip, beside the other two panes' counts, so a reader learns them without
+  // opening this pane. Saying them twice on one screen was the redundancy the
+  // strip was added to remove.
   const knowsFleet = !error && !isLoading && sources !== undefined;
   return (
     <>
@@ -330,11 +343,6 @@ function IngestionSourceList({
           permission="ingestionSources:view"
           detail="The source list stays hidden until then."
         />
-      )}
-
-      {/* No `action`: create lives in the page header, on every pane. */}
-      {canRead && (
-        <ConnectorsHeader sources={knowsFleet ? sources : undefined} />
       )}
 
       {isLoading && <Spinner size="sm" />}
@@ -510,29 +518,47 @@ function useIngestionSourceMutations({
  */
 function useInventoryPanes({
   orgId,
-  canRead,
-  canReadActivity,
+  canManageTools,
 }: {
   orgId: string;
-  canRead: boolean;
-  canReadActivity: boolean;
+  canManageTools: boolean;
 }) {
   /**
-   * Per-source volume for the catalog cards' one measured row.
+   * The organization's tool registry, which is what the Catalog pane lists.
    *
-   * Its own grant and its own plan gate, so it is asked for separately and its
-   * failure is never surfaced: a viewer who may read the catalog but not the
-   * activity monitor gets cards with one more empty row, which is exactly what
-   * the empty row already says. Nothing else on the page depends on it.
+   * Shared with the tool-catalog editor rather than re-wired here, so a tool
+   * published from one surface cannot stay missing from the other's cache.
+   * The pane used to build its cards from the source list and asked the
+   * activity monitor for each source's 24-hour event count; that read is gone
+   * with the cards it fed, because an event count belongs to the source that
+   * delivered it and attaching it to a tool was the invented relationship the
+   * catalog was rebuilt to remove.
    */
-  const healthQuery = api.activityMonitor.ingestionSourcesHealth.useQuery(
-    { organizationId: orgId },
-    {
-      enabled: !!orgId && canRead && canReadActivity,
-      ...SOURCE_HEALTH_REFRESH,
-      retry: false,
-    },
-  );
+  const catalog = useAiToolCatalog({
+    organizationId: orgId,
+    enabled: canManageTools,
+  });
+
+  /**
+   * The tool the registration or edit drawer is open on. `null` is closed.
+   *
+   * Page state rather than a URL-routed drawer because `AiToolEntryDrawer` is
+   * not in the drawer registry: it takes its target as an in-memory entry and
+   * is mounted the same way by the tool-catalog editor. Registering it would
+   * be a second, differently-behaved copy of a drawer that already has a
+   * working caller — the deep link this page honours (`?add=1`) opens this
+   * one rather than a new one.
+   */
+  const [toolDrawer, setToolDrawer] = useState<
+    | { mode: "create"; type: AiToolEntry["type"] }
+    | { mode: "edit"; entry: AiToolEntry }
+    | null
+  >(null);
+
+  /** Open the tool registration drawer on a fresh coding-assistant draft. */
+  const startToolRegistration = useCallback(() => {
+    setToolDrawer({ mode: "create", type: "coding_assistant" });
+  }, []);
 
   const sample = useSampleMode();
 
@@ -565,7 +591,10 @@ function useInventoryPanes({
   );
 
   return {
-    healthQuery,
+    catalog,
+    toolDrawer,
+    setToolDrawer,
+    startToolRegistration,
     sample,
     catalogLayout,
     setCatalogLayout,
@@ -590,8 +619,9 @@ function useIngestionSourcesPage() {
   const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
   const canRead = hasAnyPermission("ingestionSources:view");
   const canManage = hasAnyPermission("ingestionSources:manage");
-  const canReadActivity = hasAnyPermission("activityMonitor:view");
-
+  // The Catalog pane's own grant: the registry and the ingest fleet are two
+  // different things to be trusted with.
+  const canManageTools = hasAnyPermission("aiTools:manage");
   const destinationCtx = useDestinationContext(organization);
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
@@ -599,11 +629,7 @@ function useIngestionSourcesPage() {
     { enabled: !!orgId && canRead, ...SOURCE_HEALTH_REFRESH },
   );
 
-  const panes = useInventoryPanes({
-    orgId,
-    canRead,
-    canReadActivity,
-  });
+  const panes = useInventoryPanes({ orgId, canManageTools });
 
   const utils = api.useUtils();
   const refetch = () =>
@@ -640,7 +666,14 @@ function useIngestionSourcesPage() {
     setComposing(true);
   }, []);
 
-  useAddSourceParam({ isEnterprise, isPlanLoading, canManage, startComposer });
+  useAddParam({
+    isEnterprise,
+    isPlanLoading,
+    canManage,
+    canManageTools,
+    startComposer,
+    startToolRegistration: panes.startToolRegistration,
+  });
 
   /** Close the composer and drop the draft. */
   const closeComposer = () => {
@@ -655,6 +688,7 @@ function useIngestionSourcesPage() {
     isEnterprise,
     canRead,
     canManage,
+    canManageTools,
     startComposer,
     closeComposer,
     sourcesQuery,
@@ -672,49 +706,126 @@ function useIngestionSourcesPage() {
 }
 
 /**
- * `?add=<sourceType>` opens the composer on that type once, then leaves the
- * address — the deep link the overview and the docs hand out. A value the
- * Add source menu would not offer (unknown, retired, or locked on this plan)
- * is dropped silently, and so is one arriving for a viewer without the
- * manage grant. The plan gate is the same `gatedSourceTypeOptions` the menu
- * reads, so a locked type can no more slip in through the address than
- * through a click. Nothing is decided until the plan is known: an
- * Enterprise link must not be thrown away because the plan query was a
- * tick behind the page.
+ * The `?add=` deep link, in one owner.
+ *
+ * Two flows arrive through the same parameter and one hook has to dispatch
+ * between them, because two hooks reading it would race: whichever ran first
+ * would strip the parameter and the other would never see it.
+ *
+ *   `?add=1`            registers a tool. The address the Overview page's
+ *                       "Add tool" chip points at, paired with `?tab=catalog`
+ *                       so the reader lands on the pane the new tool joins.
+ *   `?add=<sourceType>` opens the source composer on that type — the link the
+ *                       docs and the rest of the section hand out.
+ *
+ * The parameter is consumed once and then left off the address, so a refresh
+ * or a back-button does not reopen the drawer the reader just dismissed.
+ *
+ * A source type the Add source menu would not offer (unknown, retired, or
+ * locked on this plan) is dropped silently, and so is either flow arriving for
+ * a reader without the grant it needs. The plan gate is the same
+ * `gatedSourceTypeOptions` the menu reads, so a locked type can no more slip
+ * in through the address than through a click. Nothing is decided until the
+ * plan is known: an Enterprise link must not be thrown away because the plan
+ * query was a tick behind the page.
  */
-function useAddSourceParam({
+const ADD_TOOL_PARAM = "1";
+
+/** The address without its `add=` flag, so a refresh does not reopen it. */
+const withoutAddParam = (previous: URLSearchParams) => {
+  const next = new URLSearchParams(previous);
+  next.delete("add");
+  return next;
+};
+
+/**
+ * The source type the address asked for, or null when it named none the Add
+ * source menu would offer on this plan.
+ *
+ * Its own function so the effect below stays a dispatch: the gate is the same
+ * `gatedSourceTypeOptions` the menu reads, which is the point — a locked type
+ * can no more slip in through the address than through a click.
+ */
+function requestedSourceType({
+  requested,
+  isEnterprise,
+}: {
+  requested: string;
+  isEnterprise: boolean;
+}): SourceType | null {
+  const option = gatedSourceTypeOptions({ isEnterprise }).find(
+    (candidate) => candidate.value === requested,
+  );
+  return option && !option.locked ? option.value : null;
+}
+
+/**
+ * Open whichever flow the address asked for, if the reader may open it.
+ *
+ * Either grant missing means nothing opens and the flag is still dropped: a
+ * link is not an authorisation, and leaving the flag on the address would
+ * reopen the refusal on every refresh.
+ */
+function openAddFlow({
+  requested,
+  isEnterprise,
+  canManage,
+  canManageTools,
+  startComposer,
+  startToolRegistration,
+}: {
+  requested: string;
+  isEnterprise: boolean;
+  canManage: boolean;
+  canManageTools: boolean;
+  startComposer: (sourceType: SourceType) => void;
+  startToolRegistration: () => void;
+}) {
+  if (requested === ADD_TOOL_PARAM) {
+    if (canManageTools) startToolRegistration();
+    return;
+  }
+  if (!canManage) return;
+  const sourceType = requestedSourceType({ requested, isEnterprise });
+  if (sourceType) startComposer(sourceType);
+}
+
+function useAddParam({
   isEnterprise,
   isPlanLoading,
   canManage,
+  canManageTools,
   startComposer,
+  startToolRegistration,
 }: {
   isEnterprise: boolean;
   isPlanLoading: boolean;
   canManage: boolean;
+  canManageTools: boolean;
   startComposer: (sourceType: SourceType) => void;
+  startToolRegistration: () => void;
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("add");
   useEffect(() => {
     if (requested === null || isPlanLoading) return;
-    const option = gatedSourceTypeOptions({ isEnterprise }).find(
-      (candidate) => candidate.value === requested,
-    );
-    if (option && !option.locked && canManage) startComposer(option.value);
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("add");
-        return next;
-      },
-      { replace: true },
-    );
+    openAddFlow({
+      requested,
+      isEnterprise,
+      canManage,
+      canManageTools,
+      startComposer,
+      startToolRegistration,
+    });
+    setSearchParams(withoutAddParam, { replace: true });
   }, [
     requested,
     isPlanLoading,
     isEnterprise,
     canManage,
+    canManageTools,
     startComposer,
+    startToolRegistration,
     setSearchParams,
   ]);
 }
@@ -732,11 +843,16 @@ function useAddSourceParam({
  * standalone page at ee/governance/dashboard/pages/anomaly-rules.tsx renders
  * the same component.
  *
- * The tool-tiles editor used to be the Catalog pane. It moved off this page
- * entirely: tiles are the launcher grid on the personal AI-tools portal and
- * the CLI's tool-path policy, neither of which is an inventory of what the
- * organization runs. See `~/components/governance/ToolCatalogPanel` for where
- * that composition now waits for a home.
+ * THE CATALOG LISTS THE TOOL REGISTRY. For a while it was built from the
+ * ingestion sources instead, on the reading that a tool entered the system by
+ * being connected — which put the admin connectors on screen as if they were
+ * tools the organization had bought. `AiToolEntry` is the registry, it is what
+ * the personal portal already launches from and what the command line reads
+ * for each tool's path policy, and it is what this pane reads now. What did
+ * NOT come back with it is the tile EDITOR: drag-to-reorder and the
+ * starter-pack import are the catalog editor's job
+ * (`~/components/governance/ToolCatalogPanel`), and an inventory is read, not
+ * arranged. Registering and editing a tool here open that editor's own drawer.
  */
 const INVENTORY_TABS = ["catalog", "environments", "sources"] as const;
 type InventoryTab = (typeof INVENTORY_TABS)[number];
@@ -907,7 +1023,6 @@ function InventorySourcesPane({
             isEnterprise={page.isEnterprise}
             sourceCount={sourcesQuery.data?.length ?? 0}
             onAdd={page.startComposer}
-            label="Add source"
           />
         ) : undefined
       }
@@ -924,9 +1039,27 @@ function InventorySourcesPane({
  */
 function AddEnvironmentControl({ onAdd }: { onAdd: () => void }) {
   return (
-    <Button size="sm" colorPalette="orange" onClick={onAdd}>
+    <PageLayout.HeaderButton onClick={onAdd}>
       <Plus size={14} /> Add environment
-    </Button>
+    </PageLayout.HeaderButton>
+  );
+}
+
+/**
+ * Register a tool, in one place.
+ *
+ * The header renders it and so does the Catalog pane's empty state, and they
+ * must stay the same control: an empty pane offering a differently-worded
+ * button is the defect the one-create-flow rule exists for. It opens the SAME
+ * drawer the tool-catalog editor opens, rather than a second registration form
+ * — a duplicate create flow over one registry is exactly how the two ended up
+ * disagreeing about what a tool is.
+ */
+function AddToolControl({ onAdd }: { onAdd: () => void }) {
+  return (
+    <PageLayout.HeaderButton onClick={onAdd} data-testid="add-tool">
+      <Plus size={14} /> Add tool
+    </PageLayout.HeaderButton>
   );
 }
 
@@ -997,15 +1130,20 @@ function InventoryHeaderActions({
         onToggle={page.sample.toggle}
         size="sm"
       />
-      {(inventoryTab === "catalog" || inventoryTab === "sources") &&
-        page.canManage && (
-          <AddSourceControl
-            isEnterprise={page.isEnterprise}
-            sourceCount={page.sourcesQuery.data?.length ?? 0}
-            onAdd={page.startComposer}
-            label={inventoryTab === "catalog" ? "Add tool" : "Add source"}
-          />
-        )}
+      {/* Each pane's own create, under its own name. Catalog adds a TOOL to
+          the registry; Sources connects a SOURCE. They were the same button
+          under two labels while the catalog was built from the source list,
+          which is precisely why a connector could end up listed as a tool. */}
+      {inventoryTab === "catalog" && page.canManageTools && (
+        <AddToolControl onAdd={page.startToolRegistration} />
+      )}
+      {inventoryTab === "sources" && page.canManage && (
+        <AddSourceControl
+          isEnterprise={page.isEnterprise}
+          sourceCount={page.sourcesQuery.data?.length ?? 0}
+          onAdd={page.startComposer}
+        />
+      )}
       {inventoryTab === "environments" && (
         <AddEnvironmentControl onAdd={() => page.setAddingEnvironment(true)} />
       )}
@@ -1017,33 +1155,178 @@ function InventoryHeaderActions({
  * The Catalog pane, wired to the page's reads.
  *
  * Extracted for the same reason the sources pane is: the page's own body is a
- * layout, and a pane's five props are not layout. `canManage` chooses the
- * empty-state SENTENCE; the action beside it is the header's own control
- * rendered a second time, which is why it is passed rather than rebuilt.
+ * layout, and a pane's props are not layout. The action beside the empty state
+ * is the header's own control rendered a second time, which is why it is
+ * passed rather than rebuilt, and the row menu is built here because the
+ * mutations behind it belong to the page rather than to the pane.
  */
 function InventoryCatalogPane({
   page,
 }: {
   page: ReturnType<typeof useIngestionSourcesPage>;
 }) {
+  const { catalog } = page;
+  const entryById = useMemo(
+    () => new Map(catalog.entries.map((entry) => [entry.id, entry])),
+    [catalog.entries],
+  );
+
+  /**
+   * The row menu, on real cards only. A sample card's actions would act on a
+   * tool that does not exist, and offering them would be the one thing sample
+   * mode must never do: let an invented row behave like a real one.
+   */
+  const renderActions = (card: ToolCard) => {
+    const entry = entryById.get(card.id);
+    if (!entry) return null;
+    return (
+      <ToolCardMenu
+        card={card}
+        onEdit={() => page.setToolDrawer({ mode: "edit", entry })}
+        onTogglePublished={() =>
+          catalog.setEnabled({ id: entry.id, enabled: !entry.enabled })
+        }
+        onRemove={() => catalog.setPendingDelete(entry)}
+        isTogglePending={catalog.togglePendingId === entry.id}
+      />
+    );
+  };
+
   return (
     <ToolCatalogTab
-      canRead={page.canRead}
-      canManage={page.canManage}
-      sources={page.sourcesQuery.data}
-      health={page.healthQuery.data}
+      canManage={page.canManageTools}
+      tools={catalog.entries}
+      isLoading={catalog.isLoading}
+      error={catalog.error}
       sampleActive={page.sample.active}
       layout={page.catalogLayout}
-      addToolAction={
-        page.canManage ? (
-          <AddSourceControl
-            isEnterprise={page.isEnterprise}
-            sourceCount={page.sourcesQuery.data?.length ?? 0}
-            onAdd={page.startComposer}
-            label="Add tool"
-          />
-        ) : undefined
-      }
+      addToolAction={<AddToolControl onAdd={page.startToolRegistration} />}
+      renderActions={page.sample.active ? undefined : renderActions}
+    />
+  );
+}
+
+/**
+ * Removing a tool drops it from the registry for good, so it asks first.
+ *
+ * The warning says what is lost and names the reversible alternative, because
+ * the reader reaching for Remove usually wants the tool to stop appearing
+ * rather than to stop existing.
+ */
+function RemoveToolDialog({
+  page,
+}: {
+  page: ReturnType<typeof useIngestionSourcesPage>;
+}) {
+  const { catalog } = page;
+  const pending = catalog.pendingDelete;
+  return (
+    <DialogRoot
+      open={pending !== null}
+      onOpenChange={({ open }) => {
+        if (!open) catalog.setPendingDelete(null);
+      }}
+      placement="center"
+    >
+      {pending && (
+        <DialogContent background="bg">
+          <DialogCloseTrigger />
+          <DialogHeader>
+            <DialogTitle>Remove {pending.displayName}?</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <Text fontSize="sm" color="fg.muted">
+              This removes the tool from the catalog and from every
+              member&apos;s tools page, and it cannot be undone. To take it off
+              their page without losing how it is set up, unpublish it instead.
+            </Text>
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => catalog.setPendingDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              colorPalette="red"
+              loading={catalog.isRemoving}
+              onClick={catalog.confirmDelete}
+            >
+              Remove tool
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      )}
+    </DialogRoot>
+  );
+}
+
+/**
+ * The catalog's cards when the page may honestly count them, and null when it
+ * may not — which is what draws the tab badge blank and the strip's em dash.
+ *
+ * THREE STATES, NOT TWO, and collapsing them is the bug this exists to stop.
+ * Cards mean a counted catalog; an empty array means a catalog counted at
+ * zero; null means the page has not been told. A reader without the registry
+ * grant and a registry read still in flight both land on null, because "0
+ * tools" is a claim about the organization and neither of them supports it.
+ *
+ * The pane itself is not built from this — it calls `catalogCards` again and
+ * has its own loading and error states. This is only what the COUNTERS may
+ * say, and the two answers are deliberately allowed to differ: a pane may show
+ * a spinner while the tab beside it simply shows no number.
+ */
+function countableCatalogCards(
+  page: ReturnType<typeof useIngestionSourcesPage>,
+): ToolCard[] | null {
+  // Sample mode answers from its own list, so no read gates it.
+  if (page.sample.active) {
+    return catalogCards({ tools: undefined, sampleActive: true });
+  }
+  if (!page.canManageTools || !page.catalog.loaded) return null;
+  return catalogCards({
+    tools: page.catalog.entries,
+    sampleActive: false,
+  });
+}
+
+/**
+ * One line for all three panes, above the tabs, so a reader learns the size of
+ * the estate without opening each one.
+ *
+ * Counted here rather than inside the strip: the shared component runs no
+ * query and totals nothing, which is what keeps an unmeasured figure from
+ * quietly becoming a zero on its way through a layout.
+ */
+function InventorySummaryStrip({
+  page,
+  cards,
+  environments,
+  sources,
+}: {
+  page: ReturnType<typeof useIngestionSourcesPage>;
+  /** Null when the reader cannot see the registry, which draws the dash. */
+  cards: readonly ToolCard[] | null;
+  environments: readonly EnvironmentRow[];
+  sources: readonly Source[] | undefined;
+}) {
+  return (
+    <GovernanceSummaryBar
+      testId="inventory-summary"
+      items={inventorySummaryItems({
+        cards,
+        environmentCount: environments.length,
+        // Sample environments are wholly invented, so none of them was typed
+        // in by this reader and all of them count as discovered.
+        discoveredEnvironmentCount:
+          environments.length -
+          (page.sample.active ? 0 : page.addedEnvironments.length),
+        sourceCount: sources?.length ?? null,
+        activeSourceCount:
+          sources?.filter((source) => source.status === "active").length ??
+          null,
+      })}
     />
   );
 }
@@ -1053,14 +1336,15 @@ function InventoryPage() {
   const { orgId, destinationCtx, sourcesQuery, mutations } = page;
   const { inventoryTab, selectInventoryTab } = useInventoryTab();
 
-  const catalogCount = page.sample.active
-    ? SAMPLE_TOOL_CARDS.length
-    : sourcesQuery.data?.length;
+  const cards = countableCatalogCards(page);
   const environments = environmentRows({
     sources: sourcesQuery.data,
     sampleActive: page.sample.active,
     added: page.addedEnvironments,
   });
+  const sources = page.sample.active
+    ? SAMPLE_INGESTION_SOURCES
+    : sourcesQuery.data;
 
   return (
     <GovernanceLayout pageTitle="Inventory · Governance · LangWatch">
@@ -1088,16 +1372,19 @@ function InventoryPage() {
           onClose={page.closeComposer}
         />
 
+        <InventorySummaryStrip
+          page={page}
+          cards={cards}
+          environments={environments}
+          sources={sources}
+        />
+
         <InventoryTabs
           inventoryTab={inventoryTab}
           selectInventoryTab={selectInventoryTab}
-          catalogCount={catalogCount}
+          catalogCount={cards?.length}
           environmentCount={environments.length}
-          sourceCount={
-            page.sample.active
-              ? SAMPLE_INGESTION_SOURCES.length
-              : sourcesQuery.data?.length
-          }
+          sourceCount={sources?.length}
           catalog={<InventoryCatalogPane page={page} />}
           environments={
             <EnvironmentsTab
@@ -1119,6 +1406,28 @@ function InventoryPage() {
         />
       </VStack>
 
+      <InventoryOverlays page={page} />
+    </GovernanceLayout>
+  );
+}
+
+/**
+ * The page's dialogs and drawers, which sit outside the content column.
+ *
+ * Grouped so the page body reads as the layout it is. Each of them is opened
+ * from somewhere different — a header button, a row menu, a mutation's reply —
+ * and every one of them is closed by writing the page state back to null,
+ * which is the only thing they have in common and the reason they are all
+ * mounted at this level rather than beside whatever opened them.
+ */
+function InventoryOverlays({
+  page,
+}: {
+  page: ReturnType<typeof useIngestionSourcesPage>;
+}) {
+  const { orgId, destinationCtx, sourcesQuery, mutations } = page;
+  return (
+    <>
       <AddEnvironmentDialog
         isOpen={page.addingEnvironment}
         onClose={() => page.setAddingEnvironment(false)}
@@ -1130,6 +1439,16 @@ function InventoryPage() {
         onClose={() => page.setSecretModal(null)}
       />
 
+      {/* The tool-catalog editor's own drawer, mounted here rather than
+          re-implemented: one registration form over one registry. */}
+      <AiToolEntryDrawer
+        organizationId={orgId}
+        state={page.toolDrawer}
+        onClose={() => page.setToolDrawer(null)}
+      />
+
+      <RemoveToolDialog page={page} />
+
       <EditingSourceDrawer
         orgId={orgId}
         destinationCtx={destinationCtx}
@@ -1138,7 +1457,7 @@ function InventoryPage() {
         sourcesQuery={sourcesQuery}
         update={mutations.update}
       />
-    </GovernanceLayout>
+    </>
   );
 }
 
@@ -1175,34 +1494,34 @@ function EditingSourceDrawer({
 }
 
 /**
- * The page's ONE create control, mounted only for a viewer holding
+ * Connect a source, in one place, and only for a viewer holding
  * `ingestionSources:manage`.
  *
- * There used to be two: a solid "Add tool" in the page header and a second,
- * outline "Add source" down inside the Sources table's own header. Both opened
- * the same menu and created the same thing, so a reader had to work out which
- * of two differently-worded, differently-weighted buttons was the real one.
- * Create now lives in the page header, on every pane, and nothing inside the
- * content region creates anything.
+ * There used to be two of these: one in the page header and a second, outline
+ * one down inside the Sources table's own header. Both opened the same menu
+ * and created the same thing, so a reader had to work out which of two
+ * differently-worded, differently-weighted buttons was the real one. Create
+ * now lives in the page header, and the empty state renders this same
+ * component rather than a button of its own.
  *
- * The label still changes with the pane, because the panes genuinely list
- * different views of the same object: the catalog lists tools and the table
- * lists sources. What must not change is that there is one of them.
+ * IT NO LONGER DOUBLES AS "ADD TOOL". While the Catalog pane was built from
+ * the source list, one button under two labels was honest — the two panes were
+ * two views of one object. They are not any more: the catalog lists what the
+ * organization registered and this connects the pipe telemetry arrives on, so
+ * the Catalog pane has its own control ({@link AddToolControl}).
  *
  * The plan cap lives here rather than at either call site. It used to be
- * carried by the in-content control alone, so the header's Add tool would
+ * carried by the in-content control alone, so the header's own button would
  * happily open a menu for an organization that had already hit its limit.
  */
 function AddSourceControl({
   isEnterprise,
   sourceCount,
   onAdd,
-  label,
 }: {
   isEnterprise: boolean;
   sourceCount: number;
   onAdd: (sourceType: SourceType) => void;
-  label: string;
 }) {
   const atCap =
     !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
@@ -1217,13 +1536,13 @@ function AddSourceControl({
       hint={
         !isEnterprise
           ? `Your plan includes up to ${NON_ENTERPRISE_INGESTION_SOURCE_CAP} sources. Upgrade to Enterprise for unlimited.`
-          : "A tool joins the catalog when you connect it as a source."
+          : "A source is where this organization's AI usage is read from."
       }
       onPick={onAdd}
     >
-      <Button size="sm" colorPalette="orange" disabled={atCap}>
-        <Plus size={14} /> {label}
-      </Button>
+      <PageLayout.HeaderButton disabled={atCap}>
+        <Plus size={14} /> Add source
+      </PageLayout.HeaderButton>
     </AddIngestionSourceMenu>
   );
 }

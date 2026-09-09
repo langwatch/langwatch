@@ -276,7 +276,7 @@ describe("governance pages for a delegated viewer", () => {
       // The one control the hero gates: this viewer holds no
       // `ingestionSources:manage`, and the inventory would drop the add link
       // it leads to, so the pill is not drawn at all.
-      expect(screen.queryByText("Add Source")).not.toBeInTheDocument();
+      expect(screen.queryByText("Add source")).not.toBeInTheDocument();
     });
 
     /** @scenario "The overview holds nothing a delegated viewer is refused" */
@@ -298,7 +298,7 @@ describe("governance pages for a delegated viewer", () => {
         initialEntry: "/governance/people?tab=departments",
       });
 
-      // Creating a department is now a header action opening a dialog, so the
+      // Creating a department is now a header action opening a drawer, so the
       // control a viewer must not see is the button, not a text box.
       expect(
         screen.queryByRole("button", { name: /Add department/ }),
@@ -309,24 +309,35 @@ describe("governance pages for a delegated viewer", () => {
       expect(screen.getByText(/governance:manage/)).toBeInTheDocument();
     });
 
-    // The pane's grant changed with the pane. It used to be the tile editor,
-    // gated on `aiTools:manage`; it is now the registered-tools catalog, built
-    // from the source list, so the grant it names is `ingestionSources:view` —
-    // which this viewer does not hold. Naming it matters more here than it did
-    // for the tiles: with no gate the pane would fall through to its "no tools
-    // registered yet" empty state and tell this viewer their organization runs
-    // no AI at all.
+    // The pane's grant has changed with the pane, twice, and it is now back
+    // where it started. It was the tile editor on `aiTools:manage`; it became
+    // the catalog built from the source list, which made `ingestionSources:view`
+    // the honest answer; it is now the registered-tools catalog reading
+    // `aiTools.adminList`, and it does not touch the source list at all. So
+    // `aiTools:manage` is the grant again — naming the source grant here would
+    // name one that has nothing to do with why this viewer cannot see the
+    // catalog, and granting it would not unblock them.
+    //
+    // The gate matters more than which grant it names: with no gate the pane
+    // falls through to its "no tools registered yet" empty state and tells
+    // this viewer their organization runs no AI at all.
     /** @scenario "The inventory Catalog pane names its own grant" */
-    it("names ingestionSources:view on the inventory Catalog pane and claims no empty estate", () => {
+    it("names aiTools:manage on the inventory Catalog pane and claims no empty estate", () => {
       renderPage({
         Page: InventoryPage,
         initialEntry: "/governance/inventory?tab=catalog",
       });
 
-      expect(screen.getByText(/ingestionSources:view/)).toBeInTheDocument();
+      expect(screen.getByText(/aiTools:manage/)).toBeInTheDocument();
+      // The headline the pane WOULD draw if the gate came off, so this half
+      // still fails if it does — the string is live at ToolCatalogTab.tsx:137
+      // and inventoryUiRules asserts a granted reader really sees it.
       expect(screen.queryByText(/No tools registered yet/)).toBeNull();
-      // The retired editor is gone from this page for every viewer.
-      expect(screen.queryByText("Tool Tiles")).not.toBeInTheDocument();
+      // The "Tool Tiles" absence that used to sit here has moved to
+      // inventoryTabShell, which owns what mounts on this page. It is a
+      // mounting guard, not a permission one, and it said nothing about this
+      // viewer's grants; keeping a third copy of it here only made it look
+      // like three tests agreed about something none of them could observe.
     });
   });
 
@@ -373,11 +384,13 @@ describe("governance pages for a delegated viewer", () => {
       renderPage({ Page: GovernanceOverviewPage });
 
       expect(screen.getByText("Good morning")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Add people" })).toBeVisible();
+      expect(
+        screen.getByRole("link", { name: "Add department" }),
+      ).toBeVisible();
       expect(screen.getByText("Insights")).toBeInTheDocument();
       expect(screen.getByText("Recent activity")).toBeInTheDocument();
       // The admin can add a source, so the admin is the one offered the pill.
-      expect(screen.getByText("Add Source")).toBeInTheDocument();
+      expect(screen.getByText("Add source")).toBeInTheDocument();
       expect(
         screen.queryByText(/Ask an organization admin to grant you/),
       ).not.toBeInTheDocument();

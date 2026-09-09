@@ -195,7 +195,15 @@ const A_SAMPLE_INSIGHT =
   "Three registered agents have run without a named owner since May.";
 
 /** The hero's ways in, by label, in the order they are drawn. */
-const WAY_IN_LABELS = ["Add people", "Add agent", "Add tool"] as const;
+const WAY_IN_LABELS = [
+  "Add department",
+  "Add agent",
+  "Add tool",
+  "Configure sources",
+] as const;
+
+/** The three that add something, as opposed to the one that configures. */
+const ADD_LABELS = ["Add department", "Add agent", "Add tool"] as const;
 
 const wayInLinks = () =>
   screen
@@ -251,6 +259,71 @@ async function tabsOfPage(path: string): Promise<string[]> {
   );
 }
 
+/**
+ * The measure the project home sets its own ask field to, read out of that
+ * hero's source.
+ *
+ * Read rather than imported because the constant is private to that module,
+ * and the governance hero restates the value rather than importing the hero
+ * behind it. Restating it is what this reads for: if either side moves, the
+ * two fields stop matching and the reader meets a field that resizes as they
+ * cross between the two screens.
+ */
+async function projectHomeAskMeasure(): Promise<string> {
+  const path = join(PACKAGE_ROOT, "src/components/home/LangyHomeHero.tsx");
+  const source = await readFile(path, "utf8");
+  const measure = /const ASK_MEASURE = "([^"]+)";/.exec(source);
+  // Thrown rather than asserted: an `expect` out here is counted against
+  // whichever test happens to be running, and a missing constant is a fact
+  // about that file rather than a failure of this page.
+  if (measure?.[1] === undefined)
+    throw new Error(`no \`const ASK_MEASURE = "..."\` in ${path}`);
+  return measure[1];
+}
+
+/**
+ * The width the nearest ancestor bounds `node` to, as the browser computed
+ * it. Walked upwards because the measure is set on a wrapper several levels
+ * above whatever the test found by role, and which level that is belongs to
+ * the layout rather than to this assertion.
+ */
+function boxedAncestorWidth(
+  node: HTMLElement,
+  property: "maxWidth" | "width",
+): string {
+  let current: HTMLElement | null = node;
+  while (current) {
+    const value = getComputedStyle(current)[property];
+    if (value && value !== "none" && value !== "auto" && value !== "")
+      return value;
+    current = current.parentElement;
+  }
+  throw new Error(`nothing above this element sets a ${property}`);
+}
+
+/**
+ * Every accent-coloured value this element resolves to, across the properties
+ * a filled treatment reaches for.
+ *
+ * The design tokens do not resolve to a colour under jsdom, which computes
+ * them to their own variable names ("var(--chakra-colors-orange-subtle)").
+ * That is enough, and it is the right thing to read: the rule is about which
+ * TOKEN a control is dressed in, not which pixels a theme happens to give
+ * that token, and the token name is what changes when the treatment does.
+ */
+function accentTokens(node: HTMLElement): string[] {
+  const style = getComputedStyle(node);
+  return (
+    [
+      style.background,
+      style.backgroundColor,
+      style.borderColor,
+      style.color,
+      style.boxShadow,
+    ] as const
+  ).filter((value) => value.includes("orange"));
+}
+
 /** The pill, found by what it does rather than by how it is drawn. */
 const sourcePill = () =>
   screen
@@ -292,23 +365,56 @@ afterEach(() => cleanup());
 
 describe("governance overview", () => {
   describe("when the overview renders", () => {
-    /** @scenario "The hero offers three ways in, in the order a surface is set up" */
-    it("offers add people, add agent and add tool, in that order", () => {
+    /** @scenario "The hero offers four ways in, three to add and one to configure" */
+    it("offers the three adds first and configure sources last", () => {
       renderPage();
 
-      expect(wayInLabels()).toEqual(["Add people", "Add agent", "Add tool"]);
-      expect(screen.getByRole("link", { name: "Add people" })).toHaveAttribute(
-        "href",
-        "/governance/people?tab=people",
-      );
+      expect(wayInLabels()).toEqual([...WAY_IN_LABELS]);
+    });
+
+    /** @scenario "Each add shortcut opens the flow that adds the thing it names" */
+    it("sends each add shortcut to the pane that opens its own add flow", () => {
+      renderPage();
+
+      expect(
+        screen.getByRole("link", { name: "Add department" }),
+      ).toHaveAttribute("href", "/governance/people?tab=departments&add=1");
       expect(screen.getByRole("link", { name: "Add agent" })).toHaveAttribute(
         "href",
         "/governance/agents?tab=agents&add=1",
       );
       expect(screen.getByRole("link", { name: "Add tool" })).toHaveAttribute(
         "href",
-        "/governance/inventory",
+        "/governance/inventory?tab=catalog&add=1",
       );
+
+      // The path alone is what two of these already had while opening
+      // nothing: they landed on the right page and left the reader to find
+      // the add button, which is the work the shortcut exists to save. So the
+      // ask to open is asserted as well as where it is asked of.
+      for (const label of ADD_LABELS) {
+        const href =
+          screen.getByRole("link", { name: label }).getAttribute("href") ?? "";
+        const query = new URLSearchParams(href.split("?")[1] ?? "");
+        expect(query.get("add")).toBe("1");
+      }
+    });
+
+    /** @scenario "A shortcut leads through to every source the product can pull from" */
+    it("leads through to the sources tab, whatever the viewer may add", () => {
+      renderPage();
+
+      const configure = screen.getByRole("link", { name: "Configure sources" });
+      expect(configure).toHaveAttribute(
+        "href",
+        "/governance/inventory?tab=sources",
+      );
+      // Last, because it configures rather than adds.
+      expect(wayInLabels().at(-1)).toBe("Configure sources");
+      // Drawn for a viewer holding nothing that manages: unlike the pill, it
+      // opens no add flow, so the tab it lands on reads without that grant.
+      // `VIEWER` is what beforeEach set, and it holds no manage grant.
+      expect(harness.permissions).not.toContain("ingestionSources:manage");
     });
 
     /** @scenario "No shortcut points at a tab the page would not honour" */
@@ -335,15 +441,40 @@ describe("governance overview", () => {
 
   describe("when the viewer can manage ingestion sources", () => {
     /** @scenario "The hero leads with adding a source" */
-    it("leads with an Add Source control that opens rather than fires", () => {
+    it("leads with an Add source control that opens rather than fires", () => {
       harness.permissions = [...VIEWER, "ingestionSources:manage"];
       renderPage();
 
       const pill = sourcePill();
       expect(pill).toBeDefined();
-      expect(pill).toHaveTextContent("Add Source");
+      expect(pill).toHaveTextContent("Add source");
       // It opens a menu; nothing is navigated by touching the pill itself.
       expect(harness.push).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The lead action is an outline control rather than a filled one" */
+    it("draws the control with no accent anywhere on it, still heavier than the chips", () => {
+      harness.permissions = [...VIEWER, "ingestionSources:manage"];
+      renderPage();
+
+      const pill = sourcePill();
+      if (!pill) throw new Error("no vendor pill to check the treatment of");
+
+      // Read on the control AND everything inside it: the label, the vendor
+      // tiles and the caret are separate elements, and the filled treatment
+      // accents the label rather than the button.
+      for (const node of [pill, ...pill.querySelectorAll("*")]) {
+        expect(accentTokens(node as HTMLElement)).toEqual([]);
+      }
+
+      // Heavier than the chips, by surface rather than by colour: it does not
+      // sit on the chips' own ground. Without this the rule above is met by
+      // flattening the pill into the row, which loses the one control the
+      // page is built around.
+      const chip = screen.getByRole("link", { name: "Add department" });
+      expect(getComputedStyle(pill).background).not.toBe(
+        getComputedStyle(chip).background,
+      );
     });
 
     /** @scenario "The source menu names the three vendors an admin arrives with" */
@@ -377,11 +508,11 @@ describe("governance overview", () => {
 
   describe("when the viewer cannot manage ingestion sources", () => {
     /** @scenario "Adding a source is offered only to whoever may add one" */
-    it("offers no Add Source control and the same three ways in", () => {
+    it("offers no Add source control and the same four ways in", () => {
       renderPage();
 
       expect(sourcePill()).toBeUndefined();
-      expect(screen.queryByText("Add Source")).not.toBeInTheDocument();
+      expect(screen.queryByText("Add source")).not.toBeInTheDocument();
       expect(wayInLabels()).toEqual([...WAY_IN_LABELS]);
     });
   });
@@ -395,13 +526,13 @@ describe("governance overview", () => {
       expect(harness.placeholder).toBe(
         "Ask Langy, search, or jump to anything",
       );
-      expect(wayInLabels()).toHaveLength(3);
+      expect(wayInLabels()).toEqual([...WAY_IN_LABELS]);
     });
   });
 
   describe("when the viewer cannot ask Langy", () => {
     /** @scenario "The field offers Langy to whoever may ask" */
-    it("offers search without Langy and the same three ways in", () => {
+    it("offers search without Langy and the same four ways in", () => {
       renderPage();
 
       expect(harness.placeholder).toBe("Search, or jump to anything");
@@ -524,6 +655,34 @@ describe("governance overview", () => {
     });
   });
 
+  describe("the measure the field is set to", () => {
+    /** @scenario "The field is the width the project home sets its own field to" */
+    it("matches the project home field, and stays inside the wider page column", async () => {
+      const { container } = renderPage();
+
+      const field = screen.getByPlaceholderText(/jump to anything/);
+      const fieldColumn = boxedAncestorWidth(field, "maxWidth");
+      expect(fieldColumn).toBe(await projectHomeAskMeasure());
+
+      // The shortcuts hang off the field, so they take its measure too: the
+      // chip row shares that same bounded ancestor.
+      const chip = screen.getByRole("link", { name: "Add department" });
+      expect(boxedAncestorWidth(chip, "maxWidth")).toBe(fieldColumn);
+
+      // The page column stays wider. Narrowing it to the field would take the
+      // two lists below down with it, and their rows are a badge, a headline
+      // and a date across two columns.
+      const pageColumn = boxedAncestorWidth(
+        screen.getByRole("heading", { name: "AI Governance" }),
+        "maxWidth",
+      );
+      expect(parseInt(pageColumn, 10)).toBeGreaterThan(
+        parseInt(fieldColumn, 10),
+      );
+      expect(container).toBeTruthy();
+    });
+  });
+
   describe("the ground the hero stands on", () => {
     /** @scenario "The hero stands on the same lit ground as the project home" */
     it("is decoration: hidden from assistive technology and untouchable", () => {
@@ -576,7 +735,9 @@ describe("governance overview", () => {
         ),
       ).toEqual([]);
       expect(screen.getByText("Good morning")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Add people" })).toBeVisible();
+      expect(
+        screen.getByRole("link", { name: "Add department" }),
+      ).toBeVisible();
     });
   });
 

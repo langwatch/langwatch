@@ -19,7 +19,6 @@ import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Source } from "../../pages/ingestionSourceForms";
 import {
-  ConnectorsHeader,
   IngestionSourcesTable,
   sortSourcesForTable,
 } from "../IngestionSourcesTable";
@@ -80,7 +79,6 @@ function renderTable({
   };
   render(
     <Providers>
-      <ConnectorsHeader sources={sources} />
       <IngestionSourcesTable
         sources={sources}
         canManage={canManage}
@@ -139,14 +137,6 @@ describe("given the ingestion sources table", () => {
       expect(
         within(pushRow).queryByText(/Hourly|Every/),
       ).not.toBeInTheDocument();
-    });
-
-    /** @scenario "The sources table shows delivery as a column" */
-    it("counts the fleet in the header from the loaded list", () => {
-      renderTable();
-
-      expect(screen.getByText("Connectors")).toBeVisible();
-      expect(screen.getByText("3 sources · 1 active")).toBeVisible();
     });
   });
 

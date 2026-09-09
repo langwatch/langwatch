@@ -1,36 +1,54 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import {
-  modeForSourceType,
-  SOURCE_TYPE_LABEL,
-  SOURCE_TYPE_OPTIONS,
-  type SourceType,
-} from "../ingestionSourceCatalog";
+import type { AiToolTileType } from "~/components/me/tiles/types";
+
+import type { SourceType } from "../ingestionSourceCatalog";
 
 /**
- * The registered-tools catalog: one card per AI tool the organization has told
- * LangWatch about, and the figures each card would carry once the platform
- * measures them.
+ * The registered-tools catalog: one card per AI tool the organization has
+ * registered with LangWatch, and the figures each card would carry once the
+ * platform measures them.
+ *
+ * A CARD IS A REGISTERED TOOL, NOT A CONNECTOR. The pane used to derive a
+ * "tool" from each configured ingestion source, so it listed the admin
+ * connectors — the pipes that carry the data, not the things the organization
+ * bought. A source is how telemetry arrives; the tool registry (`AiToolEntry`)
+ * is the list of tools, and it is what this file builds from. Nothing here
+ * joins the two: no source carries a tool, and inferring one from a source
+ * type would put a made-up relationship on a renewal screen.
  *
  * The hard rule of this file is that a figure is either MEASURED or ABSENT. A
  * card row holds nothing until a read on this branch can fill it, and the
  * renderer draws an em dash with the name of the read that would — never a
  * plausible number. The catalog is the screen someone reads before signing a
  * renewal, so a number in the house typeface that nobody measured is the one
- * failure worth designing the type around.
+ * failure worth designing the type around. On this branch NO row of a real
+ * card is measured: every per-tool read named below is still keyed by
+ * organization or by ingestion source, so every applicable row on a real card
+ * shows its dash and its sentence.
  *
- * Sample mode is the exception, and it is a whole separate list of cards
- * (`SAMPLE_TOOL_CARDS`) rather than a flag that fills the real ones in — so no
- * invented figure can ever land on a card built from a real source.
+ * A ROW EITHER APPLIES TO A TOOL OR IT DOES NOT, which is a separate question
+ * from whether it is measured. Seats do not apply to a per-person coding
+ * assistant at all — it is paid for as a subscription — so a Seats row on that
+ * card would be a permanent dash promising a read that will never exist. The
+ * rows a tool has are {@link ToolCard.applicableRows}; a card renders only
+ * those, and the table (which has fixed columns) draws an em dash in the cells
+ * a tool has no row for, saying so on hover.
+ *
+ * Sample mode is the exception to the measurement rule, and it is a whole
+ * separate list of cards (`SAMPLE_TOOL_CARDS`) rather than a flag that fills
+ * the real ones in — so no invented figure can ever land on a card built from
+ * the real registry.
  *
  * Spec: specs/ai-governance/dashboard/inventory-catalog.feature
  */
 
-/** The rows every card carries, in the order they are read. */
+/** Every row a card can carry, in the order they are read. */
 export const TOOL_CARD_ROWS = [
   "seats",
   "licencePerMonth",
   "idlePerMonth",
+  "subscriptions",
   "eventsLast24Hours",
   "usage30Days",
   "attributed",
@@ -66,6 +84,11 @@ export const TOOL_CARD_ROW_META: Record<
     label: "Unassigned licence cost",
     filledBy:
       "Assigned seat counts and contract price required to calculate monthly unassigned licence cost.",
+  },
+  subscriptions: {
+    label: "Subscriptions",
+    filledBy:
+      "Subscription counts arrive from a source that reads the vendor's plan membership.",
   },
   eventsLast24Hours: {
     label: "Events · 24 hours",
@@ -105,26 +128,50 @@ export const TOOL_CARD_ROW_META: Record<
  * A card's badges. Independent facts rather than one label, because a tool can
  * be more than one at once and a single word would have to pick.
  */
-export type ToolCardBadge = "seatsAndLicences" | "billed" | "metered";
+export type ToolCardBadge =
+  | "seatsAndLicences"
+  | "subscription"
+  | "billed"
+  | "metered";
 
 export const TOOL_CARD_BADGE_LABEL: Record<ToolCardBadge, string> = {
   seatsAndLicences: "seats · licences",
+  subscription: "subscription",
   billed: "billed",
   metered: "metered",
 };
 
+/** The registry tile's own mark, for a card built from a registered tool. */
+export interface ToolCardTile {
+  /** `AiToolEntry.iconAsset` — "preset:<kind>" or an uploaded data URL. */
+  iconAsset: string | null;
+  type: AiToolTileType;
+}
+
 export interface ToolCard {
-  /** Stable across renders; the ingestion source id for a real card. */
+  /**
+   * Stable across renders, and the id the row actions act on: the
+   * `AiToolEntry` id for a real card, an invented one for a sample.
+   */
   id: string;
   name: string;
   /** Who makes it, as a customer says it. */
   vendor: string;
   /**
-   * The catalog entry whose vendor mark this card wears, or null for a tool
-   * with no source type of its own — the card then falls back to initials.
+   * The ingestion-source catalog entry whose vendor mark this card wears.
+   * Only the sample cards set it — a real card wears its registry tile's own
+   * icon ({@link tile}) instead, since a registered tool has no source.
    */
   sourceType: SourceType | null;
+  /** The registry tile's icon, for a card built from a real registry entry. */
+  tile?: ToolCardTile | null;
   badges: ToolCardBadge[];
+  /**
+   * The rows this tool has at all, in {@link TOOL_CARD_ROWS} order. A row
+   * outside this set is not drawn on the card, and is drawn as a
+   * not-applicable dash in the table.
+   */
+  applicableRows: readonly ToolCardRow[];
   /**
    * A row absent from this map is not measured. Never zero-filled.
    *
@@ -135,15 +182,32 @@ export interface ToolCard {
    * is a token count or a dollar figure.
    */
   values: Partial<Record<ToolCardRow, string | number>>;
+  /** Whether the tool is published to the people who use it. */
+  enabled?: boolean;
   /** True only on `SAMPLE_TOOL_CARDS`, so the renderer can badge them. */
   isSample?: boolean;
 }
 
-/** Explain a missing measurement in terms of the source actually connected. */
+/** Whether this tool has this row at all. */
+export function rowAppliesToCard(card: ToolCard, row: ToolCardRow): boolean {
+  return card.applicableRows.includes(row);
+}
+
+/**
+ * Why a cell is empty, in the reader's terms.
+ *
+ * Two different emptinesses, said differently on purpose. A row the tool does
+ * not have will never fill, and saying "arrives once a source is delivering"
+ * about it would promise a read nobody is going to build. A row the tool does
+ * have but nothing measures yet gets the sentence naming what would fill it.
+ */
 export function toolCardMissingReason(
   card: ToolCard,
   row: ToolCardRow,
 ): string {
+  if (!rowAppliesToCard(card, row)) {
+    return `${TOOL_CARD_ROW_META[row].label} does not apply to ${card.name}.`;
+  }
   if (card.sourceType === "copilot_studio_dataverse") {
     if (row === "tokens30Days") {
       return "Token reporting not connected. Copilot tokens require an additional telemetry source.";
@@ -196,112 +260,10 @@ export function exactCardCount(value: number): string {
   return GROUPED.format(value);
 }
 
-/** Two letters for a tool with no vendor mark, e.g. "Cursor" becomes "CU". */
+/** Two letters for a tool with no vendor mark, e.g. "OpenCode" becomes "OP". */
 export function toolInitials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   if (words.length === 0) return "?";
   if (words.length === 1) return (words[0] ?? "").slice(0, 2).toUpperCase();
   return `${words[0]?.[0] ?? ""}${words[1]?.[0] ?? ""}`.toUpperCase();
-}
-
-/**
- * The shape of an ingestion source this module needs — a structural subset of
- * the router's DTO, so the catalog neither imports the server module nor
- * breaks each time an unrelated field on it moves.
- */
-export interface ToolCardSource {
-  id: string;
-  name: string;
-  /**
-   * The router sends this as a plain string, and a row written before a type
-   * was retired can still hold one the catalog no longer offers. Narrowed with
-   * {@link asSourceType} rather than cast, so an unrecognised value costs the
-   * card its vendor mark instead of crashing the pane.
-   */
-  sourceType: string;
-  parserConfig?: Record<string, unknown> | null;
-}
-
-/** The catalog's own type for this string, or null when it lists no such type. */
-export function asSourceType(value: string): SourceType | null {
-  return SOURCE_TYPE_OPTIONS.some((option) => option.value === value)
-    ? (value as SourceType)
-    : null;
-}
-
-/** Per-source volume, as `activityMonitor.ingestionSourcesHealth` reports it. */
-export interface ToolCardHealth {
-  id: string;
-  eventsLast24h: number;
-}
-
-/**
- * Whether this source is configured to read the vendor's licence list.
- *
- * Read off `parserConfig` because that is the only place the answer exists on
- * the wire. Absent means the source type has no licence read at all, which is
- * a different statement from "switched off" — and is why the badge is simply
- * not shown rather than shown struck through.
- */
-export function readsSeatLicences(source: ToolCardSource): boolean {
-  return source.parserConfig?.readSeats === true;
-}
-
-/**
- * The badges a real source earns.
- *
- * A pulled or S3 source reads what the provider billed, so it is `billed`; a
- * pushed source is metered as the traffic is served. Neither claims a figure —
- * the badge says where a figure WOULD come from, which is what a reader
- * looking at an empty Usage row needs to know.
- */
-export function badgesForSource(source: ToolCardSource): ToolCardBadge[] {
-  const sourceType = asSourceType(source.sourceType);
-  const badges: ToolCardBadge[] = [];
-  if (readsSeatLicences(source)) badges.push("seatsAndLicences");
-  badges.push(
-    sourceType && modeForSourceType({ sourceType }) === "push"
-      ? "metered"
-      : "billed",
-  );
-  return badges;
-}
-
-/**
- * The real cards: one per configured ingestion source.
- *
- * A source IS how a tool enters the system today, so the source list is the
- * registered-tools list — there is no second registry to reconcile it with,
- * and adding a tool is adding a source. The only row this branch can fill is
- * the 24-hour event count; every other read is keyed by organization rather
- * than by tool, so those rows stay absent and say so.
- *
- * `health` is optional because the volume read is permissioned separately from
- * the source list: a viewer who may see the catalog but not the activity
- * monitor gets cards with one more empty row rather than no cards.
- */
-export function buildToolCards({
-  sources,
-  health,
-}: {
-  sources: readonly ToolCardSource[];
-  health?: readonly ToolCardHealth[] | null;
-}): ToolCard[] {
-  const eventsById = new Map(
-    (health ?? []).map((row) => [row.id, row.eventsLast24h]),
-  );
-  return sources.map((source) => {
-    const events = eventsById.get(source.id);
-    const sourceType = asSourceType(source.sourceType);
-    return {
-      id: source.id,
-      name: source.name,
-      vendor: sourceType ? SOURCE_TYPE_LABEL[sourceType] : source.sourceType,
-      sourceType,
-      badges: badgesForSource(source),
-      // The count goes in raw; the card formats it, so a real row and a
-      // sample row cannot end up shaped differently.
-      values: events === undefined ? {} : { eventsLast24Hours: events },
-    };
-  });
 }

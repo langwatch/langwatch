@@ -174,3 +174,97 @@ Feature: The AI Governance Agents page
     When its card renders
     Then its spend and request count read as a dash
     And the dash explains itself on hover
+
+  # ===========================================================================
+  # The fleet summary strip
+  # ===========================================================================
+  #
+  # Four small cards pinned above the tabs, answering the four questions an
+  # admin opens this page with: how many agents are there, are they working,
+  # does anyone own them, and where is the money going.
+  #
+  # WHAT MAKES THIS HONEST. The page still issues no query — see the note at
+  # the top of this file — so the strip is not a second, quieter place where
+  # invented figures could pass as measured ones. Two rules keep it that way.
+  #
+  # First, every figure is derived from the same rows the cards below are drawn
+  # from. Nothing in the strip is a separately invented number, so a reader who
+  # adds up the cards gets the strip, and when an organization-wide read lands
+  # and fills `GovernanceAgentRow` the strip lights up from the same code path
+  # with no second set of figures to go and change.
+  #
+  # Second, the strip renders only when there are rows to summarize. It is
+  # gated on having rows, not on sample mode, which is the same gate the filter
+  # chips use. With nothing to summarize it is absent rather than showing four
+  # em dashes: zero agents responding and no agents at all are different facts,
+  # the pane below already says which one this is in a full sentence, and four
+  # empty boxes above that sentence would say it again without saying it.
+  #
+  # The shape is the section's shared one (~/components/governance/summary),
+  # built once for the pages that all needed a resume in the same round.
+
+  @integration
+  Scenario: The fleet summary strip sits above the tabs and above the filter chips
+    Given the sample agent cards are on screen
+    When a governance viewer opens the Agents page
+    Then a strip of four cards is above the tab bar
+    And the cards are headed Fleet, Health, Ownership and Top spenders
+    And the strip sits below the banner that says nothing on the page is real
+    And no filter chip is above it
+
+  @integration
+  Scenario: With nothing to summarize the strip is absent rather than showing zeroes
+    Given no organization-wide agent read exists
+    And the reader has turned sample data off
+    When a governance viewer opens the Agents page
+    Then no summary strip is on screen
+    And the pane says instead that no agents are registered yet
+
+  @unit
+  Scenario: The fleet card counts the agents and captions the last thirty days
+    Given the sample agent rows
+    When the fleet summary is derived from them
+    Then the fleet count is the number of rows, with the unit spelled out
+    And the caption names how many registered in the last thirty days
+    And the caption says the line beneath it is registrations over time
+
+  @unit
+  Scenario: The registration line rises to the size of the fleet
+    Given the sample agent rows, each carrying how long ago it registered
+    When the fleet summary is derived from them
+    Then the line has one point per month of the last year
+    And each point is the number of agents registered by that month
+    And the line never falls, because an agent that registered stays registered
+    And a row whose registration date was never measured is left off the line
+
+  @unit
+  Scenario: The health card lists responding, idle and erroring separately
+    Given sample agents in different health states
+    When the fleet summary is derived from them
+    Then the health card carries one row for each of responding, idle and erroring
+    And each row carries its own count and its own status dot
+    And erroring is not inferred from how long ago an agent last ran
+
+  @unit
+  Scenario: An agent that has never run is counted in the fleet but in no health state
+    Given a sample agent that has registered and never run
+    When the fleet summary is derived from them
+    Then it is included in the fleet count
+    And it is counted in none of responding, idle or erroring
+    And the three health counts therefore do not have to add up to the fleet
+
+  @unit
+  Scenario: The ownership card names the sources the unclaimed agents came from
+    Given some sample agents carry an owner and some do not
+    When the fleet summary is derived from them
+    Then the ownership card carries an owned count and an unclaimed count
+    And the unclaimed row names the sources those agents came from, in full words
+    And with nothing unclaimed the row names no sources at all
+
+  @unit
+  Scenario: Top spenders rank by share of the spend we actually measured
+    Given sample agents whose spend was measured and one whose spend was not
+    When the fleet summary is derived from them
+    Then the three highest spenders are listed, biggest share first
+    And each share is a whole percentage of the spend the platform measured
+    And an agent whose spend was never measured is neither ranked nor counted in the total

@@ -39,37 +39,68 @@ describe("given an admin on the Inventory page", () => {
     });
 
     /** @scenario "A registered tool is a card carrying its name and its vendor" */
-    it("shows a card per connected tool with its name and vendor", () => {
+    it("shows a card per registered tool with its name and vendor", () => {
       renderScreen();
-      const card = screen.getByTestId("tool-card-src-genie");
-      expect(within(card).getByText("Warehouse questions")).toBeInTheDocument();
+      const card = screen.getByTestId("tool-card-tool-claude-code");
+      expect(within(card).getByText("Claude Code")).toBeInTheDocument();
+      expect(within(card).getByText("Anthropic")).toBeInTheDocument();
+    });
+
+    /** @scenario "The catalog lists registered tools and not ingestion sources" */
+    it("lists the registry and never a connected source", () => {
+      renderScreen();
+      // The fixture's sources are a Genie connector and a Copilot Studio one,
+      // and neither is a registered tool. A card for either would be the
+      // source-as-tool linkage that was removed.
+      expect(screen.queryByTestId("tool-card-src-genie")).toBeNull();
+      expect(screen.queryByText("Warehouse questions")).toBeNull();
       expect(
-        within(card).getByText(/Databricks AI\/BI Genie/),
+        screen.getByTestId("tool-card-tool-support-desk"),
       ).toBeInTheDocument();
     });
 
-    /** @scenario "The one row this branch measures carries its real figure" */
-    it("shows the measured event count under the window it was counted over", () => {
+    /** @scenario "A tool registered but not published is still in the catalog" */
+    it("keeps an unpublished tool in the inventory and says it is unpublished", () => {
       renderScreen();
-      const card = screen.getByTestId("tool-card-src-genie");
-      expect(within(card).getByText("Events · 24 hours")).toBeInTheDocument();
-      expect(within(card).getByText("1,234")).toBeInTheDocument();
+      const card = screen.getByTestId("tool-card-tool-support-desk");
+      expect(within(card).getByText("not published")).toBeInTheDocument();
     });
 
     /** @scenario "A row nothing measures shows a dash naming what would fill it" */
-    it("draws a dash naming the missing read for every unmeasured row", () => {
+    it("draws a dash naming the missing read for every row on a real card", () => {
       renderScreen();
-      const card = screen.getByTestId("tool-card-src-genie");
+      const card = screen.getByTestId("tool-card-tool-claude-code");
       const dashes = within(card).getAllByLabelText(/not measured\./);
-      // Nine of the ten rows have no read keyed by tool on this branch. The
-      // count is asserted rather than "more than none" so a card that quietly
-      // stopped drawing dashes at all cannot pass this.
-      expect(dashes).toHaveLength(9);
+      // Every read behind these rows is keyed by organization or by ingestion
+      // source, so nothing on a real card is measured yet. The count is
+      // asserted rather than "more than none" so a card that quietly stopped
+      // drawing dashes at all cannot pass this.
+      expect(dashes).toHaveLength(5);
       for (const dash of dashes) {
         expect(dash.getAttribute("aria-label")).toMatch(/not measured\. .+\.$/);
       }
       // A row we cannot read is never drawn as a zero.
       expect(within(card).queryByText("0")).toBeNull();
+    });
+
+    /** @scenario "A row that does not apply to a tool is left off its card" */
+    it("leaves seats and licence cost off a per-person subscription tool", () => {
+      renderScreen();
+      const card = screen.getByTestId("tool-card-tool-claude-code");
+      expect(within(card).getByText("Subscriptions")).toBeInTheDocument();
+      expect(within(card).queryByText("Seats")).toBeNull();
+      expect(within(card).queryByText("Licence per month")).toBeNull();
+      expect(within(card).queryByText("Tokens · 30 days")).toBeNull();
+      expect(within(card).queryByText("Conversations · 30 days")).toBeNull();
+    });
+
+    /** @scenario "A row that does not apply to a tool is left off its card" */
+    it("gives a consumption-billed provider tokens and no subscription row", () => {
+      renderScreen();
+      const card = screen.getByTestId("tool-card-tool-openai");
+      expect(within(card).getByText("Tokens · 30 days")).toBeInTheDocument();
+      expect(within(card).queryByText("Subscriptions")).toBeNull();
+      expect(within(card).queryByText("Seats")).toBeNull();
     });
 
     /** @scenario "An environment a source points at is listed without being created" */
@@ -135,13 +166,14 @@ describe("given an admin on the Inventory page", () => {
       expect(screen.getByTestId("source-row-src-genie")).toBeInTheDocument();
     });
 
-    /** @scenario "The catalog is offered as a grid or as a list" */
-    it("switches the cards between a grid and a single column", async () => {
+    /** @scenario "The catalog is offered as a grid or as a table" */
+    it("switches the catalog between a grid of cards and a table", async () => {
       renderScreen();
       expect(screen.getByTestId("tool-catalog-cards")).toHaveAttribute(
         "data-layout",
         "grid",
       );
+      expect(screen.queryByRole("table")).toBeNull();
       await userEvent.click(screen.getByRole("radio", { name: /List/ }));
       await waitFor(() =>
         expect(screen.getByTestId("tool-catalog-cards")).toHaveAttribute(
@@ -149,10 +181,55 @@ describe("given an admin on the Inventory page", () => {
           "list",
         ),
       );
+      // A real table with a row per tool, not the same tall card stacked.
+      const table = screen.getByRole("table");
+      expect(
+        within(table).getByRole("columnheader", { name: "Tool" }),
+      ).toBeInTheDocument();
+      expect(
+        within(table).getByTestId("tool-card-tool-claude-code"),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "Table headers are spelled out rather than abbreviated" */
+    it("spells out every column header", async () => {
+      renderScreen();
+      await userEvent.click(screen.getByRole("radio", { name: /List/ }));
+      const table = await screen.findByRole("table");
+      for (const header of [
+        "Seats",
+        "Licence per month",
+        "Unassigned licence cost",
+        "Subscriptions",
+        "Usage · 30 days",
+        "Agents",
+        "Top department",
+      ]) {
+        expect(
+          within(table).getByRole("columnheader", { name: header }),
+        ).toBeInTheDocument();
+      }
+      // The design mock abbreviated these three. The section's copy rule does
+      // not allow it, and a header is exactly where a guess costs the most.
+      const headers = within(table).getAllByRole("columnheader");
+      const text = headers.map((header) => header.textContent).join(" ");
+      expect(text).not.toMatch(/\/\s*mo\b/i);
+      expect(text).not.toMatch(/\b30d\b/i);
+      expect(text).not.toMatch(/\bidle\b/i);
+    });
+
+    /** @scenario "A column a tool has no row for shows a dash saying so" */
+    it("dashes a column the tool does not have and says it does not apply", async () => {
+      renderScreen();
+      await userEvent.click(screen.getByRole("radio", { name: /List/ }));
+      const row = await screen.findByTestId("tool-card-tool-claude-code");
+      expect(
+        within(row).getByLabelText(/Seats not measured\..*does not apply/),
+      ).toBeInTheDocument();
     });
 
     /** @scenario "Sample mode replaces the cards rather than filling them in" */
-    it("shows the sample tools and no card built from a real source", async () => {
+    it("shows the sample tools and no card built from the real registry", async () => {
       renderScreen();
       await userEvent.click(
         screen.getByRole("button", { name: "See sample data" }),
@@ -160,33 +237,62 @@ describe("given an admin on the Inventory page", () => {
       expect(
         await screen.findByTestId("tool-card-sample-claude-code"),
       ).toBeInTheDocument();
-      expect(screen.queryByTestId("tool-card-src-genie")).toBeNull();
+      expect(screen.queryByTestId("tool-card-tool-openai")).toBeNull();
+    });
+
+    /** @scenario "A sample card offers no action that would act on a real tool" */
+    it("offers no row actions while sample mode is on", async () => {
+      renderScreen();
+      await userEvent.click(
+        screen.getByRole("button", { name: "See sample data" }),
+      );
+      const card = await screen.findByTestId("tool-card-sample-claude-code");
+      expect(within(card).queryByRole("button")).toBeNull();
     });
   });
 
   describe("when the catalog is in view", () => {
-    /** @scenario "Adding a tool opens the same menu that adds a source" */
-    it("offers the Add source menu's own tools behind Add tool", async () => {
+    beforeEach(connectTools);
+
+    /** @scenario "Registering a tool opens the registration drawer" */
+    it("opens the tool registration drawer from Add tool", async () => {
       renderScreen();
       await userEvent.click(
         screen.getAllByRole("button", { name: /Add tool/ })[0]!,
       );
       expect(
-        await screen.findByRole("menuitem", {
-          name: /Databricks AI\/BI Genie/,
-        }),
+        await screen.findByRole("heading", { name: /Add tool/ }),
       ).toBeInTheDocument();
     });
 
-    /** @scenario "The tool tiles and the starter pack are gone from this page" */
-    it("renders no tile editor, tile section or starter pack", () => {
+    /** @scenario "The add deep link opens the registration drawer" */
+    it("opens the registration drawer from the add deep link", async () => {
+      renderScreen({ at: "/governance/inventory?tab=catalog&add=1" });
+      expect(
+        await screen.findByRole("heading", { name: /Add tool/ }),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario "A tool row offers edit, publish and remove in one menu" */
+    it("puts every per-tool action in one overflow menu", async () => {
+      renderScreen();
+      await userEvent.click(
+        screen.getByRole("button", { name: "Actions for Claude Code" }),
+      );
+      for (const action of ["Edit", "Unpublish", "Remove"]) {
+        expect(
+          await screen.findByRole("menuitem", { name: action }),
+        ).toBeInTheDocument();
+      }
+    });
+
+    /** @scenario "The tile editor and the starter pack stay off this page" */
+    it("renders no drag-to-reorder editor or starter-pack import", () => {
       renderScreen();
       const page = document.body.textContent ?? "";
       expect(page).not.toMatch(/starter pack/i);
       expect(page).not.toMatch(/tool tiles/i);
       expect(page).not.toMatch(/ingestion templates/i);
-      expect(page).not.toMatch(/add tile/i);
-      expect(page).not.toMatch(/coding assistants/i);
     });
   });
 });

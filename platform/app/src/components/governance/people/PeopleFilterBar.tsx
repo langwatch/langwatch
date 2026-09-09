@@ -1,40 +1,39 @@
 import { Box } from "@chakra-ui/react";
-import { Building2, CalendarDays } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 import {
   FilterChip,
   FilterChipRow,
   SortChip,
-  TIME_FRAMES,
-  type TimeFrame,
-  timeFrameLabel,
 } from "~/components/governance/filters";
 import { MenuItem } from "~/components/ui/menu";
 import type { SpendSortField } from "~/hooks/useSpendSortParam";
 
 /**
- * Every choice the People table offers, in one row under the page header: how
- * far back it looks, which department it shows, and what it ranks by.
+ * Both choices the People table offers, in one row under the page header: which
+ * department it shows, and what it ranks by.
  *
- * One row rather than three places, because all three change the same table and
+ * One row rather than two places, because both change the same table and
  * splitting them puts controls that do the same job on opposite sides of the
  * screen. The pills are the section's own `FilterChip`, so a reader who learned
  * the control on Costs has already learned this one.
+ *
+ * There is no time-frame chip. It used to sit first here, and it did not
+ * correlate to the table: the people the connected providers named carry no
+ * window at all, so narrowing the frame moved the metered rows and left the
+ * rest untouched. The spend read still has a window, fixed at a year
+ * (`SPEND_WINDOW_DAYS`), and the page says so under the table.
  *
  * Spec: specs/ai-governance/dashboard/people-tabs.feature
  * Spec: specs/ai-governance/dashboard/governance-ui-controls.feature
  */
 export function PeopleFilterBar({
-  frame,
-  onFrameChange,
   department,
   departments,
   onDepartmentChange,
   sortBy,
   onSortChange,
 }: {
-  frame: TimeFrame;
-  onFrameChange: (next: TimeFrame) => void;
   /** `null` is every department. */
   department: string | null;
   /** The departments any row on the table actually shows. */
@@ -54,22 +53,6 @@ export function PeopleFilterBar({
   return (
     <Box data-testid="people-filter-row">
       <FilterChipRow>
-        <FilterChip
-          icon={<CalendarDays size={12} />}
-          label="Time frame"
-          value={timeFrameLabel(frame)}
-        >
-          {TIME_FRAMES.map((option) => (
-            <MenuItem
-              key={option.value}
-              value={option.value}
-              onClick={() => onFrameChange(option.value)}
-            >
-              {option.label}
-            </MenuItem>
-          ))}
-        </FilterChip>
-
         <FilterChip
           icon={<Building2 size={12} />}
           label="Department"

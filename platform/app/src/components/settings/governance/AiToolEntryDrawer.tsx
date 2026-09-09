@@ -420,7 +420,11 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Heading size="md">{isEdit ? "Edit tile" : "Add tile"}</Heading>
+          {/* "Tool", not "tile". A tile is how this row is drawn on the
+              personal portal; what the reader is adding is a tool the
+              organization runs, and the Inventory catalog that now opens this
+              same drawer calls it that. */}
+          <Heading size="md">{isEdit ? "Edit tool" : "Add tool"}</Heading>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>

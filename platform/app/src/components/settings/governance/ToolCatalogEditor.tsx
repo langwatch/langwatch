@@ -43,6 +43,7 @@ import type {
   CodingAssistantConfig,
   ExternalToolConfig,
 } from "~/components/me/tiles/types";
+import { useAiToolCatalog } from "~/components/settings/governance/useAiToolCatalog";
 import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Dialog } from "~/components/ui/dialog";
@@ -83,15 +84,14 @@ export function ToolCatalogEditor({
 }: Props) {
   const utils = api.useUtils();
 
-  // Delete is permanent, so it routes through a confirm dialog. `null`
-  // means no pending deletion; a non-null entry is the tile awaiting
-  // confirmation.
-  const [pendingDelete, setPendingDelete] = useState<AiToolEntry | null>(null);
-
-  const adminListQuery = api.aiTools.adminList.useQuery(
-    { organizationId },
-    { enabled: !!organizationId, refetchOnWindowFocus: false },
-  );
+  /**
+   * The registry read, the publish toggle and the permanent delete, shared
+   * with the Inventory page's Catalog pane. Reordering and the starter-pack
+   * import stay here: this is the only screen that has either.
+   */
+  const catalog = useAiToolCatalog({ organizationId });
+  const { pendingDelete, setPendingDelete } = catalog;
+  const adminListQuery = catalog.query;
 
   const departmentsQuery = api.departments.list.useQuery(
     { organizationId },
@@ -101,26 +101,6 @@ export function ToolCatalogEditor({
     () => new Map((departmentsQuery.data ?? []).map((d) => [d.id, d.name])),
     [departmentsQuery.data],
   );
-
-  const setEnabledMutation = api.aiTools.setEnabled.useMutation({
-    onSuccess: () => {
-      void utils.aiTools.adminList.invalidate({ organizationId });
-      void utils.aiTools.list.invalidate({ organizationId });
-    },
-    onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't update tile" }),
-  });
-
-  const removeMutation = api.aiTools.remove.useMutation({
-    onSuccess: () => {
-      void utils.aiTools.adminList.invalidate({ organizationId });
-      void utils.aiTools.list.invalidate({ organizationId });
-      toaster.create({ title: "Tile deleted", type: "success" });
-      setPendingDelete(null);
-    },
-    onError: (err) =>
-      showErrorToast({ error: err, fallbackTitle: "Couldn't delete tile" }),
-  });
 
   const reorderMutation = api.aiTools.reorder.useMutation({
     onSuccess: () => {
@@ -353,7 +333,7 @@ export function ToolCatalogEditor({
                 marginLeft="auto"
                 onClick={() => onAddTile(type)}
               >
-                <Plus size={14} /> Add tile
+                <Plus size={14} /> Add tool
               </Button>
             </HStack>
 
@@ -367,7 +347,7 @@ export function ToolCatalogEditor({
               >
                 <Text fontSize="xs" color="fg.muted">
                   No {SECTION_LABELS[type].toLowerCase()} configured. Click{" "}
-                  <strong>Add tile</strong> to publish one.
+                  <strong>Add tool</strong> to publish one.
                 </Text>
               </Box>
             ) : (
@@ -377,18 +357,13 @@ export function ToolCatalogEditor({
                 onDragEnd={handleSectionDragEnd(type)}
                 onEdit={onEditTile}
                 onToggleEnabled={(entry) =>
-                  setEnabledMutation.mutate({
-                    organizationId,
+                  catalog.setEnabled({
                     id: entry.id,
                     enabled: !entry.enabled,
                   })
                 }
                 onDelete={(entry) => setPendingDelete(entry)}
-                togglePendingId={
-                  setEnabledMutation.isPending
-                    ? setEnabledMutation.variables?.id
-                    : undefined
-                }
+                togglePendingId={catalog.togglePendingId}
               />
             )}
           </VStack>
@@ -410,7 +385,7 @@ export function ToolCatalogEditor({
             </Dialog.Header>
             <Dialog.Body>
               <Text fontSize="sm" color="fg.muted">
-                This permanently removes the tile from the catalog and from
+                This permanently removes the tool from the catalog and from
                 every member&apos;s /me portal. It cannot be undone. To hide it
                 without losing its configuration, use Disable instead.
               </Text>
@@ -421,15 +396,10 @@ export function ToolCatalogEditor({
               </Button>
               <Button
                 colorPalette="red"
-                loading={removeMutation.isPending}
-                onClick={() =>
-                  removeMutation.mutate({
-                    organizationId,
-                    id: pendingDelete.id,
-                  })
-                }
+                loading={catalog.isRemoving}
+                onClick={catalog.confirmDelete}
               >
-                Delete tile
+                Delete tool
               </Button>
             </Dialog.Footer>
           </Dialog.Content>

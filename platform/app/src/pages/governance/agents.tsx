@@ -1,6 +1,5 @@
 import {
   Box,
-  Button,
   Heading,
   HStack,
   SimpleGrid,
@@ -15,6 +14,7 @@ import {
   AgentCard,
   AgentFilterBar,
   type AgentFilters,
+  AgentFleetSummaryStrip,
   APPLICATIONS_EMPTY_COPY,
   applyAgentFilters,
   type GovernanceAgentRow,
@@ -23,6 +23,7 @@ import {
   RegisterAgentDialog,
   SAMPLE_AGENT_ROWS,
   sourcesPresentIn,
+  summarizeAgentFleet,
   useAgentFilters,
 } from "~/components/governance/agents";
 import {
@@ -35,6 +36,7 @@ import {
   SampleDataToggle,
   useSampleMode,
 } from "~/components/governance/sample";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 
@@ -56,6 +58,18 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
  * from the process that runs it, and the platform refuses to create one any
  * other way (`agent_register_only`), so the action opens the snippet that
  * actually works rather than fields nothing could persist.
+ *
+ * The summary strip above the tabs obeys the same constraint as everything
+ * else here. It measures nothing of its own: every figure on it is a fold over
+ * the rows the cards below are drawn from (`summarizeAgentFleet`), so it
+ * cannot become a second, quieter place where invented numbers pass as
+ * measured ones, and it cannot drift from the cards it summarizes. It is gated
+ * on having rows rather than on sample mode — the same gate the filter chips
+ * use — so with nothing to summarize it is absent rather than showing four em
+ * dashes, and when an organization-wide read lands it lights up unchanged.
+ * Absent rather than dashed because the pane below already says in a full
+ * sentence that no agent has registered; four empty boxes above that sentence
+ * would repeat it without adding to it.
  *
  * Specs: specs/ai-governance/dashboard/agents-page.feature,
  * specs/ai-gateway/governance/governance-home-routing.feature (the tab shell),
@@ -214,6 +228,12 @@ function AgentsPage() {
   // down to nothing must still have the chip that gets them back. The
   // Applications tab has nothing to filter, so the row is the Agents tab's.
   const showFilters = agentsTab === "agents" && rows.length > 0;
+  // The same gate, and deliberately not narrowed to the Agents tab. The strip
+  // sits above the tab bar, so it is a resume of the page rather than of one
+  // pane, and a summary that vanished when the reader looked at Applications
+  // would read as a component that failed rather than as a deliberate scope.
+  // Over the whole fleet, not the filtered view — see `summarizeAgentFleet`.
+  const summary = rows.length > 0 ? summarizeAgentFleet({ rows }) : null;
 
   return (
     <GovernanceLayout pageTitle="Agents · AI Governance · LangWatch">
@@ -226,21 +246,18 @@ function AgentsPage() {
               onToggle={sample.toggle}
               size="sm"
             />
-            {/* The action that creates this page's own thing, so it is the
-                solid one, in the brand palette — the same treatment the
-                inventory gives "Add tool". Solid is stated rather than left
-                to the default so the rule is legible here, not only in the
-                test that pins it.
+            {/* The action that creates this page's own thing, drawn as the
+                house header button — outline, small, leading plus glyph, the
+                same control /settings/model-providers uses for "Add Model
+                Provider". It was a solid orange button until the section-wide
+                pass that took solid orange off these pages; the brand accent
+                now marks only the sample affordances, which is the one thing
+                on the screen it needs to distinguish.
                 Rule: specs/ai-governance/dashboard/governance-ui-controls.feature */}
-            <Button
-              size="sm"
-              variant="solid"
-              colorPalette="orange"
-              onClick={() => setRegisterOpen(true)}
-            >
+            <PageLayout.HeaderButton onClick={() => setRegisterOpen(true)}>
               <Plus size={14} />
               Register agent
-            </Button>
+            </PageLayout.HeaderButton>
           </HStack>
         </HStack>
         {sample.active && (
@@ -249,6 +266,12 @@ function AgentsPage() {
             nothing here is real.
           </SampleDataBanner>
         )}
+        {/* Under the banner, above the tabs and above the chips. Under the
+            banner because every figure on it is invented while sample mode is
+            on, and the banner is the page's one claim about the whole screen;
+            above the chips because the strip summarizes the fleet rather than
+            whatever the chips have left of it. */}
+        {summary && <AgentFleetSummaryStrip summary={summary} />}
         <Tabs.Root
           value={agentsTab}
           onValueChange={({ value }) => selectAgentsTab(value)}

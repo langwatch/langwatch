@@ -62,8 +62,12 @@ const hoistedHarness = vi.hoisted(() => ({
     isLoading: false,
     error: null as unknown,
   },
-  /** What `activityMonitor.ingestionSourcesHealth` answers. */
-  health: { data: undefined as unknown },
+  /** What `aiTools.adminList` answers — the organization's tool registry. */
+  tools: {
+    data: undefined as unknown,
+    isLoading: false,
+    error: null as unknown,
+  },
 }));
 
 /**
@@ -132,6 +136,10 @@ vi.mock("~/utils/api", () => {
     api: {
       useUtils: () => ({
         ingestionSources: { list: { invalidate: vi.fn() } },
+        aiTools: {
+          adminList: { invalidate: vi.fn(), setData: vi.fn() },
+          list: { invalidate: vi.fn() },
+        },
       }),
       ingestionSources: {
         list: { useQuery: () => hoistedHarness.sources },
@@ -144,8 +152,21 @@ vi.mock("~/utils/api", () => {
         },
         validateOttl: mutation(),
       },
-      activityMonitor: {
-        ingestionSourcesHealth: { useQuery: () => hoistedHarness.health },
+      aiTools: {
+        adminList: { useQuery: () => hoistedHarness.tools },
+        setEnabled: mutation(),
+        remove: mutation(),
+        create: mutation(),
+        update: mutation(),
+        providerOptions: {
+          useQuery: () => ({ data: undefined, isLoading: false, error: null }),
+        },
+        routingPolicyOptions: {
+          useQuery: () => ({ data: undefined, isLoading: false, error: null }),
+        },
+      },
+      departments: {
+        list: { useQuery: () => ({ data: [], isLoading: false, error: null }) },
       },
     },
   };
@@ -153,16 +174,21 @@ vi.mock("~/utils/api", () => {
 
 import { AddIngestionSourceMenu } from "../../components/AddIngestionSourceMenu";
 import InventoryPage from "../inventory";
-import { CONNECTED_SOURCES } from "./inventoryFixtures";
+import { CONNECTED_SOURCES, REGISTERED_TOOLS } from "./inventoryFixtures";
 
 /** The real org-admin bag, not a hand-written list that could drift from it. */
 export const ORG_ADMIN_PERMISSIONS =
   getOrganizationRolePermissions("ADMIN").slice();
 
-export function renderScreen() {
+export function renderScreen({
+  at = "/governance/inventory",
+}: {
+  /** The address to land on, for the suites that assert a deep link. */
+  at?: string;
+} = {}) {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <MemoryRouter initialEntries={["/governance/inventory"]}>
+      <MemoryRouter initialEntries={[at]}>
         <InventoryPage />
       </MemoryRouter>
     </ChakraProvider>,
@@ -245,7 +271,7 @@ export async function openTab(name: RegExp) {
 beforeEach(() => {
   hoistedHarness.permissions = ORG_ADMIN_PERMISSIONS;
   hoistedHarness.sources = { data: [], isLoading: false, error: null };
-  hoistedHarness.health = { data: undefined };
+  hoistedHarness.tools = { data: [], isLoading: false, error: null };
   window.sessionStorage.clear();
 });
 
@@ -270,14 +296,25 @@ export function emptyWithSamplesOff() {
   window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
 }
 
-/** The screen with two tools connected, so sample mode stays off by itself. */
+/**
+ * The screen with two sources connected and three tools registered, so sample
+ * mode stays off by itself.
+ *
+ * The two lists are deliberately unrelated. A source is not a tool, no card is
+ * derived from one, and a fixture where the two lined up would let a test pass
+ * against the exact confusion the catalog was rebuilt to remove.
+ */
 export function connectTools() {
   hoistedHarness.sources = {
     data: CONNECTED_SOURCES,
     isLoading: false,
     error: null,
   };
-  hoistedHarness.health = { data: [{ id: "src-genie", eventsLast24h: 1234 }] };
+  hoistedHarness.tools = {
+    data: REGISTERED_TOOLS,
+    isLoading: false,
+    error: null,
+  };
 }
 
 /*
@@ -288,4 +325,4 @@ export function connectTools() {
  */
 export { findNativeSelects } from "~/components/governance/filters";
 export { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
-export { CONNECTED_SOURCES } from "./inventoryFixtures";
+export { CONNECTED_SOURCES, REGISTERED_TOOLS } from "./inventoryFixtures";

@@ -13,7 +13,7 @@
  *
  * Spec: specs/ai-governance/dashboard/agents-page.feature
  */
-import { Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Badge, Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   cleanup,
   render,
@@ -148,15 +148,38 @@ function renderAgentsWithReferences(entry = "/governance/agents") {
   );
 }
 
-/** Opens a filter chip by its label and picks one of its options. */
+/**
+ * Opens a filter chip by its label and picks one of its options.
+ *
+ * The chip is found among the page's buttons rather than by its text alone.
+ * "Ownership" now names two things on this page — the chip that narrows the
+ * cards, and the summary card above the tabs that counts owned against
+ * unclaimed — and a bare text query cannot tell a control from a heading. Only
+ * one of the two is pressable, which is the distinction the reader makes too.
+ */
 async function pickFilter(chipLabel: string, option: string) {
   const user = userEvent.setup();
   const chip = screen
-    .getByText(chipLabel)
-    .closest("button") as HTMLButtonElement;
+    .getAllByRole("button")
+    .find((button) => button.textContent?.startsWith(chipLabel));
+  if (!chip) throw new Error(`No filter chip labelled ${chipLabel}`);
   await user.click(chip);
   const item = await screen.findByRole("menuitem", { name: option });
   await user.click(item);
+}
+
+/**
+ * One agent card, by the name printed on it.
+ *
+ * Scoped to the cards, because the summary strip above them names the biggest
+ * spenders too and a page-wide text query would find whichever came first.
+ */
+function cardNamed(name: string): HTMLElement {
+  const card = screen
+    .getAllByTestId("governance-agent-card")
+    .find((candidate) => candidate.textContent?.includes(name));
+  if (!card) throw new Error(`No agent card named ${name}`);
+  return card;
 }
 
 const cardNames = () =>
@@ -227,7 +250,7 @@ describe("the agents page sample cards", () => {
      * binds nothing and reports nothing.
      */
     /** @scenario "Primary page actions sit top-right in the page header" */
-    it("renders Register agent solid small and the sample toggle ghost small", () => {
+    it("renders Register agent as the outline house button and the toggle ghost", () => {
       // Sample off, so the toggle is in its resting state.
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
       renderAgentsWithReferences();
@@ -236,20 +259,29 @@ describe("the agents page sample cards", () => {
         .parentElement as HTMLElement;
       const solidSmall = screen.getByText("reference solid small").className;
       const ghostSmall = screen.getByText("reference ghost small").className;
+      const outlineSmall = screen.getByText(
+        "reference outline small",
+      ).className;
 
       const actions = within(headerRow).getAllByRole("button");
       expect(actions).toHaveLength(2);
       expect(
         within(headerRow).getByRole("button", { name: /Register agent/ })
           .className,
-      ).toBe(solidSmall);
+      ).toBe(outlineSmall);
       expect(
         within(headerRow).getByRole("button", { name: "See sample data" })
           .className,
       ).toBe(ghostSmall);
+      // Being outlined is what marks the create action out now that nothing in
+      // the row is filled, so "only one" moved from solid to outline with it.
+      expect(
+        actions.filter((action) => action.className === outlineSmall),
+      ).toHaveLength(1);
+      // And nothing in the row is solid, in the brand orange or otherwise.
       expect(
         actions.filter((action) => action.className === solidSmall),
-      ).toHaveLength(1);
+      ).toHaveLength(0);
     });
 
     /**
@@ -266,16 +298,23 @@ describe("the agents page sample cards", () => {
         .parentElement as HTMLElement;
       const solidSmall = screen.getByText("reference solid small").className;
       const subtleSmall = screen.getByText("reference subtle small").className;
+      const outlineSmall = screen.getByText(
+        "reference outline small",
+      ).className;
 
       const toggle = within(headerRow).getByRole("button", {
         name: "Hide sample data",
       });
       expect(toggle.className).toBe(subtleSmall);
       expect(toggle.className).not.toBe(solidSmall);
+      // Still distinguishable from the create action, which is the clause the
+      // pressed state exists to protect: subtle and outline are not the same
+      // treatment, so a reader can still tell which one creates something.
+      expect(toggle.className).not.toBe(outlineSmall);
       expect(
         within(headerRow).getByRole("button", { name: /Register agent/ })
           .className,
-      ).toBe(solidSmall);
+      ).toBe(outlineSmall);
     });
   });
 
@@ -434,9 +473,16 @@ describe("the agents filter chips", () => {
     it("offers Source, Ownership and Sort as chips and no native select", () => {
       const { container } = renderAgentsAt();
 
-      expect(screen.getByText("Source")).toBeVisible();
-      expect(screen.getByText("Ownership")).toBeVisible();
-      expect(screen.getByText("Sort")).toBeVisible();
+      // Each label on a pressable chip, not merely somewhere on the page:
+      // "Ownership" also names a summary card above the tabs, and a page-wide
+      // text query would pass on the heading while the chip was missing.
+      for (const label of ["Source", "Ownership", "Sort"]) {
+        expect(
+          screen
+            .getAllByRole("button")
+            .filter((button) => button.textContent?.startsWith(label)),
+        ).toHaveLength(1);
+      }
       expect(findNativeSelects(container)).toHaveLength(0);
     });
 
@@ -500,9 +546,7 @@ describe("the agents filter chips", () => {
     it("names the agent, its environment, its owner, its models and its figures", () => {
       renderAgentsAt();
 
-      const card = screen
-        .getByText("support-copilot")
-        .closest('[data-testid="governance-agent-card"]') as HTMLElement;
+      const card = cardNamed("support-copilot");
 
       expect(card.textContent).toContain("production");
       expect(card.textContent).toContain("Customer Support");
@@ -517,9 +561,7 @@ describe("the agents filter chips", () => {
     it("renders a dash with its reason for an agent that has never run", () => {
       renderAgentsAt();
 
-      const card = screen
-        .getByText("contract-review")
-        .closest('[data-testid="governance-agent-card"]') as HTMLElement;
+      const card = cardNamed("contract-review");
 
       expect(card.textContent).toContain("—");
       expect(card.textContent).not.toContain("$0.00");
@@ -567,6 +609,37 @@ describe("the agents filter chips", () => {
         ]),
       );
       expect(screen.getAllByText("Unclaimed")).toHaveLength(3);
+    });
+
+    /**
+     * The exception the button rule carves out, bound where the thing it names
+     * actually lives. When solid orange left the section's controls, the next
+     * reader finishing that job would reasonably have stripped orange from
+     * this badge too — it is the same colour and the same word in the grep.
+     * It is not the same kind of object: a badge states a fact about an agent
+     * and offers nothing to press.
+     *
+     * Asserted against a badge of known palette rendered beside the page, for
+     * the same reason the header actions are: a badge that merely differs from
+     * something could be any colour at all.
+     */
+    /** @scenario "Primary page actions sit top-right in the page header" */
+    it("keeps the orange Unclaimed badge, which states a fact rather than offering a press", async () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <Badge size="xs" variant="subtle" colorPalette="orange">
+            reference orange badge
+          </Badge>
+        </ChakraProvider>,
+      );
+      const orangeBadge = screen.getByText("reference orange badge").className;
+
+      renderAgentsAt();
+      await pickFilter("Ownership", "Unclaimed only");
+
+      const badges = await screen.findAllByText("Unclaimed");
+      expect(badges).toHaveLength(3);
+      for (const badge of badges) expect(badge.className).toBe(orangeBadge);
     });
   });
 
@@ -619,34 +692,46 @@ describe("the agents filter chips", () => {
      * that. Quieter is a specific treatment, so it is compared against one.
      */
     /** @scenario "An empty pane's action is weighted by what it does" */
-    it("draws Clear filters outline and the create actions solid", async () => {
+    it("draws Clear filters ghost and the create actions as the house button", async () => {
       renderAgentsWithReferences(
         "/governance/agents?source=copilot_studio&ownership=unclaimed",
       );
 
+      const ghostSmall = screen.getByText("reference ghost small").className;
       const outlineSmall = screen.getByText(
         "reference outline small",
       ).className;
       const solidSmall = screen.getByText("reference solid small").className;
 
       const empty = await screen.findByTestId("agents-no-match");
-      expect(
-        within(empty).getByRole("button", {
-          name: NO_MATCHING_AGENTS_COPY.actionLabel,
-        }).className,
-      ).toBe(outlineSmall);
+      const clearFilters = within(empty).getByRole("button", {
+        name: NO_MATCHING_AGENTS_COPY.actionLabel,
+      });
+      expect(clearFilters.className).toBe(ghostSmall);
+      expect(clearFilters.className).not.toBe(solidSmall);
 
       // And the create-flow states go the other way, so this is a distinction
-      // rather than a blanket demotion of everything in an empty pane.
+      // rather than a blanket demotion of everything in an empty pane. Both
+      // halves moved when solid orange left the section — the create action to
+      // the house header button and the way out to ghost — and the pair is
+      // still two treatments apart, which is the only thing this rule wanted.
       cleanup();
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "false");
       renderAgentsWithReferences();
 
-      expect(
-        within(screen.getByTestId("agents-empty")).getByRole("button", {
-          name: AGENTS_EMPTY_COPY.actionLabel,
-        }).className,
-      ).toBe(solidSmall);
+      const register = within(screen.getByTestId("agents-empty")).getByRole(
+        "button",
+        { name: AGENTS_EMPTY_COPY.actionLabel },
+      );
+      expect(register.className).toBe(outlineSmall);
+      // The same treatment the header gives it, which is what stops an empty
+      // pane repeating the header's action in a different voice.
+      const headerRow = screen.getByRole("heading", { name: "Agents" })
+        .parentElement as HTMLElement;
+      expect(register.className).toBe(
+        within(headerRow).getByRole("button", { name: /Register agent/ })
+          .className,
+      );
     });
   });
 

@@ -232,6 +232,10 @@ const RoutingPolicyDrawer = lazyDefault({
     import("./settings/governance/routingPolicies/RoutingPolicyDrawer"),
   key: "RoutingPolicyDrawer",
 });
+const AddDepartmentDrawer = lazyDefault({
+  factory: () => import("./governance/people/AddDepartmentDrawer"),
+  key: "AddDepartmentDrawer",
+});
 const DefaultModelOverrideDrawer = lazyDefault({
   factory: () => import("./settings/DefaultModelOverrideDrawer"),
   key: "DefaultModelOverrideDrawer",
@@ -353,6 +357,7 @@ export const drawers = {
   dataPrivacyRule: DataPrivacyRuleDrawer,
   // AI governance
   routingPolicy: RoutingPolicyDrawer,
+  addDepartment: AddDepartmentDrawer,
   // Project management
   createProject: CreateProjectDrawer,
   editProject: EditProjectDrawer,
