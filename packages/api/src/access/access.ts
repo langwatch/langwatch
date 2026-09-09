@@ -31,27 +31,29 @@ import {
 } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 
-import { ScopeInputMismatchError } from "../errors.ts";
+import { EnterprisePlanRequiredError, ScopeInputMismatchError } from "../errors.ts";
 
 const logger = createLogger("langwatch:authz");
 
 /**
- * Every one of these permissions, asked at the one scope the input names,
- * before the handler. The authz vocabulary has no arm for an AND yet, so the
- * kind is declared here until it lands beside the other four.
+ * The authz vocabulary's AND, narrowed to the two-or-more set an AND is worth
+ * declaring for. Everything but the list is read off the authz member, so a
+ * field added there cannot drift out of this one.
  */
-export type PermissionAllDeclaration = Readonly<{
-  kind: "permission-all";
-  permissions: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]];
-  via?: ScopeTierField;
-}>;
+export type PermissionAllDeclaration = Readonly<
+  Omit<Extract<AuthzDeclaration, { kind: "permission-all" }>, "permissions"> & {
+    permissions: readonly [AuthzPermission, AuthzPermission, ...AuthzPermission[]];
+  }
+>;
 
 /**
  * What a router may declare. `custom` is deliberately absent: a custom check
  * IS its own middleware, and the one execution path has no seam for one.
+ * `public` is absent because a public route never reaches `decide` — it is
+ * `PublicRouteAccess` below, and the runtimes branch on it before this union.
  */
 export type AccessDeclaration =
-  | Exclude<AuthzDeclaration, { kind: "custom" }>
+  | Exclude<AuthzDeclaration, { kind: "custom" | "public" | "permission-all" }>
   | PermissionAllDeclaration;
 
 /**
@@ -461,6 +463,48 @@ async function decidePermissionAll({
   }
 
   return { actor, scope };
+}
+
+/**
+ * What a declaration may ask the process to confirm the tenant behind the
+ * request holds. One name today; the union is the runtime's own so a route
+ * cannot invent one no process answers for.
+ */
+export type ApiEntitlement = "enterprise";
+
+/** Whether one tenant holds one entitlement, as the process reads its plans. */
+export interface EntitlementsPort {
+  holds(input: { entitlement: ApiEntitlement; scope: AuthzDeclaredScopeId }): Promise<boolean>;
+}
+
+/**
+ * The one entitlement check both transports run, after `decide` and before the
+ * handler: access beats plan, so a caller who may not do this at all is told
+ * that rather than told to buy something. A declaration whose access resolved
+ * no scope has no tenant to ask about, which is a wiring mistake rather than a
+ * customer refusal, so it degrades to the unknown path with a trace id.
+ */
+export async function decideEntitlement({
+  entitlement,
+  scope,
+  entitlements,
+  address,
+}: {
+  entitlement: ApiEntitlement;
+  scope: AuthzDeclaredScopeId | null;
+  entitlements: EntitlementsPort;
+  address: string;
+}): Promise<void> {
+  if (!scope) {
+    throw new Error(
+      `${address} asks whether its tenant holds "${entitlement}", and access resolved no scope ` +
+        "to ask it about",
+    );
+  }
+
+  if (await entitlements.holds({ entitlement, scope })) return;
+
+  throw new EnterprisePlanRequiredError();
 }
 
 /**

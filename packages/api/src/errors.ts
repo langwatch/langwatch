@@ -1,6 +1,7 @@
 import {
   HandledError,
   isZodLikeError,
+  remediation,
   serializedHandledErrorSchema,
   ValidationError,
   type ZodLikeError,
@@ -120,6 +121,24 @@ export class RateLimitedError extends HandledError {
   constructor() {
     super("rate_limited", "Too many requests", { httpStatus: 429, retryable: true });
     this.name = "RateLimitedError";
+  }
+}
+
+/**
+ * The plan behind the tenant, not the request, is what refuses here, so the
+ * status is 402 and a caller can tell "buy the plan" from "fix the request"
+ * without reading prose, and `fault` stays customer: it is an account state
+ * they resolve. tRPC has no 402 and its boundary already renders one as
+ * FORBIDDEN, which is what the middleware this replaces answered.
+ */
+export class EnterprisePlanRequiredError extends HandledError {
+  constructor() {
+    super("enterprise_plan_required", "This operation requires an Enterprise plan", {
+      httpStatus: 402,
+      fault: "customer",
+      ...remediation("enterprise_plan_required"),
+    });
+    this.name = "EnterprisePlanRequiredError";
   }
 }
 

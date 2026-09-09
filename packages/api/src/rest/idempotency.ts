@@ -105,6 +105,13 @@ export type IdempotentRunner = (input: {
 }) => Promise<IdempotentOutcome>;
 
 /**
+ * What a replayable create declares: which create it is, and nothing else. The
+ * tenancy a key is unique within is the scope access already resolved, so a
+ * route cannot name a narrower one than the door it answers behind.
+ */
+export type RestIdempotency = Readonly<{ operation: string }>;
+
+/**
  * Spelled once so the docs can't drift from the same bounds the validator
  * enforces.
  */

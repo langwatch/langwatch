@@ -41,6 +41,16 @@ Feature: tRPC framework boundary
     And a set naming fewer than two, repeating one, or sharing no scope that grants them all is refused where it is written
 
   @unit
+  Scenario: A procedure asks whether its tenant holds an entitlement
+    Given a procedure declares that its tenant must hold the Enterprise entitlement
+    When a caller the access check admitted reaches it
+    Then the tenant the access check resolved is the one the entitlement is asked about
+    And a tenant that holds it reaches the handler
+    And a tenant that does not is refused before the handler runs, with the refusal the plan gate gave
+    And a procedure that runs with no caller may not ask, because it resolves no tenant
+    And a procedure asking when the process reads no entitlements fails the build, naming the port
+
+  @unit
   Scenario: A secret typed into a scalar field never reaches the audit trail
     Given a mutation whose action path carries its secret in a top-level field
     When its arguments are prepared for the audit trail

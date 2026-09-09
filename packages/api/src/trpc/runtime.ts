@@ -48,13 +48,16 @@ import { z } from "zod";
 import {
   AuthenticationRequiredError,
   decide,
+  decideEntitlement,
   declareAccessMiddleware,
   SCOPE_INPUT_FIELDS,
   sharedGrantTiers,
   type AccessDeclaration,
   type AccessDenialPort,
+  type ApiEntitlement,
   type AuthorizePort,
   type Caller,
+  type EntitlementsPort,
   type PublicRouteAccess,
 } from "../access/access.ts";
 import type { TrpcContract, TrpcContractMember } from "../contract/trpc-contract.ts";
@@ -354,6 +357,8 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   procedure: string;
   member: TrpcContractMember;
   access: TrpcAccess;
+  /** Present exactly when the procedure asks the tenant to hold an entitlement. */
+  entitlement?: ApiEntitlement;
   /** What the procedure asks the process for; the mount binds each one. */
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
@@ -430,6 +435,14 @@ export interface TrpcRouterAccess<
   withFacts<const Added extends readonly TrpcFact[]>(
     ...facts: Added
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, [...Facts, ...Added]>;
+  /**
+   * What the tenant behind the call must hold beside the permission. Asked
+   * after access is decided, at the scope access resolved, so a caller who may
+   * not do this at all is refused before the plan is ever looked up.
+   */
+  withEntitlement(
+    entitlement: ApiEntitlement,
+  ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
   withPermission(
     access: AuthzPermission | AuthzDeclaration,
   ): TrpcRouterImplementation<Api, Contract, Implemented, Name, Facts, "authenticated">;
@@ -482,6 +495,7 @@ export interface TrpcRouterImplementation<
 
 type Implementation = Readonly<{
   access: TrpcAccess;
+  entitlement?: ApiEntitlement;
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
 }>;
@@ -509,6 +523,7 @@ function mountRouter<Api, Contract extends TrpcContract>(
         procedure: `${contract.namespace}.${name}`,
         member,
         access: implementation.access,
+        ...(implementation.entitlement ? { entitlement: implementation.entitlement } : {}),
         facts: implementation.facts,
         handle: implementation.handle,
         app,
@@ -530,21 +545,48 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
   implementations: ReadonlyMap<string, Implementation>,
 ): TrpcRouterBuilder<Api, Contract, Implemented> {
   /** One selected procedure, with the facts it has named so far. */
-  const selected = (name: string, facts: readonly TrpcFact[]) => {
+  const selected = (name: string, facts: readonly TrpcFact[], entitlement?: ApiEntitlement) => {
     const implement = (access: TrpcAccess) => ({
       handle: (handle: (args: never, ...values: never[]) => unknown) =>
-        routerBuilder(api, contract, new Map(implementations).set(name, { access, facts, handle })),
+        routerBuilder(
+          api,
+          contract,
+          new Map(implementations).set(name, {
+            access,
+            facts,
+            handle,
+            ...(entitlement ? { entitlement } : {}),
+          }),
+        ),
     });
 
     return {
       withFacts: (...added: readonly TrpcFact[]) => {
         assertFactsDistinct({ contract, name, facts: [...facts, ...added] });
 
-        return selected(name, [...facts, ...added]);
+        return selected(name, [...facts, ...added], entitlement);
+      },
+      withEntitlement: (named: ApiEntitlement) => {
+        if (entitlement) {
+          throw new Error(
+            `tRPC ${contract.namespace}.${name} already asks whether its tenant holds ` +
+              `"${entitlement}"`,
+          );
+        }
+
+        return selected(name, facts, named);
       },
       withPermission: (access: PermissionArgument, options?: { via: ScopeTierField }) =>
         implement(permissionDeclarationOf({ contract, name, access, via: options?.via })),
       withAccess: (access: PublicRouteAccess) => {
+        // Both ask a question about a tenant, and a public procedure has none.
+        if (entitlement) {
+          throw new Error(
+            `tRPC ${contract.namespace}.${name} runs with no caller, so there is no tenant to ` +
+              `ask whether it holds "${entitlement}"`,
+          );
+        }
+
         assertAnonymousProcedure({ contract, name });
 
         return implement(access);
@@ -613,6 +655,23 @@ function permissionDeclarationOf({
 
   if (access.kind === "custom") {
     throw new Error("a tRPC router cannot declare a custom access check");
+  }
+
+  if (access.kind === "public") {
+    throw new Error("a tRPC router declares a public procedure with withAccess(publicRoute(…))");
+  }
+
+  // An AND written as a declaration object earns the same refusals as one
+  // written as a list, so the two spellings cannot disagree.
+  if (access.kind === "permission-all") {
+    const target = access.via ?? via;
+
+    return permissionAllOf({
+      contract,
+      name,
+      permissions: access.permissions,
+      ...(target ? { via: target } : {}),
+    });
   }
 
   return access;
@@ -778,6 +837,8 @@ export type TrpcRuntimePorts<TContext> = Readonly<{
   authorization: Readonly<{ forRequest(ctx: TContext): AuthorizePort }>;
   /** The two refusals whose concrete error class is the process's to choose. */
   denials: AccessDenialPort;
+  /** What the process reads a tenant's entitlements from, for a procedure that asks. */
+  entitlements?: EntitlementsPort;
   audit: Readonly<{
     record(entry: TrpcRuntimeAuditEntry): Promise<void>;
     /** The owner says WHAT is sensitive; the path only redacts. */
@@ -861,7 +922,16 @@ export function createTrpcRuntime<
       .use(trace)
       .use(requestLog(ports, { anonymous }))
       .use(handledError)
-      .use(access({ ports, declaration: request.access, app: request.app, facts }))
+      .use(
+        access({
+          ports,
+          declaration: request.access,
+          procedure: request.procedure,
+          app: request.app,
+          facts,
+          ...(request.entitlement ? { entitlement: request.entitlement } : {}),
+        }),
+      )
       .use(auditTrail(ports, { anonymous }));
 
     const handle = guardOutput({
@@ -1008,15 +1078,29 @@ type ResolverOptions = Readonly<{
 function access<TContext extends object>({
   ports,
   declaration,
+  procedure,
+  entitlement,
   app,
   facts,
 }: {
   ports: TrpcRuntimePorts<TContext>;
   declaration: TrpcAccess;
+  procedure: string;
+  entitlement?: ApiEntitlement;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
 }) {
-  return declareAccessMiddleware(declaration, check({ ports, declaration, app, facts }));
+  if (entitlement && !ports.entitlements) {
+    throw new Error(
+      `tRPC ${procedure} asks whether its tenant holds "${entitlement}", and this runtime ` +
+        "supplied no entitlements port to ask",
+    );
+  }
+
+  return declareAccessMiddleware(
+    declaration,
+    check({ ports, declaration, procedure, app, facts, ...(entitlement ? { entitlement } : {}) }),
+  );
 }
 
 type BoundFact<TContext> = Readonly<{ fact: TrpcFact; binding: TrpcFactBinding<TContext> }>;
@@ -1024,11 +1108,15 @@ type BoundFact<TContext> = Readonly<{ fact: TrpcFact; binding: TrpcFactBinding<T
 function check<TContext extends object>({
   ports,
   declaration,
+  procedure,
+  entitlement,
   app,
   facts,
 }: {
   ports: TrpcRuntimePorts<TContext>;
   declaration: TrpcAccess;
+  procedure: string;
+  entitlement?: ApiEntitlement;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
 }) {
@@ -1061,6 +1149,17 @@ function check<TContext extends object>({
 
     if (!decision.actor) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
+    }
+
+    // After access, never before it: a caller who may not do this at all is
+    // told that rather than told to buy something.
+    if (entitlement && ports.entitlements) {
+      await decideEntitlement({
+        entitlement,
+        scope: decision.scope,
+        entitlements: ports.entitlements,
+        address: `tRPC ${procedure}`,
+      });
     }
 
     const handlerArguments: ResolvedAccess = {

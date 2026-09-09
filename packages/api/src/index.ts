@@ -8,6 +8,7 @@ export {
   AuthenticatedActorRequiredError,
   ApiVersionConflictError,
   createErrorHandler,
+  EnterprisePlanRequiredError,
   formatError,
   ProjectInputMismatchError,
   InvalidApiVersionError,

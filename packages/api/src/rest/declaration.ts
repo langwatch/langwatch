@@ -14,7 +14,12 @@ import type { FeatureApiToken } from "@langwatch/runtime-composition";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
-import { SCOPE_INPUT_FIELDS, type Credential, type RouteAccess } from "../access/access.ts";
+import {
+  SCOPE_INPUT_FIELDS,
+  type ApiEntitlement,
+  type Credential,
+  type RouteAccess,
+} from "../access/access.ts";
 import type { ApiHandlerArguments } from "../handler-arguments.ts";
 import {
   assertAddressingOptions,
@@ -33,6 +38,7 @@ import {
   type RestRateLimitPolicy,
   type RestTransportMiddleware,
 } from "./request.ts";
+import type { RestIdempotency } from "./idempotency.ts";
 import type { Declined, RouteResponse } from "./response.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -327,26 +333,23 @@ type RouteResult<Output extends RouteAnswer> = Output extends RestRawAnswerDecla
 type RouteAnswer = OutputSchema | RestRouteAnswers | RestRawAnswerDeclared | Missing;
 
 /** The bytes a route that declared a raw body is handed, beside its input. */
-type RawBodyArguments<Body extends RouteSource> = Body extends RestRawBodyDeclared<infer Form>
-  ? Readonly<{ raw: RawBodyValue<Form> }>
-  : unknown;
+type RawBodyArguments<Body extends RouteSource> =
+  Body extends RestRawBodyDeclared<infer Form> ? Readonly<{ raw: RawBodyValue<Form> }> : unknown;
 
 /**
  * The files a multipart route is handed, beside its input: each part it named,
  * present for certain when the declaration said the request must carry it.
  */
-type MultipartArguments<Body extends RouteSource> = Body extends RestMultipartDeclared<
-  z.ZodObject,
-  infer Files
->
-  ? Readonly<{
-      files: {
-        readonly [Name in keyof Files]: Files[Name]["required"] extends true
-          ? File
-          : File | undefined;
-      };
-    }>
-  : unknown;
+type MultipartArguments<Body extends RouteSource> =
+  Body extends RestMultipartDeclared<z.ZodObject, infer Files>
+    ? Readonly<{
+        files: {
+          readonly [Name in keyof Files]: Files[Name]["required"] extends true
+            ? File
+            : File | undefined;
+        };
+      }>
+    : unknown;
 
 /**
  * The request a route that writes its own bytes reads for itself: the method an
@@ -391,6 +394,10 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly rateLimit?: RestRateLimitPolicy;
   /** Present exactly when the route's answer stands for a while. */
   readonly cache?: RestCachePolicy;
+  /** Present exactly when the route asks the tenant to hold an entitlement. */
+  readonly entitlement?: ApiEntitlement;
+  /** Present exactly when the route's create is replayable under a caller key. */
+  readonly idempotency?: RestIdempotency;
   /** Present exactly when the route writes its own body instead of a schema's. */
   readonly rawResponse?: RestRawResponse;
   /** Every method this one declaration answers; the declared method alone by default. */
@@ -437,6 +444,8 @@ type RouteState = Readonly<{
   multipart?: RestMultipart;
   rateLimit?: RestRateLimitPolicy;
   cache?: RestCachePolicy;
+  entitlement?: ApiEntitlement;
+  idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
   methods?: readonly HttpMethod[];
   anyMethod?: boolean;
@@ -699,6 +708,62 @@ class RouteBuilder<
     });
   }
 
+  /**
+   * What the tenant behind the request must hold beside the permission. Asked
+   * after access is decided, at the scope access resolved, so a caller who may
+   * not do this at all is refused before the plan is ever looked up.
+   */
+  withEntitlement(
+    entitlement: ApiEntitlement,
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
+    assertSourceUnset("entitlement", this.state.entitlement);
+
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      entitlement,
+    });
+  }
+
+  /**
+   * Makes this create safe to retry under a caller-chosen key. The tenancy the
+   * key is unique within is the scope access resolved, never a callback, so a
+   * route cannot key a create outside the door it answers behind.
+   */
+  withIdempotency(
+    idempotency: RestIdempotency,
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    Permission,
+    Middleware,
+    Access,
+    Door
+  > {
+    assertSourceUnset("idempotency", this.state.idempotency);
+
+    return new RouteBuilder(this.router, this.method, this.path, this.operation, {
+      ...this.state,
+      idempotency,
+    });
+  }
+
   withQuery<Schema extends z.ZodObject>(
     schema: Schema & DistinctSchema<Schema, Params> & DistinctSchema<Schema, Body>,
   ): RouteBuilder<
@@ -732,19 +797,7 @@ class RouteBuilder<
   withPermission(
     permission: AuthzPermission,
     target?: RestPermissionTarget,
-  ): RouteBuilder<
-    Api,
-    Method,
-    Path,
-    Params,
-    Body,
-    Query,
-    Output,
-    true,
-    Middleware,
-    Access,
-    Door
-  > {
+  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, true, Middleware, Access, Door> {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       permission,
@@ -1140,6 +1193,8 @@ function declaredParts(state: RouteState): Partial<RestTransportRoute<unknown>> 
     ...(state.multipart ? { multipart: state.multipart } : {}),
     ...(state.rateLimit ? { rateLimit: state.rateLimit } : {}),
     ...(state.cache ? { cache: state.cache } : {}),
+    ...(state.entitlement ? { entitlement: state.entitlement } : {}),
+    ...(state.idempotency ? { idempotency: state.idempotency } : {}),
     ...(state.rawResponse ? { rawResponse: state.rawResponse } : {}),
   };
 }
@@ -1334,12 +1389,7 @@ export function defineRestRouter<Api>(api: FeatureApiWitness<Api>) {
         withVersion(version: DateVersion): RestTransportRouter<Api, "projectKey"> {
           assertVersionLabel(version);
 
-          return new RestTransportRouter<Api, "projectKey">(
-            api,
-            namespace,
-            version,
-            "projectKey",
-          );
+          return new RestTransportRouter<Api, "projectKey">(api, namespace, version, "projectKey");
         },
       };
     },
@@ -1447,6 +1497,21 @@ function assertRouteReady({
   }
 
   if (state.access?.kind === "public") assertNoScopeInput({ operation, state });
+
+  // Both ask a question about a tenant, and a public route resolves none.
+  if (state.access?.kind === "public" && state.entitlement) {
+    throw new Error(
+      `REST ${operation} answers without a credential, so there is no tenant to ask whether it ` +
+        `holds "${state.entitlement}"`,
+    );
+  }
+
+  if (state.access?.kind === "public" && state.idempotency) {
+    throw new Error(
+      `REST ${operation} answers without a credential, so there is no tenancy a caller's ` +
+        "idempotency key is unique within",
+    );
+  }
 
   if (state.answers && state.status !== void 0) {
     throw new Error(`REST ${operation} declares responds(), so its status is the answer's own`);

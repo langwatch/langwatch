@@ -3,19 +3,29 @@
  * `defineRestRouter` records and refuses, and how a static generation is
  * selected from a path, a header or neither.
  */
+import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
 import { featureApi } from "@langwatch/runtime-composition";
-import { Hono } from "hono";
+import { Hono, type Hono as HonoApp } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { anyAuthenticated, publicRoute } from "../../access/access.ts";
-import { ApiVersionConflictError, InvalidApiVersionError } from "../../errors.ts";
+import { anyAuthenticated, publicRoute, type EntitlementsPort } from "../../access/access.ts";
+import {
+  ApiVersionConflictError,
+  createErrorHandler,
+  InvalidApiVersionError,
+} from "../../errors.ts";
 import {
   API_VERSION_HEADER,
   RestVersionSelector,
   restVersionSelectorMiddleware,
 } from "../addressing.ts";
 import { defineRestRouter, projectRestFacts } from "../declaration.ts";
+import {
+  withIdempotency,
+  type IdempotencyReceiptPersistence,
+  type IdempotencyReceiptRecord,
+} from "../idempotency.ts";
 import {
   bindRestHeader,
   bindRestMiddleware,
@@ -300,9 +310,9 @@ describe("defineRestRouter", () => {
     it("takes two successes carrying one body, and refuses two carrying different ones", () => {
       expect(() => route().responds({ 200: report, 201: report })).not.toThrow();
 
-      expect(() =>
-        route().responds({ 200: report, 201: z.object({ other: z.string() }) }),
-      ).toThrow(/two successes carrying different bodies/);
+      expect(() => route().responds({ 200: report, 201: z.object({ other: z.string() }) })).toThrow(
+        /two successes carrying different bodies/,
+      );
     });
   });
 
@@ -320,13 +330,17 @@ describe("defineRestRouter", () => {
 
     /** @scenario "A handler is given the exact request bytes" */
     it("refuses a route that declares both a raw body and a parsed one", () => {
-      expect(() => hook().withRawBody("bytes").withInput(z.object({ a: z.number() }))).toThrow(
-        /declares its body twice/,
-      );
+      expect(() =>
+        hook()
+          .withRawBody("bytes")
+          .withInput(z.object({ a: z.number() })),
+      ).toThrow(/declares its body twice/);
 
-      expect(() => hook().withInput(z.object({ a: z.number() })).withRawBody("bytes")).toThrow(
-        /declares its body twice/,
-      );
+      expect(() =>
+        hook()
+          .withInput(z.object({ a: z.number() }))
+          .withRawBody("bytes"),
+      ).toThrow(/declares its body twice/);
 
       expect(() => hook().withRawBody("bytes").withRawBody("text")).toThrow(
         /already declared withRawBody/,
@@ -661,5 +675,329 @@ describe("RestVersionSelector", () => {
     expect(latest.headers.get("X-API-Version")).toBe("v1");
     expect(latest.headers.get("X-API-Version-Status")).toBe("latest");
     expect(pinned.headers.get("X-API-Version-Status")).toBe("stable");
+  });
+});
+
+describe("a route that asks whether its tenant holds an entitlement", () => {
+  const RolesApi = featureApi<{ listRoles(): Promise<void> }>("authz");
+
+  function declaration(handle: () => { ran: boolean }) {
+    return defineRestRouter(RolesApi)
+      .withNamespace("roles")
+      .withVersion("2026-08-07")
+      .withCredential("organizationKey")
+      .get("/", "listRoles")
+      .withPermission("organization:manage")
+      .withEntitlement("enterprise")
+      .withOutput(z.object({ ran: z.boolean() }))
+      .handle(handle)
+      .build()
+      .router();
+  }
+
+  function mounted({ holds, handle }: { holds: EntitlementsPort["holds"]; handle: () => void }) {
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
+      },
+      entitlements: { holds },
+    });
+
+    return runtime.mount(
+      declaration(() => {
+        handle();
+
+        return { ran: true };
+      }),
+      {
+        app: () => ({ listRoles: async () => {} }),
+        credential: "organizationKey",
+        onError: createErrorHandler(),
+      },
+    );
+  }
+
+  /** @scenario "An endpoint asks whether its tenant holds an entitlement" */
+  it("asks about the scope the access check resolved and lets a holder through", async () => {
+    const asked: { entitlement: string; scope: AuthzDeclaredScopeId }[] = [];
+
+    const app = mounted({
+      holds: async (input) => {
+        asked.push(input);
+
+        return true;
+      },
+      handle: () => {},
+    });
+
+    const response = await app.request("/api/roles/2026-08-07/");
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ran: true });
+    expect(asked).toEqual([
+      { entitlement: "enterprise", scope: { tier: "organization", id: "org-1" } },
+    ]);
+  });
+
+  /** @scenario "An endpoint asks whether its tenant holds an entitlement" */
+  it("refuses a tenant that does not hold it before the handler runs", async () => {
+    let ran = false;
+
+    const app = mounted({ holds: async () => false, handle: () => (ran = true) });
+    const response = await app.request("/api/roles/2026-08-07/");
+
+    expect(response.status).toBe(402);
+    expect(await response.json()).toMatchObject({ code: "enterprise_plan_required" });
+    expect(ran).toBe(false);
+  });
+
+  /** @scenario "An endpoint asks whether its tenant holds an entitlement" */
+  it("refuses a route that resolves no tenant, and a mount that reads no entitlements", () => {
+    expect(() =>
+      defineRestRouter(RolesApi)
+        .withNamespace("roles")
+        .withVersion("2026-08-07")
+        .get("/", "listRoles")
+        .withAccess(publicRoute({ reason: "the public role catalogue" }))
+        .withEntitlement("enterprise")
+        .handle(() => {}),
+    ).toThrow(/no tenant to ask whether it holds "enterprise"/);
+
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
+      },
+    });
+
+    expect(() =>
+      runtime.mount(
+        declaration(() => ({ ran: true })),
+        {
+          app: () => ({ listRoles: async () => {} }),
+          credential: "organizationKey",
+          onError: createErrorHandler(),
+        },
+      ),
+    ).toThrow(/supplied no entitlements port to ask/);
+  });
+});
+
+describe("a create declared replayable under a caller's key", () => {
+  const WebhookApi = featureApi<{ createEndpoint(): Promise<void> }>("webhook");
+
+  /** The durable half of the protocol, in memory: one row per scope and key. */
+  function receipts(): IdempotencyReceiptPersistence {
+    const rows = new Map<string, IdempotencyReceiptRecord & { scopeId: string; key: string }>();
+    let next = 0;
+
+    return {
+      idempotencyReceipt: {
+        create: async ({ data }) => {
+          const at = `${data.scopeId} ${data.key}`;
+
+          if (rows.has(at)) throw Object.assign(new Error("taken"), { code: "P2002" });
+
+          const row = {
+            ...data,
+            id: `receipt-${(next += 1)}`,
+            responseStatus: null,
+            responseBody: null,
+          };
+
+          rows.set(at, row);
+
+          return { id: row.id };
+        },
+        findUnique: async ({ where }) =>
+          rows.get(`${where.scopeId_key.scopeId} ${where.scopeId_key.key}`) ?? null,
+        updateMany: async ({ where, data }) => {
+          const row = [...rows.values()].find(
+            (candidate) =>
+              candidate.id === where.id &&
+              (where.claimId === undefined || candidate.claimId === where.claimId),
+          );
+
+          if (!row) return { count: 0 };
+
+          Object.assign(row, data);
+
+          return { count: 1 };
+        },
+        deleteMany: async ({ where }) => {
+          for (const [at, row] of rows) {
+            if (row.id !== where.id) continue;
+            if (where.claimId !== undefined && row.claimId !== where.claimId) continue;
+
+            rows.delete(at);
+
+            return { count: 1 };
+          }
+
+          return { count: 0 };
+        },
+      },
+    };
+  }
+
+  function declaration(handle: (name: string) => Promise<string> | string) {
+    return defineRestRouter(WebhookApi)
+      .withNamespace("webhooks")
+      .withVersion("2026-08-07")
+      .withCredential("organizationKey")
+      .post("/endpoints", "createEndpoint")
+      .withPermission("webhookEndpoints:manage")
+      .withIdempotency({ operation: "webhooks.v1.endpoints.create" })
+      .withInput(z.object({ name: z.string() }))
+      .withOutput(z.object({ name: z.string(), secret: z.string() }))
+      .withStatus(201)
+      .handle(async ({ input }) => ({
+        name: await handle(input.name),
+        secret: `secret-for-${input.name}`,
+      }))
+      .build()
+      .router();
+  }
+
+  function mounted({
+    store,
+    handle,
+  }: {
+    store: IdempotencyReceiptPersistence;
+    handle: (name: string) => Promise<string> | string;
+  }) {
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
+      },
+      idempotency: (input) =>
+        withIdempotency({
+          ...input,
+          receipts: store,
+          cipher: { encrypt: (value) => value, decrypt: (value) => value },
+        }),
+    });
+
+    return runtime.mount(declaration(handle), {
+      app: () => ({ createEndpoint: async () => {} }),
+      credential: "organizationKey",
+      onError: createErrorHandler(),
+    });
+  }
+
+  function post({ app, key, name }: { app: HonoApp; key?: string; name: string }) {
+    return app.request("/api/webhooks/2026-08-07/endpoints", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(key ? { "Idempotency-Key": key } : {}),
+      },
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  /** @scenario "A create declared replayable answers a retry from its receipt" */
+  it("runs the create once and answers the retry from the stored bytes", async () => {
+    let runs = 0;
+
+    const app = mounted({
+      store: receipts(),
+      handle: (name) => {
+        runs += 1;
+
+        return name;
+      },
+    });
+
+    const first = await post({ app, key: "key-00000001", name: "alerts" });
+    const original = await first.clone().text();
+    const retry = await post({ app, key: "key-00000001", name: "alerts" });
+
+    expect(runs).toBe(1);
+    expect(first.status).toBe(201);
+    expect(first.headers.get("X-Idempotent-Replay")).toBeNull();
+    expect(retry.status).toBe(201);
+    expect(retry.headers.get("X-Idempotent-Replay")).toBe("true");
+    expect(await retry.text()).toBe(original);
+  });
+
+  /** @scenario "A create declared replayable answers a retry from its receipt" */
+  it("refuses the same key sent with a different body", async () => {
+    const app = mounted({ store: receipts(), handle: (name) => name });
+
+    await post({ app, key: "key-00000002", name: "alerts" });
+
+    const mismatch = await post({ app, key: "key-00000002", name: "digests" });
+
+    expect(mismatch.status).toBe(409);
+    expect(await mismatch.json()).toMatchObject({
+      code: "idempotency_error",
+      meta: { reason: "body_mismatch" },
+    });
+  });
+
+  /** @scenario "A create declared replayable answers a retry from its receipt" */
+  it("refuses a retry sent while the first is still running", async () => {
+    let reached = () => {};
+    let finish = () => {};
+    const started = new Promise<void>((resolve) => (reached = resolve));
+    const held = new Promise<void>((resolve) => (finish = resolve));
+    const store = receipts();
+
+    const app = mounted({
+      store,
+      handle: async (name) => {
+        reached();
+        await held;
+
+        return name;
+      },
+    });
+
+    const running = post({ app, key: "key-00000003", name: "alerts" });
+
+    await started;
+
+    const concurrent = await post({ app, key: "key-00000003", name: "alerts" });
+
+    expect(concurrent.status).toBe(409);
+    expect(await concurrent.json()).toMatchObject({ meta: { reason: "in_progress" } });
+
+    finish();
+    expect((await running).status).toBe(201);
+  });
+
+  /** @scenario "A create declared replayable answers a retry from its receipt" */
+  it("passes a keyless request through, and refuses a mount that keeps no receipts", async () => {
+    let runs = 0;
+
+    const app = mounted({
+      store: receipts(),
+      handle: (name) => {
+        runs += 1;
+
+        return name;
+      },
+    });
+
+    expect((await post({ app, name: "alerts" })).status).toBe(201);
+    expect((await post({ app, name: "alerts" })).status).toBe(201);
+    expect(runs).toBe(2);
+
+    const runtime = createRestRuntime({
+      identity: {
+        authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
+      },
+    });
+
+    expect(() =>
+      runtime.mount(
+        declaration((name) => name),
+        {
+          app: () => ({ createEndpoint: async () => {} }),
+          credential: "organizationKey",
+          onError: createErrorHandler(),
+        },
+      ),
+    ).toThrow(/supplied no idempotency port to keep its receipts/);
   });
 });

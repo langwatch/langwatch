@@ -28,10 +28,12 @@ import {
 import {
   assertRouteScopePermission,
   decide,
+  decideEntitlement,
   routeScopeOf,
   type AccessDenialPort,
   type AuthorizePort,
   type Credential,
+  type EntitlementsPort,
 } from "../access/access.ts";
 import { RateLimitedError } from "../errors.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
@@ -58,6 +60,12 @@ import {
   type RestTransportRoute,
   type StoredHandlerArguments,
 } from "./declaration.ts";
+import {
+  idempotentJson,
+  IDEMPOTENCY_KEY_HEADER,
+  readIdempotencyKey,
+  type IdempotentRunner,
+} from "./idempotency.ts";
 import { deprecatedAlias, deprecationNotice, documentRoute } from "./openapi.ts";
 import {
   bodyLimit,
@@ -122,9 +130,7 @@ export type RestRuntimePorts = Readonly<{
      * answers `null` for a request carrying no credential at all, and refuses
      * one carrying a credential it will not accept.
      */
-    identifyOptional?(input: {
-      request: Request;
-    }): Promise<RestCaller | null> | RestCaller | null;
+    identifyOptional?(input: { request: Request }): Promise<RestCaller | null> | RestCaller | null;
     /**
      * Whether the caller holds `permission` at the scope a route's own path
      * named. Only a declaration carrying such a route needs it, and a mount
@@ -143,6 +149,10 @@ export type RestRuntimePorts = Readonly<{
   /** The store behind every route that declared how long its answer stands. */
   cache?: ResponseCache;
   denials?: AccessDenialPort;
+  /** What the process reads a tenant's entitlements from, for a route that asks. */
+  entitlements?: EntitlementsPort;
+  /** The receipt ledger behind every create declared replayable. */
+  idempotency?: IdempotentRunner;
   /** Where the first call of each deprecated route is recorded. */
   deprecationLog?: RestDeprecationLogPort;
 }>;
@@ -314,6 +324,20 @@ function assertCapabilityPorts({
     throw new Error(
       `REST ${address} declares how long its answer stands, and this runtime supplied no ` +
         "cache port to store it in",
+    );
+  }
+
+  if (route.entitlement && !ports.entitlements) {
+    throw new Error(
+      `REST ${address} asks whether its tenant holds "${route.entitlement}", and this runtime ` +
+        "supplied no entitlements port to ask",
+    );
+  }
+
+  if (route.idempotency && !ports.idempotency) {
+    throw new Error(
+      `REST ${address} declares itself replayable under a caller's key, and this runtime ` +
+        "supplied no idempotency port to keep its receipts",
     );
   }
 }
@@ -684,7 +708,15 @@ function handlerMiddleware<Api>({
     // there is no one behind the request rather than handed a guess.
     if (!caller) {
       const anonymous = await route.handler(
-        handlerArguments({ context, route, options, input, actor: null, scope: null, target: null }),
+        handlerArguments({
+          context,
+          route,
+          options,
+          input,
+          actor: null,
+          scope: null,
+          target: null,
+        }),
         ...(await resolveFacts({ route, facts, context })),
       );
 
@@ -708,6 +740,13 @@ function handlerMiddleware<Api>({
     const target = await checkRouteScope({ route, caller, ports, input });
     const capabilities = { route, ports, context, family, version, caller, input } as const;
 
+    // The scope access resolved: the one a route's own path named when it named
+    // one, and the door's own otherwise. Both the plan question and the
+    // idempotency tenancy are asked about exactly this scope.
+    const resolved = target ?? decision.scope;
+
+    await checkEntitlement({ route, ports, scope: resolved, family });
+
     await countCall(capabilities);
 
     // After the door, never before it: a caller who may not read this cannot
@@ -716,25 +755,112 @@ function handlerMiddleware<Api>({
 
     if (stored) return stored;
 
-    const result = await route.handler(
-      handlerArguments({
-        context,
-        route,
-        options,
-        input,
-        actor: doorActorOf({ credential, actor: decision.actor }),
-        scope: handlerScopeOf({ route, credential, caller }),
-        target,
-      }),
-      ...(await resolveFacts({ route, facts, context })),
-    );
+    const run = async (): Promise<Response | undefined> => {
+      const result = await route.handler(
+        handlerArguments({
+          context,
+          route,
+          options,
+          input,
+          actor: doorActorOf({ credential, actor: decision.actor }),
+          scope: handlerScopeOf({ route, credential, caller }),
+          target,
+        }),
+        ...(await resolveFacts({ route, facts, context })),
+      );
 
-    caller.markUsed?.();
+      caller.markUsed?.();
 
-    const answer = await answerWith({ context, next, route, result });
+      return answerWith({ context, next, route, result });
+    };
+
+    const answer = route.idempotency
+      ? await replayable({ route, ports, context, input, scope: resolved, family, run })
+      : await run();
 
     return keepAnswer({ ...capabilities, answer });
   };
+}
+
+/**
+ * The plan question, asked after access is decided and before anything the
+ * handler would have done — including the rate-limit count, which an unentitled
+ * caller never spends.
+ */
+async function checkEntitlement({
+  route,
+  ports,
+  scope,
+  family,
+}: {
+  route: RestTransportRoute<unknown>;
+  ports: RestRuntimePorts;
+  scope: AuthzDeclaredScopeId | null;
+  family: string;
+}): Promise<void> {
+  if (!route.entitlement || !ports.entitlements) return;
+
+  await decideEntitlement({
+    entitlement: route.entitlement,
+    scope,
+    entitlements: ports.entitlements,
+    address: `REST ${family}.${route.operation}`,
+  });
+}
+
+/**
+ * The create, dispatched through the process's receipt ledger under the key the
+ * caller chose. The tenancy is the scope access resolved, and the answer is the
+ * bytes the ledger stored, marked as a replay.
+ */
+async function replayable({
+  route,
+  ports,
+  context,
+  input,
+  scope,
+  family,
+  run,
+}: {
+  route: RestTransportRoute<unknown>;
+  ports: RestRuntimePorts;
+  context: Context;
+  input: unknown;
+  scope: AuthzDeclaredScopeId | null;
+  family: string;
+  run: () => Promise<Response | undefined>;
+}): Promise<Response | undefined> {
+  const idempotency = route.idempotency;
+
+  if (!idempotency || !ports.idempotency) return run();
+
+  if (!scope) {
+    throw new Error(
+      `REST ${family}.${route.operation} is replayable under a caller's key, and access resolved ` +
+        "no tenancy that key would be unique within",
+    );
+  }
+
+  const outcome = await ports.idempotency({
+    operation: idempotency.operation,
+    scopeId: scope.id,
+    key: readIdempotencyKey(context.req.header(IDEMPOTENCY_KEY_HEADER)),
+    validatedBody: input,
+    handler: async () => {
+      const answer = await run();
+
+      if (!answer) {
+        throw new Error(
+          `REST ${family}.${route.operation} is replayable and wrote no response for its ` +
+            "receipt to stand in for",
+        );
+      }
+
+      return answer;
+    },
+  });
+
+  return idempotentJson({ c: context, outcome });
 }
 
 /** The logger both capabilities report a store's own failure through. */

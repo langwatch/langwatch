@@ -128,14 +128,16 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     Then it is handed the envelope's boundary handler to delegate to
     And a refusal the boundary can render still reaches it
 
-  @unimplemented
+  @unit
   Scenario: A create declared replayable answers a retry from its receipt
     Given a create declares itself replayable under a caller-chosen key
     When the same key is sent twice in one tenancy
     Then the create runs once and the retry is answered from the stored bytes, marked as a replay
-    And the same key in another tenancy runs the create again
+    And the tenancy the key is unique within is the scope the access check resolved, not a callback
+    And the same key with a different body is refused, naming the conflict
+    And a retry sent while the first is still running is refused rather than run twice
     And a request carrying no key behaves exactly as it did before, writing no receipt
-    And a key too short to be plausibly unique is refused rather than ignored
+    And a create declared replayable by a process that keeps no receipts fails the build
 
   @unimplemented
   Scenario: A replay answers the bytes the first response sent, not the handler's own value
@@ -153,6 +155,16 @@ Feature: Endpoint capabilities — rate limiting, response caching, deprecation
     Given a replayable create declares a read-only pre-flight check
     When a retry is answered from the stored bytes
     Then the pre-flight ran again, because a replay must not trust a grant the caller has since lost
+
+  @unit
+  Scenario: An endpoint asks whether its tenant holds an entitlement
+    Given an endpoint declares that its tenant must hold the Enterprise entitlement
+    When a caller the access check admitted reaches it
+    Then the tenant the access check resolved is the one the entitlement is asked about
+    And a tenant that holds it reaches the handler
+    And a tenant that does not is refused before the handler runs, told the plan is what refuses
+    And an endpoint that answers without a credential may not ask, because it resolves no tenant
+    And an endpoint asking when the process reads no entitlements fails the build, naming the port
 
   @integration
   Scenario: A capability declared without its port fails the build

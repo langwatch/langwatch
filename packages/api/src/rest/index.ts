@@ -101,6 +101,7 @@ export {
   type IdempotentOutcome,
   type IdempotentReplayed,
   type IdempotentRunner,
+  type RestIdempotency,
   type WithIdempotencyParams,
 } from "./idempotency.ts";
 

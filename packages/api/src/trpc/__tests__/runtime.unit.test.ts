@@ -821,3 +821,144 @@ describe("a procedure that names several permissions together", () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The entitlement a procedure declares: asked after access is decided, at the
+// scope access resolved, and before the handler.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("a procedure that asks whether its tenant holds an entitlement", () => {
+  interface DirectoryApi {
+    listUsers(input: { organizationId: string }): Promise<{ count: number }>;
+  }
+
+  const DirectoryApi = featureApi<DirectoryApi>("scim");
+
+  const directoryContract = defineTrpcContract("directory")
+    .query("listUsers")
+    .withInput(z.object({ organizationId: z.string() }))
+    .withOutput(z.object({ count: z.number() }))
+    .build();
+
+  type DirectoryContext = { actor: { id: string } };
+
+  const directoryRoot = TrpcRootDefinition.forContext<DirectoryContext>().create({});
+
+  function ports({
+    holds,
+  }: {
+    holds?: (input: {
+      entitlement: string;
+      scope: { tier: string; id: string };
+    }) => Promise<boolean>;
+  }): TrpcRuntimePorts<DirectoryContext> {
+    return {
+      identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
+      authorization: {
+        forRequest: () => ({
+          getDecision: async () => ({ permitted: true, organizationRole: null }),
+          getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
+          checkScopeLineage: async () => ({ kind: "consistent" }),
+        }),
+      },
+      denials: {
+        membershipDisabled: () => new Error("membership disabled"),
+        liteMemberRestricted: () => new Error("lite member"),
+      },
+      ...(holds ? { entitlements: { holds } } : {}),
+      audit: {
+        record: async () => {},
+        redact: ({ args }) => args,
+        exempt: () => false,
+      },
+      errors: {
+        report: () => {},
+        asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
+        translate: () => undefined,
+      },
+    };
+  }
+
+  function declaration(handle: () => { count: number }) {
+    return defineTrpcRouter(DirectoryApi, directoryContract)
+      .procedure("listUsers")
+      .withEntitlement("enterprise")
+      .withPermission("organization:manage")
+      .handle(handle as never)
+      .build();
+  }
+
+  function caller({
+    holds,
+    handle,
+  }: {
+    holds?: (input: {
+      entitlement: string;
+      scope: { tier: string; id: string };
+    }) => Promise<boolean>;
+    handle: () => { count: number };
+  }) {
+    const runtime = createTrpcRuntime({
+      root: directoryRoot,
+      procedure: directoryRoot.procedure,
+      ports: ports(holds ? { holds } : {}),
+    });
+
+    return runtime
+      .mount(declaration(handle), () => ({ listUsers: async () => ({ count: 0 }) }))
+      .createCaller({ actor: { id: "admin-1" } });
+  }
+
+  /** @scenario "A procedure asks whether its tenant holds an entitlement" */
+  it("asks about the scope the access check resolved and lets a holder through", async () => {
+    const asked: { entitlement: string; scope: { tier: string; id: string } }[] = [];
+
+    const answer = await caller({
+      holds: async (input) => {
+        asked.push(input);
+
+        return true;
+      },
+      handle: () => ({ count: 3 }),
+    }).listUsers({ organizationId: "org-1" });
+
+    expect(answer).toEqual({ count: 3 });
+    expect(asked).toEqual([
+      { entitlement: "enterprise", scope: { tier: "organization", id: "org-1" } },
+    ]);
+  });
+
+  /** @scenario "A procedure asks whether its tenant holds an entitlement" */
+  it("refuses a tenant that does not hold it before the handler runs", async () => {
+    let ran = false;
+
+    const call = caller({
+      holds: async () => false,
+      handle: () => {
+        ran = true;
+
+        return { count: 0 };
+      },
+    }).listUsers({ organizationId: "org-1" });
+
+    await expect(call).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      cause: { code: "enterprise_plan_required" },
+    });
+    expect(ran).toBe(false);
+  });
+
+  /** @scenario "A procedure asks whether its tenant holds an entitlement" */
+  it("refuses a procedure that runs with no caller, and a mount that reads no entitlements", () => {
+    expect(() =>
+      defineTrpcRouter(DirectoryApi, directoryContract)
+        .procedure("listUsers")
+        .withEntitlement("enterprise")
+        .withAccess(publicRoute({ reason: "the public directory" })),
+    ).toThrow(/no tenant to ask whether it holds "enterprise"/);
+
+    expect(() => caller({ handle: () => ({ count: 0 }) })).toThrow(
+      /supplied no entitlements port to ask/,
+    );
+  });
+});
