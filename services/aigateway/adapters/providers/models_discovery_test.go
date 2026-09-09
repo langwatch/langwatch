@@ -234,6 +234,7 @@ func TestHostedModelCatalogsShape(t *testing.T) {
 	for _, p := range []domain.ProviderID{
 		domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini,
 		domain.ProviderGroq, domain.ProviderXAI, domain.ProviderCerebras, domain.ProviderDeepSeek,
+		domain.ProviderOrcaRouter,
 	} {
 		if _, ok := hostedModelCatalogs[p]; !ok {
 			t.Errorf("hostedModelCatalogs missing %q: its hosted credentials would silently list nothing", p)

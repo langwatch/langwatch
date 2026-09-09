@@ -58,6 +58,7 @@ const PROVIDERS_WITH_WELL_KNOWN_MODELS = new Set([
   "gemini",
   "deepseek",
   "xai",
+  "orcarouter",
 ]);
 
 interface ModelProviderSetupProps {

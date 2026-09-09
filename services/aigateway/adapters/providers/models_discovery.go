@@ -118,6 +118,9 @@ var hostedModelCatalogs = map[domain.ProviderID]catalogProbe{
 	domain.ProviderXAI:       {modelsURL: "https://api.x.ai/v1/models"},
 	domain.ProviderCerebras:  {modelsURL: "https://api.cerebras.ai/v1/models"},
 	domain.ProviderDeepSeek:  {modelsURL: deepseekBaseURL + "/v1/models"},
+	// OrcaRouter's public endpoint already carries the /v1 segment (unlike
+	// DeepSeek's host-only base), so the probe is the full models URL.
+	domain.ProviderOrcaRouter: {modelsURL: orcarouterBaseURL + "/models"},
 }
 
 // newModelsDiscoveryClient builds the HTTP client discovery probes use.

@@ -13,6 +13,7 @@ export type ModelProviderKey =
   | "groq"
   | "open_ai_azure"
   | "open_ai"
+  | "orcarouter"
   | "vertex_ai";
 
 /** The surfaces the provider grid renders on. */
