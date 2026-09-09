@@ -14,6 +14,7 @@ import {
   GithubBranchMappingService,
   type BranchMappingTarget,
 } from "../github-branch-mapping.service.ts";
+import { Temporal } from "@langwatch/time";
 
 const NOW = new Date("2026-01-01T00:00:00Z").getTime();
 
@@ -164,7 +165,9 @@ describe("given a branch with no pull request", () => {
       await service(repository).map({ ...target, origin: "demand" });
 
       expect(repository.upserts).toHaveLength(1);
-      expect(repository.upserts[0]?.lastRequestedAt).toEqual(new Date(NOW));
+      expect(repository.upserts[0]?.lastRequestedAt).toEqual(
+        Temporal.Instant.fromEpochMilliseconds(NOW),
+      );
     });
   });
 });

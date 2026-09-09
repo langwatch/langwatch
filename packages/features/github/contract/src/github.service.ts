@@ -10,10 +10,11 @@ import type {
   GithubTurnToken,
 } from "./github.ts";
 import type { GithubConnectionStatus, GithubDisconnectResult } from "./github.connection.ts";
+import type { GithubApi } from "./github.api.ts";
 
-/** The cross-feature GitHub capabilities used by Coding Agent and Langy. */
-export abstract class GithubService {
-  abstract readonly configured: boolean;
+/** Legacy abstract fixture base; new callers should depend on {@link GithubApi}. */
+export abstract class GithubService implements GithubApi {
+  abstract configured: boolean;
   abstract getAppConfig(): GithubAppConfig;
   abstract getWebBase(): string;
   abstract normalizeRepositoryHost(repositoryHost: string): string;
@@ -35,17 +36,7 @@ export abstract class GithubService {
     userId: string;
     organizationId: string;
   }): Promise<boolean>;
-  /**
-   * What the organization's settings surface renders: the installations, whether the App is
-   * configured on this instance, and where an install starts. The uninstall deep links are
-   * built here so no caller needs to know the host this instance is bound to.
-   */
   abstract getConnectionStatus(input: { organizationId: string }): Promise<GithubConnectionStatus>;
-  /**
-   * Hands back the deep link that uninstalls the App on GitHub. Throws
-   * `GithubNotConnectedError` when the organization has no such installation — one owned by
-   * another organization answers identically, so an installation id cannot be probed.
-   */
   abstract disconnect(input: {
     organizationId: string;
     installationId: string;
@@ -53,12 +44,9 @@ export abstract class GithubService {
   abstract recordInstallation(input: {
     installationId: string;
     organizationId: string;
-    /** When the signed state that is claiming this installation was issued. */
     flowStartedAt: number;
-    /** The GitHub account login the flow named, when it named one. */
-    expectedAccountLogin?: string | undefined;
-    /** The installation the flow was pinned to, when it was a reconfigure. */
-    expectedInstallationId?: string | undefined;
+    expectedAccountLogin?: string;
+    expectedInstallationId?: string;
   }): Promise<{ accountLogin: string }>;
   abstract handleWebhookEvent(input: {
     action: "created" | "deleted" | "suspend" | "unsuspend" | "added" | "removed";
@@ -77,13 +65,7 @@ export abstract class GithubService {
     organizationId: string;
     repositoryFullName: string;
   }): Promise<boolean>;
-  abstract requestBranchMapping(input: {
-    tenantId: string;
-    repositoryHost: string;
-    repositoryOwner: string;
-    repositoryName: string;
-    headBranch: string;
-  }): Promise<void>;
+  abstract requestBranchMapping(input: BranchMappingRequest): Promise<void>;
   abstract getLivePullRequestStatuses(input: {
     organizationId: string;
     refs: readonly GithubPullRequestRef[];
@@ -91,11 +73,7 @@ export abstract class GithubService {
   abstract applyPullRequestEvent(event: GithubPullRequestEvent): Promise<boolean>;
   abstract findForBranches(input: {
     organizationId: string;
-    keys: ReadonlyArray<{
-      repositoryHost: string;
-      repositoryFullName: string;
-      headBranch: string;
-    }>;
+    keys: ReadonlyArray<{ repositoryHost: string; repositoryFullName: string; headBranch: string }>;
   }): Promise<readonly GithubPullRequest[]>;
   abstract findAllByBranches(input: {
     organizationId: string;
@@ -112,3 +90,11 @@ export abstract class GithubService {
   abstract recheckDueBranches(): Promise<number>;
   abstract pruneStaleBranchLinkage(): Promise<{ branchChecks: number }>;
 }
+
+type BranchMappingRequest = {
+  tenantId: string;
+  repositoryHost: string;
+  repositoryOwner: string;
+  repositoryName: string;
+  headBranch: string;
+};

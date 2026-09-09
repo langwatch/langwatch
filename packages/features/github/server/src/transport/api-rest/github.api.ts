@@ -10,7 +10,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
-import type { GithubInstallStatePayload, GithubService } from "@langwatch/github-contract";
+import type { GithubApi, GithubInstallStatePayload } from "@langwatch/github-contract";
 import { nowInstant } from "@langwatch/time";
 import {
   GithubInstallationAccountMismatchError,
@@ -26,7 +26,7 @@ export type GithubRestSessionPort = (
 /** Everything the installation flow reaches that GitHub does not own. */
 export type GithubRestPorts = Readonly<{
   /** The SAME service the `github.*` tRPC namespace reads. */
-  github: () => GithubService;
+  github: () => GithubApi;
   /** Resolves the browser session both `/install` and `/setup` are bound to. */
   session: GithubRestSessionPort;
   /**
@@ -70,14 +70,11 @@ const INSTALL_HANDLER_AUTH_REASON =
   "in-handler through the process's session port) plus an org-membership check " +
   "before any redirect to GitHub. State token is HMAC-signed and bound to the session.";
 
-function signState(service: GithubService, payload: GithubInstallStatePayload): string {
+function signState(service: GithubApi, payload: GithubInstallStatePayload): string {
   return service.signInstallState(payload);
 }
 
-function verifyState(
-  service: GithubService,
-  token: string | null,
-): GithubInstallStatePayload | null {
+function verifyState(service: GithubApi, token: string | null): GithubInstallStatePayload | null {
   return service.tryVerifyInstallState(token);
 }
 
@@ -138,7 +135,7 @@ function publicGithubErrorMessage(): string {
 }
 
 async function handleInstall(c: Context, ports: GithubRestPorts): Promise<Response> {
-  const service: GithubService = ports.github();
+  const service: GithubApi = ports.github();
   const config = service.getAppConfig();
   if (!config.configured) {
     return c.json(
@@ -205,7 +202,7 @@ async function handleInstall(c: Context, ports: GithubRestPorts): Promise<Respon
 }
 
 async function handleSetup(c: Context, ports: GithubRestPorts): Promise<Response> {
-  const service: GithubService = ports.github();
+  const service: GithubApi = ports.github();
   const state = verifyState(service, c.req.query("state") ?? null);
   const installationId = c.req.query("installation_id");
   if (!state || !installationId) {
@@ -369,7 +366,7 @@ function claimOf(err: {
  * installation and a supplied id can never widen what the flow accepts.
  */
 async function resolveExpectedInstallationTarget(input: {
-  service: GithubService;
+  service: GithubApi;
   organizationId: string;
   accountLogin: string | undefined;
   installationId: string | undefined;
@@ -503,7 +500,7 @@ async function applyPullRequestEvent({
 }: {
   payload: unknown;
   deliveryId: string | undefined;
-  service: GithubService;
+  service: GithubApi;
 }): Promise<void> {
   const event = service.tryParsePullRequestEvent(payload);
   if (!event) {

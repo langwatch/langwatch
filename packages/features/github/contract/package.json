@@ -23,6 +23,7 @@
   "dependencies": {
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

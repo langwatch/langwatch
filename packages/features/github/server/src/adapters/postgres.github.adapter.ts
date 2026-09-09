@@ -1,6 +1,6 @@
 import type { GithubService } from "@langwatch/github-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
   PrismaGithubInstallationsRepository,
@@ -25,6 +25,7 @@ import { GithubInstallResponseAdapter } from "./github-install-response.adapter.
 import { GithubInstallStateAdapter } from "./github-install-state.adapter.ts";
 import { GithubPullRequestEventAdapter } from "./github-pull-request-event.adapter.ts";
 import { RedisGithubAdapter } from "./redis.github.adapter.ts";
+import type { GithubRedisConnection } from "./redis.github.adapter.ts";
 
 /** Everything the whole GitHub capability reads through, in one client. */
 export type GithubDatabase = PrismaGithubInstallationsDatabase & PrismaGithubPullRequestsDatabase;
@@ -38,10 +39,10 @@ type PostgresGithubAdapterOptions = {
     webhookSecret: string;
     signingKey: string;
   };
-  redis: object | null;
+  redis: GithubRedisConnection | null;
   hostConfig?: { host?: string };
-  organization: OrganizationService;
-  project: ProjectService;
+  organization: OrganizationApi;
+  project: ProjectApi;
 };
 
 /** Composes the process-owned GitHub service with its private repositories. */

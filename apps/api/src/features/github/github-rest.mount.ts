@@ -4,14 +4,14 @@
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { CodingAgentApp } from "@langwatch/coding-agent-server";
-import type { GithubService } from "@langwatch/github-contract";
+import type { GithubApi } from "@langwatch/github-contract";
 import type { GithubRestPorts, GithubRestSessionPort } from "@langwatch/github-server";
 
 import type { ApiAuditPort } from "../../api-request.policy.ts";
 
 export type ApiGithubRestOptions = Readonly<{
   /** The SAME service the `github.*` tRPC namespace reads. */
-  github: GithubService | undefined;
+  github: GithubApi | undefined;
   /**
    * `undefined` without a Better Auth transport, which makes the whole family
    * absent: `/install` and `/setup` need a session, and `/webhook` alone

@@ -30,7 +30,7 @@ export type PostgresGithubBranchMaintenanceOptions = {
    */
   config: { appId: string; privateKey: string };
   /** The process Redis, for the installation-token cache. */
-  redis?: object | null;
+  redis?: import("./redis.github.adapter.ts").GithubRedisConnection | null;
   hostConfig?: { host?: string };
 };
 

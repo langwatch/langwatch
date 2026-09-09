@@ -1,6 +1,6 @@
 import { GithubRedisPort } from "../ports/github-app-token.port.ts";
 
-type RedisConnection = {
+export type GithubRedisConnection = {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, ...args: (string | number)[]): Promise<string | null>;
   del(key: string): Promise<number>;
@@ -8,7 +8,7 @@ type RedisConnection = {
   eval?: (script: string, numKeys: number, ...args: string[]) => Promise<number | string | null>;
 };
 
-function isRedisConnection(value: object): value is RedisConnection {
+function isRedisConnection(value: object): value is GithubRedisConnection {
   return (
     "get" in value &&
     typeof value.get === "function" &&
@@ -21,7 +21,7 @@ function isRedisConnection(value: object): value is RedisConnection {
 
 /** Keeps the process Redis client behind the GitHub feature's private port. */
 export class RedisGithubAdapter extends GithubRedisPort {
-  static create(connection: object): RedisGithubAdapter {
+  static create(connection: GithubRedisConnection): RedisGithubAdapter {
     if (!isRedisConnection(connection)) {
       throw new TypeError("GitHub requires a Redis-compatible connection");
     }
@@ -29,7 +29,7 @@ export class RedisGithubAdapter extends GithubRedisPort {
     return new RedisGithubAdapter(connection);
   }
 
-  private constructor(private readonly connection: RedisConnection) {
+  private constructor(private readonly connection: GithubRedisConnection) {
     super();
   }
 

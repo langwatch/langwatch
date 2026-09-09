@@ -1,29 +1,4 @@
-/**
- * The organization's GitHub connection over the process's tRPC transport.
- *
- *   getConnectionStatus: the settings surface and every "is GitHub connected?"
- *                        check: the organization's installations (account,
- *                        repository selection, suspended), whether the App is
- *                        configured on this instance, and where to start an
- *                        install.
- *   listRepos:           the repositories reachable across those installations.
- *   pullRequestLiveStatus: the current state of the pull requests on a page.
- *   disconnect:          GitHub can't be uninstalled via the API, so this
- *                        returns a deep link to GitHub's uninstall page; the
- *                        webhook cleans up the local row once GitHub confirms.
- *
- * Reading the connection state takes only membership plus `organization:view`,
- * which every member holds, so a surface that needs GitHub can tell the user to
- * ask an admin rather than pretend nothing is there. Changing it takes
- * `organization:manage`, because an installation grants repository access to the
- * whole organization.
- *
- * Transport only: gates, audit, and delegation to `GithubService`. The install
- * flow itself is the public REST callback the process mounts (GitHub's Setup
- * URL can't live behind tRPC).
- *
- * Spec: specs/integrations/github-connection.feature.
- */
+/** Organization connection, repository, pull-request status and disconnect queries. */
 import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -32,7 +7,7 @@ import {
   githubPullRequestLiveStatusesSchema,
   githubPullRequestRefSchema,
   githubRepositoryRefSchema,
-  type GithubService,
+  type GithubApi,
 } from "@langwatch/github-contract";
 import {
   TRPCError,
@@ -42,7 +17,7 @@ import {
 } from "@trpc/server";
 import { z } from "zod";
 
-type GithubApplication = Readonly<{ github: GithubService }>;
+type GithubApplication = Readonly<{ github: GithubApi }>;
 
 /** The process supplies authentication; authorization arrives as `policy`. */
 export type GithubTrpcContext = Readonly<{
@@ -57,31 +32,15 @@ type GithubTrpcProcedures<
 > = Readonly<{
   /** The process's authenticated procedure. */
   protected: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  /**
-   * The process's tracing, logging, error, scope-lineage, authorization and
-   * audit policy for one declared permission.
-   *
-   * Applied by this feature AFTER its own input parser rather than composed
-   * ahead of it, because the authorization check reads its scope id from the
-   * validated input: tRPC runs middlewares in the order they were added, so a
-   * check installed before `.input()` would see no input at all.
-   */
+  /** Process policy for one declared permission, applied after input parsing. */
   policy(access: AuthzPermission | AuthzDeclaration): TrpcPolicyDecorator;
   /** @see the mount field of the same name. */
   validateOutput: boolean;
 }>;
 
-/**
- * The process capabilities this transport needs that are not GitHub's own.
- */
+/** Process capabilities this transport needs besides GitHub. */
 type GithubTrpcPorts = Readonly<{
-  /**
-   * The organization a project belongs to, or undefined for an orphan project.
-   * The pull-request read is project-scoped because that is how the caller
-   * reaches it, and the organization is derived here rather than taken from
-   * the client, so a caller cannot ask about another tenant's pull requests by
-   * naming its id.
-   */
+  /** Resolves a project's organization; orphan projects are absent. */
   tryResolveOrganizationForProject(projectId: string): Promise<string | undefined>;
   /** The process's audit trail. */
   recordAudit(
@@ -106,19 +65,11 @@ const pullRequestLiveStatusInputSchema = z.object({
   refs: z.array(githubPullRequestRefSchema).max(50),
 });
 
-/**
- * Defence in depth behind the declared `organization:*` check, and the reason
- * it runs second: the permission check answers "may this caller act on an
- * organization at all", and membership then answers "is this one theirs".
- * Membership alone is role-blind, so an EXTERNAL lite member could enumerate
- * the organization's private repositories through `listRepos`; the permission
- * check is the real gate, and this keeps a permitted caller inside their own
- * tenant.
- */
+/** Confirms membership after the declared organization permission check. */
 async function ensureOrganizationMember(
   userId: string,
   organizationId: string,
-  service: GithubService,
+  service: GithubApi,
 ): Promise<void> {
   const isMember = await service.isOrganizationMember({ userId, organizationId });
   if (!isMember) {
@@ -128,12 +79,7 @@ async function ensureOrganizationMember(
   }
 }
 
-/**
- * Installs the complete `github.*` tRPC surface on a process-owned root. The
- * procedure and the policy are injected by the process so its auth, audit,
- * error, logging and tracing policies wrap every feature procedure
- * consistently.
- */
+/** Installs the GitHub tRPC surface over the process-owned policy and root. */
 export class GithubTrpcApi {
   static create<
     TContext extends GithubTrpcContext,

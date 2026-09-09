@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GithubProjectActivityPort } from "../../ports/github-project-activity.port.ts";
 import { PostgresGithubBranchDemandAdapter } from "../postgres.github-branch-demand.adapter.ts";
+import type { Instant } from "@langwatch/time";
 
 const { privateKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -84,14 +85,14 @@ function database() {
 
 class RecordingProjectActivity extends GithubProjectActivityPort {
   readonly resolved: string[] = [];
-  readonly stamped: { projectId: string; at: Date }[] = [];
+  readonly stamped: { projectId: string; at: Instant }[] = [];
 
   async getOrganizationId(projectId: string): Promise<string> {
     this.resolved.push(projectId);
     return "organization-1";
   }
 
-  async touchCodingAgentPullRequestSeen(input: { projectId: string; at: Date }): Promise<void> {
+  async touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void> {
     this.stamped.push(input);
   }
 }
@@ -139,6 +140,23 @@ describe("the GitHub branch demand path composed from Postgres alone", () => {
       });
 
       expect(project.resolved).toEqual(["project_alpha"]);
+    });
+
+    it("passes the activity instant through the project API boundary", async () => {
+      const { client } = database();
+      const project = new RecordingProjectActivity();
+      githubApi();
+
+      await demand(client, project).requestBranchMapping({
+        tenantId: "project_alpha",
+        repositoryHost: "github.com",
+        repositoryOwner: "acme",
+        repositoryName: "refunds",
+        headBranch: "feat/refunds",
+      });
+
+      expect(project.stamped).toHaveLength(1);
+      expect(project.stamped[0]?.at.epochMilliseconds).toBeTypeOf("number");
     });
 
     /** @scenario "Branch demand runs on two project facts rather than a project service" */
