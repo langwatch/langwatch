@@ -14,9 +14,13 @@ const logger = createLogger("langwatch:identity:ssoconn-routing-shadow");
  * The strings keep deciding: every method returns the DECIDING port's answer,
  * unchanged, and the shadow port's answer is only ever compared and logged.
  * That is why this is a wrapper around `SignInDomainRoutingPort` rather than
- * anything inside the router — the engine, `SignInRouterService` and
- * `signInRouterShadow.ts` are untouched, and never learn that two lookups
- * ran. Flipping to `enforce` is composing the projection port on its own.
+ * anything inside the router — the engine and `SignInRouterService` are
+ * untouched, and never learn that two lookups ran. Flipping to `enforce` is
+ * composing the projection port on its own.
+ *
+ * This is the only shadow left. The sign-in router had one too, behind
+ * `IDENTITY_ROUTER_V2`; it was deleted once its bake ended and nothing
+ * called it.
  *
  * The shadow leg cannot break a sign-in: its read runs in parallel, its
  * failures are caught here, and a comparison that could not be computed is

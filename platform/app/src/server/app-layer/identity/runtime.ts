@@ -800,10 +800,18 @@ export function sessionRevocation({
   });
 }
 
-/** The D04 grandfather as the migrations runtime registers it (tenant =
- *  organization). Its proof reads through the two ROUTING ports rather than
- *  the projection directly — a proof that asked the store instead of the port
- *  would pass while the port that actually decides sign-in was miswired. */
+/** The D04 grandfather, composed but deliberately NOT registered.
+ *
+ *  The migrations runtime registers AuthzEngine, the identifier backfill and
+ *  the secret heal, and nothing else — see
+ *  `specs/migration/system-migrations-runner.feature`, "PR1 does not run the
+ *  unproved SSO grandfather migration". This stays composed so PR2 registers
+ *  a wiring that already exists rather than writing one under time pressure;
+ *  until then it runs for nobody.
+ *
+ *  Its proof reads through the two ROUTING ports rather than the projection
+ *  directly — a proof that asked the store instead of the port would pass
+ *  while the port that actually decides sign-in was miswired. */
 export function connectionGrandfatherMigration(): IdentitySsoConnectionGrandfatherMigration {
   return new IdentitySsoConnectionGrandfatherMigration(
     new SsoConnectionGrandfatherService({
