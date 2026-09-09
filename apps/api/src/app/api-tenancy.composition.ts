@@ -2,12 +2,13 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   ApiKeyBindingIdAdapter,
   ApiKeyDiagnosticsAdapter,
-  ApiKeyApp,
+  apiKeyServer,
+  type ApiKeyApp,
 } from "@langwatch/api-key-server";
-import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import { AuthzApi, type AuthzGrantsService, type AuthzService } from "@langwatch/authz-contract";
 import { EventingAuthzGrantAdapter } from "@langwatch/authz-server";
 import { createLogger } from "@langwatch/observability";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
 import {
   GroupIdentityAdapter,
   PersonalWorkspaceDiagnosticsAdapter,
@@ -16,13 +17,14 @@ import {
   TeamIdentityAdapter,
 } from "@langwatch/organization-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
-import type { ProjectService } from "@langwatch/project-contract";
+import { ProjectApi, type ProjectService } from "@langwatch/project-contract";
 import {
   PostgresProjectAdapter,
   ProjectCredentialsAdapter,
   ProjectDiagnosticsPort,
   type ProjectKeyMapPort,
 } from "@langwatch/project-server";
+import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { ApiOrganizationSettingsSecretAdapter } from "./api-organization-settings-secret.adapter.ts";
 
@@ -45,6 +47,11 @@ export type ApiTenancyCompositionOptions = {
    * created after the last backfill resolves nothing.
    */
   keyMap?: ProjectKeyMapPort | undefined;
+  /**
+   * The process's own scope, which the credential store's runtime is stopped
+   * through. Without it the installed module outlives a failed boot.
+   */
+  resources?: ResourceScope | undefined;
 };
 
 /**
@@ -55,7 +62,7 @@ export class ApiTenancyComposition {
    * Composes the three services only when this process has everything they need to answer
    * correctly.
    */
-  static tryCompose(
+  static async tryCompose(
     options: Omit<ApiTenancyCompositionOptions, "database" | "authz" | "encryption" | "pepper"> & {
       database: PrismaConnection | undefined;
       authz: { permissions: AuthzService; grants: AuthzGrantsService } | undefined;
@@ -63,7 +70,7 @@ export class ApiTenancyComposition {
       pepper: string | undefined;
       report?: ApiTenancyAbsenceReportPort;
     },
-  ): ApiTenancyComposition | undefined {
+  ): Promise<ApiTenancyComposition | undefined> {
     if (!options.database) {
       options.report?.absent("no-database");
       return undefined;
@@ -82,10 +89,11 @@ export class ApiTenancyComposition {
       authz: options.authz,
       encryption: options.encryption,
       pepper,
+      ...(options.resources ? { resources: options.resources } : {}),
     });
   }
 
-  static compose(options: ApiTenancyCompositionOptions): ApiTenancyComposition {
+  static async compose(options: ApiTenancyCompositionOptions): Promise<ApiTenancyComposition> {
     const database = options.database.client;
     const organizations = PostgresOrganizationAdapter.create({
       database,
@@ -115,24 +123,31 @@ export class ApiTenancyComposition {
       diagnostics: LoggedApiProjectDiagnostics.create(),
     }).build();
 
-    const apiKeyApp = ApiKeyApp.create({
-      dependencies: {
-        authorization: options.authz.permissions,
-        organizations,
-        projects,
-      },
-      infrastructure: {
-        database,
+    // The credential store is installed rather than hand-built: its repositories
+    // are chosen once, here. The SAME AuthZ service answers both the permission
+    // checks and the legacy grant writes, exactly as it did before, because the
+    // module names one authorization token for both.
+    const runtime = await createApp({ name: "langwatch-api" })
+      .withPersistence("postgres", { prisma: database })
+      .withInfrastructure({
         pepper: options.pepper,
         bindingIds: ApiKeyBindingIdAdapter.create(),
         deriveBindingId: EventingAuthzGrantAdapter.deriveGrantId,
         diagnostics: ApiKeyDiagnosticsAdapter.create(createLogger("langwatch:api-key")),
-      },
-      config: undefined,
-      resources: { own: () => undefined },
-    });
+      })
+      .withProvided(AuthzApi, options.authz.permissions)
+      .withProvided(OrganizationApi, organizations)
+      .withProvided(ProjectApi, projects)
+      .withModule(apiKeyServer)
+      .boot({ role: "api" });
 
-    return new ApiTenancyComposition(organizations, projects, apiKeyApp);
+    options.resources?.own("api credential store", () => runtime.stop());
+
+    return new ApiTenancyComposition(
+      organizations,
+      projects,
+      runtime.module(apiKeyServer).provided,
+    );
   }
 
   private constructor(

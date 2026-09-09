@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ModelProviderKeysService } from "../../services/model-provider-keys.service.ts";
 import { modelProviderRest } from "../model-provider.rest.ts";
-import { createModelProviderTestApp } from "./model-provider.harness.ts";
+import { mountableModelProviderApp } from "./model-provider.harness.ts";
 
 const PROJECT_ID = "project-1";
 
@@ -67,7 +67,7 @@ function storedProviders() {
 }
 
 function mount(modelProviders: Partial<ModelProviderService>) {
-  const { app } = createModelProviderTestApp({ modelProviders });
+  const { app } = mountableModelProviderApp({ modelProviders });
   const hono = createRestRuntime({
     identity: {
       authenticate: () => ({
@@ -134,7 +134,7 @@ describe("the model-providers upsert route", () => {
       const upsert = vi.fn(async () => undefined);
       const getForProject = vi.fn(async () => storedProviders());
       const { put } = mount({
-        upsert: upsert as never,
+        upsertUnattributed: upsert as never,
         getForProject: getForProject as never,
       });
 
@@ -164,7 +164,7 @@ describe("the model-providers upsert route", () => {
     it("qualifies a bare default model with the provider the path named", async () => {
       const upsert = vi.fn(async () => undefined);
       const { put } = mount({
-        upsert: upsert as never,
+        upsertUnattributed: upsert as never,
         getForProject: (async () => ({})) as never,
       });
 
@@ -179,7 +179,7 @@ describe("the model-providers upsert route", () => {
   describe("when the application refuses with a not-found", () => {
     it("answers 404 with the failure's own code", async () => {
       const { put } = mount({
-        upsert: (async () => {
+        upsertUnattributed: (async () => {
           throw new ModelProviderNotFoundError();
         }) as never,
         getForProject: (async () => ({})) as never,
@@ -197,7 +197,7 @@ describe("the model-providers upsert route", () => {
   describe("when the application refuses with a conflict", () => {
     it("answers 409 with the failure's own code", async () => {
       const { put } = mount({
-        upsert: (async () => {
+        upsertUnattributed: (async () => {
           throw new ModelProviderRoutingHandleTakenError({ handle: "taken" });
         }) as never,
         getForProject: (async () => ({})) as never,

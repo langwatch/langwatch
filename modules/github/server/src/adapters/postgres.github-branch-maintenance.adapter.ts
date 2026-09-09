@@ -2,11 +2,11 @@ import type { GithubBranchMaintenancePort } from "../ports/github-branch-mainten
 import {
   PrismaGithubInstallationsRepository,
   type PrismaGithubInstallationsDatabase,
-} from "../repositories/prisma/github-installations.repository.ts";
+} from "../repositories/prisma/prisma.github-installations.repository.ts";
 import {
   PrismaGithubPullRequestsRepository,
   type PrismaGithubPullRequestsDatabase,
-} from "../repositories/prisma/github-pull-requests.repository.ts";
+} from "../repositories/prisma/prisma.github-pull-requests.repository.ts";
 import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service.ts";
 import { GithubBranchMappingService } from "../services/github-branch-mapping.service.ts";
 import { GithubInstallationAccessService } from "../services/github-installation-access.service.ts";

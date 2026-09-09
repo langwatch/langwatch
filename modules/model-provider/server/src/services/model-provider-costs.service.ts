@@ -10,10 +10,12 @@ import {
   type ModelCostWriteInput,
 } from "@langwatch/model-provider-contract";
 import type {
-  ModelCostRepository,
   ModelProviderCatalog,
-  ModelProviderIdService,
+  ModelProviderIdService
 } from "../ports/model-provider.port.ts";
+import type {
+  ModelCostRepository
+} from "../repositories/model-cost.repository.ts";
 import { ModelCostCatalogService } from "./model-cost-catalog.service.ts";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";

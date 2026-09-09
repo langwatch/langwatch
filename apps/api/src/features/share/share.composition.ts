@@ -8,6 +8,7 @@ import {
   DataRetentionApi,
   type DataRetentionApi as DataRetentionApiContract,
 } from "@langwatch/data-retention-contract";
+import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
 import { createApp } from "@langwatch/runtime-composition";
 import { shareServer, type ShareInfrastructure } from "@langwatch/share-server";
 
@@ -21,6 +22,8 @@ export type SharePeers = Readonly<{
   dataRetention: DataRetentionApiContract;
   /** Decides an audience, and records the grant a share hands its viewer. */
   permissions: AuthzApiContract;
+  /** Owns the project row both trace-sharing kill switches sit on. */
+  projects: ProjectApiContract;
 }>;
 
 /** Installs the share surfaces over this process's own graph. */
@@ -31,13 +34,14 @@ export async function installApiShare(options: {
   redis: ShareInfrastructure["redis"];
 }): Promise<ComposedShareFeature> {
   const { prisma } = options.infrastructure;
-  const { dataRetention, permissions } = options.peers;
+  const { dataRetention, permissions, projects } = options.peers;
 
   const runtime = await createApp({ name: "langwatch-api" })
     .withPersistence("postgres", { prisma })
     .withInfrastructure({})
     .withProvided(DataRetentionApi, dataRetention)
     .withProvided(AuthzApi, permissions)
+    .withProvided(ProjectApi, projects)
     .withModule(shareServer, { infrastructure: { redis: options.redis } })
     .boot({ role: "api" });
 

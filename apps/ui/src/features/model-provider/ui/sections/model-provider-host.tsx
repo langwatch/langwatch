@@ -9,7 +9,7 @@ import {
   ModelProviderHostProvider,
   type ModelProviderAvailableScopes,
   type ModelProviderHostPort,
-} from "@langwatch/model-provider-web/screens/model-provider";
+} from "@langwatch/model-provider-web/model-providers";
 import { useMemo, type ReactNode } from "react";
 import { DRAWER_OPEN_PARAM } from "../../../../model/ui-drawer-address";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

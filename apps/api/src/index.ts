@@ -61,8 +61,7 @@ export {
 export type { ComposedHttpProxyFeature } from "./features/agent/http-proxy.composition.types.ts";
 /** The model providers a tenant attaches, and the cost rules they are priced by. */
 export {
-  ApiModelProviderHostPort,
-  composeModelProviderFeature,
+  installApiModelProvider,
   refusingModelProviderFeature,
 } from "./features/model-provider/model-provider.composition.ts";
 export type { ComposedModelProviderFeature } from "./features/model-provider/model-provider.composition.types.ts";

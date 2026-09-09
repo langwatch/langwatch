@@ -5,6 +5,7 @@ import { TupleParam } from "@clickhouse/client";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { DatasetExperimentLookup } from "@langwatch/dataset-server";
@@ -104,6 +105,8 @@ export function composeExperimentFeature(options: {
   redis?: RedisConnection | null;
   /** The credential a run lends the code it executes. */
   apiKeys?: ApiKeyApi;
+  /** The project directory the sandbox mint asks whose personal workspace a project is. */
+  projects?: ProjectApi;
   /** The key this deployment seals stored secrets with; the shared sandbox token rides on it. */
   storedSecretEncryptionKey?: string;
   /** The live-update channel a workbench cell is broadcast on. */
@@ -199,6 +202,7 @@ export function composeExperimentFeature(options: {
     agents: options.peers.agents,
     evaluators: options.peers.evaluators,
     apiKeys: options.apiKeys,
+    projects: options.projects,
     storedSecretEncryptionKey: options.storedSecretEncryptionKey,
     ...(options.runReport ? { report: options.runReport } : {}),
   });

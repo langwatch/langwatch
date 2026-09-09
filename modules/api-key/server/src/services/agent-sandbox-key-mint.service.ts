@@ -4,8 +4,9 @@
 import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 
+import type { ProjectApi } from "@langwatch/project-contract";
+
 import type { AgentSandboxKeySharePort } from "../ports/agent-sandbox-key-share.port.ts";
-import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import { nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:api-key:agent-sandbox");
@@ -28,15 +29,15 @@ export class AgentSandboxKeyMintService {
   static create(options: {
     apiKeys: ApiKeyApi;
     /** Resolves whose credential a personal workspace's key has to be. */
-    repository: Pick<ApiKeyRepository, "findPersonalWorkspaceOwner">;
+    projects: Pick<ProjectApi, "findPersonalWorkspaceOwner">;
     share: AgentSandboxKeySharePort;
   }): AgentSandboxKeyMintService {
-    return new AgentSandboxKeyMintService(options.apiKeys, options.repository, options.share);
+    return new AgentSandboxKeyMintService(options.apiKeys, options.projects, options.share);
   }
 
   private constructor(
     private readonly apiKeys: ApiKeyApi,
-    private readonly repository: Pick<ApiKeyRepository, "findPersonalWorkspaceOwner">,
+    private readonly projects: Pick<ProjectApi, "findPersonalWorkspaceOwner">,
     private readonly share: AgentSandboxKeySharePort,
   ) {}
 
@@ -125,7 +126,7 @@ export class AgentSandboxKeyMintService {
     projectId: string;
     organizationId: string;
   }): Promise<string | null> {
-    const personal = await this.repository.findPersonalWorkspaceOwner({
+    const personal = await this.projects.findPersonalWorkspaceOwner({
       organizationId: input.organizationId,
       scopeId: input.projectId,
     });

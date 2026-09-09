@@ -33,6 +33,6 @@ export class PostgresCodingAgentActivityAdapter {
   private constructor(private readonly database: CodingAgentActivityDatabase) {}
 
   build(): PrismaCodingAgentActivityRepository {
-    return PrismaCodingAgentActivityRepository.create(this.database);
+    return PrismaCodingAgentActivityRepository.create({ prisma: this.database });
   }
 }

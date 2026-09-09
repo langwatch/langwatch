@@ -63,6 +63,18 @@ export class TestProjectApi implements ProjectApi {
     this.overrides.regenerateLegacyProjectKey?.(input) ??
     this.unimplemented("regenerateLegacyProjectKey");
 
+  findIdByLegacyApiKey: ProjectApi["findIdByLegacyApiKey"] = (input) =>
+    this.overrides.findIdByLegacyApiKey?.(input) ?? Promise.resolve(null);
+
+  rotateLegacyApiKey: ProjectApi["rotateLegacyApiKey"] = (input) =>
+    this.overrides.rotateLegacyApiKey?.(input) ?? this.unimplemented("rotateLegacyApiKey");
+
+  findPersonalWorkspaceOwner: ProjectApi["findPersonalWorkspaceOwner"] = (input) =>
+    this.overrides.findPersonalWorkspaceOwner?.(input) ?? Promise.resolve(null);
+
+  findTraceSharingConfig: ProjectApi["findTraceSharingConfig"] = (input) =>
+    this.overrides.findTraceSharingConfig?.(input) ?? Promise.resolve(null);
+
   requestTopicClustering: ProjectApi["requestTopicClustering"] = (input, by) =>
     this.overrides.requestTopicClustering?.(input, by) ??
     this.unimplemented("requestTopicClustering");

@@ -18,9 +18,10 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./screens/integrations": {
-      "types": "./dist/screens/integrations/index.d.ts",
-      "default": "./src/screens/integrations/index.ts"
+    "./integrations": {
+      "langwatch-declaration-source": "./src/integrations.ts",
+      "types": "./dist/integrations.d.ts",
+      "default": "./src/integrations.ts"
     }
   },
   "scripts": {

@@ -1,10 +1,15 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import { createApp } from "@langwatch/runtime-composition";
 import { ShareApi, ShareLinkNotFoundError } from "@langwatch/share-contract";
 import { describe, expect, it } from "vitest";
 import { shareServer } from "../../share.server.ts";
-import { createShareTestAuthz, createShareTestDataRetention } from "./share.fixture.ts";
+import {
+  createShareTestAuthz,
+  createShareTestDataRetention,
+  createShareTestProjects,
+} from "./share.fixture.ts";
 
 function process() {
   return createApp({ name: "share-installation-test" })
@@ -12,6 +17,7 @@ function process() {
     .withInfrastructure({})
     .withProvided(AuthzApi, createShareTestAuthz())
     .withProvided(DataRetentionApi, createShareTestDataRetention())
+    .withProvided(ProjectApi, createShareTestProjects())
     .withModule(shareServer, { infrastructure: { redis: null } });
 }
 

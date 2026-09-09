@@ -23,13 +23,17 @@ import {
   type ModelProviderWriteInput,
 } from "@langwatch/model-provider-contract";
 import type {
-  ModelDefaultRepository,
   ModelProviderCatalog,
   ModelProviderConnectionRateLimiter,
   ModelProviderCredentialPolicy,
-  ModelProviderIdService,
-  ModelProviderRepository,
+  ModelProviderIdService
 } from "../ports/model-provider.port.ts";
+import type {
+  ModelDefaultRepository
+} from "../repositories/model-default.repository.ts";
+import type {
+  ModelProviderRepository
+} from "../repositories/model-provider.repository.ts";
 import { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
 import { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";

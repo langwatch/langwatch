@@ -9,6 +9,7 @@ import {
   type AuthzApi,
   authzShareAudience,
 } from "@langwatch/authz-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { nanoid } from "nanoid";
 import type { ShareLink, ShareResourceType, ShareWithProject } from "@langwatch/share-contract";
 import type { ShareGrantRepository } from "../share-grant.repository.ts";
@@ -18,37 +19,36 @@ import type {
   ShareLinkScope,
   ShareRepository,
   ShareResourceScope,
-  ShareTraceSharingConfig,
 } from "../share.repository.ts";
 
 /** Revocations are system actions; link authorship remains on the mint fact. */
 const SYSTEM_ACTOR: LedgerActor = { type: "system", id: null };
 
+/** The project peer, narrowed to the tenancy answer the ledger fences grants by. */
+type LedgerProjectPeer = Pick<ProjectApi, "tryGetOrganizationId">;
+
+type LedgerShareDependencies = {
+  head: ShareRepository;
+  grants: ShareGrantRepository;
+  authz: AuthzApi;
+  projects: LedgerProjectPeer;
+};
+
 export class LedgerShareRepository implements ShareRepository {
   readonly #head: ShareRepository;
   readonly #grants: ShareGrantRepository;
   readonly #authz: AuthzApi;
+  readonly #projects: LedgerProjectPeer;
 
-  static create(deps: {
-    head: ShareRepository;
-    grants: ShareGrantRepository;
-    authz: AuthzApi;
-  }): LedgerShareRepository {
+  static create(deps: LedgerShareDependencies): LedgerShareRepository {
     return new LedgerShareRepository(deps);
   }
 
-  private constructor(deps: {
-    head: ShareRepository;
-    grants: ShareGrantRepository;
-    authz: AuthzApi;
-  }) {
+  private constructor(deps: LedgerShareDependencies) {
     this.#head = deps.head;
     this.#grants = deps.grants;
     this.#authz = deps.authz;
-  }
-
-  async findTraceSharingConfig(projectId: string): Promise<ShareTraceSharingConfig | null> {
-    return this.#head.findTraceSharingConfig(projectId);
+    this.#projects = deps.projects;
   }
 
   async findByToken(token: string): Promise<ShareWithProject | null> {
@@ -253,7 +253,7 @@ export class LedgerShareRepository implements ShareRepository {
 
   /** Resolve the organisation and use the compat head unless AuthZ reports cut-over. */
   async #ledgerOrganizationFor(projectId: string): Promise<string | null> {
-    const organizationId = await this.#grants.findOrganizationIdByProject(projectId);
+    const organizationId = await this.#organizationOf(projectId);
     if (!organizationId) return null;
     const onEngine = await this.#authz.isOnEngine({ organizationId });
     return onEngine ? organizationId : null;
@@ -264,6 +264,11 @@ export class LedgerShareRepository implements ShareRepository {
    * route could leave the Grant head live and let projection revive the link.
    */
   async #revocationOrganizationFor(projectId: string): Promise<string | null> {
-    return this.#grants.findOrganizationIdByProject(projectId);
+    return this.#organizationOf(projectId);
+  }
+
+  /** The organisation a project sits in, asked of the module that owns the row. */
+  async #organizationOf(projectId: string): Promise<string | null> {
+    return (await this.#projects.tryGetOrganizationId(projectId)) ?? null;
   }
 }

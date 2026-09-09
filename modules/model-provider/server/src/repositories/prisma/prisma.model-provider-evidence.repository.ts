@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
-import { ModelProviderEvidenceRepository } from "../../ports/model-provider.port.ts";
+import type { ModelProviderEvidenceRepository } from "../model-provider-evidence.repository.ts";
 
 type Database = Pick<PrismaClient, "modelProvider">;
 
@@ -23,10 +23,8 @@ type Database = Pick<PrismaClient, "modelProvider">;
  * composition passes is checked by the compiler rather than by a runtime `in`
  * test.
  */
-export class PrismaModelProviderEvidenceRepository extends ModelProviderEvidenceRepository {
-  private constructor(private readonly database: Database) {
-    super();
-  }
+export class PrismaModelProviderEvidenceRepository implements ModelProviderEvidenceRepository {
+  private constructor(private readonly database: Database) {}
 
   static create(database: Database): PrismaModelProviderEvidenceRepository {
     return new PrismaModelProviderEvidenceRepository(database);

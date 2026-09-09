@@ -126,7 +126,7 @@ export class ApiKeyTokenResolutionService {
 
   async regenerateLegacyProjectKey(input: { projectId: string }): Promise<string> {
     const token = this.options.tokens.generateLegacyProjectKey();
-    const rotated = await this.repository.rotateLegacyProjectKey({
+    const rotated = await this.options.projects.rotateLegacyApiKey({
       projectId: input.projectId,
       token,
     });
@@ -170,7 +170,7 @@ export class ApiKeyTokenResolutionService {
   private async findLegacyProjectKeyResolution(
     token: string,
   ): Promise<ResolvedApiKeyCredential | null> {
-    const projectId = await this.repository.findLegacyProjectId({ token });
+    const projectId = await this.options.projects.findIdByLegacyApiKey({ token });
     if (!projectId) {
       return null;
     }

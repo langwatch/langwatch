@@ -17,10 +17,6 @@ export class MemoryShareGrantRepository implements ShareGrantRepository {
     return new MemoryShareGrantRepository(input.memory);
   }
 
-  async findOrganizationIdByProject(projectId: string): Promise<string | null> {
-    return this.#database.project(projectId)?.organizationId ?? null;
-  }
-
   async findAllResourceGrantIds({
     organizationId,
     projectId,

@@ -3,8 +3,7 @@
  * other door reads one through, and the one thing the surface reaches that the feature
  * does not own: the trail a mint, a rotation and a revocation are recorded on.
  */
-import { ApiKeyApp } from "@langwatch/api-key-server";
-import { HandledError } from "@langwatch/handled-error";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 
 import type { ApiAuditPort } from "../../api-request.policy.ts";
 
@@ -21,7 +20,7 @@ export function composeApiKeyFeature(options: {
    */
   audit: ApiAuditPort | undefined;
   /** The SAME credential service every REST door authenticates a caller through. */
-  app: ApiKeyApp;
+  app: ApiKeyApi;
 }): ComposedApiKeyFeature {
   return {
     app: options.app,
@@ -30,23 +29,6 @@ export function composeApiKeyFeature(options: {
         runtime: mount.runtime,
         recordAudit: recordApiKeyAudit(options.audit),
       }),
-  };
-}
-
-/**
- * `apiKey.*` on a process that composed no credential service. The namespace still mounts
- * and every call refuses by name, so a person is told the deployment holds no credential
- * store rather than shown a project with no keys in it.
- */
-export function refusingApiKeyFeature(): ComposedApiKeyFeature {
-  const refuse = (): never => {
-    throw new ApiKeyUnavailableError("credential store");
-  };
-
-  return {
-    app: new Proxy({}, { get: () => refuse, has: () => true }) as ApiKeyApp,
-    router: (mount) =>
-      createApiKeyTrpcRouter({ runtime: mount.runtime, recordAudit: () => undefined }),
   };
 }
 
@@ -64,17 +46,4 @@ function recordApiKeyAudit(audit: ApiAuditPort | undefined): ApiKeyAuditSink["re
       error: null,
     });
   };
-}
-
-/** A capability this deployment did not compose, refused by name. */
-export class ApiKeyUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `This deployment has no ${capability}.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ApiKeyUnavailableError";
-  }
 }

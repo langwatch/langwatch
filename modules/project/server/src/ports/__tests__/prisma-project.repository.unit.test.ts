@@ -20,7 +20,7 @@ function repositoryWithQueries(options: {
     findMany: vi.fn(async () => options.paths ?? []),
   };
   const database = { project, team: {} } as unknown as PrismaClient;
-  return { repository: PrismaProjectRepository.create(database), project };
+  return { repository: PrismaProjectRepository.create({ prisma: database }), project };
 }
 
 describe("PrismaProjectRepository trace destinations", () => {
@@ -104,7 +104,7 @@ describe("PrismaProjectRepository.tryGetTraceDestination", () => {
     const database = { project, team: {} } as unknown as PrismaClient;
 
     await expect(
-      PrismaProjectRepository.create(database).tryGetTraceDestination(archived.id),
+      PrismaProjectRepository.create({ prisma: database }).tryGetTraceDestination(archived.id),
     ).resolves.toEqual(archived);
   });
 });
@@ -117,7 +117,7 @@ describe("PrismaProjectRepository.listTraceDestinations", () => {
     const database = { project, team: {} } as unknown as PrismaClient;
 
     await expect(
-      PrismaProjectRepository.create(database).listTraceDestinations([
+      PrismaProjectRepository.create({ prisma: database }).listTraceDestinations([
         first.id,
         "project_unknown",
         second.id,
@@ -133,9 +133,8 @@ describe("PrismaProjectRepository coding-agent activity", () => {
   ] as const)("throttles the %s clock independently", async (_name, field, method) => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     const repository = PrismaProjectRepository.create({
-      project: { updateMany },
-      team: {},
-    } as unknown as PrismaClient);
+      prisma: { project: { updateMany }, team: {} } as unknown as PrismaClient,
+    });
     const at = new Date("2026-08-25T12:00:00.000Z");
     const staleBefore = new Date("2026-08-25T11:00:00.000Z");
 
@@ -159,9 +158,8 @@ describe("PrismaProjectRepository.tryGetOrganizationId", () => {
       .mockResolvedValueOnce({ team: { organizationId: "org_1" } })
       .mockResolvedValueOnce(null);
     const repository = PrismaProjectRepository.create({
-      project: { findUnique },
-      team: {},
-    } as unknown as PrismaClient);
+      prisma: { project: { findUnique }, team: {} } as unknown as PrismaClient,
+    });
 
     await expect(repository.tryGetOrganizationId("project_archived")).resolves.toBe("org_1");
     await expect(repository.tryGetOrganizationId("project_missing")).resolves.toBe(undefined);

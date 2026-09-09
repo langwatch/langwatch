@@ -32,20 +32,7 @@ export interface ConsumeShareViewParams extends ShareLinkScope {
   maxViews: number | null;
 }
 
-/** Both kill switches a mint is refused by, read from the project row. */
-export interface ShareTraceSharingConfig {
-  orgEnabled: boolean;
-  projectEnabled: boolean;
-}
-
 export interface ShareRepository {
-  /**
-   * Whether the organisation and the project both still allow trace sharing.
-   * Read here rather than through `ProjectApi`, which does not declare it; the
-   * same two columns already ride every token resolution below.
-   */
-  findTraceSharingConfig(projectId: string): Promise<ShareTraceSharingConfig | null>;
-
   /** Resolve a token with the project context used by sharing policy. */
   findByToken(token: string): Promise<ShareWithProject | null>;
 

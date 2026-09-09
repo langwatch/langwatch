@@ -12,9 +12,9 @@ import { AgentSandboxKeyMintService } from "../agent-sandbox-key-mint.service.ts
 
 const create = vi.fn();
 
-// The mint takes the composed capability now rather than building one from a
-// Prisma client, so the double is the capability itself and no module needs
-// spying on.
+// The mint takes the composed capabilities now rather than building one from a
+// Prisma client, so the doubles are the capabilities themselves and no module
+// needs spying on.
 const apiKeys = { create } as unknown as ApiKeyApi;
 
 /** The share as a process holds it: whatever was last held, for as long as the test runs. */
@@ -37,19 +37,19 @@ class MemoryShare extends AgentSandboxKeySharePort {
 }
 
 /** Nobody owns a shared project; a personal workspace answers its owner. */
-function repositoryOwning(ownerUserId: string | null) {
+function projectsOwning(ownerUserId: string | null) {
   const findPersonalWorkspaceOwner = vi
     .fn()
     .mockResolvedValue(ownerUserId === null ? null : { ownerUserId });
-  return { repository: { findPersonalWorkspaceOwner }, findPersonalWorkspaceOwner };
+  return { projects: { findPersonalWorkspaceOwner }, findPersonalWorkspaceOwner };
 }
 
 function mintService(options: { ownerUserId?: string | null; share?: AgentSandboxKeySharePort }) {
-  const { repository, findPersonalWorkspaceOwner } = repositoryOwning(options.ownerUserId ?? null);
+  const { projects, findPersonalWorkspaceOwner } = projectsOwning(options.ownerUserId ?? null);
   return {
     service: AgentSandboxKeyMintService.create({
       apiKeys,
-      repository,
+      projects,
       share: options.share ?? new MemoryShare(),
     }),
     findPersonalWorkspaceOwner,

@@ -4,7 +4,7 @@
  * an editor open on the row the reader looked at before this one.
  */
 
-import type { ApiKeyPlatformDrawer } from "@langwatch/api-key-web/screens/api-key";
+import type { ApiKeyPlatformDrawer } from "@langwatch/api-key-web/api-keys";
 
 export function openPlatformDrawer({
   query,

@@ -45,7 +45,7 @@ export class PostgresProjectMetadataAdapter {
 
   build(): ProjectMetadataService {
     return ProjectMetadataService.create({
-      repository: PrismaProjectRepository.create(this.database),
+      repository: PrismaProjectRepository.create({ prisma: this.database }),
       ...(this.diagnostics ? { diagnostics: this.diagnostics } : {}),
     });
   }

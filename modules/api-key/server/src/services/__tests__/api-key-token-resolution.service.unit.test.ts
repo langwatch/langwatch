@@ -53,8 +53,6 @@ function serviceWith(fakes: Fakes = {}) {
         calls.push("upgradeHash");
         if (fakes.upgradeFails) throw new Error("write failed");
       },
-      findLegacyProjectId: async () => fakes.legacyProjectId ?? null,
-      rotateLegacyProjectKey: async () => "rotated",
     },
     tokens: {
       findTokenParts: (token: string) =>
@@ -65,6 +63,8 @@ function serviceWith(fakes: Fakes = {}) {
     },
     projects: {
       tryGetIdentity: async () => (fakes.identity === undefined ? project() : fakes.identity),
+      findIdByLegacyApiKey: async () => fakes.legacyProjectId ?? null,
+      rotateLegacyApiKey: async () => true,
     },
     legacyGrants: { mint: () => calls.push("mint") },
   } as never);
@@ -350,7 +350,7 @@ describe("ApiKeyTokenResolutionService", () => {
     describe("given a project that has no legacy key to rotate", () => {
       it("refuses, rather than reporting a token it never stored", async () => {
         const service = ApiKeyTokenResolutionService.create({
-          repository: { rotateLegacyProjectKey: async () => null },
+          projects: { rotateLegacyApiKey: async () => false },
           tokens: { generateLegacyProjectKey: () => "generated" },
         } as never);
 
@@ -375,24 +375,24 @@ describe("ApiKeyTokenResolutionService", () => {
      * be observed to actually swap which token resolves, not merely that a
      * new string came back.
      */
-    describe("given a rotation against a repository that actually swaps the stored token", () => {
+    describe("given a rotation against a project directory that swaps the stored token", () => {
       /** @scenario "Rotation invalidates the previous base key" */
       it("makes the old token resolve to nothing and the new one resolve to the project", async () => {
         const projectId = "project-1";
         let storedToken: string | null = LEGACY_TOKEN;
 
         const service = ApiKeyTokenResolutionService.create({
-          repository: {
-            findLegacyProjectId: async ({ token }: { token: string }) =>
+          tokens: { generateLegacyProjectKey: () => "sk-lw-rotated-project-key" },
+          projects: {
+            tryGetIdentity: async () => project(),
+            findIdByLegacyApiKey: async ({ token }: { token: string }) =>
               token === storedToken ? projectId : null,
-            rotateLegacyProjectKey: async (input: { projectId: string; token: string }) => {
-              if (input.projectId !== projectId) return null;
+            rotateLegacyApiKey: async (input: { projectId: string; token: string }) => {
+              if (input.projectId !== projectId) return false;
               storedToken = input.token;
               return true;
             },
           },
-          tokens: { generateLegacyProjectKey: () => "sk-lw-rotated-project-key" },
-          projects: { tryGetIdentity: async () => project() },
         } as never);
 
         await expect(service.findResolvedToken({ token: LEGACY_TOKEN })).resolves.toMatchObject({

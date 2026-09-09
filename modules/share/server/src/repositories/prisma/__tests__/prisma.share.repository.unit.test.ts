@@ -16,7 +16,7 @@ type ShareDatabase = Parameters<typeof PrismaShareRepository.create>[0]["prisma"
 describe("PrismaShareRepository tenant scoping", () => {
   const buildRepository = (shareLink: Record<string, unknown>) =>
     PrismaShareRepository.create({
-      prisma: { shareLink, project: { findUnique: vi.fn() } } as unknown as ShareDatabase,
+      prisma: { shareLink } as unknown as ShareDatabase,
     });
 
   describe("when looking a link up by id", () => {

@@ -4,15 +4,13 @@ import {
   type ModelCost,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
-import { ModelCostRepository } from "../../ports/model-provider.port.ts";
+import type { ModelCostRepository } from "../model-cost.repository.ts";
 import { byScopePrecedence } from "../../rules/model-cost-scope-precedence.rules.ts";
 
 type Database = Pick<PrismaClient, "customLLMModelCost">;
 
-export class PrismaModelCostRepository extends ModelCostRepository {
-  private constructor(private readonly database: Database) {
-    super();
-  }
+export class PrismaModelCostRepository implements ModelCostRepository {
+  private constructor(private readonly database: Database) {}
 
   static create(database: Database): PrismaModelCostRepository {
     return new PrismaModelCostRepository(database);

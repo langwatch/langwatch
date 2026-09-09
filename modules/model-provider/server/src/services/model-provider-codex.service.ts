@@ -8,7 +8,12 @@ import {
   type ModelProviderCodexStatus,
   type ModelProviderCodexStatusInput,
 } from "@langwatch/model-provider-contract";
-import type { CodexTokenRefresher, ModelProviderRepository } from "../ports/model-provider.port.ts";
+import type {
+  CodexTokenRefresher
+} from "../ports/model-provider.port.ts";
+import type {
+  ModelProviderRepository
+} from "../repositories/model-provider.repository.ts";
 import type { ModelProviderQueryService } from "./model-provider-query.service.ts";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 

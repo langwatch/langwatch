@@ -24,7 +24,7 @@ import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.compo
 import { composeAutomationFeature } from "../../automation/automation.composition.ts";
 import { composeCodingAgentFeature } from "../../coding-agent/coding-agent.composition.ts";
 import { composeEnterpriseFeature } from "../../enterprise/enterprise.composition.ts";
-import { composeProjectFeature } from "../../project/project.composition.ts";
+import { installApiProject } from "../../project/project.composition.ts";
 import { composeOrganizationFeature } from "../organization.composition.ts";
 import {
   stubCollaborators,
@@ -124,7 +124,7 @@ function testOrganizationApp() {
 /**
  * The two collaborators the invitation half is composed over.
  */
-function composeApplication(options: { withInvitations?: boolean } = {}) {
+async function composeApplication(options: { withInvitations?: boolean } = {}) {
   const prisma = testPrisma();
   const authz = testAuthz();
   const organizations = testOrganizationApp();
@@ -168,10 +168,10 @@ function composeApplication(options: { withInvitations?: boolean } = {}) {
     demoProject: { userId: "", projectId: "" },
   });
 
-  const projectFeature = composeProjectFeature({
+  const projectFeature = await installApiProject({
     infrastructure,
     peers: {
-      projects,
+      organizations,
       apiKeys: {} as unknown as ApiKeyApi,
       share: {} as unknown as ShareApi,
       topics: {
@@ -279,8 +279,8 @@ function refusal(body: unknown): string {
 
 describe("given an API process composed with the five tenant features", () => {
   describe("when the record is built", () => {
-    it("mounts all nine tenant-administration namespaces", () => {
-      const { features } = composeApplication();
+    it("mounts all nine tenant-administration namespaces", async () => {
+      const { features } = await composeApplication();
 
       const record = features.build(stubMount());
 
@@ -292,7 +292,7 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when the setup screen asks whether a project has its first trace", () => {
     it("answers through the project application this half composes", async () => {
-      const { application, projects } = composeApplication();
+      const { application, projects } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "project.getHasFirstMessage", {
         projectId: PROJECT_ID,
@@ -306,7 +306,7 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when the coding-agent page asks for a project's usage", () => {
     it("answers emptily on a process with no session storage", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { status } = await callTrpc(application, "codingAgents.usageTotals", {
         projectId: PROJECT_ID,
@@ -318,7 +318,7 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when a project lists its automations", () => {
     it("reads them through the composed automation application", async () => {
-      const { application, prisma } = composeApplication();
+      const { application, prisma } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "automation.getTriggers", {
         projectId: PROJECT_ID,
@@ -332,7 +332,7 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when a project lists the addresses that unsubscribed", () => {
     it("answers from the same automation application and records the read", async () => {
-      const { application, audit } = composeApplication();
+      const { application, audit } = await composeApplication();
 
       const { status } = await callTrpc(application, "emailSuppression.getAll", {
         projectId: PROJECT_ID,
@@ -345,7 +345,7 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when no invitation service is composed", () => {
     it("refuses the pending-invite read by name rather than answering with none", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { body } = await callTrpc(application, "organization.getOrganizationPendingInvites", {
         organizationId: ORGANIZATION_ID,
@@ -363,7 +363,7 @@ describe("given an API process composed with the five tenant features", () => {
      * invite the same person twice.
      */
     it("answers the pending-invite read from the invitation rows", async () => {
-      const { application, invites } = composeApplication({ withInvitations: true });
+      const { application, invites } = await composeApplication({ withInvitations: true });
 
       const { status, body } = await callTrpc(
         application,
@@ -383,7 +383,7 @@ describe("given an API process composed with the five tenant features", () => {
      * a default host would look right in the listing and open nothing.
      */
     it("carries an acceptance link on this deployment's own origin", async () => {
-      const { application } = composeApplication({ withInvitations: true });
+      const { application } = await composeApplication({ withInvitations: true });
 
       const { body } = await callTrpc(application, "organization.getOrganizationPendingInvites", {
         organizationId: ORGANIZATION_ID,
@@ -395,7 +395,7 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when no protections resolver is composed", () => {
     it("refuses the field-redaction read by name rather than guessing", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { body } = await callTrpc(application, "project.getFieldRedactionStatus", {
         projectId: PROJECT_ID,
@@ -413,7 +413,7 @@ describe("given an API process composed with the five tenant features", () => {
      * internals a caller cannot act on — just not this refusal.
      */
     it("refuses the request by name rather than accepting a run nobody starts", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { body } = await callTrpc(
         application,
@@ -429,7 +429,7 @@ describe("given an API process composed with the five tenant features", () => {
 
   describe("when no Enterprise application is composed", () => {
     it("still mounts the licence surface, and refuses the read by name", async () => {
-      const { application } = composeApplication();
+      const { application } = await composeApplication();
 
       const { body } = await callTrpc(application, "license.getStatus", {
         organizationId: ORGANIZATION_ID,

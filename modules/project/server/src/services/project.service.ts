@@ -47,11 +47,10 @@ import {
   type ProjectKeyMapPort,
   type ProjectStoredObjectsPort,
 } from "../ports/project.port.ts";
+import { codingAgentActivityStaleBefore } from "../repositories/coding-agent-activity.repository.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 import { ProjectMetadataService } from "./project-metadata.service.ts";
 import { ProjectSlugService } from "./project-slug.service.ts";
-
-export const CODING_AGENT_ACTIVITY_TOUCH_MS = 60 * 60 * 1000;
 
 export class ProjectService extends ProjectServiceContract {
   listPaths(input: { projectIds: string[] }) {
@@ -429,14 +428,14 @@ export class ProjectService extends ProjectServiceContract {
   touchCodingAgentSessionSeen(input: { projectId: string; at: Date }): Promise<void> {
     return this.repository.touchCodingAgentSessionSeen({
       ...input,
-      staleBefore: new Date(input.at.getTime() - CODING_AGENT_ACTIVITY_TOUCH_MS),
+      staleBefore: codingAgentActivityStaleBefore(input.at),
     });
   }
 
   touchCodingAgentPullRequestSeen(input: { projectId: string; at: Date }): Promise<void> {
     return this.repository.touchCodingAgentPullRequestSeen({
       ...input,
-      staleBefore: new Date(input.at.getTime() - CODING_AGENT_ACTIVITY_TOUCH_MS),
+      staleBefore: codingAgentActivityStaleBefore(input.at),
     });
   }
 
@@ -448,11 +447,36 @@ export class ProjectService extends ProjectServiceContract {
     return this.repository.searchByQuery(input);
   }
 
+  /**
+   * Kept on the `tryGet*` spelling because the dying abstract contract still
+   * declares it; the `find*` name a nullable answer earns lives on `ProjectApi`
+   * and on the repository below.
+   */
   tryGetTraceSharingConfig(projectId: string): Promise<TraceSharingConfig | null> {
-    return this.repository.tryGetTraceSharingConfig(projectId);
+    return this.repository.findTraceSharingConfig(projectId);
   }
 
   resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution> {
     return this.metadata.resolveOrgAdmin(projectId);
+  }
+
+  /**
+   * The three answers the credential side asks this module for. They live here
+   * because the project and team rows are this module's, and a peer that reads
+   * them itself would be a second owner of the same tables.
+   */
+  findIdByLegacyApiKey(input: { token: string }): Promise<string | null> {
+    return this.repository.findIdByLegacyApiKey(input);
+  }
+
+  rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
+    return this.repository.rotateLegacyApiKey(input);
+  }
+
+  findPersonalWorkspaceOwner(input: {
+    organizationId: string;
+    scopeId: string;
+  }): Promise<{ ownerUserId: string | null } | null> {
+    return this.repository.findPersonalWorkspaceOwner(input);
   }
 }

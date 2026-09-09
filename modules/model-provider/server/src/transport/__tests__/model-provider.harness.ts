@@ -5,20 +5,21 @@
 import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
 import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
 import type {
+  ModelProviderApi,
   ModelProviderCredentialVerdict,
-  ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { ModelProviderApp } from "../../app/model-provider.app.ts";
+import { createModelProviderTestApp } from "../../app/__tests__/model-provider.fixture.ts";
+import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
+import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
+import type { ModelProviderApp } from "../../app/model-provider.app.ts";
 import {
   CodexAccountService,
   type CodexDeviceCode,
   type CodexPollResult,
 } from "../../adapters/codex-oauth.model-provider-token-refresher.adapter.ts";
 import { ModelProviderCredentialProbePort } from "../../ports/model-provider.port.ts";
-import { ModelProviderAuthorizationService } from "../../services/model-provider-authorization.service.ts";
-import { ModelProviderWriteAuthorizationService } from "../../services/model-provider-write-authorization.service.ts";
 
 /** What a mount reads off the request: who is calling. */
 export type ModelProviderTrpcTestContext = { actor: { id: string } };
@@ -121,36 +122,86 @@ export class StubCodexAccounts extends CodexAccountService {
 }
 
 /**
- * The application under test: the gateway is a stub of exactly the operations
- * a suite reads, and the write check runs against the authorization answer the
- * suite decides.
+ * The application under test: a real app over the memory repositories, with
+ * the operations a suite decided answering in place of the stored ones. The
+ * checks the app runs before a probe leaves - the per-scope write standing  - 
+ * are the real ones, because that gate is the whole authorization.
  */
-export function createModelProviderTestApp(options: {
-  modelProviders?: Partial<ModelProviderService>;
+export function mountableModelProviderApp(options: {
+  modelProviders?: Partial<ModelProviderApi>;
   spans?: unknown;
   probe?: RecordingCredentialProbe;
   permits?: ModelProviderTestDecision;
   /** The device flow this suite decided, or none where it reaches no issuer. */
   codexAccounts?: CodexAccountService;
-}): { app: ModelProviderApp; probe: RecordingCredentialProbe } {
+}): {
+  app: ModelProviderApi;
+  probe: RecordingCredentialProbe;
+  repositories: ModelProviderRepositories;
+} {
   const probe = options.probe ?? RecordingCredentialProbe.create(VERIFIED);
   const permits = options.permits ?? (() => true);
-  const authorization = ModelProviderAuthorizationService.create(
-    createApiFixture<AuthzApi>({
-      getDecision: async ({ permission }: { permission: AuthzPermission }) => ({
-        permitted: permits(permission),
-        organizationRole: null,
-      }),
-    }),
-  );
+  const repositories = MemoryModelProviderRepositories.create();
 
-  const app = ModelProviderApp.create({
-    modelProviders: options.modelProviders as ModelProviderService,
-    spans: options.spans ?? {},
-    credentialProbe: probe,
-    providerAuthorization: ModelProviderWriteAuthorizationService.create(authorization),
-    codexAccounts: options.codexAccounts ?? new CodexAccountService(refuseFetch),
+  const real = createModelProviderTestApp({
+    repositories,
+    dependencies: {
+      permissions: createApiFixture<AuthzApi>({
+        getDecision: async ({ permission }: { permission: AuthzPermission }) => ({
+          permitted: permits(permission),
+          organizationRole: null,
+        }),
+      }),
+    },
+    infrastructure: {
+      credentialProbe: probe,
+      spans: options.spans ?? {},
+      ...(options.codexAccounts ? { codexAccounts: options.codexAccounts } : {}),
+    },
   });
 
-  return { app, probe };
+  return { app: { ...forwarded(real), ...options.modelProviders }, probe, repositories };
+}
+
+/** Every operation of the real app, bound to it so its private state travels. */
+function forwarded(app: ModelProviderApp): ModelProviderApi {
+  return {
+    estimateCost: (...args) => app.estimateCost(...args),
+    listForProject: (...args) => app.listForProject(...args),
+    listForOrganization: (...args) => app.listForOrganization(...args),
+    getForProject: (...args) => app.getForProject(...args),
+    tryGetProviderForProject: (...args) => app.tryGetProviderForProject(...args),
+    tryFindRowServingModel: (...args) => app.tryFindRowServingModel(...args),
+    getExecutionProviders: (...args) => app.getExecutionProviders(...args),
+    prepareExecution: (...args) => app.prepareExecution(...args),
+    upsert: (...args) => app.upsert(...args),
+    upsertUnattributed: (...args) => app.upsertUnattributed(...args),
+    delete: (...args) => app.delete(...args),
+    validateApiKey: (...args) => app.validateApiKey(...args),
+    validateStoredKey: (...args) => app.validateStoredKey(...args),
+    startCodexDeviceSignIn: () => app.startCodexDeviceSignIn(),
+    pollCodexDeviceSignIn: (...args) => app.pollCodexDeviceSignIn(...args),
+    testConnection: (...args) => app.testConnection(...args),
+    getCodexStatus: (...args) => app.getCodexStatus(...args),
+    refreshCodexForGateway: (...args) => app.refreshCodexForGateway(...args),
+    isManagedProvider: (...args) => app.isManagedProvider(...args),
+    getDefaultSnapshot: (...args) => app.getDefaultSnapshot(...args),
+    getDefaultSnapshotUnattributed: (...args) => app.getDefaultSnapshotUnattributed(...args),
+    getInheritedValues: (...args) => app.getInheritedValues(...args),
+    tryGetResolvedDefault: (...args) => app.tryGetResolvedDefault(...args),
+    resolveModelForFeature: (...args) => app.resolveModelForFeature(...args),
+    findAlternateModel: (...args) => app.findAlternateModel(...args),
+    setDefault: (...args) => app.setDefault(...args),
+    saveDefaultConfig: (...args) => app.saveDefaultConfig(...args),
+    assertApiKeyMayWriteDefaultScopes: (...args) => app.assertApiKeyMayWriteDefaultScopes(...args),
+    tryGetDefaultConfig: (...args) => app.tryGetDefaultConfig(...args),
+    deleteDefaultConfig: (...args) => app.deleteDefaultConfig(...args),
+    listCosts: (...args) => app.listCosts(...args),
+    findModelLimits: (...args) => app.findModelLimits(...args),
+    previewCostRuleMatchingSpans: (...args) => app.previewCostRuleMatchingSpans(...args),
+    upsertCost: (...args) => app.upsertCost(...args),
+    deleteCost: (...args) => app.deleteCost(...args),
+    translate: (...args) => app.translate(...args),
+    applyCodexCodingDefaults: (...args) => app.applyCodexCodingDefaults(...args),
+  };
 }

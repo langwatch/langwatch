@@ -9,7 +9,7 @@ import {
   AuthorizeHostProvider,
   type AuthorizeHostPort,
   type AuthorizeSessionStatus,
-} from "@langwatch/api-key-web/screens/authorize";
+} from "@langwatch/api-key-web/authorize";
 import { useMemo, type ReactNode } from "react";
 import { useUiAddress } from "../../../../behavior/ui-address";
 import { writeUiClipboard } from "../../../../behavior/ui-clipboard";

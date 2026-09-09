@@ -16,14 +16,11 @@ export interface ConsumeShareUsageParams {
 }
 
 /**
- * The grants-ledger half of a share link: the organisation a project sits in,
- * the resource grants that name its links, and the GrantUsage row that owns a
- * cut-over link's view count (ADR-092, decision 22).
+ * The grants-ledger half of a share link: the resource grants that name its
+ * links, and the GrantUsage row that owns a cut-over link's view count
+ * (ADR-092, decision 22).
  */
 export interface ShareGrantRepository {
-  /** The organisation a project belongs to, or null when it has no team. */
-  findOrganizationIdByProject(projectId: string): Promise<string | null>;
-
   /** Project-scoped resource grants matching every supplied discriminator. */
   findAllResourceGrantIds(scope: ShareGrantScope): Promise<string[]>;
 

@@ -18,19 +18,13 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { LogApi } from "@langwatch/log-contract";
 import { logServer } from "@langwatch/log-server";
 import { metricServer } from "@langwatch/metric-server";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { ModelProviderApp } from "@langwatch/model-provider-server";
+import { modelProviderServer } from "@langwatch/model-provider-server";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { BroadcastAdapter } from "@langwatch/presence-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import {
-  createApp,
-  defineModule,
-  type FeatureSetup,
-  type ResourceScope,
-} from "@langwatch/runtime-composition";
+import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import {
@@ -136,8 +130,23 @@ export async function createWorkerObservabilityApps(
     signingKey: options.githubSigningKey,
     resources: options.resources,
   });
+  // Assigned once the runtime below has booted. The cost-rule preview reads
+  // spans through this runtime's OWN trace application, and that application
+  // does not exist until every module on the runtime is installed.
+  let traceApp: TraceApi | undefined;
+  const readSpansThrough = (): TraceApi => {
+    if (!traceApp) throw new Error("The worker read spans before its trace application existed.");
+
+    return traceApp;
+  };
   const runtime = await createApp({ name: "langwatch-worker-observability" })
-    .withPersistence("postgres", { prisma: options.connection.client })
+    .withPersistence("postgres", {
+      prisma: options.connection.client,
+      // The model-provider repositories are built over the deployment's own
+      // cipher: the stored credential is a wire format shared between
+      // processes, so it travels with the connection.
+      credentials: options.models.installation.credentials,
+    })
     .withInfrastructure({})
     .withProvided(ProjectApi, foundation.projects)
     .withProvided(OrganizationApi, foundation.organizations)
@@ -149,7 +158,15 @@ export async function createWorkerObservabilityApps(
     .withProvided(EntitlementApi, options.plans)
     .withProvided(FeatureFlagApi, options.featureFlags)
     .withProvided(CodingAgentApi, codingAgents.app)
-    .withModule(workerModelProviderServer, { infrastructure: options.models })
+    .withModule(modelProviderServer, {
+      infrastructure: {
+        ...options.models.installation.infrastructure,
+        // The cost-rule preview reads spans through this runtime's OWN trace
+        // application, resolved on use rather than held: the trace module is
+        // installed on this same runtime, a line below.
+        spans: new WorkerModelProviderTraceSpans(readSpansThrough),
+      },
+    })
     .withModule(traceServer, { infrastructure: traces })
     .withModule(annotationServer)
     .withModule(dataPrivacyServer, { infrastructure: telemetry.dataPrivacy })
@@ -165,6 +182,7 @@ export async function createWorkerObservabilityApps(
     })
     .boot({ role: "worker", config: { log: telemetry.logConfig } });
 
+  traceApp = runtime.module(traceServer).provided;
   options.resources.own("worker observability feature runtime", () => runtime.stop());
   const processing = options.evaluation.processing.tryGet();
   if (!processing) {
@@ -183,36 +201,14 @@ export async function createWorkerObservabilityApps(
   };
 }
 
-const workerModelProviderDependencies = { traces: TraceApi };
-
-const workerModelProviderServer = defineModule("model-provider")
-  .withApp({
-    contract: ModelProviderApi,
-    dependencies: workerModelProviderDependencies,
-    create({
-      dependencies,
-      infrastructure,
-    }: FeatureSetup<
-      typeof workerModelProviderDependencies,
-      WorkerModelProviders,
-      undefined
-    >): ModelProviderApp {
-      return ModelProviderApp.create({
-        modelProviders: infrastructure.modelProviders,
-        spans: new WorkerModelProviderTraceSpans(dependencies.traces),
-      });
-    },
-  })
-  .build();
-
 class WorkerModelProviderTraceSpans {
-  #traces: TraceApi;
-  constructor(traces: TraceApi) {
+  #traces: () => TraceApi;
+  constructor(traces: () => TraceApi) {
     this.#traces = traces;
   }
 
   getModelUsageStats(input: { tenantId: string; fromMs: number; limit: number }) {
-    return this.#traces.readModelUsageStats({
+    return this.#traces().readModelUsageStats({
       projectId: input.tenantId,
       fromMs: input.fromMs,
       limit: input.limit,
@@ -226,7 +222,7 @@ class WorkerModelProviderTraceSpans {
     perModelLimit: number;
     limit: number;
   }) {
-    return this.#traces.readRecentSpansByModels({
+    return this.#traces().readRecentSpansByModels({
       projectId: input.tenantId,
       models: input.models,
       fromMs: input.fromMs,

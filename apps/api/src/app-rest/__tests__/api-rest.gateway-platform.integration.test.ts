@@ -28,7 +28,7 @@ import {
  * Composed at import so the module-level fixture ids below can be seeded
  * against it. Null without a datastore, which is what the suite skips on.
  */
-const harness = databaseUrl && clickHouseUrl ? mountGatewayPlatformRest() : null;
+const harness = databaseUrl && clickHouseUrl ? await mountGatewayPlatformRest() : null;
 const prisma = harness?.prisma as PrismaClient;
 
 /**

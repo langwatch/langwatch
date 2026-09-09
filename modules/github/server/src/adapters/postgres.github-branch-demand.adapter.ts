@@ -4,11 +4,11 @@ import type { GithubProjectActivityPort } from "../ports/github-project-activity
 import {
   PrismaGithubInstallationsRepository,
   type PrismaGithubInstallationsDatabase,
-} from "../repositories/prisma/github-installations.repository.ts";
+} from "../repositories/prisma/prisma.github-installations.repository.ts";
 import {
   PrismaGithubPullRequestsRepository,
   type PrismaGithubPullRequestsDatabase,
-} from "../repositories/prisma/github-pull-requests.repository.ts";
+} from "../repositories/prisma/prisma.github-pull-requests.repository.ts";
 import {
   GithubBranchDemandService,
   type BranchMappingRequest,

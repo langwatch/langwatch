@@ -11,6 +11,7 @@ import {
   TraceSharingDisabledError,
 } from "@langwatch/share-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareCacheRepository } from "../../repositories/share-cache.repository.ts";
 import type { ShareRepository } from "../../repositories/share.repository.ts";
 import { ShareService } from "../share.service.ts";
@@ -51,15 +52,12 @@ describe("ShareService", () => {
   let repo: ShareRepository;
   let dataRetention: DataRetentionApi;
   let permissions: AuthzApi;
+  let projects: Pick<ProjectApi, "findTraceSharingConfig">;
   let cache: ShareCacheRepository;
   let service: ShareService;
 
   beforeEach(() => {
     repo = {
-      findTraceSharingConfig: vi.fn().mockResolvedValue({
-        orgEnabled: true,
-        projectEnabled: true,
-      }),
       findByToken: vi.fn(),
       findById: vi.fn(),
       existsById: vi.fn().mockResolvedValue(false),
@@ -81,6 +79,12 @@ describe("ShareService", () => {
     permissions = {
       getDecision: vi.fn().mockResolvedValue({ permitted: false }),
     } as unknown as AuthzApi;
+    projects = {
+      findTraceSharingConfig: vi.fn().mockResolvedValue({
+        orgEnabled: true,
+        projectEnabled: true,
+      }),
+    };
     cache = {
       isNewViewing: vi.fn().mockResolvedValue(true),
       findPayload: vi.fn().mockResolvedValue(null),
@@ -90,6 +94,7 @@ describe("ShareService", () => {
       repository: repo,
       dataRetention,
       permissions,
+      projects,
       cache,
     });
   });
@@ -406,7 +411,7 @@ describe("ShareService", () => {
 
     describe("when the project disabled trace sharing", () => {
       it("refuses to mint a link", async () => {
-        vi.mocked(repo.findTraceSharingConfig).mockResolvedValue({
+        vi.mocked(projects.findTraceSharingConfig).mockResolvedValue({
           orgEnabled: true,
           projectEnabled: false,
         });

@@ -63,10 +63,10 @@
       "types": "./dist/behavior/use-model-providers-settings.d.ts",
       "default": "./src/behavior/use-model-providers-settings.ts"
     },
-    "./screens/model-provider": {
-      "langwatch-declaration-source": "./src/screens/model-provider/index.ts",
-      "types": "./dist/screens/model-provider/index.d.ts",
-      "default": "./src/screens/model-provider/index.ts"
+    "./model-providers": {
+      "langwatch-declaration-source": "./src/model-providers.ts",
+      "types": "./dist/model-providers.d.ts",
+      "default": "./src/model-providers.ts"
     },
     "./surfaces/clamp-max-tokens": {
       "langwatch-declaration-source": "./src/model/clamp-max-tokens.ts",

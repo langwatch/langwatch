@@ -15,11 +15,8 @@ import {
   providerDeprecation,
   routingHandleProblem,
   tryGetModelProviderDefinition,
-  type ModelCost,
   type ModelCostRate,
-  type ModelDefaultConfig,
   type ModelDefaultScope,
-  type ModelProvider,
   type ModelProviderApiKeyValidation,
   type ModelProviderCredentialVerdict,
   type CodexTokenKeys,
@@ -30,42 +27,6 @@ import {
 import type { ProjectWithTeam } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 import type { LanguageModel } from "ai";
-export type ModelProviderRecord = ModelProvider;
-export type ModelDefaultConfigSaveInput = {
-  id: string;
-  organizationId: string;
-  config: Record<string, string>;
-  scopes: ModelDefaultScope[];
-  authorId: string | null;
-  createdAt?: Instant;
-};
-export type ModelCostRecord = ModelCost;
-
-/** Persistence owned by Model Provider. No caller receives this repository. */
-export abstract class ModelProviderRepository {
-  abstract tryFindById(input: {
-    id: string;
-    organizationId?: string;
-    projectScopes?: ModelDefaultScope[];
-  }): Promise<ModelProvider | null>;
-  abstract tryFindByProviderForProject(input: {
-    provider: string;
-    projectScopes: ModelDefaultScope[];
-  }): Promise<ModelProvider | null>;
-  abstract listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelProvider[]>;
-  abstract listForOrganization(organizationId: string): Promise<ModelProvider[]>;
-  abstract create(input: ModelProviderRecord): Promise<ModelProvider>;
-  abstract update(input: ModelProviderRecord): Promise<ModelProvider>;
-  abstract delete(input: {
-    id: string;
-    organizationId?: string;
-    projectId?: string;
-  }): Promise<void>;
-  abstract hasStoredCredentials(id: string): Promise<boolean>;
-  isRoutingHandleConflict(_error: unknown): boolean {
-    return false;
-  }
-}
 
 /** Credential encoding is supplied by the application boundary. */
 export abstract class ModelProviderCredentialCodec {
@@ -112,30 +73,6 @@ export abstract class CodexTokenRefresher {
 
 export abstract class ModelProviderConnectionRateLimiter {
   abstract assertAvailable(input: { organizationId: string }): Promise<void>;
-}
-
-export abstract class ModelDefaultRepository {
-  abstract listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelDefaultConfig[]>;
-  abstract tryGetById(id: string): Promise<ModelDefaultConfig | null>;
-  abstract tryFindByScope(scope: ModelDefaultScope): Promise<ModelDefaultConfig | null>;
-  abstract save(input: ModelDefaultConfigSaveInput): Promise<ModelDefaultConfig>;
-  abstract set(input: {
-    id: string;
-    organizationId: string;
-    scope: ModelDefaultScope;
-    key: string;
-    model: string | null;
-    authorId: string | null;
-  }): Promise<void>;
-  abstract delete(id: string): Promise<void>;
-  abstract listForOrganization(organizationId: string): Promise<ModelDefaultConfig[]>;
-}
-
-export abstract class ModelCostRepository {
-  abstract listForProject(projectScopes: ModelDefaultScope[]): Promise<ModelCost[]>;
-  abstract tryFindById(id: string): Promise<ModelCost | null>;
-  abstract save(input: ModelCostRecord): Promise<ModelCost>;
-  abstract delete(id: string): Promise<void>;
 }
 
 /** Registry/SDK boundary. Provider SDKs and environment configuration stay behind this port. */
@@ -333,21 +270,6 @@ export abstract class ModelCostProjectPort {
  */
 export abstract class ModelCostProjectScopePort {
   abstract tryGetProjectScopes(projectId: string): Promise<ModelDefaultScope[] | null>;
-}
-
-/**
- * Whether a project can see any provider that is attached and switched on.
- *
- * Its own port rather than a method on {@link ModelProviderRepository}, and the
- * distinction is the credential. Every read on that repository maps a row, and
- * mapping a row decodes `customKeys` through the codec it was built with — so a
- * caller that only wants a boolean would have to be handed a decrypting reader
- * to get one. This one selects an id and cannot decode anything, which is what
- * lets the setup checklist ask the question without holding the deployment's
- * cipher.
- */
-export abstract class ModelProviderEvidenceRepository {
-  abstract hasEnabledForScopes(projectScopes: ModelDefaultScope[]): Promise<boolean>;
 }
 
 /**

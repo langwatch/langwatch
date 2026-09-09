@@ -35,9 +35,6 @@ class TestApiKeyBindingIdPort extends ApiKeyBindingIdPort {
 
 class MemoryApiKeys extends ApiKeyRepository {
   private rows: StoredApiKey[] = [];
-  legacyProjectId: string | null = null;
-  legacyProjectRotationSucceeds = true;
-  regeneratedLegacyProject: { projectId: string; token: string } | null = null;
   create(input: ApiKeyCreateRecord): Promise<StoredApiKey> {
     const now = toDate(nowInstant());
     const row = {
@@ -143,15 +140,28 @@ class MemoryApiKeys extends ApiKeyRepository {
   findIngestKeysForProject(): Promise<StoredApiKey[]> {
     return Promise.resolve([]);
   }
-  findLegacyProjectId(): Promise<string | null> {
+}
+
+/**
+ * The Project peer as the API-key services ask it now: the legacy project
+ * credential and personal-workspace ownership are the project module's rows,
+ * so a test that used to seed them on the key repository seeds them here.
+ */
+class MemoryProjects {
+  legacyProjectId: string | null = null;
+  legacyProjectRotationSucceeds = true;
+  rotated: { projectId: string; token: string } | null = null;
+  personalWorkspaceOwner: { ownerUserId: string | null } | null = null;
+
+  findIdByLegacyApiKey(): Promise<string | null> {
     return Promise.resolve(this.legacyProjectId);
   }
-  rotateLegacyProjectKey(input: { projectId: string; token: string }): Promise<boolean> {
-    this.regeneratedLegacyProject = input;
+  rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
+    this.rotated = input;
     return Promise.resolve(this.legacyProjectRotationSucceeds);
   }
   findPersonalWorkspaceOwner(): Promise<{ ownerUserId: string | null } | null> {
-    return Promise.resolve(null);
+    return Promise.resolve(this.personalWorkspaceOwner);
   }
 }
 
@@ -213,6 +223,22 @@ const resolvedIdentity = projectIdentitySchema.parse({
   ownerUserId: null,
 });
 
+/** The project directory a key service reads, over one in-memory peer. */
+function projectPeer(memory: MemoryProjects): ProjectService {
+  return {
+    getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
+    tryGetWithTeam: vi.fn().mockResolvedValue(resolvedProject),
+    tryGetIdentity: vi.fn().mockResolvedValue(resolvedIdentity),
+    getById: vi.fn().mockResolvedValue(null),
+    listByOrganization: vi.fn().mockResolvedValue({ data: [] }),
+    listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: false }),
+    findIdByLegacyApiKey: () => memory.findIdByLegacyApiKey(),
+    rotateLegacyApiKey: (input: { projectId: string; token: string }) =>
+      memory.rotateLegacyApiKey(input),
+    findPersonalWorkspaceOwner: () => memory.findPersonalWorkspaceOwner(),
+  } as unknown as ProjectService;
+}
+
 function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDependencies {
   return {
     authz: {
@@ -234,14 +260,7 @@ function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDepend
       listTeams: vi.fn().mockResolvedValue({ data: [] }),
       getBillingProfile: vi.fn().mockResolvedValue({ name: "Organization" }),
     } as unknown as OrganizationService,
-    projects: {
-      getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
-      tryGetWithTeam: vi.fn().mockResolvedValue(resolvedProject),
-      tryGetIdentity: vi.fn().mockResolvedValue(resolvedIdentity),
-      getById: vi.fn().mockResolvedValue(null),
-      listByOrganization: vi.fn().mockResolvedValue({ data: [] }),
-      listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: false }),
-    } as unknown as ProjectService,
+    projects: projectPeer(new MemoryProjects()),
     bindingIds: TestApiKeyBindingIdPort.create(),
     legacyGrants: {
       mint: vi.fn(),
@@ -308,12 +327,10 @@ describe("API-key service", () => {
   });
 
   it("falls back to the deprecated project credential after a current-shape miss", async () => {
-    const repository = new MemoryApiKeys();
-    repository.legacyProjectId = resolvedProject.id;
-    const projects = {
-      tryGetIdentity: vi.fn().mockResolvedValue(resolvedIdentity),
-    } as unknown as ProjectService;
-    const service = createService(repository, dependencies({ projects }));
+    const memory = new MemoryProjects();
+    memory.legacyProjectId = resolvedProject.id;
+    const projects = projectPeer(memory);
+    const service = createService(new MemoryApiKeys(), dependencies({ projects }));
     const token = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;
 
     await expect(service.findResolvedToken({ token })).resolves.toMatchObject({
@@ -324,9 +341,12 @@ describe("API-key service", () => {
   });
 
   it("keeps a deprecated project credential bound to its resolved project", async () => {
-    const repository = new MemoryApiKeys();
-    repository.legacyProjectId = resolvedProject.id;
-    const service = createService(repository);
+    const memory = new MemoryProjects();
+    memory.legacyProjectId = resolvedProject.id;
+    const service = createService(
+      new MemoryApiKeys(),
+      dependencies({ projects: projectPeer(memory) }),
+    );
 
     await expect(
       service.findResolvedToken({ token: "sk-lw-legacy-token", projectId: "other-project" }),
@@ -421,24 +441,30 @@ describe("API-key service", () => {
     );
   });
 
-  it("rotates the deprecated project credential through its repository", async () => {
-    const repository = new MemoryApiKeys();
-    const service = createService(repository);
+  it("rotates the deprecated project credential through the project directory", async () => {
+    const memory = new MemoryProjects();
+    const service = createService(
+      new MemoryApiKeys(),
+      dependencies({ projects: projectPeer(memory) }),
+    );
 
     const token = await service.regenerateLegacyProjectKey({
       projectId: "project-1",
     });
     expect(token).toMatch(/^sk-lw-[A-Za-z0-9]{48}$/);
-    expect(repository.regeneratedLegacyProject).toEqual({
+    expect(memory.rotated).toEqual({
       projectId: "project-1",
       token,
     });
   });
 
   it("throws when the project credential cannot be rotated", async () => {
-    const repository = new MemoryApiKeys();
-    repository.legacyProjectRotationSucceeds = false;
-    const service = createService(repository);
+    const memory = new MemoryProjects();
+    memory.legacyProjectRotationSucceeds = false;
+    const service = createService(
+      new MemoryApiKeys(),
+      dependencies({ projects: projectPeer(memory) }),
+    );
 
     await expect(
       service.regenerateLegacyProjectKey({ projectId: "missing" }),
@@ -526,6 +552,7 @@ describe("API-key service", () => {
         archivedAt: null,
         team: { id: "team-1", organizationId: "org-1" },
       }),
+      findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
     } as unknown as ProjectService;
     const service = createService(
       new MemoryApiKeys(),
@@ -551,11 +578,12 @@ describe("API-key service", () => {
   });
 
   it("refuses a personal scope for a different owner or an unowned key", async () => {
-    const repository = new MemoryApiKeys();
-    (
-      repository as unknown as { findPersonalWorkspaceOwner: ReturnType<typeof vi.fn> }
-    ).findPersonalWorkspaceOwner = vi.fn().mockResolvedValue({ ownerUserId: "owner-1" });
-    const service = createService(repository);
+    const memory = new MemoryProjects();
+    memory.personalWorkspaceOwner = { ownerUserId: "owner-1" };
+    const service = createService(
+      new MemoryApiKeys(),
+      dependencies({ projects: projectPeer(memory) }),
+    );
     await expect(
       service.create({
         name: "service",
@@ -577,14 +605,12 @@ describe("API-key service", () => {
    * still look correct.
    */
   it("allows a personal scope for the owner the workspace belongs to", async () => {
-    class OwnedPersonalWorkspace extends MemoryApiKeys {
-      override findPersonalWorkspaceOwner(): Promise<{
-        ownerUserId: string | null;
-      } | null> {
-        return Promise.resolve({ ownerUserId: "owner-1" });
-      }
-    }
-    const service = createService(new OwnedPersonalWorkspace());
+    const memory = new MemoryProjects();
+    memory.personalWorkspaceOwner = { ownerUserId: "owner-1" };
+    const service = createService(
+      new MemoryApiKeys(),
+      dependencies({ projects: projectPeer(memory) }),
+    );
 
     const created = await service.create({
       name: "owner-personal",
@@ -621,6 +647,7 @@ describe("API-key service", () => {
     const projects = {
       getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
       listActiveByScopes,
+      findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
     } as unknown as ProjectService;
     const service = createService(repository, dependencies({ authz, projects }));
     const created = await service.create({
@@ -650,6 +677,7 @@ describe("API-key service", () => {
     const repository = new MemoryApiKeys();
     const projects = {
       listActiveByScopes: vi.fn(),
+      findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
     } as unknown as ProjectService;
     const service = createService(repository, dependencies({ projects }));
     const created = await service.create({
@@ -678,6 +706,7 @@ describe("API-key service", () => {
     const projects = {
       getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
       listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: true }),
+      findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
     } as unknown as ProjectService;
     const service = createService(repository, dependencies({ authz, projects }));
     const created = await service.create({

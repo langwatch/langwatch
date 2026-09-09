@@ -1,7 +1,6 @@
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { apiKeyPermissionSchema, type ApiKeyScope } from "@langwatch/api-key-contract";
-import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 type ResolvedScope =
@@ -10,16 +9,11 @@ type ResolvedScope =
   | { type: "project"; id: string; teamId: string; organizationId: string };
 
 export class ApiKeyGrantPolicyService {
-  static create(
-    options: ApiKeyDependencies & { repository: ApiKeyRepository },
-  ): ApiKeyGrantPolicyService {
-    return new ApiKeyGrantPolicyService(options.repository, options);
+  static create(options: ApiKeyDependencies): ApiKeyGrantPolicyService {
+    return new ApiKeyGrantPolicyService(options);
   }
 
-  private constructor(
-    private readonly repository: ApiKeyRepository,
-    private readonly options: ApiKeyDependencies,
-  ) {}
+  private constructor(private readonly options: ApiKeyDependencies) {}
 
   async ensureCallerIsOrgMember(input: { userId: string; organizationId: string }): Promise<void> {
     const allowed = await this.options.authz.hasPermission({
@@ -115,7 +109,7 @@ export class ApiKeyGrantPolicyService {
         continue;
       }
 
-      const personal = await this.repository.findPersonalWorkspaceOwner({
+      const personal = await this.options.projects.findPersonalWorkspaceOwner({
         organizationId: input.organizationId,
         scopeId: scope.scopeId,
       });

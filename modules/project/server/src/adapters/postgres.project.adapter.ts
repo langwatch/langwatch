@@ -43,7 +43,7 @@ export class PostgresProjectAdapter {
 
   build(): ProjectServiceContract {
     return ProjectService.create({
-      repository: PrismaProjectRepository.create(this.options.database),
+      repository: PrismaProjectRepository.create({ prisma: this.options.database }),
       credentials: this.options.credentials,
       organizations: this.options.organizations,
       keyMap: this.options.keyMap,

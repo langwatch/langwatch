@@ -4,7 +4,7 @@
  * so a reader who can't manage providers still sees which ones exist.
  */
 
-import { modelProviderScreens } from "@langwatch/model-provider-web/screens/model-provider";
+import { modelProviderScreens } from "@langwatch/model-provider-web/model-providers";
 import type { ComponentType } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

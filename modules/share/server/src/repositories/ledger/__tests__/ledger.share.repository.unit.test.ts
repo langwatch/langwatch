@@ -37,7 +37,6 @@ const shareRow = (overrides: Partial<ShareLink> = {}): ShareLink =>
 
 const spyHead = (compatIds: string[], anchored: boolean): ShareRepository =>
   ({
-    findTraceSharingConfig: vi.fn().mockResolvedValue({ orgEnabled: true, projectEnabled: true }),
     findByToken: vi.fn().mockResolvedValue(null),
     findById: vi.fn().mockResolvedValue(shareRow()),
     existsById: vi.fn().mockResolvedValue(anchored),
@@ -65,10 +64,10 @@ function buildRepository({
 }) {
   const head = spyHead(compatIds, anchored);
   const grants = {
-    findOrganizationIdByProject: vi.fn().mockResolvedValue(ORGANIZATION_ID),
     findAllResourceGrantIds: vi.fn().mockResolvedValue(grantIds),
     consumeUsage: vi.fn().mockResolvedValue(true),
   } as unknown as ShareGrantRepository;
+  const projects = { tryGetOrganizationId: vi.fn().mockResolvedValue(ORGANIZATION_ID) };
   const authz = {
     isOnEngine: vi.fn().mockResolvedValue(onEngine),
     attachResourceGrant: vi.fn().mockResolvedValue(void 0),
@@ -79,7 +78,8 @@ function buildRepository({
     head,
     grants,
     authz,
-    repository: LedgerShareRepository.create({ head, grants, authz }),
+    projects,
+    repository: LedgerShareRepository.create({ head, grants, authz, projects }),
   };
 }
 

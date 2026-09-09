@@ -14,7 +14,7 @@
   "files": [
     "./src/behavior/github-connect-popup.ts",
     "./src/index.ts",
-    "./src/screens/integrations/index.ts"
+    "./src/integrations.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

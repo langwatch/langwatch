@@ -12,7 +12,7 @@ import { Temporal, nowInstant, toDate } from "@langwatch/time";
 function repositoryWithSpy() {
   const findMany = vi.fn(async () => []);
   const database = { apiKey: { findMany } } as unknown as PrismaApiKeyDatabase;
-  return { repository: PrismaApiKeyRepository.create(database), findMany };
+  return { repository: PrismaApiKeyRepository.create({ prisma: database }), findMany };
 }
 
 type SweepUpdate = {
@@ -23,7 +23,7 @@ type SweepUpdate = {
 function repositoryWithUpdateSpy(count = 0) {
   const updateMany = vi.fn(async (_update: SweepUpdate) => ({ count }));
   const database = { apiKey: { updateMany } } as unknown as PrismaApiKeyDatabase;
-  return { repository: PrismaApiKeyRepository.create(database), updateMany };
+  return { repository: PrismaApiKeyRepository.create({ prisma: database }), updateMany };
 }
 
 function excludedNames(findMany: ReturnType<typeof vi.fn>): string[] {
@@ -116,7 +116,7 @@ describe("PrismaApiKeyRepository", () => {
     it("scopes the lookup to the caller's organization", async () => {
       const findFirst = vi.fn(async (_args: unknown) => null);
       const database = { apiKey: { findFirst } } as unknown as PrismaApiKeyDatabase;
-      const repository = PrismaApiKeyRepository.create(database);
+      const repository = PrismaApiKeyRepository.create({ prisma: database });
 
       await repository.findIngestKey({
         organizationId: "org-1",
@@ -146,7 +146,7 @@ describe("when a key is revoked", () => {
     const database = {
       apiKey: { updateMany, findUniqueOrThrow },
     } as unknown as PrismaApiKeyDatabase;
-    return { repository: PrismaApiKeyRepository.create(database), updateMany, row };
+    return { repository: PrismaApiKeyRepository.create({ prisma: database }), updateMany, row };
   }
 
   /** @scenario "A revoke from the API keys page records a person as its cause" */

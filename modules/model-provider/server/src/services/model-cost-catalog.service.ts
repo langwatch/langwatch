@@ -1,5 +1,10 @@
 import { modelCostListInputSchema, type ModelCost } from "@langwatch/model-provider-contract";
-import type { ModelCostProjectScopePort, ModelCostRepository } from "../ports/model-provider.port.ts";
+import type {
+  ModelCostProjectScopePort
+} from "../ports/model-provider.port.ts";
+import type {
+  ModelCostRepository
+} from "../repositories/model-cost.repository.ts";
 
 /**
  * The cost rules a project has stored, listed.

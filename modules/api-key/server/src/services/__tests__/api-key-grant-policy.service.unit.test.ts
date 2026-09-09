@@ -26,10 +26,6 @@ type Fakes = {
 function policyWith(fakes: Fakes = {}) {
   const calls: Array<Record<string, unknown>> = [];
   const service = ApiKeyGrantPolicyService.create({
-    repository: {
-      findPersonalWorkspaceOwner: async () =>
-        fakes.personalOwner === undefined ? null : { ownerUserId: fakes.personalOwner },
-    },
     authz: {
       hasPermission: async () => true,
       can: async (input: { permission: string }) => {
@@ -52,6 +48,8 @@ function policyWith(fakes: Fakes = {}) {
           archivedAt: null,
           team: { id: "team-1", organizationId: "organization-1" },
         },
+      findPersonalWorkspaceOwner: async () =>
+        fakes.personalOwner === undefined ? null : { ownerUserId: fakes.personalOwner },
     },
     bindingIds: { generateBindingId: () => "generated-binding" },
     grants: {

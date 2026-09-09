@@ -1,6 +1,6 @@
 /** Model Provider settings: two screens in `@langwatch/model-provider-web`. */
 
-import { modelProviderApi } from "@langwatch/model-provider-web/screens/model-provider";
+import { modelProviderApi } from "@langwatch/model-provider-web/model-providers";
 import { lazyDrawer } from "@langwatch/ui-drawer";
 import { uiFeature } from "../../behavior/ui-feature";
 import { modelProviderFailures } from "./behavior/model-provider-failures";

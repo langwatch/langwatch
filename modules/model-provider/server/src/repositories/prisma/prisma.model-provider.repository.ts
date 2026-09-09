@@ -12,10 +12,8 @@ import {
   type ModelDefaultScope,
   type ModelProvider,
 } from "@langwatch/model-provider-contract";
-import {
-  ModelProviderCredentialCodec,
-  ModelProviderRepository,
-} from "../../ports/model-provider.port.ts";
+import type { ModelProviderCredentialCodec } from "../../ports/model-provider.port.ts";
+import type { ModelProviderRepository } from "../model-provider.repository.ts";
 
 type Database = Pick<PrismaClient, "modelProvider" | "gatewayChangeEvent" | "$transaction">;
 
@@ -36,13 +34,11 @@ const storedModelSchema = z.union([
   }),
 ]);
 
-export class PrismaModelProviderRepository extends ModelProviderRepository {
+export class PrismaModelProviderRepository implements ModelProviderRepository {
   private constructor(
     private readonly database: Database,
     private readonly credentials: ModelProviderCredentialCodec,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(
     database: Database,

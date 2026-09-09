@@ -23,6 +23,7 @@ import { composeGatewayFeature } from "../gateway.composition.ts";
 import { refusingAuthFeature } from "../../auth/auth.composition.ts";
 import { refusingUserFeature } from "../../user/user.composition.ts";
 import {
+  stubApiKeyFeature,
   stubDashboardFeature,
   stubEvaluationFeature,
   stubMonitorFeature,
@@ -37,7 +38,6 @@ import {
   stubShareFeature,
   stubTopicFeature,
 } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
-import { refusingApiKeyFeature } from "../../api-key/api-key.composition.ts";
 import { refusingLangyFeature } from "../../langy/langy.composition.ts";
 import { refusingAnalyticsFeature } from "../../analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../dataset/dataset.composition.ts";
@@ -206,7 +206,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       auth: refusingAuthFeature("langwatch-api"),
       user: refusingUserFeature("langwatch-api"),
       presence: stubPresenceFeature(),
-      apiKey: refusingApiKeyFeature(),
+      apiKey: stubApiKeyFeature(),
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),

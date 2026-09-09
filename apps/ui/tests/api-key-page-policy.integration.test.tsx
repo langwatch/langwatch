@@ -34,9 +34,9 @@ const { apiNode } = vi.hoisted(() => {
   return { apiNode: node };
 });
 
-vi.mock("@langwatch/api-key-web/screens/api-key", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/api-key-web/screens/api-key")>(
-    "@langwatch/api-key-web/screens/api-key",
+vi.mock("@langwatch/api-key-web/api-keys", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/api-key-web/api-keys")>(
+    "@langwatch/api-key-web/api-keys",
   );
   return {
     ...actual,

@@ -39,7 +39,7 @@ export class PostgresAgentSandboxKeyReapAdapter {
 
   build(): AgentSandboxKeyReapService {
     return AgentSandboxKeyReapService.create({
-      repository: PrismaApiKeyRepository.create(this.options.database),
+      repository: PrismaApiKeyRepository.create({ prisma: this.options.database }),
       ...(this.options.now ? { now: this.options.now } : {}),
     });
   }

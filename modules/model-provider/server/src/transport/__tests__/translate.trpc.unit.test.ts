@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { translateTrpcTransport } from "../translate.trpc.ts";
 import {
-  createModelProviderTestApp,
+  mountableModelProviderApp,
   modelProviderTrpcTestPorts,
   type ModelProviderTestDecision,
   type ModelProviderTrpcTestContext,
@@ -24,7 +24,7 @@ function mount(
     permits?: ModelProviderTestDecision;
   } = {},
 ) {
-  const { app } = createModelProviderTestApp({ modelProviders: options.modelProviders ?? {} });
+  const { app } = mountableModelProviderApp({ modelProviders: options.modelProviders ?? {} });
   const trpc = initTRPC.context<ModelProviderTrpcTestContext>().create();
   const router = createTrpcRuntime<ModelProviderTrpcTestContext>({
     root: trpc,

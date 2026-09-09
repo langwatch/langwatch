@@ -4,7 +4,7 @@
  * key rather than refusing, `/mcp/authorize` needs its redirect to run first.
  */
 
-import { authorizeScreens } from "@langwatch/api-key-web/screens/authorize";
+import { authorizeScreens } from "@langwatch/api-key-web/authorize";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { AuthorizeHost } from "./authorize-host";

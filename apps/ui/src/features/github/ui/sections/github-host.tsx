@@ -7,7 +7,7 @@
 import {
   GithubHostProvider,
   type GithubHostPort,
-} from "@langwatch/github-web/screens/integrations";
+} from "@langwatch/github-web/integrations";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

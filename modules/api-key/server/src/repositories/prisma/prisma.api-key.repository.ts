@@ -1,22 +1,24 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { PrismaRepository, type PrismaRepositoryClient } from "@langwatch/prisma-client";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { HIDDEN_SYSTEM_KEY_NAMES, type ApiKeyRevocationCause } from "@langwatch/api-key-contract";
-import {
+import type {
+  ApiKeyCreateRecord,
   ApiKeyRepository,
-  type ApiKeyCreateRecord,
-  type ApiKeyUpdateRecord,
-  type StoredApiKey,
+  ApiKeyUpdateRecord,
+  StoredApiKey,
 } from "../api-key.repository.ts";
 
-export type PrismaApiKeyDatabase = Pick<PrismaClient, "apiKey" | "team" | "project">;
+export type PrismaApiKeyDatabase = PrismaRepositoryClient<["ApiKey"]>;
 
 /** Prisma persistence is private to the API-key server package. */
-export class PrismaApiKeyRepository extends ApiKeyRepository {
-  private constructor(private readonly database: PrismaApiKeyDatabase) {
-    super();
-  }
-  static create(database: PrismaApiKeyDatabase): PrismaApiKeyRepository {
-    return new PrismaApiKeyRepository(database);
+export class PrismaApiKeyRepository
+  extends PrismaRepository.for("ApiKey")
+  implements ApiKeyRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaApiKeyRepository(prisma));
+
+  private get database(): PrismaApiKeyDatabase {
+    return this.prisma;
   }
 
   create(input: ApiKeyCreateRecord): Promise<StoredApiKey> {
@@ -146,20 +148,6 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
       orderBy: { createdAt: "desc" },
     });
   }
-  async findLegacyProjectId(input: { token: string }): Promise<string | null> {
-    const row = await this.database.project.findUnique({
-      where: { apiKey: input.token, archivedAt: null },
-      select: { id: true },
-    });
-    return row?.id ?? null;
-  }
-  async rotateLegacyProjectKey(input: { projectId: string; token: string }): Promise<boolean> {
-    const result = await this.database.project.updateMany({
-      where: { id: input.projectId, archivedAt: null },
-      data: { apiKey: input.token },
-    });
-    return result.count > 0;
-  }
   /**
    * One bounded UPDATE over the (name, revokedAt, expiresAt) shape.
    *
@@ -179,29 +167,5 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
       data: { revokedAt: now },
     });
     return count;
-  }
-  async findPersonalWorkspaceOwner(input: {
-    organizationId: string;
-    scopeId: string;
-  }): Promise<{ ownerUserId: string | null } | null> {
-    const team = await this.database.team.findFirst({
-      where: {
-        id: input.scopeId,
-        organizationId: input.organizationId,
-        isPersonal: true,
-      },
-      select: { ownerUserId: true },
-    });
-    if (team) return team;
-    const project = await this.database.project.findFirst({
-      where: {
-        id: input.scopeId,
-        team: { organizationId: input.organizationId },
-        OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
-        archivedAt: null,
-      },
-      select: { team: { select: { ownerUserId: true } } },
-    });
-    return project?.team ?? null;
   }
 }

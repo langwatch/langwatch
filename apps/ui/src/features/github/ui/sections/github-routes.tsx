@@ -4,7 +4,7 @@
  * ONE KEY, ONE SCREEN. The grant is the platform page's own `organization:manage`.
  */
 
-import { githubScreens } from "@langwatch/github-web/screens/integrations";
+import { githubScreens } from "@langwatch/github-web/integrations";
 import type { ComponentType } from "react";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

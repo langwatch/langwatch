@@ -2,15 +2,19 @@
  * `project.*` — one project's lifecycle and its settings form — composed as its own
  * feature.
  */
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ProjectApp } from "@langwatch/project-server";
+import { projectServer } from "@langwatch/project-server";
+import { createApp } from "@langwatch/runtime-composition";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import type { ShareApi } from "@langwatch/share-contract";
-import type { TopicApi } from "@langwatch/topic-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ShareApi, type ShareApi as ShareApiContract } from "@langwatch/share-contract";
+import { TopicApi, type TopicApi as TopicApiContract } from "@langwatch/topic-contract";
+import {
+  OrganizationApi,
+  type OrganizationApi as OrganizationApiContract,
+} from "@langwatch/organization-contract";
 
 import type { ApiAuditPort } from "../../api-request.policy.ts";
 
@@ -21,13 +25,13 @@ import { createProjectTrpcRouter, type ProjectBrowserPorts } from "./project-trp
 /** The other services one project's own surfaces reach. */
 export type ProjectPeers = Readonly<{
   /** The project directory the tenancy graph composed. */
-  organizations: OrganizationApi;
+  organizations: OrganizationApiContract;
   /** The credential service the API doors already authenticate through. */
-  apiKeys: ApiKeyApi;
+  apiKeys: ApiKeyApiContract;
   /** The share ledger the trace group composed: one project, one sharing rule. */
-  share: ShareApi;
+  share: ShareApiContract;
   /** The topic tree the trace group composed. */
-  topics: TopicApi;
+  topics: TopicApiContract;
   /** The deployment's cipher, for a project's object-storage credentials. */
   encryption: SecretEncryptionPort | undefined;
   /** The protections resolver, where the deployment composed one. */
@@ -36,34 +40,43 @@ export type ProjectPeers = Readonly<{
 
 import type { ComposedProjectFeature } from "./project.composition.types.ts";
 
-/** Composes `project.*` over this process's own graph. */
-export function composeProjectFeature(options: {
+/** Installs `project.*` over this process's own graph. */
+export async function installApiProject(options: {
   infrastructure: ApiTrpcInfrastructure;
   peers: ProjectPeers;
-}): ComposedProjectFeature {
+}): Promise<ComposedProjectFeature> {
   const logger = createLogger("langwatch:api:project");
+  const { peers } = options;
 
-  const app = ProjectApp.create({
-    infrastructure: {
-      database: options.infrastructure.prisma,
-      topicClustering: {
-        requestClustering: () =>
-          Promise.reject(
-            new ApiProjectUnavailableError(
-              "topic-clustering scheduler, so it cannot start a clustering run",
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma: options.infrastructure.prisma })
+    .withInfrastructure({})
+    .withProvided(OrganizationApi, peers.organizations)
+    .withProvided(ApiKeyApi, peers.apiKeys)
+    .withProvided(ShareApi, peers.share)
+    .withProvided(TopicApi, peers.topics)
+    .withModule(projectServer, {
+      infrastructure: {
+        // The scheduler lives on the worker: this process starts no clustering
+        // run, and says so by name rather than reporting one it never queued.
+        topicClustering: {
+          requestClustering: () =>
+            Promise.reject(
+              new ApiProjectUnavailableError(
+                "topic-clustering scheduler, so it cannot start a clustering run",
+              ),
             ),
-          ),
+        },
       },
-    },
-    dependencies: {
-      organizations: options.peers.organizations,
-      apiKeys: options.peers.apiKeys,
-      share: options.peers.share,
-      topics: options.peers.topics,
-    },
-  });
+    })
+    .boot({ role: "api" });
 
-  return { app, router: (mount) => createProjectTrpcRouter(mount.runtime, projectPorts(options, logger)) };
+  const app = runtime.module(projectServer).provided;
+
+  return {
+    app,
+    router: (mount) => createProjectTrpcRouter(mount.runtime, projectPorts(options, logger)),
+  };
 }
 
 /**
@@ -155,7 +168,6 @@ export function refusingProjectFeature(): ComposedProjectFeature {
     router: (mount) => createProjectTrpcRouter(mount.runtime, refuseEvery<ProjectBrowserPorts>()),
   };
 }
-
 
 /** A capability this deployment did not compose, refused by name. */
 export class ApiProjectUnavailableError extends HandledError {

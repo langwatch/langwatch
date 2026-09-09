@@ -103,7 +103,7 @@ export class ApiKeyCliService {
     ];
     const heldByTeam = new Map<string, string[]>();
     for (const teamId of teamIds) {
-      const personal = await this.repository.findPersonalWorkspaceOwner({
+      const personal = await this.options.projects.findPersonalWorkspaceOwner({
         organizationId: input.organizationId,
         scopeId: teamId,
       });

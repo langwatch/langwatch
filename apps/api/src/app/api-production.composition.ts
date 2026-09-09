@@ -92,10 +92,7 @@ import {
 import { installApiUser, refusingUserFeature } from "../features/user/user.composition.ts";
 import { installApiPresence } from "../features/presence/presence.composition.ts";
 import { BroadcastAdapter } from "@langwatch/presence-server";
-import {
-  composeApiKeyFeature,
-  refusingApiKeyFeature,
-} from "../features/api-key/api-key.composition.ts";
+import { composeApiKeyFeature } from "../features/api-key/api-key.composition.ts";
 import type { ApiPersonMailPort } from "./api-person-mail.port.ts";
 import { ApiEventingIdentityAdapter } from "./api-identity-eventing.adapter.ts";
 import {
@@ -144,6 +141,7 @@ import {
 import {
   composeApiModelProviders,
   LoggedApiModelProviderAbsence,
+  type ApiModelProviderCompositionOptions,
 } from "./api-model-provider.composition.ts";
 import {
   composeScenarioFeature,
@@ -168,7 +166,7 @@ import {
   type ApiOrganizationInvitePort,
 } from "../features/organization/organization.composition.ts";
 import {
-  composeProjectFeature,
+  installApiProject,
   refusingProjectFeature,
 } from "../features/project/project.composition.ts";
 import {
@@ -207,8 +205,7 @@ import {
   composeApiGatewaySpendPipeline,
   type ApiGatewaySpendPipeline,
 } from "./api-gateway-spend-pipeline.composition.ts";
-import { PostgresGithubAdapter } from "@langwatch/github-server";
-import type { GithubService } from "@langwatch/github-contract";
+import type { GithubApi } from "@langwatch/github-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
@@ -218,10 +215,8 @@ import { createPlatformUrlBuilder } from "./api-rest-ports.ts";
 import { composeHttpProxyFeature } from "../features/agent/http-proxy.composition.ts";
 import type { WorkflowStudioDispatchService } from "@langwatch/workflow-server";
 import {
-  composeModelProviderFeature,
-  LoggedApiModelProviderAbsence as LoggedApiModelProviderSurfaceAbsence,
+  installApiModelProvider,
   refusingModelProviderFeature,
-  type ApiModelProviderHostPort,
 } from "../features/model-provider/model-provider.composition.ts";
 import { installApiDashboard } from "../features/dashboard/dashboard.composition.ts";
 import type { HealthProbeRestPorts } from "../features/health/health-probe-rest.mount.ts";
@@ -261,7 +256,6 @@ import {
   LwqlKeyMapClickHouseRepository,
   LwqlKeyMapService,
 } from "@langwatch/analytics-server";
-import { composeApiModelProviderHost } from "./api-model-provider-host.composition.ts";
 import { composeApiWorkflowStudioDispatch } from "./api-studio-host.composition.ts";
 import {
   composeApiAuthoringRest,
@@ -361,7 +355,7 @@ import {
 } from "../features/langy/langy-rest.mount.ts";
 
 import { composeApiGithubRest } from "../features/github/github-rest.mount.ts";
-import { refusingGithubService } from "../features/github/github.composition.ts";
+import { installApiGithub } from "../features/github/github.composition.ts";
 import { composeApiAdminRest } from "../features/ops/admin-rest.mount.ts";
 import {
   composeApiAgentPipelines,
@@ -513,11 +507,6 @@ export type ApiProductionCompositionOptions = {
    * plus the redaction and display passes every read is carried through.
    */
   traceReads?: ApiTraceReadStackPort;
-  /**
-   * The provider capabilities that reach OUTSIDE this process: the vendor credential probes,
-   * the Codex device flow and the cost-rule span preview.
-   */
-  modelProviderHost?: ApiModelProviderHostPort;
   /**
    * The optimization studio's outbound event dispatch, and the agent test's own
    * trace write. Absent, both refuse.
@@ -786,8 +775,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The stored-secret cipher this process composed, or none.
    */
   private composedEncryption: SecretEncryptionPort | undefined;
-  private composedGithub: GithubService | undefined;
+  private composedGithub: GithubApi | undefined;
   private composedModelProviders: ModelProviderService | undefined;
+  /** The gateway's options, kept so the module install reads the same list. */
+  private modelProviderOptions: ApiModelProviderCompositionOptions | undefined;
   private composedPlanProvider: PlanProvider | undefined;
   private composedPlanSources: EntitlementServiceOptions | undefined;
   private composedEntitlementAbsence: LoggedApiEntitlementAbsence | undefined;
@@ -922,7 +913,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const encryption = composeApiSecretEncryption(options)?.encryption;
     this.composedEncryption = encryption;
     this.resolveClickHouse(options);
-    const tenancy = authz ? this.resolveTenancy(options, encryption) : undefined;
+    const tenancy = authz ? await this.resolveTenancy(options, encryption) : undefined;
     // Before the Auth graph, because the password-reset link leaves through it
     // and that graph is where Better Auth is composed. Nothing downstream of a
     // session gate: a deployment that cannot verify a browser caller still has
@@ -1103,6 +1094,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ? await installApiShare({
             infrastructure,
             peers: {
+              projects: this.composedTenancy.projects,
               dataRetention: retention.service,
               permissions: this.composedAuthz.app,
             },
@@ -1194,7 +1186,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // automations they fire, and the four Enterprise namespaces. It folds on rather than
     // seeding, because every one of them resolves an organization or a project through the
     // tenancy graph.
-    this.composeTenantFeatures(options, encryption, queueInfrastructure, infrastructure);
+    await this.composeTenantFeatures(options, encryption, queueInfrastructure, infrastructure);
     // The two tenant directories the rollout gate and the retention surface
     // authorize a tenant-targeted read against, bound now that the half that
     // owns them has composed. Both features installed above hold references to
@@ -1238,8 +1230,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const directory = this.composedTenancy;
     const github =
       database && directory
-        ? this.resolveGithub(options, database.client, queueInfrastructure, directory)
-        : refusingGithubService();
+        ? await this.resolveGithub(options, database.client, queueInfrastructure, directory)
+        : undefined;
     this.composedGateway = this.composeGateway(options, infrastructure);
     // The back office, composed from the shared infrastructure plus the three other features it
     // names: the people a row is about, the session an impersonation is started against, and
@@ -1322,17 +1314,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       agents,
       relayMaxPayloadMb: options.config.infrastructure.connectedAgents.relayMaxPayloadMb,
     });
-    this.composedModelProvider = infrastructure
-      ? composeModelProviderFeature({
-          infrastructure,
+    // Installed over the same options the gateway was composed from; a process
+    // that composed no gateway holds no cipher, and its surfaces refuse by name.
+    this.composedModelProvider = this.modelProviderOptions
+      ? await installApiModelProvider({
+          ...this.modelProviderOptions,
           peers: this.composedTrace.traceReads
             ? { spans: this.composedTrace.traceReads.readers().spans }
             : {},
-          ...(this.composedModelProviders ? { modelProviders: this.composedModelProviders } : {}),
-          host: this.composeModelProviderHost(options),
-          report: LoggedApiModelProviderSurfaceAbsence.create(
-            createLogger(options.config.serviceName),
-          ),
         })
       : refusingModelProviderFeature();
     const simulationEvidence = this.resolveSimulationEvidence();
@@ -2508,18 +2497,21 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * Precedence, and the reason for it: 1. A host's PAIR wins. A host that already owns the
    * product graph has one of each per process. 2.
    */
-  private resolveTenancy(
+  private async resolveTenancy(
     options: ApiRuntimeCompositionOptions,
     encryption: SecretEncryptionPort | undefined,
-  ): ApiResolvedTenancy | undefined {
+  ): Promise<ApiResolvedTenancy | undefined> {
     const { apiKeys, organizations } = this.options;
     // `create` has already refused a half-supplied pair, so one present means
     // both are.
     if (apiKeys && organizations) return { apiKeys, organizations };
 
     const logger = createLogger(options.config.serviceName);
-    this.composedTenancy = ApiTenancyComposition.tryCompose({
+    this.composedTenancy = await ApiTenancyComposition.tryCompose({
       database: this.composedDatabase?.connection,
+      // The process's own scope, so the credential store's runtime is stopped
+      // when this process drains or its composition fails half-built.
+      resources: options.resources,
       // The pair this process composed, never a host's single service: an
       // injected AuthZ is already reflected in `authz`, and reading it back
       // here would be reading a service whose grants half we do not hold.
@@ -3256,13 +3248,20 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const projects = composedTenancy?.projects;
     const processName = options.config.serviceName;
     const personMail = this.resolvePersonMail();
+    // The credential application this process serves from, injected by a host or
+    // installed here. It is the SAME object every REST door authenticates a
+    // caller through, so this surface never has a second answer to what a key is
+    // and never a refusing twin standing in for one.
+    this.composedApiKey = composeApiKeyFeature({
+      audit: this.resolveAudit(),
+      app: tenancy.apiKeys,
+    });
     // A host that injected its own api-key and organization pair composed no
     // tenancy here, so it holds the collaborator set whole and hands it in
     // rather than having these features built for it.
     if (!database || !projects || !composedTenancy) {
       this.composedAuthFeature = refusingAuthFeature(processName);
       this.composedUser = refusingUserFeature(processName);
-      this.composedApiKey = refusingApiKeyFeature();
       return;
     }
 
@@ -3282,13 +3281,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       deployment: this.personDeployment(options),
       ...(personMail ? { mail: personMail } : {}),
       processName,
-    });
-
-    this.composedApiKey = composeApiKeyFeature({
-      audit: this.resolveAudit(),
-      // The credential application this process composed, which is the SAME
-      // object `tenancy.apiKeys` names: one answer to what a key is.
-      app: composedTenancy.apiKeyApp,
     });
   }
 
@@ -3584,24 +3576,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     });
   }
 
-  /** The vendor probes, the Codex device flow and the cost-rule preview. */
-  private composeModelProviderHost(
-    options: ApiRuntimeCompositionOptions,
-  ): ApiModelProviderHostPort {
-    return (
-      this.options.modelProviderHost ??
-      composeApiModelProviderHost({
-        egress: {
-          blockLocal: options.config.infrastructure.modelProvider.blockLocalHttpCalls,
-          allowedHosts: options.config.infrastructure.modelProvider.allowedProxyHosts,
-          verifyTls: options.config.infrastructure.modelProvider.isSaas,
-        },
-        environment: options.config.infrastructure.modelProvider.environment,
-        processName: options.config.serviceName,
-      })
-    );
-  }
-
   /**
    * Installs what an organization's plan allows, what has been used against it and what it
    * has cost. ONE application serves all three, because the panel and every banner that
@@ -3653,12 +3627,12 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   /**
    * Composes the five tenant-administration features over this process's own graph.
    */
-  private composeTenantFeatures(
+  private async composeTenantFeatures(
     options: ApiRuntimeCompositionOptions,
     encryption: SecretEncryptionPort | undefined,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
     infrastructure: ApiTrpcInfrastructure | undefined,
-  ): void {
+  ): Promise<void> {
     const database = this.composedDatabase?.connection;
     const tenancy = this.composedTenancy;
     // The evaluator service the execution features composed, for the monitor
@@ -3764,10 +3738,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // trace open and `codingAgents.sessionsList` with it.
     const viewerProtections = this.resolveViewerProtections();
 
-    this.composedProject = composeProjectFeature({
+    this.composedProject = await installApiProject({
       infrastructure,
       peers: {
-        projects: tenancy.projects,
+        organizations: tenancy.organizations,
         apiKeys: tenancy.apiKeys,
         // Taken rather than built: a second share ledger or topic tree would
         // let the settings form and the explorer disagree about what a
@@ -3787,7 +3761,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       audit: this.resolveAudit(),
       peers: {
         projects: tenancy.projects,
-        github: this.resolveGithub(options, database.client, queueInfrastructure, tenancy),
+        github: await this.resolveGithub(options, database.client, queueInfrastructure, tenancy),
         // The SAME ClickHouse the charted reads and the traces run on: a
         // coding-agent session is a projection in that instance, and a second
         // connection would be a second pool.
@@ -4128,34 +4102,27 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   /**
    * The GitHub App this deployment registered, composed from configuration.
    */
-  private resolveGithub(
+  private async resolveGithub(
     options: ApiRuntimeCompositionOptions,
     prisma: PrismaConnection["client"],
     queueInfrastructure: ApiQueueInfrastructure | undefined,
     tenancy: ApiTenancyComposition,
-  ): GithubService {
-    // Memoized: two halves ask for it — the org group's coding-agent reads and
-    // the gateway group's `github.*` surface — and two adapters would be two
+  ): Promise<GithubApi> {
+    // Memoized: two halves ask for it, the org group's coding-agent reads and
+    // the gateway group's `github.*` surface, and two installs would be two
     // installation caches over one App.
     if (this.composedGithub) return this.composedGithub;
-    const github = options.config.infrastructure.github;
-    this.composedGithub = PostgresGithubAdapter.create({
-      database: prisma,
-      config: {
-        appId: github.appId,
-        privateKey: github.privateKey,
-        appSlug: github.appSlug,
-        webhookSecret: github.webhookSecret,
-        // The same key every other stored credential on this deployment is
-        // sealed with: an install state signed by one process and verified by
-        // another has to be the same signature.
-        signingKey: options.config.storedSecretEncryptionKey ?? "",
-      },
-      ...(github.host === undefined ? {} : { hostConfig: { host: github.host } }),
+    const installed = await installApiGithub({
+      prisma,
+      peers: { organizations: tenancy.organizations, projects: tenancy.projects },
       redis: queueInfrastructure?.redis ?? null,
-      organization: tenancy.organizations,
-      project: tenancy.projects,
+      config: options.config.infrastructure.github,
+      // The same key every other stored credential on this deployment is
+      // sealed with: an install state signed by one process and verified by
+      // another has to be the same signature.
+      signingKey: options.config.storedSecretEncryptionKey ?? "",
     });
+    this.composedGithub = installed.app;
     return this.composedGithub;
   }
 
@@ -4315,7 +4282,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       absence.absent("no-encryption");
       return undefined;
     }
-    this.composedModelProviders = composeApiModelProviders({
+    this.modelProviderOptions = {
       prisma: database.client,
       projects: tenancy.projects,
       organizations: tenancy.organizations,
@@ -4336,7 +4303,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       },
       nlpServiceUrl: options.config.infrastructure.execution.nlpServiceUrl,
       processName: options.config.serviceName,
-    });
+    };
+    this.composedModelProviders = composeApiModelProviders(this.modelProviderOptions);
     return this.composedModelProviders;
   }
 
@@ -4488,6 +4456,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // and verified through: a run's sandbox key is a narrower key, not a
       // second kind of key.
       apiKeys: tenancy.apiKeys,
+      projects: tenancy.projects,
       // The SAME key the process seals stored secrets with: the token a
       // project's runs share is held under it, and nowhere durable.
       storedSecretEncryptionKey: options.config.storedSecretEncryptionKey,

@@ -34,7 +34,7 @@ export class PostgresGovernanceInternalProjectAdapter {
 
   build(): GovernanceInternalProjectService {
     return GovernanceInternalProjectService.create({
-      repository: PrismaProjectRepository.create(this.options.database),
+      repository: PrismaProjectRepository.create({ prisma: this.options.database }),
       credentials: ProjectCredentialsAdapter.create(),
       teams: this.options.teams,
     });

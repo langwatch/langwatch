@@ -8,7 +8,6 @@ import type {
   ShareLinkScope,
   ShareRepository,
   ShareResourceScope,
-  ShareTraceSharingConfig,
 } from "../share.repository.ts";
 import type { ShareWithProject } from "@langwatch/share-contract";
 
@@ -28,10 +27,6 @@ const projectInclude = {
 
 const idSelect = { id: true } as const;
 const resourceIdSelect = { resourceId: true } as const;
-const traceSharingSelect = {
-  traceSharingEnabled: true,
-  team: { select: { organization: { select: { traceSharingEnabled: true } } } },
-} as const;
 
 /** Prisma's record-not-found failure, read off the code so it survives a client boundary. */
 function isRecordNotFound(error: unknown): boolean {
@@ -39,23 +34,10 @@ function isRecordNotFound(error: unknown): boolean {
 }
 
 export class PrismaShareRepository
-  extends PrismaRepository.for("ShareLink", "Project")
+  extends PrismaRepository.for("ShareLink")
   implements ShareRepository
 {
   static readonly create = this.factory((prisma) => new PrismaShareRepository(prisma));
-
-  async findTraceSharingConfig(projectId: string): Promise<ShareTraceSharingConfig | null> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: traceSharingSelect,
-    });
-    if (!project) return null;
-
-    return {
-      orgEnabled: project.team.organization.traceSharingEnabled,
-      projectEnabled: project.traceSharingEnabled,
-    };
-  }
 
   async findByToken(token: string): Promise<ShareWithProject | null> {
     const row = await this.prisma.shareLink.findUnique({

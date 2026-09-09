@@ -75,16 +75,30 @@ import {
   type TranslateOutput,
 } from "@langwatch/model-provider-contract";
 
+import { AuthzApi } from "@langwatch/authz-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
-import type { CodexAccountService } from "../adapters/codex-oauth.model-provider-token-refresher.adapter.ts";
 import { ModelCostRegexSafetyService } from "../services/model-cost-regex-safety.service.ts";
 import { ModelLimitsService } from "../services/model-limits.service.ts";
 import {
   ModelCostPreviewService,
   type ModelCostPreviewSpanReader,
 } from "../services/model-cost-preview.service.ts";
-import type { ModelProviderCredentialProbePort } from "../ports/model-provider.port.ts";
-import type { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
+import type {
+  CodexTokenRefresher,
+  ModelProviderCatalog,
+  ModelProviderConnectionRateLimiter,
+  ModelProviderCredentialProbePort,
+  ModelTranslationPort,
+} from "../ports/model-provider.port.ts";
+import type { ModelProviderRepositories } from "../repositories/model-provider.repositories.ts";
+import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
+import { ModelProviderService as ModelProviderGateway } from "../services/model-provider.service.ts";
+import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
 
 export type { ModelProviderCaller } from "@langwatch/model-provider-contract";
 
@@ -99,11 +113,23 @@ const TRANSLATE_FEATURE_KEY = "translate.text";
  */
 export type SpanReader = unknown;
 
-/** What the process composes this feature's application from. */
-export interface ModelProviderAppDependencies {
-  modelProviders: ModelProviderService;
-  /** The request's span reader, for the cost-rule preview. */
-  spans: SpanReader;
+/**
+ * The technical infrastructure this module asks the process for. Every member
+ * is a deployment's own answer - its provider registry, its egress fence, its
+ * identifier format, its OAuth issuer, its counters, its span reader - and
+ * none of them is another module's service.
+ */
+export interface ModelProviderInfrastructure {
+  /** The provider registry, and the system credentials this deployment holds. */
+  catalog: ModelProviderCatalog;
+  /** How a resolved model is executed, for the translation call. */
+  translation: ModelTranslationPort;
+  /** The identifier format every row this module writes is minted in. */
+  ids: ModelProviderIdFactory;
+  /** The OAuth exchange a stored Codex token is refreshed through. */
+  codexTokenRefresher: CodexTokenRefresher;
+  /** The fixed windows a connection test is metered in. */
+  connectionRateLimiter: ModelProviderConnectionRateLimiter;
   /**
    * The outbound credential probe, behind whatever egress fence the process
    * composed. A technical port: the network is the deployment's, the decision
@@ -111,18 +137,35 @@ export interface ModelProviderAppDependencies {
    */
   credentialProbe: ModelProviderCredentialProbePort;
   /**
-   * The per-scope write check the provider commands already run, reached here
-   * so the credential probe is held to the same standing. Nothing downstream
-   * re-authorizes a probe: it leaves for the vendor with the caller's keys.
+   * The Codex device flow. Named as the two answers this module asks for
+   * rather than as the class that gives them, because the outbound `fetch`
+   * and the issuer behind them are the deployment's, and outside production
+   * the issuer is overridable.
    */
-  providerAuthorization: ModelProviderWriteAuthorizationService;
-  /**
-   * The Codex device flow. Composed rather than built here because it holds
-   * the outbound `fetch` the deployment wants it to use, and the issuer it
-   * talks to is overridable outside production.
-   */
-  codexAccounts: CodexAccountService;
+  codexAccounts: ModelProviderCodexDeviceFlow;
+  /** The request's span reader, for the cost-rule preview. */
+  spans: SpanReader;
 }
+
+/** The identifier format this deployment mints a provider, default or cost in. */
+export interface ModelProviderIdFactory {
+  generate(input: Readonly<{ type: "provider" | "default" | "cost" }>): string;
+}
+
+/** The two answers the Codex device ceremony asks of this deployment. */
+export interface ModelProviderCodexDeviceFlow {
+  startDeviceSignIn(): Promise<ModelProviderCodexDeviceSignIn>;
+  pollDeviceSignIn(
+    input: Readonly<{ deviceAuthId: string; userCode: string }>,
+  ): Promise<ModelProviderCodexDeviceApproval>;
+}
+
+type ModelProviderSetup = FeatureSetup<
+  typeof ModelProviderApp.dependencies,
+  ModelProviderInfrastructure,
+  undefined,
+  ModelProviderRepositories
+>;
 
 /**
  * The two roles a Codex account is licensed for: Langy's own, and the Fast
@@ -133,8 +176,18 @@ const CODEX_CODING_ROLES = ["LANGY", "FAST"] as const;
 
 export class ModelProviderApp implements ModelProviderApi {
   static readonly contract = ModelProviderApi;
-  static create(dependencies: ModelProviderAppDependencies): ModelProviderApp {
-    return new ModelProviderApp(dependencies);
+  static readonly dependencies = {
+    projects: ProjectApi,
+    organizations: OrganizationApi,
+    permissions: AuthzApi,
+  };
+
+  static create({
+    repositories,
+    dependencies,
+    infrastructure,
+  }: ModelProviderSetup): ModelProviderApp {
+    return new ModelProviderApp(repositories, dependencies, infrastructure);
   }
 
   /** The registry's ceilings, read from the catalogue this package ships. */
@@ -150,7 +203,44 @@ export class ModelProviderApp implements ModelProviderApi {
    */
   readonly #aiCallFailures = AiCallFailureService.create();
 
-  private constructor(private readonly dependencies: ModelProviderAppDependencies) {}
+  /** The read, write, defaults and cost lifecycles, over the chosen backend. */
+  readonly #modelProviders: ModelProviderService;
+  readonly #credentialProbe: ModelProviderCredentialProbePort;
+  readonly #codexAccounts: ModelProviderCodexDeviceFlow;
+  readonly #spans: SpanReader;
+  /**
+   * The per-scope write check the provider commands already run, held here so
+   * the credential probe is held to the same standing. Nothing downstream
+   * re-authorizes a probe: it leaves for the vendor with the caller's keys.
+   */
+  readonly #providerAuthorization: ModelProviderWriteAuthorizationService;
+
+  private constructor(
+    repositories: ModelProviderRepositories,
+    dependencies: ModelProviderSetup["dependencies"],
+    infrastructure: ModelProviderInfrastructure,
+  ) {
+    this.#modelProviders = ModelProviderGateway.create({
+      repository: repositories.providers,
+      defaults: repositories.defaults,
+      costs: repositories.costs,
+      projects: dependencies.projects,
+      organizations: dependencies.organizations,
+      authorization: dependencies.permissions,
+      credentialPolicy: ModelProviderKeysService.create(),
+      catalog: infrastructure.catalog,
+      translation: infrastructure.translation,
+      ids: infrastructure.ids,
+      codexTokenRefresher: infrastructure.codexTokenRefresher,
+      connectionRateLimiter: infrastructure.connectionRateLimiter,
+    });
+    this.#providerAuthorization = ModelProviderWriteAuthorizationService.create(
+      ModelProviderAuthorizationService.create(dependencies.permissions),
+    );
+    this.#credentialProbe = infrastructure.credentialProbe;
+    this.#codexAccounts = infrastructure.codexAccounts;
+    this.#spans = infrastructure.spans;
+  }
 
   // ── providers ──────────────────────────────────────────────────────────────
 
@@ -158,14 +248,14 @@ export class ModelProviderApp implements ModelProviderApi {
   getForProject(
     input: ModelProviderListProjectInput & { provider?: string },
   ): Promise<Record<string, ModelProviderSummary>> {
-    return this.dependencies.modelProviders.getForProject(input);
+    return this.#modelProviders.getForProject(input);
   }
 
   tryGetProviderForProject(input: {
     projectId: string;
     provider: string;
   }): Promise<ModelProvider | null> {
-    return this.dependencies.modelProviders.tryGetProviderForProject(input);
+    return this.#modelProviders.tryGetProviderForProject(input);
   }
 
   tryFindRowServingModel(input: {
@@ -173,34 +263,34 @@ export class ModelProviderApp implements ModelProviderApi {
     provider: string;
     model: string;
   }): Promise<ModelProvider | null> {
-    return this.dependencies.modelProviders.tryFindRowServingModel(input);
+    return this.#modelProviders.tryFindRowServingModel(input);
   }
 
   getExecutionProviders(
     input: ModelProviderListProjectInput,
   ): Promise<Record<string, ModelProviderExecution>> {
-    return this.dependencies.modelProviders.getExecutionProviders(input);
+    return this.#modelProviders.getExecutionProviders(input);
   }
 
   prepareExecution(
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters> {
-    return this.dependencies.modelProviders.prepareExecution(input);
+    return this.#modelProviders.prepareExecution(input);
   }
 
   /** Every stored provider row the project can see, keys masked. */
   listForProject(input: ModelProviderListProjectInput): Promise<ModelProviderSummary[]> {
-    return this.dependencies.modelProviders.listForProject(input);
+    return this.#modelProviders.listForProject(input);
   }
 
   /** Every provider attached anywhere inside the organization, keys masked. */
   listForOrganization(input: ModelProviderListOrganizationInput): Promise<ModelProviderSummary[]> {
-    return this.dependencies.modelProviders.listForOrganization(input);
+    return this.#modelProviders.listForOrganization(input);
   }
 
   /** Stores or replaces a provider row, attributed to the caller. */
   upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider> {
-    return this.dependencies.modelProviders.upsert({ ...input, actorId: by.id });
+    return this.#modelProviders.upsert({ ...input, actorId: by.id });
   }
 
   /**
@@ -209,12 +299,12 @@ export class ModelProviderApp implements ModelProviderApi {
    * project it resolves to, which is the whole gate this door has ever had.
    */
   upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider> {
-    return this.dependencies.modelProviders.upsert(input);
+    return this.#modelProviders.upsert(input);
   }
 
   /** Removes a provider row, attributed to the caller. */
   delete(input: ModelProviderDeleteRequest, by: ModelProviderCaller): Promise<void> {
-    return this.dependencies.modelProviders.delete({ ...input, actorId: by.id });
+    return this.#modelProviders.delete({ ...input, actorId: by.id });
   }
 
   /** Probes a credential that is already stored, attributed to the caller. */
@@ -222,7 +312,7 @@ export class ModelProviderApp implements ModelProviderApi {
     input: ModelProviderTestConnectionRequest,
     by: ModelProviderCaller,
   ): Promise<ModelProviderCredentialVerdict> {
-    return this.dependencies.modelProviders.testConnection({ ...input, actorId: by.id });
+    return this.#modelProviders.testConnection({ ...input, actorId: by.id });
   }
 
   /**
@@ -234,11 +324,11 @@ export class ModelProviderApp implements ModelProviderApi {
     input: ModelProviderCredentialProbeRequest,
     by: ModelProviderCaller,
   ): Promise<ModelProviderCredentialVerdict> {
-    await this.dependencies.providerAuthorization.assertCanWrite(by.id, [
+    await this.#providerAuthorization.assertCanWrite(by.id, [
       probedTenantScope(input),
     ]);
 
-    return this.dependencies.credentialProbe.probe({
+    return this.#credentialProbe.probe({
       provider: input.provider,
       customKeys: input.customKeys,
     });
@@ -248,17 +338,17 @@ export class ModelProviderApp implements ModelProviderApi {
   validateStoredKey(
     input: ModelProviderStoredCredentialProbeRequest,
   ): Promise<ModelProviderCredentialVerdict> {
-    return this.dependencies.credentialProbe.probeStored({
+    return this.#credentialProbe.probeStored({
       projectId: input.projectId,
       provider: input.provider,
       customBaseUrl: input.customBaseUrl,
-      modelProviders: this.dependencies.modelProviders,
+      modelProviders: this.#modelProviders,
     });
   }
 
   /** Codex step 1: ask the issuer for a device code. Nothing is stored yet. */
   startCodexDeviceSignIn(): Promise<ModelProviderCodexDeviceSignIn> {
-    return this.dependencies.codexAccounts.startDeviceSignIn();
+    return this.#codexAccounts.startDeviceSignIn();
   }
 
   /** Codex step 2..n: one poll of the pending device authorization. */
@@ -266,25 +356,25 @@ export class ModelProviderApp implements ModelProviderApi {
     deviceAuthId: string;
     userCode: string;
   }): Promise<ModelProviderCodexDeviceApproval> {
-    return this.dependencies.codexAccounts.pollDeviceSignIn(input);
+    return this.#codexAccounts.pollDeviceSignIn(input);
   }
 
   /** Whether LangWatch itself supplies this provider's credentials. */
   isManagedProvider(input: Readonly<{ organizationId: string; provider: string }>): boolean {
-    return this.dependencies.modelProviders.isManagedProvider(input);
+    return this.#modelProviders.isManagedProvider(input);
   }
 
   // ── the Codex account ──────────────────────────────────────────────────────
 
   /** The connected Codex account for a project. Never a token, never an email. */
   getCodexStatus(input: ModelProviderCodexStatusInput): Promise<ModelProviderCodexStatus> {
-    return this.dependencies.modelProviders.getCodexStatus(input);
+    return this.#modelProviders.getCodexStatus(input);
   }
 
   refreshCodexForGateway(
     input: ModelProviderCodexGatewayRefreshInput,
   ): Promise<ModelProviderCodexGatewayRefresh> {
-    return this.dependencies.modelProviders.refreshCodexForGateway(input);
+    return this.#modelProviders.refreshCodexForGateway(input);
   }
 
   /**
@@ -313,11 +403,11 @@ export class ModelProviderApp implements ModelProviderApi {
 
   /** What the cascade resolves for one feature key, or null when nothing is set. */
   tryGetResolvedDefault(input: ModelDefaultResolveInput): Promise<ModelDefaultEffective | null> {
-    return this.dependencies.modelProviders.tryGetResolvedDefault(input);
+    return this.#modelProviders.tryGetResolvedDefault(input);
   }
 
   resolveModelForFeature(input: ModelDefaultResolveInput): Promise<ModelProviderResolution> {
-    return this.dependencies.modelProviders.resolveModelForFeature(input);
+    return this.#modelProviders.resolveModelForFeature(input);
   }
 
   findAlternateModel(input: {
@@ -325,7 +415,7 @@ export class ModelProviderApp implements ModelProviderApi {
     featureKey: string;
     skipFromScope: ModelProviderResolution["scope"];
   }): Promise<ModelProviderAlternateResolution> {
-    return this.dependencies.modelProviders.findAlternateModel(input);
+    return this.#modelProviders.findAlternateModel(input);
   }
 
   /** The Default Models settings page's snapshot, scoped to what the caller may write. */
@@ -333,14 +423,14 @@ export class ModelProviderApp implements ModelProviderApi {
     input: ModelDefaultSnapshotRequest,
     by: ModelProviderCaller,
   ): Promise<ModelDefaultSnapshot> {
-    return this.dependencies.modelProviders.getDefaultSnapshot({ ...input, actorId: by.id });
+    return this.#modelProviders.getDefaultSnapshot({ ...input, actorId: by.id });
   }
 
   /** The same snapshot read as nobody, for a credential that names no person. */
   getDefaultSnapshotUnattributed(
     input: ModelDefaultSnapshotRequest,
   ): Promise<ModelDefaultSnapshot> {
-    return this.dependencies.modelProviders.getDefaultSnapshot(input);
+    return this.#modelProviders.getDefaultSnapshot(input);
   }
 
   /**
@@ -351,7 +441,7 @@ export class ModelProviderApp implements ModelProviderApi {
    * here is what stops a handler filling one and forgetting the other.
    */
   setDefault(input: ModelDefaultAssignmentRequest, by: ModelProviderCaller): Promise<void> {
-    return this.dependencies.modelProviders.setDefault({
+    return this.#modelProviders.setDefault({
       ...input,
       authorId: by.id,
       actorId: by.id,
@@ -363,7 +453,7 @@ export class ModelProviderApp implements ModelProviderApi {
     input: ModelDefaultConfigWriteRequest,
     by: ModelProviderCaller,
   ): Promise<ModelDefaultConfig> {
-    return this.dependencies.modelProviders.saveDefaultConfig({
+    return this.#modelProviders.saveDefaultConfig({
       ...input,
       authorId: by.id,
       actorId: by.id,
@@ -372,15 +462,15 @@ export class ModelProviderApp implements ModelProviderApi {
 
   /** Deletes a default-models config and every scope attachment it holds. */
   deleteDefaultConfig(input: ModelDefaultDeleteRequest, by: ModelProviderCaller): Promise<void> {
-    return this.dependencies.modelProviders.deleteDefaultConfig({ ...input, actorId: by.id });
+    return this.#modelProviders.deleteDefaultConfig({ ...input, actorId: by.id });
   }
 
   assertApiKeyMayWriteDefaultScopes(input: ModelDefaultApiKeyScopeCheck): Promise<void> {
-    return this.dependencies.modelProviders.assertApiKeyMayWriteDefaultScopes(input);
+    return this.#modelProviders.assertApiKeyMayWriteDefaultScopes(input);
   }
 
   tryGetDefaultConfig(input: { id: string }): Promise<ModelDefaultConfig | null> {
-    return this.dependencies.modelProviders.tryGetDefaultConfig(input);
+    return this.#modelProviders.tryGetDefaultConfig(input);
   }
 
   /** What the cascade would hand back for these scopes if they held nothing. */
@@ -391,28 +481,28 @@ export class ModelProviderApp implements ModelProviderApi {
       excludeConfigId?: string;
     }>,
   ): Promise<ModelDefaultInheritedValues> {
-    return this.dependencies.modelProviders.getInheritedValues(input);
+    return this.#modelProviders.getInheritedValues(input);
   }
 
   // ── model costs ────────────────────────────────────────────────────────────
 
   /** The project's custom cost rules. */
   listCosts(input: ModelCostListInput): Promise<ModelCost[]> {
-    return this.dependencies.modelProviders.listCosts(input);
+    return this.#modelProviders.listCosts(input);
   }
 
   estimateCost(input: ModelCostEstimateInput): number {
-    return this.dependencies.modelProviders.estimateCost(input);
+    return this.#modelProviders.estimateCost(input);
   }
 
   /** Writes one cost rule at a scope the caller may manage, attributed to them. */
   upsertCost(input: ModelCostWriteRequest, by: ModelProviderCaller): Promise<ModelCost> {
-    return this.dependencies.modelProviders.upsertCost({ ...input, actorId: by.id });
+    return this.#modelProviders.upsertCost({ ...input, actorId: by.id });
   }
 
   /** Removes one cost rule, authorized against the STORED row's scope. */
   deleteCost(input: ModelCostDeleteRequest, by: ModelProviderCaller): Promise<void> {
-    return this.dependencies.modelProviders.deleteCost({ ...input, actorId: by.id });
+    return this.#modelProviders.deleteCost({ ...input, actorId: by.id });
   }
 
   /** The registry's ceilings for a model id, or null when it names no such model. */
@@ -433,7 +523,7 @@ export class ModelProviderApp implements ModelProviderApi {
   previewCostRuleMatchingSpans(
     input: ModelCostPreviewRequest,
   ): Promise<CostRuleMatchingSpansPreview> {
-    const spans = this.dependencies.spans;
+    const spans = this.#spans;
 
     if (!isPreviewSpanReader(spans)) throw new ModelCostPreviewUnavailableError();
 
@@ -457,7 +547,7 @@ export class ModelProviderApp implements ModelProviderApi {
     if (!feature) throw new Error(`${TRANSLATE_FEATURE_KEY} feature is not registered`);
 
     return this.#aiCallFailures.wrapAiCall(feature, () =>
-      this.dependencies.modelProviders.translate(input),
+      this.#modelProviders.translate(input),
     );
   }
 }

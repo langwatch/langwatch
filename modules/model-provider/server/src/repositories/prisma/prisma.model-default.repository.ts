@@ -8,10 +8,10 @@ import {
   type ModelDefaultConfig,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
-import {
+import type {
+  ModelDefaultConfigSaveInput,
   ModelDefaultRepository,
-  type ModelDefaultConfigSaveInput,
-} from "../../ports/model-provider.port.ts";
+} from "../model-default.repository.ts";
 
 type Database = Pick<
   PrismaClient,
@@ -19,10 +19,8 @@ type Database = Pick<
 >;
 type RootDatabase = Database & Pick<PrismaClient, "$transaction">;
 
-export class PrismaModelDefaultRepository extends ModelDefaultRepository {
-  private constructor(private readonly database: RootDatabase) {
-    super();
-  }
+export class PrismaModelDefaultRepository implements ModelDefaultRepository {
+  private constructor(private readonly database: RootDatabase) {}
 
   static create(database: RootDatabase): PrismaModelDefaultRepository {
     if (!isModelDefaultDatabase(database)) {

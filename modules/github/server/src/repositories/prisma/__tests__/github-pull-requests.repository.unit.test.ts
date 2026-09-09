@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   PrismaGithubPullRequestsRepository,
   type PrismaGithubPullRequestsDatabase,
-} from "../github-pull-requests.repository.ts";
+} from "../prisma.github-pull-requests.repository.ts";
 import { Temporal, toDate } from "@langwatch/time";
 
 type Call = { method: string; args: Record<string, unknown> };

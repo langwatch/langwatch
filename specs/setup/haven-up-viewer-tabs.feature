@@ -143,3 +143,24 @@ Feature: haven up viewer tabs
       When the jobs tab opens
       Then each is a row with its name, when it ran, how long it took and its exit
       And enter shows that job's captured output
+
+  Rule: Wide lines are cut, not wrapped, and expand on demand
+
+    @unit
+    Scenario: A line wider than the terminal is cut, not wrapped
+      Given a rendered line wider than the terminal
+      When the viewer draws it
+      Then it stays one row, cut to the width, with a dim marker where it was cut
+      And a line that fits carries no marker
+
+    @unit
+    Scenario: Clicking a row opens it in full, and clicking again closes it
+      When the developer clicks a cut row
+      Then that row alone is shown in full, wrapped under the message column
+      And clicking it again cuts it back to one row
+
+    @unit
+    Scenario: x opens every row on the tab, for a terminal that forwards no clicks
+      When the developer presses x
+      Then every row on the tab is shown in full
+      And the setting belongs to that tab, and x again cuts them back

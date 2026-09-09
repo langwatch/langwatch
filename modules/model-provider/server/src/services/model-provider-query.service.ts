@@ -10,9 +10,11 @@ import {
 } from "@langwatch/model-provider-contract";
 import type {
   ModelProviderCatalog,
-  ModelProviderCredentialPolicy,
-  ModelProviderRepository,
+  ModelProviderCredentialPolicy
 } from "../ports/model-provider.port.ts";
+import type {
+  ModelProviderRepository
+} from "../repositories/model-provider.repository.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 
 type ModelProviderQueryOptions = {

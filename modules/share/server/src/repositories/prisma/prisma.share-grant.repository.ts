@@ -12,7 +12,6 @@ import type {
 } from "../share-grant.repository.ts";
 
 const idSelect = { id: true } as const;
-const organizationSelect = { team: { select: { organizationId: true } } } as const;
 
 /** Prisma's unique-constraint failure, read off the code so it survives a client boundary. */
 function isUniqueConstraintViolation(error: unknown): boolean {
@@ -78,19 +77,10 @@ async function mirrorUsage(db: UsageTransaction, params: ConsumeShareUsageParams
 }
 
 export class PrismaShareGrantRepository
-  extends PrismaRepository.transactionalFor("ShareLink", "Project", "Grant", "GrantUsage")
+  extends PrismaRepository.transactionalFor("ShareLink", "Grant", "GrantUsage")
   implements ShareGrantRepository
 {
   static readonly create = this.factory((prisma) => new PrismaShareGrantRepository(prisma));
-
-  async findOrganizationIdByProject(projectId: string): Promise<string | null> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: organizationSelect,
-    });
-
-    return project?.team?.organizationId ?? null;
-  }
 
   async findAllResourceGrantIds({
     organizationId,

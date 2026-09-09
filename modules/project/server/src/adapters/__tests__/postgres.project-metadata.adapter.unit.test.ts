@@ -137,7 +137,7 @@ describe("PostgresProjectMetadataAdapter", () => {
           database: narrow.client,
         }).build();
         const service = ProjectService.create({
-          repository: PrismaProjectRepository.create(wide.client),
+          repository: PrismaProjectRepository.create({ prisma: wide.client }),
           credentials: {
             generateProjectId: () => "unused",
             generateApiKey: () => "unused",

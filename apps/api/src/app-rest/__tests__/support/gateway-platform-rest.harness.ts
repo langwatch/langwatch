@@ -90,7 +90,7 @@ export type GatewayRestHarness = {
  * is the process's own composition root: a second description of any of it here would be
  * a harness that passed while production refused.
  */
-export function mountGatewayPlatformRest(): GatewayRestHarness {
+export async function mountGatewayPlatformRest(): Promise<GatewayRestHarness> {
   if (!databaseUrl) throw new Error("DATABASE_URL is required for this suite");
   if (!clickHouseUrl) throw new Error("a test ClickHouse is required for this suite");
 
@@ -112,7 +112,7 @@ export function mountGatewayPlatformRest(): GatewayRestHarness {
     newBindingId: () => `authzbinding_${Math.random().toString(36).slice(2)}`,
   }).build();
 
-  const tenancy = ApiTenancyComposition.compose({
+  const tenancy = await ApiTenancyComposition.compose({
     database: connection,
     authz: { permissions: authzBuild.authz, grants: authzBuild.grants },
     encryption,

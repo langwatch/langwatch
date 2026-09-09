@@ -4,6 +4,7 @@ import {
   type PinnedTrace,
   type PinTraceInput,
 } from "@langwatch/data-retention-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import {
   ShareApi,
@@ -42,6 +43,7 @@ export class ShareApp implements ShareApiContract {
   static readonly dependencies = {
     dataRetention: DataRetentionApi,
     authorization: AuthzApi,
+    projects: ProjectApi,
   };
 
   readonly #shares: ShareService;
@@ -53,11 +55,12 @@ export class ShareApp implements ShareApiContract {
   }
 
   static create(setup: ShareSetup): ShareApp {
-    const { dataRetention, authorization } = setup.dependencies;
+    const { dataRetention, authorization, projects } = setup.dependencies;
     const repository = LedgerShareRepository.create({
       head: setup.repositories.shares,
       grants: setup.repositories.grants,
       authz: authorization,
+      projects,
     });
 
     return new ShareApp(
@@ -65,6 +68,7 @@ export class ShareApp implements ShareApiContract {
         repository,
         dataRetention,
         permissions: authorization,
+        projects,
         cache: RedisShareCacheRepository.create({ redis: setup.infrastructure.redis }),
       }),
       dataRetention,

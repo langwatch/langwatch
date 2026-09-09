@@ -29,12 +29,12 @@ import {
   stubDataRetentionFeature,
   stubEntitlementFeature,
   stubFeatureFlagFeature,
+  stubApiKeyFeature,
   stubPresenceFeature,
   stubSecretFeature,
   stubShareFeature,
   stubTopicFeature,
 } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
-import { refusingApiKeyFeature } from "../../../features/api-key/api-key.composition.ts";
 import { refusingLangyFeature } from "../../../features/langy/langy.composition.ts";
 import { refusingAnalyticsFeature } from "../../../features/analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../../features/dataset/dataset.composition.ts";
@@ -174,7 +174,7 @@ export function buildAppTrpcFeatures(
       auth: refusingAuthFeature("langwatch-api"),
       user: refusingUserFeature("langwatch-api"),
       presence: stubPresenceFeature(),
-      apiKey: refusingApiKeyFeature(),
+      apiKey: stubApiKeyFeature(),
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),

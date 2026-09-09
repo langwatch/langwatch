@@ -41,7 +41,7 @@ describe.skipIf(!DB_URL)(
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     const prisma = connection.client as PrismaClient;
     const projects = ProjectService.create({
-      repository: PrismaProjectRepository.create(prisma),
+      repository: PrismaProjectRepository.create({ prisma }),
       credentials,
       organizations: unusedOrganizations,
     });

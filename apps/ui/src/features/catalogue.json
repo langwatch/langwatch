@@ -84,7 +84,7 @@
       "id": "api-key",
       "root": "api-key",
       "uses": {
-        "screens": ["@langwatch/api-key-web/screens/api-key"],
+        "screens": ["@langwatch/api-key-web/api-keys"],
         "surfaces": []
       }
     },
@@ -100,7 +100,7 @@
       "id": "authorize",
       "root": "authorize",
       "uses": {
-        "screens": ["@langwatch/api-key-web/screens/authorize"],
+        "screens": ["@langwatch/api-key-web/authorize"],
         "surfaces": []
       }
     },
@@ -223,7 +223,7 @@
       "id": "integrations",
       "root": "github",
       "uses": {
-        "screens": ["@langwatch/github-web/screens/integrations"],
+        "screens": ["@langwatch/github-web/integrations"],
         "surfaces": []
       }
     },
@@ -252,7 +252,7 @@
       "id": "model-provider",
       "root": "model-provider",
       "uses": {
-        "screens": ["@langwatch/model-provider-web/screens/model-provider"],
+        "screens": ["@langwatch/model-provider-web/model-providers"],
         "surfaces": [
           "@langwatch/enterprise-managed-provider-web/surfaces/managed-provider-alert",
           "@langwatch/model-provider-web/surfaces/model-error-interceptor"

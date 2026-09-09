@@ -16,6 +16,12 @@ import {
   HttpModelProviderCredentialProbeAdapter,
   ModelProviderManagedGatewayPort,
   ModelProviderRateLimitPort,
+  type CodexTokenRefresher,
+  type ModelProviderCatalog,
+  type ModelProviderConnectionRateLimiter,
+  type ModelProviderCredentialCodec,
+  type ModelProviderIdService,
+  type ModelTranslationPort,
   PostgresModelProviderAdapter,
   PrefixedModelProviderIdAdapter,
   RegistryModelProviderCatalogAdapter,
@@ -73,10 +79,22 @@ export type ApiModelProviderCompositionOptions = Readonly<{
   processName: string;
 }>;
 
-/** Composes the model gateway from this process's own graph. */
-export function composeApiModelProviders(
-  options: ApiModelProviderCompositionOptions,
-): ModelProviderService {
+/**
+ * The pieces the model gateway is made of, stated once.
+ *
+ * Named separately from {@link composeApiModelProviders} because the installed
+ * module asks this process for the same set through `withPersistence` and
+ * `withInfrastructure`: two lists of the same eight answers would be two
+ * chances to give a different one.
+ */
+export function apiModelProviderParts(options: ApiModelProviderCompositionOptions): Readonly<{
+  credentials: ModelProviderCredentialCodec;
+  catalog: ModelProviderCatalog;
+  translation: ModelTranslationPort;
+  ids: ModelProviderIdService;
+  codexTokenRefresher: CodexTokenRefresher;
+  connectionRateLimiter: ModelProviderConnectionRateLimiter;
+}> {
   const logger = createLogger(options.processName);
   const managed = ApiManagedModelProviderGatewayAdapter.create({
     service: composeManagedProviders({
@@ -86,11 +104,7 @@ export function composeApiModelProviders(
     }),
   });
 
-  return PostgresModelProviderAdapter.create({
-    database: options.prisma,
-    projects: options.projects,
-    organizations: options.organizations,
-    authorization: options.authorization,
+  return {
     credentials: EncryptedModelProviderCredentialAdapter.create({ cipher: options.encryption }),
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherAdapter.create(),
     connectionRateLimiter: WindowedModelProviderConnectionRateLimiterAdapter.create({
@@ -116,6 +130,21 @@ export function composeApiModelProviders(
       // No `codexHandles`: see the module docblock.
     }),
     ids: PrefixedModelProviderIdAdapter.create({ suffix: () => nanoid() }),
+  };
+}
+
+/** Composes the model gateway from this process's own graph. */
+export function composeApiModelProviders(
+  options: ApiModelProviderCompositionOptions,
+): ModelProviderService {
+  const parts = apiModelProviderParts(options);
+
+  return PostgresModelProviderAdapter.create({
+    database: options.prisma,
+    projects: options.projects,
+    organizations: options.organizations,
+    authorization: options.authorization,
+    ...parts,
   }).build();
 }
 

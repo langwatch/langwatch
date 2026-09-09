@@ -5,6 +5,7 @@ import type {
   PaginatedProjects,
   Project,
   ProjectIdentity,
+  ProjectPath,
   ProjectWithTeam,
   SearchProjectsResult,
   TraceSharingConfig,
@@ -25,66 +26,69 @@ export interface ProjectWithOrgAdmin {
   adminUserId: string | null;
 }
 
-/** Persistence owned by the Project feature. It never crosses into a caller. */
-export abstract class ProjectRepository {
-  abstract listPaths(input: {
-    projectIds: string[];
-  }): Promise<import("@langwatch/project-contract").ProjectPath[]>;
-  abstract tryFindInternalByOrganization(organizationId: string): Promise<InternalProject | null>;
-  abstract tryFindInternalBySlug(slug: string): Promise<InternalProject | null>;
-  abstract createInternalOrFindWinner(input: {
+/** Persistence owned by the Project module. It never crosses into a caller. */
+export interface ProjectRepository {
+  listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]>;
+  tryFindInternalByOrganization(organizationId: string): Promise<InternalProject | null>;
+  tryFindInternalBySlug(slug: string): Promise<InternalProject | null>;
+  createInternalOrFindWinner(input: {
     id: string;
     name: string;
     slug: string;
     apiKey: string;
     teamId: string;
   }): Promise<InternalProject>;
-  abstract isPresenceEnabled(projectId: string): Promise<boolean>;
+  isPresenceEnabled(projectId: string): Promise<boolean>;
 
-  abstract tryGetById(id: string): Promise<Project | null>;
-  abstract tryGetOrganizationId(projectId: string): Promise<string | undefined>;
-  abstract tryGetWithTeam(id: string): Promise<ProjectWithTeam | null>;
-  abstract updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
-  abstract touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void>;
-  abstract touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void>;
-  abstract tryGetWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
-  abstract tryGetTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
-  abstract searchByQuery(input: {
+  tryGetById(id: string): Promise<Project | null>;
+  tryGetOrganizationId(projectId: string): Promise<string | undefined>;
+  tryGetWithTeam(id: string): Promise<ProjectWithTeam | null>;
+  updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
+  touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void>;
+  touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void>;
+  tryGetWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
+  findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
+  searchByQuery(input: {
     query: string;
     organizationId?: string;
     limit?: number;
   }): Promise<SearchProjectsResult[]>;
-  abstract create(input: CreateProjectInput): Promise<Project>;
-  abstract update(input: {
-    id: string;
-    organizationId: string;
-    data: UpdateProjectInput;
-  }): Promise<Project>;
-  abstract archive(input: { id: string; organizationId: string }): Promise<Project>;
-  abstract findAllByOrganization(input: {
+  create(input: CreateProjectInput): Promise<Project>;
+  update(input: { id: string; organizationId: string; data: UpdateProjectInput }): Promise<Project>;
+  archive(input: { id: string; organizationId: string }): Promise<Project>;
+  findAllByOrganization(input: {
     organizationId: string;
     page: number;
     limit: number;
     projectIds?: string[];
   }): Promise<PaginatedProjects>;
-  abstract findAllByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]>;
-  abstract findNamesByIds(projectIds: string[]): Promise<ProjectIdentity[]>;
-  abstract tryFindIdentity(id: string): Promise<ProjectIdentity | null>;
-  abstract findIdsByOrganization(organizationId: string): Promise<string[]>;
-  abstract findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]>;
-  abstract tryFindBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null>;
-  abstract tryFindActiveTeamInOrganization(input: {
+  findAllByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]>;
+  findNamesByIds(projectIds: string[]): Promise<ProjectIdentity[]>;
+  tryFindIdentity(id: string): Promise<ProjectIdentity | null>;
+  findIdsByOrganization(organizationId: string): Promise<string[]>;
+  findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]>;
+  tryFindBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null>;
+  tryFindActiveTeamInOrganization(input: {
     teamId: string;
     organizationId: string;
   }): Promise<{ id: string; isPersonal: boolean } | null>;
-  abstract tryFindLiveTraceDestination(input: {
+  tryFindLiveTraceDestination(input: {
     organizationId: string;
     projectId: string;
   }): Promise<TraceDestinationProject | null>;
-  abstract tryFindOldestGovernanceTraceDestination(
+  tryFindOldestGovernanceTraceDestination(
     organizationId: string,
   ): Promise<TraceDestinationProject | null>;
-  abstract countLiveNonGovernanceProjects(organizationId: string): Promise<number>;
-  abstract tryGetTraceDestination(projectId: string): Promise<TraceDestinationProject | null>;
-  abstract listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]>;
+  countLiveNonGovernanceProjects(organizationId: string): Promise<number>;
+  tryGetTraceDestination(projectId: string): Promise<TraceDestinationProject | null>;
+  listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]>;
+  /** The live project the legacy `apiKey` column names, or nothing. */
+  findIdByLegacyApiKey(input: { token: string }): Promise<string | null>;
+  /** False when no live row took the write, which is how the caller learns nothing rotated. */
+  rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean>;
+  /** Resolves personal team/project ownership for a caller that owns neither table. */
+  findPersonalWorkspaceOwner(input: {
+    organizationId: string;
+    scopeId: string;
+  }): Promise<{ ownerUserId: string | null } | null>;
 }

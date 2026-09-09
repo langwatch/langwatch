@@ -11,7 +11,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/index.ts", "./src/testing.ts"],
+  "files": ["./src/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -52,6 +52,9 @@
     },
     {
       "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../secret/server/tsconfig.build.json"

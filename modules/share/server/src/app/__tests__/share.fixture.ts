@@ -1,5 +1,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi, PinnedTrace } from "@langwatch/data-retention-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
@@ -37,5 +38,12 @@ export function createShareTestDataRetention(): DataRetentionApi {
     unpin: vi.fn(async () => void 0),
     tryGetPin: vi.fn(async () => null),
     listByProject: vi.fn(async () => []),
+  });
+}
+
+/** Both kill switches open, so a mint is only ever refused by the test that closes one. */
+export function createShareTestProjects(): ProjectApi {
+  return Object.assign(createApiFixture<ProjectApi>(), {
+    findTraceSharingConfig: vi.fn(async () => ({ orgEnabled: true, projectEnabled: true })),
   });
 }

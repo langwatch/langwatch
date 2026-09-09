@@ -20,7 +20,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ModelProviderAuthorizationService } from "../../services/model-provider-authorization.service.ts";
 import { ModelProviderWriteAuthorizationService } from "../../services/model-provider-write-authorization.service.ts";
 import { modelDefaultsRest, modelDefaultsRestCredential } from "../model-defaults.rest.ts";
-import { createModelProviderTestApp } from "./model-provider.harness.ts";
+import { mountableModelProviderApp } from "./model-provider.harness.ts";
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
@@ -63,7 +63,7 @@ function mount(
       ? { apiKeyId: "api-key-1", userId: "owner-user", organizationId: ORGANIZATION }
       : options.credential;
 
-  const { app } = createModelProviderTestApp({ modelProviders: options.modelProviders ?? {} });
+  const { app } = mountableModelProviderApp({ modelProviders: options.modelProviders ?? {} });
   const hono = createRestRuntime({
     identity: {
       authenticate: ({ permission }) => {

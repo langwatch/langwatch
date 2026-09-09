@@ -331,31 +331,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "github|fixtures-directory",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "github|installer-not-booted",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "github|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "github|persistence-adapter",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "github|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "github|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "github|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {
@@ -523,31 +499,11 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "model-provider|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "model-provider|no-installer",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "model-provider|persistence-adapter",
       "measured": "2026-09-08"
     },
     {
-      "key": "model-provider|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "model-provider|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "model-provider|testing-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "model-provider|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {
@@ -627,15 +583,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "project|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "project|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "project|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {

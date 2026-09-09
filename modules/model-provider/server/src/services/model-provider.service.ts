@@ -41,15 +41,21 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type {
   CodexTokenRefresher,
-  ModelCostRepository,
-  ModelDefaultRepository,
   ModelProviderCatalog,
   ModelProviderConnectionRateLimiter,
   ModelProviderCredentialPolicy,
   ModelProviderIdService,
-  ModelProviderRepository,
-  ModelTranslationPort,
+  ModelTranslationPort
 } from "../ports/model-provider.port.ts";
+import type {
+  ModelCostRepository
+} from "../repositories/model-cost.repository.ts";
+import type {
+  ModelDefaultRepository
+} from "../repositories/model-default.repository.ts";
+import type {
+  ModelProviderRepository
+} from "../repositories/model-provider.repository.ts";
 import { ModelProviderCommandService } from "./model-provider-command.service.ts";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import { ModelProviderCodexService } from "./model-provider-codex.service.ts";

@@ -4,7 +4,7 @@
  * produces. Two of the three drawers have openers outside this family.
  */
 
-import type { ModelProviderPlatformDrawer } from "@langwatch/model-provider-web/screens/model-provider";
+import type { ModelProviderPlatformDrawer } from "@langwatch/model-provider-web/model-providers";
 
 export function openPlatformDrawer({
   drawer,

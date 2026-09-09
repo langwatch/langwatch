@@ -5,8 +5,8 @@ import {
   type Project,
   type ProjectWithTeam,
   type PaginatedProjects,
-  type ProjectService,
   type TopicClusteringRequest,
+  type TraceSharingConfig,
   type UpdateProjectInput,
 } from "@langwatch/project-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -15,12 +15,11 @@ import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { ProjectOperationsService } from "../services/project-operations.service.ts";
-import { PostgresProjectAdapter } from "../adapters/postgres.project.adapter.ts";
 import { ProjectCredentialsAdapter } from "../adapters/project-credentials.adapter.ts";
-import type { PrismaProjectDatabase } from "../repositories/prisma/prisma.project.repository.ts";
+import type { ProjectRepositories } from "../repositories/project.repositories.ts";
+import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
 
 export type ProjectInfrastructure = Readonly<{
-  database: PrismaProjectDatabase;
   topicClustering: {
     requestClustering(input: {
       tenantId: string;
@@ -40,7 +39,12 @@ type ProjectDependencies = Readonly<{
   share: typeof ShareApi;
   topics: typeof TopicApi;
 }>;
-type ProjectSetup = FeatureSetup<ProjectDependencies, ProjectInfrastructure, undefined>;
+type ProjectSetup = FeatureSetup<
+  ProjectDependencies,
+  ProjectInfrastructure,
+  undefined,
+  ProjectRepositories
+>;
 
 export class ProjectApp implements ProjectApiContract {
   listPaths(input: { projectIds: string[] }) {
@@ -55,19 +59,22 @@ export class ProjectApp implements ProjectApiContract {
     topics: TopicApi,
   };
 
-  readonly #projectService: ProjectService;
+  readonly #projectService: ProjectApplicationService;
   readonly #operations: ProjectOperationsService;
-  private constructor(projectService: ProjectService, operations: ProjectOperationsService) {
+  private constructor(
+    projectService: ProjectApplicationService,
+    operations: ProjectOperationsService,
+  ) {
     this.#projectService = projectService;
     this.#operations = operations;
   }
 
-  static create({ infrastructure, dependencies }: ProjectSetup): ProjectApp {
-    const projects = PostgresProjectAdapter.create({
-      database: infrastructure.database,
+  static create({ infrastructure, dependencies, repositories }: ProjectSetup): ProjectApp {
+    const projects = ProjectApplicationService.create({
+      repository: repositories.projects,
       credentials: ProjectCredentialsAdapter.create(),
       organizations: dependencies.organizations,
-    }).build();
+    });
     const operations = ProjectOperationsService.create({
       projects,
       apiKeys: dependencies.apiKeys,
@@ -158,6 +165,27 @@ export class ProjectApp implements ProjectApiContract {
 
   regenerateLegacyProjectKey(input: Readonly<{ projectId: string }>): Promise<string> {
     return this.#operations.regenerateLegacyProjectKey(input);
+  }
+
+  findIdByLegacyApiKey(input: Readonly<{ token: string }>): Promise<string | null> {
+    return this.#projectService.findIdByLegacyApiKey(input);
+  }
+
+  rotateLegacyApiKey(input: Readonly<{ projectId: string; token: string }>): Promise<boolean> {
+    return this.#projectService.rotateLegacyApiKey(input);
+  }
+
+  /** Both kill switches a trace share is minted under, read off this module's rows. */
+  findTraceSharingConfig(
+    input: Readonly<{ projectId: string }>,
+  ): Promise<TraceSharingConfig | null> {
+    return this.#projectService.tryGetTraceSharingConfig(input.projectId);
+  }
+
+  findPersonalWorkspaceOwner(
+    input: Readonly<{ organizationId: string; scopeId: string }>,
+  ): Promise<{ ownerUserId: string | null } | null> {
+    return this.#projectService.findPersonalWorkspaceOwner(input);
   }
 
   requestTopicClustering(

@@ -61,8 +61,6 @@ export abstract class ApiKeyRepository {
     organizationId: string;
     projectId: string;
   }): Promise<StoredApiKey[]>;
-  abstract findLegacyProjectId(input: { token: string }): Promise<string | null>;
-  abstract rotateLegacyProjectKey(input: { projectId: string; token: string }): Promise<boolean>;
   /**
    * Revokes every unrevoked key of one reserved name whose expiry has elapsed.
    *
@@ -72,9 +70,4 @@ export abstract class ApiKeyRepository {
    * and policy belongs above persistence.
    */
   abstract revokeExpiredByName(input: { name: string; now: Instant }): Promise<number>;
-  /** Resolves personal team/project ownership without leaking foreign persistence upward. */
-  abstract findPersonalWorkspaceOwner(input: {
-    organizationId: string;
-    scopeId: string;
-  }): Promise<{ ownerUserId: string | null } | null>;
 }

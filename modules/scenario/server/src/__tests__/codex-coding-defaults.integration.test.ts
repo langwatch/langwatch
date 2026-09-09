@@ -35,7 +35,7 @@ import {
   UnavailableModelProviderCredentialProbeAdapter,
   UnmanagedModelProviderGatewayAdapter,
   VercelAiModelTranslationAdapter,
-} from "@langwatch/model-provider-server/testing";
+} from "@langwatch/model-provider-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import {

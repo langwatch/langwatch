@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { modelProviderTrpcTransport } from "../model-provider.trpc.ts";
 import type { CodexAccountService } from "../../adapters/codex-oauth.model-provider-token-refresher.adapter.ts";
 import {
-  createModelProviderTestApp,
+  mountableModelProviderApp,
   modelProviderTrpcTestPorts,
   RecordingCredentialProbe,
   StubCodexAccounts,
@@ -57,7 +57,7 @@ function mount(
     userId?: string;
   } = {},
 ) {
-  const { app, probe } = createModelProviderTestApp({
+  const { app, probe, repositories } = mountableModelProviderApp({
     modelProviders: options.modelProviders ?? {},
     permits: options.permits,
     probe: options.probe,
@@ -74,6 +74,7 @@ function mount(
   return {
     router,
     probe,
+    repositories,
     caller: router.createCaller({ actor: { id: options.userId ?? "user_a" } }),
   };
 }
@@ -258,9 +259,9 @@ describe("the modelProvider tRPC namespace", () => {
       });
 
       expect(upsert.mock.calls[0]?.[0]).toMatchObject({
-        actorId: "user_a",
         scopes: [{ scopeType: "TEAM", scopeId: "team-1" }],
       });
+      expect(upsert.mock.calls[0]?.[1]).toMatchObject({ id: "user_a" });
     });
   });
 
@@ -391,12 +392,8 @@ describe("the modelProvider tRPC namespace", () => {
       });
 
       it("points only the LANGY and FAST roles at the codex model when asked", async () => {
-        const setDefault = vi.fn(async (_input: { key: string }) => {});
-        const { caller } = mount({
-          modelProviders: {
-            upsert: (async () => ({ id: "mp_codex" })) as never,
-            setDefault: setDefault as never,
-          },
+        const { caller, repositories } = mount({
+          modelProviders: { upsert: (async () => ({ id: "mp_codex" })) as never },
           codexAccounts: StubCodexAccounts.create({ status: "complete", keys: CODEX_KEYS }),
         });
 
@@ -408,7 +405,14 @@ describe("the modelProvider tRPC namespace", () => {
           setAsCodingDefaults: true,
         });
 
-        expect(setDefault.mock.calls.map((call) => call[0].key)).toEqual(["LANGY", "FAST"]);
+        const stored = await repositories.defaults.tryFindByScope({
+          scopeType: "ORGANIZATION",
+          scopeId: "org-1",
+        });
+
+        // The Default role - playground, evaluators, workflows - is untouched:
+        // those are not coding surfaces.
+        expect(Object.keys(stored?.config ?? {}).sort()).toEqual(["FAST", "LANGY"]);
       });
     });
   });

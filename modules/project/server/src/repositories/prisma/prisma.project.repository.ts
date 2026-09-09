@@ -24,11 +24,12 @@ import {
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
+import { PrismaRepository } from "@langwatch/prisma-client";
 import { mapProjectIdentityRow, PROJECT_IDENTITY_SELECT } from "./prisma.project.mapper.ts";
-import {
+import type {
   ProjectRepository,
-  type ProjectWithOrgAdmin,
-  type TouchCodingAgentActivityInput,
+  ProjectWithOrgAdmin,
+  TouchCodingAgentActivityInput,
 } from "../project.repository.ts";
 
 /**
@@ -42,7 +43,10 @@ import {
  */
 export type PrismaProjectDatabase = Pick<PrismaClient, "project" | "team">;
 
-export class PrismaProjectRepository extends ProjectRepository {
+export class PrismaProjectRepository
+  extends PrismaRepository.for("Project", "Team")
+  implements ProjectRepository
+{
   async listPaths(input: { projectIds: string[] }) {
     const projects = await this.prisma.project.findMany({
       where: { id: { in: input.projectIds } },
@@ -59,13 +63,7 @@ export class PrismaProjectRepository extends ProjectRepository {
     }));
   }
 
-  private constructor(private readonly prisma: PrismaProjectDatabase) {
-    super();
-  }
-
-  static create(database: PrismaProjectDatabase): PrismaProjectRepository {
-    return new PrismaProjectRepository(database);
-  }
+  static readonly create = this.factory((prisma) => new PrismaProjectRepository(prisma));
 
   async tryFindInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
     return this.mapInternal(
@@ -212,7 +210,7 @@ export class PrismaProjectRepository extends ProjectRepository {
     };
   }
 
-  async tryGetTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {
+  async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {
     const project = await this.prisma.project.findUnique({
       where: { id },
       select: {
@@ -450,6 +448,47 @@ export class PrismaProjectRepository extends ProjectRepository {
       const project = byId.get(projectId);
       return project ? [project] : [];
     });
+  }
+
+  async findIdByLegacyApiKey(input: { token: string }): Promise<string | null> {
+    const row = await this.prisma.project.findUnique({
+      where: { apiKey: input.token, archivedAt: null },
+      select: { id: true },
+    });
+    return row?.id ?? null;
+  }
+
+  async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
+    const result = await this.prisma.project.updateMany({
+      where: { id: input.projectId, archivedAt: null },
+      data: { apiKey: input.token },
+    });
+    return result.count > 0;
+  }
+
+  async findPersonalWorkspaceOwner(input: {
+    organizationId: string;
+    scopeId: string;
+  }): Promise<{ ownerUserId: string | null } | null> {
+    const team = await this.prisma.team.findFirst({
+      where: {
+        id: input.scopeId,
+        organizationId: input.organizationId,
+        isPersonal: true,
+      },
+      select: { ownerUserId: true },
+    });
+    if (team) return team;
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: input.scopeId,
+        team: { organizationId: input.organizationId },
+        OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
+        archivedAt: null,
+      },
+      select: { team: { select: { ownerUserId: true } } },
+    });
+    return project?.team ?? null;
   }
 
   private mapProject(row: PrismaProject | null): Project | null {

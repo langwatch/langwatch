@@ -2,22 +2,20 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate } from "@langwatch/time";
 import type { GetRecentItemsParams } from "../../rules/recent-items.rules.ts";
 import { ACTION_TO_TYPE_MAP } from "../../rules/recent-items.rules.ts";
-import {
+import type {
+  AuditLog,
+  RecentArchivableRow,
   RecentItemsRepository,
-  type AuditLog,
-  type RecentArchivableRow,
-  type RecentPromptRow,
-  type RecentSluggedRow,
+  RecentPromptRow,
+  RecentSluggedRow,
 } from "../recent-items.repository.ts";
 
 /**
  * The audit-trail reads behind the home screen's recent strip, and the five entity lookups that
  * hydrate what it finds there.
  */
-export class PrismaRecentItemsRepository extends RecentItemsRepository {
-  private constructor(private readonly prisma: PrismaClient) {
-    super();
-  }
+export class PrismaRecentItemsRepository implements RecentItemsRepository {
+  private constructor(private readonly prisma: PrismaClient) {}
 
   static create(options: { prisma: PrismaClient }): PrismaRecentItemsRepository {
     return new PrismaRecentItemsRepository(options.prisma);

@@ -24,7 +24,6 @@ export {
   ModelProviderCredentialProbePort,
   ModelProviderConnectionRateLimiter,
   ModelProviderEgressPort,
-  ModelProviderEvidenceRepository,
   ModelProviderManagedGatewayPort,
   ModelProviderRateLimitPort,
   CodexTokenRefresher,
@@ -98,10 +97,13 @@ export {
 } from "./rules/legacy-model-provider.rules.ts";
 export {
   ModelProviderApp,
-  type ModelProviderAppDependencies,
   type ModelProviderCaller,
+  type ModelProviderCodexDeviceFlow,
+  type ModelProviderIdFactory,
+  type ModelProviderInfrastructure,
   type SpanReader,
 } from "./app/model-provider.app.ts";
+export { modelProviderServer } from "./model-provider.server.ts";
 export { modelProviderRest } from "./transport/model-provider.rest.ts";
 export {
   modelDefaultsRest,

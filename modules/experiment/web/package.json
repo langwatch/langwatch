@@ -151,7 +151,7 @@
     "@types/papaparse": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitest/browser": "^5.0.0",
+    "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "jsdom": "catalog:",
     "react-dom": "catalog:",

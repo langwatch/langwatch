@@ -4,7 +4,7 @@
  * its own SSO redirect, which a guard would break by refusing it first.
  */
 
-import { apiKeyScreens } from "@langwatch/api-key-web/screens/api-key";
+import { apiKeyScreens } from "@langwatch/api-key-web/api-keys";
 import { useEffect, type ComponentType } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

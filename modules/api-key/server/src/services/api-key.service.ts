@@ -19,9 +19,9 @@ import {
   type RevokeApiKeyInput,
   type UpdateApiKeyInput,
 } from "@langwatch/api-key-contract";
-import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port.ts";
 import type { ApiKeyTokenPort } from "../ports/api-key-token.port.ts";
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
@@ -36,10 +36,10 @@ import type { LegacyApiKeyGrantService } from "./legacy-api-key-grant.service.ts
 import type { Instant } from "@langwatch/time";
 
 export type ApiKeyDependencies = {
-  authz: AuthzService;
-  grants: AuthzGrantsService;
-  organizations: OrganizationService;
-  projects: ProjectService;
+  authz: AuthzApi;
+  grants: AuthzApi;
+  organizations: OrganizationApi;
+  projects: ProjectApi;
   bindingIds: ApiKeyBindingIdPort;
   legacyGrants: LegacyApiKeyGrantService;
   tokens: ApiKeyTokenPort;

@@ -65,7 +65,7 @@ export type WorkerTenancyCompositionOptions = Readonly<{
   dataRetention: Omit<DataRetentionInfrastructure, "redis">;
   share: Omit<ShareInfrastructure, "database" | "redis">;
   topics: TopicInfrastructure;
-  project: Omit<ProjectInfrastructure, "database">;
+  project: ProjectInfrastructure;
 }>;
 
 /**
@@ -98,8 +98,8 @@ export function installWorkerTenancy<Infrastructure>(
         seats: WorkerOrganizationSeats.create({ plans: options.plans, database }),
       },
     })
-    .withModule(projectServer, { infrastructure: { ...options.project, database } })
-    .withModule(apiKeyServer, { infrastructure: { ...options.apiKeys, database } })
+    .withModule(projectServer, { infrastructure: options.project })
+    .withModule(apiKeyServer, { infrastructure: options.apiKeys })
     .withModule(dataRetentionServer, {
       infrastructure: { ...options.dataRetention, redis: options.redis },
     })

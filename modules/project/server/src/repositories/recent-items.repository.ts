@@ -53,14 +53,11 @@ export type RecentSluggedRow = RecentEntityRow & { slug: string };
  * The audit-trail reads behind the home screen's recent strip, and the five entity lookups that
  * hydrate what it finds there.
  */
-export abstract class RecentItemsRepository {
-  abstract getRecentAuditLogEntries(params: GetRecentItemsParams): Promise<AuditLog[]>;
-  abstract tryGetPromptById(id: string, projectId: string): Promise<RecentPromptRow | null>;
-  abstract tryGetWorkflowById(id: string, projectId: string): Promise<RecentArchivableRow | null>;
-  abstract tryGetDatasetById(id: string, projectId: string): Promise<RecentArchivableRow | null>;
-  abstract tryGetMonitorById(id: string, projectId: string): Promise<RecentSluggedRow | null>;
-  abstract tryGetAnnotationQueueById(
-    id: string,
-    projectId: string,
-  ): Promise<RecentSluggedRow | null>;
+export interface RecentItemsRepository {
+  getRecentAuditLogEntries(params: GetRecentItemsParams): Promise<AuditLog[]>;
+  tryGetPromptById(id: string, projectId: string): Promise<RecentPromptRow | null>;
+  tryGetWorkflowById(id: string, projectId: string): Promise<RecentArchivableRow | null>;
+  tryGetDatasetById(id: string, projectId: string): Promise<RecentArchivableRow | null>;
+  tryGetMonitorById(id: string, projectId: string): Promise<RecentSluggedRow | null>;
+  tryGetAnnotationQueueById(id: string, projectId: string): Promise<RecentSluggedRow | null>;
 }

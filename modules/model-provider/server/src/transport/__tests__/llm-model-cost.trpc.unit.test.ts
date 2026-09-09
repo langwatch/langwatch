@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { llmModelCostTrpcTransport } from "../llm-model-cost.trpc.ts";
 import {
-  createModelProviderTestApp,
+  mountableModelProviderApp,
   modelProviderTrpcTestPorts,
   type ModelProviderTestDecision,
   type ModelProviderTrpcTestContext,
@@ -25,7 +25,7 @@ function mount(
     spans?: unknown;
   } = {},
 ) {
-  const { app } = createModelProviderTestApp({
+  const { app } = mountableModelProviderApp({
     modelProviders: options.modelProviders ?? {},
     spans: options.spans,
   });
@@ -95,8 +95,10 @@ describe("the llmModelCost tRPC namespace", () => {
         projectId: PROJECT_ID,
         scopeType: "PROJECT",
         scopeId: PROJECT_ID,
-        actorId: "user-1",
       });
+      // The caller arrives as an argument; the application is what stamps the
+      // write with them, so the door never has to remember to.
+      expect(upsertCost.mock.calls[0]?.[1]).toMatchObject({ id: "user-1" });
     });
   });
 

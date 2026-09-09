@@ -18,7 +18,7 @@ import {
   playgroundRestProject,
   playgroundRestSystemPrompt,
 } from "../playground.rest.ts";
-import { createModelProviderTestApp } from "./model-provider.harness.ts";
+import { mountableModelProviderApp } from "./model-provider.harness.ts";
 
 const PROJECT_ID = "project-1";
 
@@ -64,7 +64,7 @@ function mount(
     modelProviders?: Partial<ModelProviderService>;
   } = {},
 ) {
-  const { app } = createModelProviderTestApp({ modelProviders: options.modelProviders ?? {} });
+  const { app } = mountableModelProviderApp({ modelProviders: options.modelProviders ?? {} });
   const hono = createRestRuntime({
     identity: {
       authenticate: () => {

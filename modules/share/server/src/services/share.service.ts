@@ -1,6 +1,7 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   createShareInputSchema,
   PinnedToActiveShareError,
@@ -38,10 +39,17 @@ const generateShareToken = customAlphabet(
   32,
 );
 
+/**
+ * The project peer, narrowed to the one answer a mint is refused by. The
+ * project module owns the row both trace-sharing switches sit on.
+ */
+type ShareProjectPeer = Pick<ProjectApi, "findTraceSharingConfig">;
+
 type ShareServiceOptions = {
   repository: ShareRepository;
   dataRetention: DataRetentionApi;
   permissions: AuthzApi;
+  projects: ShareProjectPeer;
   cache: ShareCacheRepository;
 };
 
@@ -177,7 +185,9 @@ export class ShareService {
     const parsed = createShareInputSchema.parse(input);
 
     if (parsed.resourceType === "TRACE") {
-      const config = await this.#options.repository.findTraceSharingConfig(parsed.projectId);
+      const config = await this.#options.projects.findTraceSharingConfig({
+        projectId: parsed.projectId,
+      });
       const enabled = config?.orgEnabled === true && config.projectEnabled;
 
       if (!enabled) {

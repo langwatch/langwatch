@@ -82,13 +82,12 @@ export function createWorkerTenancyInfrastructure(
   const encryption = resolveWorkerStoredSecretCipher(options.config);
   const authzBindingIds = KsuidAuthzBindingIdAdapter.create();
   const apiKeys: ApiKeyInfrastructure = {
-    database: options.connection.client,
     pepper: options.config.apiKeyPepper,
     bindingIds: ApiKeyBindingIdAdapter.create(),
     deriveBindingId: EventingAuthzGrantAdapter.deriveGrantId,
     diagnostics: ApiKeyDiagnosticsAdapter.create(logger),
   };
-  const project: Omit<ProjectInfrastructure, "database"> = {
+  const project: ProjectInfrastructure = {
     topicClustering: options.topicClustering,
   };
   const topics: TopicInfrastructure = {

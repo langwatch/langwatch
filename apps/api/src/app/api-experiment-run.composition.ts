@@ -5,7 +5,6 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   AbsentAgentSandboxKeyShareAdapter,
   AgentSandboxKeyMintService,
-  PostgresAgentSandboxKeyMintAdapter,
   RedisAgentSandboxKeyShareAdapter,
   type AgentSandboxKeyShareRedis,
 } from "@langwatch/api-key-server";
@@ -46,6 +45,7 @@ import {
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type {
@@ -207,6 +207,11 @@ export type ApiExperimentRunOptions = Readonly<{
   /** The credential a run lends the code it executes. Absent means it lends none. */
   apiKeys: ApiKeyApi | undefined;
   /**
+   * The project directory the mint asks whose personal workspace a project is.
+   * Absent means the run lends no key, exactly as an absent `apiKeys` does.
+   */
+  projects: ProjectApi | undefined;
+  /**
    * The 32-byte hex key this deployment seals stored secrets with, which the shared sandbox
    * token is held under too. Absent means the runs of a project share no key.
    */
@@ -350,6 +355,7 @@ export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiEx
     sandboxCredentials: ApiExperimentSandboxCredentialAdapter.create({
       prisma: options.prisma,
       apiKeys: options.apiKeys,
+      projects: options.projects,
       redis: redis,
       storedSecretEncryptionKey: options.storedSecretEncryptionKey,
     }),
@@ -574,6 +580,7 @@ class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialP
   static create(options: {
     prisma: PrismaClient;
     apiKeys: ApiKeyApi | undefined;
+    projects: ProjectApi | undefined;
     redis: AgentSandboxKeyShareRedis | null;
     storedSecretEncryptionKey: string | undefined;
   }): ApiExperimentSandboxCredentialAdapter {
@@ -581,13 +588,11 @@ class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialP
     const share = secret
       ? RedisAgentSandboxKeyShareAdapter.create({ redis: options.redis, secret })
       : AbsentAgentSandboxKeyShareAdapter.create();
-    const mint = options.apiKeys
-      ? PostgresAgentSandboxKeyMintAdapter.create({
-          database: options.prisma,
-          apiKeys: options.apiKeys,
-          share,
-        }).build()
-      : undefined;
+    const projects = options.projects;
+    const mint =
+      options.apiKeys && projects
+        ? AgentSandboxKeyMintService.create({ apiKeys: options.apiKeys, projects, share })
+        : undefined;
     return new ApiExperimentSandboxCredentialAdapter(options.prisma, mint);
   }
 

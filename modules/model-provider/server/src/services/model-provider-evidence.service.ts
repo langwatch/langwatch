@@ -1,8 +1,10 @@
 import { modelProviderListProjectInputSchema } from "@langwatch/model-provider-contract";
 import type {
-  ModelCostProjectScopePort,
-  ModelProviderEvidenceRepository,
+  ModelCostProjectScopePort
 } from "../ports/model-provider.port.ts";
+import type {
+  ModelProviderEvidenceRepository
+} from "../repositories/model-provider-evidence.repository.ts";
 
 /**
  * Whether a project has a model provider attached and switched on.

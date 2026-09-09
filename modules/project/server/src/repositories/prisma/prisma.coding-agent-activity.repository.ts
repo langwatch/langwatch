@@ -1,5 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
+import {
+  codingAgentActivityStaleBefore,
+  type CodingAgentActivityRepository,
+} from "../coding-agent-activity.repository.ts";
 
 /**
  * The one model the coding-agent activity seam reads and writes, and nothing
@@ -11,18 +15,6 @@ import { ProjectNotFoundError } from "@langwatch/project-contract";
 export type PrismaCodingAgentActivityDatabase = Pick<PrismaClient, "project">;
 
 /**
- * How stale a project's recorded coding-agent activity has to be before the
- * next fold writes it again.
- *
- * Frozen twin: `ProjectService`'s `CODING_AGENT_ACTIVITY_TOUCH_MS` is the same
- * hour, and both graphs write the same two columns of the same rows. A shorter
- * window on either side turns a busy fleet's session folds into Postgres
- * traffic; a longer one leaves the settings surfaces reading an activity date
- * that the other graph has already moved.
- */
-const CODING_AGENT_ACTIVITY_TOUCH_MS = 60 * 60 * 1000;
-
-/**
  * The project reads and writes the coding-agent session pipeline performs.
  *
  * Three operations, one model, no service graph: resolving the organization a
@@ -32,12 +24,14 @@ const CODING_AGENT_ACTIVITY_TOUCH_MS = 60 * 60 * 1000;
  * clustering port, a credentials adapter and both transports' collaborators —
  * none of which any of these three asks anything.
  */
-export class PrismaCodingAgentActivityRepository {
-  static create(database: PrismaCodingAgentActivityDatabase): PrismaCodingAgentActivityRepository {
-    return new PrismaCodingAgentActivityRepository(database);
-  }
-
+export class PrismaCodingAgentActivityRepository implements CodingAgentActivityRepository {
   private constructor(private readonly prisma: PrismaCodingAgentActivityDatabase) {}
+
+  static create(
+    options: Readonly<{ prisma: PrismaCodingAgentActivityDatabase }>,
+  ): PrismaCodingAgentActivityRepository {
+    return new PrismaCodingAgentActivityRepository(options.prisma);
+  }
 
   /**
    * The organization an active project belongs to.
@@ -66,7 +60,7 @@ export class PrismaCodingAgentActivityRepository {
         archivedAt: null,
         OR: [
           { lastCodingAgentSessionAt: null },
-          { lastCodingAgentSessionAt: { lte: staleBefore(input.at) } },
+          { lastCodingAgentSessionAt: { lte: codingAgentActivityStaleBefore(input.at) } },
         ],
       },
       data: { lastCodingAgentSessionAt: input.at },
@@ -81,14 +75,10 @@ export class PrismaCodingAgentActivityRepository {
         archivedAt: null,
         OR: [
           { lastCodingAgentPullRequestAt: null },
-          { lastCodingAgentPullRequestAt: { lte: staleBefore(input.at) } },
+          { lastCodingAgentPullRequestAt: { lte: codingAgentActivityStaleBefore(input.at) } },
         ],
       },
       data: { lastCodingAgentPullRequestAt: input.at },
     });
   }
-}
-
-function staleBefore(at: Date): Date {
-  return new Date(at.getTime() - CODING_AGENT_ACTIVITY_TOUCH_MS);
 }

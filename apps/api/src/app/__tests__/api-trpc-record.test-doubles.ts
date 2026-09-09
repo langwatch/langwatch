@@ -69,7 +69,8 @@ import { refusingAuthFeature } from "../../features/auth/auth.composition.ts";
 import { refusingUserFeature } from "../../features/user/user.composition.ts";
 import { createPresenceTrpcRouter } from "../../features/presence/presence-trpc.mount.ts";
 import type { ComposedPresenceFeature } from "../../features/presence/presence.composition.types.ts";
-import { refusingApiKeyFeature } from "../../features/api-key/api-key.composition.ts";
+import { createApiKeyTrpcRouter } from "../../features/api-key/api-key-trpc.mount.ts";
+import type { ComposedApiKeyFeature } from "../../features/api-key/api-key.composition.types.ts";
 import { createSecretTrpcRouter } from "../../features/secret/secret-trpc.mount.ts";
 import type { ComposedSecretFeature } from "../../features/secret/secret.composition.types.ts";
 import type { ComposedApiFeatures } from "../../app-trpc/app-trpc.composed.ts";
@@ -235,6 +236,14 @@ export function stubDataRetentionFeature(): ComposedDataRetentionFeature {
   };
 }
 
+export function stubApiKeyFeature(): ComposedApiKeyFeature {
+  return {
+    app: stub("apiKeys"),
+    router: (mount) =>
+      createApiKeyTrpcRouter({ runtime: mount.runtime, recordAudit: () => undefined }),
+  };
+}
+
 export function stubTopicFeature(): ComposedTopicFeature {
   return {
     app: stub("topic"),
@@ -376,7 +385,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     auth: refusingAuthFeature("langwatch-api"),
     user: refusingUserFeature("langwatch-api"),
     presence: stubPresenceFeature(),
-    apiKey: refusingApiKeyFeature(),
+    apiKey: stubApiKeyFeature(),
     secret: stubSecretFeature(),
   };
 }

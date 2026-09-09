@@ -1,8 +1,7 @@
 import type { ApiKey } from "@langwatch/api-key-contract";
 import type {
-  AuthzGrantsService,
+  AuthzApi,
   AuthzLedgerBindingAttach,
-  AuthzService,
   LedgerPrincipal,
   LedgerScope,
 } from "@langwatch/authz-contract";
@@ -65,8 +64,8 @@ export class LegacyApiKeyGrantService {
   }
 
   static create(options: {
-    authz: AuthzService;
-    grants: AuthzGrantsService;
+    authz: AuthzApi;
+    grants: AuthzApi;
     deriveBindingId: AuthzBindingIdDeriver;
     diagnostics: ApiKeyDiagnosticsPort;
     now?: () => number;
@@ -76,8 +75,8 @@ export class LegacyApiKeyGrantService {
 
   private constructor(
     private readonly options: {
-      authz: AuthzService;
-      grants: AuthzGrantsService;
+      authz: AuthzApi;
+      grants: AuthzApi;
       deriveBindingId: AuthzBindingIdDeriver;
       diagnostics: ApiKeyDiagnosticsPort;
       now?: () => number;

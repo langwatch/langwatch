@@ -64,23 +64,6 @@ describe("MemoryShareRepository", () => {
     });
   });
 
-  describe("when either kill switch is off", () => {
-    it("reports the project's own setting", async () => {
-      const { repository } = build(false, true);
-
-      await expect(repository.findTraceSharingConfig(PROJECT_ID)).resolves.toEqual({
-        orgEnabled: true,
-        projectEnabled: false,
-      });
-    });
-
-    it("answers nothing for a project it never saw", async () => {
-      const { repository } = build();
-
-      await expect(repository.findTraceSharingConfig("project_other")).resolves.toBeNull();
-    });
-  });
-
   describe("when a resource is unshared", () => {
     it("drops every link for the resource and stops counting it as active", async () => {
       const { repository } = build();

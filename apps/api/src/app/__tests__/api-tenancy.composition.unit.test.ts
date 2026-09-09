@@ -1,7 +1,7 @@
 /**
  * Spec: specs/server/api-process-tenancy.feature
  */
-import { PostgresApiKeyAdapter } from "@langwatch/api-key-server";
+import { ApiKeyTokenAdapter } from "@langwatch/api-key-server";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { PrismaConnection } from "@langwatch/prisma-client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
@@ -44,8 +44,8 @@ class RecordingAbsence extends ApiTenancyAbsenceReportPort {
 describe("ApiTenancyComposition", () => {
   describe("when the process has a database, AuthZ, a cipher and a pepper", () => {
     /** @scenario "The API process composes its own organization and API-key services" */
-    it("composes the organization, project and API-key services as one graph", () => {
-      const composed = ApiTenancyComposition.compose({
+    it("composes the organization, project and API-key services as one graph", async () => {
+      const composed = await ApiTenancyComposition.compose({
         database: stubConnection(),
         authz: stubAuthz(),
         encryption: encryption(),
@@ -64,10 +64,10 @@ describe("ApiTenancyComposition", () => {
     // only because a configured value's surrounding whitespace is not part of
     // the operator's intent.
     /** @scenario "The API-key pepper reaches the service verbatim" */
-    it("hands the API-key service the configured pepper and nothing derived from it", () => {
-      const create = vi.spyOn(PostgresApiKeyAdapter, "create");
+    it("hands the API-key service the configured pepper and nothing derived from it", async () => {
+      const create = vi.spyOn(ApiKeyTokenAdapter, "create");
 
-      ApiTenancyComposition.tryCompose({
+      await ApiTenancyComposition.tryCompose({
         database: stubConnection(),
         authz: stubAuthz(),
         encryption: encryption(),
@@ -75,18 +75,18 @@ describe("ApiTenancyComposition", () => {
         report: new RecordingAbsence(),
       });
 
-      expect(create.mock.calls[0]![0].pepper).toBe(PEPPER.trim());
-      expect(create.mock.calls[0]![0].pepper).not.toBe(ENCRYPTION_KEY);
+      expect(create.mock.calls[0]?.[0]).toBe(PEPPER.trim());
+      expect(create.mock.calls[0]?.[0]).not.toBe(ENCRYPTION_KEY);
       create.mockRestore();
     });
   });
 
   describe("when the process is missing one of the four", () => {
     /** @scenario "A process missing any of the four composes no credential services" */
-    it("composes nothing without a database, and names what was missing", () => {
+    it("composes nothing without a database, and names what was missing", async () => {
       const report = new RecordingAbsence();
 
-      const composed = ApiTenancyComposition.tryCompose({
+      const composed = await ApiTenancyComposition.tryCompose({
         database: undefined,
         authz: stubAuthz(),
         encryption: encryption(),
@@ -99,10 +99,10 @@ describe("ApiTenancyComposition", () => {
     });
 
     /** @scenario "A process missing any of the four composes no credential services" */
-    it("composes nothing without AuthZ, and names what was missing", () => {
+    it("composes nothing without AuthZ, and names what was missing", async () => {
       const report = new RecordingAbsence();
 
-      const composed = ApiTenancyComposition.tryCompose({
+      const composed = await ApiTenancyComposition.tryCompose({
         database: stubConnection(),
         authz: undefined,
         encryption: encryption(),
@@ -117,10 +117,10 @@ describe("ApiTenancyComposition", () => {
     // A blank pepper is not a weaker service: it is one that hashes every
     // presented credential under a different key.
     /** @scenario "A process missing any of the four composes no credential services" */
-    it("composes nothing for a blank pepper rather than one that locks every key out", () => {
+    it("composes nothing for a blank pepper rather than one that locks every key out", async () => {
       const report = new RecordingAbsence();
 
-      const composed = ApiTenancyComposition.tryCompose({
+      const composed = await ApiTenancyComposition.tryCompose({
         database: stubConnection(),
         authz: stubAuthz(),
         encryption: encryption(),

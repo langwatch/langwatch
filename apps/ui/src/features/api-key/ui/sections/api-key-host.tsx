@@ -13,7 +13,7 @@ import {
   type ApiKeyOrganizationProject,
   type ApiKeyOrganizationTeam,
   type ApiKeySessionStatus,
-} from "@langwatch/api-key-web/screens/api-key";
+} from "@langwatch/api-key-web/api-keys";
 import { useMemo, type ReactNode } from "react";
 import { useUiAddress } from "../../../../behavior/ui-address";
 import { writeUiClipboard } from "../../../../behavior/ui-clipboard";

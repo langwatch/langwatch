@@ -9,7 +9,7 @@ import type { OpsApp } from "@langwatch/ops-server";
 import type { ScenarioApp } from "@langwatch/scenario-server";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
-import type { ApiKeyApp } from "@langwatch/api-key-server";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AutomationApp } from "@langwatch/automation-server";
 import type { CodingAgentApp } from "@langwatch/coding-agent-server";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -60,7 +60,7 @@ import type { WorkflowApp } from "@langwatch/workflow-server";
 export type ApiTrpcFeatureApplication = Readonly<{
   analytics: AnalyticsApp;
   annotation: AnnotationApi;
-  apiKeys: ApiKeyApp;
+  apiKeys: ApiKeyApi;
   /**
    * A project's triggers, their channels and the addresses that asked those channels to
    * stop. One application for both wire names, because a suppression is a fact about a

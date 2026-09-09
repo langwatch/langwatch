@@ -1,141 +1,101 @@
 /**
- * The provider surfaces, served by the API process.
+ * The provider surfaces, installed by the API process.
+ *
+ * The module boots in the `api` role over this process's own selection, and
+ * the app it provides is the one `ctx.app.modelProviders` is read from. There
+ * is no refusing twin to fall back to: a process installs the module or names
+ * what it is missing at boot.
  */
-import type { AuthzService } from "@langwatch/authz-contract";
-import type { AgentApi } from "@langwatch/agent-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { describe, expect, it } from "vitest";
-import { ApiApplication } from "../../../api.application.ts";
-import { composeApiModelProviderHost } from "../../../app/api-model-provider-host.composition.ts";
-import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
-import {
-  stubCollaborators,
-  stubComposedFeatures,
-  stubInfrastructureEntitlements,
-} from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
-import { composeModelProviderFeature } from "../model-provider.composition.ts";
+import { describe, expect, it, vi } from "vitest";
+import { installApiModelProvider } from "../model-provider.composition.ts";
 
-const SESSION_USER = { id: "user-1", email: "sam@acme.test", role: "ADMIN" };
+const PROJECT_ID = "project-1";
+const ORGANIZATION_ID = "organization-1";
 
-function testAuthz(): AuthzService {
+/** The rows this module reads, as a double: nothing here reaches a database. */
+function testPrisma() {
   return {
-    hasPermission: async () => true,
-    getDecision: async () => ({ permitted: true, organizationRole: null }),
-    getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
-    checkScopeLineage: async () => ({ kind: "consistent" }),
-  } as unknown as AuthzService;
+    modelProvider: {
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async () => null),
+      findUnique: vi.fn(async () => null),
+    },
+    modelDefaultConfig: { findMany: vi.fn(async () => []), findUnique: vi.fn(async () => null) },
+    modelDefaultConfigScope: { findMany: vi.fn(async () => []) },
+    customLLMModelCost: { findMany: vi.fn(async () => []), findUnique: vi.fn(async () => null) },
+    gatewayChangeEvent: { create: vi.fn(async () => ({})) },
+    $executeRaw: vi.fn(async () => 0),
+    $transaction: vi.fn(),
+  };
 }
 
-/** The real host, behind the same egress fence the gateway's own probe runs on. */
-function realHost() {
-  return composeApiModelProviderHost({
-    egress: { blockLocal: true, allowedHosts: [], verifyTls: true },
+/** The one project row the scope derivation reads. */
+function testProject() {
+  return {
+    id: PROJECT_ID,
+    teamId: "team-1",
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    team: { id: "team-1", organizationId: ORGANIZATION_ID },
+  };
+}
+
+/** A cipher that is present and reversible; the format is not under test here. */
+function testEncryption(): SecretEncryptionPort {
+  return {
+    encrypt: (value: string) => `sealed:${value}`,
+    decrypt: (value: string) => value.replace(/^sealed:/, ""),
+  } as SecretEncryptionPort;
+}
+
+function installOver(prisma: ReturnType<typeof testPrisma>) {
+  return installApiModelProvider({
+    prisma: prisma as unknown as PrismaClient,
+    projects: createApiFixture<ProjectApi>({
+      getWithTeam: async () => testProject(),
+      tryGetWithTeam: async () => testProject(),
+    }),
+    organizations: createApiFixture<OrganizationApi>(),
+    authorization: createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
+    encryption: testEncryption(),
+    rateLimit: async () => ({ allowed: true, resetAt: 0 }),
     environment: {},
+    isSaas: false,
+    egress: { blockLocal: true, allowedHosts: [], verifyTls: true },
+    nlpServiceUrl: undefined,
     processName: "langwatch-api",
   });
 }
 
-function composeApplication(options: { host?: ReturnType<typeof realHost> } = {}) {
-  const infrastructure = {
-    ...stubInfrastructureEntitlements(),
-    prisma: {} as unknown as PrismaClient,
-    authz: testAuthz(),
-    audit: undefined,
-  };
-  const modelProvider = composeModelProviderFeature({
-    infrastructure,
-    ...(options.host ? { host: options.host } : {}),
-  });
+describe("given the API process installs the model-provider module", () => {
+  describe("when it boots in the api role", () => {
+    it("provides the app the provider surfaces are read from", async () => {
+      const composed = await installOver(testPrisma());
 
-  const features = ApiTrpcFeaturesComposition.tryCompose({
-    composed: { ...stubComposedFeatures(), modelProvider },
-    infrastructure,
-    collaborators: stubCollaborators({
-      modelProviders: modelProvider.app,
-    }),
-  });
-  if (!features) throw new Error("the record refused to compose against its collaborators");
-
-  const application = ApiApplication.create({
-    agents: createApiFixture<AgentApi>(),
-    features,
-    http: {
-      createContext: async () => ({
-        actor: () => ({ id: SESSION_USER.id }),
-        tryActor: () => ({ id: SESSION_USER.id }),
-        authorize: async () => undefined,
-        session: { user: SESSION_USER },
-      }),
-    },
-  });
-
-  return { application, modelProvider };
-}
-
-async function callTrpc(
-  application: ApiApplication,
-  path: string,
-  input: Record<string, unknown>,
-): Promise<{ status: number; body: unknown }> {
-  if (!application.hono) throw new Error("HTTP composition was not created.");
-  const response = await application.hono.request(
-    `http://127.0.0.1/api/trpc/${path}?input=${encodeURIComponent(JSON.stringify(input))}`,
-  );
-  return { status: response.status, body: await response.json() };
-}
-
-describe("given an API process composed with the provider surfaces", () => {
-  describe("when a model's ceilings are read through the real handler", () => {
-    it("answers the registry's own limits rather than null", async () => {
-      const { application } = composeApplication({ host: realHost() });
-
-      const { status, body } = await callTrpc(application, "llmModelCost.tryGetModelLimits", {
-        projectId: "project-1",
-        model: "openai/gpt-5-mini",
-      });
-
-      expect(status).toBe(200);
-      expect(body).toMatchObject({
-        result: { data: { maxInputTokens: expect.any(Number) } },
-      });
-    });
-  });
-
-  describe("when a catastrophic-backtracking pattern reaches the cost-rule preview", () => {
-    /**
-     * The gate is read while the PROCEDURE is built — it becomes the input
-     * parser's own refinement — so what it answers is observable as a rejected
-     * request rather than as a returned boolean.
-     */
-    it("refuses the dangerous pattern where the host's real gate is composed", async () => {
-      const { application } = composeApplication({ host: realHost() });
-
-      const refused = await callTrpc(application, "llmModelCost.previewMatchingSpans", {
-        projectId: "project-1",
-        regex: "(a+)+$",
-      });
-
-      expect(refused.status).toBe(400);
+      expect(typeof composed.app.listForProject).toBe("function");
+      expect(typeof composed.app.listCosts).toBe("function");
+      expect(typeof composed.app.translate).toBe("function");
     });
 
-    it("refuses it on a process with no host rather than allowing everything", async () => {
-      const { application } = composeApplication();
+    it("reads a project's cost rules through its own repositories", async () => {
+      const prisma = testPrisma();
+      const composed = await installOver(prisma);
 
-      const refused = await callTrpc(application, "llmModelCost.previewMatchingSpans", {
-        projectId: "project-1",
-        regex: "(a+)+$",
-      });
-      // A safe pattern gets past the parser and reaches the preview, which is
-      // the capability this deployment does not hold — a different answer, and
-      // the point: the gate is not refusing everything.
-      const allowed = await callTrpc(application, "llmModelCost.previewMatchingSpans", {
-        projectId: "project-1",
-        regex: "^gpt-5",
-      });
+      const costs = await composed.app.listCosts({ projectId: PROJECT_ID });
 
-      expect(refused.status).toBe(400);
-      expect(allowed.status).not.toBe(400);
+      expect(costs).toEqual([]);
+      expect(prisma.customLLMModelCost.findMany).toHaveBeenCalled();
+    });
+
+    it("answers the registry's ceilings without reaching a database at all", async () => {
+      const composed = await installOver(testPrisma());
+
+      expect(composed.app.findModelLimits({ model: "not-a-model" })).toBeNull();
     });
   });
 });

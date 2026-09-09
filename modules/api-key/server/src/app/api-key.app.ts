@@ -36,28 +36,40 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
+import { ApiKeyTokenAdapter } from "../adapters/api-key-token.api-key-token.adapter.ts";
+import type { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port.ts";
+import type { ApiKeyDiagnosticsPort } from "../ports/api-key-diagnostics.port.ts";
+import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
+import { ApiKeyService } from "../services/api-key.service.ts";
 import {
-  PostgresApiKeyAdapter,
-  type PostgresApiKeyAdapterOptions,
-} from "../adapters/postgres.api-key.adapter.ts";
-import type { ApiKeyService } from "../services/api-key.service.ts";
+  LegacyApiKeyGrantService,
+  type AuthzBindingIdDeriver,
+} from "../services/legacy-api-key-grant.service.ts";
 
 /** Who an operation is performed by, and whose membership is proved. */
 export interface ApiKeyCaller {
   readonly id: string;
 }
 
-/** What the process composes this feature's application from. */
-export type ApiKeyInfrastructure = Omit<
-  PostgresApiKeyAdapterOptions,
-  "authz" | "grants" | "organizations" | "projects"
->;
+/** The technical collaborators the composing process supplies. */
+export interface ApiKeyInfrastructure {
+  /** The HMAC key a stored secret is derived under. */
+  readonly pepper: string;
+  readonly bindingIds: ApiKeyBindingIdPort;
+  readonly deriveBindingId: AuthzBindingIdDeriver;
+  readonly diagnostics: ApiKeyDiagnosticsPort;
+}
 type ApiKeyDependencies = Readonly<{
   authorization: typeof AuthzApi;
   organizations: typeof OrganizationApi;
   projects: typeof ProjectApi;
 }>;
-export type ApiKeySetup = FeatureSetup<ApiKeyDependencies, ApiKeyInfrastructure, undefined>;
+export type ApiKeySetup = FeatureSetup<
+  ApiKeyDependencies,
+  ApiKeyInfrastructure,
+  undefined,
+  ApiKeyRepositories
+>;
 
 /** What a key may create: the caller's own personal key, or an admin's key. */
 export type CreateApiKeyRequest = Readonly<{
@@ -91,15 +103,25 @@ export class ApiKeyApp implements ApiKeyApi {
   };
 
   static create(setup: ApiKeySetup): ApiKeyApp {
+    const authorization = setup.dependencies.authorization;
+
     return new ApiKeyApp(
-      PostgresApiKeyAdapter.create({
-        ...setup.infrastructure,
-        authz: setup.dependencies.authorization,
-        grants: setup.dependencies.authorization,
+      ApiKeyService.create({
+        repository: setup.repositories.apiKeys,
+        authz: authorization,
+        grants: authorization,
         organizations: setup.dependencies.organizations,
         projects: setup.dependencies.projects,
-      }).build(),
-      setup.dependencies.authorization,
+        bindingIds: setup.infrastructure.bindingIds,
+        legacyGrants: LegacyApiKeyGrantService.create({
+          authz: authorization,
+          grants: authorization,
+          deriveBindingId: setup.infrastructure.deriveBindingId,
+          diagnostics: setup.infrastructure.diagnostics,
+        }),
+        tokens: ApiKeyTokenAdapter.create(setup.infrastructure.pepper),
+      }),
+      authorization,
     );
   }
 

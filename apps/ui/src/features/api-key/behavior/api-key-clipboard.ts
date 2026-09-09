@@ -7,7 +7,7 @@
 import type {
   ApiKeyFailureNotice,
   ApiKeySuccessNotice,
-} from "@langwatch/api-key-web/screens/api-key";
+} from "@langwatch/api-key-web/api-keys";
 
 export async function copyToClipboard({
   text,

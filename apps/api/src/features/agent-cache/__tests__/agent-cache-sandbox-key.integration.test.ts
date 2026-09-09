@@ -114,13 +114,14 @@ function sandboxKeySecurity(grantedPermissions: readonly string[]): AppRestSecur
 
 /**
  * The mint as a process composes it: the real share adapter over no Redis (so
- * the share is this process's own, sealed the same way), and a repository that
- * answers who — if anyone — owns the workspace the project sits in.
+ * the share is this process's own, sealed the same way), and a project
+ * directory that answers who - if anyone - owns the workspace the project
+ * sits in.
  */
 function mintOver(options: { apiKeys: ApiKeyApi; ownerUserId?: string }) {
   return AgentSandboxKeyMintService.create({
     apiKeys: options.apiKeys,
-    repository: {
+    projects: {
       findPersonalWorkspaceOwner: async () =>
         options.ownerUserId ? { ownerUserId: options.ownerUserId } : null,
     },

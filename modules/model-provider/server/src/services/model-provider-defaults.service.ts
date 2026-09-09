@@ -12,10 +12,14 @@ import {
   type ModelDefaultSnapshotInput,
 } from "@langwatch/model-provider-contract";
 import type {
-  ModelDefaultRepository,
-  ModelProviderCatalog,
-  ModelProviderRepository,
+  ModelProviderCatalog
 } from "../ports/model-provider.port.ts";
+import type {
+  ModelDefaultRepository
+} from "../repositories/model-default.repository.ts";
+import type {
+  ModelProviderRepository
+} from "../repositories/model-provider.repository.ts";
 import { ModelProviderAuthorizationService } from "./model-provider-authorization.service.ts";
 import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
 

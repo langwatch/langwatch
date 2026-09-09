@@ -6,6 +6,7 @@ import type {
   ProjectNamesByIdsInput,
   ProjectWithTeam,
   SearchProjectsResult,
+  TraceSharingConfig,
   UpdateProjectInput,
 } from "./project.ts";
 import type { TopicClusteringRequest } from "./project.responses.ts";
@@ -51,6 +52,27 @@ export interface ProjectApi {
   updateSettings(input: Readonly<UpdateProjectInput & { projectId: string }>): Promise<Project>;
   archive(input: Readonly<{ projectId: string }>): Promise<{ alreadyArchived: boolean }>;
   regenerateLegacyProjectKey(input: Readonly<{ projectId: string }>): Promise<string>;
+  /** The live project a legacy `apiKey` column names, or nothing. */
+  findIdByLegacyApiKey(input: Readonly<{ token: string }>): Promise<string | null>;
+  /**
+   * Writes a new legacy key onto a live project. False when there is no live
+   * row to write it to, which is how the caller knows nothing was rotated.
+   */
+  rotateLegacyApiKey(input: Readonly<{ projectId: string; token: string }>): Promise<boolean>;
+  /**
+   * Whether the organisation and the project both still allow trace sharing.
+   * Nothing when the project is not there to read the two switches from.
+   */
+  findTraceSharingConfig(
+    input: Readonly<{ projectId: string }>,
+  ): Promise<TraceSharingConfig | null>;
+  /**
+   * Whose personal workspace a scope is: the team's own owner, or the owner of
+   * the team a personal project hangs from. Nothing when the scope is shared.
+   */
+  findPersonalWorkspaceOwner(
+    input: Readonly<{ organizationId: string; scopeId: string }>,
+  ): Promise<{ ownerUserId: string | null } | null>;
   requestTopicClustering(
     input: Readonly<{ projectId: string }>,
     by: Readonly<{ id: string }>,

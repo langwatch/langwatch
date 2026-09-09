@@ -21,7 +21,7 @@ import {
 } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ProjectCredentialsPort } from "../project.port.ts";
-import { ProjectRepository } from "../../repositories/project.repository.ts";
+import type { ProjectRepository } from "../../repositories/project.repository.ts";
 import { ProjectService } from "../../services/project.service.ts";
 
 const project: InternalProject = {
@@ -89,7 +89,7 @@ const projectWithTeam = (overrides: Partial<ProjectWithTeam> = {}): ProjectWithT
   ...overrides,
 });
 
-class StubRepository extends ProjectRepository {
+class StubRepository implements ProjectRepository {
   listPaths = vi.fn(async () => []);
   existing: InternalProject | null = null;
   tryFindInternalByOrganization = vi.fn(async () => this.existing);
@@ -114,7 +114,7 @@ class StubRepository extends ProjectRepository {
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
   tryGetWithOrgAdmin = vi.fn(async () => null);
-  tryGetTraceSharingConfig = vi.fn(async () => null);
+  findTraceSharingConfig = vi.fn(async () => null);
   searchByQuery = vi.fn(async () => []);
   update = vi.fn(async () => applicationProject);
   archive = vi.fn(async () => applicationProject);
@@ -135,6 +135,11 @@ class StubRepository extends ProjectRepository {
   countLiveNonGovernanceProjects = vi.fn(async () => 0);
   tryGetTraceDestination = vi.fn(async () => null);
   listTraceDestinations = vi.fn(async () => []);
+  findIdByLegacyApiKey = vi.fn(async (): Promise<string | null> => null);
+  rotateLegacyApiKey = vi.fn(async () => true);
+  findPersonalWorkspaceOwner = vi.fn(
+    async (): Promise<{ ownerUserId: string | null } | null> => null,
+  );
 }
 
 class StubOrganizationService extends OrganizationServiceContract {

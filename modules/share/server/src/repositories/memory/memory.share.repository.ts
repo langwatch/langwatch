@@ -14,7 +14,6 @@ import type {
   ShareLinkScope,
   ShareRepository,
   ShareResourceScope,
-  ShareTraceSharingConfig,
 } from "../share.repository.ts";
 import { MemoryShareDatabase } from "./memory.share.database.ts";
 
@@ -31,16 +30,6 @@ export class MemoryShareRepository implements ShareRepository {
 
   static create(input: Readonly<{ memory: MemoryShareDatabase }>): MemoryShareRepository {
     return new MemoryShareRepository(input.memory);
-  }
-
-  async findTraceSharingConfig(projectId: string): Promise<ShareTraceSharingConfig | null> {
-    const project = this.#database.project(projectId);
-    if (!project) return null;
-
-    return {
-      orgEnabled: project.organizationTraceSharingEnabled,
-      projectEnabled: project.traceSharingEnabled,
-    };
   }
 
   async findByToken(token: string): Promise<ShareWithProject | null> {

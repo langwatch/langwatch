@@ -12,6 +12,7 @@ import {
 import type { ManagedProviderService } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import {
+  CodexAccountService,
   CodexOAuthModelProviderTokenRefresherAdapter,
   EncryptedModelProviderCredentialAdapter,
   HttpModelProviderCredentialProbeAdapter,
@@ -25,6 +26,8 @@ import {
   VercelAiModelTranslationAdapter,
   WindowedModelProviderConnectionRateLimiterAdapter,
   type ModelProviderCredentialCipherPort,
+  type ModelProviderCredentialCodec,
+  type ModelProviderInfrastructure,
   type PostgresModelProviderAdapterOptions,
 } from "@langwatch/model-provider-server";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -84,6 +87,17 @@ export type WorkerModelProviderCompositionOptions = Readonly<{
 export type WorkerModelProviders = Readonly<{
   modelProviders: ModelProviderService;
   managedProviders: ManagedProviderService;
+  /**
+   * What the installed model-provider module is built over in this same
+   * process: the deployment's credential cipher, which travels with the
+   * connection because a stored credential is a wire format, and the technical
+   * answers the module asks for. Stated once, so the gateway above and the
+   * installed module cannot be composed from two different registries.
+   */
+  installation: Readonly<{
+    credentials: ModelProviderCredentialCodec;
+    infrastructure: Omit<ModelProviderInfrastructure, "spans">;
+  }>;
 }>;
 
 /**
@@ -150,12 +164,23 @@ export function createWorkerModelProviders(
   if (!executionProxyBaseUrl) options.absence?.withoutModelTranslation();
   if (!options.redis) options.absence?.withoutConnectionWindows();
 
-  const modelProviders = PostgresModelProviderAdapter.create({
-    database: options.database,
-    projects: options.projects,
-    organizations: options.organizations,
-    authorization: options.authorization,
-    credentials: EncryptedModelProviderCredentialAdapter.create({ cipher: options.encryption }),
+  const credentials = EncryptedModelProviderCredentialAdapter.create({
+    cipher: options.encryption,
+  });
+  const credentialProbe = HttpModelProviderCredentialProbeAdapter.create({
+    egress: SsrfModelProviderEgressAdapter.create({
+      policy: {
+        blockLocal: options.config.infrastructure.modelProvider.blockLocalHttpCalls,
+        allowedHosts: options.config.infrastructure.modelProvider.allowedProxyHosts,
+        // Tied to the hosted flag rather than to the address policy, the same
+        // join the webhook sender makes: an on-prem install calling a service
+        // with a self-signed certificate is a different question from whether
+        // private addresses are reachable.
+        verifyTls: options.config.deployment.saas,
+      },
+    }),
+  });
+  const technical = {
     codexTokenRefresher: CodexOAuthModelProviderTokenRefresherAdapter.create(),
     connectionRateLimiter: WindowedModelProviderConnectionRateLimiterAdapter.create({
       limiter: options.redis
@@ -164,19 +189,7 @@ export function createWorkerModelProviders(
     }),
     catalog: RegistryModelProviderCatalogAdapter.create({
       managed: WorkerManagedModelProviderGatewayAdapter.create({ service: managedProviders }),
-      probe: HttpModelProviderCredentialProbeAdapter.create({
-        egress: SsrfModelProviderEgressAdapter.create({
-          policy: {
-            blockLocal: options.config.infrastructure.modelProvider.blockLocalHttpCalls,
-            allowedHosts: options.config.infrastructure.modelProvider.allowedProxyHosts,
-            // Tied to the hosted flag rather than to the address policy, the
-            // same join the webhook sender makes: an on-prem install calling a
-            // service with a self-signed certificate is a different question
-            // from whether private addresses are reachable.
-            verifyTls: options.config.deployment.saas,
-          },
-        }),
-      }),
+      probe: credentialProbe,
       systemProviderEnvironment: options.config.infrastructure.modelProvider.environment,
       isSaas: options.config.deployment.saas,
     }),
@@ -187,9 +200,25 @@ export function createWorkerModelProviders(
         })
       : new AbsentWorkerModelTranslation(),
     ids: PrefixedModelProviderIdAdapter.create({ suffix: () => nanoid() }),
+  };
+
+  const modelProviders = PostgresModelProviderAdapter.create({
+    database: options.database,
+    projects: options.projects,
+    organizations: options.organizations,
+    authorization: options.authorization,
+    credentials,
+    ...technical,
   }).build();
 
-  return { modelProviders, managedProviders };
+  return {
+    modelProviders,
+    managedProviders,
+    installation: {
+      credentials,
+      infrastructure: { ...technical, credentialProbe, codexAccounts: new CodexAccountService() },
+    },
+  };
 }
 
 /** Composes the Enterprise managed-provider service over this process's projects. */
