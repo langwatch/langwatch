@@ -152,6 +152,7 @@ export {
   IdentitySignInRefusedError,
   IdentityVerificationExpiredError,
   IdentityVerificationInvalidError,
+  IdentityVerificationNotSettledError,
   JoinAutoConnectionAdmitsError,
   JoinAutoDomainUnprovenError,
   JoinAutoNotLicensedError,

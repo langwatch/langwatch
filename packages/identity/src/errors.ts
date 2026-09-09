@@ -108,6 +108,36 @@ export class IdentityVerificationInvalidError extends HandledError {
   }
 }
 
+/**
+ * The link was good and the write went out, but the projection has not caught
+ * up enough to say what became of the address (ADR-135).
+ *
+ * Separate from `invalid` because nothing was wrong with what the person did,
+ * and separate from `expired` because the link is still good — it is the same
+ * link, and clicking it again is the whole remediation. The completion
+ * ceremony can only report success once the identifier is recorded VERIFIED,
+ * and can only report the address as taken once it is recorded DEAD_END; the
+ * gap between those is this, and saying so is the alternative to guessing
+ * which of the two to claim.
+ *
+ * `platform` fault and a 5xx on purpose: the person did nothing wrong and has
+ * nothing to fix. A run of these is the fold lagging, which is ours.
+ */
+export class IdentityVerificationNotSettledError extends HandledError {
+  constructor() {
+    super(
+      "identity_verification_not_settled",
+      "identity_verification_not_settled",
+      {
+        httpStatus: 503,
+        fault: "platform",
+        tips: ["Open the same link again in a moment."],
+      },
+    );
+    this.name = "IdentityVerificationNotSettledError";
+  }
+}
+
 export class IdentityVerificationExpiredError extends HandledError {
   constructor() {
     super("identity_verification_expired", "identity_verification_expired", {

@@ -390,6 +390,21 @@ Feature: The identity storage adapter - one adapter, two branches, Account retir
     And it never reports the identifier as verified
     And the single-use proof is not consumed
 
+  # Both outcomes above are read from what was RECORDED, so there is a third
+  # answer: not recorded yet. Claiming either of the other two would tell
+  # somebody their address is verified when it is not, or that a stranger
+  # holds it when nobody does (ADR-135).
+  @unit
+  Scenario: A verification whose outcome is not yet recorded claims neither
+    Given a finalized user "sam" completing verification for "work@acme.com"
+    And the write is accepted but has not been applied yet
+    When "sam"'s completion is processed
+    Then the completion fails with the handled code "identity_verification_not_settled"
+    And it does not report the identifier as verified
+    And it does not report the address as held by somebody else
+    And the single-use proof is not consumed
+    And the same link completes once the write has been applied
+
   @unit
   Scenario: The sign-in screen renders a platform refusal from the registry
     Given the auth response carries the handled code "identity_email_in_use"

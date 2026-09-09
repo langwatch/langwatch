@@ -2121,6 +2121,15 @@ const presentations = {
     title: "That verification link has expired",
     describe: () => "Request a new verification email and use the newest link.",
   },
+  // Deliberately NOT "didn't work" and not "expired": the link is still good
+  // and the person did nothing wrong, so the copy asks for the one thing that
+  // actually resolves it rather than sending them back to their inbox for a
+  // new email they do not need.
+  identity_verification_not_settled: {
+    title: "We're still confirming that address",
+    describe: () =>
+      "Your confirmation went through and we're finishing up. Open the same link again in a moment.",
+  },
   identity_identifier_not_found: {
     title: "That sign-in method is no longer on your account",
     describe: () =>
