@@ -60,28 +60,40 @@ export interface DepartmentTableRow {
 }
 
 /**
- * The fold key for deciding two names are the same department.
+ * The key deciding that a directory's department and one of ours are the same
+ * department: the trimmed name, compared exactly.
  *
- * Case- and whitespace-insensitive, because the collision this exists for is a
- * human one: an administrator creates "Engineering" and their directory sends
- * "engineering". Two rows reading the same word with no visible difference
- * between them is exactly the confusion the second table used to cause.
+ * This is not a rule this screen gets to invent. The backend already maps
+ * directory department text onto `Department` rows, on both paths that carry it
+ * — the SCIM push (`scim.service.ts`) and the daily directory pull
+ * (`directoryDepartmentSync.service.ts`) — and both do it by trimming the
+ * directory's text and handing it to `DepartmentService.resolveByNameOrCreate`,
+ * which looks the name up with an exact, case-SENSITIVE equality behind a
+ * partial unique index on `(organizationId, name)` where the row is active.
+ *
+ * So a directory sending "engineering" to an organization that created
+ * "Engineering" does not join it — it causes a second `Department` row to be
+ * created, and the two attribute spend separately. Folding case here would
+ * print that pair as one row and tell the reader their spend lands in one place
+ * when it lands in two; worse, it would drop one of the two records off the
+ * table, leaving a real department that can never be renamed or archived from
+ * this screen. The table matches the predicate the writes use.
  */
-const foldName = (name: string) => name.trim().toLowerCase();
+const foldName = (name: string) => name.trim();
 
 /**
  * Every department the tab shows, once each.
  *
- * A created department and a directory name that fold to the same key are ONE
- * row: the reader is looking at one department, and the truthful thing to say
- * about it is that they created it AND a directory also files people under it.
- * Splitting them would print the same word twice and leave the reader to guess
- * which one their spend attributes to.
+ * A created department and a directory name with the same trimmed name are ONE
+ * row: they are one department — the backend resolves the directory's text to
+ * exactly that record — and the truthful thing to say is that the organization
+ * created it AND a directory also files people under it. Splitting them would
+ * print the same word twice and leave the reader to guess which one their spend
+ * attributes to.
  *
- * The organization's own name wins the display when both exist, because that is
- * the name spend attributes under and the one that appears in the assignment
- * pickers; the directory's casing is an observation about somebody else's
- * system.
+ * Two records can never collide here: the partial unique index makes at most one
+ * active `Department` per name, so no record's row can be overwritten by
+ * another's.
  *
  * Ordered by name. One list the reader looks a department up in, so it is
  * ordered the way a reader looks things up — not by headcount, which would rank
@@ -110,23 +122,24 @@ export function mergeDepartmentRows({
   for (const seen of observed) {
     const key = foldName(seen.name);
     const existing = rows.get(key);
-    if (existing) {
-      rows.set(key, {
-        ...existing,
-        providers: seen.providers,
-        directoryPeopleCount: seen.peopleCount,
-      });
-      continue;
-    }
+    // `groupObservedDepartments` groups on the directory's verbatim text, so
+    // "Engineering" and " Engineering " reach here as two entries. The backend
+    // trims before resolving and would land both on one `Department`, so they
+    // are one row — and the row has to ADD them up rather than let whichever
+    // arrived last stand for both, which would drop a provider's badge and
+    // undercount the people it named.
     rows.set(key, {
       // A discovered name has no identifier of its own, so the folded name is
-      // the only stable key available for it. Prefixed so it can never collide
-      // with a record's id.
-      key: `observed:${key}`,
-      name: seen.name,
-      record: null,
-      providers: seen.providers,
-      directoryPeopleCount: seen.peopleCount,
+      // the only key available for it. Prefixed so it can never collide with a
+      // record's id.
+      key: existing?.key ?? `observed:${key}`,
+      name: existing?.name ?? seen.name,
+      record: existing?.record ?? null,
+      providers: [
+        ...new Set([...(existing?.providers ?? []), ...seen.providers]),
+      ].sort(),
+      directoryPeopleCount:
+        (existing?.directoryPeopleCount ?? 0) + seen.peopleCount,
     });
   }
 

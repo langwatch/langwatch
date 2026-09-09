@@ -372,6 +372,28 @@ Feature: The People page is two tabs, People and Departments
     And that row carries a badge naming the provider whose directory used it
     # Two rows reading the same word, differing in nothing the reader can see,
     # is the confusion the second table caused. One department, one row.
+    #
+    # "The same" means the trimmed name, compared exactly. That is not this
+    # screen's choice: both paths that land directory department text on a
+    # `Department` — the SCIM push and the daily directory pull — trim it and
+    # resolve it through `resolveByNameOrCreate`, which matches case-sensitively
+    # behind a unique index on the active name. The table matches the predicate
+    # the writes use, so the next scenario follows from it.
+
+  @unit
+  Scenario: A directory spelling that differs in case is a different department
+    Given the organization created a department named Engineering
+    And a connected directory files people under engineering in lower case
+    When sam opens the Departments tab
+    Then they are two rows
+    And only the one the organization created is offered Rename and Archive
+    # Because the backend genuinely keeps them two departments: the directory's
+    # spelling does not resolve to the record, it CREATES a second one, and the
+    # two attribute spend separately. Folding them into one row here would tell
+    # the reader their spend lands in one place while it lands in two, and would
+    # leave one real department unmanageable from this screen. If the product
+    # wants case-insensitive departments, the fix belongs in
+    # `resolveByNameOrCreate`, where the rows are made — not in this table.
 
   @integration
   Scenario: A department only a directory named carries its provider and no row actions

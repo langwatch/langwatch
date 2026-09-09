@@ -33,12 +33,12 @@ describe("given the departments an organization created and the ones its directo
     });
 
     /** @scenario "A department the organization created and one a directory names are one row" */
-    it("folds a directory's casing into the name the organization created", () => {
+    it("matches on the trimmed name, the way the directory sync resolves it", () => {
       const rows = mergeDepartmentRows({
         departments: [{ id: "dept_1", name: "Engineering" }],
         observed: [
           {
-            name: "  engineering ",
+            name: "  Engineering ",
             peopleCount: 2,
             providers: ["openai_admin"],
           },
@@ -49,6 +49,56 @@ describe("given the departments an organization created and the ones its directo
       // The organization's own spelling wins: it is the name spend attributes
       // under and the one the assignment pickers show.
       expect(rows[0]?.name).toBe("Engineering");
+      expect(rows[0]?.record).toEqual({ id: "dept_1", name: "Engineering" });
+    });
+
+    it("adds up two directory spellings that differ only in spacing", () => {
+      // The backend trims before resolving, so both land on one Department.
+      // The row has to sum them, not let the last one stand for both.
+      const rows = mergeDepartmentRows({
+        departments: [],
+        observed: [
+          { name: "Engineering", peopleCount: 2, providers: ["openai_admin"] },
+          {
+            name: " Engineering ",
+            peopleCount: 3,
+            providers: ["copilot_studio_dataverse"],
+          },
+        ],
+      });
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.directoryPeopleCount).toBe(5);
+      expect(rows[0]?.providers).toEqual([
+        "copilot_studio_dataverse",
+        "openai_admin",
+      ]);
+    });
+  });
+
+  describe("when a directory's casing differs from the one the organization created", () => {
+    /** @scenario "A directory spelling that differs in case is a different department" */
+    it("keeps them two rows, because the backend keeps them two departments", () => {
+      // `DepartmentService.resolveByNameOrCreate` looks the name up with an
+      // exact, case-sensitive equality, so a directory sending "engineering"
+      // to an organization holding "Engineering" CREATES a second department
+      // and the two attribute spend separately. One row would claim otherwise,
+      // and would leave one of the two records unmanageable from this screen.
+      const rows = mergeDepartmentRows({
+        departments: [{ id: "dept_1", name: "Engineering" }],
+        observed: [
+          { name: "engineering", peopleCount: 2, providers: ["openai_admin"] },
+        ],
+      });
+
+      expect(rows).toHaveLength(2);
+      // Which of the two sorts first is the collator's business, not this
+      // rule's. What matters is that both survive and only ours is a record.
+      expect(rows.find((row) => row.name === "Engineering")?.record).toEqual({
+        id: "dept_1",
+        name: "Engineering",
+      });
+      expect(rows.find((row) => row.name === "engineering")?.record).toBeNull();
     });
   });
 
