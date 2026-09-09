@@ -764,6 +764,9 @@ func (state *bootState) chAdmin(ctx context.Context, query string) error {
 	if err != nil {
 		return err
 	}
+	// A server URL may carry a database as its path; administrative
+	// statements address the server itself.
+	endpoint.Path = "/"
 	endpoint.RawQuery = "query=" + url.QueryEscape(query)
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
 	if err != nil {

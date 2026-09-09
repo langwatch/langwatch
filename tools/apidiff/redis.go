@@ -32,8 +32,14 @@ func RedisIndices(runID string) (branch, main int, err error) {
 	if _, err := digest.Write([]byte(runID)); err != nil {
 		return 0, 0, err
 	}
+	// Logical database 0 is the one a developer's own stack lives in, so
+	// neither side may ever derive it: the branch takes 1 to half-1 and
+	// main sits half above it.
 	half := redisLogicalDBs / 2
 	branch = int(digest.Sum32() % uint32(half))
+	if branch == 0 {
+		branch = half - 1
+	}
 	main = branch + half
 	if branch == main {
 		return 0, 0, fmt.Errorf("redis indices for run %q collide on %d", runID, branch)

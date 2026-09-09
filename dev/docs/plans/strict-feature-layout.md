@@ -125,6 +125,19 @@ Where an ADR states one, the ADR is the authority and this list is the index.
 | Uncommitted paths in the worktree | `git status --porcelain \| wc -l` | — | **~1,400**, almost all the 09-07 pile (section 6) | 0 |
 | Disk free | `df -h /` | — | 22 GiB (was 40 at 16:00; lane transcripts and declaration caches) | keep above 15 |
 
+### The goal counters, 2026-09-09 21:1x (`$CLAUDE_JOB_DIR/tmp/goal.sh`, one line per loop tick, log in `goal.log`)
+
+| Counter | 18:4x | 21:1x | Target |
+| --- | --- | --- | --- |
+| Legacy transport files (non-test, at HEAD) | 126 | **96** | 0 |
+| Modules still on a legacy transport | 16 | **10** (agent, experiment, gateway, governance, langy, organization, scenario, trace, plus prompt's playground door and webhook's REST family) | 0 |
+| Feature-shape rows | 225 | **210** | 0 |
+| REST families absent at boot (registry entries without a mount) | 57 | **48** (about half belong to converted modules not yet installed: analytics, langwatch-ql, query, prompts, workflows, workflow-run, workflow-studio, triggers, unsubscribe, model-providers, evaluations-legacy) | process-owned doors only |
+| Api-side files (`apps/api/src/features/**` compositions and mounts) | 170 | **175** (auto-mount deletes them) | about 40 |
+| `ports/` and `adapters/` files across modules | 803 | **791** (coding-agent, user, prompt cleared; the persistence wave is the rest) | 0 |
+| Main commits unfolded | 64 | **64** | 0 |
+| Api boots (entrypoint) | unknown | **yes at `9c7cb5ff5e`**; the dev-runtime backend path loads its module graph; tRPC record still absent until auto-mount | both paths, tRPC live |
+
 Every whole-repository check takes a machine-wide slot. Lanes run the
 per-package form; the whole-repository form runs once before a push.
 
@@ -309,6 +322,12 @@ guarding things outside the package, 29 failing, 17 policies untested).
 
 | Lane | Brief | Started |
 | --- | --- | --- |
+| Auto-mount: `withTransports({ rest, trpc })` on `createApp`, declarations mount at boot, per-namespace tRPC record goes live, registry shrinks to process-owned doors, two-path boot gate (entrypoint and dev-runtime), worker user record | `$CLAUDE_JOB_DIR/tmp/AUTO-MOUNT-BRIEF.md` + `TRPC-LIVE-BRIEF.md` | 09-09 20:0x, Opus, RUNNING |
+| apidiff main vs committed HEAD (`9c7cb5ff5e`, detached worktree under `tmp/apidiff/branch`), tool patched to address the ClickHouse server and never derive Redis DB 0 | `tools/apidiff/README.md` | 09-09 21:1x, background run; Haiku reads the report after |
+| QUEUED behind auto-mount: `publicEnv` procedure goes, `NEXTAUTH_PROVIDER` ships in the HTML shell | `tmp/PUBLIC-ENV-SHELL-BRIEF.md` | Sonnet |
+| QUEUED behind auto-mount: wiring 3b as install lines (analytics, model-provider, evaluation, prompt, workflow, automation, ops), then the test pass on committed HEAD (curl the families, drive the app in the browser) BEFORE any further conversion (Alex 20:4x: "we want to test a little first") | `tmp/wiring/*.md` | Opus |
+| QUEUED: persistence wave (the 791 `ports/`/`adapters/` files; automation's four adapters are worker-constructed, workflow's by both apps, prompt's repository reaches into model-provider inside a transaction) | per-module notes in `tmp/wiring/*.md` | Opus, after the test pass |
+| QUEUED small Haiku jobs: shutdown logging (requested and complete lines, api, worker, dev-runtime), the unlevelled fatal-boot line, gateway's `tryGetDeliverable` type | `tmp/HAIKU-QUEUE.md` | Haiku |
 
 Live briefs kept as work orders: `wave4-process-wiring.md` (landed `9697edd1f5`; its Wave 5 section is the open work order),
 `api-rest-runtime-gaps-3.md` (part A RUNNING, B and C QUEUED), `api-package-rebuild.md` (phase 3
@@ -317,7 +336,7 @@ deletion list, QUEUED for after the last family converts),
 with the agent conversion), `architecture-lint-review-2026-09-08.md` (L3 to
 L8). Every landed brief is retired in section 14.
 
-Rules every lane runs under: Opus only; Read/Edit/Write, no scripted rewrites,
+Rules every lane runs under: Opus for shape choices, Sonnet for cross-file renames and repoints, Haiku for single-file remaps (scored 09-09, `tmp/model-compare.md`); every remap runs `.claude/skills/module/references/remap.md`; Read/Edit/Write, no scripted rewrites,
 read before delete, `mv` not `git mv`; no git writes; no root typecheck, lint or
 format; no baseline edits (the root session does them); the spec wins; a
 memory twin ships with a contract test; `source-folder-shape` applies; one

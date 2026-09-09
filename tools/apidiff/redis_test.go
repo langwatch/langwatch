@@ -89,6 +89,18 @@ func (server *fakeRedis) url() string {
 	return "redis://" + server.listener.Addr().String()
 }
 
+func TestRedisIndicesNeverNameTheDeveloperDatabase(t *testing.T) {
+	for _, runID := range []string{"work", "run", "20260906-120000", "apidiff", "x"} {
+		branch, main, err := RedisIndices(runID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if branch == 0 || main == 0 {
+			t.Fatalf("run %q derived logical database 0 (%d/%d), which a developer's own stack uses", runID, branch, main)
+		}
+	}
+}
+
 func TestRedisIndicesAreRunScopedAndDistinct(t *testing.T) {
 	branch, main, err := RedisIndices("20260906-120000")
 	if err != nil {
