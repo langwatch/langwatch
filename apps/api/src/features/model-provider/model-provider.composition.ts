@@ -19,12 +19,6 @@ import type { TraceAppDependencies } from "@langwatch/trace-server";
 
 import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
-import {
-  createLlmModelCostTrpcRouter,
-  createModelProviderTrpcRouter,
-  type ModelProviderTrpcChecks,
-} from "./model-provider-trpc.mount.ts";
-import { createTranslateTrpcRouter } from "./translate-trpc.mount.ts";
 
 /**
  * The model-provider capabilities that reach OUTSIDE this process: the vendor
@@ -105,17 +99,9 @@ export function composeModelProviderFeature(options: {
     spans: options.peers?.spans,
   });
 
-  return {
-    app,
-    routers: (mount) =>
-      buildRouters({
-        mount,
-        authz: options.infrastructure.authz,
-        probes: options.host?.probes() ?? refusing("the provider credential probe"),
-        costRules: options.host?.costRules() ?? conservativeCostRules(),
-        translate: options.host?.translate() ?? { wrapAiCall: (_feature, call) => call() },
-      }),
-  };
+  // The three namespaces, their ports and the two data-dependent gates went
+  // with the transports that took them; they return with the converted ones.
+  return { app };
 }
 
 /**
@@ -124,127 +110,12 @@ export function composeModelProviderFeature(options: {
  * cannot answer rather than reporting that a tenant has attached no providers.
  */
 export function refusingModelProviderFeature(): ComposedModelProviderFeature {
-  return {
-    app: refusing<ModelProviderApp>("the provider gateway"),
-    routers: (mount) =>
-      buildRouters({
-        mount,
-        authz: refusing<AuthzService>("the permission service"),
-        probes: refusing("the provider credential probe"),
-        costRules: conservativeCostRules(),
-        translate: { wrapAiCall: (_feature, call) => call() },
-      }),
-  };
+  return { app: refusing<ModelProviderApp>("the provider gateway") };
 }
 
-/** The three routers, over whatever this deployment could answer with. */
-function buildRouters(options: {
-  mount: ApiTrpcFeatureMount;
-  authz: AuthzService;
-  probes: ReturnType<ApiModelProviderHostPort["probes"]>;
-  costRules: LlmModelCostTrpcPorts;
-  translate: TranslateTrpcPorts;
-}) {
-  const { mount } = options;
-  const ports = {
-    ...options.probes,
-    // Fire and forget, as the router has always done: a connect is recorded,
-    // but a slow audit write never holds up the sign-in response.
-    recordAudit: () => undefined,
-  } as ModelProviderTrpcPorts<unknown, unknown>;
 
-  return {
-    modelProvider: createModelProviderTrpcRouter({
-      ...mount,
-      ports,
-      checks: modelProviderChecks(options.authz),
-    }),
-    llmModelCost: createLlmModelCostTrpcRouter({ ...mount, ports: options.costRules }),
-    translate: createTranslateTrpcRouter({ ...mount, ports: options.translate }),
-  };
-}
 
-/**
- * The two data-dependent gates the provider surface authorizes through.
- */
-function modelProviderChecks(authz: AuthzService): ModelProviderTrpcChecks {
-  const probe =
-    (permission: AuthzPermission) =>
-    async (params: {
-      ctx: { actor(): { id: string }; permissionChecked?: boolean };
-      input: { projectId?: string; organizationId?: string };
-      next(): unknown;
-    }) => {
-      const scope = params.input.projectId
-        ? { projectId: params.input.projectId }
-        : { organizationId: params.input.organizationId ?? "" };
-      const permitted = await authz.hasPermission({
-        userId: params.ctx.actor().id,
-        permission,
-        ...scope,
-      });
-      if (!permitted) throw new ProviderTenantDeniedError(permission);
-      params.ctx.permissionChecked = true;
-      return params.next();
-    };
 
-  return {
-    tenantWrite: (permission) =>
-      declareAuthzMiddleware(
-        {
-          kind: "custom",
-          reason:
-            "the tenant anchor is data-dependent: a project when one is named, otherwise the organization the provider belongs to",
-          permissions: [permission, "organization:view"],
-        },
-        async (params: never) => {
-          const call = params as unknown as Parameters<ReturnType<typeof probe>>[0];
-          return call.input.projectId ? probe(permission)(call) : probe("organization:view")(call);
-        },
-      ),
-    credentialProbe: declareAuthzMiddleware(
-      {
-        kind: "custom",
-        reason:
-          "the credential probe goes straight out to the vendor with caller-supplied keys, so this gate IS the authorization rather than a coarse pre-filter",
-        permissions: ["project:update", "organization:manage"],
-      },
-      async (params: never) => {
-        const call = params as unknown as Parameters<ReturnType<typeof probe>>[0];
-        return call.input.projectId
-          ? probe("project:update")(call)
-          : probe("organization:manage")(call);
-      },
-    ),
-  };
-}
-
-/** The caller may not write providers at the tenant they named. */
-class ProviderTenantDeniedError extends HandledError {
-  declare readonly code: "permission_denied";
-
-  constructor(permission: AuthzPermission) {
-    super("permission_denied", "You do not have permission to manage model providers here", {
-      httpStatus: 403,
-      fault: "customer",
-      meta: { permission },
-    });
-    this.name = "ProviderTenantDeniedError";
-  }
-}
-
-/**
- * The cost-rule ports for a process with no provider host.
- */
-function conservativeCostRules(): LlmModelCostTrpcPorts {
-  const nestedQuantifier = /\([^)]*[+*][^)]*\)\s*[+*]/;
-  return {
-    isSafeRegex: (pattern) => !nestedQuantifier.test(pattern),
-    tryGetModelLimits: () => null,
-    previewMatchingSpans: () =>
-      Promise.reject(new ApiModelProviderUnavailableError("the cost rule's span preview")),
-  };
-}
 
 /** A stand-in whose every member refuses by name. */
 function refusing<T>(capability: string): T {

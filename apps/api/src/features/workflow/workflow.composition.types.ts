@@ -1,18 +1,10 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { WorkflowApp } from "@langwatch/workflow-server";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
-import type {
-  createWorkflowOptimizationTrpcRouter,
-  createWorkflowTrpcRouter,
-} from "./workflow-trpc.mount.ts";
 
-/** The two namespaces and the `ctx.app.workflows` application. */
+/** The `ctx.app.workflows` application. The two tRPC namespaces are not here:
+ * their transports are unconverted. */
 export type ComposedWorkflowFeature = Readonly<{
-  routers(mount: ApiTrpcFeatureMount): {
-    workflow: ReturnType<typeof createWorkflowTrpcRouter>;
-    optimization: ReturnType<typeof createWorkflowOptimizationTrpcRouter>;
-  };
   /** For `ctx.app.workflows`, and for the packaged workflow REST family. */
   app: WorkflowApp;
   /**

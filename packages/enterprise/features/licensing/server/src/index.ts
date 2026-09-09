@@ -1,16 +1,14 @@
 export { NodeLicenseCryptographyAdapter } from "./adapters/node.license-cryptography.adapter.ts";
 export {
   LicensingApp,
-  type LicensingAppDependencies,
+  type LicensingInfrastructure,
+  type LicensingRuntime,
   type LicensingCaller,
   type MintLicenseInput,
   type SsoGateStatus,
 } from "./app/licensing.app.ts";
-export { LicenseTrpcApi, type LicenseTrpcContext } from "./transport/api-trpc/license.api.ts";
-export {
-  LicenseEnforcementTrpcApi,
-  type LicenseEnforcementTrpcContext,
-} from "./transport/api-trpc/license-enforcement.api.ts";
+// The two tRPC transports are not exported: they still name the deleted legacy
+// builder.
 export {
   LicensingEntitlementSourceAdapter,
   type LicensePlanReader,

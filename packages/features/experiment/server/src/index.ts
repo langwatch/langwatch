@@ -26,11 +26,8 @@ export {
   type ExperimentMonitorCascade,
   type ExperimentWithRuns,
 } from "./app/experiment.app.ts";
-export {
-  ExperimentTrpcApi,
-  type ExperimentTrpcContext,
-  type ExperimentTrpcPorts,
-} from "./transport/api-trpc/experiment.api.ts";
+export { experimentServer } from "./experiment.server.ts";
+// The tRPC transport is not exported: it still names the deleted legacy builder.
 export { createExperimentsRestApp } from "./transport/api-rest/experiment.api.ts";
 export { createBlankWorkbenchState } from "./rules/experiment-blank-workbench-state.rules.ts";
 export { workbenchActorFrom } from "./rules/experiment-workbench-actor.rules.ts";

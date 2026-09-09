@@ -1,8 +1,5 @@
-export {
-  SubscriptionTrpcApi,
-  type SubscriptionTrpcContext,
-} from "./transport/api-trpc/subscription.api.ts";
-export { CurrencyTrpcApi, type CurrencyTrpcContext } from "./transport/api-trpc/currency.api.ts";
+// The two tRPC transports are not exported: they still name the deleted legacy
+// builder.
 export { StripeErrorAdapter } from "./adapters/stripe-error.stripe-error.adapter.ts";
 export {
   ClickHouseBillingAdapter,

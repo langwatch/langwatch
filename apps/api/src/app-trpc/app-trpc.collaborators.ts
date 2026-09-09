@@ -15,9 +15,10 @@ export type ApiTrpcCollaborators = Readonly<{
 }>;
 
 /**
- * Reports the composition decision a missing application would otherwise hide. Two
- * reasons, and neither is a list of the individual capabilities: they are one graph.
+ * Reports the composition decision a missing application would otherwise hide. Three
+ * reasons, and none is a list of the individual capabilities: they are one graph.
+ * `unconverted-transports` is the state of the record itself, not of this deployment.
  */
 export abstract class ApiTrpcCollaboratorsAbsence {
-  abstract absent(reason: "no-collaborators" | "no-database"): void;
+  abstract absent(reason: "no-collaborators" | "no-database" | "unconverted-transports"): void;
 }

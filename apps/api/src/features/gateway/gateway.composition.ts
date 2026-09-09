@@ -17,7 +17,6 @@ import {
   type ApiGatewayClickHousePort,
   type ApiGatewayIdempotencyPort,
 } from "../../app/api-gateway.composition.ts";
-import { createGatewayTrpcRouters } from "./gateway-trpc.mount.ts";
 
 /** A capability this deployment did not compose, refused by name. */
 class ApiCapabilityUnavailableError extends HandledError {
@@ -77,14 +76,7 @@ export function composeGatewayFeature(options: GatewayFeatureOptions): ComposedG
     ...(options.idempotency ? { idempotency: options.idempotency } : {}),
   });
 
-  return {
-    app: composition.app,
-    composition,
-    // The one thing that could not follow the rest onto `GatewayApp`: a tRPC
-    // input parser is fixed when the router is BUILT.
-    router: (mount) =>
-      createGatewayTrpcRouters({ ...mount, ports: { virtualKeys: composition.app.schemas } }),
-  };
+  return { app: composition.app, composition };
 }
 
 const logger: Pick<Logger, "info"> = createLogger("langwatch:api:gateway");
@@ -112,12 +104,7 @@ function refusingGateway(): ComposedGatewayFeature {
     has: () => true,
   });
 
-  return {
-    app,
-    composition: undefined,
-    router: (mount) =>
-      createGatewayTrpcRouters({ ...mount, ports: { virtualKeys: GATEWAY_INPUT_SCHEMAS } }),
-  };
+  return { app, composition: undefined };
 }
 
 /**

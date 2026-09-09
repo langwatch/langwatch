@@ -22,9 +22,7 @@ import { resolveInviteDisplayStatus } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { UserService } from "@langwatch/user-contract";
 
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
-import { createFrontDoorTrpcRouter, createPublicEnvTrpcProcedure } from "./auth-trpc.mount.ts";
 
 /**
  * What the deployment answers so a person-shaped surface can be served. Five values, none
@@ -247,7 +245,7 @@ export function composeAuthFeature(options: {
     resolveAuthProvider,
   });
 
-  return { app, resolveAuthProvider, routers: (mount) => authRouters(mount, app) };
+  return { app, resolveAuthProvider };
 }
 
 /**
@@ -260,20 +258,7 @@ export function refusingAuthFeature(processName: string): ComposedAuthFeature {
   };
   const app = new Proxy({}, { get: () => refuse, has: () => true }) as AuthApp;
 
-  return {
-    app,
-    resolveAuthProvider: () => Promise.resolve("email"),
-    routers: (mount) => authRouters(mount, app),
-  };
-}
-
-function authRouters(mount: ApiTrpcFeatureMount, app: AuthApp) {
-  return {
-    frontDoor: createFrontDoorTrpcRouter({ ...mount, ports: app }),
-    // A procedure rather than a router: the client calls `publicEnv({})` at
-    // the root, and giving it a namespace would rename it.
-    publicEnv: createPublicEnvTrpcProcedure({ ...mount, ports: app }),
-  };
+  return { app, resolveAuthProvider: () => Promise.resolve("email") };
 }
 
 /**

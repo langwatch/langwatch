@@ -39,6 +39,8 @@ import {
   PrismaJoinSettingsAdapter,
 } from "@langwatch/identity-server";
 import { createLogger, type Logger } from "@langwatch/observability";
+import { ResourceScope } from "@langwatch/runtime-composition";
+import { toDate } from "@langwatch/time";
 import {
   INVITE_ALREADY_ACCEPTED_MESSAGE,
   INVITE_NOT_READY_MESSAGE,
@@ -46,6 +48,7 @@ import {
   InviteNotFoundError,
   InviteWrongAccountError,
   OrganizationNotFoundError,
+  type OrganizationApi,
   type OrganizationService,
 } from "@langwatch/organization-contract";
 import {
@@ -57,13 +60,16 @@ import {
   isCustomRole,
   isTeamRoleAllowedForOrganizationRole,
   OrganizationMembershipService,
+  PersonalWorkspaceDiagnosticsAdapter,
   resolveInviteDisplayStatus,
-  OrganizationApp,
+  ServerOrganizationApp,
   OrganizationGrantCachePort,
   OrganizationPromptSeedPort,
   OrganizationSeatLicensePort,
   OrganizationSessionRevocationPort,
-  PostgresOrganizationMembershipAdapter,
+  GroupIdentityAdapter,
+  PersonalWorkspaceIdentityAdapter,
+  TeamIdentityAdapter,
   type GroupTrpcPorts,
   type JoinRequestTrpcPorts,
   type OnboardingTrpcPorts,
@@ -79,25 +85,19 @@ import {
   type OrganizationUserRole,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi, ProjectService } from "@langwatch/project-contract";
 import type { RoleApi } from "@langwatch/role-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { UserApp } from "@langwatch/user-server";
 import { z } from "zod";
 
 import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import { ApiOrganizationSettingsSecretAdapter } from "../../app/api-organization-settings-secret.adapter.ts";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { composeApiOrganizationInvites } from "../../app/api-organization-invites.composition.ts";
 import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
 import type { ApiEnterpriseApplicationPort } from "../enterprise/enterprise.composition.ts";
-import {
-  createGroupTrpcRouter,
-  createJoinRequestTrpcRouter,
-  createOnboardingTrpcRouter,
-  createOrganizationTrpcRouter,
-  createTeamTrpcRouter,
-} from "./organization-trpc.mount.ts";
 
 /**
  * The questionnaire the sign-up form collects, as the ceremony forwards it. Opaque to the
@@ -167,6 +167,8 @@ export type OrganizationMembershipPeers = Readonly<{
   organizations: OrganizationService;
   /** The same project service the tenancy graph composed. */
   projects: ProjectService;
+  /** The complete project feature API used by organization-owned workflows. */
+  projectApi: ProjectApi;
   /** The grant ledger every membership write states its access on. */
   grants: AuthzGrantsService;
   /** The Auth service a disabled membership's browser sessions are revoked through. */
@@ -205,28 +207,24 @@ export function composeOrganizationFeature(options: {
   demoProject: Readonly<{ userId: string; projectId: string }>;
 }): ComposedOrganizationFeature {
   const logger = createLogger("langwatch:api:organization");
-  const ports = organizationPorts(options, logger);
-  const auditLogCheck = auditLogCheckFor(options.infrastructure.authz);
   const membership = options.peers.membership
     ? composeMembershipHalf({
         prisma: options.infrastructure.prisma,
         plans: options.infrastructure.plans,
         peers: options.peers.membership,
+        permissions: options.infrastructure.authz,
         rateLimit: (input) => options.rateLimit(input),
         logger,
+        encryption: options.peers.encryption,
         baseHost: options.baseHost,
       })
     : undefined;
 
+  // The five namespaces, their forty-six ports, the team ports and the
+  // audit-log check went with the transports that took them; they return with
+  // the converted ones.
   return {
-    router: (mount) => createOrganizationTrpcRouter({ ...mount, auditLogCheck, ports }),
-    routers: (mount) =>
-      membershipRouters({
-        mount,
-        ports: membership?.ports ?? refusingMembershipPorts(),
-        team: composeTeamPorts(options.infrastructure),
-      }),
-    app: membership?.app ?? refusingOrganizationApp(),
+    app: membership?.app ?? refusingServerOrganizationApp(),
     rest: membership?.rest,
     provisioning: membership?.provisioning,
   };
@@ -238,321 +236,9 @@ export function composeOrganizationFeature(options: {
  * cannot answer rather than shown an organization with no members in it.
  */
 export function refusingOrganizationFeature(): ComposedOrganizationFeature {
-  const refuse = (): never => {
-    throw new ApiOrganizationUnavailableError("organization directory");
-  };
-  // The two members the namespace reads while it is being BUILT rather than
-  // called: the questionnaire schema its input parser is derived from, and the
-  // role-naming test its member list renders with.
-  const buildTime: Record<string, unknown> = { signUpDataSchema, isCustomRole };
-
-  return {
-    router: (mount) =>
-      createOrganizationTrpcRouter({
-        ...mount,
-        auditLogCheck: declareAuthzMiddleware(AUDIT_LOG_DECLARATION, () => refuse()),
-        ports: new Proxy(
-          {},
-          {
-            get: (_target, property) => buildTime[property as string] ?? refuse,
-            has: () => true,
-          },
-        ) as OrganizationTrpcPorts<typeof signUpDataSchema>,
-      }),
-    routers: (mount) =>
-      membershipRouters({
-        mount,
-        ports: refusingMembershipPorts(),
-        team: {
-          probeOrganizationPermission: refuse,
-          assertCustomRolesAllowed: refuse,
-        },
-      }),
-    app: refusingOrganizationApp(),
-    rest: undefined,
-    provisioning: undefined,
-  };
+  return { app: refusingServerOrganizationApp(), rest: undefined, provisioning: undefined };
 }
 
-/**
- * The forty-six answers `organization.*` needs from this deployment.
- */
-function organizationPorts(
-  options: Readonly<{
-    infrastructure: ApiTrpcInfrastructure;
-    peers: OrganizationPeers;
-    rateLimit(
-      input: Readonly<{ key: string; windowSeconds: number; max: number }>,
-    ): Promise<Readonly<{ allowed: boolean; resetAt: number }>>;
-    baseHost: string;
-    demoProject: Readonly<{ userId: string; projectId: string }>;
-  }>,
-  logger: Logger,
-): OrganizationTrpcPorts<typeof signUpDataSchema> {
-  const { prisma, authz } = options.infrastructure;
-  const plans: Pick<PlanProvider, "getActivePlan"> = options.infrastructure.plans;
-  const { peers } = options;
-  // Injected wins, so a host that composed its own invitation service keeps
-  // it. Otherwise this process composes one over its own graph, and only a
-  // process missing the grant ledger or the role service still refuses.
-  const invites =
-    peers.invites ??
-    (peers.authzGrants && peers.roles
-      ? composeApiOrganizationInvites({
-          prisma,
-          grants: peers.authzGrants,
-          roles: peers.roles,
-          plans,
-          rateLimit: (input) => options.rateLimit(input),
-          baseHost: options.baseHost,
-        }).trpc
-      : undefined);
-  const refuseInvitations = (what: string): Promise<never> =>
-    Promise.reject(new ApiOrganizationUnavailableError(`invitation service, so it cannot ${what}`));
-  const inviteports = invites?.ports;
-
-  return {
-    signUpDataSchema,
-
-    probeOrganizationPermission: (ctx, organizationId, permission) =>
-      authz.hasPermission({ userId: actorId(ctx), permission, organizationId }),
-
-    /**
-     * Which of an organization's projects this caller holds one permission on.
-     */
-    batchProjectPermissions: async (ctx, input) => {
-      const userId = actorId(ctx);
-      const decisions = await mapWithConcurrency([...input.projectIds], (projectId) =>
-        authz
-          .hasPermission({ userId, permission: input.permission, projectId })
-          .then((permitted) => [projectId, permitted] as const),
-      );
-      return new Map(decisions);
-    },
-
-    listBindingsForSynthesis: (_ctx, input) =>
-      authz.listBindingsForSynthesis(input) as Promise<AuthzBindingForSynthesis[]>,
-
-    enrichTeamWithRoleBindings: OrganizationMembershipService.enrichTeamWithRoleBindings,
-
-    demoProject: () => options.demoProject,
-    decryptStoredSecret: (value) => decryptStoredSecret(peers.encryption, value),
-
-    /**
-     * Both Enterprise plan gates, over the ONE plan provider this process resolves every
-     * allowance through.
-     */
-    assertCustomRolesAllowed: async (_ctx, { organizationId }) => {
-      const plan = await plans.getActivePlan({ organizationId });
-      assertEnterprisePlanType({
-        planType: plan.type,
-        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-      });
-    },
-    assertAuditLogsAllowed: async (_ctx, { organizationId }) => {
-      const plan = await plans.getActivePlan({ organizationId });
-      assertEnterprisePlanType({
-        planType: plan.type,
-        errorMessage: ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS,
-      });
-    },
-    isCustomRole,
-
-    fullMemberLimitMessage: FULL_MEMBER_LIMIT_MESSAGE,
-    liteMemberViewerOnlyMessage: LITE_MEMBER_VIEWER_ONLY_ERROR,
-    asMemberSeatLimitReached: (error) =>
-      error instanceof MemberSeatLimitReachedError
-        ? {
-            limitType: error.meta.limitType,
-            current: error.meta.current,
-            max: error.meta.max,
-          }
-        : null,
-    /**
-     * Always null, and correctly so rather than degraded: this process
-     * composes no licence-enforcement service, so nothing here raises a
-     * resource-limit refusal for the transport to recognise.
-     */
-    asResourceLimitExceeded: () => null,
-    isOrganizationNotFound: (error) => error instanceof OrganizationNotFoundError,
-    notifyResourceLimitReached: async (_ctx, input) => {
-      const usageLimits = peers.enterprise?.usageLimits;
-      if (!usageLimits) {
-        logger.debug(
-          { organizationId: input.organizationId, limitType: input.limitType },
-          "no Enterprise usage-limit store is composed: the resource-limit notification for this organization is not sent",
-        );
-        return;
-      }
-      await usageLimits.notifyResourceLimitReached(input as never);
-    },
-    isTeamRoleAllowedForOrganizationRole: ({ organizationRole, teamRole }) =>
-      isTeamRoleAllowedForOrganizationRole({
-        organizationRole,
-        teamRole: teamRole as TeamRoleValue,
-      }),
-    /**
-     * The seat guard on an external role change, refused by name.
-     */
-    assertTeamRoleChangeWithinSeatLimits: () =>
-      Promise.reject(
-        new ApiOrganizationUnavailableError(
-          "Enterprise seat licence, so it cannot authorize a member role change",
-        ),
-      ),
-    assertNoPersonalTeamScope: async (_ctx, { teamId }) => {
-      await PersonalTeamScopeService.create(
-        PostgresPersonalTeamScopeAdapter.create({ database: prisma }),
-      ).assertNoPersonalTeamScope({
-        scopes: [{ scopeType: RoleBindingScopeType.TEAM, scopeId: teamId }],
-      });
-    },
-    tryGetTeamOrganizationId: async (_ctx, { teamId }) => {
-      const team = await prisma.team.findUnique({
-        where: { id: teamId },
-        select: { organizationId: true },
-      });
-      return team?.organizationId ?? null;
-    },
-    tryGetOrganizationMemberRole: async (_ctx, { organizationId, userId }) => {
-      const membership = await prisma.organizationUser.findUnique({
-        where: { userId_organizationId: { userId, organizationId } },
-      });
-      return membership?.role ?? null;
-    },
-
-    createInvites: (ctx, input) =>
-      inviteports
-        ? inviteports.createInvites(ctx, input)
-        : refuseInvitations("invite anybody to this organization"),
-    revokeInvite: (ctx, input) =>
-      inviteports
-        ? inviteports.revokeInvite(ctx, input)
-        : refuseInvitations("revoke an invitation"),
-    assertInviteSendAllowed: (ctx, input) =>
-      inviteports
-        ? inviteports.assertInviteSendAllowed(ctx, input)
-        : refuseInvitations("meter invitation sends"),
-    resendInvite: (ctx, input) =>
-      inviteports
-        ? inviteports.resendInvite(ctx, input)
-        : refuseInvitations("resend an invitation"),
-    buildInviteAcceptUrl: (inviteCode) => buildInviteAcceptUrl(options.baseHost, inviteCode),
-    listInvites: (ctx, input) =>
-      inviteports
-        ? inviteports.listInvites(ctx, input)
-        : refuseInvitations("list this organization's invitations"),
-    /**
-     * A row read, so it is answered here rather than behind the port: the code
-     * in the link addresses one invitation, and reading it is what tells a
-     * signed-in person which organization they were asked to join.
-     */
-    tryGetInviteByCode: (_ctx, { inviteCode }) =>
-      prisma.organizationInvite.findUnique({
-        where: { inviteCode },
-        include: { organization: true },
-      }),
-    resolveInviteDisplayStatus,
-    matchInviteToAcceptor: (ctx, input) =>
-      inviteports
-        ? inviteports.matchInviteToAcceptor(ctx, input)
-        : refuseInvitations("match an invitation to the person accepting it"),
-    maskInvitedAddress: (email) =>
-      inviteports ? inviteports.maskInvitedAddress(email) : maskAddress(email),
-    applyInvite: (ctx, input) =>
-      inviteports ? inviteports.applyInvite(ctx, input) : refuseInvitations("accept an invitation"),
-    tryFindLandingProjectSlug: (ctx, input) =>
-      inviteports
-        ? inviteports.tryFindLandingProjectSlug(ctx, input)
-        : refuseInvitations("resolve where an accepted invitation lands"),
-    inviteNotFoundError: () => new InviteNotFoundError("Invitation not found"),
-    inviteExpiredError: () => new InviteExpiredError(),
-    inviteWrongAccountError: (maskedEmail) => new InviteWrongAccountError(maskedEmail),
-    inviteAlreadyAcceptedMessage: INVITE_ALREADY_ACCEPTED_MESSAGE,
-    inviteNotReadyMessage: INVITE_NOT_READY_MESSAGE,
-
-    resolveJoinRequestByInvitation: (ctx, input) =>
-      inviteports
-        ? inviteports.resolveJoinRequestByInvitation(ctx, input)
-        : refuseInvitations("settle a join request against an invitation"),
-    withdrawJoinRequestOnInvitationAccepted: (ctx, input) =>
-      inviteports
-        ? inviteports.withdrawJoinRequestOnInvitationAccepted(ctx, input)
-        : refuseInvitations("withdraw a join request an invitation superseded"),
-    tryFindUserIdByEmail: async (_ctx, { email }) => {
-      const user = await prisma.user.findFirst({ where: { email }, select: { id: true } });
-      return user?.id ?? null;
-    },
-
-    /**
-     * The product trail, on a process with no analytics sink.
-     */
-    trackServerEvent: (input) => {
-      logger.debug(
-        { event: input.event },
-        "no product-analytics sink is composed: this organization event is not recorded",
-      );
-    },
-    fireTeamMemberInvitedNurturing: () => undefined,
-    fireInviteAcceptedNurturing: () => undefined,
-    sendSlackSignupEvent: () => Promise.resolve(),
-    reportError: (error) => {
-      logger.error({ error }, "an organization surface failed");
-    },
-  } as OrganizationTrpcPorts<typeof signUpDataSchema>;
-}
-
-/** What the audit-log read declares, in both the real check and the refusal. */
-const AUDIT_LOG_DECLARATION = {
-  kind: "custom",
-  reason:
-    "the audit-log read is authorized at the organization tier the query is anchored on, never the optional project filter",
-  permissions: ["auditLog:view"],
-} as const;
-
-/**
- * The audit-log read's own check: the ORGANIZATION tier, always. A bare
- * `permission("auditLog:view")` cannot express this.
- */
-function auditLogCheckFor(authz: AuthzService): unknown {
-  return declareAuthzMiddleware(AUDIT_LOG_DECLARATION, async (params: never) => {
-    const call = params as unknown as ScopeCheckParams<{
-      organizationId: string;
-      projectId?: string;
-    }>;
-    const userId = call.ctx.actor().id;
-    const permitted = await authz.hasPermission({
-      userId,
-      permission: "auditLog:view",
-      organizationId: call.input.organizationId,
-    });
-    if (!permitted) throw new AuditLogDeniedError();
-    if (call.input.projectId) {
-      const forProject = await authz.hasPermission({
-        userId,
-        permission: "auditLog:view",
-        projectId: call.input.projectId,
-      });
-      if (!forProject) throw new AuditLogDeniedError();
-    }
-    call.ctx.permissionChecked = true;
-    return call.next();
-  });
-}
-
-/** The caller may not read this organization's audit trail. */
-class AuditLogDeniedError extends HandledError {
-  declare readonly code: "permission_denied";
-
-  constructor() {
-    super("permission_denied", "You do not have permission to read this audit trail", {
-      httpStatus: 403,
-      fault: "customer",
-      meta: { permission: "auditLog:view" },
-    });
-    this.name = "AuditLogDeniedError";
-  }
-}
 
 /** What a `kind: "custom"` check is handed on this process's root. */
 type ScopeCheckParams<TInput> = {
@@ -633,9 +319,10 @@ export class ApiOrganizationUnavailableError extends HandledError {
 
 /** Everything the membership half composed, ready to mount. */
 type OrganizationMembership = Readonly<{
-  app: OrganizationApp;
+  app: OrganizationApi;
   rest: OrganizationRestService;
-  provisioning: OrganizationService & OrganizationProvisioningPort;
+  provisioning: OrganizationProvisioningPort &
+    Pick<OrganizationService, "getBillingProfile" | "claimBillingCustomerId">;
   ports: MembershipPorts;
 }>;
 
@@ -646,45 +333,7 @@ type MembershipPorts = Readonly<{
   onboarding: OnboardingTrpcPorts<typeof signUpDataSchema>;
 }>;
 
-function membershipRouters(options: {
-  mount: ApiTrpcFeatureMount;
-  ports: MembershipPorts;
-  team: TeamTrpcPorts;
-}) {
-  const { mount, ports } = options;
-  return {
-    group: createGroupTrpcRouter({ ...mount, ports: ports.group }),
-    joinRequests: createJoinRequestTrpcRouter({ ...mount, ports: ports.joinRequests }),
-    // The sign-up ceremony, beside the `organization.createAndAssign` it is
-    // built on: same package, same questionnaire schema, same opt-out reason.
-    onboarding: createOnboardingTrpcRouter({ ...mount, ports: ports.onboarding }),
-    // The teams a member is placed in. Here rather than with the roles they
-    // hold: a team is an organization's own subdivision, and the surface's two
-    // answers are this deployment's permission probe and its plan gate.
-    team: createTeamTrpcRouter({ ...mount, ports: options.team }),
-  };
-}
 
-/** The two answers the team surface needs from this deployment. */
-function composeTeamPorts(infrastructure: ApiTrpcInfrastructure): TeamTrpcPorts {
-  return {
-    probeOrganizationPermission: (ctx, organizationId, permission) =>
-      infrastructure.authz.hasPermission({ userId: actorId(ctx), permission, organizationId }),
-    // Only a list that actually assigns a custom role is gated. A member list
-    // carrying none never touches the Enterprise capability, and refusing it
-    // would break team editing on every deployment without the plan.
-    assertCustomRolesAllowed: async (_ctx, input) => {
-      if (!input.members.some((member) => isCustomRole(member.role))) return;
-      const plan = await infrastructure.plans.getActivePlan({
-        organizationId: input.organizationId,
-      });
-      assertEnterprisePlanType({
-        planType: plan.type,
-        errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
-      });
-    },
-  };
-}
 
 /**
  * Composes the membership half over this process's own graph. The organization service,
@@ -695,44 +344,26 @@ function composeMembershipHalf(options: {
   prisma: PrismaClient;
   plans: Pick<PlanProvider, "getActivePlan">;
   peers: OrganizationMembershipPeers;
+  permissions: AuthzService;
   rateLimit(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
   ): Promise<Readonly<{ allowed: boolean; resetAt: number }>>;
   logger: Logger;
+  encryption: SecretEncryptionPort;
   /** This deployment's public origin, for a lapsed requester's personal project link. */
   baseHost: string;
 }): OrganizationMembership {
-  const { prisma, plans, peers, logger, baseHost } = options;
-  const { organizations, projects, grants, auth, users, eventing, mail, processName } = peers;
+  const { prisma, plans, peers, logger, baseHost, encryption } = options;
+  const { projects, projectApi, grants, auth, users, eventing, mail, processName } = peers;
   const unavailable = (capability: string) => new ApiOrganizationUnavailableError(capability);
 
-  const membership = PostgresOrganizationMembershipAdapter.create({
-    database: prisma,
-    grants,
-    prompts: LoggedApiOrganizationPromptSeed.create({ processName, logger }),
-    // The seat gate, over the SAME counts the usage panel shows and the SAME
-    // plan the invitation half spends a seat against: an administrator refused
-    // here and an administrator shown their usage there cannot be told two
-    // different numbers about one organization.
-    seats: ApiOrganizationSeatLicense.create({
-      plans,
-      memberships: PrismaUsageMembershipRepository.create(prisma),
-    }),
-    sessions: AuthServiceOrganizationSessionRevocation.create(auth),
-    grantCache: AuthzOrganizationGrantCache.create(grants),
-  }).build();
-
-  const organizationsForApp = new Proxy(organizations, {
-    get(target, property, receiver) {
-      if (typeof property === "string" && MEMBERSHIP_OPERATIONS.has(property)) {
-        const operation = (membership as unknown as Record<string, unknown>)[property];
-        return typeof operation === "function" ? operation.bind(membership) : operation;
-      }
-      const value = Reflect.get(target, property, receiver) as unknown;
-      return typeof value === "function" ? value.bind(target) : value;
-    },
-  }) as unknown as Parameters<typeof OrganizationApp.create>[0]["organizations"];
-
+  const prompts = LoggedApiOrganizationPromptSeed.create({ processName, logger });
+  const seats = ApiOrganizationSeatLicense.create({
+    plans,
+    memberships: PrismaUsageMembershipRepository.create(prisma),
+  });
+  const sessions = AuthServiceOrganizationSessionRevocation.create(auth);
+  const grantCache = AuthzOrganizationGrantCache.create(grants);
   const identityEmails = PostgresIdentityEmailAdapter.create({ database: prisma }).build();
 
   function notifyNothing(what: string): void {
@@ -799,15 +430,78 @@ function composeMembershipHalf(options: {
     return row?.emailVerified ? (row.email ?? null) : null;
   };
 
+  const app = ServerOrganizationApp.create({
+    infrastructure: {
+      database: prisma,
+      identities: PersonalWorkspaceIdentityAdapter.create(),
+      teamIdentities: TeamIdentityAdapter.create(),
+      groupIdentities: GroupIdentityAdapter.create(),
+      settingsSecrets: ApiOrganizationSettingsSecretAdapter.create({ encryption }),
+      diagnostics: PersonalWorkspaceDiagnosticsAdapter.create(logger),
+      prompts,
+      seats,
+    },
+    dependencies: {
+      projects: projectApi,
+      permissions: options.permissions,
+      users,
+    },
+    config: undefined,
+    resources: new ResourceScope(),
+  });
+  const rest: OrganizationRestService = {
+    getSettings: (input) => app.getSettings(input),
+    updateSettings: (input) => app.updateSettings(input),
+    listMembers: async (input) => {
+      const result = await app.listMembers(input);
+      return {
+        ...result,
+        members: result.members.map((member) => ({
+          ...member,
+          disabledAt: member.disabledAt === null ? null : toDate(member.disabledAt),
+          createdAt: toDate(member.createdAt),
+          updatedAt: toDate(member.updatedAt),
+        })),
+      };
+    },
+    getMember: async (input) => {
+      const member = await app.getMember(input);
+      return {
+        ...member,
+        disabledAt: member.disabledAt === null ? null : toDate(member.disabledAt),
+        createdAt: toDate(member.createdAt),
+        updatedAt: toDate(member.updatedAt),
+      };
+    },
+    changeMemberRole: (input, by) => app.changeMemberRole(input, by),
+    setMemberDisabled: (input, by) => app.setMemberDisabled(input, by),
+    deleteMember: (input, by) => app.deleteMember(input, by),
+  };
+  const provisioning: OrganizationProvisioningPort &
+    Pick<OrganizationService, "getBillingProfile" | "claimBillingCustomerId"> = {
+    createForProvisioning: (input) => app.createForProvisioning(input),
+    deleteProvisionedOrganization: (input) => app.deleteProvisionedOrganization(input),
+    getBillingProfile: (input) => app.getBillingProfile(input),
+    claimBillingCustomerId: (input) => app.claimBillingCustomerId(input),
+    listProvisioningSummaries: async () =>
+      (await app.listProvisioningSummaries()).map((summary) => ({
+        ...summary,
+        createdAt: toDate(summary.createdAt),
+      })),
+    tryGetProvisioningSummary: async (organizationId) => {
+      const summary = await app.tryGetProvisioningSummary(organizationId);
+      return summary === null ? null : { ...summary, createdAt: toDate(summary.createdAt) };
+    },
+  };
+
   return {
-    app: OrganizationApp.create({ organizations: organizationsForApp, projects }),
-    // The SAME merged object `OrganizationApp` reads, published so the
+    app,
+    // The SAME merged object `ServerOrganizationApp` reads, published so the
     // management REST family serves from it too. A second service over the
     // same rows would let `/api/organization/members` and the members screen
     // disagree about who is in an organization.
-    rest: organizationsForApp as unknown as OrganizationRestService,
-    provisioning: organizationsForApp as unknown as OrganizationService &
-      OrganizationProvisioningPort,
+    rest,
+    provisioning,
     ports: {
       group: {
         /**
@@ -883,64 +577,9 @@ function composeMembershipHalf(options: {
   };
 }
 
-/**
- * One organization object, two owners. `OrganizationApp` reads a single `organizations`
- * dependency that is the canonical contract AND the fourteen membership operations the
- * contract does not declare.
- */
-const MEMBERSHIP_OPERATIONS = new Set<string>([
-  "createAndAssign",
-  "deleteMember",
-  "setMemberDisabled",
-  "getAllForUser",
-  "tryGetOrganizationWithMembers",
-  "tryGetMemberById",
-  "getAllMembers",
-  "tryGetUserOrgRoleByTeamId",
-  "tryGetPrimaryIntent",
-  "updateTeamMemberRole",
-  "changeMemberRole",
-  "getAuditLogs",
-  // The paged listing and the single-member read the MANAGEMENT REST family
-  // asks for. On this list for the same reason as the twelve above: the
-  // canonical contract declares neither, so routing them here is what makes
-  // one object answer both halves rather than two objects answering one
-  // question each.
-  "listMembers",
-  "getMember",
-  // The four INSTANCE-PROVISIONING operations `/api/organizations` performs. Same reason
-  // again: the canonical contract does not declare them because they run before any
-  // credential for the organization exists, so the door that creates a tenant and the
-  // screens that administer it afterwards must resolve through one object or a
-  // provisioned organization would be invisible to the second.
-  "createForProvisioning",
-  "listProvisioningSummaries",
-  "tryGetProvisioningSummary",
-  "deleteProvisionedOrganization",
-]);
-
-/** The membership namespaces on a process that composed no membership graph. */
-function refusingMembershipPorts(): MembershipPorts {
-  const refuse = (): never => {
-    throw new ApiOrganizationUnavailableError("membership graph");
-  };
-  const refusing = <T>(buildTime: Record<string, unknown> = {}): T =>
-    new Proxy(buildTime, {
-      get: (target, property) => target[property as string] ?? refuse,
-      has: () => true,
-    }) as T;
-
-  return {
-    group: refusing<GroupTrpcPorts>(),
-    joinRequests: refusing<JoinRequestTrpcPorts>(),
-    // The one member the namespace reads while it is being BUILT rather than
-    // called: the questionnaire schema its input parser is derived from.
-    onboarding: refusing<OnboardingTrpcPorts<typeof signUpDataSchema>>({ signUpDataSchema }),
-  };
-}
 
 /** The `ctx.app.organizations` slice on a process with no membership graph. */
-function refusingOrganizationApp(): OrganizationApp {
+function refusingServerOrganizationApp(): OrganizationApi {
   return new Proxy(
     {},
     {
@@ -949,7 +588,7 @@ function refusingOrganizationApp(): OrganizationApp {
       },
       has: () => true,
     },
-  ) as OrganizationApp;
+  ) as OrganizationApi;
 }
 
 /** A seat decision with every field answered. */

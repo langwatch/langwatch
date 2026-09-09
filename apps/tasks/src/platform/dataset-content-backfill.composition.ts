@@ -3,9 +3,9 @@ import {
   DatasetObjectStorageResolverAdapter,
   DatasetObjectStorageS3ClientResolverAdapter,
   DatasetStorageDestinationPort,
-  PostgresDatasetMigrationAdapter,
   type DatasetStorageDestination,
 } from "@langwatch/dataset-server";
+import { PrismaDatasetMigrationRepository } from "@langwatch/dataset-server/composition/dataset-migration";
 import type { TasksObjectStorage } from "./infrastructure/tasks-stored-object-storage.adapter.ts";
 import type { TasksHost } from "./tasks-host.composition.ts";
 
@@ -48,7 +48,10 @@ export function buildDatasetContentBackfillTask({
           globalS3: objectStorage.globalS3,
         }),
       });
-      return PostgresDatasetMigrationAdapter.create({ database: host.requirePrisma(), storage });
+      // The process holds the typed Prisma client, so it builds the migration
+      // repository directly, the way `object-storage-migrate.composition.ts`
+      // builds its ClickHouse one.
+      return PrismaDatasetMigrationRepository.create({ database: host.requirePrisma(), storage });
     },
   });
 }

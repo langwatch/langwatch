@@ -7,10 +7,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
 import { filterFieldsEnum } from "@langwatch/analytics-contract";
 import {
-  AnalyticsAdapter,
   AnalyticsApp,
-  FilterOptionsAdapter,
-  LangWatchQLAdapter,
   LangWatchQLNotEnabledError,
   lwqlEnabled,
   MAX_LWQL_LENGTH,
@@ -21,9 +18,8 @@ import {
   sharedFiltersInputSchema,
   timeseriesInputSchema,
   type LangWatchQLService,
-  type LangWatchQLTrpcPorts,
 } from "@langwatch/analytics-server";
-import type { Trigger } from "@langwatch/automation-contract";
+import type { LangWatchQLTrpcPorts } from "@langwatch/analytics-server/api-trpc/langwatch-ql";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import {
@@ -41,10 +37,9 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import type { ApiLangWatchQLConfigResolution } from "../../platform/config/api.config.ts";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
-import {
-  analyticsRouters,
-  type AnalyticsFeaturePorts,
-  type ApiAnalyticsReadPorts,
+import type {
+  AnalyticsFeaturePorts,
+  ApiAnalyticsReadPorts,
 } from "./analytics-trpc.routers.ts";
 
 /**
@@ -87,28 +82,39 @@ import type { ComposedAnalyticsFeature } from "./analytics.composition.types.ts"
 export function composeAnalyticsFeature(
   options: AnalyticsFeatureCollaborators,
 ): ComposedAnalyticsFeature {
-  const langWatchQL = LangWatchQLAdapter.create({
-    connection: options.langWatchQL ?? null,
-  });
-  options.resources.own("API LangWatchQL identity", () => langWatchQL.close());
-
   const featureFlags = options.featureFlags;
 
   const analytics = AnalyticsApp.create({
-    analytics: AnalyticsAdapter.create({
-      // The adapter's own contract: `null` is a deployment without ClickHouse,
-      // and its repository answers the refusal rather than this composition
-      // guessing at one.
-      resolveClient: async (tenantId) =>
-        options.resolveClickHouseClient ? await options.resolveClickHouseClient(tenantId) : null,
+    infrastructure: {
+      resolveClickHouseClient: options.resolveClickHouseClient,
       clickhouseEnabled: options.resolveClickHouseClient !== null,
       defaultRetentionDays: DEFAULT_RETENTION_DAYS,
-    }),
-    filterOptions: FilterOptionsAdapter.create({
-      resolveClient: options.resolveClickHouseClient,
-    }),
-    langWatchQL,
+    },
+    config: {
+      langwatchQl: options.langWatchQL ?? {
+        url: undefined,
+        username: undefined,
+        password: undefined,
+        database: undefined,
+        tenantSetting: undefined,
+      },
+    },
+    dependencies: {},
+    resources: options.resources,
   });
+
+  // Compatibility port for the still application-owned saved-chart routes.
+  // The implementation is the AnalyticsApi; LangWatchQL itself is owned by
+  // AnalyticsApp and closed through the feature resource scope.
+  const langWatchQL: LangWatchQLService = {
+    get available() {
+      return analytics.isLangWatchQLAvailable();
+    },
+    close: () => Promise.resolve(),
+    describeSchema: (input) => analytics.describeLangWatchQLSchema(input),
+    validate: (input) => analytics.validateLangWatchQL(input),
+    execute: (input) => analytics.executeLangWatchQL(input),
+  };
 
   const protections = ApiAnalyticsProtections.create({
     authz: options.authz,
@@ -192,7 +198,6 @@ export function composeAnalyticsFeature(
   } as AnalyticsFeaturePorts;
 
   return {
-    routers: (mount) => analyticsRouters(mount, ports),
     analytics,
     dashboardPorts: {
       isWorkbenchEnabled: ({ projectId }) => workbenchEnabled(projectId),
@@ -248,7 +253,6 @@ export function refusingAnalyticsFeature(): ComposedAnalyticsFeature {
     ) as T;
 
   return {
-    routers: (mount) => analyticsRouters(mount, ports),
     analytics: refusingApplication<AnalyticsApp>(),
     dashboardPorts: {
       isWorkbenchEnabled: refuseAsync,

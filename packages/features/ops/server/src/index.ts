@@ -1,6 +1,7 @@
 export {
   OpsApp,
   OpsConfirmationRequiredError,
+  type OpsAppInfrastructure,
   OpsImpersonatedOperatorRefusedError,
   OpsOperatorSessionRequiredError,
   OpsUnknownFeatureFlagError,
@@ -13,23 +14,12 @@ export {
   type OpsProcessRef,
   type OpsReplayRunner,
 } from "./app/ops.app.ts";
-export {
-  BugReportTrpcApi,
-  BUG_REPORTS_NO_PERMISSION,
-  type BugReportTrpcContext,
-  type BugReportTrpcPorts,
-} from "./transport/api-trpc/bug-report.api.ts";
 export { BugReportRepositoryPort } from "./ports/bug-report.port.ts";
 export { PrismaBugReportRepository } from "./repositories/prisma/prisma.bug-report.repository.ts";
 export {
   BugReportInboxService,
   type BugReportListing,
 } from "./services/bug-report-inbox.service.ts";
-export {
-  OpsTrpcApi,
-  type OpsTrpcContext,
-  type OpsTrpcPorts,
-} from "./transport/api-trpc/ops.api.ts";
 export {
   PostgresOpsAdapter,
   type PostgresOpsAdapterOptions,

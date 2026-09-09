@@ -12,8 +12,8 @@ export {
   type PromptAppDependencies,
   type PromptCaller,
 } from "./app/prompt.app.ts";
-export { PromptTagTrpcApi } from "./transport/api-trpc/prompt-tag.api.ts";
-export { PromptTrpcApi } from "./transport/api-trpc/prompt.api.ts";
+// The two tRPC transports are not exported: they still name the deleted legacy
+// builder. Their context vocabulary below is framework-free and stays.
 export type {
   PromptTrpcContext,
   PromptTrpcPorts,

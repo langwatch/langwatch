@@ -2,10 +2,7 @@ export {
   PostgresWorkflowAdapter,
   type PostgresWorkflowAdapterOptions,
 } from "./adapters/postgres.workflow.adapter.ts";
-export {
-  PrismaWorkflowAgentMappingAdapter,
-  type WorkflowAgentMappingDatabase,
-} from "./adapters/prisma.workflow-agent-mapping.adapter.ts";
+export { WorkflowAgentMappingAdapter } from "./adapters/workflow-agent-mapping.adapter.ts";
 export {
   PrismaWorkflowProjectEnvironmentAdapter,
   UnavailableWorkflowEnvironmentDecryptor,
@@ -69,6 +66,7 @@ export {
   type WorkflowAppDependencies,
   type WorkflowCaller,
 } from "./app/workflow.app.ts";
+export { workflowServer } from "./workflow.server.ts";
 export {
   WorkflowAgentMappingPort,
   WorkflowDslMigrationPort,
@@ -105,24 +103,8 @@ export {
   type SaveStudioWorkflowVersionInput,
   type WorkflowStudioVersionServiceOptions,
 } from "./services/workflow-studio-version.service.ts";
-export {
-  WorkflowOptimizationTrpcApi,
-  type WorkflowOptimizationTrpcContext,
-  type WorkflowOptimizationTrpcPorts,
-} from "./transport/api-trpc/workflow-optimization.api.ts";
-export {
-  WorkflowTrpcApi,
-  type WorkflowCascadeArchiveResult,
-  type WorkflowCopiesRow,
-  type WorkflowCopyRow,
-  type WorkflowListRow,
-  type WorkflowProjectPath,
-  type WorkflowRowWithLatestVersion,
-  type WorkflowSourceRow,
-  type WorkflowTrpcContext,
-  type WorkflowTrpcPorts,
-  type WorkflowVersionRow,
-} from "./transport/api-trpc/workflow.api.ts";
+// The two tRPC transports are not exported: they still name the deleted legacy
+// builder.
 export {
   createWorkflowsRestApp,
   type WorkflowEvaluationOutcome,

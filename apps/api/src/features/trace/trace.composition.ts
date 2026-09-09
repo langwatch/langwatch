@@ -1,3 +1,4 @@
+import type { TraceSpanIngestPort } from "@langwatch/trace-server";
 import type { Protections } from "@langwatch/trace-contract";
 /**
  * A project's captured traffic, composed as its own feature.
@@ -13,26 +14,17 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
-import {
-  TraceApp,
-  type SharedTraceTrpcPorts,
-  type SpansTrpcPorts,
-  type TraceAppDependencies,
-  type TraceEditOverlayTrpcPorts,
-  type TracesTrpcPorts,
-} from "@langwatch/trace-server";
+import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
+import type { SharedTraceTrpcPorts } from "@langwatch/trace-server/api-trpc/shared-trace";
+import type { SpansTrpcPorts } from "@langwatch/trace-server/api-trpc/spans";
+import type { TraceEditOverlayTrpcPorts } from "@langwatch/trace-server/api-trpc/trace-edit-overlay";
+import type { TracesTrpcPorts } from "@langwatch/trace-server/api-trpc/traces";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import type { TrpcRequestLike } from "@langwatch/api/trpc";
 import { trpcClientAddress } from "../../app/api-client-address.ts";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import { ApiTraceReadStackPort } from "./trace-read-stack.port.ts";
+import type { ApiTraceProducerCommands } from "./trace-producer.composition.ts";
 import type { ApiTracePorts } from "./trace.composition.types.ts";
-import {
-  createSpansTrpcRouter,
-  createTraceEditOverlayTrpcRouter,
-  createTracesTrpcRouter,
-} from "./trace-trpc.mount.ts";
-import { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "./traces-v2-trpc.mount.ts";
 
 // ---------------------------------------------------------------------------
 // The four named absences
@@ -71,6 +63,9 @@ export type TraceFeatureOptions = Readonly<{
   rateLimit: SharedTraceTrpcPorts["rateLimit"];
   /** Names a refusal, so a stand-in says which process reached it. */
   processName: string;
+  /** The process's once-registered trace pipeline senders for annotation markers. */
+  traceCommands?: ApiTraceProducerCommands;
+  spanIngest?: TraceSpanIngestPort;
   /** The other features' services the trace application is built over. */
   peers: Readonly<{
     /** The one ledger an anonymous read redeems its token against. */
@@ -107,6 +102,9 @@ export function composeTraceFeature(options: TraceFeatureOptions): ComposedTrace
   if (!traceReads) options.report?.absent("trace-reads");
 
   const traces = TraceApp.create({
+    spanIngest: options.spanIngest,
+    ...(traceReads ? { viewer: traceReads.viewer() } : {}),
+    ...(options.traceCommands ? { annotationCommands: options.traceCommands } : {}),
     traces:
       traceReads?.readers() ?? refuseAll<TraceAppDependencies["traces"]>(refuse, "trace read"),
     topics: options.peers.topics,
@@ -197,8 +195,9 @@ export function composeTraceFeature(options: TraceFeatureOptions): ComposedTrace
     } satisfies SharedTraceTrpcPorts,
   };
 
+  // The five namespaces went with the transports that took them; the ports
+  // below stay, because the REST doors and the read stack share them.
   return {
-    routers: (mount) => mountTraceRouters(mount, ports),
     traces,
     ...(traceReads ? { traceReads } : {}),
     planProvider: planProvider ?? {
@@ -216,37 +215,11 @@ export function refusingTraceFeature(): ComposedTraceFeature {
   const ports = refuseAll<ApiTracePorts>(refuse, "the trace read stack");
 
   return {
-    routers: (mount) =>
-      mountTraceRouters(mount, {
-        traces: refuseAll(refuse, "the legacy trace grid"),
-        tracesV2: refuseAll(refuse, "the trace explorer"),
-        spans: refuseAll(refuse, "the trace read passes"),
-        traceEditOverlay: refuseAll(refuse, "the reviewer-correction redaction"),
-        sharedTrace: refuseAll(refuse, "the anonymous trace read"),
-      } as ApiTracePorts),
     traces: refuseAll<TraceApp>(refuse, "the trace application"),
     planProvider: {
       getActivePlan: () => Promise.reject(refuse("the organization's active plan")),
     },
     ports,
-  };
-}
-
-/**
- * The five namespaces, on the process's own root.
- * `sharedTrace` takes the PUBLIC procedure as well: ADR-057's one anonymous
- */
-function mountTraceRouters(mount: ApiTrpcFeatureMount, ports: ApiTracePorts) {
-  return {
-    traces: createTracesTrpcRouter({ ...mount, ports: ports.traces }),
-    tracesV2: createTracesV2TrpcRouter({ ...mount, ports: ports.tracesV2 }),
-    spans: createSpansTrpcRouter({ ...mount, ports: ports.spans }),
-    traceEditOverlay: createTraceEditOverlayTrpcRouter({ ...mount, ports: ports.traceEditOverlay }),
-    sharedTrace: createSharedTraceTrpcRouter({
-      ...mount,
-      publicProcedure: mount.publicProcedure,
-      ports: ports.sharedTrace,
-    }),
   };
 }
 

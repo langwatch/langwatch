@@ -1,11 +1,9 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { ProjectApp } from "@langwatch/project-server";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
-import type { createProjectTrpcRouter } from "./project-trpc.mount.ts";
+import type { ProjectApi } from "@langwatch/project-contract";
 
-/** The one namespace this feature mounts, and the `ctx.app.projects` slice. */
+/** The `ctx.app.projects` slice. The tRPC namespace is not here: its transport
+ * is unconverted. */
 export type ComposedProjectFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createProjectTrpcRouter>;
-  /** For `ctx.app.projects`, which several other namespaces read as well. */
-  app: ProjectApp;
+  /** The Project API boundary shared with other namespaces. */
+  app: ProjectApi;
 }>;

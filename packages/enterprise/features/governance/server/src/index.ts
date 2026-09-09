@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+export {
+  PostgresGovernanceAdapter,
+  type PostgresGovernanceServices,
+} from "./adapters/postgres.governance.adapter.ts";
+
 export { PostgresGovernanceDirectoryAdapter } from "./adapters/postgres.governance-directory.adapter.ts";
 export { PostgresOrganizationSupportContactAdapter } from "./adapters/postgres.organization-support-contact.adapter.ts";
 
@@ -8,6 +13,7 @@ export {
   type GovernanceDirectoryProject,
   type GovernanceMembershipStatus,
 } from "./ports/governance-directory.port.ts";
+export type { PersonalUsageRollup } from "./services/personal-usage-dashboard.service.ts";
 export { GovernanceService } from "@langwatch/enterprise-governance-contract";
 /**
  * The landing decision, re-exported beside the service it gathers signals from.
@@ -147,61 +153,9 @@ export {
 export { GovernanceOcsfSubscriber } from "./subscribers/governance-ocsf.subscriber.ts";
 export { TraceAlertTriggerMatchSubscriber } from "./subscribers/trace-alert-trigger-match.subscriber.ts";
 
-/**
- * The app-process tRPC transports this feature owns. The process supplies its
- * root, authenticated procedure and policy chain; the procedure names, input
- * schemas, access declarations and delegation are the feature's.
- */
-export {
-  PersonalVirtualKeyTrpcApi,
-  type PersonalVirtualKeyTrpcContext,
-} from "./transport/api-trpc/personal-virtual-key.api.ts";
-export {
-  RoutingPolicyTrpcApi,
-  type RoutingPolicyTrpcContext,
-} from "./transport/api-trpc/routing-policy.api.ts";
-export {
-  PersonalDashboardTrpcApi,
-  type PersonalDashboardTrpcContext,
-} from "./transport/api-trpc/personal-dashboard.api.ts";
-export {
-  PersonalSessionsTrpcApi,
-  type PersonalSessionsTrpcContext,
-} from "./transport/api-trpc/personal-sessions.api.ts";
-export {
-  SessionPolicyTrpcApi,
-  type SessionPolicyTrpcContext,
-} from "./transport/api-trpc/session-policy.api.ts";
-export {
-  IngestionKeyTrpcApi,
-  type IngestionKeyTrpcContext,
-} from "./transport/api-trpc/ingestion-key.api.ts";
-export {
-  DepartmentsTrpcApi,
-  type DepartmentsTrpcContext,
-} from "./transport/api-trpc/departments.api.ts";
-export {
-  IngestionTemplatesTrpcApi,
-  type IngestionTemplatesTrpcContext,
-} from "./transport/api-trpc/ingestion-templates.api.ts";
-export {
-  ActivityMonitorTrpcApi,
-  type ActivityMonitorTrpcContext,
-} from "./transport/api-trpc/activity-monitor.api.ts";
-export {
-  AnomalyRulesTrpcApi,
-  type AnomalyRulesTrpcContext,
-} from "./transport/api-trpc/anomaly-rules.api.ts";
-export {
-  GovernanceTrpcApi,
-  type GovernanceTrpcContext,
-} from "./transport/api-trpc/governance.api.ts";
-export {
-  IngestionSourcesTrpcApi,
-  toIngestionSourceDto,
-  type IngestionSourcesTrpcContext,
-} from "./transport/api-trpc/ingestion-sources.api.ts";
-export { AiToolsTrpcApi, type AiToolsTrpcContext } from "./transport/api-trpc/ai-tools.api.ts";
+// The thirteen tRPC transports this feature owns are not exported: they still
+// name the deleted legacy builder, so nothing may reach them until each is
+// converted to the declared `defineTrpcRouter` shape.
 
 /**
  * The public REST family this feature owns. The process supplies the bound REST security

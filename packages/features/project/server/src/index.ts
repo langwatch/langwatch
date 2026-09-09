@@ -15,13 +15,9 @@ export { RecentItemsService } from "./services/recent-items.service.ts";
 export type { GetRecentItemsParams, RecentItemType } from "./rules/recent-items.rules.ts";
 export { ProjectMetadataService } from "./services/project-metadata.service.ts";
 export { ProjectCredentialsAdapter } from "./adapters/project-credentials.adapter.ts";
-export {
-  ProjectApp,
-  type ProjectAppDependencies,
-  type ProjectCaller,
-  type TopicClusteringCommands,
-  type UpdateProjectSettings,
-} from "./app/project.app.ts";
+export { ProjectApp, type ProjectInfrastructure } from "./app/project.app.ts";
+export { ProjectOperationsService } from "./services/project-operations.service.ts";
+export { projectServer } from "./project.server.ts";
 export {
   ProjectCredentialsPort,
   ProjectDiagnosticsPort,
@@ -29,21 +25,8 @@ export {
   ProjectStoredObjectsPort,
 } from "./ports/project.port.ts";
 export { createProjectRestApp } from "./transport/api-rest/project.api.ts";
-export {
-  ProjectTrpcApi,
-  type ProjectFieldProtections,
-  type ProjectTrpcContext,
-} from "./transport/api-trpc/project.api.ts";
-export {
-  HomeTrpcApi,
-  type HomeTrpcContext,
-  type HomeTrpcPorts,
-} from "./transport/api-trpc/home.api.ts";
-export {
-  IntegrationsChecksTrpcApi,
-  type IntegrationsChecksTrpcContext,
-  type IntegrationsChecksTrpcPorts,
-} from "./transport/api-trpc/integrations-checks.api.ts";
+// The three tRPC transports are not exported: they still name the deleted
+// legacy builder.
 export {
   GovernanceInternalProjectPort,
   GovernanceInternalProjectService,

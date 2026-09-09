@@ -4,20 +4,21 @@
  * scimToken.*                        the directory-sync credentials
  */
 import type { LimitCheckResult, LimitType } from "@langwatch/enterprise-licensing-contract";
-import { LicensingApp, type LicensingCaller } from "@langwatch/enterprise-licensing-server";
+import {
+  LicensingApp,
+  type LicensingCaller,
+  type LicenseStoragePort,
+} from "@langwatch/enterprise-licensing-server";
 import {
   ENTERPRISE_FEATURE_ERRORS,
   assertEnterprisePlanType,
 } from "@langwatch/enterprise-plan-gate";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
+import { ResourceScope } from "@langwatch/runtime-composition";
 import type { SsoConnectionLedgerPort } from "@langwatch/enterprise-api";
 
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
-import {
-  createEnterpriseTrpcRouters,
-  type EnterpriseTrpcMountPorts,
-} from "./enterprise-trpc.mount.ts";
 
 /**
  * Whether one seat allowance still admits another member, over the process's OWN plan
@@ -74,16 +75,15 @@ export function composeEnterpriseFeature(options: {
   enterprise?: ApiEnterpriseApplicationPort | undefined;
   /** The seat allowances this deployment answers without an Enterprise application. */
   seats?: ApiSeatAllowancePort | undefined;
+  /** The process-owned licence store used for enforcement on an unlicensed deployment. */
+  licensingStore?: LicenseStoragePort | undefined;
+  /** Optional rotated public key for validating activated licences. */
+  licensePublicKey?: string | undefined;
 }): ComposedEnterpriseFeature {
   const logger = createLogger("langwatch:api:enterprise");
-  const application = enterpriseApplication(options.enterprise, options.seats, logger);
-  const ports = composeEnterpriseMountPorts();
+  const application = enterpriseApplication(options.enterprise, options, logger);
 
-  return {
-    application,
-    scim: application.scimApp,
-    routers: (mount) => createEnterpriseTrpcRouters({ ...mount, ports }),
-  };
+  return { application, scim: application.scimApp };
 }
 
 /**
@@ -98,52 +98,24 @@ export function refusingEnterpriseFeature(): ComposedEnterpriseFeature {
       scimApp: refuse("Enterprise SCIM application, so it can neither list nor mint a token"),
       usageLimits: refuse("Enterprise usage-limit store, so it cannot report a limit"),
     } as Pick<ApiTrpcFeatureApplication, "licensing" | "scimApp" | "usageLimits">,
-    routers: (mount) =>
-      createEnterpriseTrpcRouters({
-        ...mount,
-        ports: {
-          scimToken: {
-            requireEnterprisePlan: () =>
-              Promise.reject(
-                new ApiEnterpriseUnavailableError(
-                  "Enterprise plan gate, so it cannot mint a token",
-                ),
-              ),
-          },
-        } as EnterpriseTrpcMountPorts,
-      }),
   };
 }
 
-/**
- * The one Enterprise mount port: the plan gate a SCIM token is minted behind.
- *
- * Exported because the gate is the part worth pinning — the refusal a
- * deployment on a lesser plan reads is this one, and it is the SCIM
- * application's own plan provider rather than the process-wide one.
- */
-export function composeEnterpriseMountPorts(): EnterpriseTrpcMountPorts {
-  return {
-    scimToken: {
-      requireEnterprisePlan: async ({ planProvider, organizationId }) => {
-        const plan = await planProvider.getActivePlan({ organizationId });
-        assertEnterprisePlanType({
-          planType: plan.type,
-          errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
-        });
-      },
-    },
-  } as EnterpriseTrpcMountPorts;
-}
+// The SCIM-token plan gate went with the tRPC mount it was the port for; it
+// returns with the converted transport.
 
 /**
  * The three Enterprise `ctx.app` slices, or a refusal per capability.
  */
 function enterpriseApplication(
   enterprise: ApiEnterpriseApplicationPort | undefined,
-  seats: ApiSeatAllowancePort | undefined,
+  options: Pick<
+    Parameters<typeof composeEnterpriseFeature>[0],
+    "seats" | "licensingStore" | "licensePublicKey"
+  >,
   logger: Logger,
 ): Pick<ApiTrpcFeatureApplication, "licensing" | "scimApp" | "usageLimits"> {
+  const { seats } = options;
   const licensing = enterprise?.licensing;
   const scimApp = enterprise?.scimApp;
   const usageLimits = enterprise?.usageLimits;
@@ -172,7 +144,12 @@ function enterpriseApplication(
   return {
     licensing: (licensing ??
       (seats
-        ? unlicensedLicensing(seats, logger)
+        ? unlicensedLicensing({
+            seats,
+            logger,
+            repository: options.licensingStore,
+            publicKey: options.licensePublicKey,
+          })
         : refusingApplicationSlice(
             "Enterprise licence store, so it cannot read or write an instance licence",
           ))) as ApiTrpcFeatureApplication["licensing"],
@@ -212,29 +189,37 @@ function unreportableUsageLimits(): ApiTrpcFeatureApplication["usageLimits"] {
  * `/settings/members` asks `checkLimit` on every open, and refusing it left the page blank on a
  * deployment that has seat allowances whether or not it is licensed.
  */
-function unlicensedLicensing(seats: ApiSeatAllowancePort, logger: Logger): LicensingApp {
-  const refuse = (capability: string): never => {
-    throw new ApiEnterpriseUnavailableError(capability);
-  };
-
+function unlicensedLicensing(options: {
+  seats: ApiSeatAllowancePort;
+  logger: Logger;
+  repository: LicenseStoragePort | undefined;
+  publicKey: string | undefined;
+}): LicensingApp {
+  if (!options.repository) {
+    throw new ApiEnterpriseUnavailableError(
+      "Enterprise licence store, so it cannot enforce member seat allowances",
+    );
+  }
   return LicensingApp.create({
-    licenses: () =>
-      refuse("Enterprise licence store, so it cannot read or write an instance licence"),
-    cryptography: () => refuse("Enterprise licence signing key, so it cannot mint a licence"),
-    configuredAuthProvider: () =>
-      refuse("Enterprise single sign-on gate, so it cannot say why federation is off"),
-    platformSsoAllowed: () =>
-      Promise.reject(
-        new ApiEnterpriseUnavailableError(
-          "Enterprise licence store, so it cannot say whether single sign-on is licensed",
+    dependencies: {},
+    infrastructure: {
+      repository: options.repository,
+      configuredAuthProvider: () => null,
+      platformSsoAllowed: () =>
+        Promise.reject(
+          new ApiEnterpriseUnavailableError(
+            "Enterprise licence store, so it cannot say whether single sign-on is licensed",
+          ),
         ),
-      ),
-    authProviderIsMounted: () => false,
-    reportSigningFailure: () => {},
-    checkLimit: (input) => seats.checkLimit(input),
-    reportError: (error) => {
-      logger.error({ error }, "a licence-enforcement side effect failed");
+      authProviderIsMounted: () => false,
+      reportSigningFailure: () => {},
+      checkLimit: (input) => options.seats.checkLimit(input),
+      reportError: (error) => {
+        options.logger.error({ error }, "a licence-enforcement side effect failed");
+      },
     },
+    config: { publicKey: options.publicKey },
+    resources: new ResourceScope(),
   });
 }
 

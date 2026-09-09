@@ -16,11 +16,6 @@ import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import { composeApiAutomationApp } from "../../app/api-automation.composition.ts";
-import {
-  createAutomationTrpcRouter,
-  createEmailSuppressionTrpcRouter,
-  type AutomationMountPorts,
-} from "./automation-trpc.mount.ts";
 
 /** The other services and deployment facts a trigger is read and written over. */
 export type AutomationPeers = Readonly<{
@@ -107,14 +102,7 @@ export function composeAutomationFeature(options: {
     },
   };
 
-  return {
-    app,
-    service: app,
-    routers: (mount) => ({
-      automation: createAutomationTrpcRouter({ ...mount, ports: automation }),
-      emailSuppression: createEmailSuppressionTrpcRouter({ ...mount, ports: emailSuppression }),
-    }),
-  };
+  return { app, service: app };
 }
 
 /**
@@ -126,23 +114,7 @@ export function refusingAutomationFeature(): ComposedAutomationFeature {
   };
   const refuseEvery = <T>(): T => new Proxy({}, { get: () => refuse, has: () => true }) as T;
 
-  return {
-    app: refuseEvery<AutomationApp>(),
-    routers: (mount) => ({
-      automation: createAutomationTrpcRouter({
-        ...mount,
-        ports: {
-          rateLimit: () => refuse(),
-          listSlackChannels: () => refuse(),
-          providers: refuseEvery<AutomationMountPorts["providers"]>(),
-        } as AutomationMountPorts,
-      }),
-      emailSuppression: createEmailSuppressionTrpcRouter({
-        ...mount,
-        ports: refuseEvery<EmailSuppressionTrpcPorts>(),
-      }),
-    }),
-  };
+  return { app: refuseEvery<AutomationApp>() };
 }
 
 /** The deployment's stored-secret cipher, or a refusal that names the variable. */

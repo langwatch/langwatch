@@ -3,8 +3,8 @@
  */
 import { TupleParam } from "@clickhouse/client";
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { AgentService } from "@langwatch/agent-contract";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { DatasetExperimentLookup } from "@langwatch/dataset-server";
@@ -28,6 +28,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PromptService } from "@langwatch/prompt-contract";
 import { PostgresPromptAdapter } from "@langwatch/prompt-server";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { ResourceScope } from "@langwatch/runtime-composition";
 import { WorkflowVersionRequiredError } from "@langwatch/workflow-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { WorkflowApp } from "@langwatch/workflow-server";
@@ -43,7 +44,6 @@ import {
   type ApiExperimentRunAbsenceReport,
 } from "../../app/api-experiment-run.composition.ts";
 import { permissiveCoerceMonitorMappings } from "../trace/trace-mappings.ts";
-import { createExperimentTrpcRouter } from "./experiment-trpc.mount.ts";
 
 /**
  * The retention floor a DSPy run read is bounded by when a project names no policy of its
@@ -76,7 +76,7 @@ export type ExperimentPeers = Readonly<{
   /** The evaluators a run scores its cells with. */
   evaluators: EvaluatorService;
   /** The agents a wizard references and a run resolves. */
-  agents: AgentService;
+  agents: AgentApi;
   /** The gateway a run's dispatch and its price table read. */
   modelProviders: ModelProviderService;
   /** Reports a cell's result onto the evaluation pipeline. */
@@ -103,7 +103,7 @@ export function composeExperimentFeature(options: {
   /** The queue's Redis, where a run's abort flag and its progress both live. */
   redis?: RedisConnection | null;
   /** The credential a run lends the code it executes. */
-  apiKeys?: ApiKeyService;
+  apiKeys?: ApiKeyApi;
   /** The key this deployment seals stored secrets with; the shared sandbox token rides on it. */
   storedSecretEncryptionKey?: string;
   /** The live-update channel a workbench cell is broadcast on. */
@@ -169,11 +169,16 @@ export function composeExperimentFeature(options: {
   });
 
   const app = ExperimentApp.create({
-    experiments,
-    workflows: options.peers.workflows,
-    dataset: options.peers.datasets,
-    monitors: options.peers.monitors,
-    broadcast,
+    dependencies: {},
+    infrastructure: {
+      experiments,
+      workflows: options.peers.workflows,
+      dataset: options.peers.datasets,
+      monitors: options.peers.monitors,
+      broadcast,
+    },
+    config: undefined,
+    resources: new ResourceScope(),
   });
 
   // The run loop, over the SAME services the namespace answers from. A second
@@ -198,80 +203,10 @@ export function composeExperimentFeature(options: {
     ...(options.runReport ? { report: options.runReport } : {}),
   });
 
-  const workflowApp = options.peers.workflowApp;
+  // The tRPC ports this feature used to build went with the transport that
+  // took them; they return with the converted one.
 
-  const ports: ExperimentTrpcPorts<unknown> = {
-    workbenchStateSchema:
-      workbenchStateSchema as ExperimentTrpcPorts<unknown>["workbenchStateSchema"],
-    slugify: slugifyExperimentName,
-    saveWorkflowVersion: (ctx, input) => workflowApp.saveStudioVersion(input, { id: actorId(ctx) }),
-    /**
-     * A copy whose SOURCE has no version cannot be copied, and the studio renders that as
-     * "not found" rather than as a failure of the copy.
-     */
-    copyWorkflowWithDatasets: async (_ctx, input) => {
-      try {
-        return await workflowApp.copyStudioWorkflow(input);
-      } catch (error) {
-        if (error instanceof WorkflowVersionRequiredError) {
-          throw new NotFoundError(
-            "workflow_version_not_found",
-            "Workflow version",
-            input.workflow.id,
-          );
-        }
-        throw error;
-      }
-    },
-    coerceMonitorMappings: options.coerceMonitorMappings ?? permissiveCoerceMonitorMappings,
-    upsertExperimentMonitor: async (_ctx, { projectId, experimentId, monitor }) =>
-      await options.peers.monitors.upsertForExperiment({
-        projectId,
-        experimentId,
-        name: monitor.name,
-        checkType: monitor.checkType,
-        slug: monitor.slug,
-        preconditions: monitor.preconditions,
-        parameters: monitor.parameters,
-        mappings: monitor.mappings,
-        sample: monitor.sample,
-        enabled: monitor.enabled,
-        executionMode: monitor.executionMode,
-      } as Parameters<MonitorService["upsertForExperiment"]>[0]),
-
-    probeProjectPermission: (ctx: unknown, projectId: string, permission: AuthzPermission) =>
-      authz.hasPermission({ userId: actorId(ctx), permission, projectId }),
-
-    createWorkflow: async (_ctx, input) =>
-      await prisma.workflow.create({
-        data: {
-          id: `workflow_${nanoid()}`,
-          projectId: input.projectId,
-          name: input.name,
-          icon: input.icon ?? "",
-          description: input.description ?? "",
-        },
-      }),
-
-    tryFindWorkflow: async (_ctx, input) =>
-      await prisma.workflow.findFirst({
-        where: { id: input.workflowId, projectId: input.projectId },
-      }),
-
-    resolveAuthorNames: async (_ctx, authorIds) =>
-      await prisma.user.findMany({
-        where: { id: { in: [...authorIds] } },
-        select: { id: true, name: true },
-      }),
-  };
-
-  return {
-    app,
-    experiments,
-    experimentLookup: experiments,
-    run,
-    router: (mount) => createExperimentTrpcRouter({ ...mount, ports }),
-  };
+  return { app, experiments, experimentLookup: experiments, run };
 }
 
 /**
@@ -289,8 +224,6 @@ export function refusingExperimentFeature(): ComposedExperimentFeature {
     app: refuseEvery<ExperimentApp>(),
     experimentLookup: refuseEvery<DatasetExperimentLookup>(),
     run: refuseEvery<ApiExperimentRun>(),
-    router: (mount) =>
-      createExperimentTrpcRouter({ ...mount, ports: refuseEvery<ExperimentTrpcPorts<unknown>>() }),
   };
 }
 

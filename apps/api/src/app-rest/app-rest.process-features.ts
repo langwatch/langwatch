@@ -1,16 +1,14 @@
 /**
  * The REST families the API process mounts from its OWN graph. This is the ONE list.
  */
-import type { AnnotationApp } from "@langwatch/annotation-server";
-import { createAnnotationsRestApp } from "@langwatch/annotation-server";
-import { mountStoredObjectRest } from "../features/stored-object/stored-object-rest.mount.ts";
+import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type {
   AppRestManagementAuditPort,
   AppRestSecurity,
   MountableRestApp,
 } from "@langwatch/api/rest";
-import type { ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import {
@@ -86,7 +84,6 @@ import { mountQueryRest } from "../features/analytics/query-rest.mount.ts";
 import { mountOrganizationRest } from "../features/organization/organization-rest.mount.ts";
 import { mountPromptsRest } from "../features/prompt/prompt-rest.mount.ts";
 import type { ApiAuthoringRestComposition } from "../app/api-authoring-rest.composition.ts";
-import { mountDatasetGenerateRest } from "../features/dataset/dataset-generate-rest.mount.ts";
 import { mountPlaygroundRest } from "../features/model-provider/playground-rest.mount.ts";
 import { mountScenarioGenerateRest } from "../features/scenario/scenario-generate-rest.mount.ts";
 import { mountWorkflowStudioRest } from "../features/workflow/workflow-studio-rest.mount.ts";
@@ -102,6 +99,8 @@ import {
   mountWorkflowRunRest,
   type ApiWorkflowRunRestCollaborators,
 } from "../features/workflow/workflow-run-rest.mount.ts";
+import { mountAnnotationRest } from "../features/annotation/annotation-rest.mount.ts";
+import { mountStoredObjectRest } from "../features/stored-object/stored-object-rest.mount.ts";
 import { createApiDiscoveryRestApp } from "../features/discovery/api-discovery-rest.ts";
 import { createGatewayOpenApiRestApp } from "../features/discovery/gateway-openapi-rest.ts";
 import { createRootDiscoveryRestApp } from "../features/discovery/root-discovery-rest.ts";
@@ -113,10 +112,10 @@ import type { RumRateLimiter } from "../features/rum/rum-ingest.service.ts";
 import { createRumRestApp } from "../features/rum/rum-rest.ts";
 import {
   createOtlpIngestRestApp,
-  createOtlpPathAliasRestApp,
-  type CollectorRestPorts,
   type OtlpIngestRestPorts,
-} from "@langwatch/trace-server";
+} from "@langwatch/trace-server/api-rest/otlp-ingest";
+import { createOtlpPathAliasRestApp } from "@langwatch/trace-server/api-rest/otlp-path-alias";
+import type { CollectorRestPorts } from "@langwatch/trace-server/api-rest/collector";
 import {
   mountEvaluationsLegacyRest,
   type ApiEvaluationBatchRestCollaborators,
@@ -159,7 +158,7 @@ export type ApiHandlerManagedCredentialPort = (input: {
   | Readonly<{
       ok: true;
       project: Readonly<{ id: string }>;
-      resolved: ResolvedApiKeyToken;
+      resolved: ResolvedApiKeyCredential;
       markUsed: () => void;
     }>
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>
@@ -172,7 +171,7 @@ export type ApiHandlerManagedCredentialPort = (input: {
  */
 export type ApiProcessRestServices = Readonly<{
   /** The reviewer's comments `/api/annotations` reads and writes. */
-  annotations?: (() => AnnotationApp) | undefined;
+  annotations?: (() => AnnotationApi) | undefined;
   /** The charted reads `/api/analytics/timeseries` answers from. */
   analytics?: (() => AnalyticsApp) | undefined;
   /**
@@ -504,15 +503,12 @@ export function createApiProcessRestFeatures(options: {
     features.push(mountScenarioRunExportRest({ security, ...scenarioRunExport }));
   }
 
-  // The four AUTHORING doors. Each owns a literal path inside a namespace nothing above
+  // The AUTHORING doors. Each owns a literal path inside a namespace nothing above
   // claims, and each is registered ahead of any parameterised sibling that could swallow
-  // it: `/api/dataset/generate` before a dataset family's `/:slugOrId`, and
-  // `/api/workflows/{code-completion,post_event}` before a workflow family's
-  // `/:workflowId/run`.
+  // it: `/api/workflows/{code-completion,post_event}` before a workflow family's
+  // `/:workflowId/run`. `/api/dataset/generate` is not among them: its transport is
+  // unconverted, and the authoring composition reports the absence.
   const authoring = services.authoring;
-  if (authoring?.datasetGenerate) {
-    features.push(mountDatasetGenerateRest({ security, ...authoring.datasetGenerate }));
-  }
   if (authoring?.workflowStudio) {
     features.push(mountWorkflowStudioRest({ security, collaborators: authoring.workflowStudio }));
   }
@@ -551,13 +547,7 @@ export function createApiProcessRestFeatures(options: {
 
   const annotations = services.annotations;
   if (annotations) {
-    features.push(
-      createAnnotationsRestApp({
-        security,
-        annotations,
-        credential: ports.handlerManagedCredential,
-      }),
-    );
+    features.push(mountAnnotationRest({ annotations, credential: ports.handlerManagedCredential }));
   }
 
   // `/api/stored-objects/2026-08-22/*`: the upload confirmation, the read and

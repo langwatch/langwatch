@@ -60,19 +60,16 @@ export {
 } from "./ports/coding-agent-caller-scope.port.ts";
 export {
   CodingAgentApp,
-  type CodingAgentAppDependencies,
   type CodingAgentCaller,
   type CodingAgentCallerScope,
   type CodingAgentPullRequestRef,
   type CodingAgentScopePorts,
 } from "./app/coding-agent.app.ts";
-export {
-  CodingAgentTrpcApi,
-  type CodingAgentTrpcContext,
-  type CodingAgentTrpcPorts,
-  type CodingAgentTrpcRequest,
-  type CodingAgentViewerVisibility,
-} from "./transport/api-trpc/coding-agent.api.ts";
+// Neither the installed feature nor its two transports is exported: the tRPC
+// one still names the deleted legacy builder, and the declaration file itself
+// names `createRestRouter` and `createTrpcRouter`, which `@langwatch/api` does
+// not publish yet. Nothing outside this package imports them, so the export
+// returns with the framework.
 export {
   createCodingAgentRestApp,
   type CodingAgentRestAuditPort,

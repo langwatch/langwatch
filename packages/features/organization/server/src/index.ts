@@ -93,37 +93,8 @@ export {
   type OrganizationRestPorts,
   type OrganizationRestService,
 } from "./transport/api-rest/organization.api.ts";
-export {
-  TeamTrpcApi,
-  type TeamTrpcContext,
-  type TeamTrpcPorts,
-} from "./transport/api-trpc/team.api.ts";
-export {
-  GroupTrpcApi,
-  type GroupTrpcContext,
-  type GroupTrpcPorts,
-} from "./transport/api-trpc/group.api.ts";
-export {
-  JoinRequestTrpcApi,
-  type JoinRequestTrpcContext,
-  type JoinRequestTrpcPorts,
-} from "./transport/api-trpc/join-request.api.ts";
-export {
-  OnboardingTrpcApi,
-  onboardingIntegrationMethodSchema,
-  type OnboardingIntegrationMethod,
-  type OnboardingTrpcContext,
-  type OnboardingTrpcPorts,
-} from "./transport/api-trpc/onboarding.api.ts";
-export {
-  OrganizationTrpcApi,
-  type OrganizationTrpcContext,
-  type OrganizationTrpcPorts,
-} from "./transport/api-trpc/organization.api.ts";
-export {
-  PersonalWorkspaceFeaturesTrpcApi,
-  type PersonalWorkspaceFeaturesTrpcContext,
-} from "./transport/api-trpc/personal-workspace-features.api.ts";
+// The six tRPC transports are not exported: they still name the deleted legacy
+// builder.
 export { createGroupRestApp } from "./transport/api-rest/group.api.ts";
 export {
   createOrganizationsRestApp,

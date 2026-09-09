@@ -10,8 +10,8 @@ export {
   type AuthRequestContext,
   type AuthSession,
 } from "./app/auth.app.ts";
-export { FrontDoorTrpcApi, type FrontDoorTrpcContext } from "./transport/api-trpc/front-door.api.ts";
-export { PublicEnvTrpcApi, type PublicEnvTrpcContext } from "./transport/api-trpc/public-env.api.ts";
+// Neither tRPC transport this feature owns is exported: the front door and the
+// public-environment reader both still name deleted legacy builders.
 export {
   SIGN_UP_VERIFICATION_TTL_MS,
   SignUpVerificationService,

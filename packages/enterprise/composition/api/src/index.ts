@@ -2,20 +2,10 @@ import { EnterpriseCatalogue } from "@langwatch/enterprise";
 import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
 import type { ScimService } from "@langwatch/enterprise-scim-contract";
 
-export {
-  EnterpriseGatewayTrpcComposition,
-  type EnterpriseGatewayTrpcContext,
-} from "./trpc/enterprise-gateway-trpc.composition.ts";
-export {
-  EnterpriseGovernanceTrpcComposition,
-  type EnterpriseGovernanceTrpcContext,
-} from "./trpc/enterprise-governance-trpc.composition.ts";
-export {
-  CURRENCY_NO_PERMISSION,
-  EnterpriseTrpcComposition,
-  INSTANCE_LICENSE_NO_PERMISSION,
-  type EnterpriseTrpcContext,
-} from "./trpc/enterprise-trpc.composition.ts";
+// The three tRPC compositions are not exported: each assembles feature tRPC
+// transports that still name the deleted legacy builder. Their only consumers
+// were the API process's own tRPC mounts, which are unmounted for the same
+// reason.
 export {
   AppGatewayDebitAdapter,
   AppGatewayGovernancePort,

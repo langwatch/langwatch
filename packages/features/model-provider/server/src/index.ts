@@ -104,21 +104,8 @@ export {
 } from "./app/model-provider.app.ts";
 export { createModelProvidersRestApp } from "./transport/api-rest/model-provider.api.ts";
 export { createModelDefaultsRestApp } from "./transport/api-rest/model-defaults.api.ts";
-export {
-  ModelProviderTrpcApi,
-  type ModelProviderTrpcContext,
-  type ModelProviderTrpcPorts,
-} from "./transport/api-trpc/model-provider.api.ts";
-export {
-  LlmModelCostTrpcApi,
-  type LlmModelCostTrpcContext,
-  type LlmModelCostTrpcPorts,
-} from "./transport/api-trpc/llm-model-cost.api.ts";
-export {
-  TranslateTrpcApi,
-  type TranslateTrpcContext,
-  type TranslateTrpcPorts,
-} from "./transport/api-trpc/translate.api.ts";
+// The three tRPC transports are not exported: they still name the deleted
+// legacy builder.
 export {
   createPlaygroundRestApp,
   type PlaygroundRestPorts,

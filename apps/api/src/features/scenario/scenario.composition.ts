@@ -3,15 +3,17 @@
  * agent's test cases are written, watched and driven through.
  */
 import { MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
-import { PostgresPromptAdapter } from "@langwatch/prompt-server";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { PostgresPromptAdapter, PromptApp } from "@langwatch/prompt-server";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { LocalFeatureApis, type ResourceScope } from "@langwatch/runtime-composition";
+import { ScenarioApi } from "@langwatch/scenario-contract";
 import {
   AgentTestService,
   PrismaScenarioAdapter,
@@ -38,40 +40,33 @@ import {
   type ResultAtomsService,
   type RunConfigurationsService,
   type ScenarioExecutionPrefetchConfig,
-  type ScenarioTrpcPorts,
   type SimulationReadClient,
   type SimulationWindowedReadInput,
 } from "@langwatch/scenario-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
-import type { SecretService } from "@langwatch/secret-contract";
-import type { TraceService } from "@langwatch/trace-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
-import type { SuiteService } from "@langwatch/suite-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
 import type { ConnectedPresenceReader, SuiteClickHouseClient } from "@langwatch/suite-server";
 import {
-  PostgresSuiteAdapter,
-  SuiteApp,
   SuiteExecutionService,
   SuiteRunIdPort,
   SuiteRunModelsService,
 } from "@langwatch/suite-server";
+
+import { installApiSuite, type SuiteRestPorts } from "../suite/suite.composition.ts";
 import type {
   ScenarioService,
   ScenarioTabRegistry,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import type { ApiAgentPipelines } from "../../app/api-agent-pipelines.composition.ts";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
-import { createSetupSkillsTrpcRouter } from "../langy/setup-skills-trpc.mount.ts";
-import { createSuiteTrpcRouter } from "../suite/suite-trpc.mount.ts";
-import { createScenarioTrpcRouter } from "./scenario-trpc.mount.ts";
-import { ApiAgentTestConnectedDispatchAdapter } from "../agent/agent-test-connected-dispatch.adapter.ts";
-import { ApiAgentTestOwnershipAdapter } from "../agent/agent-test-ownership.adapter.ts";
 import { nowInstant, toDate } from "@langwatch/time";
 
 /**
@@ -131,24 +126,21 @@ export type ApiScenarioExecutionCollaborators = Readonly<{
   /** The ONE model gateway the adapter, simulator and judge roles resolve on. */
   modelProviders: ModelProviderService;
   /** The project secret store a run's secret parameters are read from. */
-  secrets: SecretService;
+  secrets: SecretApi;
   /** The canonical trace reads an HTTP target's ingest wait is measured on. */
-  traces: TraceService;
-  /**
-   * Where the child reports its own scenario events, where the NLP engine answers, and the model a target that
-   * names none falls back to. All three are the deployment's rather than the feature's, and all three are read by
-   * `api.config.ts`, which is this process's only environment reader.
-   */
+  traces: TraceApi;
+  /** Deployment endpoints and fallback model, parsed once by API config. */
   config: ScenarioExecutionPrefetchConfig;
 }>;
 
 export type ScenarioFeatureCollaborators = Readonly<{
   /** The one guarded connection every row read below runs on. */
   prisma: PrismaClient;
+  resources: ResourceScope;
   /** The permission service this process authorizes every other surface with. */
   authz: AuthzService;
   /** The agent directory a suite's cases are run against. */
-  agents: AgentService;
+  agents: AgentApi;
   /**
    * Which connected agents have a process attached. A target that names a
    * connected agent without an environment is settled by presence, so a
@@ -162,9 +154,9 @@ export type ScenarioFeatureCollaborators = Readonly<{
    */
   scenarioExecution: ApiScenarioExecutionCollaborators;
   /** The user directory, as the browser-session boundary already composed it. */
-  users: UserService;
+  users: UserApi;
   /** The project directory the tenancy graph composed. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /**
    * The broadcast fabric presence already publishes on.
    */
@@ -181,24 +173,27 @@ export type ScenarioFeatureCollaborators = Readonly<{
   redis: RedisConnection | null;
   /** The number the event store already stamps its own rows with. */
   defaultRetentionDays: number;
-  /**
-   * The agent-side command senders this process registered producer-only, so a scenario run and a suite run reach
-   * the worker that drains them. Registered by the root rather than here: the Langy feature dispatches on the same
-   * runtime and is no longer composed beside this half.
-   */
+  /** Root-owned command senders shared by Scenario, Suite and Langy. */
   pipelines: ApiAgentPipelines;
   /** Names this process in every refusal below. */
   processName: string;
+  /** What the three suite REST families answer through. */
+  suiteRest: SuiteRestPorts;
   report?: ApiScenarioAbsenceReport;
 }>;
 
 import type { ComposedScenarioFeature } from "./scenario.composition.types.ts";
 
 /** Composes the scenario feature over this process's own graph. */
-export function composeScenarioFeature(
+export async function composeScenarioFeature(
   options: ScenarioFeatureCollaborators,
-): ComposedScenarioFeature {
+): Promise<ComposedScenarioFeature> {
   const logger = createLogger(`${options.processName}:scenario`);
+
+  const clients = new LocalFeatureApis();
+  clients.declare(ScenarioApi);
+  const scenarioApi = clients.reference(ScenarioApi);
+  options.resources.own("api scenario peer", () => clients.close());
 
   const pipelines = options.pipelines;
   if (!options.redis) options.report?.absent("live-buffer");
@@ -227,42 +222,54 @@ export function composeScenarioFeature(
   // prompt target read the same rows.
   const prompts = PostgresPromptAdapter.create({ database: options.prisma }).build();
 
-  const suites = PostgresSuiteAdapter.create({
-    database: options.prisma,
-    agents: options.agents,
-    ...(options.connectedPresence ? { connectedPresence: options.connectedPresence } : {}),
-    prompts,
-    scenarios,
-    resolveClickHouseClient: options.resolveClickHouseClient,
-    defaultRetentionDays: options.defaultRetentionDays,
-    execution: SuiteExecutionService.create({
-      commands: pipelines.suiteRuns,
-      ids: new KsuidSuiteRunId(),
-      scenarios,
-      resolveRunModels: SuiteRunModelsService.create({
-        scenarios,
-        modelProviders: options.scenarioExecution.modelProviders,
-      }).resolve,
-    }),
-    generateId: () => `suite_${nanoid()}`,
+  const promptApp = PromptApp.create({ prompts, projects: options.projects });
+  const suite = await installApiSuite({
+    prisma: options.prisma,
+    peers: {
+      scenarios: scenarioApi,
+      agents: options.agents,
+      prompts: promptApp,
+      projects: options.projects,
+    },
+    infrastructure: {
+      ...(options.connectedPresence ? { connectedPresence: options.connectedPresence } : {}),
+      resolveClickHouseClient: options.resolveClickHouseClient,
+      defaultRetentionDays: options.defaultRetentionDays,
+      execution: SuiteExecutionService.create({
+        commands: pipelines.suiteRuns,
+        ids: new KsuidSuiteRunId(),
+        scenarios: scenarioApi,
+        resolveRunModels: SuiteRunModelsService.create({
+          scenarios: scenarioApi,
+          modelProviders: options.scenarioExecution.modelProviders,
+        }).resolve,
+      }),
+      generateId: () => `suite_${nanoid()}`,
+    },
+    rest: options.suiteRest,
   });
-  // ONE suite service behind both applications and the prefetcher: a run's
-  // suite overrides and the suite the page lists are the same rows.
-  const suiteService = suites.build();
-
-  const suiteApp = SuiteApp.create({
-    suites: suiteService,
-    scenarios,
-    projects: options.projects,
-    simulations,
-  });
+  const suiteApp = suite.app;
 
   const scenarioApp = ScenarioApp.create({
+    agentTesting: AgentTestService.create({
+      agents: options.agents,
+      projects: options.projects,
+      workflows: options.scenarioExecution.workflows,
+      prompts,
+      secrets: options.scenarioExecution.secrets,
+      modelProviders: options.scenarioExecution.modelProviders,
+      simulations,
+      config: options.scenarioExecution.config,
+      agentAdapters: SerializedAgentRegistryAdapter.create({
+        nlpTimeouts: NlpFetchAdapter.timeoutsFromEnvironment(process.env),
+      }),
+      maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
+    }),
     scenarios,
     simulations,
     scenarioExecution: composeScenarioExecution(options, {
       scenarios,
-      suites: suiteService,
+      suites: suiteApp,
       prompts,
       simulations,
     }),
@@ -273,51 +280,16 @@ export function composeScenarioFeature(
     runConfigurations: composeRunConfigurations(options),
   });
 
-  // "Test agent": the same target prefetch and adapter registry a real run
-  // uses, over this process's own graph. Composed here rather than beside
-  // `ScenarioApp` because it is `agents.testTurn`/`agents.testRun` that call
-  // it — the Agent package's own tRPC surface, over a port it declares and
-  // this root implements (`ApiAgentTestAdapter`).
-  const agentTestService = AgentTestService.create({
-    agents: options.agents,
-    projects: options.projects,
-    workflows: options.scenarioExecution.workflows,
-    prompts,
-    secrets: options.scenarioExecution.secrets,
-    modelProviders: options.scenarioExecution.modelProviders,
-    simulations,
-    config: options.scenarioExecution.config,
-    ownership: ApiAgentTestOwnershipAdapter.create(),
-    connectedDispatch: ApiAgentTestConnectedDispatchAdapter.create(),
-    agentAdapters: SerializedAgentRegistryAdapter.create({
-      nlpTimeouts: NlpFetchAdapter.timeoutsFromEnvironment(process.env),
-    }),
-    maxCallTimeoutMs: MAX_CALL_TIMEOUT_MS,
-  });
+  clients.bind(ScenarioApi, scenarioApp);
+  clients.ready();
 
   return {
     scenarios: scenarioApp,
     scenarioService: scenarios,
     scenarioTabs,
     simulations,
-    agentTestService,
     suites: suiteApp,
-    routers: (mount) => scenarioRouters(mount, composeScenarioPorts(logger)),
-  };
-}
-
-/**
- * The three namespaces, built the one way whether the feature composed or not.
- */
-function scenarioRouters(mount: ApiTrpcFeatureMount, ports: ScenarioTrpcPorts) {
-  return {
-    scenarios: createScenarioTrpcRouter({ ...mount, ports }),
-    // Takes no ports: the catalogue is a compiled artifact the Langy package
-    // holds, so there is nothing for a deployment to answer.
-    setupSkills: createSetupSkillsTrpcRouter(mount),
-    // Takes no ports either — a suite, its folders and its runs are all read
-    // through `ctx.app.suites`.
-    suites: createSuiteTrpcRouter(mount),
+    suiteRest: suite.rest,
   };
 }
 
@@ -337,18 +309,12 @@ export function refusingScenarioFeature(): ComposedScenarioFeature {
     ) as T;
 
   return {
-    routers: (mount) =>
-      scenarioRouters(mount, {
-        trackScenarioCreated: () => undefined,
-        fireScenarioCreatedNurturing: () => undefined,
-        captureException: () => undefined,
-      }),
     scenarios: refuse<ScenarioApp>("The scenario surface"),
     scenarioService: refuse<ScenarioService>("The scenario store"),
     scenarioTabs: refuse<ScenarioTabRegistry>("The scenario tab registry"),
     simulations: refuse<SimulationService>("The simulation run store"),
-    agentTestService: refuse<AgentTestService>("Running a test agent"),
-    suites: refuse<SuiteApp>("The suite surface"),
+    suites: refuse<SuiteApi>("The suite surface"),
+    suiteRest: [],
   };
 }
 
@@ -470,11 +436,7 @@ class UnavailableApiScenarioSecretCipher extends ScenarioSecretCipherPort {
   }
 }
 
-/**
- * Raised rather than answered with a blank, because a blank is worse: an agent run handed an empty credential
- * fails against the provider with a message about the provider, and the person reading it has no way back to the
- * missing deployment key.
- */
+/** Refuses decryption without the deployment key before a provider receives invalid credentials. */
 class ScenarioSecretsUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
 
@@ -516,7 +478,7 @@ function composeScenarioExecution(
   options: ScenarioFeatureCollaborators,
   composed: {
     scenarios: ScenarioService;
-    suites: SuiteService;
+    suites: SuiteApi;
     prompts: PromptService;
     simulations: SimulationService;
   },
@@ -551,25 +513,3 @@ function composeScenarioExecution(
   });
 }
 
-/**
- * The two fire-and-forget signals a newly written test case fires.
- */
-function composeScenarioPorts(logger: Logger): ScenarioTrpcPorts {
-  return {
-    trackScenarioCreated: ({ userId, projectId }) => {
-      logger.info(
-        { userId, projectId },
-        "scenario created: this process composes no product-analytics sink, so the event was not recorded",
-      );
-    },
-    fireScenarioCreatedNurturing: ({ userId, projectId, scenarioId }) => {
-      logger.info(
-        { userId, projectId, scenarioId },
-        "scenario created: this process composes no nurturing sink, so no lifecycle mail was queued",
-      );
-    },
-    captureException: (error) => {
-      logger.error({ error }, "a scenario side effect failed");
-    },
-  };
-}

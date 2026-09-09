@@ -23,6 +23,10 @@
     "./composition/dataset-content": {
       "types": "./dist/repositories/prisma/prisma.dataset-content.repository.d.ts",
       "default": "./src/repositories/prisma/prisma.dataset-content.repository.ts"
+    },
+    "./composition/dataset-migration": {
+      "types": "./dist/repositories/prisma/prisma.dataset-migration.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.dataset-migration.repository.ts"
     }
   },
   "scripts": {

@@ -1,13 +1,11 @@
-import { type ApiKeyService, type ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import { type ApiKeyApi, type ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { AuthenticatedActorRequiredError } from "@langwatch/api";
-import {
-  createAppRestSecurity,
-  type ApiErrorEnvelope,
-  type AppRestSecurity,
-  type AppRestSecurityPorts,
-  type IdempotentRunner,
-  type RequestActor,
+import type {
+  ApiErrorEnvelope,
+  AppRestSecurityPorts,
+  IdempotentRunner,
+  RequestActor,
 } from "@langwatch/api/rest";
 import { HandledError, remediation } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -183,10 +181,14 @@ export interface ApiRestSecurityObservability {
  */
 export class ApiRestSecurity {
   /**
-   * Bind the framework's REST service builder to this process's services.
+   * The enforcement ports this process fills, as the framework's own contract
+   * names them. The builder that used to wrap them into a service object is
+   * gone with the legacy transport, so what a family is handed now is the port
+   * record itself; a family that still asks the object to BUILD it is
+   * unconverted and does not mount.
    */
   static create(options: {
-    apiKeys: ApiKeyService;
+    apiKeys: ApiKeyApi;
     authz: AuthzService;
     organizations: OrganizationService;
     observability: ApiRestSecurityObservability;
@@ -201,7 +203,7 @@ export class ApiRestSecurity {
      * family may leave it out.
      */
     idempotency?: IdempotentRunner;
-  }): AppRestSecurity {
+  }): AppRestSecurityPorts {
     const security = new ApiRestSecurity(
       options.apiKeys,
       options.authz,
@@ -209,17 +211,17 @@ export class ApiRestSecurity {
       options.audit,
       options.logger ?? createLogger("langwatch:api:rest-security"),
     );
-    return createAppRestSecurity({
+    return {
       ...security.ports(options.observability),
       ...(options.idempotency ? { idempotency: options.idempotency } : {}),
-    });
+    };
   }
 
   /**
    * The same enforcement, exposed as the four callables `createRestService` takes.
    */
   static projectPolicy(options: {
-    apiKeys: ApiKeyService;
+    apiKeys: ApiKeyApi;
     authz: AuthzService;
     organizations: OrganizationService;
     audit?: ApiAuditPort;
@@ -237,7 +239,7 @@ export class ApiRestSecurity {
   }
 
   private constructor(
-    private readonly apiKeys: ApiKeyService,
+    private readonly apiKeys: ApiKeyApi,
     private readonly authz: AuthzService,
     private readonly organizations: OrganizationService,
     private readonly audit: ApiAuditPort | undefined,
@@ -284,7 +286,7 @@ export class ApiRestSecurity {
         return this.refuse(context, new ApiRestMissingCredentialsError(), envelope);
       }
 
-      const resolved = await this.apiKeys.tryResolveToken(credentials);
+      const resolved = await this.apiKeys.findResolvedToken(credentials);
       if (!resolved) {
         return this.refuse(context, new ApiRestInvalidCredentialsError(), envelope);
       }
@@ -305,7 +307,7 @@ export class ApiRestSecurity {
    */
   projectAuthorization(permission: AuthzPermission, envelope: Envelope): MiddlewareHandler {
     return async (context, next) => {
-      const resolved = context.get("resolvedToken") as ResolvedApiKeyToken | undefined;
+      const resolved = context.get("resolvedToken") as ResolvedApiKeyCredential | undefined;
       if (!resolved) {
         // A permission gate running with nobody authenticated is a mis-wired
         // route: refuse rather than wave the request through. Plain Error
@@ -502,7 +504,7 @@ export class ApiRestSecurity {
    */
   private async completeProjectRequest(
     context: Context,
-    resolved: ResolvedApiKeyToken,
+    resolved: ResolvedApiKeyCredential,
   ): Promise<void> {
     if (resolved.type !== "apiKey") {
       return;
@@ -612,7 +614,7 @@ export class ApiRestProjectPolicy {
 /** The refusal mode a chain answers in; `throw` is the versioned-family mode. */
 type Envelope = ApiErrorEnvelope | "throw";
 
-function installProjectVariables(context: Context, resolved: ResolvedApiKeyToken): void {
+function installProjectVariables(context: Context, resolved: ResolvedApiKeyCredential): void {
   context.set("project", resolved.project);
   context.set("resolvedToken", resolved);
   if (resolved.type === "apiKey") {

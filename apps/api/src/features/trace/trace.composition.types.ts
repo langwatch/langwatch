@@ -5,35 +5,17 @@ import type {
   TraceLegacyFilterInput,
   TraceLegacyListInput,
 } from "@langwatch/trace-contract";
-import type {
-  SharedTraceTrpcPorts,
-  SpansTrpcPorts,
-  TraceEditOverlayTrpcPorts,
-  TracesTrpcPorts,
-  TracesV2TrpcPorts,
-} from "@langwatch/trace-server";
+import type { SharedTraceTrpcPorts } from "@langwatch/trace-server/api-trpc/shared-trace";
+import type { SpansTrpcPorts } from "@langwatch/trace-server/api-trpc/spans";
+import type { TraceEditOverlayTrpcPorts } from "@langwatch/trace-server/api-trpc/trace-edit-overlay";
+import type { TracesTrpcPorts } from "@langwatch/trace-server/api-trpc/traces";
+import type { TracesV2TrpcPorts } from "@langwatch/trace-server/api-trpc/traces-v2";
 import type { TraceApp } from "@langwatch/trace-server";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { ApiTraceReadStackPort } from "./trace-read-stack.port.ts";
-import type {
-  createSpansTrpcRouter,
-  createTraceEditOverlayTrpcRouter,
-  createTracesTrpcRouter,
-} from "./trace-trpc.mount.ts";
-import type { createSharedTraceTrpcRouter, createTracesV2TrpcRouter } from "./traces-v2-trpc.mount.ts";
 
-/** The application slices and the group's ports, composed together. */
+/** The application slices and the group's ports, composed together. The five
+ * tRPC namespaces are not here: their transports are unconverted. */
 export type ComposedTraceFeature = Readonly<{
-  /**
-   * The five namespaces, built on the process's own root.
-   */
-  routers(mount: ApiTrpcFeatureMount): {
-    traces: ReturnType<typeof createTracesTrpcRouter>;
-    tracesV2: ReturnType<typeof createTracesV2TrpcRouter>;
-    spans: ReturnType<typeof createSpansTrpcRouter>;
-    traceEditOverlay: ReturnType<typeof createTraceEditOverlayTrpcRouter>;
-    sharedTrace: ReturnType<typeof createSharedTraceTrpcRouter>;
-  };
   /** For `ctx.app.traces` — the one application all five trace doors read. */
   traces: TraceApp;
   /**

@@ -1,17 +1,9 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { AutomationApp } from "@langwatch/automation-server";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
-import type {
-  createAutomationTrpcRouter,
-  createEmailSuppressionTrpcRouter,
-} from "./automation-trpc.mount.ts";
 
-/** The two namespaces this feature mounts, and its `ctx.app` application. */
+/** This feature's `ctx.app` application. Its two tRPC namespaces are not here:
+ * their transport is unconverted. */
 export type ComposedAutomationFeature = Readonly<{
-  routers(mount: ApiTrpcFeatureMount): {
-    automation: ReturnType<typeof createAutomationTrpcRouter>;
-    emailSuppression: ReturnType<typeof createEmailSuppressionTrpcRouter>;
-  };
   /** For `ctx.app.automation`. */
   app: AutomationApp;
   /**

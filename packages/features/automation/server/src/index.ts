@@ -191,16 +191,8 @@ export {
   type UnsubscribeTokenPayload,
 } from "./ports/unsubscribe-token.port.ts";
 export { ScheduledJobStorePort, type ScheduledJobRecord } from "./ports/scheduled-jobs.port.ts";
-export {
-  AutomationTrpcApi,
-  type AutomationTrpcContext,
-  type AutomationTrpcPorts,
-} from "./transport/api-trpc/automation.api.ts";
-export {
-  EmailSuppressionTrpcApi,
-  type EmailSuppressionTrpcContext,
-  type EmailSuppressionTrpcPorts,
-} from "./transport/api-trpc/email-suppression.api.ts";
+// The two tRPC transports are not exported: they still name the deleted legacy
+// builder.
 export { buildRetryAfterMessage } from "./rules/retry-after-message.rules.ts";
 
 /**

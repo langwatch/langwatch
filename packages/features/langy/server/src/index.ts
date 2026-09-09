@@ -6,6 +6,8 @@ export {
   LangyTrustedMessagePort,
   type PostgresLangyAdapterOptions,
 } from "./adapters/langy.langy.adapter.ts";
+export type { LangyInfrastructure } from "./app/langy.app.ts";
+export { langyServer } from "./langy.server.ts";
 export { LangyNavigateFallbackService } from "./services/langy-navigate-fallback.service.ts";
 export { LangyNavigateProjectPort } from "./ports/langy-navigate-project.port.ts";
 export { LangyNavigateResourcePort } from "./ports/langy-navigate-resource.port.ts";
@@ -44,31 +46,17 @@ export type { LangyTurnAdmissionCapability } from "@langwatch/langy-contract";
 export {
   LangyApp,
   LangySessionRequiredError,
-  type LangyAppDependencies,
   type LangyBroadcast,
   type LangyEgressState,
   type LangyRedis,
   type LangyTurnRequest,
   type LangyTurnStream,
 } from "./app/langy.app.ts";
-export {
-  LangyTrpcApi,
-  type LangyTrpcContext,
-  type LangyTrpcPorts,
-  type LangyUiActionPort,
-} from "./transport/api-trpc/langy.api.ts";
-export {
-  LangyEgressTrpcApi,
-  type LangyEgressTrpcContext,
-  type LangyEgressTrpcPorts,
-} from "./transport/api-trpc/langy-egress.api.ts";
-// The setup-skill catalogue and the door onto it. Langy's because the BODIES
-// are: they are generated from the compiled skills the Langy image ships, so
-// the prompt a customer copies and the skill Langy runs cannot disagree.
-export {
-  SetupSkillsTrpcApi,
-  type SetupSkillsTrpcContext,
-} from "./transport/api-trpc/setup-skills.api.ts";
+// The three tRPC transports this feature owns are not exported: they still name
+// the deleted legacy builder, so nothing may reach them until each is converted
+// to the declared `defineTrpcRouter` shape. The setup-skill catalogue behind one
+// of them stays reachable, because the bodies are generated from the compiled
+// skills the Langy image ships.
 export { SetupSkillsService, type SetupSkillId } from "./services/setup-skills.service.ts";
 // The agent-to-page UI-action channel. Moved here whole from the application
 // that used to hold it; the one thing it could not bring is the workbench's
@@ -340,7 +328,6 @@ export { UserWaitService } from "./services/langy-local-user-wait.service.ts";
 export type { UserWaitEvents } from "./rules/langy-local-user-wait-record.rules.ts";
 export { LangyLocalPresenceAdapter } from "./adapters/redis.langy-local-presence.adapter.ts";
 export { reconcileSkipPolicy, type SkipGate } from "./rules/langy-local-skip-policy.rules.ts";
-export type { LangyLocalTrpcPorts } from "./transport/api-trpc/langy.api.ts";
 export {
   SkipPermissionsService,
   type SkipPermissionsDecision,

@@ -9,11 +9,7 @@ export {
   type ScimAppDependencies,
   type ScimPlanProvider,
 } from "./app/scim.app.ts";
-export {
-  ScimTokenTrpcApi,
-  type ScimTokenTrpcContext,
-  type ScimTokenTrpcPorts,
-} from "./transport/api-trpc/scim-token.api.ts";
+// The tRPC transport is not exported: it still names the deleted legacy builder.
 export { createScimTokensRestApp } from "./transport/api-rest/scim.api.ts";
 // The SCIM 2.0 protocol family itself, and the Auth0 webhook intake beside it.
 // Both take the application as a provider rather than a request context, so a

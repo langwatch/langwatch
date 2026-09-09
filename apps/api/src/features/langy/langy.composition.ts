@@ -20,7 +20,6 @@ import {
   LangyTurnHandoffAdapter,
   LangyUiActionCatalogPort,
   LangyUiActionService,
-  PostgresLangyAdapter,
   type LangyEgressTrpcPorts,
   type LangyRelayCompositionOptions,
   type LangyLocalTrpcPorts,
@@ -35,16 +34,12 @@ import { createLogger } from "@langwatch/observability";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { ResourceScope } from "@langwatch/runtime-composition";
 
 import type { ApiAuditPort } from "../../api-request.policy.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
 import { createPlatformUrlBuilder } from "../../app/api-rest-ports.ts";
-import {
-  createLangyEgressTrpcRouter,
-  createLangyTrpcRouter,
-  type LangyTrpcGates,
-} from "./langy-trpc.mount.ts";
 
 const LANGY_RELEASE_FLAG = "release_langy_enabled";
 
@@ -122,24 +117,9 @@ export function composeLangyFeature(options: {
     navigateResources: options.navigateResources,
     local: options.local,
   };
-  const app = composeLangy(collaborators);
-  const gates = composeLangyGates(collaborators);
-
-  return {
-    app,
-    routers: (mount) => ({
-      langy: createLangyTrpcRouter({
-        ...mount,
-        ports: composeLangyPorts(collaborators, app),
-        gates,
-      }),
-      langyEgress: createLangyEgressTrpcRouter({
-        ...mount,
-        ports: composeLangyEgressPorts(collaborators),
-        gates,
-      }),
-    }),
-  };
+  // The two namespaces, their ports and the two gates went with the transport
+  // that took them; they return with the converted one.
+  return { app: composeLangy(collaborators) };
 }
 
 /** One Langy application, refused by name on every member. */
@@ -153,39 +133,10 @@ export function refusingLangyFeature(): ComposedLangyFeature {
       has: () => true,
     },
   ) as LangyApp;
-  const gates: LangyTrpcGates = {
-    refuseDemoProject: async ({ next }: { next: () => unknown }) => next(),
-    enforceLangyAccess: async (): Promise<never> => {
-      throw new ApiLangyUnavailableError("The Langy conversation surface");
-    },
-  };
 
-  return {
-    app,
-    routers: (mount) => ({
-      langy: createLangyTrpcRouter({ ...mount, ports: refusingLangyPorts(), gates }),
-      langyEgress: createLangyEgressTrpcRouter({
-        ...mount,
-        ports: { recordAudit: async () => undefined },
-        gates,
-      }),
-    }),
-  };
+  return { app };
 }
 
-/** Every conversation port, refused by name for the same one reason. */
-function refusingLangyPorts(): LangyTrpcPorts {
-  const refuse = (): never => {
-    throw new ApiLangyUnavailableError("The Langy conversation surface");
-  };
-  return {
-    checkMessageRateLimit: refuse,
-    checkWarmRateLimit: refuse,
-    recordProductEvent: refuse,
-    uiActions: { claim: refuse, complete: refuse },
-    local: refusingLangyLocalPorts(),
-  };
-}
 
 /** A Langy capability this process does not run, refused by name. */
 class ApiLangyUnavailableError extends HandledError {
@@ -201,7 +152,6 @@ class ApiLangyUnavailableError extends HandledError {
 }
 
 function composeLangy(options: LangyFeatureCollaborators): LangyApp {
-  const adapter = PostgresLangyAdapter.create({ database: options.prisma });
   const redis = options.redis;
   // The daily pull-request budget, metered on the SAME connection the token
   // buffer and the turn stores use. Without Redis the service answers every
@@ -240,38 +190,40 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
   };
 
   const relay = composeLangyRelay(options, redis);
-  const service = adapter.build({
-    turns,
-    credentials: {
-      sessionKeys: {
-        mint: () => Promise.reject(new ApiLangyUnavailableError("Minting a Langy session key")),
-        revokeManaged: () => Promise.resolve("refused" as const),
-      },
-      virtualKeys: {
-        provision: () =>
-          Promise.reject(new ApiLangyUnavailableError("Provisioning a Langy virtual key")),
-      },
-      github: {
-        enabled: false,
-        mintTurnToken: () => Promise.resolve(null),
-      },
-      runtime: {
-        workerCallbackUrl: undefined,
-        workerGatewayBaseUrl: undefined,
-        mirrorProjectId: undefined,
-      },
-    },
-    commands: options.commands,
-    events: null,
-    blockMetrics: LangyBlockOtelMetricsAdapter.create(),
-    ...(redis ? { feedbackPromptRedis: redis } : {}),
-    ...(relay ? { relay } : {}),
-  });
-
   return LangyApp.create({
-    langy: service,
-    redis: redis as unknown as Parameters<typeof LangyApp.create>[0]["redis"],
-    broadcast: options.broadcast,
+    dependencies: {},
+    infrastructure: {
+      database: options.prisma,
+      turns,
+      credentials: {
+        sessionKeys: {
+          mint: () => Promise.reject(new ApiLangyUnavailableError("Minting a Langy session key")),
+          revokeManaged: () => Promise.resolve("refused" as const),
+        },
+        virtualKeys: {
+          provision: () =>
+            Promise.reject(new ApiLangyUnavailableError("Provisioning a Langy virtual key")),
+        },
+        github: {
+          enabled: false,
+          mintTurnToken: () => Promise.resolve(null),
+        },
+        runtime: {
+          workerCallbackUrl: undefined,
+          workerGatewayBaseUrl: undefined,
+          mirrorProjectId: undefined,
+        },
+      },
+      commands: options.commands,
+      events: null,
+      blockMetrics: LangyBlockOtelMetricsAdapter.create(),
+      redis,
+      broadcast: options.broadcast,
+      ...(redis ? { feedbackPromptRedis: redis } : {}),
+      ...(relay ? { relay } : {}),
+    },
+    config: { agentUrl: undefined, internalSecret: undefined },
+    resources: new ResourceScope(),
   });
 }
 
@@ -301,67 +253,7 @@ function composeLangyRelay(
   };
 }
 
-/**
- * The two Langy budgets, the analytics sink and the UI-action channel. The budgets meter
- * through the SAME counter the public REST surface and the identity half's throttles use,
- * so a caller has one budget per rule rather than one per surface.
- */
-function composeLangyPorts(options: LangyFeatureCollaborators, langy: LangyApp): LangyTrpcPorts {
-  const logger = createLogger(`${options.processName}:langy`);
-  const uiActions = () =>
-    LangyUiActionService.create({
-      redis: options.redis as unknown as UiActionRedis,
-      conversations: {
-        findByIdVisible: (args) => langy.tryFindVisible(args),
-      },
-      buffer: LangyTokenBufferAdapter.create({ redis: options.redis }),
-      actions: new UnavailableApiLangyUiActionCatalog(),
-    });
 
-  const budget = (input: { userId: string; projectId: string }, key: string, max: number) =>
-    options
-      .rateLimit({ key: `${key}:${input.projectId}:${input.userId}`, windowSeconds: 60, max })
-      .then(({ allowed }) => ({ allowed }))
-      .catch(() => ({ allowed: true }));
-
-  return {
-    // 30 messages a minute and 60 warms, the two budgets the platform host set.
-    // Restated here because they are this process's policy rather than Langy's,
-    // and the module that held them is one this migration deletes.
-    checkMessageRateLimit: (input) => budget(input, "langy:rl:msg", 30),
-    checkWarmRateLimit: (input) => budget(input, "langy:rl:warm", 60),
-    recordProductEvent: ({ userId, projectId, event }) => {
-      logger.info(
-        { userId, projectId, event },
-        "langy product event not recorded: this process composes no product-analytics sink",
-      );
-    },
-    uiActions: {
-      claim: (input) => uiActions().claim(input),
-      complete: (input) => uiActions().complete(input),
-    },
-    local: options.local ?? refusingLangyLocalPorts(),
-  };
-}
-
-/**
- * The developer's own machine, absent. A process that composed no local-control
- * runtime refuses every one of its procedures by name rather than answering an
- * empty folder, which would read as "nothing is connected".
- */
-function refusingLangyLocalPorts(): LangyLocalTrpcPorts {
-  const refuse = (): never => {
-    throw new ApiLangyUnavailableError("Langy local control");
-  };
-  return {
-    get runtime(): never {
-      return refuse();
-    },
-    commands: { changeLocalPolicy: refuse, disconnectLocalWorkspace: refuse },
-    skipGate: refuse,
-    codeAccess: { tryRead: refuse, write: refuse },
-  };
-}
 
 /**
  * The page-action catalogue, absent. The only catalogue that exists is the experiments
@@ -374,92 +266,7 @@ class UnavailableApiLangyUiActionCatalog extends LangyUiActionCatalogPort {
   }
 }
 
-/**
- * The two gates every customer-facing Langy procedure carries, built here
- * because neither is a permission.
- */
-function composeLangyGates(options: LangyFeatureCollaborators) {
-  /**
-   * Refuses the demo project outright. `project:view` is granted to every authenticated
-   * user on the demo project, so a permission check alone would expose whatever Langy
-   * chat somebody left there.
-   */
-  const refuseDemoProject = async ({
-    input,
-    next,
-  }: {
-    input: { projectId?: string };
-    next: () => unknown;
-  }) => {
-    if (options.demoProjectId && input.projectId === options.demoProjectId) {
-      throw new NotFoundError("not_found", "Langy", input.projectId);
-    }
-    return next();
-  };
 
-  /**
-   * The authoritative internal-only rollout decision, LAST in the chain so membership is
-   * always proven by RBAC before the flag is read.
-   */
-  const enforceLangyAccess = async ({
-    ctx,
-    input,
-    next,
-  }: {
-    ctx: unknown;
-    input: { projectId?: string; organizationId?: string };
-    next: () => unknown;
-  }) => {
-    const userId = (ctx as ApiTrpcPortsContext).actor().id;
-    const organizationId =
-      input.organizationId ??
-      (input.projectId ? await options.projects.getOrganizationId(input.projectId) : undefined);
-
-    const target: FeatureFlagTarget = input.projectId
-      ? {
-          kind: "project",
-          userId,
-          projectId: input.projectId,
-          ...(organizationId ? { organizationId } : {}),
-        }
-      : organizationId
-        ? { kind: "organization", userId, organizationId }
-        : { kind: "user", userId };
-
-    if (!(await options.featureFlags.isEnabled(LANGY_RELEASE_FLAG, target))) {
-      // A typed handled error, not a bare NOT_FOUND: the client tells a rollout
-      // gate apart from a load failure by the code on the wire.
-      throw new LangyNotEnabledError();
-    }
-    return next();
-  };
-
-  return { refuseDemoProject, enforceLangyAccess };
-}
-
-/** The audit trail an egress allow-list change is recorded on. */
-function composeLangyEgressPorts(options: LangyFeatureCollaborators): LangyEgressTrpcPorts {
-  const audit = options.audit;
-  const logger = createLogger(`${options.processName}:langy-egress`);
-  return {
-    recordAudit: async (entry) => {
-      if (!audit) {
-        logger.warn(
-          { projectId: entry.projectId, action: entry.action },
-          "langy egress change not audited: this process composed no audit sink",
-        );
-        return;
-      }
-      // Awaited rather than fired and forgotten: an allow-list change is a
-      // network policy, and the record of who widened it is part of the write.
-      try {
-        await audit.record(entry as unknown as Parameters<ApiAuditPort["record"]>[0]);
-      } catch (error) {
-        logger.error({ error, action: entry.action }, "langy egress audit failed");
-      }
-    },
-  };
-}
 
 /**
  * The daily pull-request counter, on this process's own Redis. `eval` is

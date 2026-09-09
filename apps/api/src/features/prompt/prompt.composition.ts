@@ -5,12 +5,10 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectService } from "@langwatch/project-contract";
-import { PostgresPromptAdapter, PromptApp, type PromptTrpcPorts } from "@langwatch/prompt-server";
+import { PostgresPromptAdapter, PromptApp } from "@langwatch/prompt-server";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
-import { createPromptTrpcRouter } from "./prompt-trpc.mount.ts";
 
 /**
  * The product signal a project's new prompt fires, for a deployment that has
@@ -37,11 +35,9 @@ export function composePromptFeature(options: {
   /** The nurturing sink, where the deployment composed one. */
   nurturing?: ApiPromptNurturingPort;
 }): ComposedPromptFeature {
-  const logger = createLogger("langwatch:api:prompt");
-
+  // The namespace and its one nurturing port went with the transport that took
+  // them; they return with the converted one.
   return {
-    router: (mount) =>
-      createPromptTrpcRouter({ ...mount, ports: promptPorts(logger, options.nurturing) }),
     app: PromptApp.create({
       prompts: PostgresPromptAdapter.create({
         database: options.infrastructure.prisma,
@@ -58,38 +54,11 @@ export function composePromptFeature(options: {
  * unreachable rather than shown an empty library.
  */
 export function refusingPromptFeature(): ComposedPromptFeature {
-  const logger = createLogger("langwatch:api:prompt");
   const refuse = (): never => {
     throw new ApiPromptUnavailableError();
   };
 
-  return {
-    router: (mount) => createPromptTrpcRouter({ ...mount, ports: promptPorts(logger, undefined) }),
-    app: new Proxy({}, { get: () => refuse, has: () => true }) as PromptApp,
-  };
-}
-
-/**
- * The one answer the prompt surface needs from the deployment. The same on a composed
- * feature and a refusing one: the signal is fire-and-forget marketing, so an absent sink
- * logs once rather than refusing the prompt it was meant to announce.
- */
-function promptPorts(
-  logger: Pick<Logger, "debug">,
-  nurturing: ApiPromptNurturingPort | undefined,
-): PromptTrpcPorts {
-  return {
-    afterPromptCreated: (input) => {
-      if (!nurturing) {
-        logger.debug(
-          { projectId: input.projectId },
-          "no prompt nurturing sink is composed: the lifecycle signal for this prompt is not sent",
-        );
-        return;
-      }
-      nurturing.afterPromptCreated(input);
-    },
-  };
+  return { app: new Proxy({}, { get: () => refuse, has: () => true }) as PromptApp };
 }
 
 /** The prompt library reached on a process that composed none. */

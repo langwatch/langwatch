@@ -1,11 +1,10 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { UserApi } from "@langwatch/user-contract";
 import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
-import type { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc.mount.ts";
 
-/** The two namespaces this feature mounts, and the slices behind them. */
+/** The slices and the port groups. The two tRPC namespaces are not here: their
+ * transports are unconverted. */
 export type ComposedUserFeature = Readonly<{
   /** The `ctx.app.users` slice. */
   app: UserApi;
@@ -21,8 +20,4 @@ export type ComposedUserFeature = Readonly<{
    * The two port groups the namespaces are built on.
    */
   ports: Readonly<{ identity: IdentityTrpcPorts; user: UserTrpcPorts }>;
-  routers(mount: ApiTrpcFeatureMount): Readonly<{
-    identity: ReturnType<typeof createIdentityTrpcRouter>;
-    user: ReturnType<typeof createUserTrpcRouter>;
-  }>;
 }>;

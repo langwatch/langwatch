@@ -35,11 +35,14 @@ export type ApiScenarioGenerateRestCollaborators = Readonly<{
   timeoutMs: () => number;
 }>;
 
-/** Which of the four authoring doors this process can actually open. */
+/**
+ * Which of the authoring doors this process can actually open. The dataset
+ * generator is not among them until its transport is converted, so it has no
+ * field here and is reported absent for that reason.
+ */
 export type ApiAuthoringRestComposition = Readonly<{
   workflowStudio?: ApiWorkflowStudioRestCollaborators | undefined;
   playground?: ApiPlaygroundRestCollaborators | undefined;
-  datasetGenerate?: ApiGeneratorRestCollaborators | undefined;
   scenarioGenerate?: ApiScenarioGenerateRestCollaborators | undefined;
 }>;
 
@@ -93,9 +96,13 @@ export function composeApiAuthoringRest(options: {
   const composition: {
     workflowStudio?: ApiWorkflowStudioRestCollaborators;
     playground?: ApiPlaygroundRestCollaborators;
-    datasetGenerate?: ApiGeneratorRestCollaborators;
     scenarioGenerate?: ApiScenarioGenerateRestCollaborators;
   } = {};
+
+  report?.absent(
+    "dataset-generate",
+    "its REST transport still names a deleted legacy builder and has not been converted",
+  );
 
   if (resolveModel && workflows && studioDispatch) {
     composition.workflowStudio = {
@@ -132,7 +139,6 @@ export function composeApiAuthoringRest(options: {
   }
 
   if (resolveModel) {
-    composition.datasetGenerate = { session, resolveModel };
     composition.scenarioGenerate = {
       session,
       resolveModel,
@@ -141,7 +147,6 @@ export function composeApiAuthoringRest(options: {
       timeoutMs: () => readScenarioGenerateTimeoutMs(process.env),
     };
   } else {
-    report?.absent("dataset-generate", "this process composed no model gateway");
     report?.absent("scenario-generate", "this process composed no model gateway");
   }
 

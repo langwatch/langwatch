@@ -26,8 +26,10 @@ export {
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,
 } from "./processes/github-branch-recheck.process.ts";
-export { GithubTrpcApi, type GithubTrpcContext } from "./transport/api-trpc/github.api.ts";
+// The tRPC transport is not exported: it still names the deleted legacy builder.
 export { GithubConnectionService } from "./services/github-connection.service.ts";
+export { GithubApp, type GithubInfrastructure } from "./app/github.app.ts";
+export { githubServer } from "./github.server.ts";
 
 // The GitHub App installation flow's REST family: the session-gated start, the
 // protocol-mandated Setup URL and the HMAC-verified webhook, plus the two

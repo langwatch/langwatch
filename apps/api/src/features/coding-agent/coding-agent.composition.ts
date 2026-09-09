@@ -7,9 +7,6 @@ import {
   CodingAgentApp,
   CodingAgentBillingPolicyPort,
   CodingAgentCallerScopeDirectoryPort,
-  CodingAgentCallerScopeService,
-  CodingAgentProjectionPersistenceAdapter,
-  CodingAgentRuntime,
   CodingAgentScopePermissionsPort,
   type CodingAgentClickHousePort,
   type CodingAgentScopeCaller,
@@ -22,10 +19,10 @@ import type { GithubService } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
+import { ResourceScope } from "@langwatch/runtime-composition";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections.ts";
-import { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount.ts";
 
 /** The other services and stores one project's coding agents are read over. */
 export type CodingAgentPeers = Readonly<{
@@ -49,13 +46,8 @@ export function composeCodingAgentFeature(options: {
   defaultRetentionDays: number;
 }): ComposedCodingAgentFeature {
   const app = composeCodingAgentApp(options);
-  const ports = codingAgentPorts(options.peers);
 
-  return {
-    app,
-    service: app,
-    router: (mount) => createCodingAgentTrpcRouter({ ...mount, ports }),
-  };
+  return { app, service: app };
 }
 
 /**
@@ -67,34 +59,7 @@ export function refusingCodingAgentFeature(): ComposedCodingAgentFeature {
   };
   const refuseEvery = <T>(): T => new Proxy({}, { get: () => refuse, has: () => true }) as T;
 
-  return {
-    app: refuseEvery<CodingAgentApp>(),
-    router: (mount) =>
-      createCodingAgentTrpcRouter({ ...mount, ports: refuseEvery<CodingAgentTrpcPorts>() }),
-  };
-}
-
-/**
- * What one viewer may see of one project: whether captured content is readable, and
- * whether spend is.
- */
-function codingAgentPorts(peers: CodingAgentPeers): CodingAgentTrpcPorts {
-  return {
-    readViewerVisibility: async (request, input): Promise<CodingAgentViewerVisibility> => {
-      const resolver = peers.viewerProtections;
-      if (!resolver) {
-        throw new ApiCodingAgentUnavailableError(
-          "content-protections resolver, so it cannot say what this viewer may read of a coding-agent session",
-        );
-      }
-      const protections = await resolver.getViewerProtections(request, input);
-      return {
-        canReadCapturedContent:
-          protections.canSeeCapturedInput === true && protections.canSeeCapturedOutput === true,
-        canSeeCosts: protections.canSeeCosts === true,
-      };
-    },
-  };
+  return { app: refuseEvery<CodingAgentApp>() };
 }
 
 /**
@@ -107,34 +72,17 @@ function composeCodingAgentApp(options: {
   defaultRetentionDays: number;
 }): CodingAgentApp {
   const { peers } = options;
-  const runtime = CodingAgentRuntime.create({
-    projections: CodingAgentProjectionPersistenceAdapter.create({
-      clickHouse: peers.clickHouse,
-      retention: { defaultTraceRetentionDays: options.defaultRetentionDays },
-    }),
-    github: peers.github,
-    projects: peers.projects,
-    billing: new ApiCodingAgentBilling(),
-  });
-
-  const scope = CodingAgentCallerScopeService.create({
-    directory: new ApiCodingAgentScopeDirectory(options.infrastructure.prisma),
-    permissions: new ApiCodingAgentScopePermissions(options.infrastructure.authz),
-  });
-
   return CodingAgentApp.create({
-    codingAgents: runtime.service,
-    github: peers.github,
-    scope: {
-      tryResolveOrganizationForProject: async (projectId) => {
-        try {
-          return await peers.projects.getOrganizationId(projectId);
-        } catch {
-          return undefined;
-        }
-      },
-      resolveCallerProjectScope: (input) => scope.resolve(input),
+    dependencies: { github: peers.github, projects: peers.projects },
+    infrastructure: {
+      clickHouse: peers.clickHouse,
+      defaultTraceRetentionDays: options.defaultRetentionDays,
+      billing: new ApiCodingAgentBilling(),
+      scopeDirectory: new ApiCodingAgentScopeDirectory(options.infrastructure.prisma),
+      scopePermissions: new ApiCodingAgentScopePermissions(options.infrastructure.authz),
     },
+    config: undefined,
+    resources: new ResourceScope(),
   });
 }
 

@@ -2,13 +2,11 @@
 import type { DatasetExperimentLookup } from "@langwatch/dataset-server";
 import type { ExperimentService } from "@langwatch/experiment-contract";
 import type { ExperimentApp } from "@langwatch/experiment-server";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { ApiExperimentRun } from "../../app/api-experiment-run.composition.ts";
-import type { createExperimentTrpcRouter } from "./experiment-trpc.mount.ts";
 
-/** The namespace, the `ctx.app.experiments` application and the run loop. */
+/** The `ctx.app.experiments` application and the run loop. The tRPC namespace
+ * is not here: its transport is unconverted. */
 export type ComposedExperimentFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createExperimentTrpcRouter>;
   /** For `ctx.app.experiments`, and for the packaged experiment REST family. */
   app: ExperimentApp;
   /** The experiment lookup a dataset resolves a borrowed name through. */

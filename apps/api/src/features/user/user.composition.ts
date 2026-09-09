@@ -34,7 +34,6 @@ import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiPersonDeploymentFacts } from "../auth/auth.composition.ts";
 import { ApiUserAvatarStorageAdapter } from "./user-avatar-storage.adapter.ts";
-import { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc.mount.ts";
 
 import type { ComposedUserFeature } from "./user.composition.types.ts";
 
@@ -276,10 +275,6 @@ export async function composeUserFeature(options: {
     ops: adminAccess as unknown as ApiTrpcFeatureApplication["ops"],
     config: { opsSidebarEmails: AdminAccessService.parseEmails(deployment.adminEmails ?? []) },
     ports: { identity: identityPorts, user: userPorts },
-    routers: (mount) => ({
-      identity: createIdentityTrpcRouter({ ...mount, ports: identityPorts }),
-      user: createUserTrpcRouter({ ...mount, ports: userPorts }),
-    }),
   };
 }
 
@@ -303,10 +298,6 @@ export function refusingUserFeature(processName: string): ComposedUserFeature {
     ops: refusing<ApiTrpcFeatureApplication["ops"]>(),
     config: {},
     ports,
-    routers: (mount) => ({
-      identity: createIdentityTrpcRouter({ ...mount, ports: ports.identity }),
-      user: createUserTrpcRouter({ ...mount, ports: ports.user }),
-    }),
   };
 }
 

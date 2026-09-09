@@ -1,19 +1,15 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { LangWatchQLCaller, LangWatchQLProtections } from "@langwatch/analytics-contract";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
-import type { AnalyticsApp, LangWatchQLService } from "@langwatch/analytics-server";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { LangWatchQLService } from "@langwatch/analytics-server";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
-import type { analyticsRouters } from "./analytics-trpc.routers.ts";
 
-/** The two namespaces, the two `ctx.app` slices, and what the REST doors take. */
+/** The two `ctx.app` slices, and what the REST doors take. The tRPC namespaces
+ * are not here: their transport is unconverted. */
 export type ComposedAnalyticsFeature = Readonly<{
-  /**
-   * `analytics.*` and `graphs.*`, on the process's own root.
-   */
-  routers(mount: ApiTrpcFeatureMount): ReturnType<typeof analyticsRouters>;
   /** For `ctx.app.analytics`. */
-  analytics: AnalyticsApp;
+  analytics: AnalyticsApi;
   /**
    * The three workbench answers the dashboard feature installs over. They are
    * this half's because a saved chart and the workbench statement behind it

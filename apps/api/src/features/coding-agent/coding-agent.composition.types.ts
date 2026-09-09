@@ -1,11 +1,9 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { CodingAgentApp } from "@langwatch/coding-agent-server";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
-import type { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount.ts";
 
-/** The one namespace this feature mounts, and its `ctx.app` application. */
+/** This feature's `ctx.app` application. Its tRPC namespace is not here: the
+ * transport is unconverted. */
 export type ComposedCodingAgentFeature = Readonly<{
-  router(mount: ApiTrpcFeatureMount): ReturnType<typeof createCodingAgentTrpcRouter>;
   /** For `ctx.app.codingAgentApp`. */
   app: CodingAgentApp;
   /**

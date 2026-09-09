@@ -1,5 +1,5 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { AgentTestService, ScenarioApp } from "@langwatch/scenario-server";
+import type { ScenarioApp } from "@langwatch/scenario-server";
 import type { MountableRestApp } from "@langwatch/api/rest";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type {
@@ -7,19 +7,11 @@ import type {
   ScenarioTabRegistry,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import type { ApiTrpcFeatureMount } from "../../api.application.ts";
-import type { createSetupSkillsTrpcRouter } from "../langy/setup-skills-trpc.mount.ts";
-import type { createSuiteTrpcRouter } from "../suite/suite-trpc.mount.ts";
-import type { createScenarioTrpcRouter } from "./scenario-trpc.mount.ts";
 
-/** The three routers, the two `ctx.app` slices, and the services the doors take. */
+/** The two `ctx.app` slices and the services the doors take. `scenarios.*`,
+ * `suites.*` and `setupSkills.*` are not here: their transports are
+ * unconverted. */
 export type ComposedScenarioFeature = Readonly<{
-  /** `scenarios.*`, `suites.*` and `setupSkills.*`, on the process's own root. */
-  routers(mount: ApiTrpcFeatureMount): {
-    scenarios: ReturnType<typeof createScenarioTrpcRouter>;
-    setupSkills: ReturnType<typeof createSetupSkillsTrpcRouter>;
-    suites: ReturnType<typeof createSuiteTrpcRouter>;
-  };
   /** For `ctx.app.scenarios`. */
   scenarios: ScenarioApp;
   /**
@@ -33,11 +25,6 @@ export type ComposedScenarioFeature = Readonly<{
    * through it.
    */
   simulations: SimulationService;
-  /**
-   * Runs "Test agent", for the `AgentTestPort` this root wires into the
-   * Agent package's own application (`ApiAgentTestAdapter`).
-   */
-  agentTestService: AgentTestService;
   /** For `ctx.app.suites`. */
   suites: SuiteApi;
   /**
