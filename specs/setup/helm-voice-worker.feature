@@ -48,6 +48,12 @@ Feature: The voice worker is opt-in and cannot render half-configured
       And TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM_NUMBER are read from the named Secret by the configured keys
 
     @e2e
+    Scenario: The voice Deployment's terminationGracePeriodSeconds follows voice.*, not workers.*
+      Given voice.enabled=true with a publicBaseUrl and a Twilio existingSecret, voice.terminationGracePeriodSeconds and voice.shutdownDrainSeconds set, and a different workers.terminationGracePeriodSeconds also set
+      When the chart renders
+      Then the voice Deployment's terminationGracePeriodSeconds comes from voice.terminationGracePeriodSeconds, not from workers.terminationGracePeriodSeconds
+
+    @e2e
     Scenario: Enabling voice renders a Service but no Ingress by default
       Given voice.enabled=true with a publicBaseUrl and a Twilio existingSecret
       When the chart renders

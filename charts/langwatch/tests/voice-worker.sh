@@ -38,10 +38,23 @@ normalise() {
   sed -E 's/: "[A-Za-z0-9+\/=]{16,}"/: "<redacted>"/'
 }
 
+# Runs helm template with $BASE plus the given flags, printing combined
+# stdout/stderr and preserving helm's exit status. The only place `$BASE`
+# and a caller's flags are word-split, so the disable comment lives here once
+# instead of on every call site.
+render() {
+  local out status
+  # shellcheck disable=SC2086
+  out=$(helm template lw . $BASE $1 2>&1)
+  status=$?
+  printf '%s' "$out"
+  return $status
+}
+
 # @scenario "The default install renders no voice resources"
 test_default_has_no_voice_resources() {
   local out
-  if ! out=$(helm template lw . $BASE 2>&1); then
+  if ! out=$(render ""); then
     fail "default render" "chart failed to render at all: $(printf '%s' "$out" | tail -5)"
     return
   fi
@@ -55,8 +68,8 @@ test_default_has_no_voice_resources() {
 # @scenario "voice.enabled=false explicitly changes nothing"
 test_explicit_false_matches_default() {
   local default_out explicit_out
-  default_out=$(helm template lw . $BASE | normalise)
-  explicit_out=$(helm template lw . $BASE --set voice.enabled=false | normalise)
+  default_out=$(render "" | normalise)
+  explicit_out=$(render "--set voice.enabled=false" | normalise)
   if [ "$default_out" != "$explicit_out" ]; then
     fail "explicit false matches default" \
       "rendered manifest differs between default and --set voice.enabled=false: $(diff <(printf '%s' "$default_out") <(printf '%s' "$explicit_out") | head -10 | tr '\n' ' ')"
@@ -68,8 +81,7 @@ test_explicit_false_matches_default() {
 # Renders a profile and prints only one component's manifest, so a value from
 # another component can never satisfy an assertion.
 render_component() {
-  # shellcheck disable=SC2086
-  helm template lw . $2 | awk -v want="langwatch/templates/voice/$1" '
+  render "$2" | awk -v want="langwatch/templates/voice/$1" '
     $0 ~ "^# Source: " want { grab=1; next }
     grab && /^# Source:/ { grab=0 }
     grab { print }
@@ -81,7 +93,7 @@ readonly ENABLED_FLAGS="--set voice.enabled=true --set voice.publicBaseUrl=https
 # @scenario "Enabling voice renders a single-replica worker wired to the Twilio secret"
 test_enabled_renders_deployment() {
   local block
-  block=$(render_component "deployment.yaml" "$BASE $ENABLED_FLAGS")
+  block=$(render_component "deployment.yaml" "$ENABLED_FLAGS")
   if [ -z "$block" ]; then
     fail "voice deployment" "rendered no voice Deployment with voice.enabled=true"
     return
@@ -113,10 +125,26 @@ test_enabled_renders_deployment() {
   echo "ok   [voice deployment] replicas=1, VOICE_WORKER_ONLY=true, Twilio secretKeyRefs present"
 }
 
+# @scenario "The voice Deployment's terminationGracePeriodSeconds follows voice.*, not workers.*"
+test_termination_grace_period_follows_voice_values() {
+  local block
+  block=$(render_component "deployment.yaml" \
+    "$ENABLED_FLAGS --set voice.terminationGracePeriodSeconds=90 --set voice.shutdownDrainSeconds=60 --set workers.terminationGracePeriodSeconds=999")
+  if [ -z "$block" ]; then
+    fail "voice terminationGracePeriodSeconds" "rendered no voice Deployment with voice.enabled=true"
+    return
+  fi
+  if ! printf '%s' "$block" | grep -q "terminationGracePeriodSeconds: 90"; then
+    fail "voice terminationGracePeriodSeconds" "expected terminationGracePeriodSeconds: 90 (from voice.terminationGracePeriodSeconds), got: $(printf '%s' "$block" | grep terminationGracePeriodSeconds)"
+    return
+  fi
+  echo "ok   [voice terminationGracePeriodSeconds] follows --set voice.terminationGracePeriodSeconds, not workers.*"
+}
+
 # @scenario "Enabling voice renders a Service but no Ingress by default"
 test_enabled_renders_service_no_ingress() {
   local svc ing
-  svc=$(render_component "service.yaml" "$BASE $ENABLED_FLAGS")
+  svc=$(render_component "service.yaml" "$ENABLED_FLAGS")
   if [ -z "$svc" ]; then
     fail "voice service" "rendered no voice Service with voice.enabled=true"
     return
@@ -125,7 +153,7 @@ test_enabled_renders_service_no_ingress() {
     fail "voice service targetPort" "expected targetPort: voice-ws"
     return
   fi
-  ing=$(render_component "ingress.yaml" "$BASE $ENABLED_FLAGS")
+  ing=$(render_component "ingress.yaml" "$ENABLED_FLAGS")
   if [ -n "$ing" ]; then
     fail "voice ingress absent by default" "voice.ingress.enabled defaults to false but an Ingress rendered anyway"
     return
@@ -137,7 +165,7 @@ test_enabled_renders_service_no_ingress() {
 test_ingress_enabled_renders() {
   local ing
   ing=$(render_component "ingress.yaml" \
-    "$BASE $ENABLED_FLAGS --set voice.ingress.enabled=true --set voice.ingress.host=voice.example.com")
+    "$ENABLED_FLAGS --set voice.ingress.enabled=true --set voice.ingress.host=voice.example.com")
   if [ -z "$ing" ]; then
     fail "voice ingress enabled" "rendered no voice Ingress with voice.ingress.enabled=true"
     return
@@ -156,7 +184,7 @@ test_ingress_enabled_renders() {
 # @scenario "voice.enabled without publicBaseUrl refuses to render"
 test_enabled_without_public_base_url_refuses() {
   local out
-  if out=$(helm template lw . $BASE --set voice.enabled=true --set voice.twilio.existingSecret=twilio 2>&1); then
+  if out=$(render "--set voice.enabled=true --set voice.twilio.existingSecret=twilio"); then
     fail "missing publicBaseUrl" "chart rendered when voice.publicBaseUrl was not set"
     return
   fi
@@ -171,7 +199,7 @@ test_enabled_without_public_base_url_refuses() {
 # @scenario "voice.enabled without an existing Twilio secret refuses to render"
 test_enabled_without_twilio_secret_refuses() {
   local out
-  if out=$(helm template lw . $BASE --set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com 2>&1); then
+  if out=$(render "--set voice.enabled=true --set voice.publicBaseUrl=https://voice.example.com"); then
     fail "missing twilio secret" "chart rendered when voice.twilio.existingSecret was not set"
     return
   fi
@@ -186,6 +214,7 @@ test_enabled_without_twilio_secret_refuses() {
 test_default_has_no_voice_resources
 test_explicit_false_matches_default
 test_enabled_renders_deployment
+test_termination_grace_period_follows_voice_values
 test_enabled_renders_service_no_ingress
 test_ingress_enabled_renders
 test_enabled_without_public_base_url_refuses

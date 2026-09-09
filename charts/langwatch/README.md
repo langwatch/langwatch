@@ -698,9 +698,9 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `workers.extraInitContainers`             | Additional init containers.                                                                                                                                                                                             | `[]`                |
 | `workers.extraVolumeMounts`               | Additional volume mounts for workers container.                                                                                                                                                                         | `[]`                |
 
-### Voice worker (opt-in)
+### Voice worker
 
-Off by default (`voice.enabled: false`). The default install renders no voice
+Off by default (`voice.enabled: false`); the default install renders no voice
 resources at all.
 
 Turning it on deploys a **single-replica** worker Deployment (same app image,
@@ -742,6 +742,9 @@ The chart refuses to render when `voice.enabled` is true and either
 | `voice.tolerations`            | Tolerations overrides.                                                                                                     | `[]`                 |
 | `voice.affinity`               | Affinity overrides.                                                                                                        | `{}`                 |
 | `voice.priorityClassName`      | PriorityClass for the voice worker pod (overrides `global.scheduling.priorityClassName`).                                  | `""`                 |
+| `voice.shutdownDrainSeconds`   | Seconds the voice worker may spend draining in-flight jobs on shutdown.                                                    | `25`                 |
+| `voice.terminationGracePeriodSeconds` | Seconds before SIGKILL. Must be at least `shutdownDrainSeconds` + 30.                                               | `55`                 |
+| `voice.extraEnvs`              | Additional environment variables for the voice worker container.                                                           | `[]`                 |
 | `voice.pod.annotations`        | Additional pod annotations for the voice worker.                                                                           | `{}`                 |
 | `voice.deployment.annotations` | Additional Deployment annotations for the voice worker.                                                                    | `{}`                 |
 | `voice.service.type`           | Service type.                                                                                                              | `ClusterIP`          |

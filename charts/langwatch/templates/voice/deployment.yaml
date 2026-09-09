@@ -49,7 +49,7 @@ spec:
       serviceAccountName: {{ . }}
       {{- end }}
       automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
-      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.workers "name" "workers") }}
+      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.voice "name" "voice") }}
       securityContext:
         {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.voice) | nindent 8 }}
 
@@ -87,7 +87,7 @@ spec:
               protocol: TCP
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
-            {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers "name" "workers") | nindent 12 }}
+            {{- include "langwatch.shutdownEnv" (dict "component" .Values.voice "name" "voice") | nindent 12 }}
 
             - name: OTEL_SERVICE_NAME
               value: {{ .Values.voice.otel.serviceName | default "langwatch-voice" | quote }}
@@ -122,6 +122,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.voice.twilio.existingSecret }}
                   key: {{ .Values.voice.twilio.keys.fromNumber }}
+
+            {{- with .Values.voice.extraEnvs }}
+            {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "voice.extraEnvs") }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
 
           resources:
             {{- toYaml .Values.voice.resources | nindent 12 }}
