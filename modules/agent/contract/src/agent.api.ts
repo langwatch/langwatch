@@ -148,6 +148,8 @@ export interface AgentApi {
     projectId: string;
     actorId: string;
   }): Promise<AgentTestRunResult>;
+  /** The platform's own deep link to this agent's editor drawer. */
+  platformUrl(input: { projectSlug: string; agentId: string; agentType: string }): string;
 }
 
 export const AgentApi = moduleApi<AgentApi>("agent");

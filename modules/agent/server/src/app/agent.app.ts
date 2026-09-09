@@ -51,6 +51,7 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 import type { AgentRepositories } from "../repositories/agent.repositories.ts";
+import { agentPlatformUrl } from "../rules/agent-platform-url.rules.ts";
 import { agentWithResolvedFields, declaredAgentParameters } from "../rules/agent-view.rules.ts";
 import { AgentService } from "../services/agent.service.ts";
 import { AgentCopyService } from "../services/agent-copy.service.ts";
@@ -101,6 +102,7 @@ export class AgentApp implements AgentApi {
   readonly #scenarios: ScenarioApi;
   readonly #users: UserApi;
   readonly #workflows: WorkflowApi;
+  readonly #publicBaseUrl: string;
 
   private constructor({
     repositories,
@@ -111,6 +113,7 @@ export class AgentApp implements AgentApi {
   }: AgentSetup) {
     this.#agents = AgentService.create(repositories.agents);
     this.#copies = AgentCopyService.create(repositories.agents, dependencies.workflows);
+    this.#publicBaseUrl = config.publicBaseUrl;
     this.#auditLog = dependencies.auditLog;
     this.#permissions = dependencies.permissions;
     this.#projects = dependencies.projects;
@@ -145,6 +148,10 @@ export class AgentApp implements AgentApi {
 
   static create(setup: AgentSetup): AgentApp {
     return new AgentApp(setup);
+  }
+
+  platformUrl(input: { projectSlug: string; agentId: string; agentType: string }): string {
+    return agentPlatformUrl({ publicBaseUrl: this.#publicBaseUrl, ...input });
   }
 
   async getAll(input: AgentProjectInput & { viewerUserId?: string | null }) {

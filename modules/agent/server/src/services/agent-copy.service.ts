@@ -63,7 +63,6 @@ export class AgentCopyService {
           sourceProjectId: command.sourceProjectId,
           targetProjectId: command.targetProjectId,
           copiedFromWorkflowId: sourceWorkflowId,
-          authorId: command.actorUserId,
         },
         { id: command.actorUserId },
       );

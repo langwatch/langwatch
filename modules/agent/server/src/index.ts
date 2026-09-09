@@ -4,9 +4,7 @@ export { agentServer } from "./agent.server.ts";
 export { agentTrpcTransport } from "./transport/agent.trpc.ts";
 export { httpProxyTrpcTransport } from "./transport/http-proxy.trpc.ts";
 
-// The deprecated `/api/agents` family and the `/api/v1/agents` family (list,
-// create, read, update, archive, test, call and the HTTP long-poll `/connect/*`
-// routes, ADR-128) are not exported: all four transport files still name deleted
-// legacy builders.
-
+export { agentRest, agentRestErrorHandler } from "./transport/agent.rest.ts";
+export { agentLegacyRest, AGENTS_ALIAS_SUCCESSOR } from "./transport/agent-legacy.rest.ts";
+export { agentConnectHeaders, agentConnectRest } from "./transport/agent-connect.rest.ts";
 export { CONNECT_PATH, createAgentWebSocketProtocol } from "./transport/agent-connect.ws.ts";

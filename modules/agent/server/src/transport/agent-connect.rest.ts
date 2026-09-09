@@ -1,3 +1,11 @@
+/**
+ * `/api/v1/agents/connect/*` - the connected-agent instance protocol: register,
+ * poll for work, post results. The credential is not the project door's own:
+ * a connecting instance presents its key and project explicitly over headers,
+ * and the app verifies them itself, answering a refusal as a frame rather than
+ * an HTTP error. Routes are declared public so the framework resolves no
+ * credential of its own; the protocol's own headers arrive as a bound fact.
+ */
 import {
   ackFrameSchema,
   AgentApi,
@@ -14,13 +22,18 @@ import {
   PROTOCOL_VERSION,
   type RefusedCode,
 } from "@langwatch/agent-contract";
-import { handlerManagedAuth } from "@langwatch/api";
-import {
-  MANAGEMENT_API_VERSION,
-  registerJsonProtocol,
-  type RestApiVersionedFamily,
-} from "@langwatch/api/rest";
+import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { z } from "zod";
+
+/**
+ * The protocol's own credential facts, bound from the request's own headers:
+ * `authorization`, `x-project-id`, `x-agent-instance-token`. Not the family's
+ * door - the app verifies these itself and answers a refusal as a frame.
+ */
+export const agentConnectHeaders = defineRestMiddleware(
+  "agentConnectHeaders",
+  agentConnectCredentialsSchema,
+);
 
 export const postedFramesSchema = z.object({
   frames: z
@@ -54,44 +67,34 @@ export const framesAnswerSchema = z.object({
   accepted: z.number().int().describe("How many frames were taken."),
 });
 
-const pollQuerySchema = z
-  .object({
-    inFlight: z
-      .string()
-      .max(200_000)
-      .optional()
-      .catch(void 0),
-  })
-  .transform(({ inFlight }) => ({ inFlightCallIds: (inFlight ?? "").split(",").filter(Boolean) }));
-
-const connectAccess = handlerManagedAuth({
-  reason:
-    "The connected-session protocol authenticates its declared credential facts and answers refusals as protocol frames.",
-  credential: "apiKey",
-  permissions: ["scenarios:manage"],
+const pollQuerySchema = z.object({
+  inFlight: z.string().max(200_000).optional().catch(void 0),
 });
 
-const headers = {
-  authorization: "authorization",
-  projectId: "x-project-id",
-  instanceToken: "x-agent-instance-token",
-};
-
 const refusalSchema = z.object({ frame: refusedFrameSchema });
-const refusalStatuses = {
-  api_key_invalid: 401,
-  project_required: 400,
-  permission_denied: 403,
-  key_type_not_allowed: 403,
-  replica_count_unsupported: 503,
-  parameters_invalid: 422,
-  environment_invalid: 422,
-  protocol_invalid: 422,
-} as const satisfies Record<RefusedCode, number>;
 
-function refused(error: unknown): z.infer<typeof refusalSchema> {
-  if (!(error instanceof AgentRegisterRefusedError)) throw error;
-  const { reason, ...meta } = error.meta;
+// A plain `z.union` is not a valid REST output schema (only ZodObject,
+// ZodArray and ZodDiscriminatedUnion are), and these two shapes share no
+// discriminator field, so a refusable answer merges both into one optional
+// object instead of unioning two schemas.
+const pollOrRefusalSchema = z.object({
+  frames: pollAnswerSchema.shape.frames.optional(),
+  frame: refusedFrameSchema.optional(),
+});
+const framesOrRefusalSchema = z.object({
+  accepted: framesAnswerSchema.shape.accepted.optional(),
+  frame: refusedFrameSchema.optional(),
+});
+
+/**
+ * A refused frame, answered at HTTP 200: the declarative router ties status to
+ * the declared output schema, and register/poll/frames declare one schema
+ * covering both outcomes. origin/main answered a refusal at a code-specific
+ * status (401/403/422/503); a client reading the frame body is unaffected, one
+ * branching on HTTP status is not. See the agent module handover notes.
+ */
+function refusal(error: AgentRegisterRefusedError): z.infer<typeof refusalSchema> {
+  const { reason, ...meta } = error.meta as { reason: RefusedCode } & Record<string, unknown>;
 
   return refusalSchema.parse({
     frame: {
@@ -104,92 +107,94 @@ function refused(error: unknown): z.infer<typeof refusalSchema> {
   });
 }
 
-function statusOf(response: object) {
-  const refusal = refusalSchema.safeParse(response);
-  return refusal.success ? refusalStatuses[refusal.data.frame.code] : 200;
-}
+const relayCaps = relayPayloadCaps();
 
-export function registerConnectEndpoints(options: {
-  family: RestApiVersionedFamily;
-  app: () => AgentApi;
-  relayMaxPayloadMb?: number;
-}): void {
-  const caps = relayPayloadCaps(options.relayMaxPayloadMb);
-  const common = {
-    family: options.family,
-    app: options.app,
-    version: MANAGEMENT_API_VERSION,
-    access: connectAccess,
-    facts: agentConnectCredentialsSchema,
-    headers,
-    error: refused,
-    status: statusOf,
-    tags: ["Agents"],
-    inputError: () =>
-      new AgentRegisterRefusedError({
+export const agentConnectRest = defineRestRouter(AgentApi)
+  .withNamespace("agents")
+  .withVersion(MANAGEMENT_API_VERSION)
+
+  .post("/connect/register", "registerConnectedAgentInstance")
+  .withRawBody("text")
+  .withAccess({
+    kind: "public",
+    reason:
+      "The connected-session protocol authenticates its declared credential facts and answers refusals as protocol frames.",
+  })
+  .withOutput(registerAnswerSchema)
+  .withBodyLimit({
+    maxBytes: relayCaps.frameBytes,
+    onExceeded: () => new AgentPayloadTooLargeError({ what: "result", limitBytes: relayCaps.frameBytes }),
+  })
+  .withDocs({
+    summary: "Register this process's agents",
+    description:
+      "Returns a registered frame and instance token, or a refused frame.",
+  })
+  .withMiddleware(agentConnectHeaders)
+  .handle(async ({ app, raw }, credentials) => {
+    let body: unknown;
+
+    try {
+      body = JSON.parse(raw as string);
+    } catch {
+      const error = new AgentRegisterRefusedError({
         reason: "protocol_invalid",
         message: "The request is not a valid connected-agent frame.",
-      }),
-  };
-  const payload = {
-    maxPayloadBytes: caps.frameBytes,
-    payloadError: () =>
-      new AgentPayloadTooLargeError({ what: "result", limitBytes: caps.frameBytes }),
-  };
+      });
 
-  registerJsonProtocol({
-    ...common,
-    ...payload,
-    method: "post",
-    path: "/connect/register",
-    operation: "registerConnectedAgentInstance",
-    description:
-      "Register this process's agents. Returns a registered frame and instance token, or a refused frame.",
-    input: z.unknown(),
-    output: registerAnswerSchema,
-    responses: {
-      200: { description: "The instance is registered" },
-      400: { description: "The key requires an explicit project: a refused frame" },
-      401: { description: "The API key is not valid: a refused frame" },
-      403: { description: "The key type or permissions cannot connect an agent: a refused frame" },
-      422: { description: "The register frame or an agent is invalid: a refused frame" },
-      503: { description: "The deployment runs several replicas without Redis: a refused frame" },
-    },
-    handle: ({ app, input }, credentials) => app.connectRegister(input, credentials),
-  });
+      return refusal(error) as z.infer<typeof registerAnswerSchema>;
+    }
 
-  registerJsonProtocol({
-    ...common,
-    method: "get",
-    path: "/connect/poll",
-    operation: "pollConnectedAgentInstance",
-    description: "Wait for call and cancel frames while refreshing this instance's presence.",
-    input: pollQuerySchema,
-    output: z.union([pollAnswerSchema, refusalSchema]),
-    responses: {
-      200: { description: "The frames waiting for the instance, possibly none" },
-      401: { description: "The API key is not valid: a refused frame" },
-      410: { description: "The instance token is unknown; register the instance again" },
-    },
-    handle: ({ app, input, signal }, credentials) =>
-      app.connectPoll({ ...input, signal }, credentials),
-  });
+    try {
+      return await app.connectRegister(body, credentials);
+    } catch (error) {
+      if (error instanceof AgentRegisterRefusedError) return refusal(error) as never;
+      throw error;
+    }
+  })
 
-  registerJsonProtocol({
-    ...common,
-    ...payload,
-    method: "post",
-    path: "/connect/frames",
-    operation: "postConnectedAgentFrames",
-    description: "Accept this instance's acknowledgements, results and deregistration.",
-    input: postedFramesSchema,
-    output: z.union([framesAnswerSchema, refusalSchema]),
-    responses: {
-      200: { description: "The frames were taken" },
-      401: { description: "The API key is not valid: a refused frame" },
-      410: { description: "The instance token is unknown; register the instance again" },
-      422: { description: "A frame is not one the endpoint takes" },
-    },
-    handle: ({ app, input }, credentials) => app.connectFrames(input, credentials),
-  });
-}
+  .get("/connect/poll", "pollConnectedAgentInstance")
+  .withQuery(pollQuerySchema)
+  .withAccess({
+    kind: "public",
+    reason:
+      "The connected-session protocol authenticates its declared credential facts and answers refusals as protocol frames.",
+  })
+  .withOutput(pollOrRefusalSchema)
+  .withDocs({ summary: "Wait for call and cancel frames while refreshing this instance's presence" })
+  .withMiddleware(agentConnectHeaders)
+  .handle(async ({ app, input, signal }, credentials) => {
+    const inFlightCallIds = (input.inFlight ?? "").split(",").filter(Boolean);
+
+    try {
+      return await app.connectPoll({ inFlightCallIds, signal }, credentials);
+    } catch (error) {
+      if (error instanceof AgentRegisterRefusedError) return refusal(error) as never;
+      throw error;
+    }
+  })
+
+  .post("/connect/frames", "postConnectedAgentFrames")
+  .withInput(postedFramesSchema)
+  .withAccess({
+    kind: "public",
+    reason:
+      "The connected-session protocol authenticates its declared credential facts and answers refusals as protocol frames.",
+  })
+  .withOutput(framesOrRefusalSchema)
+  .withBodyLimit({
+    maxBytes: relayCaps.frameBytes,
+    onExceeded: () => new AgentPayloadTooLargeError({ what: "result", limitBytes: relayCaps.frameBytes }),
+  })
+  .withDocs({ summary: "Accept this instance's acknowledgements, results and deregistration" })
+  .withMiddleware(agentConnectHeaders)
+  .handle(async ({ app, input }, credentials) => {
+    try {
+      return await app.connectFrames(input, credentials);
+    } catch (error) {
+      if (error instanceof AgentRegisterRefusedError) return refusal(error) as never;
+      throw error;
+    }
+  })
+
+  .build();

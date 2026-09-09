@@ -1,5 +1,11 @@
+/**
+ * `/api/v1/agents` - the current agents REST family: CRUD over a project's
+ * agents, a scripted test run, and the relay call to an online connected
+ * agent. One flat declaration, mounted by the process on its project door.
+ */
 import {
   AgentApi,
+  AgentPayloadTooLargeError,
   agentListResponseSchema,
   agentResponseSchema,
   agentRestParamsSchema,
@@ -7,17 +13,20 @@ import {
   agentTestRunResponseSchema,
   archiveResultSchema,
   createAgentRequestSchema,
+  relayCallBodySchema,
+  relayCallResponseSchema,
+  relayPayloadCaps,
   updateAgentRequestSchema,
   type AgentOverview,
 } from "@langwatch/agent-contract";
-import { defineRestRouter, MANAGEMENT_API_VERSION, projectRestFacts } from "@langwatch/api/rest";
 import {
   createFamilyErrorHandler,
-  mountProjectRestRouter,
+  defineRestMiddleware,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
   NotFoundError,
+  projectRestFacts,
   UnprocessableEntityError,
-  type AppRestSecurity,
-  type MountableRestApp,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import {
@@ -26,17 +35,13 @@ import {
   InvalidAgentConfigError,
 } from "@langwatch/agent-contract";
 import { z } from "zod";
-import { registerCallEndpoint, type AgentCallDeps } from "./agent-call.rest.ts";
-import { registerConnectEndpoints } from "./agent-connect.rest.ts";
 
-export type AgentPlatformUrlBuilder = (input: {
-  projectSlug: string;
-  agentId: string;
-  agentType: string;
-}) => string;
+export { relayCallBodySchema, relayCallResponseSchema } from "@langwatch/agent-contract";
 
-export function createAgentRestRouter(platformUrl: AgentPlatformUrlBuilder) {
-  const response = (agent: AgentOverview, projectSlug: string) => ({
+const traceparent = defineRestMiddleware("traceparent", z.string().nullable());
+
+function response(agent: AgentOverview, app: AgentApi, projectSlug: string) {
+  return {
     id: agent.id,
     name: agent.name,
     type: agent.type,
@@ -53,123 +58,146 @@ export function createAgentRestRouter(platformUrl: AgentPlatformUrlBuilder) {
     notSelectableReason: agent.notSelectableReason,
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
-    platformUrl: platformUrl({ projectSlug, agentId: agent.id, agentType: agent.type }),
-  });
-  return defineRestRouter(AgentApi)
-    .withNamespace("agents")
-    .withVersion(MANAGEMENT_API_VERSION)
-
-    .get("/", "listAgents")
-    .withQuery(agentRestQuerySchema)
-    .withPermission("project:view")
-    .withOutput(agentListResponseSchema)
-    .withDocs({ summary: "List agents with their current presence and owner" })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, facts) => {
-      const page = await app.listWithPresence({
-        ...input,
-        projectId: scope.id,
-        viewerUserId: facts.viewerUserId,
-      });
-
-      return {
-        pagination: page.pagination,
-        data: page.data.map((agent) => response(agent, facts.projectSlug)),
-      };
-    })
-
-    .post("/", "createAgent")
-    .withInput(createAgentRequestSchema)
-    .withPermission("project:update")
-    .withOutput(agentResponseSchema)
-    .withStatus(201)
-    .withDocs({ summary: "Create an authored agent; connected agents register through the SDK" })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, facts) => {
-      const created = await app.create({ ...input, projectId: scope.id });
-      const agent = await app.getById({
-        id: created.id,
-        projectId: scope.id,
-        viewerUserId: facts.viewerUserId,
-      });
-
-      return response(agent, facts.projectSlug);
-    })
-
-    .get("/:id", "getAgent")
-    .withParams(agentRestParamsSchema)
-    .withPermission("project:view")
-    .withOutput(agentResponseSchema)
-    .withDocs({ summary: "Get an agent in the caller's project" })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, facts) => {
-      const agent = await app.getById({
-        ...input,
-        projectId: scope.id,
-        viewerUserId: facts.viewerUserId,
-      });
-
-      return response(agent, facts.projectSlug);
-    })
-
-    .patch("/:id", "updateAgent")
-    .withParams(agentRestParamsSchema)
-    .withInput(updateAgentRequestSchema)
-    .withPermission("project:update")
-    .withOutput(agentResponseSchema)
-    .withDocs({ summary: "Update an authored agent" })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, facts) => {
-      await app.update({ ...input, projectId: scope.id });
-      const agent = await app.getById({
-        id: input.id,
-        projectId: scope.id,
-        viewerUserId: facts.viewerUserId,
-      });
-
-      return response(agent, facts.projectSlug);
-    })
-
-    .put("/:id", "replaceAgent")
-    .withParams(agentRestParamsSchema)
-    .withInput(updateAgentRequestSchema)
-    .withPermission("project:update")
-    .withOutput(agentResponseSchema)
-    .withDocs({ summary: "Update an authored agent; PUT retains partial update semantics" })
-    .withMiddleware(projectRestFacts)
-    .handle(async ({ app, input, scope }, facts) => {
-      await app.update({ ...input, projectId: scope.id });
-      const agent = await app.getById({
-        id: input.id,
-        projectId: scope.id,
-        viewerUserId: facts.viewerUserId,
-      });
-
-      return response(agent, facts.projectSlug);
-    })
-
-    .delete("/:id", "archiveAgent")
-    .withParams(agentRestParamsSchema)
-    .withPermission("project:delete")
-    .withOutput(archiveResultSchema)
-    .withDocs({ summary: "Archive an agent while keeping its runs" })
-    .handle(async ({ app, input, scope }) => {
-      const agent = await app.archive({ ...input, projectId: scope.id });
-
-      return { id: agent.id, name: agent.name, type: agent.type, archivedAt: agent.archivedAt };
-    })
-
-    .post("/:id/test", "testAgent")
-    .withParams(agentRestParamsSchema)
-    .withPermission("scenarios:create")
-    .withOutput(agentTestRunResponseSchema)
-    .withDocs({ summary: "Schedule a scripted test run and return its run identifiers" })
-    .withMiddleware(projectRestFacts)
-    .handle(({ app, input, scope }, facts) =>
-      app.testRun({ agentId: input.id, projectId: scope.id, actorId: facts.actorId }),
-    )
-    .build();
+    platformUrl: app.platformUrl({ projectSlug, agentId: agent.id, agentType: agent.type }),
+  };
 }
+
+const relayMaxBytes = relayPayloadCaps().envelopeBytes;
+
+export const agentRest = defineRestRouter(AgentApi)
+  .withNamespace("agents")
+  .withVersion(MANAGEMENT_API_VERSION)
+
+  .get("/", "listAgents")
+  .withQuery(agentRestQuerySchema)
+  .withPermission("project:view")
+  .withOutput(agentListResponseSchema)
+  .withDocs({ summary: "List agents with their current presence and owner" })
+  .withMiddleware(projectRestFacts)
+  .handle(async ({ app, input, scope }, facts) => {
+    const page = await app.listWithPresence({
+      ...input,
+      projectId: scope.id,
+      viewerUserId: facts.viewerUserId,
+    });
+
+    return {
+      pagination: page.pagination,
+      data: page.data.map((agent) => response(agent, app, facts.projectSlug)),
+    };
+  })
+
+  .post("/", "createAgent")
+  .withInput(createAgentRequestSchema)
+  .withPermission("project:update")
+  .withOutput(agentResponseSchema)
+  .withStatus(201)
+  .withDocs({ summary: "Create an authored agent; connected agents register through the SDK" })
+  .withMiddleware(projectRestFacts)
+  .handle(async ({ app, input, scope }, facts) => {
+    const created = await app.create({ ...input, projectId: scope.id });
+    const agent = await app.getById({
+      id: created.id,
+      projectId: scope.id,
+      viewerUserId: facts.viewerUserId,
+    });
+
+    return response(agent, app, facts.projectSlug);
+  })
+
+  .get("/:id", "getAgent")
+  .withParams(agentRestParamsSchema)
+  .withPermission("project:view")
+  .withOutput(agentResponseSchema)
+  .withDocs({ summary: "Get an agent in the caller's project" })
+  .withMiddleware(projectRestFacts)
+  .handle(async ({ app, input, scope }, facts) => {
+    const agent = await app.getById({
+      ...input,
+      projectId: scope.id,
+      viewerUserId: facts.viewerUserId,
+    });
+
+    return response(agent, app, facts.projectSlug);
+  })
+
+  .patch("/:id", "updateAgent")
+  .withParams(agentRestParamsSchema)
+  .withInput(updateAgentRequestSchema)
+  .withPermission("project:update")
+  .withOutput(agentResponseSchema)
+  .withDocs({ summary: "Update an authored agent" })
+  .withMiddleware(projectRestFacts)
+  .handle(async ({ app, input, scope }, facts) => {
+    await app.update({ ...input, projectId: scope.id });
+    const agent = await app.getById({
+      id: input.id,
+      projectId: scope.id,
+      viewerUserId: facts.viewerUserId,
+    });
+
+    return response(agent, app, facts.projectSlug);
+  })
+
+  .put("/:id", "replaceAgent")
+  .withParams(agentRestParamsSchema)
+  .withInput(updateAgentRequestSchema)
+  .withPermission("project:update")
+  .withOutput(agentResponseSchema)
+  .withDocs({ summary: "Update an authored agent; PUT retains partial update semantics" })
+  .withMiddleware(projectRestFacts)
+  .handle(async ({ app, input, scope }, facts) => {
+    await app.update({ ...input, projectId: scope.id });
+    const agent = await app.getById({
+      id: input.id,
+      projectId: scope.id,
+      viewerUserId: facts.viewerUserId,
+    });
+
+    return response(agent, app, facts.projectSlug);
+  })
+
+  .delete("/:id", "archiveAgent")
+  .withParams(agentRestParamsSchema)
+  .withPermission("project:delete")
+  .withOutput(archiveResultSchema)
+  .withDocs({ summary: "Archive an agent while keeping its runs" })
+  .handle(async ({ app, input, scope }) => {
+    const agent = await app.archive({ ...input, projectId: scope.id });
+
+    return { id: agent.id, name: agent.name, type: agent.type, archivedAt: agent.archivedAt };
+  })
+
+  .post("/:id/test", "testAgent")
+  .withParams(agentRestParamsSchema)
+  .withPermission("scenarios:create")
+  .withOutput(agentTestRunResponseSchema)
+  .withDocs({ summary: "Schedule a scripted test run and return its run identifiers" })
+  .withMiddleware(projectRestFacts)
+  .handle(({ app, input, scope }, facts) =>
+    app.testRun({ agentId: input.id, projectId: scope.id, actorId: facts.actorId }),
+  )
+
+  .post("/:id/call", "callConnectedAgent")
+  .withParams(agentRestParamsSchema)
+  .withInput(relayCallBodySchema)
+  .withPermission("scenarios:create")
+  .withOutput(relayCallResponseSchema)
+  .withDocs({ summary: "Send one conversation turn to an online connected agent" })
+  .withBodyLimit({
+    maxBytes: relayMaxBytes,
+    onExceeded: () =>
+      new AgentPayloadTooLargeError({ what: "envelope", limitBytes: relayMaxBytes }),
+  })
+  .withMiddleware(projectRestFacts, traceparent)
+  .handle(({ app, input, scope, signal }, facts, header) =>
+    app.call(
+      { ...input, projectId: scope.id },
+      { viewerUserId: facts.viewerUserId, traceparent: header, signal },
+    ),
+  )
+
+  .build();
 
 export const agentRestErrorHandler = (boundary: RestErrorHandler): RestErrorHandler =>
   createFamilyErrorHandler({
@@ -187,33 +215,3 @@ export const agentRestErrorHandler = (boundary: RestErrorHandler): RestErrorHand
       return error;
     },
   });
-
-export interface AgentsV1Deps {
-  security: AppRestSecurity;
-  agents: () => AgentApi;
-  agentPlatformUrl: AgentPlatformUrlBuilder;
-  connect?: { relayMaxPayloadMb?: number };
-  call?: Omit<AgentCallDeps, "agents">;
-}
-
-export function createAgentV1RestApp(deps: AgentsV1Deps): MountableRestApp {
-  const family = deps.security.createProjectVersionedApp({
-    name: "agents-v1",
-    basePath: "/api/v1/agents",
-    errorEnvelope: "legacy",
-    staticGeneration: "v1",
-    errorHandler: agentRestErrorHandler,
-  });
-
-  if (deps.connect) {
-    registerConnectEndpoints({ family, app: deps.agents, ...deps.connect });
-  }
-  mountProjectRestRouter({
-    family,
-    transport: createAgentRestRouter(deps.agentPlatformUrl).router(),
-    app: deps.agents,
-  });
-  if (deps.call) registerCallEndpoint({ family, deps: { agents: deps.agents, ...deps.call } });
-
-  return family.service.build();
-}

@@ -3,31 +3,7 @@
   "policy": "feature-shape",
   "entries": [
     {
-      "key": "agent|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "agent|installer-not-booted",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "agent|legacy-transport-runtime",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "agent|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "agent|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "agent|persistence-adapter",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "agent|postgres-without-memory",
       "measured": "2026-09-08"
     },
     {
@@ -36,10 +12,6 @@
     },
     {
       "key": "agent|testing-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "agent|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {
