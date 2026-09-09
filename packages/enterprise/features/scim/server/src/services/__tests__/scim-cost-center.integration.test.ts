@@ -9,7 +9,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PostgresDepartmentAdapter } from "@langwatch/enterprise-governance-server/testing";
-import { EntitlementService } from "@langwatch/entitlement-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -39,7 +39,7 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-class EnterprisePlan extends EntitlementService {
+class EnterprisePlan implements Pick<EntitlementApi, "getActivePlan"> {
   async getActivePlan() {
     return {
       planSource: "free" as const,

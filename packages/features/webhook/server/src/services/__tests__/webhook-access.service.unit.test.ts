@@ -1,4 +1,4 @@
-import { EntitlementService, type Plan } from "@langwatch/entitlement-contract";
+import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { WebhookEndpointsNotEntitledError } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 import { WebhookAccessService } from "../webhook-access.service.ts";
@@ -16,10 +16,8 @@ const plan = (webhookEndpointsEnabled: boolean): Plan => ({
   prices: { USD: 0, EUR: 0 },
 });
 
-class FixedEntitlementService extends EntitlementService {
-  constructor(private readonly activePlan: Plan) {
-    super();
-  }
+class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {
+  constructor(private readonly activePlan: Plan) {}
 
   getActivePlan(): Promise<Plan> {
     return Promise.resolve(this.activePlan);
@@ -46,8 +44,9 @@ describe("WebhookAccessService", () => {
 
     /** @scenario Endpoint access uses the shared entitlement service */
     it("names no webhook-specific entitlement service or plan repository as a constructor dependency", () => {
-      // WebhookAccessService.create takes exactly the shared EntitlementService
-      // (imported from @langwatch/entitlement-contract) as its only dependency;
+      // WebhookAccessService.create takes exactly the shared entitlement api
+      // (Pick<EntitlementApi, "getActivePlan">, from @langwatch/entitlement-contract)
+      // as its only dependency;
       // it declares no plan repository or webhook-local entitlement type of its
       // own, so this is the whole entitlement surface the service can reach.
       expect(WebhookAccessService.create.length).toBe(1);

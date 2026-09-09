@@ -4,7 +4,7 @@ import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { AuthService } from "@langwatch/auth-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { ScimService as ScimServiceContract } from "@langwatch/enterprise-scim-contract";
-import type { EntitlementService } from "@langwatch/entitlement-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { UserService } from "@langwatch/user-contract";
 import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port.ts";
 import { PrismaScimRepository } from "../repositories/prisma/scim.repository.ts";
@@ -16,7 +16,7 @@ export interface PostgresScimAdapterOptions {
   users: UserService;
   auth: AuthService;
   governance: GovernanceService;
-  entitlements: EntitlementService;
+  entitlements: Pick<EntitlementApi, "getActivePlan">;
   lifecycle: ScimSyncLifecyclePort;
   provenOffboarding: boolean;
 }

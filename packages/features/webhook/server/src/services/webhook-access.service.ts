@@ -1,10 +1,14 @@
-import type { EntitlementService } from "@langwatch/entitlement-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { WebhookEndpointsNotEntitledError } from "@langwatch/webhook-contract";
 
 export class WebhookAccessService {
-  private constructor(private readonly entitlements: EntitlementService) {}
+  private constructor(
+    private readonly entitlements: Pick<EntitlementApi, "getActivePlan">,
+  ) {}
 
-  static create(entitlements: EntitlementService): WebhookAccessService {
+  static create(
+    entitlements: Pick<EntitlementApi, "getActivePlan">,
+  ): WebhookAccessService {
     return new WebhookAccessService(entitlements);
   }
 

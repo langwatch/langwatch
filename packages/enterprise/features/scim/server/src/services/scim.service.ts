@@ -2,7 +2,7 @@
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import crypto from "node:crypto";
 import type { UserProfile } from "@langwatch/user-contract";
-import type { EntitlementService } from "@langwatch/entitlement-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   type ScimCreateUserRequest,
   type ScimCreateGroupRequest,
@@ -53,7 +53,7 @@ export class ScimService extends ScimServiceContract {
   private readonly repository: ScimRepositoryPort;
   private readonly userOperations: ScimProvisioningService;
   private readonly groups: ScimDirectoryService;
-  private readonly entitlements: EntitlementService;
+  private readonly entitlements: Pick<EntitlementApi, "getActivePlan">;
   private readonly identities: ScimDirectoryIdentityService;
   private readonly lifecycle: ScimSyncLifecyclePort;
 
@@ -72,7 +72,7 @@ export class ScimService extends ScimServiceContract {
     users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
-    entitlements: EntitlementService;
+    entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecyclePort;
     provenOffboarding: boolean;
   }) {
@@ -101,7 +101,7 @@ export class ScimService extends ScimServiceContract {
     users: ScimUserProvisioning;
     auth: ScimSessionRevocation;
     governance: ScimDepartmentAssignment;
-    entitlements: EntitlementService;
+    entitlements: Pick<EntitlementApi, "getActivePlan">;
     lifecycle: ScimSyncLifecyclePort;
     provenOffboarding: boolean;
   }): ScimService {

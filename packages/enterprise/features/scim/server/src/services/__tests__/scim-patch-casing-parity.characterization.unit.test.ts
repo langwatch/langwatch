@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { ScimDepartmentAssignment } from "../scim-cost-center.service.ts";
-import { EntitlementService } from "@langwatch/entitlement-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
 import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
 import { describe, expect, it, vi } from "vitest";
@@ -18,7 +18,7 @@ const patchSchema = "urn:ietf:params:scim:api:messages:2.0:PatchOp";
 const parse = (operations: unknown[]) =>
   scimPatchRequestSchema.parse({ schemas: [patchSchema], Operations: operations });
 
-class EnterpriseEntitlements extends EntitlementService {
+class EnterpriseEntitlements implements Pick<EntitlementApi, "getActivePlan"> {
   async getActivePlan() {
     return {
       planSource: "free" as const,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { EntitlementService } from "@langwatch/entitlement-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ScimService } from "../scim.service.ts";
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { ScimRepositoryPort } from "../../ports/scim-repository.port.ts";
@@ -47,10 +47,8 @@ function repository(overrides: Record<string, unknown> = {}): ScimRepositoryPort
   } as ScimRepositoryPort;
 }
 
-class FixedEntitlementService extends EntitlementService {
-  constructor(private readonly enterprise: boolean) {
-    super();
-  }
+class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {
+  constructor(private readonly enterprise: boolean) {}
 
   async getActivePlan() {
     return {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { EntitlementService } from "@langwatch/entitlement-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
   type ScimCreateUserRequest,
@@ -32,7 +32,7 @@ function user(overrides: Partial<UserProfile> = {}): UserProfile {
   };
 }
 
-class EnterpriseEntitlements extends EntitlementService {
+class EnterpriseEntitlements implements Pick<EntitlementApi, "getActivePlan"> {
   async getActivePlan() {
     return {
       planSource: "free" as const,
