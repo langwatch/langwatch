@@ -4391,6 +4391,9 @@ importers:
 
   packages/features/automation/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
@@ -10500,6 +10503,9 @@ importers:
 
   packages/features/user/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../handled-error

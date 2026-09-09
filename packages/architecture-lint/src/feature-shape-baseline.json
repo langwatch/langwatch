@@ -127,14 +127,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "auth|legacy-transport-runtime",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "auth|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "auth|nested-web-entry",
       "measured": "2026-09-08"
     },

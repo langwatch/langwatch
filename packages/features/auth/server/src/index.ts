@@ -10,8 +10,6 @@ export {
   type AuthRequestContext,
   type AuthSession,
 } from "./app/auth.app.ts";
-// Neither tRPC transport this feature owns is exported: the front door and the
-// public-environment reader both still name deleted legacy builders.
 export {
   SIGN_UP_VERIFICATION_TTL_MS,
   SignUpVerificationService,
@@ -78,26 +76,42 @@ export {
 
 // The `/api/auth` REST family: the Better Auth catch-all, the browser's
 // session poll, the explicit logout and the legacy project-token check. The
-// one Better Auth instance arrives as a port for the reason
+// one Better Auth instance arrives on the door's api for the reason
 // `ApiAuthComposition` states — a second one verifies nothing and reads as
 // "signed out" to every caller.
 export {
-  createAuthRestApp,
+  authRest,
+  AuthDoorApi,
   type AuthRestFederatedLogout,
-  type AuthRestPorts,
   type AuthRestSession,
-} from "./transport/api-rest/auth.api.ts";
+} from "./transport/auth.rest.ts";
 
 // The `/api/auth/cli` device grant: RFC 8628's three CLI endpoints plus the
 // four browser-side ones that resolve, approve, deny and end a device session.
 // All seven are one family because they are one state machine over one
 // keyspace — see the transport's docblock.
 export {
-  createAuthCliDeviceFlowRestApp,
-  type AuthCliDeviceFlowRestPorts,
-  type CliBrowserSessionPort,
+  authCliDeviceFlowRest,
+  AuthCliDeviceFlowApi,
+  type CliBrowserSession,
   type CliPersonalWorkspace,
-} from "./transport/api-rest/auth-cli-device-flow.api.ts";
+} from "./transport/auth-cli-device-flow.rest.ts";
+
+// The unauthenticated `frontDoor.*` surface (D13, ADR-117 §6), and the one
+// deployment fact the sign-in page reads beside it. `publicEnv` is a single
+// query at the ROOT of the tRPC surface, so a process merges its declaration
+// into the root rather than nesting it.
+export {
+  callerEmailFact,
+  FrontDoorApi,
+  frontDoorTrpcTransport,
+} from "./transport/front-door.trpc.ts";
+export {
+  operatorAllowListFact,
+  PublicEnvApi,
+  publicEnvTrpcTransport,
+  viewerEmailFact,
+} from "./transport/public-env.trpc.ts";
 export { CliDeviceSessionStorePort } from "./ports/cli-device-session-store.port.ts";
 export {
   ACCESS_TOKEN_TTL_SECONDS,

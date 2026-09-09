@@ -38,6 +38,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@simplewebauthn/server": "^13.3.2",
