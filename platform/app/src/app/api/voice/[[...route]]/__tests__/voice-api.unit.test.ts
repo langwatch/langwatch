@@ -369,6 +369,9 @@ describe("Feature: Voice session HTTP door", () => {
             exp: Date.now() + 60_000,
           },
         });
+        // Provider not ready: the finish writes the (empty) browser transcript
+        // and succeeds without creating an agent.
+        fetchCallRecord.mockResolvedValue(null);
 
         const res = await post("/api/voice/session/conv_1/finish", {
           projectId: PROJECT_ID,
@@ -379,7 +382,7 @@ describe("Feature: Voice session HTTP door", () => {
           endedAt: 2,
         });
 
-        expect(res.status).not.toBe(403);
+        expect(res.status).toBe(200);
       });
     });
   });

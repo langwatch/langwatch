@@ -11,7 +11,17 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Scenario } from "~/generated/prisma/client";
 import type { AgentWithFields } from "~/server/agents/agent-fields";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { createVoiceSessionPortsFromServices } from "../voice-session.ports";
+
+// findExistingRun reaches the app layer directly for the run row; the fake lets
+// each case hand back a run (or none) without a datastore.
+const { getScenarioRunData } = vi.hoisted(() => ({
+  getScenarioRunData: vi.fn(),
+}));
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({ simulations: { runs: { getScenarioRunData } } }),
+}));
 
 function fakeAgentService(over: {
   getById?: (input: {
@@ -206,6 +216,77 @@ describe("Feature: voice-session ports composition", () => {
         });
 
         expect(result).toBeNull();
+      });
+    });
+  });
+
+  describe("given findExistingRun", () => {
+    const ports = () =>
+      createVoiceSessionPortsFromServices({
+        agentService: fakeAgentService({}),
+        scenarioService: fakeScenarioService({}),
+      });
+
+    describe("when the run carries well-formed metadata", () => {
+      it("maps agent id, source, recording and scenario set through", async () => {
+        getScenarioRunData.mockResolvedValueOnce({
+          status: ScenarioRunStatus.SUCCESS,
+          scenarioSetId: "set_1",
+          metadata: {
+            agentId: "agent_row",
+            source: "provider",
+            audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+          },
+        });
+
+        const existing = await ports().findExistingRun({
+          projectId: "p1",
+          scenarioRunId: "run_1",
+        });
+
+        expect(existing).toEqual({
+          agentId: "agent_row",
+          status: ScenarioRunStatus.SUCCESS,
+          source: "provider",
+          audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+          scenarioSetId: "set_1",
+        });
+      });
+    });
+
+    describe("when the metadata fields are the wrong type", () => {
+      it("narrows a non-source and a non-string recording to null", async () => {
+        getScenarioRunData.mockResolvedValueOnce({
+          status: ScenarioRunStatus.SUCCESS,
+          scenarioSetId: undefined,
+          metadata: { agentId: 7, source: 42, audioUrl: {} },
+        });
+
+        const existing = await ports().findExistingRun({
+          projectId: "p1",
+          scenarioRunId: "run_1",
+        });
+
+        expect(existing).toEqual({
+          agentId: null,
+          status: ScenarioRunStatus.SUCCESS,
+          source: null,
+          audioUrl: null,
+          scenarioSetId: null,
+        });
+      });
+    });
+
+    describe("when no run exists for the id", () => {
+      it("answers null", async () => {
+        getScenarioRunData.mockResolvedValueOnce(null);
+
+        const existing = await ports().findExistingRun({
+          projectId: "p1",
+          scenarioRunId: "missing",
+        });
+
+        expect(existing).toBeNull();
       });
     });
   });

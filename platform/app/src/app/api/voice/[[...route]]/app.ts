@@ -64,6 +64,18 @@ type VoicePermission =
   | "scenarios:view"
   | "evaluations:manage";
 
+/** A voice call always needs scenarios:create; creating an agent on the way in
+ *  (a mint with no saved row, a finish whose token names no agent) also needs
+ *  evaluations:manage up front (#8021 AC1/AC2). */
+const voicePermissionsFor = ({
+  createsAgent,
+}: {
+  createsAgent: boolean;
+}): readonly VoicePermission[] =>
+  createsAgent
+    ? ["scenarios:create", "evaluations:manage"]
+    : ["scenarios:create"];
+
 /** The proof a request cleared the voice door's session auth and feature gate,
  *  carried to {@link requirePermissions} so the permission probe reuses the
  *  same session. */
@@ -162,9 +174,7 @@ secured
       await requireProject({
         req: c.req.raw,
         projectId,
-        permissions: agentRowId
-          ? ["scenarios:create"]
-          : ["scenarios:create", "evaluations:manage"],
+        permissions: voicePermissionsFor({ createsAgent: !agentRowId }),
       });
 
       const result = await mintVoiceSession({
@@ -228,8 +238,8 @@ secured
         projectId: body.projectId,
       });
 
-      // Then the token must verify, and its project be the authorised one, or
-      // the finish is refused before anything is read or written.
+      // Then the token must verify, and its project must be the authorised
+      // one, or the finish is refused before anything is read or written.
       const token = verifyVoiceSessionToken({
         token: body.sessionToken,
         now: Date.now(),
@@ -245,9 +255,7 @@ secured
       await requirePermissions(
         witness,
         body.projectId,
-        token.agentId
-          ? ["scenarios:create"]
-          : ["scenarios:create", "evaluations:manage"],
+        voicePermissionsFor({ createsAgent: !token.agentId }),
       );
 
       const result = await finishVoiceSession({

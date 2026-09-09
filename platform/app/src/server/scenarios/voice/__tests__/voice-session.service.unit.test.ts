@@ -241,6 +241,7 @@ describe("finishVoiceSession", () => {
                 status: ScenarioRunStatus.SUCCESS,
                 source: "provider" as const,
                 audioUrl: null,
+                scenarioSetId: null,
               }
             : null,
         );
@@ -266,6 +267,9 @@ describe("finishVoiceSession", () => {
 
         expect(writeCallRun).toHaveBeenCalledTimes(1);
         expect(first.runId).toBe(second.runId);
+        // The token names no agent, so the short-circuit answers with the id
+        // the existing run attached (terminalRunResult's agentId fallback).
+        expect(second.agentId).toBe("agent_row");
       });
     });
 
@@ -284,6 +288,7 @@ describe("finishVoiceSession", () => {
               status: ScenarioRunStatus.SUCCESS,
               source: "provider" as const,
               audioUrl: null,
+              scenarioSetId: null,
             })),
           },
         });
@@ -313,6 +318,7 @@ describe("finishVoiceSession", () => {
               source: "browser" as const,
               // Same-origin proxy URL the transport wrote, read back verbatim.
               audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+              scenarioSetId: "set_terminal",
             })),
           },
         });
@@ -329,6 +335,9 @@ describe("finishVoiceSession", () => {
         expect(result.audioUrl).toBe(
           "/api/voice/session/conv_1/audio?projectId=p1",
         );
+        // The persisted set id deep-links the retried run (AC14), without
+        // re-resolving the scenario.
+        expect(result.scenarioSetId).toBe("set_terminal");
       });
 
       /** @scenario "A retried hang-up leaves a terminal run untouched" */
@@ -349,6 +358,7 @@ describe("finishVoiceSession", () => {
               status: ScenarioRunStatus.SUCCESS,
               source: "provider" as const,
               audioUrl: null,
+              scenarioSetId: null,
             })),
           },
         });
@@ -381,6 +391,7 @@ describe("finishVoiceSession", () => {
               status: ScenarioRunStatus.IN_PROGRESS,
               source: "provider" as const,
               audioUrl: null,
+              scenarioSetId: null,
             })),
           },
         });

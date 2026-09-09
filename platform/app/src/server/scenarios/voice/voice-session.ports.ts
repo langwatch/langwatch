@@ -51,6 +51,27 @@ export interface VoiceSessionServices {
   };
 }
 
+/** The terminal-retry fields a finished run persisted, narrowed from the loose
+ *  run metadata to the shapes {@link VoiceSessionPorts.findExistingRun}
+ *  promises. The persisted audioUrl is already the same-origin proxy url the
+ *  transport wrote (fetchCallRecord sets it from audioProxyUrl), so it is kept
+ *  as-is. */
+function narrowPersistedRunFields(rawMetadata: unknown): {
+  agentId: string | null;
+  source: "provider" | "browser" | null;
+  audioUrl: string | null;
+} {
+  const metadata = rawMetadata as
+    | { agentId?: unknown; source?: unknown; audioUrl?: unknown }
+    | undefined;
+  const { agentId, source, audioUrl } = metadata ?? {};
+  return {
+    agentId: typeof agentId === "string" ? agentId : null,
+    source: source === "provider" || source === "browser" ? source : null,
+    audioUrl: typeof audioUrl === "string" ? audioUrl : null,
+  };
+}
+
 /**
  * Compose the ports from already-built services. Split out from
  * {@link createVoiceSessionPorts} so a unit test can pass in-memory fakes for
@@ -91,23 +112,17 @@ export function createVoiceSessionPortsFromServices({
         scenarioRunId,
       });
       if (!run) return null;
-      const metadata = run.metadata as
-        | { agentId?: unknown; source?: unknown; audioUrl?: unknown }
-        | undefined;
-      const agentId = metadata?.agentId;
-      const source = metadata?.source;
-      const audioUrl = metadata?.audioUrl;
       // The status decides whether a retried finish short-circuits (terminal)
       // or re-drives a half-written run (non-terminal, #7973). The persisted
-      // source and recording let a terminal retry report the original run's
-      // transcript origin and Play control (AC14). The persisted audioUrl is
-      // already the same-origin proxy URL the transport wrote (fetchCallRecord
-      // sets it from audioProxyUrl), so it is returned as-is.
+      // source, recording and set let a terminal retry report the original
+      // run's transcript origin, Play control and deep link (AC14).
       return {
-        agentId: typeof agentId === "string" ? agentId : null,
+        ...narrowPersistedRunFields(run.metadata),
         status: run.status,
-        source: source === "provider" || source === "browser" ? source : null,
-        audioUrl: typeof audioUrl === "string" ? audioUrl : null,
+        // The set the run landed in, so a terminal retry deep-links it without
+        // re-resolving the (possibly archived) scenario (#7973 AC1).
+        scenarioSetId:
+          typeof run.scenarioSetId === "string" ? run.scenarioSetId : null,
       };
     },
 

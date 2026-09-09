@@ -201,6 +201,9 @@ export interface VoiceSessionPorts {
     status: ScenarioRunStatus;
     source: CallRecord["source"] | null;
     audioUrl: string | null;
+    /** The set the run landed in, so a terminal retry deep-links it (AC14).
+     *  Null when the run carries none (a drawer call). */
+    scenarioSetId: string | null;
   } | null>;
   /** Create the voice agent row on hang-up when the drawer had none yet. */
   createVoiceAgent(input: {
@@ -437,18 +440,17 @@ async function resolveScenarioContext(
   return { scenarioId, scenarioSetId: scenario.scenarioSetId };
 }
 
-type ExistingRun = {
-  agentId: string | null;
-  status: ScenarioRunStatus;
-  source: CallRecord["source"] | null;
-  audioUrl: string | null;
-};
+type ExistingRun = NonNullable<
+  Awaited<ReturnType<VoiceSessionPorts["findExistingRun"]>>
+>;
 
 /**
  * The result for a terminal run returned untouched: a duplicate finish writes
  * nothing (AC14, #7973 AC1). The agent id comes from the token when it names
- * one, else from the run that already landed; the transcript source and
- * recording come from that run, so a retry keeps the Play control.
+ * one, else from the run that already landed; the transcript source, recording
+ * and scenario set all come from that run, so a retry keeps the Play control
+ * and the deep link to the set (AC14) — the scenario is deliberately not
+ * re-resolved, so an archived scenario cannot break the retry (#7973 AC1).
  */
 function terminalRunResult(
   scenarioRunId: string,
@@ -462,6 +464,7 @@ function terminalRunResult(
     hasFetchFailed: false,
     hasAudio: existing.audioUrl !== null,
     audioUrl: existing.audioUrl ?? undefined,
+    scenarioSetId: existing.scenarioSetId ?? undefined,
   };
 }
 
