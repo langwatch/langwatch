@@ -1,8 +1,8 @@
-# ADR-129: better-auth is a boundary over identity services
+# ADR-131: better-auth is a boundary over identity services
 
 **Date:** 2026-08-28
 
-**Status:** Proposed
+**Status:** Accepted
 
 **Builds on:** [ADR-115](115-identity-ships-as-packages.md) — identity ships as
 two packages and the app has ONE composition root. This ADR applies the same
@@ -16,9 +16,6 @@ serialises a `HandledError`, it does not rebuild one),
 branches), [ADR-117](117-identifier-first-front-door.md) (the front door the
 boundary serves), [ADR-127](127-an-identifier-is-an-aggregate.md),
 `dev/docs/best_practices/repository-service.md`.
-
-> The ADR number is free as of 2026-08-28 on main and in every open PR
-> (#7648 holds 128). A crowded range: check again before merging.
 
 ## Context
 

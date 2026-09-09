@@ -5,7 +5,7 @@ Feature: The auth boundary is classes over identity services
   So that a sign-in rule lives in one testable place, a lookup exists once,
   and a framework hook cannot decide anything about the data on its own
 
-  # ADR-129 (dev/docs/adr/129-better-auth-is-a-boundary-over-identity-services.md):
+  # ADR-131 (dev/docs/adr/131-better-auth-is-a-boundary-over-identity-services.md):
   # ADR-115's discipline applied to the layer it left alone.
   #
   #   BOUNDARY     better-auth/ · routers/{auth,user}.ts · routes/auth.ts
@@ -18,7 +18,7 @@ Feature: The auth boundary is classes over identity services
   # Every scenario is a graph fact a ratchet test walks, like identity-packages.feature.
   # Current-main SSO compatibility residuals are named explicitly: no new
   # residual may appear, and each removed residual must tighten the ratchet.
-  # Behaviour does not change: every scenario that was green before ADR-129
+  # Behaviour does not change: every scenario that was green before ADR-131
   # is green after it, and the bindings below add rules, not features.
 
   @unit

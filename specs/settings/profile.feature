@@ -118,9 +118,10 @@ Feature: Profile - who I am here, and where I am signed in
 
     @integration
     Scenario: A deployment that does not offer a thing does not list it
-      Given my deployment offers neither passkeys nor two-step verification
+      Given my deployment does not offer two-step verification
       When I open my profile
-      Then neither is listed as something I do not have
+      Then it is not listed as something I do not have
+      And my passkey row is still there, since every deployment offers one
 
     @integration
     Scenario: A read that fails says so without taking the band down

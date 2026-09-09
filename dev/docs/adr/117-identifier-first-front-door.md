@@ -517,7 +517,9 @@ answers:
 
 - **Shadow mode is deleted.** It compared the router against the legacy path
   on every live login. There is no legacy path to compare against, so the
-  comparison has no second party and the module that ran it is gone.
+  comparison has no second party and `signInRouterShadow.ts`, the module that
+  ran it, is deleted along with the `IDENTITY_ROUTER_V2` env entries that
+  gated it.
 - **The legacy screens are deleted** — the credential sign-in form, the
   password-up-front sign-up form, and the invitation landing that preceded
   `InviteLanding`. `/auth/signin` and `/auth/signup` are now the screen and

@@ -20,7 +20,7 @@ Replace the `NEXTAUTH_PROVIDER` one-method auth screens with identifier-first ro
   - No match at all → JIT if the connection allows, else deny with guidance.
 - `pendingSsoSetup`: reconciled once against identifier data, column dropped.
 - ADR-027 amendment: the global `before` hook's path blocking becomes per-method policy on the router. License-gate semantics preserved (SSO requires license; credential paths stay open). Carry over ADR-027's constants table and the `ssoRouteTableCanary.test.ts` discipline — every auth route keeps a reviewed classification.
-- Shadow mode compared every login against the legacy path before the flip. Both are gone: there is no legacy path left to compare against.
+- Shadow mode compared every login against the legacy path before the flip. Both are gone at bake end: `signInRouterShadow.ts` and the `IDENTITY_ROUTER_V2` flag it read are deleted, and there is no legacy path left to compare against.
 
 # Out of Scope
 

@@ -109,6 +109,7 @@ describe("RetroactiveUpdateService", () => {
     });
 
     describe("given the scenarios category is updated", () => {
+      /** @scenario "Retroactive updates select the matching event-log category" */
       it("updates scenario tables and only scenario-class event rows", async () => {
         const command = vi.fn().mockResolvedValue(undefined);
         const query = vi.fn().mockResolvedValue({ json: async () => [] });
@@ -159,6 +160,7 @@ describe("RetroactiveUpdateService", () => {
     });
 
     describe("given the experiments category is updated", () => {
+      /** @scenario "Retroactive updates select the matching event-log category" */
       it("updates experiment tables and only experiment-class event rows", async () => {
         const command = vi.fn().mockResolvedValue(undefined);
         const query = vi.fn().mockResolvedValue({ json: async () => [] });
@@ -206,6 +208,7 @@ describe("RetroactiveUpdateService", () => {
     });
 
     describe("when event-log category mutations overlap", () => {
+      /** @scenario "Event-log category mutations can run in parallel" */
       it("allows trace, scenario, and experiment mutations to coexist", async () => {
         const activeEventLogMutations: Array<{
           mutationId: string;
@@ -327,6 +330,7 @@ describe("RetroactiveUpdateService", () => {
     });
 
     describe("when a mutation is already in progress for a table", () => {
+      /** @scenario "Rate-limited to one mutation per tenant, category, and table" */
       /** @scenario Conflict error names the mutation IDs callers can kill */
       it("throws RetroactiveMutationInProgressError listing mutationId + table for every blocker", async () => {
         const command = vi.fn().mockResolvedValue(undefined);

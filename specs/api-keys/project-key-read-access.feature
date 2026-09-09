@@ -63,7 +63,7 @@ Feature: Read the project base API key
   Scenario: The base key is withheld from the session payload for project members
     Given I can update the project but not manage it
     When the application loads my organizations and projects
-    Then the project carries no base API key in the payload
+    Then the project's base API key is blank in the payload
 
   Scenario: Personal context remains usable when its base key is withheld
     Given I have a valid signed-in session for my personal workspace
