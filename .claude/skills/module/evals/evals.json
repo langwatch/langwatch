@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "Add a new 'saved-view' module: users can save a named set of trace filters per project, list them and delete them. Settings page under the project.",
-      "expected_output": "Creates modules/saved-view/{contract,server,web} with feature.json, a spec file written first, a catalogue.json subject, zod schemas with infer, a callable <Name>Api interface with its featureApi token, an installer built with defineFeature, an app class over private services, repository interfaces with Prisma and memory backends selected by defineRepositories, a flat tRPC declaration via defineTrpcContract in the contract and defineTrpcRouter / defineRestRouter, an apps/api composition that boots the installer with createApp, apps/ui catalogue and WebInstallation registrations, error codes registered in handled-error, and tests binding every scenario; runs scoped gates only.",
+      "expected_output": "Creates modules/saved-view/{contract,server,web} with feature.json, a spec file written first, a catalogue.json subject, zod schemas with infer, a callable <Name>Api interface with its moduleApi token, an installer built with defineModule, an app class over private services, repository interfaces with Prisma and memory backends selected by defineRepositories, a flat tRPC declaration via defineTrpcContract in the contract and defineTrpcRouter / defineRestRouter, an apps/api composition that boots the installer with createApp, apps/ui catalogue and WebInstallation registrations, error codes registered in handled-error, and tests binding every scenario; runs scoped gates only.",
       "files": []
     },
     {
@@ -52,7 +52,7 @@
     {
       "id": 9,
       "prompt": "Make the worker run the new dataset-normalization command.",
-      "expected_output": "Installs the dataset server in the capability root that owns the job with .withFeature, adds the catalogue entry, and calls out the job-registry.json change as deliberate; proves routability with the capability-mount test.",
+      "expected_output": "Installs the dataset server in the capability root that owns the job with .withModule, adds the catalogue entry, and calls out the job-registry.json change as deliberate; proves routability with the capability-mount test.",
       "files": []
     }
   ]

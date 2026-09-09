@@ -304,12 +304,12 @@ async function composeOps(
     .withProvided(ProjectApi, options.projects)
     .withProvided(AuditLogApi, options.auditLog)
     .withProvided(ApiKeyApi, options.apiKeys)
-    .withFeature(opsServer)
+    .withModule(opsServer)
     .boot({ role: "api" });
 
   resources?.own("api operator back office", () => runtime.stop());
 
-  return runtime.feature(opsServer).provided;
+  return runtime.module(opsServer).provided;
 }
 
 /**

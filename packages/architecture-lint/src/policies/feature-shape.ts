@@ -55,7 +55,7 @@ type FeatureShapeBaselineEntry = { feature: string; kind: FeatureShapeLegacyKind
 
 const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "contract-service":
-    "The contract's capability is <feature>.api.ts: the <Feature>Api interface plus its featureApi token. Delete the abstract service.",
+    "The contract's capability is <feature>.api.ts: the <Feature>Api interface plus its moduleApi token. Delete the abstract service.",
   "persistence-adapter":
     "Persistence is selected by defineRepositories in repositories/<feature>-repositories.registry.ts; the app builds its services from the repositories it is handed. Delete the adapter.",
   "fixtures-directory":
@@ -73,11 +73,11 @@ const TARGET: Record<FeatureShapeLegacyKind, string> = {
   "memory-twin-untested":
     "A memory twin is proven by repositories/__tests__/<x>.repository.contract.test.ts running the same cases against the memory and the Prisma backends; an installation test booting over the twin proves nothing about the twin.",
   "no-installer":
-    'The server package is installed through src/<feature>.server.ts: defineFeature("<feature>").withRepositories(registry).withApp(<Feature>App).withTransports(...).build().',
+    'The server package is installed through src/<feature>.server.ts: defineModule("<feature>").withRepositories(registry).withApp(<Feature>App).withTransports(...).build().',
   "no-app":
     "One app: src/app/<feature>.app.ts is class <Feature>App implements <Feature>Api with static contract, static dependencies, a private constructor and static create(setup).",
   "installer-not-booted":
-    "A process boots the installer: createApp(...).withPersistence(...).withProvided(PeerApi, peer).withFeature(<feature>Server).boot({ role }) in apps/api, apps/worker or apps/tasks. Delete the hand-built composition.",
+    "A process boots the installer: createApp(...).withPersistence(...).withProvided(PeerApi, peer).withModule(<feature>Server).boot({ role }) in apps/api, apps/worker or apps/tasks. Delete the hand-built composition.",
   "refusing-composition":
     "A process either installs the feature or does not. Delete the refusing*/absent twin; a missing provider fails boot by name.",
   "nested-web-entry":
@@ -91,7 +91,7 @@ const BOOT_SCAN_ROOTS = [
   "enterprise/packages/composition",
 ];
 const COMPOSITION_ROOTS = ["apps/api/src/features", "apps/worker/src/features"];
-const BOOTED_INSTALLER = /withFeature\(\s*([A-Za-z0-9_]+)/g;
+const BOOTED_INSTALLER = /withModule\(\s*([A-Za-z0-9_]+)/g;
 const REFUSING_EXPORT = /export function refusing/;
 
 /**
@@ -142,7 +142,7 @@ function pascalCase(feature: string): string {
     .join("");
 }
 
-/** Every `<x>Server` identifier a process hands to `withFeature(...)`. */
+/** Every `<x>Server` identifier a process hands to `withModule(...)`. */
 function bootedInstallers(root: string): Set<string> {
   const booted = new Set<string>();
 

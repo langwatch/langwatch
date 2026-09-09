@@ -71,11 +71,7 @@ import type {
   WorkflowApiRestoreVersionInput,
   WorkflowApiRestoreVersionOutput,
 } from "@langwatch/workflow-contract";
-import {
-  createFeatureApi,
-  type OutputsFromMap,
-  type RouterFromMap,
-} from "@langwatch/api/web";
+import { createModuleApi, type OutputsFromMap, type RouterFromMap } from "@langwatch/api/web";
 
 /** Where a workflow lives, as the copy lineage tooltip spells it out. */
 export type WorkflowProjectPath = {
@@ -443,9 +439,9 @@ export type WorkflowApiMap = {
 /**
  * The Workflows family's typed tRPC hooks. Same machinery, same transport and
  * same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
+ * `createModuleApi` for why separate instances still share cache entries.
  */
-export const workflowApi = createFeatureApi<WorkflowApiMap>();
+export const workflowApi = createModuleApi<WorkflowApiMap>();
 
 /** The studio's slice of the root router: every procedure it calls. */
 export type WorkflowApiRouter = RouterFromMap<WorkflowApiMap>;

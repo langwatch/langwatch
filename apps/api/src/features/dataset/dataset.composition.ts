@@ -41,10 +41,10 @@ export async function installApiDataset(options: {
     .withInfrastructure({})
     .withProvided(ExperimentApi, options.peers.experiments)
     .withProvided(AuthzApi, options.peers.permissions)
-    .withFeature(datasetServer, { infrastructure: options.infrastructure })
+    .withModule(datasetServer, { infrastructure: options.infrastructure })
     .boot({ role: "api" });
 
-  const app = runtime.feature(datasetServer).provided;
+  const app = runtime.module(datasetServer).provided;
 
   return {
     routers: (mount) => ({

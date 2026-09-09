@@ -27,7 +27,7 @@
  */
 
 import type { OrganizationIntent } from "@langwatch/organization-contract";
-import { createFeatureApi } from "@langwatch/api/web";
+import { createModuleApi } from "@langwatch/api/web";
 import type { TimeInput } from "@langwatch/time";
 
 /** What a signing-up reader told us about themselves, verbatim. */
@@ -185,11 +185,11 @@ export type OnboardingApiMap = {
 /**
  * The onboarding family's typed tRPC hooks. Same machinery, same transport and
  * same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
+ * `createModuleApi` for why separate instances still share cache entries.
  *
  * Exported as `api` as well, which is what let the moved call sites keep their
  * `api.onboarding.initializeOrganization.useMutation()` spelling unchanged.
  */
-export const onboardingApi = createFeatureApi<OnboardingApiMap>();
+export const onboardingApi = createModuleApi<OnboardingApiMap>();
 
 export const api = onboardingApi;

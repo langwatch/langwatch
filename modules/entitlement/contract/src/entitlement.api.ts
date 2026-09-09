@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   GetUsageInput,
   ListOrganizationSpendInput,
@@ -22,4 +22,4 @@ export interface EntitlementApi {
   listOrganizationSpend(input: ListOrganizationSpendInput): Promise<ProjectSpendRollup[]>;
 }
 
-export const EntitlementApi = featureApi<EntitlementApi>("entitlement");
+export const EntitlementApi = moduleApi<EntitlementApi>("entitlement");

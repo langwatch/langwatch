@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   Topic,
   TopicClusteringRunHistoryEntry,
@@ -15,4 +15,4 @@ export interface TopicApi {
   getClusteringRunHistory(input: TopicProjectInput): Promise<TopicClusteringRunHistoryEntry[]>;
 }
 
-export const TopicApi = featureApi<TopicApi>("topic");
+export const TopicApi = moduleApi<TopicApi>("topic");

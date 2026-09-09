@@ -17,7 +17,7 @@
  * import below is the only one in the package.
  */
 
-import { type FeatureApi, createFeatureApi } from "@langwatch/api/web";
+import { type ModuleApi, createModuleApi } from "@langwatch/api/web";
 
 /** The organization every SCIM procedure is scoped to. */
 type OrganizationScope = { organizationId: string };
@@ -52,4 +52,4 @@ export type ScimApiMap = {
  * The SCIM family's typed tRPC hooks. Same machinery, same transport and same
  * React Query cache as the application's `api` proxy.
  */
-export const scimApi: FeatureApi<ScimApiMap> = createFeatureApi<ScimApiMap>();
+export const scimApi: ModuleApi<ScimApiMap> = createModuleApi<ScimApiMap>();

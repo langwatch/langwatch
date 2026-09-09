@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { CodexTokenKeys } from "./codex-account.ts";
 import type { CostRuleMatchingSpansPreview, ModelLimits } from "./model-cost-preview.ts";
 import type {
@@ -210,9 +210,7 @@ export interface ModelProviderApi {
    * person. What a snapshot shows is filtered by what its reader may see, and
    * there is no reader here.
    */
-  getDefaultSnapshotUnattributed(
-    input: ModelDefaultSnapshotRequest,
-  ): Promise<ModelDefaultSnapshot>;
+  getDefaultSnapshotUnattributed(input: ModelDefaultSnapshotRequest): Promise<ModelDefaultSnapshot>;
   getInheritedValues(input: {
     projectId: string;
     scopes: ModelDefaultScope[];
@@ -249,4 +247,4 @@ export interface ModelProviderApi {
   ): Promise<void>;
 }
 
-export const ModelProviderApi = featureApi<ModelProviderApi>("model-provider");
+export const ModelProviderApi = moduleApi<ModelProviderApi>("model-provider");

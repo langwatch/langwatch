@@ -192,7 +192,7 @@ function boundaryViolations(file: string): ArchitectureViolation[] {
       line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
       message,
       allowed:
-        "Use an explicit named contract input/output and complete FeatureApi, with schemas validating unknown values at the boundary.",
+        "Use an explicit named contract input/output and complete ModuleApi, with schemas validating unknown values at the boundary.",
     });
   };
 
@@ -203,7 +203,7 @@ function boundaryViolations(file: string): ArchitectureViolation[] {
 
     report(
       node,
-      `Boundary signatures cannot mirror another type with global ${name}; use an explicit named contract input/output and complete FeatureApi.`,
+      `Boundary signatures cannot mirror another type with global ${name}; use an explicit named contract input/output and complete ModuleApi.`,
     );
   };
 

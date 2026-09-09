@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   DataPrivacyConfig,
   DataPrivacyPolicy,
@@ -88,4 +88,4 @@ export interface DataPrivacyApi {
   ): Promise<void>;
 }
 
-export const DataPrivacyApi = featureApi<DataPrivacyApi>("data-privacy");
+export const DataPrivacyApi = moduleApi<DataPrivacyApi>("data-privacy");

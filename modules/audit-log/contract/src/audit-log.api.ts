@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { RecordAuditLogCommand } from "./audit-log.commands.ts";
 import type { AuditLogHistoryEntry, ListAuditLogEntityHistoryInput } from "./audit-log.ts";
 
@@ -8,4 +8,4 @@ export interface AuditLogApi {
   listEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]>;
 }
 
-export const AuditLogApi = featureApi<AuditLogApi>("audit-log");
+export const AuditLogApi = moduleApi<AuditLogApi>("audit-log");

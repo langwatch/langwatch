@@ -1,6 +1,6 @@
-import { defineFeature } from "@langwatch/runtime-composition";
+import { defineModule } from "@langwatch/runtime-composition";
 import { MetricApp } from "./app/metric.app.ts";
 
 export type { MetricInfrastructure } from "./app/metric.app.ts";
 
-export const metricServer = defineFeature("metric").withApp(MetricApp).build();
+export const metricServer = defineModule("metric").withApp(MetricApp).build();

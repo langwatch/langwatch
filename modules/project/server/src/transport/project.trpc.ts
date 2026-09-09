@@ -17,7 +17,7 @@ import {
   projectTrpc,
   type ProjectApi,
 } from "@langwatch/project-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 /** A scope a probe is asked at, when the declaration resolved a different one. */
 export type ProjectPermissionScope = Readonly<{
@@ -77,7 +77,7 @@ export interface ProjectBrowserApi {
   reportTopicClusteringFailure(error: unknown, context: { projectId: string }): void;
 }
 
-export const ProjectBrowserApi = featureApi<ProjectBrowserApi>("project");
+export const ProjectBrowserApi = moduleApi<ProjectBrowserApi>("project");
 
 /**
  * `create`'s standing depends on what was asked for, so no single permission
@@ -270,7 +270,11 @@ async function requireCreateStanding({
   input,
 }: {
   app: ProjectBrowserApi;
-  input: Readonly<{ organizationId: string; teamId?: string | undefined; newTeamName?: string | undefined }>;
+  input: Readonly<{
+    organizationId: string;
+    teamId?: string | undefined;
+    newTeamName?: string | undefined;
+  }>;
 }): Promise<void> {
   if (!input.teamId && !input.newTeamName) throw new ProjectCreateTargetMissingError();
 

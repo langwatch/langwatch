@@ -9,7 +9,7 @@ is done. The reference is `modules/annotation/contract`.
 
 ```
 index.ts
-<name>.api.ts                  interface <Name>Api + export const <Name>Api = featureApi<<Name>Api>("<name>")   REQUIRED
+<name>.api.ts                  interface <Name>Api + export const <Name>Api = moduleApi<<Name>Api>("<name>")   REQUIRED
 <name>.schemas.ts              the domain value's zod schema(s) and inferred types
 <name>-<part>.schemas.ts       one file per public shape family (queue, response, review, …)
 <name>-rest.schemas.ts         params, query, body and response schemas of the REST door
@@ -29,14 +29,14 @@ module converts; do not add one.
 Contract must not import Node runtime APIs, Prisma, Hono, tRPC server code, React,
 Eventing, application aliases, or its own server and web packages. It may import `zod`,
 `@langwatch/handled-error`, `@langwatch/time`, `@langwatch/runtime-composition` (only
-`featureApi`, `FeatureApiToken` and `FeatureName`), `@langwatch/api/contract` (only
+`moduleApi`, `ModuleApiToken` and `ModuleName`), `@langwatch/api/contract` (only
 `defineTrpcContract`) and other modules' contracts.
 
 ## The callable API and its token
 
 ```ts
 // contract/src/annotation.api.ts
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 export interface AnnotationApi {
   create(input: CreateAnnotationInput): Promise<Annotation>;
@@ -46,7 +46,7 @@ export interface AnnotationApi {
   queueTraces(input: QueueAnnotationTracesInput): Promise<Readonly<{ created: number; skipped: number }>>;
 }
 
-export const AnnotationApi = featureApi<AnnotationApi>("annotation");
+export const AnnotationApi = moduleApi<AnnotationApi>("annotation");
 ```
 
 - One interface of callable operations. No service-valued properties, getters,
@@ -55,10 +55,10 @@ export const AnnotationApi = featureApi<AnnotationApi>("annotation");
   depend on: the peer names it in its app's `static dependencies`, the process provides an
   implementation with `.withProvided(AnnotationApi, app)` or by installing the module,
   and boot rejects a missing, duplicate or cyclic provider by name.
-- `featureApi` takes a `FeatureName`, the literal union generated from
+- `moduleApi` takes a `ModuleName`, the literal union generated from
   `modules/catalogue.json` (`packages/runtime-composition/src/feature-names.generated.ts`,
   regenerate with `node packages/runtime-composition/scripts/check-feature-names.mjs --write`).
-  `featureApi("annotations")` does not compile.
+  `moduleApi("annotations")` does not compile.
 - Operation names use RPC verbs: `get` for one known record, `getMany` for known ids,
   `list` for queries, `create`, `update`, `delete` for mutations; `<verb><Entity>` for
   a second entity (`listScores`, `upsertScore`, `markQueueItemDone`). A method returns a

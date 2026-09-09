@@ -1,4 +1,4 @@
-import { defineFeature } from "@langwatch/runtime-composition";
+import { defineModule } from "@langwatch/runtime-composition";
 import { WorkflowApp } from "#app/workflow.app";
 import { workflowRunRest } from "#transport/workflow-run.rest";
 import { workflowStudioRest } from "#transport/workflow-studio.rest";
@@ -10,7 +10,7 @@ import { workflowTrpcTransport } from "#transport/workflow.trpc";
  * platform-URL builder to write the studio link on every row, so the process
  * mounts `createWorkflowRest(platformUrl)` itself.
  */
-export const workflowServer = defineFeature("workflow")
+export const workflowServer = defineModule("workflow")
   .withApp(WorkflowApp)
   .withTransports(
     workflowTrpcTransport,

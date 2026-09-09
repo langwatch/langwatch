@@ -42,10 +42,10 @@ export async function installApiAnnotation(options: {
     .withProvided(UserApi, users)
     .withProvided(TraceApi, traces)
     .withProvided(AuthzApi, permissions)
-    .withFeature(annotationServer)
+    .withModule(annotationServer)
     .boot({ role: "api" });
 
-  const app = runtime.feature(annotationServer).provided;
+  const app = runtime.module(annotationServer).provided;
 
   return {
     routers: (mount) => ({

@@ -59,7 +59,7 @@ export async function installApiRole(options: {
     .withProvided(AuthzApi, permissions)
     .withProvided(OrganizationApi, organizations)
     .withProvided(UserApi, users)
-    .withFeature(roleServer, {
+    .withModule(roleServer, {
       infrastructure: {
         scope: new ApiRoleScope(prisma),
         plan: new ApiCustomRolePlanGate(options.plans),
@@ -68,7 +68,7 @@ export async function installApiRole(options: {
     })
     .boot({ role: "api" });
 
-  const app = runtime.feature(roleServer).provided;
+  const app = runtime.module(roleServer).provided;
 
   return {
     routers: (mount) => ({

@@ -35,7 +35,7 @@ function process_() {
     .withInfrastructure(
       createWorkflowTestInfrastructure({ workflows: createWorkflowTestService([workflow]) }),
     )
-    .withFeature(workflowServer);
+    .withModule(workflowServer);
 }
 
 describe("workflow app installation", () => {
@@ -46,7 +46,7 @@ describe("workflow app installation", () => {
       try {
         const app = runtime.service(WorkflowApi);
 
-        expect(runtime.feature(workflowServer).provided).toBe(app);
+        expect(runtime.module(workflowServer).provided).toBe(app);
         await expect(app.list({ projectId: "project-1" })).resolves.toEqual([workflow]);
       } finally {
         await runtime.stop();

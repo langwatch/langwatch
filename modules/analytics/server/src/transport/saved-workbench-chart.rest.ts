@@ -17,7 +17,7 @@ import {
   type RouteResponse,
 } from "@langwatch/api/rest";
 import type { SavedWorkbenchChart } from "@langwatch/dashboard-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
 
 import { langWatchQLCallerProtections } from "./query.rest.ts";
@@ -59,7 +59,7 @@ export interface SavedWorkbenchChartApi {
   unplaceSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<void>;
 }
 
-export const SavedWorkbenchChartApi = featureApi<SavedWorkbenchChartApi>("analytics");
+export const SavedWorkbenchChartApi = moduleApi<SavedWorkbenchChartApi>("analytics");
 
 /**
  * The deep link back into the workbench for the project this credential

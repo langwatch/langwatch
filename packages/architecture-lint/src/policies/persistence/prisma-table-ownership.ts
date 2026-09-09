@@ -51,7 +51,7 @@ function issue(file: string, message: string, line?: number): ArchitectureViolat
     line,
     message,
     allowed:
-      "Declare literal model names with prismaTables(...) or PrismaRepository.for(...) on the owning Prisma repository. Peers call the owner's FeatureApi. See ADR-134.",
+      "Declare literal model names with prismaTables(...) or PrismaRepository.for(...) on the owning Prisma repository. Peers call the owner's ModuleApi. See ADR-134.",
   };
 }
 

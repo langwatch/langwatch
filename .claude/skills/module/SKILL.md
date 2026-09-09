@@ -8,10 +8,9 @@ argument-hint: "<new|extend|convert|wire|move|web-surface> <module> [details]"
 # Build or change a module
 
 A **module** is one folder, `modules/<name>/`, owning three workspace
-packages: `contract`, `server` and `web`. The folder is still named `modules/`
-and every generated identifier still reads `Feature*` (`defineFeature`, `withFeature`,
-`featureApi`, `installApi<Name>`, `<Name>Api`, `FeatureName`) until the tree rename in
-`dev/docs/plans/modules-rename.md` lands; write those as code, say "module" in prose.
+packages: `contract`, `server` and `web`. The word is the same in the tree and in
+the identifiers a module author types: `defineModule`, `withModule`, `moduleApi`,
+`installApi<Name>`, `<Name>Api`, `ModuleName`.
 
 Read `.claude/skills/architecture-guide/SKILL.md` first, always. It is the map of the
 whole shape; this skill is the set of procedures for changing it. `modules/annotation`
@@ -42,7 +41,7 @@ edits, evidence-first.
 ```
 modules/<name>/
 ├── feature.json · specs/ · adrs/
-├── contract/src/    <name>.api.ts (interface <Name>Api + featureApi token), schemas,
+├── contract/src/    <name>.api.ts (interface <Name>Api + moduleApi token), schemas,
 │                    errors, <name>.trpc.ts (defineTrpcContract), <name>-rest.schemas.ts
 ├── server/src/      <name>.server.ts (installer), app/<name>.app.ts (implements <Name>Api),
 │                    services/, repositories/{interfaces, prisma/, memory/}, transport/

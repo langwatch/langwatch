@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createApp, defineFeature, defineRepositories, type FeatureSetup } from "../src/index.ts";
+import { createApp, defineModule, defineRepositories, type FeatureSetup } from "../src/index.ts";
 import {
   instantiateRepositories,
   selectedRepositoryOwnership,
@@ -71,8 +71,8 @@ class ConfiguredApp {
   constructor(readonly value: string) {}
 }
 
-const feature = defineFeature("annotation").withRepositories(repositories).withApp(App).build();
-const configuredFeature = defineFeature("agent")
+const feature = defineModule("annotation").withRepositories(repositories).withApp(App).build();
+const configuredFeature = defineModule("agent")
   .withRepositories(repositories)
   .withApp(ConfiguredApp)
   .build();
@@ -102,7 +102,7 @@ class DuplicateApp {
 }
 
 const duplicateRepositories = defineRepositories({ postgres: DuplicateRepositories });
-const duplicateFeature = defineFeature("project")
+const duplicateFeature = defineModule("project")
   .withRepositories(duplicateRepositories)
   .withApp(DuplicateApp)
   .build();
@@ -119,7 +119,7 @@ class CanonicalPrismaRepositories {
 }
 
 const canonicalPrismaRepositories = defineRepositories({ postgres: CanonicalPrismaRepositories });
-const canonicalPrismaFeature = defineFeature("user")
+const canonicalPrismaFeature = defineModule("user")
   .withRepositories(canonicalPrismaRepositories)
   .withApp(DuplicateApp)
   .build();
@@ -155,10 +155,10 @@ describe("repository registries", () => {
     const runtime = await createApp({ name: "configured-worker" })
       .withPersistence("memory", {})
       .withInfrastructure({ suffix: "worker" })
-      .withFeature(configuredFeature)
+      .withModule(configuredFeature)
       .boot({ role: "worker", config: { agent: { prefix: "config" } } });
 
-    expect(runtime.feature(configuredFeature).provided.value).toBe("config:memory:worker");
+    expect(runtime.module(configuredFeature).provided.value).toBe("config:memory:worker");
     await runtime.stop();
   });
 
@@ -166,9 +166,9 @@ describe("repository registries", () => {
     const runtime = await createApp({ name: "configured" })
       .withPersistence("postgres", { prisma: { prefix: "database" } })
       .withInfrastructure({ suffix: "infra" })
-      .withFeature(configuredFeature)
+      .withModule(configuredFeature)
       .boot({ role: "api", config: { agent: { prefix: "config" } } });
-    expect(runtime.feature(configuredFeature).provided.value).toBe("config:database:infra");
+    expect(runtime.module(configuredFeature).provided.value).toBe("config:database:infra");
     await runtime.stop();
   });
 
@@ -178,9 +178,9 @@ describe("repository registries", () => {
     const runtime = await createApp({ name: "postgres" })
       .withPersistence("postgres", { prisma: { prefix: "postgres" } })
       .withInfrastructure({})
-      .withFeature(feature)
+      .withModule(feature)
       .boot({ role: "api" });
-    expect(runtime.feature(feature).provided.value).toBe("postgres");
+    expect(runtime.module(feature).provided.value).toBe("postgres");
     expect(postgresCreates).toBe(1);
     expect(memoryCreates).toBe(0);
     await runtime.stop();
@@ -192,9 +192,9 @@ describe("repository registries", () => {
     const runtime = await createApp({ name: "memory" })
       .withPersistence("memory", {})
       .withInfrastructure({})
-      .withFeature(feature)
+      .withModule(feature)
       .boot({ role: "api" });
-    expect(runtime.feature(feature).provided.value).toBe("memory");
+    expect(runtime.module(feature).provided.value).toBe("memory");
     expect(postgresCreates).toBe(0);
     expect(memoryCreates).toBe(1);
     await runtime.stop();
@@ -211,7 +211,7 @@ describe("repository registries", () => {
       }
       constructor(readonly value: string) {}
     }
-    const methodFeature = defineFeature("share")
+    const methodFeature = defineModule("share")
       .withRepositories(repositories)
       .withApp(MethodApp)
       .build();
@@ -219,10 +219,10 @@ describe("repository registries", () => {
     const runtime = await createApp({ name: "method" })
       .withPersistence("memory", {})
       .withInfrastructure({})
-      .withFeature(methodFeature)
+      .withModule(methodFeature)
       .boot({ role: "api" });
 
-    expect(runtime.feature(methodFeature).provided.value).toBe("memory");
+    expect(runtime.module(methodFeature).provided.value).toBe("memory");
     await runtime.stop();
   });
 
@@ -232,7 +232,7 @@ describe("repository registries", () => {
       createApp({ name: "missing" })
         .withPersistence("postgres", {})
         .withInfrastructure({})
-        .withFeature(feature)
+        .withModule(feature)
         .boot({ role: "api" }),
     ).rejects.toThrow('requires infrastructure "prisma"');
     expect(postgresCreates).toBe(0);
@@ -246,7 +246,7 @@ describe("repository registries", () => {
         createApp({ name: "invalid" })
           .withPersistence("postgres", infrastructure)
           .withInfrastructure({})
-          .withFeature(feature)
+          .withModule(feature)
           .boot({ role: "api" }),
       ).rejects.toThrow('requires infrastructure "prisma"');
     }
@@ -255,7 +255,7 @@ describe("repository registries", () => {
 
   it("rejects selected duplicate table claims before either repository factory runs", async () => {
     duplicateCreates = 0;
-    const conflictingFeature = defineFeature("user")
+    const conflictingFeature = defineModule("user")
       .withRepositories(duplicateRepositories)
       .withApp(DuplicateApp)
       .build();
@@ -263,8 +263,8 @@ describe("repository registries", () => {
       createApp({ name: "duplicate-ownership" })
         .withPersistence("postgres", {})
         .withInfrastructure({})
-        .withFeature(duplicateFeature)
-        .withFeature(conflictingFeature)
+        .withModule(duplicateFeature)
+        .withModule(conflictingFeature)
         .boot({ role: "api" }),
     ).rejects.toThrow(RepositoryOwnershipConflictError);
     expect(duplicateCreates).toBe(0);
@@ -276,8 +276,8 @@ describe("repository registries", () => {
       createApp({ name: "canonical-prisma-conflict" })
         .withPersistence("postgres", {})
         .withInfrastructure({})
-        .withFeature(duplicateFeature)
-        .withFeature(canonicalPrismaFeature)
+        .withModule(duplicateFeature)
+        .withModule(canonicalPrismaFeature)
         .boot({ role: "api" }),
     ).rejects.toBeInstanceOf(RepositoryOwnershipConflictError);
     expect(duplicateCreates).toBe(0);

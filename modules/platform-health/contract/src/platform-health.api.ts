@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   PlatformHealthCheckName,
   PlatformHealthQuery,
@@ -19,4 +19,4 @@ export interface PlatformHealthApi {
   acceptsKey(presented: string | null | undefined): boolean;
 }
 
-export const PlatformHealthApi = featureApi<PlatformHealthApi>("platform-health");
+export const PlatformHealthApi = moduleApi<PlatformHealthApi>("platform-health");

@@ -9,7 +9,7 @@
  * what minting a token means, or which tenant a directory push provisions, had
  * three places to live. It has one.
  */
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 import type {
   ScimCreateGroupRequest,
@@ -79,9 +79,7 @@ export interface ScimApi {
    * @throws {ScimProtocolError} 401 for a missing, malformed or unknown
    * bearer, 403 for one whose organization no longer holds the plan.
    */
-  authenticateDirectory(input: {
-    authorization: string | null;
-  }): Promise<ScimDirectoryScope>;
+  authenticateDirectory(input: { authorization: string | null }): Promise<ScimDirectoryScope>;
   /**
    * The same verification, answered rather than thrown, for the intake that
    * owns its own refusal bodies.
@@ -96,10 +94,7 @@ export interface ScimApi {
     startIndex?: number | undefined;
     count?: number | undefined;
   }): Promise<ScimListResponse<ScimUser>>;
-  createUser(input: {
-    organizationId: string;
-    request: ScimCreateUserRequest;
-  }): Promise<ScimUser>;
+  createUser(input: { organizationId: string; request: ScimCreateUserRequest }): Promise<ScimUser>;
   getUser(input: { organizationId: string; id: string }): Promise<ScimUser>;
   replaceUser(input: {
     organizationId: string;
@@ -163,4 +158,4 @@ export interface ScimApi {
   relayDirectoryEvents(input: { organizationId: string; events: unknown[] }): Promise<void>;
 }
 
-export const ScimApi = featureApi<ScimApi>("scim");
+export const ScimApi = moduleApi<ScimApi>("scim");

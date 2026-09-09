@@ -10,7 +10,7 @@ import type {
   AuthzPermission,
   ScopeTierField,
 } from "@langwatch/authz-contract";
-import type { FeatureApiToken } from "@langwatch/runtime-composition";
+import type { ModuleApiToken } from "@langwatch/runtime-composition";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
@@ -56,7 +56,7 @@ import type { RestTransportDocs } from "./openapi.ts";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** The portable part of a feature API token; no runtime-composition dependency. */
-export type FeatureApiWitness<Api> = FeatureApiToken<Api>;
+export type FeatureApiWitness<Api> = ModuleApiToken<Api>;
 
 type SourceSchema = z.ZodObject | z.ZodDiscriminatedUnion<readonly z.ZodObject[]>;
 type Missing = undefined;

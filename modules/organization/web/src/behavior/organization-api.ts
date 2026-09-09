@@ -21,7 +21,7 @@ import type {
   RoleBindingScopeType,
   TeamUserRole,
 } from "../model/prisma-types.ts";
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 
 /**
  * Every filter the audit table narrows by, in the one shape both the table and
@@ -794,9 +794,9 @@ export type OrganizationApiMap = {
 /**
  * The organization family's typed tRPC hooks. Same machinery, same transport
  * and same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
+ * `createModuleApi` for why separate instances still share cache entries.
  */
-export const organizationApi = createFeatureApi<OrganizationApiMap>();
+export const organizationApi = createModuleApi<OrganizationApiMap>();
 
 /**
  * The outputs of this map, addressed the way `RouterOutputs` was — a

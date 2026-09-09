@@ -12,7 +12,7 @@ function process() {
     .withInfrastructure({})
     .withProvided(AuthzApi, createShareTestAuthz())
     .withProvided(DataRetentionApi, createShareTestDataRetention())
-    .withFeature(shareServer, { infrastructure: { redis: null } });
+    .withModule(shareServer, { infrastructure: { redis: null } });
 }
 
 describe("share app installation", () => {
@@ -22,7 +22,7 @@ describe("share app installation", () => {
     try {
       const app = runtime.service(ShareApi);
 
-      expect(runtime.feature(shareServer).provided).toBe(app);
+      expect(runtime.module(shareServer).provided).toBe(app);
 
       await expect(
         app.resolveForViewer({ token: "tok_missing", viewer: { type: "anonymous" } }),

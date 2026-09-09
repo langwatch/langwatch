@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApp, defineFeature, featureApi, type FeatureSetup } from "../src/index.ts";
+import { createApp, defineModule, moduleApi, type FeatureSetup } from "../src/index.ts";
 import {
   assertRepositoryOwnership,
   RepositoryOwnershipConflictError,
@@ -9,7 +9,7 @@ const userTables = { store: "prisma", tables: ["User"] };
 const created = vi.fn();
 
 class UserApp {
-  static readonly contract = featureApi<UserApp>("user");
+  static readonly contract = moduleApi<UserApp>("user");
   static readonly dependencies = {};
   static readonly repositories = { users: { tables: userTables } };
   private constructor() {}
@@ -23,7 +23,7 @@ class UserApp {
 }
 
 class AnnotationApp {
-  static readonly contract = featureApi<AnnotationApp>("annotation");
+  static readonly contract = moduleApi<AnnotationApp>("annotation");
   static readonly dependencies = {};
   static readonly repositories = { foreign: { tables: userTables } };
   private constructor() {}
@@ -43,8 +43,8 @@ describe("repository ownership", () => {
       created.mockClear();
       const runtime = createApp({ name: "ownership" })
         .withInfrastructure({})
-        .withFeature(defineFeature("user").withApp(UserApp).build())
-        .withFeature(defineFeature("annotation").withApp(AnnotationApp).build());
+        .withModule(defineModule("user").withApp(UserApp).build())
+        .withModule(defineModule("annotation").withApp(AnnotationApp).build());
       await expect(runtime.boot({ role })).rejects.toThrow(RepositoryOwnershipConflictError);
       expect(created).not.toHaveBeenCalled();
     },
@@ -84,7 +84,7 @@ describe("repository ownership", () => {
       repositories: { rows: { tables: { store: "prisma", tables } } },
       create: UserApp.create,
     };
-    const declaration = defineFeature("user").withApp(app).build();
+    const declaration = defineModule("user").withApp(app).build();
     tables.push("User");
     expect(declaration.repositories?.rows?.tables.tables).toEqual(["AuditLog"]);
     expect(Object.isFrozen(declaration.repositories?.rows?.tables.tables)).toBe(true);

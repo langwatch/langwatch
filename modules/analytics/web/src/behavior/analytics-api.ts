@@ -5,7 +5,7 @@
  */
 
 import type { analyticsTrpc, analyticsLwqlTrpc } from "@langwatch/analytics-contract";
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 
 import type { FilterField } from "../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../model/analytics-filter-params.ts";
@@ -258,4 +258,4 @@ export type AnalyticsApiMap = ContractApiMap<typeof analyticsTrpc> &
  * and same React Query cache as the application's `api` proxy. Exported
  * from screens/analytics only so the process shell can mount Provider.
  */
-export const analyticsApi = createFeatureApi<AnalyticsApiMap>();
+export const analyticsApi = createModuleApi<AnalyticsApiMap>();

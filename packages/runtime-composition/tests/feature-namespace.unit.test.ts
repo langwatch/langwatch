@@ -1,11 +1,11 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   FEATURE_NAMES,
-  type FeatureName,
+  type ModuleName,
   type PublicNamespace,
   publicNamespace,
   publicNamespaceFromUnknown,
-} from "../src/feature-namespace.ts";
+} from "../src/module-namespace.ts";
 
 const EXPECTED_PUBLIC_NAMESPACES = {
   agent: "agents",
@@ -62,7 +62,7 @@ const EXPECTED_PUBLIC_NAMESPACES = {
   scim: "scim",
   sso: "sso",
   webhook: "webhooks",
-} as const satisfies { [F in FeatureName]: PublicNamespace<F> };
+} as const satisfies { [F in ModuleName]: PublicNamespace<F> };
 
 describe("feature namespaces", () => {
   it("contains every catalogue owner", () => {
@@ -80,6 +80,6 @@ describe("feature namespaces", () => {
     expectTypeOf(publicNamespace("annotation")).toEqualTypeOf<"annotations">();
     expectTypeOf<PublicNamespace<"api-key">>().toEqualTypeOf<"api-keys">();
     expectTypeOf<PublicNamespace<"identity">>().toEqualTypeOf<"identities">();
-    expectTypeOf<FeatureName>().toEqualTypeOf<(typeof FEATURE_NAMES)[number]>();
+    expectTypeOf<ModuleName>().toEqualTypeOf<(typeof FEATURE_NAMES)[number]>();
   });
 });

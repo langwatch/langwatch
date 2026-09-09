@@ -6,11 +6,11 @@ import type {
   TokenIdentity,
   TokenMap,
 } from "./dependency-token.ts";
-import type { FeatureName, PublicNamespace } from "./feature-namespace.ts";
-import { publicNamespace, publicNamespaceFromUnknown } from "./feature-namespace.ts";
+import type { ModuleName, PublicNamespace } from "./module-namespace.ts";
+import { publicNamespace, publicNamespaceFromUnknown } from "./module-namespace.ts";
 import type { ResourceOwnership } from "./resource-scope.ts";
 import { FeatureConfigError } from "./boot-errors.ts";
-import { FeatureApiToken, type FeatureApiIdentity } from "./feature-api-token.ts";
+import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
 import {
   instantiateRepositories,
   type RepositoriesFor,
@@ -43,7 +43,7 @@ export type FeatureSetup<
 
 type AppContract<Dependencies extends TokenMap, App> =
   | Readonly<{
-      contract: FeatureApiToken<App>;
+      contract: ModuleApiToken<App>;
       dependencies: Dependencies & Readonly<Record<string, FeatureApiIdentity>>;
     }>
   | Readonly<{ contract: abstract new (...args: never[]) => App; dependencies: Dependencies }>;
@@ -649,14 +649,14 @@ export function serverFeature<Infrastructure>(
 }
 
 /** Names a feature whose App owns its factory and peer API declarations. */
-export function defineFeature<const Name extends FeatureName>(
+export function defineModule<const Name extends ModuleName>(
   name: Name,
 ): DefinedFeatureBuilder<Name> {
   publicNamespaceFromUnknown(name);
   return new DefinedFeatureBuilder(name);
 }
 
-class DefinedFeatureBuilder<Name extends FeatureName> {
+class DefinedFeatureBuilder<Name extends ModuleName> {
   constructor(private readonly name: Name) {}
 
   withRepositories<
@@ -719,7 +719,7 @@ type RepositoryAppDefinitionWithoutConfig<
   }>;
 
 class RepositoryDefinedFeatureBuilder<
-  Name extends FeatureName,
+  Name extends ModuleName,
   Definitions extends Record<
     string,
     Readonly<{ requires: readonly string[]; create: (...arguments_: never[]) => unknown }>
@@ -771,7 +771,7 @@ class RepositoryDefinedFeatureBuilder<
 }
 
 class RepositoryAppBuilder<
-  Name extends FeatureName,
+  Name extends ModuleName,
   Definitions extends Record<
     string,
     Readonly<{ requires: readonly string[]; create: (...arguments_: never[]) => unknown }>
@@ -837,13 +837,13 @@ class RepositoryAppBuilder<
     return {
       ...setup,
       repositoryRegistry: registry,
-      ...(app.contract instanceof FeatureApiToken ? { apiContract: app.contract } : {}),
+      ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
     };
   }
 }
 
 class RepositoryUnconfiguredAppBuilder<
-  Name extends FeatureName,
+  Name extends ModuleName,
   Definitions extends Record<
     string,
     Readonly<{ requires: readonly string[]; create: (...arguments_: never[]) => unknown }>
@@ -880,7 +880,7 @@ class RepositoryUnconfiguredAppBuilder<
 }
 
 class ConfiguredAppBuilder<
-  Name extends FeatureName,
+  Name extends ModuleName,
   Dependencies extends TokenMap,
   Infrastructure,
   Config,
@@ -932,13 +932,13 @@ class ConfiguredAppBuilder<
     return {
       ...declaration,
       repositories: snapshotRepositories(app.repositories),
-      ...(app.contract instanceof FeatureApiToken ? { apiContract: app.contract } : {}),
+      ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
     };
   }
 }
 
 class UnconfiguredAppBuilder<
-  Name extends FeatureName,
+  Name extends ModuleName,
   Dependencies extends TokenMap,
   Infrastructure,
   App,
@@ -982,13 +982,13 @@ class UnconfiguredAppBuilder<
     return {
       ...declaration,
       repositories: snapshotRepositories(app.repositories),
-      ...(app.contract instanceof FeatureApiToken ? { apiContract: app.contract } : {}),
+      ...(app.contract instanceof ModuleApiToken ? { apiContract: app.contract } : {}),
     };
   }
 }
 
 class ConfiguredAppWithTransportsBuilder<
-  Name extends FeatureName,
+  Name extends ModuleName,
   Dependencies extends TokenMap,
   Infrastructure,
   Config,
@@ -1022,7 +1022,7 @@ class ConfiguredAppWithTransportsBuilder<
 }
 
 class UnconfiguredAppWithTransportsBuilder<
-  Name extends FeatureName,
+  Name extends ModuleName,
   Dependencies extends TokenMap,
   Infrastructure,
   App,

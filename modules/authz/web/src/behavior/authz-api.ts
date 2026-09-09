@@ -27,7 +27,7 @@
  */
 
 import type { AuthzManagedOrganizationBinding, AuthzPermission } from "@langwatch/authz-contract";
-import { createFeatureApi } from "@langwatch/api/web";
+import { createModuleApi } from "@langwatch/api/web";
 import type { Role } from "@langwatch/role-contract";
 
 /** One organization, the tenant key every procedure on these surfaces takes. */
@@ -98,10 +98,10 @@ export type AuthzApiMap = {
 
 /**
  * The AuthZ family's typed tRPC hooks. Same machinery, same transport and same
- * React Query cache as the application's `api` proxy — see `createFeatureApi`
+ * React Query cache as the application's `api` proxy — see `createModuleApi`
  * for why separate instances still share cache entries.
  *
  * INTERNAL to this package by convention: the screens call it, and the process
  * shell mounts `authzApi.Provider`.
  */
-export const authzApi = createFeatureApi<AuthzApiMap>();
+export const authzApi = createModuleApi<AuthzApiMap>();

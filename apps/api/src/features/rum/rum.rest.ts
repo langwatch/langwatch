@@ -10,7 +10,7 @@ import {
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import { RUM_TRACES_PATH } from "@langwatch/react-rum/constants";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
 
 /** What the door hands the ingest path, once per export. */
@@ -23,7 +23,7 @@ export interface RumIngestApi {
   acceptExport(input: { request: Request; callerKey: string }): Promise<void>;
 }
 
-export const RumIngestApi = featureApi<RumIngestApi>("trace");
+export const RumIngestApi = moduleApi<RumIngestApi>("trace");
 
 /** The session the browser asserts for itself, as the process read it. */
 export const rumSession = defineRestMiddleware("rumSession", z.string().nullable());

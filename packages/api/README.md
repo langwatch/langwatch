@@ -9,7 +9,7 @@ LangWatch's API framework, in six entry points.
 | `@langwatch/api`      | The transport-agnostic vocabulary: the handled-error classes and their wire envelope, the access-policy vocabulary (`requires`, `publicEndpoint`, `credentialClassFor`, …), the rate-limit and cache ports, and the Standard Schema boundary. Imports no transport framework. |
 | `@langwatch/api/rest` | The contract-sealed Hono service framework: explicit version namespaces, input/output validation, OpenAPI documentation, capability middleware, SSE streaming, the route-policy registry and the REST service builder.                                                        |
 | `@langwatch/api/trpc` | The typed tRPC root and the policy spine every procedure runs through: tracing, request logging, handled-error translation, scope lineage, declared authorization and audit, all over injected ports.                                                                         |
-| `@langwatch/api/web` | The browser's half: `createFeatureApi` derives a feature's typed tRPC hooks from its own contract, and `trpcQueryKey` / `trpcQueryFilter` / `useInvalidateProcedure` reach a procedure no contract the package names declares yet. React and `@trpc/react-query` live here and nowhere else in the package. It is the ONLY entry a web package may import. |
+| `@langwatch/api/web` | The browser's half: `createModuleApi` derives a feature's typed tRPC hooks from its own contract, and `trpcQueryKey` / `trpcQueryFilter` / `useInvalidateProcedure` reach a procedure no contract the package names declares yet. React and `@trpc/react-query` live here and nowhere else in the package. It is the ONLY entry a web package may import. |
 
 None re-exports another. A consumer that wants the error vocabulary imports
 `@langwatch/api`; one that wants the REST builder imports `@langwatch/api/rest`;
@@ -66,7 +66,7 @@ The browser derives its client from the same declaration, so no map restates it:
 
 ```ts
 // web/src/behavior/annotation-api.ts
-export const annotationApi = createFeatureApi<ContractApiMap<typeof annotationTrpc>>();
+export const annotationApi = createModuleApi<ContractApiMap<typeof annotationTrpc>>();
 ```
 
 REST is declared whole in the server, because it has no browser half to share a
@@ -567,7 +567,7 @@ src/
 
   web/
     index.ts                     # "./web" -- the browser's typed hooks and cache keys
-    feature-api.ts               # createFeatureApi, ContractApiMap, RouterFromMap, OutputsFromMap, WireOf
+    feature-api.ts               # createModuleApi, ContractApiMap, RouterFromMap, OutputsFromMap, WireOf
     trpc-query-key.ts            # trpcQueryKey / trpcQueryFilter: tRPC's cache key from a path string
     use-invalidate-procedure.ts  # Invalidating a procedure the feature's own map does not declare
 ```

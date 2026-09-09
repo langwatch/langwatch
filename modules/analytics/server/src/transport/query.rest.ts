@@ -20,7 +20,7 @@ import {
   MANAGEMENT_API_VERSION,
   resolver,
 } from "@langwatch/api/rest";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
 
 import { LWQL_COLUMN_UNITS } from "../services/langwatch-ql-catalog-shapes.service.ts";
@@ -44,7 +44,7 @@ export interface AnalyticsQueryApi {
   execute(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
 }
 
-export const AnalyticsQueryApi = featureApi<AnalyticsQueryApi>("analytics");
+export const AnalyticsQueryApi = moduleApi<AnalyticsQueryApi>("analytics");
 
 /**
  * What this credential may see of its project's content. A fact rather than an

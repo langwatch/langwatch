@@ -4,7 +4,7 @@
  * The `dataRetention` namespace is derived from the contract's declaration.
  */
 
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { dataRetentionTrpc } from "@langwatch/data-retention-contract";
 
 /**
@@ -34,7 +34,7 @@ export type DataRetentionApiMap = ContractApiMap<typeof dataRetentionTrpc> & Bor
 
 /**
  * The Data Retention family's typed tRPC hooks. Same machinery, same transport and same React
- * Query cache as the application's `api` proxy — see `createFeatureApi` for why separate
+ * Query cache as the application's `api` proxy — see `createModuleApi` for why separate
  * instances still share cache entries.
  */
-export const dataRetentionApi = createFeatureApi<DataRetentionApiMap>();
+export const dataRetentionApi = createModuleApi<DataRetentionApiMap>();

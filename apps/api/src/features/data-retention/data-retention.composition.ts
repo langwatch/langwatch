@@ -63,7 +63,7 @@ export async function installApiDataRetention(options: {
     .withProvided(OrganizationApi, organizations)
     .withProvided(AuthzApi, permissions)
     .withProvided(UserApi, users)
-    .withFeature(dataRetentionServer, {
+    .withModule(dataRetentionServer, {
       infrastructure: {
         directory: PrismaDataRetentionDirectoryRepository.create(prisma),
         plans: ApiDataRetentionPlans.create(plans),
@@ -78,7 +78,7 @@ export async function installApiDataRetention(options: {
       },
     });
 
-  const app = runtime.feature(dataRetentionServer).provided;
+  const app = runtime.module(dataRetentionServer).provided;
 
   return {
     router: (mount) => createDataRetentionTrpcRouter(mount.runtime),

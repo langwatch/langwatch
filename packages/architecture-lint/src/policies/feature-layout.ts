@@ -52,7 +52,7 @@ function violation(file: string, message: string, allowed: string): Architecture
  * declares its callable API with, and the name of a feature. Everything else
  * the package exports is process wiring a contract may not reach.
  */
-const FEATURE_API_VOCABULARY = new Set(["featureApi", "FeatureApiToken", "FeatureName"]);
+const FEATURE_API_VOCABULARY = new Set(["moduleApi", "ModuleApiToken", "ModuleName"]);
 
 /** What an import of the composition root binds that a contract may not. */
 function compositionBindingsBeyondFeatureApi(statement: ts.ImportDeclaration): string[] {
@@ -102,7 +102,7 @@ function lintContract(
           violation(
             api,
             `A portable feature API may bind only the feature-API vocabulary from @langwatch/runtime-composition; it binds ${bound.join(", ")}.`,
-            "Import featureApi, FeatureApiToken or FeatureName and nothing else; the rest of the runtime root is a composition boundary.",
+            "Import moduleApi, ModuleApiToken or ModuleName and nothing else; the rest of the runtime root is a composition boundary.",
           ),
         );
       }
@@ -115,7 +115,7 @@ function lintContract(
     violation(
       `${pkg.root}/src`,
       "A strict contract package must declare its callable feature API.",
-      "Add src/<feature>.api.ts exporting the <Feature>Api interface and its featureApi token, and export it from src/index.ts.",
+      "Add src/<feature>.api.ts exporting the <Feature>Api interface and its moduleApi token, and export it from src/index.ts.",
     ),
   ];
 }
@@ -226,10 +226,7 @@ function lintRulesImports(
   return violations;
 }
 
-function lintServer(
-  snapshot: WorkspaceSnapshot,
-  pkg: ClassifiedPackage,
-): ArchitectureViolation[] {
+function lintServer(snapshot: WorkspaceSnapshot, pkg: ClassifiedPackage): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   const files = snapshot.files({
     directory: `${pkg.root}/src`,

@@ -1,4 +1,4 @@
-import { defineFeature } from "@langwatch/runtime-composition";
+import { defineModule } from "@langwatch/runtime-composition";
 import { CodingAgentApp } from "./app/coding-agent.app.ts";
 import { codingAgentRest, codingAgentRollupRest } from "./transport/coding-agent.rest.ts";
 import { codingAgentV1Rest } from "./transport/coding-agent-v1.rest.ts";
@@ -6,7 +6,7 @@ import { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
 
 export type { CodingAgentInfrastructure } from "./app/coding-agent.app.ts";
 
-export const codingAgentServer = defineFeature("coding-agent")
+export const codingAgentServer = defineModule("coding-agent")
   .withApp(CodingAgentApp)
   .withTransports(
     codingAgentRest,

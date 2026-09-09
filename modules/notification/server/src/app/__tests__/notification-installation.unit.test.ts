@@ -8,7 +8,7 @@ function process() {
   return createApp({ name: "notification-installation-test" })
     .withPersistence("memory", {})
     .withInfrastructure({})
-    .withFeature(notificationServer);
+    .withModule(notificationServer);
 }
 
 const record = {
@@ -27,7 +27,7 @@ describe("notification app installation", () => {
       const app = runtime.service(NotificationApi);
       const created = await app.create(record);
 
-      expect(runtime.feature(notificationServer).provided).toBe(app);
+      expect(runtime.module(notificationServer).provided).toBe(app);
 
       await expect(
         app.listRecentByOrganization({ organizationId: "organization-1", since }),

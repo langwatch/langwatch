@@ -13,7 +13,7 @@ import {
   type SubscriptionBillingInterval,
   type SubscriptionInvite,
 } from "@langwatch/enterprise-billing-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
 
 /** The customer this checkout is opened for, as the provider knows them. */
@@ -76,7 +76,7 @@ export interface BillingSubscriptionApi {
   listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]>;
 }
 
-export const BillingSubscriptionApi = featureApi<BillingSubscriptionApi>("billing");
+export const BillingSubscriptionApi = moduleApi<BillingSubscriptionApi>("billing");
 
 /**
  * The signed-in customer's address, as the PROCESS resolved it. A fact rather

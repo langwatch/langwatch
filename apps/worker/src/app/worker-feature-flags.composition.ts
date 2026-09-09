@@ -62,7 +62,7 @@ export async function installWorkerFeatureFlags(options: {
     .withProvided(AuthzApi, options.peers.permissions)
     .withProvided(ProjectApi, options.peers.projects)
     .withProvided(OrganizationApi, options.peers.organizations)
-    .withFeature(featureFlagServer, {
+    .withModule(featureFlagServer, {
       infrastructure: {
         cache: RedisFeatureFlagCacheAdapter.create(options.redis ?? null),
         config: options.config.featureFlags,
@@ -70,5 +70,5 @@ export async function installWorkerFeatureFlags(options: {
     })
     .boot({ role: "worker" });
 
-  return runtime.feature(featureFlagServer).provided;
+  return runtime.module(featureFlagServer).provided;
 }

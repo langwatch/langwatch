@@ -1,6 +1,6 @@
 import { FEATURE_NAMES } from "./feature-names.generated.ts";
 
-export type FeatureName = (typeof FEATURE_NAMES)[number];
+export type ModuleName = (typeof FEATURE_NAMES)[number];
 
 const NAMESPACE_EXCEPTIONS = {
   analytics: "analytics",
@@ -18,11 +18,11 @@ const NAMESPACE_EXCEPTIONS = {
   saas: "saas",
   scim: "scim",
   sso: "sso",
-} as const satisfies Partial<Record<FeatureName, string>>;
+} as const satisfies Partial<Record<ModuleName, string>>;
 
 type NamespaceExceptions = typeof NAMESPACE_EXCEPTIONS;
 
-export type PublicNamespace<F extends FeatureName> = F extends keyof NamespaceExceptions
+export type PublicNamespace<F extends ModuleName> = F extends keyof NamespaceExceptions
   ? NamespaceExceptions[F]
   : F extends `${infer Stem}y`
     ? F extends `${string}${"a" | "e" | "i" | "o" | "u"}y`
@@ -34,8 +34,8 @@ export type PublicNamespace<F extends FeatureName> = F extends keyof NamespaceEx
 
 const FEATURE_NAME_SET = new Set<unknown>(FEATURE_NAMES);
 
-export function publicNamespace<const F extends FeatureName>(feature: F): PublicNamespace<F>;
-export function publicNamespace(feature: FeatureName): string {
+export function publicNamespace<const F extends ModuleName>(feature: F): PublicNamespace<F>;
+export function publicNamespace(feature: ModuleName): string {
   return publicNamespaceFromUnknown(feature);
 }
 
@@ -69,7 +69,7 @@ export function publicNamespaceFromUnknown(feature: unknown): string {
   return `${feature}s`;
 }
 
-function isFeatureName(feature: unknown): feature is FeatureName {
+function isFeatureName(feature: unknown): feature is ModuleName {
   return FEATURE_NAME_SET.has(feature);
 }
 

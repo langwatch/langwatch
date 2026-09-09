@@ -6,7 +6,7 @@
  * on it is the rule both doors get, and a caller arrives as an argument —
  * `actorId` — never read from a session or a request.
  */
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   EvaluatorCascadeArchive,
   EvaluatorCopy,
@@ -91,4 +91,4 @@ export interface EvaluatorApi {
   ): Promise<EvaluatorSyncFromSourceResult>;
 }
 
-export const EvaluatorApi = featureApi<EvaluatorApi>("evaluator");
+export const EvaluatorApi = moduleApi<EvaluatorApi>("evaluator");

@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   AuthenticatedExperimentTarget,
   ExperimentCatalogueEntry,
@@ -145,4 +145,4 @@ export interface FeatureFlagApi {
   setExperimentTenantPolicyForCaller(input: ExperimentTenantPolicyForCaller): Promise<void>;
 }
 
-export const FeatureFlagApi = featureApi<FeatureFlagApi>("feature-flag");
+export const FeatureFlagApi = moduleApi<FeatureFlagApi>("feature-flag");

@@ -300,7 +300,13 @@ describe("explicit Prisma lifecycle", () => {
       forwardPrismaEvent({
         logger,
         level: "query",
-        event: { target: "postgres.query", query: "SELECT 1", params: "[]", duration: 4, timestamp },
+        event: {
+          target: "postgres.query",
+          query: "SELECT 1",
+          params: "[]",
+          duration: 4,
+          timestamp,
+        },
       });
 
       expect(logger.debug).toHaveBeenCalledWith(

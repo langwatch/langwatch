@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   CopyPromptCommand,
   CreatePromptCommand,
@@ -198,4 +198,4 @@ export interface PromptApi {
   deleteTagForProject(input: { projectId: string; name: string }): Promise<PromptTag>;
 }
 
-export const PromptApi = featureApi<PromptApi>("prompt");
+export const PromptApi = moduleApi<PromptApi>("prompt");

@@ -35,13 +35,13 @@ export {
   type TokenMap,
   tokenName,
 } from "./dependency-token.ts";
-export { featureApi, FeatureApiToken } from "./feature-api-token.ts";
+export { moduleApi, ModuleApiToken } from "./module-api-token.ts";
 export { LocalFeatureApis } from "./local-feature-api.ts";
 export {
   type FeatureConfigSchema,
   type AppDefinition,
   type AppDefinitionWithoutConfig,
-  defineFeature,
+  defineModule,
   type FeatureTransportDescriptor,
   type FeatureSetup,
   type FeatureInstallArguments,
@@ -60,11 +60,11 @@ export {
 } from "./feature-installer.ts";
 export {
   FEATURE_NAMES,
-  type FeatureName,
+  type ModuleName,
   type PublicNamespace,
   publicNamespace,
   publicNamespaceFromUnknown,
-} from "./feature-namespace.ts";
+} from "./module-namespace.ts";
 export {
   GracefulShutdown,
   type GracefulShutdownOptions,

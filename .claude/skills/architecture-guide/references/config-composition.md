@@ -43,7 +43,7 @@ config.value.langy.internalSecret; // typed, deep-frozen
   `assert<Feature>Config()`.
 - A module declares its config definition in its **contract** (`<f>.config.ts`) and the
   process spreads it into its own definition; the module receives the parsed value through
-  `FeatureSetup`'s config parameter or `.withFeature(x, { config })`.
+  `FeatureSetup`'s config parameter or `.withModule(x, { config })`.
 - Definitions live in `apps/api/src/platform/config/api.config.ts`,
   `apps/worker/src/platform/config/worker.config.ts` and
   `apps/tasks/src/platform/config/tasks.config.ts`. Shared infrastructure shapes have
@@ -85,10 +85,10 @@ export async function installApiAnnotation(options: {
     .withProvided(UserApi, options.peers.users)
     .withProvided(TraceApi, options.peers.traces)
     .withProvided(AuthzApi, options.peers.permissions)
-    .withFeature(annotationServer)
+    .withModule(annotationServer)
     .boot({ role: "api" });
 
-  const app = runtime.feature(annotationServer).provided; // the AnnotationApi
+  const app = runtime.module(annotationServer).provided; // the AnnotationApi
   return {
     routers: (mount) => ({ annotation: createAnnotationTrpcRouter(mount), annotationScore: createAnnotationScoreTrpcRouter(mount) }),
     app,
@@ -102,11 +102,11 @@ export async function installApiAnnotation(options: {
   boot, never falls back to memory.
 - `.withProvided(Token, implementation)` supplies a peer that this graph does not install
   (today most roots still hold the older composed apps and hand them in this way);
-  `.withFeature(installer)` installs a module so its app is provided under its own token.
-  `.withFeature(installer, { infrastructure, config })` passes the technical inputs an
+  `.withModule(installer)` installs a module so its app is provided under its own token.
+  `.withModule(installer, { infrastructure, config })` passes the technical inputs an
   app's `FeatureSetup` declares.
 - `.boot({ role: "api" | "worker" | "task", config? })` constructs only that role's
-  contributions. `runtime.feature(installer).provided` is the app; `runtime.service(Token)`
+  contributions. `runtime.module(installer).provided` is the app; `runtime.service(Token)`
   reads any provided token. Shutdown drains hosts before closing modules.
 - The worker boots one graph for several modules (`apps/worker/src/app/worker-observability-apps.composition.ts`:
   trace, annotation, data-privacy, log and evaluation over one `.withPersistence("postgres", …)`);

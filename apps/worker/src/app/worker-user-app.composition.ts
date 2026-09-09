@@ -16,7 +16,7 @@ import {
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
-  defineFeature,
+  defineModule,
   type ApplicationBuilder,
   type FeatureSetup,
 } from "@langwatch/runtime-composition";
@@ -111,7 +111,7 @@ export class WorkerAuthApp implements AuthService {
   }
 }
 
-export const workerAuthServer = defineFeature("auth").withApp(WorkerAuthApp).build();
+export const workerAuthServer = defineModule("auth").withApp(WorkerAuthApp).build();
 
 export type WorkerUserCompositionOptions = Readonly<{
   connection: PrismaConnection;
@@ -163,8 +163,8 @@ export function installWorkerUser<Infrastructure>(
   options: WorkerUserCompositionOptions,
 ): ApplicationBuilder<Infrastructure> {
   return builder
-    .withFeature(workerAuthServer, {
+    .withModule(workerAuthServer, {
       infrastructure: { connection: options.connection, redis: options.redis ?? null },
     })
-    .withFeature(userServer, { infrastructure: workerUserInfrastructure(options) });
+    .withModule(userServer, { infrastructure: workerUserInfrastructure(options) });
 }

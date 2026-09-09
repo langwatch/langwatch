@@ -27,7 +27,7 @@
  * that name, and nothing checks that promise until the generator exists.
  */
 
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   ActivityEventDetailRow,
   ActivityMonitorSummary,
@@ -728,14 +728,14 @@ export type GovernanceApiMap = {
 
 /**
  * Governance's typed tRPC hooks. Same machinery, same transport and same React
- * Query cache as the application's `api` proxy — see `createFeatureApi` for why
+ * Query cache as the application's `api` proxy — see `createModuleApi` for why
  * separate instances still share cache entries.
  *
  * INTERNAL to this package by convention: hooks here call it, and other
  * packages call the hooks. It is exported from `src/index.ts` only so the
  * process shell can mount `governanceApi.Provider`.
  */
-export const governanceApi = createFeatureApi<GovernanceApiMap>();
+export const governanceApi = createModuleApi<GovernanceApiMap>();
 
 /**
  * Every procedure's output, addressed the way the screens already address it.

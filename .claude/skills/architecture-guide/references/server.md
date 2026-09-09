@@ -24,7 +24,7 @@ The reference shape:
 
 ```
 index.ts                                              exports <f>Server and the transport declarations, nothing else
-<f>.server.ts                                         the installer (defineFeature)
+<f>.server.ts                                         the installer (defineModule)
 app/<f>.app.ts                                        REQUIRED: the one class implementing <F>Api
 app/__tests__/<f>.fixture.ts                          test builders: the app over memory repositories, peer fixtures
 services/<name>.service.ts                            REQUIRED: at least one; one class per entity
@@ -90,14 +90,14 @@ repository, rules, service, store, subscriber, task`.
 **`<f>.server.ts`, the installer**
 
 ```ts
-export const annotationServer = defineFeature("annotation")
+export const annotationServer = defineModule("annotation")
   .withRepositories(annotationRepositories)
   .withApp(AnnotationApp)
   .withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport)
   .build();
 ```
 
-One installer per module, reused by every process role. `defineFeature` takes the
+One installer per module, reused by every process role. `defineModule` takes the
 catalogue name; the framework derives the public namespace (`annotation` becomes
 `annotations` for REST under `/api/v1`, and the tRPC namespace) so the module writes
 neither. A module without persistence omits `.withRepositories`; a module with a worker
@@ -291,7 +291,7 @@ for stays in `apps/api/src/tasks/` instead.
 
 ```
 app/__tests__/<f>.fixture.ts                        createAnnotationTestApp({ repositories?, dependencies? }) over MemoryAnnotationRepositories
-app/__tests__/<f>-installation.unit.test.ts         createApp(...).withPersistence("memory", {}).withProvided(...).withFeature(<f>Server).boot({ role })
+app/__tests__/<f>-installation.unit.test.ts         createApp(...).withPersistence("memory", {}).withProvided(...).withModule(<f>Server).boot({ role })
 app/__tests__/<f>-boundary.unit.test.ts             peer errors propagate, references validated, side effects best-effort
 services/__tests__/<name>.service.unit.test.ts
 repositories/memory/__tests__/memory.<name>.repository.unit.test.ts

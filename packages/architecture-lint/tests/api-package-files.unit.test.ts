@@ -42,7 +42,7 @@ const TARGET_FILES = new Set([
   "trpc/audit.ts",
   // The browser door, folded in from @langwatch/platform-api-client.
   "web/index.ts",
-  "web/feature-api.ts",
+  "web/module-api.ts",
   "web/trpc-query-key.ts",
   "web/use-invalidate-procedure.ts",
 ]);

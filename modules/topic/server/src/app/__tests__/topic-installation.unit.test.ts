@@ -10,7 +10,7 @@ function process(schedule = UnscheduledTopicClustering.create()) {
   return createApp({ name: "topic-installation-test" })
     .withPersistence("memory", {})
     .withInfrastructure({})
-    .withFeature(topicServer, { infrastructure: { schedule } });
+    .withModule(topicServer, { infrastructure: { schedule } });
 }
 
 describe("topic app installation", () => {
@@ -20,7 +20,7 @@ describe("topic app installation", () => {
     try {
       const app = runtime.service(TopicApi);
 
-      expect(runtime.feature(topicServer).provided).toBe(app);
+      expect(runtime.module(topicServer).provided).toBe(app);
       await expect(app.getAll({ projectId: "project-1" })).resolves.toEqual([]);
       await expect(
         app.getNamesByIds({ projectId: "project-1", ids: ["topic-1"] }),

@@ -11,7 +11,7 @@ imports the server package or `apps/*`. The reference is
 ```
 src/<entry>.ts(x)   flat public entries: annotations.ts, annotation-card.ts, annotation-form.ts, testing.tsx
 model/              pure values, types, view-model transforms, the *HostPort contract and its React context
-behavior/           hooks, the api binding (createFeatureApi), stores, form logic
+behavior/           hooks, the api binding (createModuleApi), stores, form logic
 ui/elements/        leaf presentation: props in, JSX out
 ui/blocks/          small compositions of elements
 ui/sections/        composed presentation fed by behavior; screens and layouts live here
@@ -97,10 +97,10 @@ carries facts the screen needs (`project`, `currentUser`, `hasPermission`,
 ```ts
 // behavior/annotation-api.ts
 import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
-import { createFeatureApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 
 type AnnotationProcedures = ContractApiMap<typeof annotationTrpc> & ContractApiMap<typeof annotationScoreTrpc>;
-export const annotationApi = createFeatureApi<AnnotationProcedures>();
+export const annotationApi = createModuleApi<AnnotationProcedures>();
 export type RouterOutputs = OutputsFromMap<AnnotationProcedures>;
 ```
 
@@ -109,7 +109,7 @@ export type RouterOutputs = OutputsFromMap<AnnotationProcedures>;
   an input or an output. A procedure another module owns and this package still calls is
   the one thing written by hand, in a `BorrowedProcedures` type that says so, until that
   module's contract declares it.
-- `createFeatureApi`, `ContractApiMap`, `WireOf` and `OutputsFromMap` live in
+- `createModuleApi`, `ContractApiMap`, `WireOf` and `OutputsFromMap` live in
   `@langwatch/api/web`, the one subpath of `@langwatch/api` a web package may name.
   Types come from the contract, never from
   `AppRouter` (ADR-130) and never `any`.

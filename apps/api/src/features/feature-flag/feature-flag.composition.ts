@@ -41,7 +41,7 @@ export async function installApiFeatureFlag(options: {
     .withProvided(AuthzApi, options.peers.permissions)
     .withProvided(ProjectApi, options.peers.projects)
     .withProvided(OrganizationApi, options.peers.organizations)
-    .withFeature(featureFlagServer, {
+    .withModule(featureFlagServer, {
       infrastructure: {
         cache: new UncachedApiFeatureFlags(),
         config: options.config,
@@ -50,7 +50,7 @@ export async function installApiFeatureFlag(options: {
     .boot({ role: "api" });
 
   return {
-    app: runtime.feature(featureFlagServer).provided,
+    app: runtime.module(featureFlagServer).provided,
     router: (mount) => createFeatureFlagTrpcRouter(mount.runtime),
   };
 }

@@ -5,7 +5,7 @@
  * also makes this module the package's one `@langwatch/api/web` import.
  */
 
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { topicTrpc } from "@langwatch/topic-contract";
 
 /** Procedures another feature owns. */
@@ -22,7 +22,7 @@ export type TopicApiMap = ContractApiMap<typeof topicTrpc> & BorrowedProcedures;
 
 /**
  * The topic family's typed tRPC hooks. Same machinery, same transport and same
- * React Query cache as the application's `api` proxy — see `createFeatureApi`
+ * React Query cache as the application's `api` proxy — see `createModuleApi`
  * for why separate instances still share cache entries.
  */
-export const topicApi = createFeatureApi<TopicApiMap>();
+export const topicApi = createModuleApi<TopicApiMap>();

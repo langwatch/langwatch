@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   AbortPendingUploadInput,
   CopyDatasetInput,
@@ -30,10 +30,7 @@ import type {
   UploadExistingDatasetInput,
   UpsertDatasetInput,
 } from "./dataset.ts";
-import type {
-  BatchEvaluationRecord,
-  BatchEvaluationSummary,
-} from "./batch-record.trpc.ts";
+import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-record.trpc.ts";
 
 /** Callable capability exposed by the composed Dataset application. */
 export interface DatasetApi {
@@ -75,10 +72,16 @@ export interface DatasetApi {
   getDatasetHead(input: DatasetLookupInput): Promise<DatasetHead>;
   listRecords(input: DatasetPageInput): Promise<DatasetRecordPage>;
   batchCreateRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]>;
-  upsertRecord(input: UpdateDatasetRecordInput & { recordId: string }): Promise<DatasetRecordMutationResult>;
+  upsertRecord(
+    input: UpdateDatasetRecordInput & { recordId: string },
+  ): Promise<DatasetRecordMutationResult>;
   deleteRecords(input: DeleteDatasetRecordsInput): Promise<{ count: number }>;
-  createDatasetFromUpload(input: CreateDatasetFromUploadInput): Promise<CreateDatasetFromUploadResult>;
-  uploadToExistingDataset(input: UploadExistingDatasetInput): Promise<{ datasetId: string; recordsCreated: number }>;
+  createDatasetFromUpload(
+    input: CreateDatasetFromUploadInput,
+  ): Promise<CreateDatasetFromUploadResult>;
+  uploadToExistingDataset(
+    input: UploadExistingDatasetInput,
+  ): Promise<{ datasetId: string; recordsCreated: number }>;
   createPendingUpload(input: PendingUploadInput): Promise<PendingUploadResult>;
   writeStagedUpload(input: StagedUploadInput): Promise<void>;
   finalizeUpload(input: FinalizeUploadInput): Promise<{ datasetId: string; status: "processing" }>;
@@ -87,9 +90,7 @@ export interface DatasetApi {
   getByIds(input: { projectId: string; datasetIds: string[] }): Promise<Dataset[]>;
   renameDataset(input: { datasetId: string; projectId: string; name: string }): Promise<Dataset>;
   /** One row per experiment and dataset: how many ran, total cost, mean score. */
-  summariseBatchEvaluations(input: {
-    projectId: string;
-  }): Promise<BatchEvaluationSummary[]>;
+  summariseBatchEvaluations(input: { projectId: string }): Promise<BatchEvaluationSummary[]>;
   /** Every batch-evaluation record of the experiment the slug names. */
   listBatchEvaluations(input: {
     projectId: string;
@@ -97,4 +98,4 @@ export interface DatasetApi {
   }): Promise<BatchEvaluationRecord[]>;
 }
 
-export const DatasetApi = featureApi<DatasetApi>("dataset");
+export const DatasetApi = moduleApi<DatasetApi>("dataset");

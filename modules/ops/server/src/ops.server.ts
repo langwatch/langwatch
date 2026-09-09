@@ -1,4 +1,4 @@
-import { defineFeature } from "@langwatch/runtime-composition";
+import { defineModule } from "@langwatch/runtime-composition";
 import { OpsApp } from "#app/ops.app";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
 import { adminRest } from "#transport/admin.rest";
@@ -11,7 +11,7 @@ import { opsPlatformTrpcTransport } from "#transport/ops-platform.trpc";
 import { opsProcessTrpcTransport } from "#transport/ops-process.trpc";
 import { opsQueueTrpcTransport } from "#transport/ops-queue.trpc";
 
-export const opsServer = defineFeature("ops")
+export const opsServer = defineModule("ops")
   .withRepositories(opsRepositories)
   .withApp(OpsApp)
   .withTransports(

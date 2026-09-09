@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   CreateWebhookEndpointCommand,
   UpdateWebhookEndpointCommand,
@@ -20,7 +20,9 @@ import type {
  * a repository or one of the feature's internal services.
  */
 export interface WebhookApi {
-  create(input: CreateWebhookEndpointCommand): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
+  create(
+    input: CreateWebhookEndpointCommand,
+  ): Promise<{ endpoint: WebhookEndpointView; secret: string }>;
   getAll(input: { organizationId: string }): Promise<WebhookEndpointView[]>;
   getById(input: { organizationId: string; endpointId: string }): Promise<WebhookEndpointView>;
   update(input: UpdateWebhookEndpointCommand): Promise<WebhookEndpointView>;
@@ -51,4 +53,4 @@ export interface WebhookApi {
   assertEndpointsEntitled(organizationId: string): Promise<void>;
 }
 
-export const WebhookApi = featureApi<WebhookApi>("webhook");
+export const WebhookApi = moduleApi<WebhookApi>("webhook");

@@ -5,7 +5,7 @@
  */
 
 import type { annotationScoreTrpc } from "@langwatch/annotation-contract";
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 
 /** The score-settings transport. Same cache as `annotationApi`, own Provider. */
-export const annotationScoresApi = createFeatureApi<ContractApiMap<typeof annotationScoreTrpc>>();
+export const annotationScoresApi = createModuleApi<ContractApiMap<typeof annotationScoreTrpc>>();

@@ -191,10 +191,10 @@ export async function installApiEvaluation(options: {
     .withProvided(WorkflowApi, workflows)
     .withProvided(TraceApi, traces)
     .withProvided(ModelProviderApi, modelProviders)
-    .withFeature(evaluationServer)
+    .withModule(evaluationServer)
     .boot({ role: "api" });
 
-  const app = runtime.feature(evaluationServer).provided;
+  const app = runtime.module(evaluationServer).provided;
 
   return {
     routers: (mount) => ({ evaluations: createEvaluationTrpcRouter(mount.runtime) }),

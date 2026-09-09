@@ -17,7 +17,7 @@ import {
 } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import {
   isReadbackSafe,
   StoredObjectOwnerLookupUnavailableError,
@@ -118,7 +118,7 @@ export interface StoredObjectFileApi {
   readById(input: { projectId: string; id: string }): Promise<StoredObjectFileStreamRead | null>;
 }
 
-export const StoredObjectFileApi = featureApi<StoredObjectFileApi>("stored-object");
+export const StoredObjectFileApi = moduleApi<StoredObjectFileApi>("stored-object");
 
 /**
  * The `Content-Disposition` filename a caller may ask for. Optional, so a
@@ -376,9 +376,7 @@ async function authorizeFilePurpose({
  * The verifier sets a ceiling on every key it resolves; reaching here without
  * one means that contract broke. Refuse rather than read.
  */
-function ceilingOf(
-  caller: StoredObjectFileCaller,
-): (permission: AuthzPermission) => Promise<void> {
+function ceilingOf(caller: StoredObjectFileCaller): (permission: AuthzPermission) => Promise<void> {
   const ceiling = caller.apiKeyCeiling;
 
   if (!ceiling) throw new HTTPException(500, { message: "api key ceiling unresolved" });

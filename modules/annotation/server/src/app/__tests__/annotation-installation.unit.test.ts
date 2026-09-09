@@ -31,7 +31,7 @@ function process() {
     .withProvided(TraceApi, createAnnotationTestTraces())
     .withProvided(UserApi, createAnnotationTestUsers())
     .withProvided(AuthzApi, createAnnotationTestAuthz())
-    .withFeature(annotationServer);
+    .withModule(annotationServer);
 }
 
 const input = {
@@ -49,7 +49,7 @@ describe("annotation app installation", () => {
       const app = runtime.service(AnnotationApi);
       const created = await app.createUnattributed(input);
 
-      expect(runtime.feature(annotationServer).provided).toBe(app);
+      expect(runtime.module(annotationServer).provided).toBe(app);
 
       await expect(
         app.getById({ projectId: input.projectId, id: created.id }),

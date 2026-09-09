@@ -42,7 +42,7 @@ export async function installWorkerAgent(options: {
     .withProvided(TraceApi, peers.traces)
     .withProvided(UserApi, peers.users)
     .withProvided(WorkflowApi, peers.workflows)
-    .withFeature(agentServer)
+    .withModule(agentServer)
     .boot({ role: "worker", config: { agent: options.config } });
   return { agents: runtime.service(AgentApi), runtime };
 }

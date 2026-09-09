@@ -14,7 +14,7 @@ import {
   type LangWatchQLSchema,
 } from "@langwatch/analytics-contract";
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 /**
  * What the workbench door reaches. The rollout gate and the caller resolution
@@ -27,10 +27,7 @@ export interface AnalyticsLwqlApi {
   /** The project's own rollout switch, read rather than enforced. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
   /** What this member may see of the project's content. */
-  protectionsFor(input: {
-    projectId: string;
-    userId: string;
-  }): Promise<LangWatchQLProtections>;
+  protectionsFor(input: { projectId: string; userId: string }): Promise<LangWatchQLProtections>;
   /** The project identity a member's execution runs under, and its protections. */
   runCallerFor(input: {
     projectId: string;
@@ -40,7 +37,7 @@ export interface AnalyticsLwqlApi {
   execute(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
 }
 
-export const AnalyticsLwqlApi = featureApi<AnalyticsLwqlApi>("analytics");
+export const AnalyticsLwqlApi = moduleApi<AnalyticsLwqlApi>("analytics");
 
 /** The rollout gate, chained AFTER the permission check on every route but one. */
 async function assertWorkbenchEnabled(app: AnalyticsLwqlApi, projectId: string): Promise<void> {

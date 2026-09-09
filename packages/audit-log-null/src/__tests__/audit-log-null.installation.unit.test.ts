@@ -11,13 +11,13 @@ describe("given a process that installed no Enterprise audit log", () => {
       async (role) => {
         const runtime = await createApp({ name: "audit-log-null-installation-test" })
           .withInfrastructure({})
-          .withFeature(auditLogNullServer)
+          .withModule(auditLogNullServer)
           .boot({ role });
 
         try {
           const app = runtime.service(AuditLogApi);
 
-          expect(runtime.feature(auditLogNullServer).provided).toBe(app);
+          expect(runtime.module(auditLogNullServer).provided).toBe(app);
           await expect(
             app.record({ userId: "user-1", action: "agents.create", args: { id: "agent-1" } }),
           ).resolves.toBeUndefined();

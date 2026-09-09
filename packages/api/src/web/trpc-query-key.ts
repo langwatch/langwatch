@@ -1,7 +1,7 @@
 /**
  * tRPC's React Query cache key, rebuilt from a procedure path string.
  *
- * A feature's `createFeatureApi` binding can only name the procedures that
+ * A feature's `createModuleApi` binding can only name the procedures that
  * feature's map declares, and during the migration that is a fraction of the
  * real router — and never another feature's. A package hook regularly
  * needs to invalidate a procedure that has NOT been declared yet — a moved
@@ -19,7 +19,7 @@
  * under it, which is what lets `invalidateQueries` match a whole procedure.
  *
  * Reach for this only for a procedure the feature's map does not declare. Once
- * it does, `featureApi.useUtils().tracesV2.list.invalidate()` says the same
+ * it does, `moduleApi.useUtils().tracesV2.list.invalidate()` says the same
  * thing with the types checked, and a typo in a path string here is a silent
  * no-op rather than a compile error.
  */

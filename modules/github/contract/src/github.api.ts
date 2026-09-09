@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   GithubAppConfig,
   GithubInstallation,
@@ -86,4 +86,4 @@ export interface GithubApi {
   pruneStaleBranchLinkage(): Promise<{ branchChecks: number }>;
 }
 
-export const GithubApi = featureApi<GithubApi>("github");
+export const GithubApi = moduleApi<GithubApi>("github");

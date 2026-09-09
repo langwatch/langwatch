@@ -48,15 +48,13 @@ function featurePackage({
   enterprise?: boolean;
   layoutVersion?: 0;
   subjects?: string[];
-  /** The contract capability: the legacy abstract service, or the reference featureApi token. */
+  /** The contract capability: the legacy abstract service, or the reference moduleApi token. */
   capability?: "service" | "api";
 }): void {
   const prefix = enterprise
     ? `enterprise/modules/${feature}/${role}`
     : `modules/${feature}/${role}`;
-  const featureRoot = enterprise
-    ? `enterprise/modules/${feature}`
-    : `modules/${feature}`;
+  const featureRoot = enterprise ? `enterprise/modules/${feature}` : `modules/${feature}`;
   const decisionMarker = feature.split("").reverse().join("");
   const adrName = "001-package-boundary.md";
   const cataloguePath = join(root, "modules/catalogue.json");
@@ -168,7 +166,7 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
   if (layoutVersion === 0 && role === "contract" && capability === "api") {
     write(
       `${prefix}/src/${feature}.api.ts`,
-      `import { featureApi } from "@langwatch/runtime-composition"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = featureApi<${className(feature)}Api>("${feature}");`,
+      `import { moduleApi } from "@langwatch/runtime-composition"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = moduleApi<${className(feature)}Api>("${feature}");`,
     );
   }
   if (layoutVersion === 0 && role === "server") {
@@ -526,10 +524,7 @@ describe("feature package boundary lint", () => {
       "modules/agent/server/src/testing.ts",
       'export { agentFixture } from "./stores/agent.test-fakes";',
     );
-    write(
-      "modules/agent/server/src/stores/agent.test-fakes.ts",
-      "export const agentFixture = {};",
-    );
+    write("modules/agent/server/src/stores/agent.test-fakes.ts", "export const agentFixture = {};");
 
     expect(policies()).not.toContain("private-runtime-export");
   });
@@ -632,10 +627,7 @@ describe("strict feature source layout", () => {
   /** @scenario "Test fixtures have a named non-production home" */
   it("accepts canonical version-0 contract and server source", () => {
     featurePackage({ feature: "agent", role: "contract", layoutVersion: 0 });
-    write(
-      "modules/agent/contract/src/agent.service.ts",
-      "export abstract class AgentService {}",
-    );
+    write("modules/agent/contract/src/agent.service.ts", "export abstract class AgentService {}");
     featurePackage({ feature: "agent", role: "server", layoutVersion: 0 });
     write(
       "modules/agent/server/src/services/agent.service.ts",
@@ -653,14 +645,8 @@ describe("strict feature source layout", () => {
       "modules/agent/server/src/transport/api-rest/agent.api.ts",
       "export class AgentApi { static create() { return new AgentApi(); } }",
     );
-    write(
-      "modules/agent/server/src/transport/agent.rest.ts",
-      "export const agentRest = {};",
-    );
-    write(
-      "modules/agent/server/src/transport/agent.trpc.ts",
-      "export const agentTrpc = {};",
-    );
+    write("modules/agent/server/src/transport/agent.rest.ts", "export const agentRest = {};");
+    write("modules/agent/server/src/transport/agent.trpc.ts", "export const agentTrpc = {};");
     write(
       "modules/agent/server/src/fixtures/agent.fixture.ts",
       "export const agentFixture = { id: 'agent_1' };",
@@ -686,7 +672,7 @@ describe("strict feature source layout", () => {
     rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
     write(
       "modules/widget/contract/src/widget.api.ts",
-      'import { featureApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = featureApi<WidgetApi>("widget");',
+      'import { moduleApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>("widget");',
     );
 
     expect(policies()).not.toContain("feature-source-layout");
@@ -701,7 +687,7 @@ describe("strict feature source layout", () => {
     rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
     write(
       "modules/widget/contract/src/widget.api.ts",
-      'import { createApp, featureApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = featureApi<WidgetApi>("widget"); export const app = createApp;',
+      'import { createApp, moduleApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>("widget"); export const app = createApp;',
     );
 
     expect(policies()).toContain("feature-source-layout");
@@ -716,7 +702,7 @@ describe("strict feature source layout", () => {
     rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
     write(
       "modules/widget/contract/src/widget.api.ts",
-      'import { featureApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = featureApi<WidgetApi>("widget");',
+      'import { moduleApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>("widget");',
     );
 
     expect(policies()).not.toContain("feature-source-layout");
@@ -728,10 +714,7 @@ describe("strict feature source layout", () => {
    */
   it("accepts tests and their helpers anywhere under a __tests__ directory", () => {
     featurePackage({ feature: "agent", role: "server", layoutVersion: 0 });
-    write(
-      "modules/agent/server/src/services/agent.service.ts",
-      "export class AgentService {}",
-    );
+    write("modules/agent/server/src/services/agent.service.ts", "export class AgentService {}");
     write(
       "modules/agent/server/src/services/__tests__/agent.service.unit.test.ts",
       "export const covered = true;",

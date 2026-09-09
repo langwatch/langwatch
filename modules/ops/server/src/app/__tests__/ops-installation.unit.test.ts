@@ -25,7 +25,7 @@ function process() {
     .withProvided(ProjectApi, createApiFixture<ProjectApi>({ searchByQuery: async () => [] }))
     .withProvided(AuditLogApi, createApiFixture<AuditLogApi>({ record: async () => {} }))
     .withProvided(ApiKeyApi, createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }))
-    .withFeature(opsServer);
+    .withModule(opsServer);
 }
 
 describe("ops app installation", () => {
@@ -36,7 +36,7 @@ describe("ops app installation", () => {
       try {
         const app = runtime.service(OpsApi);
 
-        expect(runtime.feature(opsServer).provided).toBe(app);
+        expect(runtime.module(opsServer).provided).toBe(app);
         expect(app.operatorScope({ id: "user_alex", email: OPS_STAFF_ADDRESS })).toEqual({
           kind: "platform",
         });

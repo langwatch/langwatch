@@ -19,7 +19,7 @@ function process() {
     .withInfrastructure({})
     .withProvided(ExperimentApi, createDatasetTestExperiments())
     .withProvided(AuthzApi, createDatasetTestAuthz())
-    .withFeature(datasetServer, { infrastructure: {} });
+    .withModule(datasetServer, { infrastructure: {} });
 }
 
 const projectId = "project-1";
@@ -30,7 +30,7 @@ describe("dataset app installation", () => {
 
     try {
       const app = runtime.service(DatasetApi);
-      expect(runtime.feature(datasetServer).provided).toBe(app);
+      expect(runtime.module(datasetServer).provided).toBe(app);
 
       const created = await app.upsertDataset({
         projectId,
@@ -38,9 +38,9 @@ describe("dataset app installation", () => {
         columnTypes: [{ name: "input", type: "string" }],
       });
 
-      await expect(
-        app.getBySlugOrId({ projectId, slugOrId: created.slug }),
-      ).resolves.toMatchObject({ id: created.id, name: "Nightly regression" });
+      await expect(app.getBySlugOrId({ projectId, slugOrId: created.slug })).resolves.toMatchObject(
+        { id: created.id, name: "Nightly regression" },
+      );
 
       await expect(
         app.getBySlugOrId({ projectId: "other-project", slugOrId: created.slug }),

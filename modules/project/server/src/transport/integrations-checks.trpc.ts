@@ -4,11 +4,8 @@
  * so the whole rollup arrives through the door's own api.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import {
-  integrationsChecksTrpc,
-  type IntegrationsCheckStatus,
-} from "@langwatch/project-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { integrationsChecksTrpc, type IntegrationsCheckStatus } from "@langwatch/project-contract";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 /** What the setup-checklist door reaches, which is nobody's single vertical. */
 export interface IntegrationsChecksApi {
@@ -20,7 +17,7 @@ export interface IntegrationsChecksApi {
   getCheckStatus(input: { projectId: string }): Promise<IntegrationsCheckStatus>;
 }
 
-export const IntegrationsChecksApi = featureApi<IntegrationsChecksApi>("project");
+export const IntegrationsChecksApi = moduleApi<IntegrationsChecksApi>("project");
 
 export const integrationsChecksTrpcTransport = defineTrpcRouter(
   IntegrationsChecksApi,

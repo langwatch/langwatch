@@ -28,7 +28,7 @@ function process(redactMetricAttributes: DataPrivacyApi["redactMetricAttributes"
     .withPersistence("memory", {})
     .withInfrastructure({})
     .withProvided(DataPrivacyApi, createApiFixture<DataPrivacyApi>({ redactMetricAttributes }))
-    .withFeature(metricServer);
+    .withModule(metricServer);
 }
 
 describe("metric app installation", () => {
@@ -43,7 +43,7 @@ describe("metric app installation", () => {
       try {
         const app = runtime.service(MetricApi);
 
-        expect(runtime.feature(metricServer).provided).toBe(app);
+        expect(runtime.module(metricServer).provided).toBe(app);
 
         const preparation = await app.prepareMetricDataPoints({
           tenantId: "project-1",

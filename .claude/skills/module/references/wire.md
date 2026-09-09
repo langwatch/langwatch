@@ -23,8 +23,8 @@ base path and aliases before assuming a missing mount (annotation answers under
 `/api/annotations`; a plural or singular the family never declared is simply not a route).
 
 Also check whether the module's installer is booted at all:
-`grep -rn "withFeature(<f>Server" apps/api/src apps/worker/src`. Many modules still
-export a `defineFeature` installer that no process installs, while the roots hand-build
+`grep -rn "withModule(<f>Server" apps/api/src apps/worker/src`. Many modules still
+export a `defineModule` installer that no process installs, while the roots hand-build
 their app and adapter (`feature-shape: installer-not-booted`, often beside a
 `refusing<F>Feature()` twin, `refusing-composition`). That is conversion debt
 `references/convert.md` closes (step 7), not a wiring gap you fix by adding a mount, and
@@ -34,8 +34,8 @@ the report should say which it found.
 
 1. **The module's composition** `apps/api/src/features/<f>/<f>.composition.ts`, modelled
    on `annotation.composition.ts`: `installApi<F>({ infrastructure, peers })` builds
-   `createApp({ name: "langwatch-api" }).withPersistence("postgres", { prisma }).withInfrastructure({…}).withProvided(PeerApi, peer)….withFeature(<f>Server).boot({ role: "api" })`,
-   reads `runtime.feature(<f>Server).provided`, and returns the `Composed<F>Feature`
+   `createApp({ name: "langwatch-api" }).withPersistence("postgres", { prisma }).withInfrastructure({…}).withProvided(PeerApi, peer)….withModule(<f>Server).boot({ role: "api" })`,
+   reads `runtime.module(<f>Server).provided`, and returns the `Composed<F>Feature`
    declared in `<f>.composition.types.ts` (`routers(mount)`, `app`, `restServices`). Every
    token the app's `static dependencies` names is provided here, or boot fails by name.
    Do not invent a `refusing*` twin for new work; the root either installs the module or
@@ -57,7 +57,7 @@ the report should say which it found.
    wires the returned routers and REST services.
 5. **Config**: a module's config is a `Config.group`/`Config.value` definition in its
    contract (`<f>.config.ts`), spread into `apps/api/src/platform/config/api.config.ts`,
-   threaded from the root into `.withFeature(<f>Server, { config })`, documented in
+   threaded from the root into `.withModule(<f>Server, { config })`, documented in
    `.env.example`. Never `process.env` below the entrypoint.
 6. **Tests**: `apps/api/src/features/<f>/__tests__/<f>.composition.integration.test.ts`
    drives `installApi<F>` with `createApiFixture` peers and a recording Prisma client
@@ -66,9 +66,9 @@ the report should say which it found.
 ## apps/worker
 
 1. **The capability root** that owns the module's jobs
-   (`apps/worker/src/app/worker-<capability>.composition.ts`) adds `.withFeature(<f>Server[, { infrastructure }])`
+   (`apps/worker/src/app/worker-<capability>.composition.ts`) adds `.withModule(<f>Server[, { infrastructure }])`
    to its `createApp(...)` chain and provides any new peer token; the app is read back with
-   `runtime.feature(<f>Server).provided`. The worker boots one graph for several modules
+   `runtime.module(<f>Server).provided`. The worker boots one graph for several modules
    (`worker-observability-apps.composition.ts` boots trace, annotation, data-privacy, log
    and evaluation together). Mounted from `apps/worker/src/app/worker-production.composition.ts`.
 2. **Catalogue**: `apps/worker/src/features/catalogue.json`.

@@ -7,7 +7,7 @@
  */
 
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { TRPCDefaultErrorShape } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -51,7 +51,7 @@ interface ReviewApi {
   read(input: { id: string }): Promise<{ id: string; comment: string }>;
 }
 
-const ReviewApi = featureApi<ReviewApi>("annotation");
+const ReviewApi = moduleApi<ReviewApi>("annotation");
 
 const contract = defineTrpcContract("review")
   .query("getById")
@@ -460,7 +460,7 @@ interface AccountApi {
   register(input: { email: string }): Promise<{ id: string }>;
 }
 
-const AccountApi = featureApi<AccountApi>("user");
+const AccountApi = moduleApi<AccountApi>("user");
 
 const accountContract = defineTrpcContract("account")
   .mutation("register")
@@ -832,7 +832,7 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
     listUsers(input: { organizationId: string }): Promise<{ count: number }>;
   }
 
-  const DirectoryApi = featureApi<DirectoryApi>("scim");
+  const DirectoryApi = moduleApi<DirectoryApi>("scim");
 
   const directoryContract = defineTrpcContract("directory")
     .query("listUsers")

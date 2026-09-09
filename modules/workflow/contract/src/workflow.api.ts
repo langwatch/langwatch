@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import type {
@@ -229,10 +229,7 @@ export interface WorkflowApi {
     projectId: string;
     name: string;
   }): Promise<Evaluator>;
-  unlinkEvaluatorFromWorkflow(input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<void>;
+  unlinkEvaluatorFromWorkflow(input: { workflowId: string; projectId: string }): Promise<void>;
 
   // -- what the caller may see in a project other than the scoped one -------
 
@@ -305,4 +302,4 @@ export interface WorkflowApi {
   listPublishedComponents(input: { projectId: string }): Promise<unknown>;
 }
 
-export const WorkflowApi = featureApi<WorkflowApi>("workflow");
+export const WorkflowApi = moduleApi<WorkflowApi>("workflow");

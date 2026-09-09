@@ -25,7 +25,7 @@ function process() {
       ModelProviderApiToken,
       createApiFixture<ModelProviderApi>({ getExecutionProviders: async () => ({}) }),
     )
-    .withFeature(evaluationServer);
+    .withModule(evaluationServer);
 }
 
 describe("given a process that installs the evaluation feature", () => {
@@ -36,7 +36,7 @@ describe("given a process that installs the evaluation feature", () => {
       try {
         const app = runtime.service(EvaluationApi);
 
-        expect(runtime.feature(evaluationServer).provided).toBe(app);
+        expect(runtime.module(evaluationServer).provided).toBe(app);
         await expect(app.listCustomEvaluators({ projectId: "project-1" })).resolves.toEqual([]);
         await expect(app.warmupEvaluators({ projectId: "project-1", count: 1 })).resolves.toEqual({
           success: true,

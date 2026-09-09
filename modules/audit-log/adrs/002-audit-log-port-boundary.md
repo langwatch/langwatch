@@ -20,14 +20,14 @@ token. A process installs exactly one of the two.
 ## Public surfaces and transports
 
 The contract exports one callable capability with two operations —
-`record(command)` and `listEntityHistory(input)` — its `featureApi` token, and
+`record(command)` and `listEntityHistory(input)` — its `moduleApi` token, and
 the Zod schemas both carry. There is no transport: the feature answers other
 features through the token, and the audit surfaces a customer reads are the
 organization package's own tRPC and REST doors.
 
 ## Dependencies
 
-Zod 4 and `featureApi` from `@langwatch/runtime-composition`, and nothing else. The
+Zod 4 and `moduleApi` from `@langwatch/runtime-composition`, and nothing else. The
 package is browser-safe and Apache-licensed, so an OSS feature may depend on the
 capability without depending on the Enterprise implementation.
 

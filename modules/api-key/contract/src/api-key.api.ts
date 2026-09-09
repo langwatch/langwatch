@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 import type {
   ApiKey,
@@ -188,4 +188,4 @@ export interface ApiKeyApi {
   ): Promise<ApiKeyUser[]>;
 }
 
-export const ApiKeyApi = featureApi<ApiKeyApi>("api-key");
+export const ApiKeyApi = moduleApi<ApiKeyApi>("api-key");

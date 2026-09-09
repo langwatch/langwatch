@@ -30,7 +30,7 @@ import type { MediaProbeResult } from "@langwatch/scenario-web/surfaces/media-pa
 import type { ShareLink, ShareResourceType, ShareVisibility } from "@langwatch/share-contract";
 import type { CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { CodingAgentSessionDisplay } from "@langwatch/coding-agent-web/surfaces/agent-traces";
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type { ConversationTurn } from "../model/explorer/conversation-turn.ts";
 import type { SessionGroupPayloadItem } from "../model/explorer/session-group-payload.ts";
 import type { ExportProgress, ExportProgressEvent } from "../model/export-types.ts";
@@ -867,10 +867,10 @@ export type RouterOutputs = OutputsFromMap<TraceApiMap>;
 
 /**
  * Trace's typed tRPC hooks. Same machinery, same transport and same React Query
- * cache as the application's `api` proxy — see `createFeatureApi` for why
+ * cache as the application's `api` proxy — see `createModuleApi` for why
  * separate instances still share cache entries.
  */
-export const traceApi = createFeatureApi<TraceApiMap>();
+export const traceApi = createModuleApi<TraceApiMap>();
 
 /** The name a hundred moved call sites already write. */
 export const api = traceApi;

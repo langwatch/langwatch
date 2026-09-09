@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/application.ts";
-import { featureApi } from "../src/feature-api-token.ts";
-import { defineFeature, type FeatureSetup } from "../src/feature-installer.ts";
+import { moduleApi } from "../src/module-api-token.ts";
+import { defineModule, type FeatureSetup } from "../src/feature-installer.ts";
 import {
   DuplicateTransportNamespaceError,
   MissingTransportHostError,
@@ -13,7 +13,7 @@ import {
 interface CatalogueApi {
   read(): string;
 }
-const CatalogueApi = featureApi<CatalogueApi>("dataset");
+const CatalogueApi = moduleApi<CatalogueApi>("dataset");
 
 class CatalogueApp implements CatalogueApi {
   static readonly contract = CatalogueApi;
@@ -71,7 +71,7 @@ function recordingTrpcHost(): FeatureTrpcHost<Readonly<{ app: unknown }>> {
 describe("given a feature whose server declares transports", () => {
   describe("when the application was handed the process's own doors", () => {
     it("mounts every declared family on the REST door", async () => {
-      const server = defineFeature("dataset")
+      const server = defineModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueRest)
         .build();
@@ -80,7 +80,7 @@ describe("given a feature whose server declares transports", () => {
       const runtime = await createApp({ name: "test" })
         .withInfrastructure({})
         .withTransports({ rest })
-        .withFeature(server)
+        .withModule(server)
         .boot({ role: "api" });
 
       expect(runtime.transports.rest).toHaveLength(1);
@@ -88,7 +88,7 @@ describe("given a feature whose server declares transports", () => {
     });
 
     it("binds the handler's application to the feature's own app", async () => {
-      const server = defineFeature("dataset")
+      const server = defineModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueTrpc)
         .build();
@@ -96,7 +96,7 @@ describe("given a feature whose server declares transports", () => {
       const runtime = await createApp({ name: "test" })
         .withInfrastructure({})
         .withTransports({ trpc: recordingTrpcHost() })
-        .withFeature(server)
+        .withModule(server)
         .boot({ role: "api" });
 
       const mounted = runtime.transports.trpc.dataset;
@@ -105,7 +105,7 @@ describe("given a feature whose server declares transports", () => {
     });
 
     it("keys each mounted namespace by the name its declaration carries", async () => {
-      const server = defineFeature("dataset")
+      const server = defineModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueTrpc)
         .build();
@@ -113,14 +113,14 @@ describe("given a feature whose server declares transports", () => {
       const runtime = await createApp({ name: "test" })
         .withInfrastructure({})
         .withTransports({ trpc: recordingTrpcHost() })
-        .withFeature(server)
+        .withModule(server)
         .boot({ role: "api" });
 
       expect(Object.keys(runtime.transports.trpc)).toEqual(["dataset"]);
     });
 
     it("passes the install's facts and error boundary to the mount", async () => {
-      const server = defineFeature("dataset")
+      const server = defineModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueRest)
         .build();
@@ -131,7 +131,7 @@ describe("given a feature whose server declares transports", () => {
       await createApp({ name: "test" })
         .withInfrastructure({})
         .withTransports({ rest })
-        .withFeature(server, { facts: [fact], rest: { onError } })
+        .withModule(server, { facts: [fact], rest: { onError } })
         .boot({ role: "api" });
 
       expect(rest.mounted[0]?.options).toEqual({ onError, facts: [fact] });
@@ -140,7 +140,7 @@ describe("given a feature whose server declares transports", () => {
 
   describe("when the process opened no door for a declared protocol", () => {
     it("refuses at boot, naming the feature and the protocol", async () => {
-      const server = defineFeature("dataset")
+      const server = defineModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueTrpc)
         .build();
@@ -149,7 +149,7 @@ describe("given a feature whose server declares transports", () => {
         createApp({ name: "test" })
           .withInfrastructure({})
           .withTransports({ rest: recordingRestHost() })
-          .withFeature(server)
+          .withModule(server)
           .boot({ role: "api" }),
       ).rejects.toThrow(MissingTransportHostError);
     });
@@ -157,14 +157,14 @@ describe("given a feature whose server declares transports", () => {
 
   describe("when two installed features claim one namespace", () => {
     it("refuses at boot, naming both", async () => {
-      const dataset = defineFeature("dataset")
+      const dataset = defineModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueTrpc)
         .build();
-      const monitor = defineFeature("monitor")
+      const monitor = defineModule("monitor")
         .withApp(
           class MonitorApp {
-            static readonly contract = featureApi<CatalogueApi>("monitor");
+            static readonly contract = moduleApi<CatalogueApi>("monitor");
             static readonly dependencies = {};
             static create(): CatalogueApi {
               return { read: () => "one monitor" };
@@ -178,8 +178,8 @@ describe("given a feature whose server declares transports", () => {
         createApp({ name: "test" })
           .withInfrastructure({})
           .withTransports({ trpc: recordingTrpcHost() })
-          .withFeature(dataset)
-          .withFeature(monitor)
+          .withModule(dataset)
+          .withModule(monitor)
           .boot({ role: "api" }),
       ).rejects.toThrow(DuplicateTransportNamespaceError);
     });
@@ -187,7 +187,7 @@ describe("given a feature whose server declares transports", () => {
 
   describe("when the same feature is installed on a worker", () => {
     it("mounts nothing, because a worker serves no door", async () => {
-      const server = defineFeature("dataset")
+      const server = defineModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueRest, catalogueTrpc)
         .build();
@@ -196,7 +196,7 @@ describe("given a feature whose server declares transports", () => {
       const runtime = await createApp({ name: "test" })
         .withInfrastructure({})
         .withTransports({ rest })
-        .withFeature(server)
+        .withModule(server)
         .boot({ role: "worker" });
 
       expect(runtime.transports).toEqual({ rest: [], trpc: {} });

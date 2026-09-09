@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { Experiment, ExperimentLookup, ExperimentSlugLookup } from "./experiment.ts";
 
 /** Callable capability exposed by the composed Experiment application. */
@@ -7,4 +7,4 @@ export interface ExperimentApi {
   tryGetBySlug(input: ExperimentSlugLookup): Promise<Experiment | null>;
 }
 
-export const ExperimentApi = featureApi<ExperimentApi>("experiment");
+export const ExperimentApi = moduleApi<ExperimentApi>("experiment");

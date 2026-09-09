@@ -9,7 +9,7 @@ import type {
   UpdateProjectInput,
 } from "./project.ts";
 import type { TopicClusteringRequest } from "./project.responses.ts";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 
 export type ProjectPath = { projectId: string; fullPath: string };
@@ -58,4 +58,4 @@ export interface ProjectApi {
   touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void>;
 }
 
-export const ProjectApi = featureApi<ProjectApi>("project");
+export const ProjectApi = moduleApi<ProjectApi>("project");

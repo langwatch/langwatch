@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { Authorized, AuthzDecision, AuthzPrincipalRef, AuthzScopeRef } from "./authz.ts";
 import type * as Binding from "./authz.binding-management.ts";
 import type * as Commands from "./authz.commands.ts";
@@ -154,4 +154,4 @@ export interface AuthzApi {
   }): Promise<boolean>;
 }
 
-export const AuthzApi = featureApi<AuthzApi>("authz");
+export const AuthzApi = moduleApi<AuthzApi>("authz");

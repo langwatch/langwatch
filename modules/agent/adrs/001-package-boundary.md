@@ -56,7 +56,7 @@ Protocol cleanup and compensating rollback retain explicit error handling.
 
 ## Persistence
 
-The feature declares `agentRepositories` and `AgentApp` through `defineFeature`.
+The feature declares `agentRepositories` and `AgentApp` through `defineModule`.
 Process boot selects Postgres or memory. The App receives repository interfaces
 and semantic config; it knows neither Prisma nor backend selection. Each repository
 instance and service is constructed once in that process and belongs to its

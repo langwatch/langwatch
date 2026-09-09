@@ -18,7 +18,7 @@ vi.mock("@langwatch/api/web", async () => {
   const actual = await vi.importActual<typeof import("@langwatch/api/web")>("@langwatch/api/web");
   return {
     ...actual,
-    createFeatureApi: () =>
+    createModuleApi: () =>
       new Proxy(
         {},
         {

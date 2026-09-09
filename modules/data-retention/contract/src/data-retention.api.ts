@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   KillRetroactiveMutationInput,
   PinTraceInput,
@@ -84,4 +84,4 @@ export interface DataRetentionApi {
   ): Promise<void>;
 }
 
-export const DataRetentionApi = featureApi<DataRetentionApi>("data-retention");
+export const DataRetentionApi = moduleApi<DataRetentionApi>("data-retention");

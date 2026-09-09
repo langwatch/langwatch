@@ -7,7 +7,7 @@
  * entry rather than for a call, so invalidation reaches an un-migrated list.
  */
 
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   LegacyModelProvider,
   ModelDefaultEffective,
@@ -241,12 +241,12 @@ export type PromptApiMap = {
 /**
  * The Prompt family's typed tRPC hooks. Same machinery, same transport and the
  * same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
+ * `createModuleApi` for why separate instances still share cache entries.
  *
  * INTERNAL to this package by convention: the screen calls it, and the process
  * shell mounts `promptApi.Provider`.
  */
-export const promptApi = createFeatureApi<PromptApiMap>();
+export const promptApi = createModuleApi<PromptApiMap>();
 
 /** Every procedure's output, as the browser receives it. */
 export type RouterOutputs = OutputsFromMap<PromptApiMap>;

@@ -13,7 +13,7 @@ function installation() {
   return createApp({ name: "stored-object-installation-test" })
     .withPersistence("memory", {})
     .withInfrastructure(createStoredObjectTestInfrastructure())
-    .withFeature(storedObjectServer);
+    .withModule(storedObjectServer);
 }
 
 const bytes = {
@@ -38,7 +38,7 @@ describe("stored-object app installation", () => {
         try {
           const app = runtime.service(StoredObjectApi);
 
-          expect(runtime.feature(storedObjectServer).provided).toBe(app);
+          expect(runtime.module(storedObjectServer).provided).toBe(app);
 
           const stored = await app.storeFromBytes(bytes);
 

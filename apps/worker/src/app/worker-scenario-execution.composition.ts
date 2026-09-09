@@ -261,7 +261,7 @@ export async function createWorkerScenarioExecutionGraph(input: {
     .withProvided(AgentApi, agents)
     .withProvided(PromptApi, promptApp)
     .withProvided(ProjectApi, deps.projects)
-    .withFeature(suiteServer, {
+    .withModule(suiteServer, {
       infrastructure: {
         resolveClickHouseClient: deps.resolveClickHouseClient,
         defaultRetentionDays: deps.defaultRetentionDays,
@@ -271,7 +271,7 @@ export async function createWorkerScenarioExecutionGraph(input: {
     })
     .boot({ role: "worker" });
   input.resources.own("worker scenario suites", () => suiteRuntime.stop());
-  const suites = suiteRuntime.feature(suiteServer).provided;
+  const suites = suiteRuntime.module(suiteServer).provided;
 
   const datasets = await createWorkerDatasetApp({ database: prisma, resources: input.resources });
   const nlpRuntime = HttpWorkflowNlpRuntimeAdapter.create({
@@ -296,10 +296,10 @@ export async function createWorkerScenarioExecutionGraph(input: {
   const secretRuntime = await createApp({ name: "langwatch-worker-secret" })
     .withPersistence("postgres", { prisma })
     .withInfrastructure({})
-    .withFeature(secretServer, { infrastructure: { encryption } })
+    .withModule(secretServer, { infrastructure: { encryption } })
     .boot({ role: "worker" });
   input.resources.own("worker scenario secrets", () => secretRuntime.stop());
-  const secrets = secretRuntime.feature(secretServer).provided;
+  const secrets = secretRuntime.module(secretServer).provided;
 
   const prefetcher = ScenarioExecutionPrefetcherService.create({
     secretCipher,

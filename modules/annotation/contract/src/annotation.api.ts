@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   Annotation,
   AnnotationByIdInput,
@@ -93,4 +93,4 @@ export interface AnnotationApi {
   ): Promise<Readonly<{ created: number; skipped: number }>>;
 }
 
-export const AnnotationApi = featureApi<AnnotationApi>("annotation");
+export const AnnotationApi = moduleApi<AnnotationApi>("annotation");

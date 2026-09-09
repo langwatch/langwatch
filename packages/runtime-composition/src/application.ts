@@ -34,7 +34,7 @@ import {
 } from "./transport-mounting.ts";
 import { ResourceScope } from "./resource-scope.ts";
 import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
-import { FeatureApiToken, type FeatureApiIdentity } from "./feature-api-token.ts";
+import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
 import { LocalFeatureApis } from "./local-feature-api.ts";
 import {
   selectedRepositoryOwnership,
@@ -76,11 +76,11 @@ export class BootedRuntime<Infrastructure, Rest = never, Trpc = never> {
   }
 
   /**
-   * One installed feature, typed by its own declaration. The stored state is
-   * erased — the root installs features it knows nothing else about — so the
+   * One installed module, typed by its own declaration. The stored state is
+   * erased — the root installs modules it knows nothing else about — so the
    * declaration's own types are what name it again here.
    */
-  feature<
+  module<
     Config,
     Dependencies extends TokenMap,
     TransportDependencies extends TokenMap,
@@ -212,15 +212,15 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
   }
 
   /** Declares one feature. Constructs nothing. */
-  withFeature(
+  withModule(
     declaration: InstallableServerFeature<Infrastructure>,
     options?: FeatureInstallOptions,
   ): this;
-  withFeature<FeatureInfrastructure>(
+  withModule<FeatureInfrastructure>(
     declaration: InstallableServerFeature<FeatureInfrastructure>,
     options: FeatureInstallOptions & { infrastructure: FeatureInfrastructure },
   ): this;
-  withFeature<FeatureInfrastructure>(
+  withModule<FeatureInfrastructure>(
     declaration: InstallableServerFeature<FeatureInfrastructure>,
     options?: FeatureInstallOptions & { infrastructure?: FeatureInfrastructure },
   ): this {
@@ -331,7 +331,7 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
           persistence,
           role,
           resolve: (token) =>
-            token instanceof FeatureApiToken ? apis.reference(token) : provided.get(token),
+            token instanceof ModuleApiToken ? apis.reference(token) : provided.get(token),
         });
         featureServices.push(...resources.sealServices());
         this.bindProviders(declaration, state, apis, provided);
@@ -381,10 +381,10 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
     provided: Map<TokenIdentity, unknown>,
   ): void {
     for (const token of providerOf.keys()) {
-      if (token instanceof FeatureApiToken) apis.declare(token);
+      if (token instanceof ModuleApiToken) apis.declare(token);
     }
     for (const [token, value] of this.state.preProvided) {
-      if (!(token instanceof FeatureApiToken)) continue;
+      if (!(token instanceof ModuleApiToken)) continue;
       apis.bind(token, value);
       provided.set(token, apis.reference(token));
     }
@@ -398,7 +398,7 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
   ): void {
     for (const provider of declaration.providers) {
       const value = provider.read(state.provided as never);
-      if (provider.token instanceof FeatureApiToken) {
+      if (provider.token instanceof ModuleApiToken) {
         apis.bind(provider.token, value);
         provided.set(provider.token, apis.reference(provider.token));
       } else {
@@ -423,11 +423,11 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
     const apiOwners = new Map<string, string>();
     const register = (token: TokenIdentity, owner: string): void => {
       const existing =
-        token instanceof FeatureApiToken ? apiOwners.get(token.name) : providerOf.get(token);
+        token instanceof ModuleApiToken ? apiOwners.get(token.name) : providerOf.get(token);
       if (existing !== void 0) {
         throw new DuplicateProviderError(tokenName(token), [existing, owner]);
       }
-      if (token instanceof FeatureApiToken) apiOwners.set(token.name, owner);
+      if (token instanceof ModuleApiToken) apiOwners.set(token.name, owner);
       providerOf.set(token, owner);
     };
     for (const token of this.state.preProvided.keys()) {
@@ -453,7 +453,7 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
         );
       }
       for (const [key, token] of Object.entries(declaration.dependencies)) {
-        if (!(token instanceof FeatureApiToken)) {
+        if (!(token instanceof ModuleApiToken)) {
           throw new Error(
             `Feature "${declaration.name}" dependency "${key}" must use a peer API token.`,
           );
@@ -516,7 +516,9 @@ export function createApp(options: { name: string }): {
 /** Each repository-aware feature has a backend the process selected for it. */
 function assertRepositoryBackend(
   declarations: readonly DeclaredFeature[],
-  persistence: Readonly<{ backend: string; infrastructure: Readonly<Record<string, unknown>> }> | undefined,
+  persistence:
+    | Readonly<{ backend: string; infrastructure: Readonly<Record<string, unknown>> }>
+    | undefined,
 ): void {
   for (const declaration of declarations) {
     if (!declaration.repositoryRegistry) continue;
@@ -589,11 +591,11 @@ function orderByDependency(
 
 function assertLegacyProviders(declaration: DeclaredFeature): void {
   const providesApi = declaration.providers.some(
-    (provider) => provider.token instanceof FeatureApiToken,
+    (provider) => provider.token instanceof ModuleApiToken,
   );
   if (providesApi) {
     throw new Error(
-      `Feature "${declaration.name}" must provide its API through defineFeature().withApp().`,
+      `Feature "${declaration.name}" must provide its API through defineModule().withApp().`,
     );
   }
 }
@@ -606,7 +608,7 @@ function constructorDependencies(
 ): DeclaredFeature[] {
   const dependencies: DeclaredFeature[] = [];
   for (const [, token] of dependenciesFor(declaration, role)) {
-    if (token instanceof FeatureApiToken) continue;
+    if (token instanceof ModuleApiToken) continue;
     const provider = providerOf.get(token);
     const dependency = provider === void 0 ? void 0 : byName.get(provider);
     if (dependency) dependencies.push(dependency);

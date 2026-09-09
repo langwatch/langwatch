@@ -30,7 +30,7 @@ errors), [react.md](./react.md), [error-handling.md](./error-handling.md).
 │ @langwatch/api/web   (the browser half of @langwatch/api. No feature     │
 │                       role — this is why it can name @trpc/server types) │
 │                                                                          │
-│   createFeatureApi<Map>()   turns a feature's plain procedure map into    │
+│   createModuleApi<Map>()   turns a feature's plain procedure map into    │
 │                             a real @trpc/react-query binding             │
 │   useInvalidateProcedure()  invalidate a procedure your map lacks         │
 │   trpcQueryKey / Filter     tRPC's cache-key encoding, rebuilt            │
@@ -58,7 +58,7 @@ is the single most important property here and it is explained in full below.
 **Where this is going:** `@langwatch/api/web` already exports a
 single shared `trpcReact` built against `apps/api`'s root router type (see
 `secret/web/src/behavior/secret-api.ts`). It is meant to replace the
-per-feature `createFeatureApi<Map>()` maps described below once the api-map
+per-feature `createModuleApi<Map>()` maps described below once the api-map
 lane finishes its fan-out (`dev/docs/plans/strict-feature-layout.md` section 4
 item 11). This section will be rewritten around `trpcReact` at that point.
 
@@ -67,7 +67,7 @@ it builds itself.
 
 ```ts
 // modules/trace/web/src/trace-api.ts
-import { createFeatureApi } from "@langwatch/api/web";
+import { createModuleApi } from "@langwatch/api/web";
 import type { TraceHeader, TraceHeaderReadInput } from "@langwatch/trace-contract";
 
 export type TraceApiMap = {
@@ -76,7 +76,7 @@ export type TraceApiMap = {
   };
 };
 
-export const traceApi = createFeatureApi<TraceApiMap>();
+export const traceApi = createModuleApi<TraceApiMap>();
 ```
 
 and then, anywhere in the package:
@@ -165,7 +165,7 @@ const mounted = apis.reduceRight<ReactNode>(
 One untyped client (`ownTransport`) is handed to every binding's `Provider` in
 turn, `reduceRight` so the list reads in mount order at the call site. There is
 no cast: `Provider` accepts the client as `unknown` at this call site, and each
-feature's own binding — `createFeatureApi<Map>()` or `trpcReact` — supplies the
+feature's own binding — `createModuleApi<Map>()` or `trpcReact` — supplies the
 type on the way back out through its own hooks.
 
 Two rules, and breaking either one is the cause of the bug class this whole
@@ -470,7 +470,7 @@ as a prop instead of from `useOrganizationTeamProject`, and the toast comes from
 
 `packages/api/src/web/__tests__/trpc-query-key.unit.test.ts` asserts the load-
 bearing property against tRPC's own `getQueryKey`: two independent
-`createFeatureApi` instances derive identical keys, and `trpcQueryKey` matches
+`createModuleApi` instances derive identical keys, and `trpcQueryKey` matches
 what tRPC produces for both the procedure-wide and the input-specific form. If
 `@trpc/react-query` ever changes its encoding, that test fails instead of every
 migrated hook silently detaching from its un-migrated siblings.
@@ -610,7 +610,7 @@ Two specific findings worth acting on:
 1. A feature web package declares `@langwatch/api` and its own
    contract, and imports only through the `@langwatch/api/web` subpath. Never
    `@trpc/*`, never `@tanstack/react-query`, never a server package.
-2. One `createFeatureApi<Map>()` per feature web package, at module scope.
+2. One `createModuleApi<Map>()` per feature web package, at module scope.
 3. The shell mounts the Provider with **its** client and **its** QueryClient.
    The package never builds either.
 4. Payload types come from the contract package. `z.input` for procedure inputs

@@ -20,7 +20,7 @@ function process() {
     .withProvided(AnalyticsApi, createDashboardTestAnalytics())
     .withProvided(AutomationApi, createDashboardTestAutomation())
     .withProvided(ProjectApi, createDashboardTestProjects())
-    .withFeature(dashboardServer);
+    .withModule(dashboardServer);
 }
 
 describe("dashboard app installation", () => {
@@ -31,7 +31,7 @@ describe("dashboard app installation", () => {
       try {
         const app = runtime.service(DashboardApi);
 
-        expect(runtime.feature(dashboardServer).provided).toBe(app);
+        expect(runtime.module(dashboardServer).provided).toBe(app);
 
         const created = await app.create({ projectId: "project-1", name: "Reports" });
 

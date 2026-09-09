@@ -1,5 +1,5 @@
 import type { CodingAgentSessionLookupInput } from "./coding-agent.ts";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   CodingAgentGithubConnection,
   CodingAgentPersonalPullRequestUsage,
@@ -120,4 +120,4 @@ export interface CodingAgentApi {
   githubConnection(organizationId: string | undefined): Promise<CodingAgentGithubConnection>;
 }
 
-export const CodingAgentApi = featureApi<CodingAgentApi>("coding-agent");
+export const CodingAgentApi = moduleApi<CodingAgentApi>("coding-agent");

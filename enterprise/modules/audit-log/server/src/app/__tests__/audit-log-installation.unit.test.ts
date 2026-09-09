@@ -7,7 +7,7 @@ function process() {
   return createApp({ name: "audit-log-installation-test" })
     .withPersistence("memory", {})
     .withInfrastructure({})
-    .withFeature(auditLogServer);
+    .withModule(auditLogServer);
 }
 
 const command = {
@@ -28,7 +28,7 @@ describe("given a process that installed the audit log", () => {
 
       try {
         const app = runtime.service(AuditLogApi);
-        expect(runtime.feature(auditLogServer).provided).toBe(app);
+        expect(runtime.module(auditLogServer).provided).toBe(app);
 
         await app.record(command);
 

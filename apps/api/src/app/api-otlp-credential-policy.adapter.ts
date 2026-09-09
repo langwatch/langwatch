@@ -1,7 +1,7 @@
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { OtlpIngestCredential } from "@langwatch/trace-server/api-rest/otlp-ingest";
 
-/** Compatibility composition until Governance adopts its complete callable FeatureApi. */
+/** Compatibility composition until Governance adopts its complete callable ModuleApi. */
 export class ApiOtlpCredentialPolicyAdapter {
   readonly #governance: GovernanceService | undefined;
 

@@ -11,7 +11,7 @@ import {
   type SignUpVerificationResult,
 } from "@langwatch/auth-contract";
 import type { RoutingDecision } from "@langwatch/identity-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
@@ -66,7 +66,7 @@ export interface FrontDoorApi {
   ): Promise<void>;
 }
 
-export const FrontDoorApi = featureApi<FrontDoorApi>("auth");
+export const FrontDoorApi = moduleApi<FrontDoorApi>("auth");
 
 /** An hour: the window every counter on this surface spends its budget over. */
 const HOUR_SECONDS = 60 * 60;
@@ -99,7 +99,8 @@ const FRESH_INVITE_REQUEST = publicRoute({
     "asks the holder of an expired code's organization to send a new one; mints nothing, names nobody, and is throttled per code and per IP",
 });
 
-const OWN_ADDRESS = "sends the session user's own address confirmation; no tenant scope is involved";
+const OWN_ADDRESS =
+  "sends the session user's own address confirmation; no tenant scope is involved";
 
 export const frontDoorTrpcTransport = defineTrpcRouter(FrontDoorApi, frontDoorTrpc)
   /**

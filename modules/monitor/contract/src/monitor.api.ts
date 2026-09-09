@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
 import type {
   EnabledGuardrailMonitor,
@@ -57,4 +57,4 @@ export interface MonitorApi {
   performanceForProject(input: MonitorPerformanceInput): Promise<OnlineEvaluationPerformance[]>;
 }
 
-export const MonitorApi = featureApi<MonitorApi>("monitor");
+export const MonitorApi = moduleApi<MonitorApi>("monitor");

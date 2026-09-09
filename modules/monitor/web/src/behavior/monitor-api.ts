@@ -19,7 +19,7 @@
  * import below is the only one in the package.
  */
 
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { monitorTrpc } from "@langwatch/monitor-contract";
 
 /** One experiment, as the legacy-wizard check reads it. */
@@ -84,6 +84,6 @@ export type MonitorApiMap = ContractApiMap<typeof monitorTrpc> & BorrowedProcedu
 /**
  * The monitor family's typed tRPC hooks. Same machinery, same transport and
  * same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
+ * `createModuleApi` for why separate instances still share cache entries.
  */
-export const monitorApi = createFeatureApi<MonitorApiMap>();
+export const monitorApi = createModuleApi<MonitorApiMap>();

@@ -10,7 +10,7 @@ import { trpcQueryFilter } from "./trpc-query-key.ts";
  * belongs to another feature — a rename in Trace refreshing a list the
  * application still owns.
  *
- * Prefer `featureApi.useUtils().<procedure>.invalidate()` whenever the map
+ * Prefer `moduleApi.useUtils().<procedure>.invalidate()` whenever the map
  * declares the procedure. This takes a string, so a typo is a silent no-op
  * rather than a compile error, and that is exactly why it should be the second
  * choice rather than the habit.

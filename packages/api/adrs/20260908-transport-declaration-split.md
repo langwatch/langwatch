@@ -100,7 +100,7 @@ segment now travels **with** the declaration, so
 ### The browser derives its client
 
 `@langwatch/api/web` gained `ContractApiMap<TContract>`, which turns
-a contract's type into the `FeatureApiMap` shape `createFeatureApi` already
+a contract's type into the `ModuleApiMap` shape `createModuleApi` already
 took. The annotation web package went from 281 lines of hand-written map to
 
 ```ts

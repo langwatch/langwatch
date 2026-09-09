@@ -119,7 +119,7 @@ adapters; it contains no feature-flag business logic.
 ## Runtime and registration
 
 A process installs `featureFlagServer` once — `createApp(...).withPersistence(
-"postgres", { prisma }).withFeature(featureFlagServer)` — and exposes the app
+"postgres", { prisma }).withModule(featureFlagServer)` — and exposes the app
 it provides as `app.featureFlag`. Hono, tRPC, workers and other features
 receive that instance; none register or construct it on demand.
 

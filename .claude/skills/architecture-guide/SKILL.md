@@ -14,11 +14,10 @@ programs), plus the Go services `services/aigateway`, `services/nlpgo` and
 their own database, Redis and ClickHouse handles through `@langwatch/runtime-composition`.
 
 A **module** is a folder `modules/<name>/` that owns three workspace
-packages. The folder is still named `modules/` and every generated identifier
-still reads `Feature*` (`defineFeature`, `withFeature`, `featureApi`,
-`installApi<Name>`, `<Name>Api`, `FeatureName`) - that is code, not prose, and it stays
-until the tree rename lands (`dev/docs/plans/modules-rename.md`); everywhere else, in
-conversation and in these skills, the word for this shape is "module".
+packages. One word throughout: the folder is `modules/`, the identifiers are
+`defineModule`, `withModule`, `moduleApi`, `installApi<Name>`, `<Name>Api` and
+`ModuleName`, and in conversation and in these skills the word for this shape
+is "module".
 
 | Directory  | Package                      | Holds                                                                          |
 | ---------- | ---------------------------- | ------------------------------------------------------------------------------ |
@@ -43,13 +42,13 @@ produce this same shape: `references/convert.md` closes a module's entries kind 
 modules/annotation/
 ├── feature.json · specs/ · adrs/
 ├── contract/src/
-│   ├── annotation.api.ts            interface AnnotationApi + featureApi token
+│   ├── annotation.api.ts            interface AnnotationApi + moduleApi token
 │   ├── annotation.trpc.ts · annotation-score.trpc.ts   defineTrpcContract: every procedure's name, kind, input, output
 │   ├── annotation.schemas.ts · annotation-queue.schemas.ts · annotation-rest.schemas.ts · annotation-trpc.schemas.ts
 │   ├── annotation.errors.ts · annotation-queue.errors.ts
 │   └── annotation-*.types.ts · index.ts
 ├── server/src/
-│   ├── annotation.server.ts         defineFeature("annotation").withRepositories(...).withApp(...).withTransports(...).build()
+│   ├── annotation.server.ts         defineModule("annotation").withRepositories(...).withApp(...).withTransports(...).build()
 │   ├── index.ts                     exports the installer and the transport declarations, nothing else
 │   ├── app/annotation.app.ts        class AnnotationApp implements AnnotationApi; owns the private services
 │   ├── services/*.service.ts        one class per entity, each over its repository interface
@@ -77,8 +76,8 @@ other half. Another module imports only the owner's contract, names the owner's 
 token in its app's `static dependencies`, and receives the owner's app at boot. Nobody
 imports another module's service or repository. `modules/catalogue.json` maps
 every subject to exactly one owning module; `feature-source-subject` fires when a
-filename claims another module's subject, and `FeatureName` (the type `defineFeature`
-and `featureApi` accept) is generated from that catalogue.
+filename claims another module's subject, and `ModuleName` (the type `defineModule`
+and `moduleApi` accept) is generated from that catalogue.
 
 ## Which reference to read
 
@@ -92,7 +91,7 @@ Read the one that matches the layer you are about to touch. Each is short.
 - `references/web.md`: the layer order and import matrix, flat entries versus screens
   versus surfaces versus pages, host ports, the api-map, drawers.
 - `references/config-composition.md`: `RuntimeConfig` and `Config.group`, the per-process
-  config modules, the root `.env`, `createApp(...).withPersistence().withProvided().withFeature().boot()`,
+  config modules, the root `.env`, `createApp(...).withPersistence().withProvided().withModule().boot()`,
   the REST and tRPC mounts in `apps/api/src/features/<f>/`, the worker, producer-only
   eventing.
 - `references/install.md`: the steps that put a screen in front of a user
@@ -105,7 +104,7 @@ Read the one that matches the layer you are about to touch. Each is short.
 ## The rules that bite most often
 
 - The contract's capability is `<f>.api.ts`: one `interface <F>Api` of callable operations
-  and `export const <F>Api = featureApi<<F>Api>("<f>")`. There is no abstract service in a
+  and `export const <F>Api = moduleApi<<F>Api>("<f>")`. There is no abstract service in a
   contract any more (`feature-shape: contract-service`).
 - The server exposes one app. `app/<f>.app.ts` is `class <F>App implements <F>Api` with
   `static readonly contract`, `static readonly dependencies`, a private constructor and
@@ -138,7 +137,7 @@ Read the one that matches the layer you are about to touch. Each is short.
 - Test builders live in `app/__tests__/<f>.fixture.ts`; there is no `fixtures/` and no
   `testing.ts` in a server package (`feature-shape: fixtures-directory`, `testing-entry`).
 - A module exists to be installed: `<f>.server.ts` is its installer, `app/<f>.app.ts` its
-  one app, and some process boots it with `createApp(...).withFeature(<f>Server)`. A
+  one app, and some process boots it with `createApp(...).withModule(<f>Server)`. A
   server package without them, or an installer no process boots while the root hand-builds
   the app, is conversion debt (`feature-shape: no-installer`, `no-app`,
   `installer-not-booted`). A process installs a module or does not; there is no
@@ -165,10 +164,10 @@ Read the one that matches the layer you are about to touch. Each is short.
 
 ## The `modules` folder name
 
-The tree still reads `modules/`, and every generated identifier still reads
-`Feature*`, because the rename to `modules` is a separate, queued change
-(`dev/docs/plans/modules-rename.md`). Write the folder and the identifiers as code;
-say "module" everywhere else.
+The tree reads `modules/` and `enterprise/modules/`, and the identifiers read
+`Module*` (`defineModule`, `withModule`, `moduleApi`, `ModuleName`). The words a
+lint policy id uses are the exception: `feature-source-layout`, `feature-catalogue`
+and `feature-shape` are baseline keys and keep their names.
 
 ## Where the rules are written down
 

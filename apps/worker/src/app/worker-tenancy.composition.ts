@@ -83,10 +83,10 @@ export function installWorkerTenancy<Infrastructure>(
   const prompts = PostgresPromptAdapter.create({ database }).build();
 
   return builder
-    .withFeature(authzServer, {
+    .withModule(authzServer, {
       infrastructure: { database, redis: options.redis, ...options.authz },
     })
-    .withFeature(organizationFeature, {
+    .withModule(organizationFeature, {
       infrastructure: {
         database,
         identities: PersonalWorkspaceIdentityAdapter.create(),
@@ -98,15 +98,15 @@ export function installWorkerTenancy<Infrastructure>(
         seats: WorkerOrganizationSeats.create({ plans: options.plans, database }),
       },
     })
-    .withFeature(projectServer, { infrastructure: { ...options.project, database } })
-    .withFeature(apiKeyServer, { infrastructure: { ...options.apiKeys, database } })
-    .withFeature(dataRetentionServer, {
+    .withModule(projectServer, { infrastructure: { ...options.project, database } })
+    .withModule(apiKeyServer, { infrastructure: { ...options.apiKeys, database } })
+    .withModule(dataRetentionServer, {
       infrastructure: { ...options.dataRetention, redis: options.redis },
     })
-    .withFeature(shareServer, {
+    .withModule(shareServer, {
       infrastructure: { ...options.share, redis: options.redis },
     })
-    .withFeature(topicServer, { infrastructure: options.topics });
+    .withModule(topicServer, { infrastructure: options.topics });
 }
 
 class WorkerOrganizationSettingsSecrets extends OrganizationSettingsSecretPort {
@@ -141,7 +141,6 @@ class WorkerOrganizationPrompts extends OrganizationPromptSeedPort {
     this.logger.error({ error }, "Organization provisioning could not undo its own commit");
   }
 }
-
 
 class WorkerOrganizationSeats extends OrganizationSeatLicensePort {
   static create(options: {

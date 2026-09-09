@@ -4,7 +4,7 @@
  */
 
 import type { codingAgentTrpc } from "@langwatch/coding-agent-contract";
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { PullRequestStatus } from "./pull-request-status.ts";
 
 /** One pull request the page is asking the current state of. */
@@ -58,4 +58,4 @@ export type CodingAgentApiMap = ContractApiMap<typeof codingAgentTrpc> & Borrowe
  * process shell; since `apps/ui` may not import this ungoverned package,
  * `@langwatch/user - web`'s `screens/personal - workspace` names it instead.
  */
-export const codingAgentApi = createFeatureApi<CodingAgentApiMap>();
+export const codingAgentApi = createModuleApi<CodingAgentApiMap>();

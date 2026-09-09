@@ -16,7 +16,7 @@ import {
   type GithubInstallStatePayload,
 } from "@langwatch/github-contract";
 import { createLogger } from "@langwatch/observability";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -53,7 +53,7 @@ export interface GithubInstallApi {
   backfillPullRequestMappings(input: { organizationId: string }): Promise<void>;
 }
 
-export const GithubInstallApi = featureApi<GithubInstallApi>("github");
+export const GithubInstallApi = moduleApi<GithubInstallApi>("github");
 
 const logger = createLogger("langwatch:api:github");
 
@@ -203,9 +203,7 @@ async function startInstallation({
 
   if (refusal) return refusal;
 
-  return redirectTo(
-    await installUrlFor({ app, query, organizationId, userId: session.user.id }),
-  );
+  return redirectTo(await installUrlFor({ app, query, organizationId, userId: session.user.id }));
 }
 
 /**
@@ -395,14 +393,14 @@ async function recordInstallation({
       : redirectTo(withGithubError(returnTo, message));
   }
 
-  void app.backfillPullRequestMappings({ organizationId: state.organizationId }).catch(
-    (error: unknown) => {
+  void app
+    .backfillPullRequestMappings({ organizationId: state.organizationId })
+    .catch((error: unknown) => {
       logger.warn(
         { error, organizationId: state.organizationId, installationId },
         "GitHub installation pull-request backfill failed",
       );
-    },
-  );
+    });
 
   await recordInstallAudit({ app, state, installationId, accountLogin });
 

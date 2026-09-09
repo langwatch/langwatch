@@ -12,7 +12,7 @@ import {
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
 } from "@langwatch/api/rest";
 import { isReadbackSafe } from "@langwatch/stored-object-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
 
 /** How long a proxied image may be cached: it is addressed by its own URL. */
@@ -31,7 +31,7 @@ export interface ImageProxyApi {
   fetchImage(input: { url: string }): Promise<ProxiedImage>;
 }
 
-export const ImageProxyApi = featureApi<ImageProxyApi>("stored-object");
+export const ImageProxyApi = moduleApi<ImageProxyApi>("stored-object");
 
 /** A request naming no image at all. */
 export class ImageProxyUrlMissingError extends Error {

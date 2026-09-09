@@ -4,7 +4,7 @@
  * selected from a path, a header or neither.
  */
 import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { Hono, type Hono as HonoApp } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -37,7 +37,7 @@ import { createRestRuntime } from "../runtime.ts";
 describe("defineRestRouter", () => {
   /** @scenario "A REST endpoint is one complete declaration in the server" */
   it("keeps route declarations inert and callable for feature discovery", () => {
-    const api = featureApi<{ get(input: { id: string }): Promise<{ id: string }> }>("annotation");
+    const api = moduleApi<{ get(input: { id: string }): Promise<{ id: string }> }>("annotation");
 
     const transport = defineRestRouter(api)
       .withNamespace("annotations")
@@ -68,7 +68,7 @@ describe("defineRestRouter", () => {
   });
 
   it("rejects conflicting request sources and malformed path parameters", () => {
-    const api = featureApi<{ get(input: { id: string }): Promise<{ id: string }> }>("annotation");
+    const api = moduleApi<{ get(input: { id: string }): Promise<{ id: string }> }>("annotation");
 
     const router = () =>
       defineRestRouter(api).withNamespace("annotations").withVersion("2026-08-07");
@@ -127,7 +127,7 @@ describe("defineRestRouter", () => {
   describe("when a route answers without a credential", () => {
     /** @scenario "A route that answers without a credential names no tenant" */
     it("refuses a public route whose own input names a scope", () => {
-      const api = featureApi<{ ping(): Promise<void> }>("ops");
+      const api = moduleApi<{ ping(): Promise<void> }>("ops");
 
       expect(() =>
         defineRestRouter(api)
@@ -142,7 +142,7 @@ describe("defineRestRouter", () => {
 
     /** @scenario "A route that answers without a credential names no tenant" */
     it("refuses a route that declares both a permission and public access", () => {
-      const api = featureApi<{ ping(): Promise<void> }>("ops");
+      const api = moduleApi<{ ping(): Promise<void> }>("ops");
 
       expect(() =>
         defineRestRouter(api)
@@ -156,7 +156,7 @@ describe("defineRestRouter", () => {
     });
 
     it("refuses a route that declares neither", () => {
-      const api = featureApi<{ ping(): Promise<void> }>("ops");
+      const api = moduleApi<{ ping(): Promise<void> }>("ops");
 
       expect(() => {
         const route = defineRestRouter(api)
@@ -170,7 +170,7 @@ describe("defineRestRouter", () => {
   });
 
   describe("when a route is gated by the family's door alone", () => {
-    const OpsApi = featureApi<{ ping(): Promise<void> }>("ops");
+    const OpsApi = moduleApi<{ ping(): Promise<void> }>("ops");
 
     /** @scenario "A route the family's own door alone gates asks no permission of it" */
     it("refuses a route that declares both a permission and authenticated access", () => {
@@ -220,7 +220,7 @@ describe("defineRestRouter", () => {
   });
 
   describe("when a route checks its permission at the scope its path names", () => {
-    const ProjectApi = featureApi<{ ping(): Promise<void> }>("project");
+    const ProjectApi = moduleApi<{ ping(): Promise<void> }>("project");
 
     /** @scenario "A route checks its permission at the scope its own path names" */
     it("refuses a route whose sources parse no such field", () => {
@@ -267,7 +267,7 @@ describe("defineRestRouter", () => {
   });
 
   describe("when a route declares the several answers it may give", () => {
-    const HealthApi = featureApi<{ ping(): Promise<void> }>("platform-health");
+    const HealthApi = moduleApi<{ ping(): Promise<void> }>("platform-health");
     const report = z.object({ status: z.string() });
 
     function route() {
@@ -317,7 +317,7 @@ describe("defineRestRouter", () => {
   });
 
   describe("when a route reads or writes its own bytes", () => {
-    const HookApi = featureApi<{ record(): Promise<void> }>("webhook");
+    const HookApi = moduleApi<{ record(): Promise<void> }>("webhook");
     const answer = z.object({ ok: z.boolean() });
 
     function hook() {
@@ -404,7 +404,7 @@ describe("defineRestRouter", () => {
   });
 
   describe("when a family declares the door it answers behind", () => {
-    const OrganizationApi = featureApi<{ listRoles(): Promise<void> }>("role");
+    const OrganizationApi = moduleApi<{ listRoles(): Promise<void> }>("role");
 
     /** @scenario "A declaration names the credential its routes accept" */
     it("records the declared door, and defaults to the project key", () => {
@@ -493,7 +493,7 @@ describe("defineRestRouter", () => {
 
   describe("when a family declares how it is addressed", () => {
     it("refuses an addressing declared after the first route", () => {
-      const api = featureApi<{ ping(): Promise<void> }>("ops");
+      const api = moduleApi<{ ping(): Promise<void> }>("ops");
 
       const router = defineRestRouter(api)
         .withNamespace("ops")
@@ -509,7 +509,7 @@ describe("defineRestRouter", () => {
 
     /** @scenario "A family whose paths were never aliased declares no twin" */
     it("refuses a twin declared by a family that names its generation in the path", () => {
-      const api = featureApi<{ ping(): Promise<void> }>("ops");
+      const api = moduleApi<{ ping(): Promise<void> }>("ops");
 
       const router = () =>
         defineRestRouter(api).withNamespace("webhooks").withVersion("2026-08-07");
@@ -523,7 +523,7 @@ describe("defineRestRouter", () => {
 
     /** @scenario "A family publishing its paths literally may answer at the root" */
     it("takes a one-segment path from a literal family that says it answers at the root", () => {
-      const api = featureApi<{ ping(): Promise<void> }>("ops");
+      const api = moduleApi<{ ping(): Promise<void> }>("ops");
 
       const declaration = defineRestRouter(api)
         .withNamespace("root-discovery")
@@ -541,7 +541,7 @@ describe("defineRestRouter", () => {
 
     /** @scenario "A family publishing its paths literally may answer at the root" */
     it("refuses a root path from a family that declared no root, and a root that claims a twin", () => {
-      const api = featureApi<{ ping(): Promise<void> }>("ops");
+      const api = moduleApi<{ ping(): Promise<void> }>("ops");
 
       const router = () =>
         defineRestRouter(api).withNamespace("root-discovery").withVersion("2026-08-07");
@@ -562,7 +562,7 @@ describe("defineRestRouter", () => {
 });
 
 describe("a mount binding the facts a declaration names", () => {
-  const OpsApi = featureApi<{ ping(): Promise<void> }>("ops");
+  const OpsApi = moduleApi<{ ping(): Promise<void> }>("ops");
   const surface = defineRestMiddleware("surface", z.string().nullable());
 
   function declaration() {
@@ -679,7 +679,7 @@ describe("RestVersionSelector", () => {
 });
 
 describe("a route that asks whether its tenant holds an entitlement", () => {
-  const RolesApi = featureApi<{ listRoles(): Promise<void> }>("authz");
+  const RolesApi = moduleApi<{ listRoles(): Promise<void> }>("authz");
 
   function declaration(handle: () => { ran: boolean }) {
     return defineRestRouter(RolesApi)
@@ -783,7 +783,7 @@ describe("a route that asks whether its tenant holds an entitlement", () => {
 });
 
 describe("a create declared replayable under a caller's key", () => {
-  const WebhookApi = featureApi<{ createEndpoint(): Promise<void> }>("webhook");
+  const WebhookApi = moduleApi<{ createEndpoint(): Promise<void> }>("webhook");
 
   /** The durable half of the protocol, in memory: one row per scope and key. */
   function receipts(): IdempotencyReceiptPersistence {

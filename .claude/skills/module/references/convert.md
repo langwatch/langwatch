@@ -15,14 +15,14 @@ F=<module>; P=modules/$F
 grep -n "\"$F\"" packages/architecture-lint/src/feature-shape-baseline.json
 find $P/contract/src $P/server/src $P/web/src -type f | grep -v __tests__ | grep -v node_modules | sort
 ls apps/api/src/features/$F apps/worker/src/features/$F 2>/dev/null
-grep -rn "withFeature(" apps/api/src apps/worker/src apps/tasks/src | grep -v __tests__ | grep -i "$(echo $F | sed 's/-//g')"
+grep -rn "withModule(" apps/api/src apps/worker/src apps/tasks/src | grep -v __tests__ | grep -i "$(echo $F | sed 's/-//g')"
 ```
 
 Each baseline `kind` is one gap, and each gap has exactly one target in annotation:
 
 | kind                        | what the module has                                     | copy this from annotation                                                                    |
 | ---------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `contract-service`          | `contract/src/<f>.service.ts` abstract class            | `contract/src/annotation.api.ts` (interface + `featureApi` token)                            |
+| `contract-service`          | `contract/src/<f>.service.ts` abstract class            | `contract/src/annotation.api.ts` (interface + `moduleApi` token)                            |
 | `persistence-adapter`       | `server/src/adapters/postgres.<x>.adapter.ts`           | `repositories/prisma/prisma.annotation-score.repository.ts` and its memory twin              |
 | `unregistered-repositories` | repositories chosen by an adapter or the process        | `repositories/annotation-repositories.registry.ts`, `annotation.repositories.ts`             |
 | `postgres-without-memory`   | Prisma repositories only                                | `repositories/memory/memory.annotation-score.repository.ts`, `memory.annotation.repositories.ts` |
@@ -49,7 +49,7 @@ export interface ApiKeyApi {
   list(input: ListApiKeysInput): Promise<ApiKey[]>;
   …
 }
-export const ApiKeyApi = featureApi<ApiKeyApi>("api-key");
+export const ApiKeyApi = moduleApi<ApiKeyApi>("api-key");
 ```
 
 - Rename as you move, never after: `list`/`get` stay on the API (RPC verbs), `find*`
@@ -146,7 +146,7 @@ export class ApiKeyApp implements ApiKeyApi {
 
 ## 5. Installer and exports
 
-`<f>.server.ts`: `defineFeature("<f>").withRepositories(<f>Repositories).withApp(<F>App).withTransports(…).build()`.
+`<f>.server.ts`: `defineModule("<f>").withRepositories(<f>Repositories).withApp(<F>App).withTransports(…).build()`.
 `index.ts` exports `<f>Server` and the transport declarations only. Delete `testing.ts`
 and `fixtures/`; the builders become `app/__tests__/<f>.fixture.ts`
 (`create<F>TestApp` over `Memory<F>Repositories`, peers via `createApiFixture<PeerApi>`).
@@ -188,13 +188,13 @@ builder details and the browser side.
 ## 7. Composition: boot the installer
 
 `apps/api/src/features/<f>/<f>.composition.ts` becomes `installApi<F>({ infrastructure, peers })`
-copied from `annotation.composition.ts`: `createApp({ name: "langwatch-api" }).withPersistence("postgres", { prisma }).withInfrastructure({…}).withProvided(PeerApi, peer)….withFeature(<f>Server).boot({ role: "api" })`,
-`runtime.feature(<f>Server).provided`, `routers(mount)` from `<f>-trpc.mount.ts`,
+copied from `annotation.composition.ts`: `createApp({ name: "langwatch-api" }).withPersistence("postgres", { prisma }).withInfrastructure({…}).withProvided(PeerApi, peer)….withModule(<f>Server).boot({ role: "api" })`,
+`runtime.module(<f>Server).provided`, `routers(mount)` from `<f>-trpc.mount.ts`,
 `restServices`. The root (`api-production.composition.ts`) calls it with the peers it
 holds and no longer constructs the app. Delete `refusing<F>Feature`, `<f>-absence.ts`,
 `Unavailable*` errors that exist only for the twin, and every call site: boot names a
 missing provider by token. The worker root that owns the module's jobs adds
-`.withFeature(<f>Server)` to its own `createApp` chain the same way. Details in
+`.withModule(<f>Server)` to its own `createApp` chain the same way. Details in
 `references/wire.md`; the composition integration test drives the real mount with
 `createApiFixture` peers.
 
@@ -210,7 +210,7 @@ layers under `model/`, `behavior/`, `ui/` do not move.
 ## 9. Tests, then the ratchet
 
 - `app/__tests__/<f>-installation.unit.test.ts` boots
-  `createApp(...).withPersistence("memory", {}).withProvided(PeerApi, fixture).withFeature(<f>Server).boot({ role })`
+  `createApp(...).withPersistence("memory", {}).withProvided(PeerApi, fixture).withModule(<f>Server).boot({ role })`
   for every role the module serves.
 - Service unit tests over the memory repositories; the Prisma repositories' integration
   test if the package declares a datastore; every existing test re-pointed at the new

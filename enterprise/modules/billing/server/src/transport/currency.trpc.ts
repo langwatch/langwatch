@@ -5,7 +5,7 @@
  */
 import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
 import { currencyTrpc, type DetectedCurrency } from "@langwatch/enterprise-billing-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
 
 import type { CurrencyRequest } from "../services/currency.service.ts";
@@ -16,7 +16,7 @@ export interface BillingCurrencyApi {
   detectCurrency(request: CurrencyRequest): DetectedCurrency;
 }
 
-export const BillingCurrencyApi = featureApi<BillingCurrencyApi>("billing");
+export const BillingCurrencyApi = moduleApi<BillingCurrencyApi>("billing");
 
 /**
  * The headers this request arrived with, as the PROCESS reads them off its own

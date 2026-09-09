@@ -47,7 +47,7 @@ export async function installApiAgent(options: {
     .withProvided(TraceApi, peers.traces)
     .withProvided(UserApi, peers.users)
     .withProvided(WorkflowApi, peers.workflows)
-    .withFeature(agentServer)
+    .withModule(agentServer)
     .boot({ role: "api", config: { agent: options.config } });
 
   return { agents: runtime.service(AgentApi), runtime };

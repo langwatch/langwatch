@@ -122,7 +122,7 @@ alias with its last caller.
 ```text
 contract/src/
 ├── index.ts
-├── <feature>.api.ts                      interface <Feature>Api + featureApi token
+├── <feature>.api.ts                      interface <Feature>Api + moduleApi token
 ├── <subject>.schemas.ts · <subject>-<part>.schemas.ts
 ├── <subject>-rest.schemas.ts · <subject>-trpc.schemas.ts
 ├── <subject>.errors.ts · <subject>-<part>.errors.ts
@@ -130,7 +130,7 @@ contract/src/
 
 server/src/
 ├── index.ts                              exports <feature>Server and the transport declarations only
-├── <feature>.server.ts                   defineFeature(...).withRepositories(...).withApp(...).withTransports(...).build()
+├── <feature>.server.ts                   defineModule(...).withRepositories(...).withApp(...).withTransports(...).build()
 ├── app/<feature>.app.ts                  class <Feature>App implements <Feature>Api
 ├── app/__tests__/<feature>.fixture.ts
 ├── services/<subject>.service.ts
@@ -184,7 +184,7 @@ The contract is portable. It owns:
 - domain values and identifiers;
 - Zod 4 schemas and inferred transport-safe types;
 - commands, queries, events, and concrete domain errors; and
-- one callable `<Feature>Api` interface and its `featureApi` token, the only
+- one callable `<Feature>Api` interface and its `moduleApi` token, the only
   cross-feature dependency surface (ADR-133).
 
 It must not import Node runtime APIs, Prisma, Hono, tRPC server code, React,

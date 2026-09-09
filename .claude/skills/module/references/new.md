@@ -46,7 +46,7 @@ module to `modules/catalogue.json`:
 { "id": "<name>", "root": "modules/<name>", "classification": "core", "subjects": ["<name>"] }
 ```
 
-then regenerate the `FeatureName` union:
+then regenerate the `ModuleName` union:
 `node packages/runtime-composition/scripts/check-feature-names.mjs --write`.
 
 ## 2. Contract package
@@ -58,7 +58,7 @@ copy `modules/annotation/contract/package.json`), `tsconfig.json` and
 
 ```
 index.ts
-<name>.api.ts            export interface <Name>Api { … }; export const <Name>Api = featureApi<<Name>Api>("<name>")
+<name>.api.ts            export interface <Name>Api { … }; export const <Name>Api = moduleApi<<Name>Api>("<name>")
 <name>.schemas.ts        the domain value's zod schema and inferred types; write/read inputs as schemas
 <name>-rest.schemas.ts   params/query/body/response schemas for the REST door (if public)
 <name>-trpc.schemas.ts   input schemas for the tRPC door
@@ -84,7 +84,7 @@ service: `feature-shape` inventories a `<name>.service.ts` in a contract.
 
 ```
 src/index.ts                                          export { <name>Server } and the transport declarations, nothing else
-src/<name>.server.ts                                  defineFeature("<name>").withRepositories(<name>Repositories).withApp(<Name>App).withTransports(…).build()
+src/<name>.server.ts                                  defineModule("<name>").withRepositories(<name>Repositories).withApp(<Name>App).withTransports(…).build()
 src/app/<name>.app.ts                                 class <Name>App implements <Name>Api: static contract/dependencies, private ctor, static create(setup: FeatureSetup<…>)
 src/app/__tests__/<name>.fixture.ts                   create<Name>TestApp over Memory<Name>Repositories and createApiFixture peers
 src/services/<name>.service.ts                        one class per entity; static create({ repository }); parses input with contract schemas
@@ -111,7 +111,7 @@ in `packages/prisma-client/prisma/schema.prisma` with a migration under
 `testing.ts` (`feature-shape`).
 
 Tests: `app/__tests__/<name>-installation.unit.test.ts` boots the installer with
-`createApp(...).withPersistence("memory", {}).withProvided(PeerApi, fixture).withFeature(<name>Server).boot({ role })`
+`createApp(...).withPersistence("memory", {}).withProvided(PeerApi, fixture).withModule(<name>Server).boot({ role })`
 for every role it serves; `services/__tests__/*.unit.test.ts` over memory repositories;
 `repositories/memory/__tests__` and `repositories/prisma/__tests__` (the latter with an
 integration test if the package declares a datastore in `vitest.integration.config.ts`);
@@ -125,7 +125,7 @@ entry per public piece plus `./testing`):
 ```
 src/<name>s.ts                      the entry: export const <name>Screens = { <name>s: () => import("./ui/sections/<name>s-screen.tsx") }; export { <name>Api }; export { <Name>HostPort, <Name>HostProvider, use<Name>Host }
 src/model/<name>-host.ts            abstract <Name>HostPort + React context (project, user, permissions, route, navigate, notify)
-src/behavior/<name>-api.ts          export type <Name>ApiMap; export const <name>Api = createFeatureApi<<Name>ApiMap>()
+src/behavior/<name>-api.ts          export type <Name>ApiMap; export const <name>Api = createModuleApi<<Name>ApiMap>()
 src/behavior/use-<name>s.ts         hooks over <name>Api
 src/ui/elements/ … ui/blocks/ … ui/sections/<name>s-screen.tsx (default export, view as prop)
 src/testing.tsx                     Stub<Name>Host extends <Name>HostPort + render harness

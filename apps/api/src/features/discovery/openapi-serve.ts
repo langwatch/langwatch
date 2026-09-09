@@ -11,7 +11,7 @@
  */
 
 import type { RestErrorHandler } from "@langwatch/api/rest";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 import { apiDocumentBytes, apiDocumentETag } from "./openapi-document.ts";
 
@@ -25,7 +25,7 @@ export interface ApiDocumentApi {
  * The description is nobody's product feature, so it is filed under the
  * deployment's own operational surface rather than given a module of its own.
  */
-export const ApiDocumentApi = featureApi<ApiDocumentApi>("ops");
+export const ApiDocumentApi = moduleApi<ApiDocumentApi>("ops");
 
 /**
  * Public and immutable for the life of a deploy, but not immutable across

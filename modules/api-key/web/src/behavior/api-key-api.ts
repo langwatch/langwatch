@@ -6,7 +6,7 @@
  */
 
 import type { apiKeyTrpc } from "@langwatch/api-key-contract";
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 
 /**
  * Procedures other features own. Each belongs in that feature's own contract;
@@ -50,9 +50,9 @@ export type ApiKeyApiMap = ContractApiMap<typeof apiKeyTrpc> & BorrowedProcedure
 /**
  * The API Key family's typed tRPC hooks. Same machinery, same transport and
  * same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
+ * `createModuleApi` for why separate instances still share cache entries.
  *
  * INTERNAL to this package by convention: the screens call it, and the process
  * shell mounts `apiKeyApi.Provider`.
  */
-export const apiKeyApi = createFeatureApi<ApiKeyApiMap>();
+export const apiKeyApi = createModuleApi<ApiKeyApiMap>();

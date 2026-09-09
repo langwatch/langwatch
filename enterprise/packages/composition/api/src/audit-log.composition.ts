@@ -19,7 +19,7 @@ export class EnterpriseApiAuditLog {
     const runtime = await createApp({ name: "enterprise-api:audit-log" })
       .withPersistence("postgres", { prisma: options.prisma })
       .withInfrastructure({})
-      .withFeature(auditLogServer)
+      .withModule(auditLogServer)
       .boot({
         role: "api",
         config: { "audit-log": { maxArgsBytes: options.maxArgsBytes ?? DEFAULT_MAX_ARGS_BYTES } },

@@ -77,13 +77,13 @@ describe("entitlement app installation", () => {
         warnings: TestUsageWarnings.create(),
       })
       .withProvided(UserApi, createEntitlementTestUsers())
-      .withFeature(entitlementServer)
+      .withModule(entitlementServer)
       .boot({ role: "api" });
 
     try {
       const app = runtime.service(EntitlementApi);
 
-      expect(runtime.feature(entitlementServer).provided).toBe(app);
+      expect(runtime.module(entitlementServer).provided).toBe(app);
 
       await expect(app.getActivePlan({ organizationId: "organization-1" })).resolves.toMatchObject({
         type: "FREE",

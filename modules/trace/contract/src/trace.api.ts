@@ -15,7 +15,7 @@ import type { DerivedTraceEvent } from "./trace-derived-event.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
 import type { SpanTreeDeltaInput, SpanTreeInput, TraceIngestWaitInput } from "./trace.queries.ts";
 import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   EvaluationTraceReadInput,
   EvaluationTraceSpan,
@@ -310,4 +310,4 @@ export interface TraceApi {
   readProject(projectId: string): Promise<unknown>;
 }
 
-export const TraceApi = featureApi<TraceApi>("trace");
+export const TraceApi = moduleApi<TraceApi>("trace");

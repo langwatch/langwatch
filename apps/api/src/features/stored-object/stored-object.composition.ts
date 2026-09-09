@@ -194,10 +194,10 @@ export async function installApiStoredObject(
       files: bytes,
       owners: composeOwnerResolver(options, logger),
     })
-    .withFeature(storedObjectServer)
+    .withModule(storedObjectServer)
     .boot({ role: "api" });
 
-  const app = runtime.feature(storedObjectServer).provided;
+  const app = runtime.module(storedObjectServer).provided;
 
   return {
     router: (mount) => createStoredObjectTrpcRouter(mount.runtime),

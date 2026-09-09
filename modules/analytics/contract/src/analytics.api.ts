@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   AnalyticsFeedbacksResult,
   AnalyticsFilterOption,
@@ -56,4 +56,4 @@ export interface AnalyticsApi {
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
 }
 
-export const AnalyticsApi = featureApi<AnalyticsApi>("analytics");
+export const AnalyticsApi = moduleApi<AnalyticsApi>("analytics");

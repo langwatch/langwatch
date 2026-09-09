@@ -123,10 +123,10 @@ export async function installApiScim(
   const runtime = await createApp({ name: "langwatch-api" })
     .withPersistence("postgres", { prisma })
     .withInfrastructure(infrastructure)
-    .withFeature(scimServer)
+    .withModule(scimServer)
     .boot({ role: "api" });
 
-  return runtime.feature(scimServer).provided;
+  return runtime.module(scimServer).provided;
 }
 
 /**

@@ -33,7 +33,7 @@ import {
   type ProjectService,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
 
 import {
@@ -56,7 +56,7 @@ export interface ProjectManagementApi {
   apiKeys(): ApiKeyApi;
 }
 
-export const ProjectManagementApi = featureApi<ProjectManagementApi>("project");
+export const ProjectManagementApi = moduleApi<ProjectManagementApi>("project");
 
 /**
  * The organization credential this door resolved: the key, and the member it
@@ -183,7 +183,9 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withOutput(projectRestSchema)
   .withDocs(GET_PROJECT)
   .handle(async ({ app, input, scope }) =>
-    projectResponse(await projectInOrganization({ app, id: input.projectId, organizationId: scope.id })),
+    projectResponse(
+      await projectInOrganization({ app, id: input.projectId, organizationId: scope.id }),
+    ),
   )
 
   .patch("/:projectId", "updateProject")

@@ -6,7 +6,7 @@
  * key, so a different spelling stops sharing a cache with `api.evaluators.*`.
  */
 
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type {
   EvaluatorCascadeArchive,
   EvaluatorRelatedEntities as EvaluatorRelatedEntitiesContract,
@@ -79,6 +79,6 @@ export type EvaluatorApiMap = ContractApiMap<typeof evaluatorTrpc> & BorrowedPro
 /**
  * The evaluator family's typed tRPC hooks. Same machinery, same transport and
  * same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
+ * `createModuleApi` for why separate instances still share cache entries.
  */
-export const evaluatorApi = createFeatureApi<EvaluatorApiMap>();
+export const evaluatorApi = createModuleApi<EvaluatorApiMap>();

@@ -5,7 +5,7 @@
 
 import type { automationTrpc, emailSuppressionTrpc } from "@langwatch/automation-contract";
 import type { Monitor } from "@langwatch/monitor-contract";
-import { createFeatureApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 
 /** The project every automation procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -148,14 +148,16 @@ type BorrowedProcedures = {
 };
 
 /** Everything this family calls: the declared namespaces plus the borrowed six. */
-export type AutomationApiMap = ContractApiMap<typeof automationTrpc> & ContractApiMap<typeof emailSuppressionTrpc> & BorrowedProcedures;
+export type AutomationApiMap = ContractApiMap<typeof automationTrpc> &
+  ContractApiMap<typeof emailSuppressionTrpc> &
+  BorrowedProcedures;
 
 /**
  * The automations family's typed tRPC hooks. Internal by convention - hooks
  * here call it, other packages call the hooks. Exported only so
  * `screens/automations` can mount `automationApi.Provider`.
  */
-export const automationApi = createFeatureApi<AutomationApiMap>();
+export const automationApi = createModuleApi<AutomationApiMap>();
 
 /** Every procedure's output, addressed the way the screen already addresses it. */
 export type RouterOutputs = OutputsFromMap<AutomationApiMap>;

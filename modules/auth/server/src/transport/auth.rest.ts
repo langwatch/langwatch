@@ -4,14 +4,10 @@
  * door's own. @see specs/auth/auth-rest-family-mounted.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestRawResult,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 import type { AuthDirectoryPort } from "../ports/auth-directory.port.ts";
 import { isBornFinalizedSignUp } from "./better-auth/born-finalized-opt-in.api.ts";
@@ -72,7 +68,7 @@ export interface AuthDoorApi {
   runWithIdentityBirth: <T>(run: () => Promise<T>) => Promise<T>;
 }
 
-export const AuthDoorApi = featureApi<AuthDoorApi>("auth");
+export const AuthDoorApi = moduleApi<AuthDoorApi>("auth");
 
 const JSON_MEDIA_TYPE = "application/json";
 

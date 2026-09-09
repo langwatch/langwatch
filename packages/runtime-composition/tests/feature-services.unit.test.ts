@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/application.ts";
-import { featureApi } from "../src/feature-api-token.ts";
-import { defineFeature, type FeatureSetup } from "../src/feature-installer.ts";
+import { moduleApi } from "../src/module-api-token.ts";
+import { defineModule, type FeatureSetup } from "../src/feature-installer.ts";
 import { ResourceScope, type ResourceOwnership } from "../src/resource-scope.ts";
 
 interface ProjectApi {
   name(): string;
 }
-const ProjectApi = featureApi<ProjectApi>("project");
+const ProjectApi = moduleApi<ProjectApi>("project");
 
 interface Infrastructure {
   events: string[];
@@ -64,9 +64,9 @@ class ProjectApp implements ProjectApi {
   }
 }
 
-const project = defineFeature("project").withApp(ProjectApp).build();
+const project = defineModule("project").withApp(ProjectApp).build();
 function graph(infrastructure: Infrastructure) {
-  return createApp({ name: "lifecycle" }).withInfrastructure(infrastructure).withFeature(project);
+  return createApp({ name: "lifecycle" }).withInfrastructure(infrastructure).withModule(project);
 }
 
 describe("feature-owned runtime services", () => {
@@ -86,7 +86,7 @@ describe("feature-owned runtime services", () => {
           },
         })
         .boot({ role });
-      callApi = () => runtime.feature(project).provided.name();
+      callApi = () => runtime.module(project).provided.name();
 
       expect(events).toEqual([]);
       await Promise.all([runtime.start(), runtime.start()]);

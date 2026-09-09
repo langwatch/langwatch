@@ -22,7 +22,7 @@ it("accepts the fluent annotation REST router and rejects a body from an implici
     accepted,
     `import { z } from "zod";
 import { defineRestRouter } from ${JSON.stringify(transport)};
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 interface AnnotationApi {
   getAnnotation(input: { id: string }): Promise<{ id: string }>;
@@ -30,7 +30,7 @@ interface AnnotationApi {
   deleteAnnotation(input: { id: string }): Promise<void>;
 }
 
-const AnnotationApi = featureApi<AnnotationApi>("annotation");
+const AnnotationApi = moduleApi<AnnotationApi>("annotation");
 const transportDeclaration = defineRestRouter(AnnotationApi)
   .withNamespace("annotations")
   .withVersion("2026-08-07")
@@ -57,9 +57,9 @@ transportDeclaration.router();
   writeFileSync(
     rejected,
     `import { defineRestRouter } from ${JSON.stringify(transport)};
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
-const AnnotationApi = featureApi<object>("annotation");
+const AnnotationApi = moduleApi<object>("annotation");
 defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-08-07")
   .get("/", "deleteAnnotation").withPermission("annotations:update").handle(() => ({ body: "forbidden" }));
 `,
@@ -69,9 +69,9 @@ defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-0
     mismatchedParams,
     `import { z } from "zod";
 import { defineRestRouter } from ${JSON.stringify(transport)};
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
-const AnnotationApi = featureApi<object>("annotation");
+const AnnotationApi = moduleApi<object>("annotation");
 const annotationRestParamsSchema = z.object({ id: z.string() });
 defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-08-07")
   .get("/:idd", "getAnnotation")
@@ -84,9 +84,9 @@ defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-0
   writeFileSync(
     unpermitted,
     `import { defineRestRouter } from ${JSON.stringify(transport)};
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
-const AnnotationApi = featureApi<object>("annotation");
+const AnnotationApi = moduleApi<object>("annotation");
 defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-08-07")
   .get("/", "listAnnotations").handle(() => {});
 `,
@@ -110,10 +110,10 @@ it("infers trailing middleware arguments and rejects wrong facts and responses",
   writeFileSync(
     fixture,
     `import { z } from "zod";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { defineRestRouter } from "../src/rest/declaration.ts";
 import { defineRestMiddleware } from "../src/rest/request.ts";
-const api = featureApi<object>("annotation");
+const api = moduleApi<object>("annotation");
 const facts = defineRestMiddleware("caller", z.object({ userId: z.string() }));
 const route = () => defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
   .get("/", "read").withPermission("annotations:view")
@@ -170,9 +170,9 @@ it("types the handler's scope from the declared credential, and refuses a door w
   writeFileSync(
     fixture,
     `import { z } from "zod";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { defineRestRouter } from "../src/rest/declaration.ts";
-const api = featureApi<object>("role");
+const api = moduleApi<object>("role");
 const tier = z.object({ tier: z.literal("organization") });
 defineRestRouter(api).withNamespace("roles").withVersion("2026-09-08")
   .withCredential("organizationKey")
@@ -221,9 +221,9 @@ it("types the handler's answer from the statuses the declaration named", () => {
   writeFileSync(
     fixture,
     `import { z } from "zod";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { defineRestRouter } from "../src/rest/declaration.ts";
-const api = featureApi<object>("platform-health");
+const api = moduleApi<object>("platform-health");
 const report = z.object({ status: z.string() });
 const route = () => defineRestRouter(api).withNamespace("platform-health").withVersion("2026-09-08")
   .get("/", "getPlatformHealth").withPermission("project:view")

@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   ChangeOwnPasswordInput,
   CompleteUserVerificationInput,
@@ -153,4 +153,4 @@ export interface UserApi {
   readAvatarObject(input: { projectId: string; id: string }): Promise<UserAvatarObjectRead>;
 }
 
-export const UserApi = featureApi<UserApi>("user");
+export const UserApi = moduleApi<UserApi>("user");

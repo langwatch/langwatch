@@ -52,7 +52,7 @@ export async function installApiSuite(options: {
     .withProvided(AgentApi, peers.agents)
     .withProvided(PromptApi, peers.prompts)
     .withProvided(ProjectApi, peers.projects)
-    .withFeature(suiteServer, {
+    .withModule(suiteServer, {
       infrastructure: {
         execution: infrastructure.execution,
         resolveClickHouseClient: infrastructure.resolveClickHouseClient,
@@ -65,7 +65,7 @@ export async function installApiSuite(options: {
     })
     .boot({ role: "api" });
 
-  const app = runtime.feature(suiteServer).provided;
+  const app = runtime.module(suiteServer).provided;
 
   return {
     routers: (mount) => ({ suites: createSuiteTrpcRouter(mount) }),

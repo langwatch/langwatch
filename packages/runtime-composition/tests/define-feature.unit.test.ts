@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
-import { defineFeature, type FeatureSetup } from "../src/feature-installer.ts";
+import { defineModule, type FeatureSetup } from "../src/feature-installer.ts";
 
 abstract class DirectoryApp {
   abstract readonly name: string;
@@ -33,25 +33,25 @@ class ComposedDirectoryApp extends DirectoryApp {
   }
 }
 
-const directoryServer = defineFeature("annotation").withApp(ComposedDirectoryApp).build();
+const directoryServer = defineModule("annotation").withApp(ComposedDirectoryApp).build();
 const directoryApis = [
   { protocol: "rest", router: (host: string) => ({ host }) },
   { protocol: "trpc", router: (host: string) => ({ host }) },
 ] as const;
-const directoryWithTransports = defineFeature("annotation")
+const directoryWithTransports = defineModule("annotation")
   .withApp(ComposedDirectoryApp)
   .withTransports(...directoryApis)
   .build();
 
-describe("defineFeature", () => {
+describe("defineModule", () => {
   it("constructs the declared app once during boot and publishes its contract", async () => {
     const runtime = await createApp({ name: "test" })
       .withInfrastructure({ prefix: "tenant-" })
-      .withFeature(directoryServer)
+      .withModule(directoryServer)
       .boot({ role: "api", config: { annotation: { suffix: "directory" } } });
 
     expect(runtime.service(DirectoryApp).name).toBe("tenant-directory");
-    expect(runtime.feature(directoryServer).provided).toBe(runtime.service(DirectoryApp));
+    expect(runtime.module(directoryServer).provided).toBe(runtime.service(DirectoryApp));
   });
 
   it("passes the framework resource owner to the factory context", async () => {
@@ -72,10 +72,10 @@ describe("defineFeature", () => {
       }
     }
 
-    const declaration = defineFeature("presence").withApp(ResourceApp).build();
+    const declaration = defineModule("presence").withApp(ResourceApp).build();
     const runtime = await createApp({ name: "test" })
       .withInfrastructure({ prefix: "unused" })
-      .withFeature(declaration)
+      .withModule(declaration)
       .boot({ role: "api" });
 
     await runtime.stop();
@@ -85,12 +85,12 @@ describe("defineFeature", () => {
   it("validates semantic config before invoking the app factory", async () => {
     const create = vi.fn(ComposedDirectoryApp.create);
     const app = { ...ComposedDirectoryApp, create };
-    const declaration = defineFeature("annotation").withApp(app).build();
+    const declaration = defineModule("annotation").withApp(app).build();
 
     await expect(
       createApp({ name: "test" })
         .withInfrastructure({ prefix: "unused" })
-        .withFeature(declaration)
+        .withModule(declaration)
         .boot({ role: "api", config: { annotation: {} } }),
     ).rejects.toThrow("suffix is required");
     expect(create).not.toHaveBeenCalled();

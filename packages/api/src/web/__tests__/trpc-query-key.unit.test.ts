@@ -1,6 +1,6 @@
 import { getQueryKey } from "@trpc/react-query";
 import { describe, expect, it } from "vitest";
-import { createFeatureApi } from "../feature-api.ts";
+import { createModuleApi } from "../module-api.ts";
 import { trpcQueryFilter, trpcQueryKey } from "../trpc-query-key.ts";
 
 /**
@@ -28,8 +28,8 @@ type ProbeApiMap = {
   };
 };
 
-const probeApi = createFeatureApi<ProbeApiMap>();
-const otherInstance = createFeatureApi<ProbeApiMap>();
+const probeApi = createModuleApi<ProbeApiMap>();
+const otherInstance = createModuleApi<ProbeApiMap>();
 
 describe("feature tRPC bindings", () => {
   describe("given two independent createTRPCReact instances over one router shape", () => {

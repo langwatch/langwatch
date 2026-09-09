@@ -4,7 +4,7 @@
  */
 
 import type { frontDoorTrpc } from "@langwatch/auth-contract";
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 
 /** What an invitation link may say to whoever opens it. */
 export type AuthInviteLanding = {
@@ -28,4 +28,4 @@ type BorrowedProcedures = {
 
 export type AuthApiMap = ContractApiMap<typeof frontDoorTrpc> & BorrowedProcedures;
 
-export const authApi = createFeatureApi<AuthApiMap>();
+export const authApi = createModuleApi<AuthApiMap>();

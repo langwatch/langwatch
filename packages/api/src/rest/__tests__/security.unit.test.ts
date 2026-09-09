@@ -5,7 +5,7 @@
  * Spec: packages/api/specs/transport-declaration-split.feature.
  */
 
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -15,7 +15,7 @@ import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
 import { allRegisteredRoutes, assertEveryRouteDeclared, undeclaredRoutes } from "../security.ts";
 
-const SecretApi = featureApi<{ getById(input: { id: string }): Promise<{ id: string }> }>("secret");
+const SecretApi = moduleApi<{ getById(input: { id: string }): Promise<{ id: string }> }>("secret");
 
 const secrets = defineRestRouter(SecretApi)
   .withNamespace("secrets")

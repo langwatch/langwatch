@@ -91,16 +91,14 @@ export async function createWorkerDatasetApp(options: {
     // neither, and this is the one place that says so.
     .withProvided(DatasetApp.dependencies.experiments, uncomposed("experiment directory"))
     .withProvided(DatasetApp.dependencies.permissions, uncomposed("grants service"))
-    .withFeature(datasetServer, {
-      infrastructure: storage
-        ? { storageResolver: new WorkerDatasetStorageResolver(storage) }
-        : {},
+    .withModule(datasetServer, {
+      infrastructure: storage ? { storageResolver: new WorkerDatasetStorageResolver(storage) } : {},
     })
     .boot({ role: "worker" });
 
   options.resources.own("worker dataset application", () => runtime.stop());
 
-  return runtime.feature(datasetServer).provided;
+  return runtime.module(datasetServer).provided;
 }
 
 /** A directory this process does not compose, refused by name on every member. */

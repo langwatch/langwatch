@@ -21,14 +21,17 @@ function process() {
   return createApp({ name: "suite-installation-test" })
     .withPersistence("memory", {})
     .withInfrastructure({})
-    .withProvided(ScenarioApi, createApiFixture<ScenarioApiContract>({ tryGetTestSuite: async () => null }))
+    .withProvided(
+      ScenarioApi,
+      createApiFixture<ScenarioApiContract>({ tryGetTestSuite: async () => null }),
+    )
     .withProvided(AgentApiToken, createApiFixture<AgentApi>({}))
     .withProvided(PromptApiToken, createApiFixture<PromptApi>({}))
     .withProvided(
       ProjectApiToken,
       createApiFixture<ProjectApi>({ tryGetOrganizationId: async () => "organization-1" }),
     )
-    .withFeature(suiteServer, {
+    .withModule(suiteServer, {
       infrastructure: {
         execution: new RecordingSuiteExecution(),
         resolveClickHouseClient: null,
@@ -47,7 +50,7 @@ describe("suite app installation", () => {
       const app = runtime.service(SuiteApi);
       const created = await app.create(plan);
 
-      expect(runtime.feature(suiteServer).provided).toBe(app);
+      expect(runtime.module(suiteServer).provided).toBe(app);
       expect(created.slug).toBe("nightly");
 
       await expect(app.list({ projectId: plan.projectId })).resolves.toMatchObject([

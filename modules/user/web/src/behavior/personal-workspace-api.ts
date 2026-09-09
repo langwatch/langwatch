@@ -4,7 +4,7 @@
  */
 
 import type { userTrpc, identityTrpc } from "@langwatch/user-contract";
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
 import type { AiToolEntry } from "../model/ai-tool-catalog.ts";
 
@@ -346,13 +346,15 @@ type BorrowedProcedures = {
   };
 };
 
-export type PersonalWorkspaceApiMap = ContractApiMap<typeof userTrpc> & ContractApiMap<typeof identityTrpc> & BorrowedProcedures;
+export type PersonalWorkspaceApiMap = ContractApiMap<typeof userTrpc> &
+  ContractApiMap<typeof identityTrpc> &
+  BorrowedProcedures;
 
 /**
  * The personal workspace's typed tRPC hooks. Same machinery, same transport and same React
  * Query cache as the application's `api` proxy.
  */
-export const personalWorkspaceApi = createFeatureApi<PersonalWorkspaceApiMap>();
+export const personalWorkspaceApi = createModuleApi<PersonalWorkspaceApiMap>();
 
 /** The name the screens call it by. */
 export const api = personalWorkspaceApi;

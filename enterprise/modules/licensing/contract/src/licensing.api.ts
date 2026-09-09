@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   LicenseStatus,
   PlatformLicenseAccess,
@@ -56,4 +56,4 @@ export interface LicensingApi {
   reportLimitBlocked(input: LicenseLimitCheck): Promise<void>;
 }
 
-export const LicensingApi = featureApi<LicensingApi>("licensing");
+export const LicensingApi = moduleApi<LicensingApi>("licensing");

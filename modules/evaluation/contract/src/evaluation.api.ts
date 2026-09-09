@@ -1,5 +1,5 @@
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   ExecuteEvaluationCommand,
   UpsertEvaluationRunCommand,
@@ -101,4 +101,4 @@ export interface EvaluationApi {
   deriveEvaluatorId(name: string): string;
 }
 
-export const EvaluationApi = featureApi<EvaluationApi>("evaluation");
+export const EvaluationApi = moduleApi<EvaluationApi>("evaluation");

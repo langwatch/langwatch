@@ -39,7 +39,7 @@ compatibility decision rather than a migration-side behaviour change.
 ### Public surfaces and transports
 
 The contract exports portable Zod 4 values, API-key errors, and the one
-callable `ApiKeyApi` interface with its `featureApi` token. Existing REST,
+callable `ApiKeyApi` interface with its `moduleApi` token. Existing REST,
 tRPC, CLI, OTLP, and internal callers remain compatibility transports and
 delegate to the feature app on the process context.
 

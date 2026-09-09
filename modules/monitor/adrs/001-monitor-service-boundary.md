@@ -69,7 +69,7 @@ runs one set of cases against both.
 
 ## Runtime and registration
 
-The process boots `monitorServer` through `createApp(...).withFeature(...)` and
+The process boots `monitorServer` through `createApp(...).withModule(...)` and
 reads `MonitorApi` back off the runtime, handing the four technical ports in as
 that feature's infrastructure. API and worker callers receive that one object;
 no request handler constructs a repository or a Prisma client, and this package

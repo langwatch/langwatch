@@ -23,7 +23,7 @@
  */
 
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import { createFeatureApi } from "@langwatch/api/web";
+import { createModuleApi } from "@langwatch/api/web";
 import type { TimeInput } from "@langwatch/time";
 import type { PlanType } from "../model/plan-form-defaults.ts";
 
@@ -68,4 +68,4 @@ export type LicensingApiMap = {
  * The licensing family's typed tRPC hooks. Same machinery, same transport and
  * same React Query cache as the application's `api` proxy.
  */
-export const licensingApi = createFeatureApi<LicensingApiMap>();
+export const licensingApi = createModuleApi<LicensingApiMap>();

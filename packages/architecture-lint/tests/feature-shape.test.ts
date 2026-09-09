@@ -61,15 +61,13 @@ function referenceFeature(): void {
   write("modules/widget/server/src/repositories/widget-repositories.registry.ts");
   write("modules/widget/server/src/repositories/prisma/prisma.widget.repository.ts");
   write("modules/widget/server/src/repositories/memory/memory.widget.repository.ts");
-  write(
-    "modules/widget/server/src/repositories/__tests__/widget.repository.contract.test.ts",
-  );
+  write("modules/widget/server/src/repositories/__tests__/widget.repository.contract.test.ts");
   write("modules/widget/server/src/transport/widget.rest.ts");
   write("modules/widget/server/src/transport/widget.trpc.ts");
   write("modules/widget/web/src/widgets.ts");
   write(
     "apps/api/src/features/widget/widget.composition.ts",
-    'createApp().withFeature(widgetServer).boot({ role: "api" });\n',
+    'createApp().withModule(widgetServer).boot({ role: "api" });\n',
   );
 }
 
@@ -252,12 +250,7 @@ describe("feature shape", () => {
   describe("given a repositories folder without the reference's selection", () => {
     it("asks for a registry when repositories are not selected by one", () => {
       referenceFeature();
-      rmSync(
-        join(
-          root,
-          "modules/widget/server/src/repositories/widget-repositories.registry.ts",
-        ),
-      );
+      rmSync(join(root, "modules/widget/server/src/repositories/widget-repositories.registry.ts"));
 
       expect(findings().map((finding) => finding.kind)).toEqual(["unregistered-repositories"]);
     });
@@ -317,7 +310,7 @@ describe("feature shape", () => {
       referenceFeature();
       write(
         "apps/api/src/features/widget/widget.composition.ts",
-        'createApp().withFeature(workerWidgetServer).boot({ role: "worker" });\n',
+        'createApp().withModule(workerWidgetServer).boot({ role: "worker" });\n',
       );
 
       expect(findings()).toEqual([]);

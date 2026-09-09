@@ -8,7 +8,7 @@ import { PostgresAuthAdapter } from "@langwatch/auth-server";
 import { PostgresIdentityEmailAdapter } from "@langwatch/identity-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { defineFeature, type FeatureSetup } from "@langwatch/runtime-composition";
+import { defineModule, type FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 
 /** What the process holds behind the browser-session service. */
@@ -40,4 +40,4 @@ const apiAuthSessionApp = {
     }).build(),
 };
 
-export const apiAuthSessionServer = defineFeature("auth").withApp(apiAuthSessionApp).build();
+export const apiAuthSessionServer = defineModule("auth").withApp(apiAuthSessionApp).build();

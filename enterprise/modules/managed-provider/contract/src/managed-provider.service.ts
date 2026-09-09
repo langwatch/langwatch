@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 export const MANAGED_PROVIDER_FEATURE_ID = "managed-provider" as const;
 
@@ -35,7 +35,7 @@ export interface ManagedProviderApi {
   ): Promise<Record<string, string>>;
 }
 
-export const ManagedProviderApi = featureApi<ManagedProviderApi>(MANAGED_PROVIDER_FEATURE_ID);
+export const ManagedProviderApi = moduleApi<ManagedProviderApi>(MANAGED_PROVIDER_FEATURE_ID);
 
 /** Compatibility type for service-level tests and existing package callers. */
 export abstract class ManagedProviderService implements ManagedProviderApi {

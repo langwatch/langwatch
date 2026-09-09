@@ -3,8 +3,12 @@
  * from features not yet split. Segment names are load-bearing for React Query cache.
  */
 
-import type { modelProviderTrpc, llmModelCostTrpc, translateTrpc } from "@langwatch/model-provider-contract";
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import type {
+  modelProviderTrpc,
+  llmModelCostTrpc,
+  translateTrpc,
+} from "@langwatch/model-provider-contract";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 
 type BorrowedProcedures = {
   organization: {
@@ -16,8 +20,11 @@ type BorrowedProcedures = {
   };
 };
 
-export type ModelProviderApiMap = ContractApiMap<typeof modelProviderTrpc> & ContractApiMap<typeof llmModelCostTrpc> & ContractApiMap<typeof translateTrpc> & BorrowedProcedures;
+export type ModelProviderApiMap = ContractApiMap<typeof modelProviderTrpc> &
+  ContractApiMap<typeof llmModelCostTrpc> &
+  ContractApiMap<typeof translateTrpc> &
+  BorrowedProcedures;
 
-export const modelProviderApi = createFeatureApi<ModelProviderApiMap>();
+export const modelProviderApi = createModuleApi<ModelProviderApiMap>();
 
 export const api = modelProviderApi;

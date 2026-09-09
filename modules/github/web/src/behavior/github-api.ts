@@ -25,7 +25,7 @@
  */
 
 import type { GithubConnectionStatus, GithubDisconnectResult } from "@langwatch/github-contract";
-import { createFeatureApi } from "@langwatch/api/web";
+import { createModuleApi } from "@langwatch/api/web";
 
 export type GithubApiMap = {
   github: {
@@ -54,7 +54,7 @@ export type GithubApiMap = {
 
 /**
  * The GitHub family's typed tRPC hooks. Same machinery, same transport and same
- * React Query cache as the application's `api` proxy — see `createFeatureApi`
+ * React Query cache as the application's `api` proxy — see `createModuleApi`
  * for why separate instances still share cache entries.
  */
-export const githubApi = createFeatureApi<GithubApiMap>();
+export const githubApi = createModuleApi<GithubApiMap>();

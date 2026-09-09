@@ -15,7 +15,7 @@ import {
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger, validationMeta, type RequestContext } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
-import type { FeatureApiToken } from "@langwatch/runtime-composition";
+import type { ModuleApiToken } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import {
   context as otelContext,
@@ -268,7 +268,7 @@ export const callerAddressFact = defineTrpcFact("callerAddress", z.string().null
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** A feature API token is the runtime identity a router binds to. */
-export type TrpcFeatureApiWitness<Api> = FeatureApiToken<Api>;
+export type TrpcFeatureApiWitness<Api> = ModuleApiToken<Api>;
 
 /** What a governed handler is handed. There is no `ctx`, request or response. */
 export type TrpcContractHandlerArguments<Input, App> = Omit<

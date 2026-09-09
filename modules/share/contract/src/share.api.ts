@@ -1,5 +1,5 @@
 import type { PinnedTrace, PinTraceInput } from "@langwatch/data-retention-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   CreateShareInput,
   ResolveShareInput,
@@ -32,4 +32,4 @@ export interface ShareApi {
   cachePayload(input: SharedPayloadCacheInput & { payload: unknown }): Promise<void>;
 }
 
-export const ShareApi = featureApi<ShareApi>("share");
+export const ShareApi = moduleApi<ShareApi>("share");

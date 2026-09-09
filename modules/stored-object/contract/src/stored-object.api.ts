@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { StoredObjectDeliveryAudience } from "./audiences.ts";
 import type { StoredObjectId, StoredObjectProjectId } from "./ids.ts";
 import type {
@@ -99,4 +99,4 @@ export interface StoredObjectApi {
   resolveOwner(input: { id: string }): Promise<{ projectId: string } | null>;
 }
 
-export const StoredObjectApi = featureApi<StoredObjectApi>("stored-object");
+export const StoredObjectApi = moduleApi<StoredObjectApi>("stored-object");

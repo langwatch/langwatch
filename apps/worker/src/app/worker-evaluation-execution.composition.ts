@@ -23,11 +23,7 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { PrismaEvaluationCostRepository } from "@langwatch/evaluation-server/composition/evaluation-cost";
-import type {
-  MonitorApi,
-  MonitorIdInput,
-  MonitorWithEvaluator,
-} from "@langwatch/monitor-contract";
+import type { MonitorApi, MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import {
   monitorServer,
   MonitorEvaluatorPort,
@@ -139,7 +135,7 @@ export async function createWorkerMonitorApp(options: {
     .withPersistence("postgres", { prisma: options.database })
     .withInfrastructure({})
     .withProvided(AuthzApi, options.permissions)
-    .withFeature(monitorServer, {
+    .withModule(monitorServer, {
       infrastructure: {
         evaluators: new UncomposedMonitorEvaluators(),
         performance: new UncomposedMonitorPerformance(),
@@ -151,7 +147,7 @@ export async function createWorkerMonitorApp(options: {
 
   options.resources.own("worker monitor application", () => runtime.stop());
 
-  return runtime.feature(monitorServer).provided;
+  return runtime.module(monitorServer).provided;
 }
 
 /** A monitor read this process makes, over the one monitor application. */

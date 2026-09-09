@@ -7,7 +7,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { Hono } from "hono";
 import { generateSpecs } from "hono-openapi";
 import { describe, expect, it, vi } from "vitest";
@@ -41,7 +41,7 @@ interface AnnotationApi {
   remove(input: { id: string }): Promise<void>;
 }
 
-const AnnotationApi = featureApi<AnnotationApi>("annotation");
+const AnnotationApi = moduleApi<AnnotationApi>("annotation");
 
 const annotations = defineRestRouter(AnnotationApi)
   .withNamespace("annotations")
@@ -94,7 +94,7 @@ interface SecretApi {
   create(input: { name: string }): Promise<{ id: string }>;
 }
 
-const SecretApi = featureApi<SecretApi>("secret");
+const SecretApi = moduleApi<SecretApi>("secret");
 
 const secrets = defineRestRouter(SecretApi)
   .withNamespace("secrets")
@@ -215,9 +215,7 @@ describe("a declared REST router mounted through the runtime", () => {
       expect(registered).toContain(`GET /api/annotations/${VERSION}/:id`);
       expect(registered).toContain("GET /api/annotations/:id");
       expect(registered).toContain("DELETE /api/v1/annotations/latest/:id");
-      expect(
-        registered.every((address) => / \/api\/(v1\/)?annotations/.test(address)),
-      ).toBe(true);
+      expect(registered.every((address) => / \/api\/(v1\/)?annotations/.test(address))).toBe(true);
     });
 
     /** @scenario "A declared route answers at every address its family already served" */
@@ -319,7 +317,7 @@ interface ReportApi {
   read(input: { id: string }): Promise<{ id: string }>;
 }
 
-const ReportApi = featureApi<ReportApi>("ops");
+const ReportApi = moduleApi<ReportApi>("ops");
 const surface = defineRestMiddleware("surface", z.string().nullable());
 
 const reports = defineRestRouter(ReportApi)
@@ -621,8 +619,11 @@ interface RoleApi {
   createRole(input: { organizationId: string; name: string }): Promise<{ id: string }>;
 }
 
-const RoleApi = featureApi<RoleApi>("role");
-const roleRestFacts = defineRestMiddleware("roleRestFacts", z.object({ organizationId: z.string() }));
+const RoleApi = moduleApi<RoleApi>("role");
+const roleRestFacts = defineRestMiddleware(
+  "roleRestFacts",
+  z.object({ organizationId: z.string() }),
+);
 
 const ORGANIZATION_ID = "organization-1";
 
@@ -862,7 +863,7 @@ interface ProjectApi {
   read(input: { projectId: string }): Promise<{ id: string }>;
 }
 
-const ProjectApi = featureApi<ProjectApi>("project");
+const ProjectApi = moduleApi<ProjectApi>("project");
 const PROJECT_ID = "project-7";
 
 const LISTING_IS_THE_GATE =
@@ -951,7 +952,9 @@ describe("a route the family's own door alone gates", () => {
   /** @scenario "A route the family's own door alone gates asks no permission of it" */
   it("keeps the family's security scheme, unlike a public route", async () => {
     const published = await generateSpecs(projectsApp().app, SPEC_OPTIONS);
-    const item = published.paths?.["/api/projects"] as { get?: { security?: unknown[] } } | undefined;
+    const item = published.paths?.["/api/projects"] as
+      | { get?: { security?: unknown[] } }
+      | undefined;
 
     expect(item?.get?.security).toBeUndefined();
   });
@@ -1078,9 +1081,7 @@ describe("a family that names its generation inside its own path", () => {
   it("publishes exactly the address it serves", async () => {
     const published = await generateSpecs(webhooksApp(), SPEC_OPTIONS);
 
-    expect(Object.keys(published.paths ?? {})).toEqual([
-      "/api/webhooks/v1/endpoints/{projectId}",
-    ]);
+    expect(Object.keys(published.paths ?? {})).toEqual(["/api/webhooks/v1/endpoints/{projectId}"]);
   });
 });
 
@@ -1093,7 +1094,7 @@ interface PlatformHealthApi {
   check(): Promise<{ status: "healthy" | "unhealthy" }>;
 }
 
-const PlatformHealthApi = featureApi<PlatformHealthApi>("platform-health");
+const PlatformHealthApi = moduleApi<PlatformHealthApi>("platform-health");
 const healthReport = z.object({ status: z.enum(["healthy", "unhealthy"]) });
 
 const MONITORED =
@@ -1352,7 +1353,7 @@ interface HookApi {
   record(input: { digest: string }): Promise<void>;
 }
 
-const HookApi = featureApi<HookApi>("webhook");
+const HookApi = moduleApi<HookApi>("webhook");
 
 const hooks = defineRestRouter(HookApi)
   .withNamespace("hooks")
@@ -1380,7 +1381,10 @@ function hooksApp(): Hono {
     },
   });
 
-  return runtime.mount(hooks.router(), { app: () => ({}) as HookApi, onError: createErrorHandler() });
+  return runtime.mount(hooks.router(), {
+    app: () => ({}) as HookApi,
+    onError: createErrorHandler(),
+  });
 }
 
 describe("a route whose body is the evidence", () => {
@@ -1442,7 +1446,7 @@ interface ObjectApi {
   readById(input: { id: string }): Promise<{ mediaType: string; bytes: string }>;
 }
 
-const ObjectApi = featureApi<ObjectApi>("stored-object");
+const ObjectApi = moduleApi<ObjectApi>("stored-object");
 
 const cancelled: string[] = [];
 
@@ -1556,9 +1560,7 @@ const aliases = defineRestRouter(ObjectApi)
   .withVersion(VERSION)
   .withAddressing("v1-only")
   .get("/*", "forwardAliased")
-  .withAccess(
-    publicRoute({ reason: "the alias terminates nothing; it rewrites and forwards" }),
-  )
+  .withAccess(publicRoute({ reason: "the alias terminates nothing; it rewrites and forwards" }))
   .withRawResponse({ produces: ["application/json"] })
   .anyMethod()
   .handle(({ request }) => {
@@ -1573,7 +1575,9 @@ const aliases = defineRestRouter(ObjectApi)
   .build();
 
 function aliasHost(): Hono {
-  const runtime = createRestRuntime({ identity: { authenticate: () => ({ actor: null, scope: null }) } });
+  const runtime = createRestRuntime({
+    identity: { authenticate: () => ({ actor: null, scope: null }) },
+  });
   const family = runtime.mount(aliases.router(), {
     app: () => objectApplication,
     onError: createErrorHandler(),
@@ -1598,10 +1602,7 @@ describe("one path that answers every method", () => {
 
     expect(await read.text()).toBe("rewritten");
     expect(removed.status).toBe(200);
-    expect(seenByAlias).toEqual([
-      "GET /api/v1/aliased/known",
-      "DELETE /api/v1/aliased/known",
-    ]);
+    expect(seenByAlias).toEqual(["GET /api/v1/aliased/known", "DELETE /api/v1/aliased/known"]);
     expect(published.paths?.["/api/v1/aliased/*"]).toBeUndefined();
     expect(getRoutePolicy("all", "/api/v1/aliased/*")).toMatchObject({ family: "aliased" });
   });
@@ -1664,7 +1665,7 @@ interface UploadApi {
   create(input: { name: string }): Promise<{ known: boolean }>;
 }
 
-const UploadApi = featureApi<UploadApi>("dataset");
+const UploadApi = moduleApi<UploadApi>("dataset");
 
 const createdUpload = z.discriminatedUnion("status", [
   z.object({ status: z.literal("existing"), id: z.string() }),
@@ -1736,9 +1737,8 @@ describe("a route whose answer takes one of several shapes", () => {
   /** @scenario "A route answers one of several shapes, told apart by a field" */
   it("publishes both shapes with the field that tells them apart", async () => {
     const published = await generateSpecs(uploadsApp(), SPEC_OPTIONS);
-    const schema = (published.paths?.["/api/v1/uploads"] as any)?.post?.responses?.["200"]?.content?.[
-      "application/json"
-    ]?.schema;
+    const schema = (published.paths?.["/api/v1/uploads"] as any)?.post?.responses?.["200"]
+      ?.content?.["application/json"]?.schema;
 
     expect(schema?.discriminator).toEqual({ propertyName: "status" });
     expect(schema?.oneOf).toHaveLength(2);
@@ -1759,7 +1759,7 @@ interface EvaluationsApi {
   evaluate(input: { evaluator: string }): Promise<{ status: string }>;
 }
 
-const EvaluationsApi = featureApi<EvaluationsApi>("evaluation");
+const EvaluationsApi = moduleApi<EvaluationsApi>("evaluation");
 
 // The shape of evaluation's legacy family: six paths under two prefixes it
 // shares with everything else at `/api`, and a namespace of its own for the
@@ -1861,7 +1861,7 @@ interface DirectoryApi {
   listUsers(): Promise<{ Resources: string[] }>;
 }
 
-const DirectoryApi = featureApi<DirectoryApi>("scim");
+const DirectoryApi = moduleApi<DirectoryApi>("scim");
 
 // `/api/scim/v2` IS the SCIM 2.0 contract: the generation the path names is
 // the protocol's, not ours to date.
@@ -1907,8 +1907,7 @@ describe("a family whose protocol fixes the generation its path names", () => {
 
   /** @scenario "A family names a generation other than v1 in its own path" */
   it("refuses a generation named by a family that carries none in its path", () => {
-    const family = () =>
-      defineRestRouter(DirectoryApi).withNamespace("scim").withVersion(VERSION);
+    const family = () => defineRestRouter(DirectoryApi).withNamespace("scim").withVersion(VERSION);
 
     expect(() => family().withAddressing("dated", { generation: "v2" })).toThrow(
       /names no generation in its own path/,
@@ -1919,12 +1918,11 @@ describe("a family whose protocol fixes the generation its path names", () => {
   });
 });
 
-
 interface FilesApi {
   read(input: { id: string }): Promise<{ ownerProjectId: string; bytes: string }>;
 }
 
-const FilesApi = featureApi<FilesApi>("stored-object");
+const FilesApi = moduleApi<FilesApi>("stored-object");
 
 const OWNER_IN_HANDLER =
   "the object is addressed by id alone, so only a cross-tenant read of the row knows " +
@@ -2025,7 +2023,7 @@ interface UploadsApi {
   upsert(input: { id: string; bytes: string }): Promise<{ created: boolean }>;
 }
 
-const UploadsApi = featureApi<UploadsApi>("dataset");
+const UploadsApi = moduleApi<UploadsApi>("dataset");
 
 /** One schema for both successes: the status says only whether it created. */
 const datasetRecord = z.object({ id: z.string() });
@@ -2114,9 +2112,8 @@ describe("a request that carries files beside its fields", () => {
   /** @scenario "A request carries files beside its fields" */
   it("describes the body as multipart, with each file part as binary", async () => {
     const published = await generateSpecs(datasetApp(), SPEC_OPTIONS);
-    const schema = (published.paths?.["/api/v1/dataset/upload"] as any)?.post?.requestBody?.content?.[
-      "multipart/form-data"
-    ]?.schema;
+    const schema = (published.paths?.["/api/v1/dataset/upload"] as any)?.post?.requestBody
+      ?.content?.["multipart/form-data"]?.schema;
 
     expect(schema?.properties?.file).toEqual({ type: "string", format: "binary" });
     expect(schema?.properties?.name?.type).toBe("string");
@@ -2135,15 +2132,17 @@ describe("a request that carries files beside its fields", () => {
       files: { file: { required: true } },
     } as const;
 
-    expect(() => route().withInput(z.object({ name: z.string() })).withMultipart(multipart)).toThrow(
-      /declares its body twice/,
-    );
+    expect(() =>
+      route()
+        .withInput(z.object({ name: z.string() }))
+        .withMultipart(multipart),
+    ).toThrow(/declares its body twice/);
     expect(() => route().withMultipart(multipart).withRawBody("bytes")).toThrow(
       /declares its body twice/,
     );
-    expect(() =>
-      route().withMultipart({ fields: z.object({ a: z.string() }), files: {} }),
-    ).toThrow(/names no file part/);
+    expect(() => route().withMultipart({ fields: z.object({ a: z.string() }), files: {} })).toThrow(
+      /names no file part/,
+    );
   });
 });
 
@@ -2182,7 +2181,7 @@ interface BugReportApi {
   submit(input: { title: string; projectId: string | null }): Promise<{ id: string }>;
 }
 
-const BugReportApi = featureApi<BugReportApi>("ops");
+const BugReportApi = moduleApi<BugReportApi>("ops");
 
 const KEY_ONLY_ENRICHES =
   "reporters may have no working credentials; an API key only links the report to a project";
@@ -2202,16 +2201,23 @@ const bugReports = defineRestRouter(BugReportApi)
   .handle(async ({ app, input, scope, actor }) => {
     const report = await app.submit({ title: input.title, projectId: scope?.id ?? null });
 
-    return { id: report.id, filedUnder: scope?.id ?? (actor ? "an-actor-without-a-scope" : "none") };
+    return {
+      id: report.id,
+      filedUnder: scope?.id ?? (actor ? "an-actor-without-a-scope" : "none"),
+    };
   })
   .build();
 
-function bugReportsApp(
-  options: { caller?: "none" | "project"; optional?: boolean } = {},
-): { app: Hono; identifyOptional: ReturnType<typeof vi.fn> } {
+function bugReportsApp(options: { caller?: "none" | "project"; optional?: boolean } = {}): {
+  app: Hono;
+  identifyOptional: ReturnType<typeof vi.fn>;
+} {
   const identifyOptional = vi.fn(() =>
     options.caller === "project"
-      ? { actor: { type: "user", id: "user-1" } as const, scope: { tier: "project", id: "project-7" } as const }
+      ? {
+          actor: { type: "user", id: "user-1" } as const,
+          scope: { tier: "project", id: "project-7" } as const,
+        }
       : null,
   );
 
@@ -2279,7 +2285,7 @@ interface InstanceApi {
   createOrganization(input: { name: string }): Promise<{ id: string }>;
 }
 
-const InstanceApi = featureApi<InstanceApi>("organization");
+const InstanceApi = moduleApi<InstanceApi>("organization");
 
 // The shape of the self-hosted setup door: the operator's own key, which
 // creates the first organization and so names no tenant of its own.
@@ -2366,7 +2372,7 @@ interface CatalogueApi {
   read(input: { id: string }): Promise<{ id: string; evaluators: number }>;
 }
 
-const CatalogueApi = featureApi<CatalogueApi>("evaluator");
+const CatalogueApi = moduleApi<CatalogueApi>("evaluator");
 
 // The two capabilities the public stored-object family declared: how often one
 // caller may ask, and how long the answer stands.
@@ -2383,9 +2389,7 @@ const catalogue = defineRestRouter(CatalogueApi)
   .handle(async ({ app, input }) => app.read({ id: input.id }))
   .build();
 
-function catalogueApp(
-  options: { allowed?: boolean; ported?: boolean } = {},
-): {
+function catalogueApp(options: { allowed?: boolean; ported?: boolean } = {}): {
   app: Hono;
   reads: ReturnType<typeof vi.fn>;
   entries: Map<string, { tag: string; body: Uint8Array }>;

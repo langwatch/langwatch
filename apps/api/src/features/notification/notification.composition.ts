@@ -21,8 +21,8 @@ export async function installApiNotification(options: {
   const runtime = await createApp({ name: "langwatch-api" })
     .withPersistence("postgres", { prisma })
     .withInfrastructure({})
-    .withFeature(notificationServer)
+    .withModule(notificationServer)
     .boot({ role: "api" });
 
-  return { app: runtime.feature(notificationServer).provided };
+  return { app: runtime.module(notificationServer).provided };
 }

@@ -27,7 +27,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
   createApp,
-  defineFeature,
+  defineModule,
   type FeatureSetup,
   type ResourceScope,
 } from "@langwatch/runtime-composition";
@@ -149,15 +149,15 @@ export async function createWorkerObservabilityApps(
     .withProvided(EntitlementApi, options.plans)
     .withProvided(FeatureFlagApi, options.featureFlags)
     .withProvided(CodingAgentApi, codingAgents.app)
-    .withFeature(workerModelProviderServer, { infrastructure: options.models })
-    .withFeature(traceServer, { infrastructure: traces })
-    .withFeature(annotationServer)
-    .withFeature(dataPrivacyServer, { infrastructure: telemetry.dataPrivacy })
-    .withFeature(logServer, { infrastructure: telemetry.log })
+    .withModule(workerModelProviderServer, { infrastructure: options.models })
+    .withModule(traceServer, { infrastructure: traces })
+    .withModule(annotationServer)
+    .withModule(dataPrivacyServer, { infrastructure: telemetry.dataPrivacy })
+    .withModule(logServer, { infrastructure: telemetry.log })
     // Beside the log half and in the SAME graph: a metric point is redacted by
     // the one Data Privacy application this runtime already provides.
-    .withFeature(metricServer)
-    .withFeature(workerEvaluationServer, { infrastructure: options.evaluation })
+    .withModule(metricServer)
+    .withModule(workerEvaluationServer, { infrastructure: options.evaluation })
     .withService({
       name: "worker trace broadcast",
       start: () => broadcast.start(),
@@ -172,10 +172,10 @@ export async function createWorkerObservabilityApps(
     throw new Error("Evaluation feature setup did not publish its processing graph.");
   }
   return {
-    annotations: runtime.feature(annotationServer).provided,
-    traces: runtime.feature(traceServer).provided,
-    dataPrivacy: runtime.feature(dataPrivacyServer).provided,
-    logs: runtime.feature(logServer).provided,
+    annotations: runtime.module(annotationServer).provided,
+    traces: runtime.module(traceServer).provided,
+    dataPrivacy: runtime.module(dataPrivacyServer).provided,
+    logs: runtime.module(logServer).provided,
     evaluationProcessing: processing,
     start: async () => {
       await runtime.start();
@@ -185,7 +185,7 @@ export async function createWorkerObservabilityApps(
 
 const workerModelProviderDependencies = { traces: TraceApi };
 
-const workerModelProviderServer = defineFeature("model-provider")
+const workerModelProviderServer = defineModule("model-provider")
   .withApp({
     contract: ModelProviderApi,
     dependencies: workerModelProviderDependencies,

@@ -22,7 +22,7 @@ function process() {
     .withProvided(AuthzApi, createFeatureFlagTestAuthz())
     .withProvided(ProjectApi, createFeatureFlagTestProjects())
     .withProvided(OrganizationApi, TestOrganizations.create().api())
-    .withFeature(featureFlagServer, {
+    .withModule(featureFlagServer, {
       infrastructure: {
         cache: new MemoryFeatureFlagCache(),
         config: resolveFeatureFlagConfig({}),
@@ -37,7 +37,7 @@ describe("feature flag app installation", () => {
     try {
       const app = runtime.service(FeatureFlagApi);
 
-      expect(runtime.feature(featureFlagServer).provided).toBe(app);
+      expect(runtime.module(featureFlagServer).provided).toBe(app);
 
       await expect(app.isEnabled(SYSTEM_FLAG, { kind: "system" })).resolves.toBe(false);
 

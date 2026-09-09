@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   ActivateSsoConnectionInput,
   BackofficeSsoConnection,
@@ -51,4 +51,4 @@ export interface SsoApi {
   requestTeardown(input: SsoConnectionReasonInput, by: SsoOperator): Promise<void>;
 }
 
-export const SsoApi = featureApi<SsoApi>("sso");
+export const SsoApi = moduleApi<SsoApi>("sso");

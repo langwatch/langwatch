@@ -1,4 +1,4 @@
-import { defineFeature } from "@langwatch/runtime-composition";
+import { defineModule } from "@langwatch/runtime-composition";
 import { AnalyticsApp } from "./app/analytics.app.ts";
 import { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 import { analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
@@ -9,7 +9,7 @@ import { savedWorkbenchChartRest } from "./transport/saved-workbench-chart.rest.
 
 export type { AnalyticsInfrastructure } from "./app/analytics.app.ts";
 
-export const analyticsServer = defineFeature("analytics")
+export const analyticsServer = defineModule("analytics")
   .withApp(AnalyticsApp)
   .withTransports(
     analyticsRest,

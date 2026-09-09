@@ -125,7 +125,7 @@ ingestion-source keys. The default process's incomplete Governance composition
 is a separate migration task, not a reason to invent an unlicensed fallback.
 
 The complete `GovernanceService` contract is still the migration boundary;
-Governance's missing canonical FeatureApi/App installer is recorded in the
+Governance's missing canonical ModuleApi/App installer is recorded in the
 [cleanup work packets](../../../../../dev/docs/research/architecture-cleanup-work-packets.md).
 This correction does not claim that broader adoption is complete.
 

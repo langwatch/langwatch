@@ -4,7 +4,7 @@
 # declares what it needs; boot validates and constructs; start serves. Imports
 # and constructors never start background work.
 #
-# Accepted app factory target: defineFeature(...).withApp(ServerApp), with
+# Accepted app factory target: defineModule(...).withApp(ServerApp), with
 # static API, dependencies and create on the server class. Scenarios tagged
 # @unimplemented describe the agreed API still to be built. withTransports takes
 # variadic inbound declarations; namespaces derive from the owner.
@@ -390,7 +390,7 @@ Feature: Composing a process from feature installers
     @unimplemented @typecheck
     Scenario: Plural feature names cannot bypass catalogue ownership
       Given annotation is a catalogue owner and annotations is not
-      When a declaration calls defineFeature with annotations
+      When a declaration calls defineModule with annotations
       Then type checking rejects the feature name
 
     @unimplemented @unit

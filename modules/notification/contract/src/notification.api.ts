@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   CreateNotificationCommand,
   Notification,
@@ -10,4 +10,4 @@ export interface NotificationApi {
   create(input: CreateNotificationCommand): Promise<Notification>;
 }
 
-export const NotificationApi = featureApi<NotificationApi>("notification");
+export const NotificationApi = moduleApi<NotificationApi>("notification");

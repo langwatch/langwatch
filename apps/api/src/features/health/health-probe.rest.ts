@@ -9,7 +9,7 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
 
 /** One project, as a probe's key resolves to it. */
@@ -33,7 +33,7 @@ export interface HealthProbeApi {
   }): Promise<HealthProbeAnswer>;
 }
 
-export const HealthProbeApi = featureApi<HealthProbeApi>("platform-health");
+export const HealthProbeApi = moduleApi<HealthProbeApi>("platform-health");
 
 /** No token at all, in the sentence this family has always answered with. */
 export class HealthProbeTokenMissingError extends Error {

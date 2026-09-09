@@ -11,7 +11,7 @@
 // list answer by accident. Values travel ONE WAY, on `create` and `update`,
 // and neither answers one back; `secret-api.unit.test.ts` states that.
 
-import { type ContractApiMap, type FeatureApi, createFeatureApi } from "@langwatch/api/web";
+import { type ContractApiMap, type ModuleApi, createModuleApi } from "@langwatch/api/web";
 import type { secretTrpc } from "@langwatch/secret-contract";
 
 /**
@@ -21,4 +21,4 @@ import type { secretTrpc } from "@langwatch/secret-contract";
 export type SecretApiMap = ContractApiMap<typeof secretTrpc>;
 
 /** The Secrets family's typed tRPC hooks. */
-export const secretApi: FeatureApi<SecretApiMap> = createFeatureApi<SecretApiMap>();
+export const secretApi: ModuleApi<SecretApiMap> = createModuleApi<SecretApiMap>();

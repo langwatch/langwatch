@@ -38,10 +38,10 @@ export async function installApiShare(options: {
     .withInfrastructure({})
     .withProvided(DataRetentionApi, dataRetention)
     .withProvided(AuthzApi, permissions)
-    .withFeature(shareServer, { infrastructure: { redis: options.redis } })
+    .withModule(shareServer, { infrastructure: { redis: options.redis } })
     .boot({ role: "api" });
 
-  const app = runtime.feature(shareServer).provided;
+  const app = runtime.module(shareServer).provided;
 
   return {
     routers: (mount) => ({

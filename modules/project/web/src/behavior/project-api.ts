@@ -19,7 +19,7 @@
  * import below is the only one in the package.
  */
 
-import { createFeatureApi } from "@langwatch/api/web";
+import { createModuleApi } from "@langwatch/api/web";
 import type { ProjectHostOrganization, ProjectHostProject } from "../model/project-host.ts";
 
 export type ProjectApiMap = {
@@ -103,7 +103,7 @@ export type ProjectApiMap = {
 };
 
 /** The project family's typed tRPC hooks. */
-export const projectApi = createFeatureApi<ProjectApiMap>();
+export const projectApi = createModuleApi<ProjectApiMap>();
 
 /** The alias the screen moved with: `api.organization.update…`, unchanged. */
 export const api = projectApi;

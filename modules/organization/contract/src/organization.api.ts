@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 import type { PaginatedProjects, Project } from "@langwatch/project-contract";
 import type {
@@ -308,4 +308,4 @@ export interface OrganizationApi {
   ): Promise<Project[]>;
 }
 
-export const OrganizationApi = featureApi<OrganizationApi>("organization");
+export const OrganizationApi = moduleApi<OrganizationApi>("organization");

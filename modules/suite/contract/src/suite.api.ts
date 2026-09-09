@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   ScenarioTestSuite,
   ScenarioTestSuiteCreateInput,
@@ -61,4 +61,4 @@ export interface SuiteApi {
   getOrganizationId(projectId: string): Promise<string>;
 }
 
-export const SuiteApi = featureApi<SuiteApi>("suite");
+export const SuiteApi = moduleApi<SuiteApi>("suite");

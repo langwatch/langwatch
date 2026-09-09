@@ -120,7 +120,7 @@ const RELATION_READ_OPERATIONS = new Set([
 
 function ownershipError(message: string): Error {
   return new Error(
-    `Prisma repository capability denied ${message}. Use the owning FeatureApi instead.`,
+    `Prisma repository capability denied ${message}. Use the owning ModuleApi instead.`,
   );
 }
 

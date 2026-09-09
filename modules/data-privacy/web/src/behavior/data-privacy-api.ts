@@ -7,13 +7,13 @@
  */
 
 import type { dataPrivacyTrpc } from "@langwatch/data-privacy-contract";
-import { createFeatureApi, type ContractApiMap, type FeatureApi } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap, type ModuleApi } from "@langwatch/api/web";
 
 export type DataPrivacyApiMap = ContractApiMap<typeof dataPrivacyTrpc>;
 
 /**
  * The Data Privacy family's typed tRPC hooks. Same machinery, same transport
  * and same React Query cache as the application's `api` proxy — see
- * `createFeatureApi` for why separate instances still share cache entries.
+ * `createModuleApi` for why separate instances still share cache entries.
  */
-export const dataPrivacyApi: FeatureApi<DataPrivacyApiMap> = createFeatureApi<DataPrivacyApiMap>();
+export const dataPrivacyApi: ModuleApi<DataPrivacyApiMap> = createModuleApi<DataPrivacyApiMap>();

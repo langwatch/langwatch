@@ -28,7 +28,7 @@ function bootPresence() {
     })
     .withProvided(ProjectApi, createPresenceTestProjects())
     .withProvided(UserApi, createPresenceTestUsers({ name: "Ada", image: null }))
-    .withFeature(presenceServer)
+    .withModule(presenceServer)
     .boot({ role: "api" });
 }
 
@@ -54,7 +54,7 @@ describe("given a process that installs presence", () => {
       const runtime = await bootPresence();
 
       await expect(
-        runtime.feature(presenceServer).provided.list({ projectId: "project-1" }),
+        runtime.module(presenceServer).provided.list({ projectId: "project-1" }),
       ).resolves.toEqual([]);
     });
   });

@@ -5,7 +5,7 @@
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { homeTrpc, type RecentItem } from "@langwatch/project-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 /**
  * What the home door reaches. The strip is not the project's own read: the
@@ -24,7 +24,7 @@ export interface ProjectHomeApi {
   }): Promise<RecentItem[]>;
 }
 
-export const ProjectHomeApi = featureApi<ProjectHomeApi>("project");
+export const ProjectHomeApi = moduleApi<ProjectHomeApi>("project");
 
 export const homeTrpcTransport = defineTrpcRouter(ProjectHomeApi, homeTrpc)
   .procedure("getRecentItems")

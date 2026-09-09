@@ -29,10 +29,10 @@ export async function installApiEntitlement(options: {
     .withPersistence("postgres", { prisma: options.infrastructure.prisma })
     .withInfrastructure(options.entitlement)
     .withProvided(UserApi, options.peers.users)
-    .withFeature(entitlementServer)
+    .withModule(entitlementServer)
     .boot({ role: "api" });
 
-  const app = runtime.feature(entitlementServer).provided;
+  const app = runtime.module(entitlementServer).provided;
 
   return {
     routers: (mount) => ({

@@ -20,11 +20,11 @@ export async function installApiTopic(options: {
     // starts no scheduler. `null` is the status panel's own "not scheduled",
     // which is what a process that never schedules should say.
     .withInfrastructure({ schedule: new UnscheduledTopicClustering() })
-    .withFeature(topicServer)
+    .withModule(topicServer)
     .boot({ role: "api" });
 
   return {
-    app: runtime.feature(topicServer).provided,
+    app: runtime.module(topicServer).provided,
     router: (mount) => createTopicTrpcRouter(mount.runtime),
   };
 }

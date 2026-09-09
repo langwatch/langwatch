@@ -405,7 +405,7 @@ a new procedure on a declared namespace needs no edit here:
 
 ```ts
 type AnnotationProcedures = ContractApiMap<typeof annotationTrpc> & ContractApiMap<typeof annotationScoreTrpc>;
-export const annotationApi = createFeatureApi<AnnotationProcedures>();
+export const annotationApi = createModuleApi<AnnotationProcedures>();
 export type RouterOutputs = OutputsFromMap<AnnotationProcedures>;
 ```
 

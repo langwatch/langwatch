@@ -5,7 +5,7 @@ import type {
   LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
 import type { Trigger } from "@langwatch/automation-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 import type { Dashboard, DashboardSummary } from "./dashboard.ts";
 import type { Graph, GraphLayout } from "./graph.ts";
@@ -169,4 +169,4 @@ export interface DashboardApi {
   }): Promise<{ success: true }>;
 }
 
-export const DashboardApi = featureApi<DashboardApi>("dashboard");
+export const DashboardApi = moduleApi<DashboardApi>("dashboard");

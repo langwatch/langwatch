@@ -31,7 +31,7 @@ function process(connections = RecordingSsoConnectionLedger.create()) {
     .withProvided(OpsApi, createSsoTestOperators())
     .withProvided(UserApi, createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL }))
     .withProvided(AuditLogApi, createSsoTestAuditLog())
-    .withFeature(ssoServer, {
+    .withModule(ssoServer, {
       infrastructure: { connections, logger: RecordingSsoGateLogger.create() },
     });
 }
@@ -47,7 +47,7 @@ describe("given a process that installed single sign-on", () => {
 
       try {
         const app = runtime.service(SsoApi);
-        expect(runtime.feature(ssoServer).provided).toBe(app);
+        expect(runtime.module(ssoServer).provided).toBe(app);
 
         await expect(
           app.listConnections({ page: 0, pageSize: 25 }, { id: STAFF_ID }),

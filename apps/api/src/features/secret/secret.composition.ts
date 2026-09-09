@@ -20,10 +20,10 @@ export async function installApiSecret(options: {
   const runtime = await createApp({ name: "langwatch-api" })
     .withPersistence("postgres", { prisma: options.prisma })
     .withInfrastructure({})
-    .withFeature(secretServer, { infrastructure: { encryption: options.encryption } })
+    .withModule(secretServer, { infrastructure: { encryption: options.encryption } })
     .boot({ role: "api" });
 
-  const app = runtime.feature(secretServer).provided;
+  const app = runtime.module(secretServer).provided;
 
   return {
     routers: (mount) => ({ secrets: createSecretTrpcRouter(mount.runtime) }),

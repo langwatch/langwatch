@@ -26,7 +26,7 @@ function process() {
     .withProvided(OrganizationApi, createDataRetentionTestOrganizations())
     .withProvided(AuthzApi, createDataRetentionTestAuthz())
     .withProvided(UserApi, createDataRetentionTestUsers())
-    .withFeature(dataRetentionServer, {
+    .withModule(dataRetentionServer, {
       infrastructure: createDataRetentionTestInfrastructure(),
     });
 }
@@ -43,7 +43,7 @@ describe("data retention app installation", () => {
     try {
       const app = runtime.service(DataRetentionApi);
 
-      expect(runtime.feature(dataRetentionServer).provided).toBe(app);
+      expect(runtime.module(dataRetentionServer).provided).toBe(app);
 
       await expect(
         app.getResolvedForProject({ projectId: retentionTestGraph.projectId }),

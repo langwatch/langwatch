@@ -75,7 +75,7 @@ export async function installApiMonitor(options: {
     .withPersistence("postgres", { prisma })
     .withInfrastructure({})
     .withProvided(AuthzApi, permissions)
-    .withFeature(monitorServer, {
+    .withModule(monitorServer, {
       infrastructure: {
         evaluators: new ProcessMonitorEvaluators(evaluators),
         performance: composeMonitorPerformance(options.resolveClickHouseClient),
@@ -85,7 +85,7 @@ export async function installApiMonitor(options: {
     })
     .boot({ role: "api" });
 
-  const app = runtime.feature(monitorServer).provided;
+  const app = runtime.module(monitorServer).provided;
 
   return {
     routers: (mount) => ({ monitors: createMonitorTrpcRouter(mount.runtime) }),
@@ -159,7 +159,9 @@ function composeMonitorPerformance(
 ): MonitorPerformancePort {
   const window = AnalyticsComparisonWindowService.create();
   const previousPeriodStartMs = ({ startMs, endMs }: { startMs: number; endMs: number }) =>
-    window.currentVsPrevious({ startDate: startMs, endDate: endMs }).previousPeriodStartDate.getTime();
+    window
+      .currentVsPrevious({ startDate: startMs, endDate: endMs })
+      .previousPeriodStartDate.getTime();
 
   if (!resolveClickHouseClient) return new UncomposedMonitorPerformance(previousPeriodStartMs);
 
@@ -176,7 +178,9 @@ function composeMonitorPerformance(
 
 class ClickHouseMonitorPerformance extends MonitorPerformancePort {
   constructor(
-    private readonly evaluations: { getMonitorPerformance: MonitorPerformancePort["getMonitorPerformance"] },
+    private readonly evaluations: {
+      getMonitorPerformance: MonitorPerformancePort["getMonitorPerformance"];
+    },
     private readonly window: (range: { startMs: number; endMs: number }) => number,
   ) {
     super();

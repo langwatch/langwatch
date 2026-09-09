@@ -4,13 +4,9 @@
  * @see enterprise/modules/billing/specs/stripe-webhook.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestRawAnswer,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawAnswer } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type Stripe from "stripe";
 
 import type { HandleEventResult } from "../services/billing-stripe-webhook.service.ts";
@@ -39,7 +35,7 @@ export interface BillingStripeWebhookApi {
   handleEvent(event: Stripe.Event): Promise<HandleEventResult>;
 }
 
-export const BillingStripeWebhookApi = featureApi<BillingStripeWebhookApi>("billing");
+export const BillingStripeWebhookApi = moduleApi<BillingStripeWebhookApi>("billing");
 
 /**
  * `/api/webhooks/stripe`, at exactly the address Stripe's dashboard holds, and

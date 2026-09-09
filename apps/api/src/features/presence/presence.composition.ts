@@ -51,11 +51,11 @@ export async function installApiPresence(options: {
     .withInfrastructure(infrastructure)
     .withProvided(ProjectApi, options.peers.projects)
     .withProvided(UserApi, options.peers.users)
-    .withFeature(presenceServer)
+    .withModule(presenceServer)
     .boot({ role: "api" });
 
   return {
-    app: runtime.feature(presenceServer).provided,
+    app: runtime.module(presenceServer).provided,
     emitter: broadcast,
     broadcast,
     router: (mount) => createPresenceTrpcRouter(mount.runtime),

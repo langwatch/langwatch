@@ -1,5 +1,5 @@
 import type { AgentCallSignal } from "./connected-agent.connection.ts";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 import type { AgentPresence } from "./connected-agent.view.ts";
 import type { AgentCallInput, AgentCallContext, AgentCallResult } from "./connected-agent.call.ts";
@@ -150,7 +150,7 @@ export interface AgentApi {
   }): Promise<AgentTestRunResult>;
 }
 
-export const AgentApi = featureApi<AgentApi>("agent");
+export const AgentApi = moduleApi<AgentApi>("agent");
 
 export type AgentWorkflowInput = { projectId: string; workflowId: string };
 export type AgentWorkflowConfig = { id: string; config: Record<string, unknown> };

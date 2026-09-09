@@ -9,7 +9,7 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { z } from "zod";
 
 import type {
@@ -22,7 +22,7 @@ export interface McpAuthorizeApi {
   approve(request: McpApprovalRequest): Promise<McpApprovalOutcome>;
 }
 
-export const McpAuthorizeApi = featureApi<McpAuthorizeApi>("hosted-mcp");
+export const McpAuthorizeApi = moduleApi<McpAuthorizeApi>("hosted-mcp");
 
 /** The signed-in person behind the request, as the mounting process resolves one. */
 export const mcpAuthorizeApprover = defineRestMiddleware(

@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   CanonicalMetricDataPoint,
   MetricTraceCorrelation,
@@ -28,4 +28,4 @@ export interface MetricApi {
   }): Promise<MetricDataPointPreparation>;
 }
 
-export const MetricApi = featureApi<MetricApi>("metric");
+export const MetricApi = moduleApi<MetricApi>("metric");

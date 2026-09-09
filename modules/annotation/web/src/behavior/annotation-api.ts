@@ -4,7 +4,7 @@
  */
 
 import type { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
-import { createFeatureApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap, type OutputsFromMap } from "@langwatch/api/web";
 import type { Trace } from "@langwatch/trace-contract";
 import type { AnnotationTrace } from "../model/annotation-row.ts";
 
@@ -91,7 +91,7 @@ type AnnotationProcedures = ContractApiMap<typeof annotationTrpc> &
   BorrowedProcedures;
 
 /** The annotations family's typed tRPC hooks; the screen mounts its Provider. */
-export const annotationApi = createFeatureApi<AnnotationProcedures>();
+export const annotationApi = createModuleApi<AnnotationProcedures>();
 
 /** The name the queue walker spells. */
 export { annotationApi as api };

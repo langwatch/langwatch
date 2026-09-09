@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { Monitor } from "@langwatch/monitor-contract";
 import type {
   AutomationApiCreateInput,
@@ -136,11 +136,8 @@ export interface AutomationApi {
     via: UnsubscribeChannel;
   }): Promise<void>;
   /** The operator-facing suppression list, audited because it reads addresses. */
-  listSuppressions(input: {
-    projectId: string;
-    actorId: string;
-  }): Promise<EmailSuppressionRow[]>;
+  listSuppressions(input: { projectId: string; actorId: string }): Promise<EmailSuppressionRow[]>;
   removeSuppression(input: { id: string; projectId: string }): Promise<void>;
 }
 
-export const AutomationApi = featureApi<AutomationApi>("automation");
+export const AutomationApi = moduleApi<AutomationApi>("automation");

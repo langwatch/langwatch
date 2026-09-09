@@ -8,7 +8,7 @@ function process() {
   return createApp({ name: "secret-installation-test" })
     .withPersistence("memory", {})
     .withInfrastructure({})
-    .withFeature(secretServer, {
+    .withModule(secretServer, {
       infrastructure: { encryption: new ReversibleTestSecretEncryption() },
     });
 }
@@ -24,15 +24,15 @@ describe("secret app installation", () => {
       const app = runtime.service(SecretApi);
       const created = await app.create(input, caller);
 
-      expect(runtime.feature(secretServer).provided).toBe(app);
+      expect(runtime.module(secretServer).provided).toBe(app);
 
       await expect(app.get({ projectId: input.projectId, id: created.id })).resolves.toMatchObject({
         name: input.name,
       });
 
-      await expect(
-        app.get({ projectId: "other-project", id: created.id }),
-      ).rejects.toBeInstanceOf(SecretNotFoundError);
+      await expect(app.get({ projectId: "other-project", id: created.id })).rejects.toBeInstanceOf(
+        SecretNotFoundError,
+      );
 
       await app.delete({ projectId: input.projectId, id: created.id });
 

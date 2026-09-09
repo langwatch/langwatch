@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { CanonicalTraceLogRecord } from "./log-record.ts";
 import type { LogPiiRedactionLevel, LogPreparation } from "./log-preparation.types.ts";
 
@@ -19,4 +19,4 @@ export interface LogApi {
   }): Promise<CanonicalTraceLogRecord[]>;
 }
 
-export const LogApi = featureApi<LogApi>("log");
+export const LogApi = moduleApi<LogApi>("log");

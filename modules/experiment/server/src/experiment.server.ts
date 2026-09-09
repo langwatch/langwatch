@@ -1,10 +1,10 @@
 import { ExperimentApi } from "@langwatch/experiment-contract";
-import { defineFeature, type FeatureSetup } from "@langwatch/runtime-composition";
+import { defineModule, type FeatureSetup } from "@langwatch/runtime-composition";
 import { ExperimentApp, type ExperimentAppDependencies } from "#app/experiment.app";
 
 export type { ExperimentAppDependencies };
 
-export const experimentServer = defineFeature("experiment")
+export const experimentServer = defineModule("experiment")
   .withApp({
     contract: ExperimentApi,
     dependencies: {},

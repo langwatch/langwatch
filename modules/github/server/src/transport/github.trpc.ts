@@ -10,7 +10,7 @@ import {
   type GithubApi,
   type GithubConnectionAuditEntry,
 } from "@langwatch/github-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 /**
  * What the connection door reaches. The GitHub capability is this module's; the
@@ -26,7 +26,7 @@ export interface GithubConnectionApi {
   recordAudit(entry: GithubConnectionAuditEntry): Promise<void>;
 }
 
-export const GithubConnectionApi = featureApi<GithubConnectionApi>("github");
+export const GithubConnectionApi = moduleApi<GithubConnectionApi>("github");
 
 /**
  * Membership is asked AFTER the declared permission and BEFORE any connection

@@ -116,23 +116,22 @@ export async function createWorkerFoundationApps(options: {
 
   return {
     tenancy: {
-      projects: runtime.feature((await import("@langwatch/project-server")).projectServer).provided,
-      organizations: runtime.feature(
+      projects: runtime.module((await import("@langwatch/project-server")).projectServer).provided,
+      organizations: runtime.module(
         (await import("@langwatch/organization-server")).organizationFeature,
       ).provided,
-      authorization: runtime.feature((await import("@langwatch/authz-server")).authzServer)
-        .provided,
-      apiKeys: runtime.feature((await import("@langwatch/api-key-server")).apiKeyServer).provided,
-      shares: runtime.feature((await import("@langwatch/share-server")).shareServer).provided,
-      topics: runtime.feature((await import("@langwatch/topic-server")).topicServer).provided,
+      authorization: runtime.module((await import("@langwatch/authz-server")).authzServer).provided,
+      apiKeys: runtime.module((await import("@langwatch/api-key-server")).apiKeyServer).provided,
+      shares: runtime.module((await import("@langwatch/share-server")).shareServer).provided,
+      topics: runtime.module((await import("@langwatch/topic-server")).topicServer).provided,
       close: () => runtime.stop(),
     },
-    users: runtime.feature((await import("@langwatch/user-server")).userServer).provided,
-    auth: runtime.feature((await import("./worker-user-app.composition.ts")).workerAuthServer)
+    users: runtime.module((await import("@langwatch/user-server")).userServer).provided,
+    auth: runtime.module((await import("./worker-user-app.composition.ts")).workerAuthServer)
       .provided,
-    ops: runtime.feature((await import("@langwatch/ops-server")).opsServer).provided,
+    ops: runtime.module((await import("@langwatch/ops-server")).opsServer).provided,
     auditLog: auditLog.auditLog(),
-    retention: runtime.feature(dataRetentionServer).provided,
+    retention: runtime.module(dataRetentionServer).provided,
     close: () => runtime.stop(),
   };
 }

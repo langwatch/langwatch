@@ -45,7 +45,7 @@ export async function installApiDataPrivacy(options: {
     .withProvided(OrganizationApi, organizations)
     .withProvided(AuthzApi, permissions)
     .withProvided(FeatureFlagApi, featureFlags)
-    .withFeature(dataPrivacyServer, {
+    .withModule(dataPrivacyServer, {
       infrastructure: {
         directory: PrismaDataPrivacyDirectoryRepository.create(prisma),
         // This process composes no PII analysis transport: the log and metric
@@ -55,7 +55,7 @@ export async function installApiDataPrivacy(options: {
     })
     .boot({ role: "api" });
 
-  const app = runtime.feature(dataPrivacyServer).provided;
+  const app = runtime.module(dataPrivacyServer).provided;
 
   return {
     router: (mount) => createDataPrivacyTrpcRouter(mount.runtime),

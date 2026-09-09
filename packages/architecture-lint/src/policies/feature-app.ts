@@ -573,7 +573,7 @@ function importedFeatureApi(
     if (!bindings || !ts.isNamedImports(bindings)) continue;
 
     const item = bindings.elements.find((element) => element.name.text === localName);
-    const isFeatureApi = item !== void 0 && (item.propertyName ?? item.name).text === "featureApi";
+    const isFeatureApi = item !== void 0 && (item.propertyName ?? item.name).text === "moduleApi";
     if (isFeatureApi) return statement.moduleSpecifier.text;
   }
 
@@ -748,8 +748,8 @@ function contractViolations(
   if (!validToken)
     violations.push(
       add(
-        "A feature API must export its canonical featureApi token.",
-        `Export const ${name} = featureApi<${name}>("${feature}") from src/${feature}.api.ts using @langwatch/runtime-composition.`,
+        "A feature API must export its canonical moduleApi token.",
+        `Export const ${name} = moduleApi<${name}>("${feature}") from src/${feature}.api.ts using @langwatch/runtime-composition.`,
       ),
     );
 
@@ -1221,7 +1221,7 @@ function collectInstallerImport(
       legacyNames.add(item.name.text);
     }
 
-    if (imported === "defineFeature") {
+    if (imported === "defineModule") {
       definedNames.add(item.name.text);
     }
   }
@@ -1258,7 +1258,7 @@ function isInstallerCall(
     return { call: node, kind: "legacy" };
   }
 
-  if (callee.name.text === "defineFeature") {
+  if (callee.name.text === "defineModule") {
     return { call: node, kind: "defined" };
   }
 
@@ -1343,7 +1343,7 @@ function installerViolations(
         appViolation(
           declaration.file,
           "Legacy serverFeature installers are not accepted for catalogue features.",
-          `Use defineFeature("${pkg.feature}").withApp(${appName(pkg.feature ?? "")}).build() in the canonical installer.`,
+          `Use defineModule("${pkg.feature}").withApp(${appName(pkg.feature ?? "")}).build() in the canonical installer.`,
         ),
       ];
 }
@@ -1375,7 +1375,7 @@ function definedInstallerViolations(
         appViolation(
           file,
           "The installer does not use its canonical feature name and location.",
-          `Declare defineFeature("${pkg.feature}") in src/${pkg.feature}.server.ts.`,
+          `Declare defineModule("${pkg.feature}") in src/${pkg.feature}.server.ts.`,
         ),
       ];
   const app = declaration.app;
@@ -1413,8 +1413,8 @@ function definedInstallerViolations(
     violations.push(
       appViolation(
         file,
-        "A defineFeature installer must bind exactly one valid concrete app with no legacy builder stages.",
-        `Use defineFeature("${pkg.feature}").withApp(${appName(pkg.feature ?? "")}).build(); implement ${apiName(pkg.feature ?? "")} operations and expose only static API metadata and create.`,
+        "A defineModule installer must bind exactly one valid concrete app with no legacy builder stages.",
+        `Use defineModule("${pkg.feature}").withApp(${appName(pkg.feature ?? "")}).build(); implement ${apiName(pkg.feature ?? "")} operations and expose only static API metadata and create.`,
       ),
     );
 
@@ -1560,11 +1560,11 @@ function lintFeatureOwner(
       appViolation(
         installerFile,
         hidden
-          ? "The canonical installer hides its defineFeature declaration."
+          ? "The canonical installer hides its defineModule declaration."
           : `Catalogue feature "${owner.id}" has no canonical server installer.`,
         hidden
-          ? "Call the runtime-composition defineFeature factory directly in the canonical installer; do not hide registration behind wrappers or local aliases."
-          : "Move the existing construction into defineFeature(...).withApp(...), then rewire API, worker and task composition to reuse that installer.",
+          ? "Call the runtime-composition defineModule factory directly in the canonical installer; do not hide registration behind wrappers or local aliases."
+          : "Move the existing construction into defineModule(...).withApp(...), then rewire API, worker and task composition to reuse that installer.",
       ),
     );
 
@@ -1899,8 +1899,8 @@ function apiOrService(
   const ownServiceClass =
     ts.isClassDeclaration(local.node) && (serviceFile || declaredName.endsWith("Service"));
   const ownCanonicalService = declaredName.endsWith("Service") && canonicalName;
-  const featureApi = declaredName.endsWith("Api") && local.file.includes(".api.");
-  if (!featureApi && !ownServiceClass && !ownCanonicalService) {
+  const moduleApi = declaredName.endsWith("Api") && local.file.includes(".api.");
+  if (!moduleApi && !ownServiceClass && !ownCanonicalService) {
     return undefined;
   }
 

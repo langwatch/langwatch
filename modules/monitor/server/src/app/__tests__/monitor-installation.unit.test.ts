@@ -23,7 +23,7 @@ function process() {
       AuthzApi,
       createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),
     )
-    .withFeature(monitorServer, {
+    .withModule(monitorServer, {
       infrastructure: {
         evaluators: new FakeMonitorEvaluators(),
         performance: new FakeMonitorPerformance(),
@@ -53,13 +53,13 @@ describe("monitor app installation", () => {
       const app = runtime.service(MonitorApi);
       const monitor = await app.create({ ...created });
 
-      expect(runtime.feature(monitorServer).provided).toBe(app);
+      expect(runtime.module(monitorServer).provided).toBe(app);
       await expect(app.list({ projectId: "project-1" })).resolves.toMatchObject([
         { id: monitor.id },
       ]);
-      await expect(
-        app.getById({ id: monitor.id, projectId: "project-1" }),
-      ).resolves.toMatchObject({ name: "Hallucination" });
+      await expect(app.getById({ id: monitor.id, projectId: "project-1" })).resolves.toMatchObject({
+        name: "Hallucination",
+      });
     } finally {
       await runtime.stop();
     }

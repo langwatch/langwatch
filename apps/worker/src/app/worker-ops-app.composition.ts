@@ -90,7 +90,7 @@ export function installWorkerOps<Infrastructure>(
   const snapshots = RedisOpsSnapshotAdapter.create({
     redis: IoredisOpsSnapshotRedisAdapter.create(options.redis),
   });
-  return builder.withFeature(opsServer, {
+  return builder.withModule(opsServer, {
     infrastructure: {
       createCapability: (peers: OpsAppDependencies) => {
         const operations = PostgresOpsAdapter.create({

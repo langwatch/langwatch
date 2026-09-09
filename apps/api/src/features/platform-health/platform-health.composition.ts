@@ -42,7 +42,7 @@ export async function installApiPlatformHealth(
 
   const runtime = await createApp({ name: "langwatch-api" })
     .withInfrastructure({})
-    .withFeature(platformHealthServer, {
+    .withModule(platformHealthServer, {
       infrastructure: {
         publicBaseUrl: probes.publicBaseUrl,
         automation: () => {
@@ -62,7 +62,7 @@ export async function installApiPlatformHealth(
     })
     .boot({ role: "api", config: { "platform-health": { apiKey, probeApiKey } } });
 
-  const app = runtime.feature(platformHealthServer).provided;
+  const app = runtime.module(platformHealthServer).provided;
 
   return { app };
 }

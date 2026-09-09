@@ -1,8 +1,4 @@
-import {
-  EnterpriseApiAuditLog,
-  EnterpriseApiSso,
-  type ScimApi,
-} from "@langwatch/enterprise-api";
+import { EnterpriseApiAuditLog, EnterpriseApiSso, type ScimApi } from "@langwatch/enterprise-api";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { LocalFeatureApis, type BootedRuntime } from "@langwatch/runtime-composition";
@@ -2374,8 +2370,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const scim = this.composedScim;
     const restRuntime = createApiRestRuntime({
       projectCredential: (input) => handlerManagedCredentials.authenticate(input),
-      organizationCredential: (input) =>
-        handlerManagedCredentials.authenticateOrganization(input),
+      organizationCredential: (input) => handlerManagedCredentials.authenticateOrganization(input),
       organizationIdentity: (input) => handlerManagedCredentials.identifyOrganization(input),
       routeAuthorization: (input) => handlerManagedCredentials.authorizeOrganizationRoute(input),
       errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
@@ -3123,7 +3118,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       },
       // The MEMBER, not the application: a deployment that composed a
       // session-policy store and no connection ledger refuses here by name.
-      connections: this.resolveEnterprise()?.backoffice?.() ?? ApiUnavailableSsoConnectionLedger.create(),
+      connections:
+        this.resolveEnterprise()?.backoffice?.() ?? ApiUnavailableSsoConnectionLedger.create(),
       logger: ApiSsoGateLogger.create(createLogger("langwatch:api:sso")),
       peers: {
         licensing: this.composedEnterprise.application.licensing,
@@ -3617,27 +3613,26 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   ): Promise<ComposedEntitlementFeature | undefined> {
     const notifications = this.composedNotification;
     if (!infrastructure || !notifications) return undefined;
-    const usage =
-      composeApiUsageStats({
-        prisma: infrastructure.prisma,
-        plans: this.resolvePlanProvider(options),
-        notifications: notifications.app,
-        // Both routings, off the ONE connection: the trace rollup is keyed by
-        // project and the billable-events rollup by organization, which the
-        // tenant router cannot answer. They travel together because this
-        // process either opened that connection or did not.
-        clickhouse: this.composedClickHouse
-          ? {
-              resolveClient: this.composedClickHouse.resolveClient,
-              resolveOrganizationClient: this.composedClickHouse.resolveOrganizationClient,
-            }
-          : null,
-        // The SAME gateway the password-reset link leaves through, and the
-        // same host the message's "View Usage Details" button points at.
-        ...(this.composedMail ? { mail: this.composedMail } : {}),
-        processName: options.config.serviceName,
-        report: this.entitlementAbsence(options),
-      });
+    const usage = composeApiUsageStats({
+      prisma: infrastructure.prisma,
+      plans: this.resolvePlanProvider(options),
+      notifications: notifications.app,
+      // Both routings, off the ONE connection: the trace rollup is keyed by
+      // project and the billable-events rollup by organization, which the
+      // tenant router cannot answer. They travel together because this
+      // process either opened that connection or did not.
+      clickhouse: this.composedClickHouse
+        ? {
+            resolveClient: this.composedClickHouse.resolveClient,
+            resolveOrganizationClient: this.composedClickHouse.resolveOrganizationClient,
+          }
+        : null,
+      // The SAME gateway the password-reset link leaves through, and the
+      // same host the message's "View Usage Details" button points at.
+      ...(this.composedMail ? { mail: this.composedMail } : {}),
+      processName: options.config.serviceName,
+      report: this.entitlementAbsence(options),
+    });
 
     return await installApiEntitlement({
       infrastructure,

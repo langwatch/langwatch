@@ -1,7 +1,7 @@
 import type { TRPCUntypedClient } from "@trpc/client";
 import { type CreateTRPCReact, createTRPCReact } from "@trpc/react-query";
 // Load-bearing, not convenience: a web package's `export const fooApi =
-// createFeatureApi<FooMap>()` emits a declaration naming these, and only this
+// createModuleApi<FooMap>()` emits a declaration naming these, and only this
 // package depends on `@trpc/react-query`. Without them TS2883 refuses the
 // emit and asks every call site for a hand-written annotation.
 export type {
@@ -43,7 +43,7 @@ export type ProcedureShape =
  * A feature's procedures, nested exactly as the process's root router mounts
  * them. The nesting is load-bearing: those segments become the tRPC cache key.
  */
-export type FeatureApiMap = { [segment: string]: ProcedureShape | FeatureApiMap };
+export type ModuleApiMap = { [segment: string]: ProcedureShape | ModuleApiMap };
 
 /**
  * The two sides of a declared schema, read structurally: `z.input` and
@@ -125,7 +125,7 @@ export type RouterFromMap<TMap> = TRPCBuiltRouter<FeatureApiRootTypes, Procedure
  * reading the map by hand does not, and the difference is invisible until a
  * `.getTime()` throws in the browser.
  */
-export type OutputsFromMap<TMap extends FeatureApiMap> = inferRouterOutputs<RouterFromMap<TMap>>;
+export type OutputsFromMap<TMap extends ModuleApiMap> = inferRouterOutputs<RouterFromMap<TMap>>;
 
 /**
  * One value the way the browser receives it, given the type the server states.
@@ -146,7 +146,7 @@ export type WireOf<TValue> = OutputsFromMap<{
  *
  * Call this once per feature web package, at module scope:
  *
- *     export const traceApi = createFeatureApi<TraceApiMap>();
+ *     export const traceApi = createModuleApi<TraceApiMap>();
  *
  * and then write `traceApi.tracesV2.header.useQuery(input, options)` — the same
  * call the code wrote as `api.tracesV2.header.useQuery(...)` while it lived in
@@ -175,9 +175,9 @@ export type WireOf<TValue> = OutputsFromMap<{
  * for those — deliberately more visible than a typed call, because reaching
  * into another feature's cache should be.
  */
-export type FeatureApi<TMap extends FeatureApiMap> = CreateTRPCReact<RouterFromMap<TMap>, unknown>;
+export type ModuleApi<TMap extends ModuleApiMap> = CreateTRPCReact<RouterFromMap<TMap>, unknown>;
 
-export function createFeatureApi<TMap extends FeatureApiMap>(): FeatureApi<TMap> {
+export function createModuleApi<TMap extends ModuleApiMap>(): ModuleApi<TMap> {
   return createTRPCReact<RouterFromMap<TMap>>();
 }
 
@@ -192,4 +192,4 @@ export function createFeatureApi<TMap extends FeatureApiMap>(): FeatureApi<TMap>
  * application hook and one fired by a package hook in the same tick still
  * travel in a single request. A second client would quietly split them.
  */
-export type FeatureApiClient<TMap extends FeatureApiMap> = TRPCUntypedClient<RouterFromMap<TMap>>;
+export type ModuleApiClient<TMap extends ModuleApiMap> = TRPCUntypedClient<RouterFromMap<TMap>>;

@@ -5,7 +5,7 @@
  */
 
 import type { batchRecordTrpc, datasetRecordTrpc, datasetTrpc } from "@langwatch/dataset-contract";
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 
 /**
  * Procedures other features own. Each belongs in that feature's own contract;
@@ -77,4 +77,4 @@ export type DatasetApiMap = ContractApiMap<typeof datasetTrpc> &
  * React Query cache. Internal by convention; exported from `./datasets` only
  * so the process shell can mount `datasetApi.Provider`.
  */
-export const datasetApi = createFeatureApi<DatasetApiMap>();
+export const datasetApi = createModuleApi<DatasetApiMap>();

@@ -14,7 +14,7 @@ import type {
   AuthzListManagedBindingsForUserOutput,
   AuthzUpdateBindingInput,
 } from "@langwatch/authz-contract";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { RolePermissionCatalog } from "./role-rest.schemas.ts";
 import type { Role, RoleCreate, RoleUpdate, RoleWriteAcknowledged } from "./role.ts";
 
@@ -98,4 +98,4 @@ export interface RoleApi {
   ): Promise<AuthzBindingMutationSuccess>;
 }
 
-export const RoleApi = featureApi<RoleApi>("role");
+export const RoleApi = moduleApi<RoleApi>("role");

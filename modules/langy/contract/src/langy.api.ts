@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   LangyConversationDetail,
   LangyConversationEventPage,
@@ -139,4 +139,4 @@ export interface LangyApi {
   }): Promise<void>;
 }
 
-export const LangyApi = featureApi<LangyApi>("langy");
+export const LangyApi = moduleApi<LangyApi>("langy");

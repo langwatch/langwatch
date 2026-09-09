@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { AdminIdentity } from "./admin.ts";
 import type {
   BugReport,
@@ -239,9 +239,7 @@ export interface OpsApi {
   /** Null when no Grafana is configured: callers render no link, not a dead one. */
   findGrafanaLinkConfig(): OpsGrafanaLinkConfig;
   listSystemMigrations(): Promise<OpsMigrationOverview[]>;
-  listMigrationEnrollments(input: {
-    requestedBy: string;
-  }): Promise<OpsMigrationEnrollmentListing>;
+  listMigrationEnrollments(input: { requestedBy: string }): Promise<OpsMigrationEnrollmentListing>;
   searchMigrationOrganizations(input: { query: string }): Promise<OpsMigrationOrganizationMatch[]>;
   enrollMigrationTenant(input: {
     organizationId: string;
@@ -435,4 +433,4 @@ export interface OpsApi {
   dismissAnomaly(input: { tenantId: string; kind: AnomalyKind }): Promise<boolean>;
 }
 
-export const OpsApi = featureApi<OpsApi>("ops");
+export const OpsApi = moduleApi<OpsApi>("ops");

@@ -6,7 +6,7 @@
 
 import type { AgentType } from "@langwatch/agent-contract";
 import type { OpsApiGetBadgeCountsOutput } from "@langwatch/ops-contract";
-import { createFeatureApi } from "@langwatch/api/web";
+import { createModuleApi } from "@langwatch/api/web";
 
 export type NavigationHomeResolution = {
   destination: string;
@@ -209,4 +209,4 @@ export type NavigationApiMap = {
   };
 };
 
-export const navigationApi = createFeatureApi<NavigationApiMap>();
+export const navigationApi = createModuleApi<NavigationApiMap>();

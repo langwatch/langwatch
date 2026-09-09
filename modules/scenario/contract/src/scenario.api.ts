@@ -1,4 +1,4 @@
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type {
   AgentTestRunResult,
   AgentTestTurnResult,
@@ -78,4 +78,4 @@ export interface ScenarioApi {
   ): Promise<SimulationExternalSetSummary[]>;
 }
 
-export const ScenarioApi = featureApi<ScenarioApi>("scenario");
+export const ScenarioApi = moduleApi<ScenarioApi>("scenario");

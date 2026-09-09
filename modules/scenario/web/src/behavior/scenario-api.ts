@@ -7,7 +7,7 @@ import type {
   ModelDefaultResolvedTrpcOutput,
   ModelProviderListAllForProjectTrpcOutput,
 } from "@langwatch/model-provider-contract";
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 
 /**
  * A payload no contract package publishes yet.
@@ -198,7 +198,7 @@ type InputsOf<TNode> = TNode extends { query: { input: infer TIn } }
       ? TIn
       : { [K in keyof TNode]: InputsOf<TNode[K]> };
 
-export const api = createFeatureApi<ScenarioApiMap>();
+export const api = createModuleApi<ScenarioApiMap>();
 
 /** The same object, under the name the process shell mounts it by. */
 export const scenarioApi = api;

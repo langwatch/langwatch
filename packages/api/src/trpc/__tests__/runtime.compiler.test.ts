@@ -12,10 +12,10 @@ import { describe, expect, it } from "vitest";
 const fixture = (contract: string, router: string, body: string) => `import { z } from "zod";
 import { defineTrpcContract } from ${JSON.stringify(contract)};
 import { defineTrpcRouter } from ${JSON.stringify(router)};
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 
 interface AnnotationApi { read(input: { id: string }): Promise<{ id: string }> }
-const AnnotationApi = featureApi<AnnotationApi>("annotation");
+const AnnotationApi = moduleApi<AnnotationApi>("annotation");
 const scope = z.object({ projectId: z.string(), id: z.string() });
 const contract = defineTrpcContract("annotation")
   .query("getById").withInput(scope).withOutput(z.object({ id: z.string() }))

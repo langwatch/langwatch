@@ -4,7 +4,7 @@
  */
 
 import type { Instant } from "@langwatch/time";
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 import type {
   GatewayApplicableBudget,
   GatewayBudgetLedgerStatus,
@@ -963,10 +963,10 @@ export type GatewayApiMap = {
 
 /**
  * The gateway's typed tRPC hooks. Same machinery, same transport and same React Query cache as
- * the application's `api` proxy — see `createFeatureApi` for why separate instances still share
+ * the application's `api` proxy — see `createModuleApi` for why separate instances still share
  * cache entries.
  */
-export const gatewayApi = createFeatureApi<GatewayApiMap>();
+export const gatewayApi = createModuleApi<GatewayApiMap>();
 
 /**
  * Every procedure's output, addressed the way the screens already address it. The application's

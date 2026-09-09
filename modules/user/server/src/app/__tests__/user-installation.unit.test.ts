@@ -20,7 +20,7 @@ function process() {
     .withProvided(AuthApi, createUserTestAuth())
     .withProvided(OrganizationApi, createUserTestOrganizations())
     .withProvided(OpsApi, createUserTestOps())
-    .withFeature(userServer, { infrastructure: createUserTestInfrastructure() });
+    .withModule(userServer, { infrastructure: createUserTestInfrastructure() });
 }
 
 describe("user app installation", () => {
@@ -29,7 +29,7 @@ describe("user app installation", () => {
 
     try {
       const app = runtime.service(UserApi);
-      expect(runtime.feature(userServer).provided).toBe(app);
+      expect(runtime.module(userServer).provided).toBe(app);
 
       const created = await app.createCredentialUser({
         name: "Ada",

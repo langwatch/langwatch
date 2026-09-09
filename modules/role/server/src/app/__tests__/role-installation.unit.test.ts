@@ -6,7 +6,11 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 import { roleServer } from "../../role.server.ts";
-import { AllowingTestRolePlan, AllowingTestRoleScope, CountingTestRoleBindingIds } from "./role.fixture.ts";
+import {
+  AllowingTestRolePlan,
+  AllowingTestRoleScope,
+  CountingTestRoleBindingIds,
+} from "./role.fixture.ts";
 
 const ORGANIZATION_ID = "org-1";
 
@@ -32,7 +36,7 @@ function process() {
     )
     .withProvided(OrganizationApi, createApiFixture<OrganizationApi>())
     .withProvided(UserApi, createApiFixture<UserApi>())
-    .withFeature(roleServer, {
+    .withModule(roleServer, {
       infrastructure: {
         scope: new AllowingTestRoleScope(),
         plan: new AllowingTestRolePlan(),
@@ -48,7 +52,7 @@ describe("role app installation", () => {
     try {
       const app = runtime.service(RoleApi);
 
-      expect(runtime.feature(roleServer).provided).toBe(app);
+      expect(runtime.module(roleServer).provided).toBe(app);
       await expect(app.listRoles({ organizationId: ORGANIZATION_ID })).resolves.toMatchObject([
         { id: "role-1", name: "Auditor", kind: "custom" },
       ]);

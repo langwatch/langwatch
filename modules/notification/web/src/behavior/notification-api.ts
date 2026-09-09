@@ -21,7 +21,7 @@
  * import below is the only one in the package.
  */
 
-import { type FeatureApi, createFeatureApi } from "@langwatch/api/web";
+import { type ModuleApi, createModuleApi } from "@langwatch/api/web";
 import type { TimeInput } from "@langwatch/time";
 
 /** The project every suppression procedure is scoped to. */
@@ -61,5 +61,4 @@ export type NotificationApiMap = {
  * The notification family's typed tRPC hooks. Same machinery, same transport
  * and same React Query cache as the application's `api` proxy.
  */
-export const notificationApi: FeatureApi<NotificationApiMap> =
-  createFeatureApi<NotificationApiMap>();
+export const notificationApi: ModuleApi<NotificationApiMap> = createModuleApi<NotificationApiMap>();

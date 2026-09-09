@@ -52,7 +52,7 @@ describe("given a stored annotation", () => {
 
 ```
 app/__tests__/annotation.fixture.ts                createAnnotationTestApp({ repositories?, dependencies? })
-app/__tests__/annotation-installation.unit.test.ts createApp(...).withPersistence("memory", {}).withProvided(...).withFeature(annotationServer).boot({ role })
+app/__tests__/annotation-installation.unit.test.ts createApp(...).withPersistence("memory", {}).withProvided(...).withModule(annotationServer).boot({ role })
 app/__tests__/annotation-boundary.unit.test.ts     peer errors propagate; references validated; trace markers best effort
 services/__tests__/annotation-*.service.unit.test.ts
 repositories/memory/__tests__/memory.*.repository.unit.test.ts

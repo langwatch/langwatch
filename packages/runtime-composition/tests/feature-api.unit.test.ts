@@ -6,9 +6,9 @@ import {
   FeatureApiUnavailableError,
   MissingProviderError,
 } from "../src/boot-errors.ts";
-import { featureApi } from "../src/feature-api-token.ts";
+import { moduleApi } from "../src/module-api-token.ts";
 import {
-  defineFeature,
+  defineModule,
   serverFeature,
   type FeatureSetup,
   type ServerRole,
@@ -20,13 +20,13 @@ interface ProjectApi {
   echo(value: unknown): unknown;
   fail(error: Error): never;
 }
-const ProjectApi = featureApi<ProjectApi>("project");
+const ProjectApi = moduleApi<ProjectApi>("project");
 
 interface OrganizationApi {
   name(): Promise<string>;
   projectName(): Promise<string>;
 }
-const OrganizationApi = featureApi<OrganizationApi>("organization");
+const OrganizationApi = moduleApi<OrganizationApi>("organization");
 
 describe("process-owned feature references", () => {
   it("forwards through the bound app only after readiness", async () => {
@@ -207,14 +207,14 @@ class OrganizationApp implements OrganizationApi {
   }
 }
 
-const project = defineFeature("project").withApp(ProjectApp).build();
-const organization = defineFeature("organization").withApp(OrganizationApp).build();
+const project = defineModule("project").withApp(ProjectApp).build();
+const organization = defineModule("organization").withApp(OrganizationApp).build();
 
 function graph(infrastructure: Infrastructure, reversed = false) {
   const builder = createApp({ name: "api-bindings" }).withInfrastructure(infrastructure);
   return reversed
-    ? builder.withFeature(organization).withFeature(project)
-    : builder.withFeature(project).withFeature(organization);
+    ? builder.withModule(organization).withModule(project)
+    : builder.withModule(project).withModule(organization);
 }
 
 describe("feature APIs", () => {
@@ -268,9 +268,9 @@ describe("feature APIs", () => {
     await expect(
       createApp({ name: "legacy-api" })
         .withInfrastructure({})
-        .withFeature(legacy)
+        .withModule(legacy)
         .boot({ role: "api" }),
-    ).rejects.toThrow("defineFeature().withApp()");
+    ).rejects.toThrow("defineModule().withApp()");
     expect(events).toEqual([]);
   });
 
@@ -282,7 +282,7 @@ describe("feature APIs", () => {
       const projects = runtime.service(ProjectApi);
       const organizations = runtime.service(OrganizationApi);
 
-      expect(runtime.feature(project).provided).toBe(projects);
+      expect(runtime.module(project).provided).toBe(projects);
       await expect(projects.organizationName()).resolves.toBe("organization");
       await expect(organizations.projectName()).resolves.toBe("project");
       expect(events).toEqual(["create:project", "create:organization"]);
@@ -336,7 +336,7 @@ describe("feature APIs", () => {
     await expect(
       createApp({ name: "missing" })
         .withInfrastructure({ events })
-        .withFeature(project)
+        .withModule(project)
         .boot({ role: "api" }),
     ).rejects.toBeInstanceOf(MissingProviderError);
     expect(events).toEqual([]);
@@ -391,7 +391,7 @@ describe("feature APIs", () => {
   });
 
   it("rejects two distinct token objects claiming the same feature identity", async () => {
-    const duplicate = featureApi<ProjectApi>("project");
+    const duplicate = moduleApi<ProjectApi>("project");
     const existing: ProjectApi = {
       name: async () => "provided",
       organizationName: async () => "provided",
@@ -409,12 +409,12 @@ describe("feature APIs", () => {
 
   it("rejects a declaration/API name mismatch before invoking the factory", async () => {
     const events: string[] = [];
-    const declaration = defineFeature("organization").withApp(ProjectApp).build();
+    const declaration = defineModule("organization").withApp(ProjectApp).build();
 
     await expect(
       createApp({ name: "mismatch" })
         .withInfrastructure({ events })
-        .withFeature(declaration)
+        .withModule(declaration)
         .boot({ role: "api" }),
     ).rejects.toThrow('cannot provide API "project"');
     expect(events).toEqual([]);

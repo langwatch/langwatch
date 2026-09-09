@@ -1,5 +1,5 @@
 import { FeatureApiUnavailableError } from "./boot-errors.ts";
-import type { FeatureApiIdentity, FeatureApiToken } from "./feature-api-token.ts";
+import type { FeatureApiIdentity, ModuleApiToken } from "./module-api-token.ts";
 
 /** References are wired at boot, never constructed on a request's first call. */
 export class LocalFeatureApis {
@@ -14,7 +14,7 @@ export class LocalFeatureApis {
     this.bindings.set(token, new LocalFeatureApi(token.name, () => this.assertReady(token)));
   }
 
-  reference<Api>(token: FeatureApiToken<Api>): Api;
+  reference<Api>(token: ModuleApiToken<Api>): Api;
   reference(token: FeatureApiIdentity): object;
   reference(token: FeatureApiIdentity): object {
     return this.binding(token).reference;
@@ -22,7 +22,7 @@ export class LocalFeatureApis {
 
   bind<Token extends FeatureApiIdentity>(
     token: Token,
-    implementation: Token extends FeatureApiToken<infer Api> ? NoInfer<Api> : unknown,
+    implementation: Token extends ModuleApiToken<infer Api> ? NoInfer<Api> : unknown,
   ): void {
     this.assertConstructing();
     this.binding(token).bind(implementation);

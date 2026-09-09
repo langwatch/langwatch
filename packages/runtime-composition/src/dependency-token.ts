@@ -1,7 +1,7 @@
-import type { FeatureApiIdentity, FeatureApiToken } from "./feature-api-token.ts";
+import type { FeatureApiIdentity, ModuleApiToken } from "./module-api-token.ts";
 
 /** Constructor tokens remain for installers awaiting the feature API cutover. */
-export type DependencyToken<T> = FeatureApiToken<T> | (abstract new (...args: never[]) => T);
+export type DependencyToken<T> = ModuleApiToken<T> | (abstract new (...args: never[]) => T);
 
 export type TokenIdentity = FeatureApiIdentity | (abstract new (...args: never[]) => unknown);
 

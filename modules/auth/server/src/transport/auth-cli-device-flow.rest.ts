@@ -4,11 +4,7 @@
  * catch-all. @see specs/ai-governance/cli-onboarding/
  */
 import { publicRoute } from "@langwatch/api/access";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestRawResult,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
 import {
   ApiKeyScopeViolationError,
   type ApiKeyApi,
@@ -17,7 +13,7 @@ import {
 } from "@langwatch/api-key-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
-import { featureApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
@@ -107,7 +103,7 @@ export interface AuthCliDeviceFlowApi {
   publicBaseUrl?: string | undefined;
 }
 
-export const AuthCliDeviceFlowApi = featureApi<AuthCliDeviceFlowApi>("auth");
+export const AuthCliDeviceFlowApi = moduleApi<AuthCliDeviceFlowApi>("auth");
 
 const JSON_MEDIA_TYPE = "application/json";
 
@@ -698,11 +694,14 @@ async function approve({
   // organizations without it, pointing them at project login instead.
   const governanceEnabled = await app
     .featureFlags()
-    .isEnabled(GOVERNANCE_RELEASE_FLAG as never, {
-      kind: "organization",
-      userId: person.id,
-      organizationId: organization_id,
-    } as never)
+    .isEnabled(
+      GOVERNANCE_RELEASE_FLAG as never,
+      {
+        kind: "organization",
+        userId: person.id,
+        organizationId: organization_id,
+      } as never,
+    )
     .catch(() => true);
 
   if (!governanceEnabled) {
@@ -761,7 +760,9 @@ async function approveProjectKey({
   // permission check below is, and it inspects project-, team- and org-scoped
   // bindings. The org-scoping predicate here plus that check together stop a
   // spoofed `project_id` from leaking another org's key.
-  const project = await app.directory().tryFindLiveProject({ projectId: project_id, organizationId });
+  const project = await app
+    .directory()
+    .tryFindLiveProject({ projectId: project_id, organizationId });
 
   if (!project) {
     return refuse("forbidden", "Project not found or unavailable in this organization", 403);

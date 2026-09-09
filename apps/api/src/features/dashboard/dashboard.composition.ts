@@ -82,7 +82,7 @@ export async function installApiDashboard(options: {
     .withProvided(AnalyticsApi, analytics)
     .withProvided(AutomationApi, automation)
     .withProvided(ProjectApi, projects)
-    .withFeature(dashboardServer, {
+    .withModule(dashboardServer, {
       infrastructure: {
         workbenchAccess: new ProcessWorkbenchAccess(options.ports),
         workbenchCaller: new ProcessWorkbenchCaller(options.ports),
@@ -92,7 +92,7 @@ export async function installApiDashboard(options: {
     })
     .boot({ role: "api" });
 
-  const app = runtime.feature(dashboardServer).provided;
+  const app = runtime.module(dashboardServer).provided;
 
   return {
     routers: (mount) => ({

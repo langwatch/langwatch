@@ -68,7 +68,7 @@ Use `grep -rn`, not ripgrep: `rg` returns incomplete results in this repo.
 
 Walk `server/src` against `.claude/skills/architecture-guide/references/server.md`:
 
-- **The installer**: `<f>.server.ts` is `defineFeature("<f>")` with `.withRepositories`
+- **The installer**: `<f>.server.ts` is `defineModule("<f>")` with `.withRepositories`
   (when it persists), `.withApp`, `.withTransports`. `index.ts` exports it and the transport
   declarations only; a service, app, repository, store or projection export is a finding.
 - **The app**: `app/<f>.app.ts` implements `<F>Api`, has `static contract`,
@@ -123,7 +123,7 @@ Walk `server/src` against `.claude/skills/architecture-guide/references/server.m
 
 ## 3. Contract
 
-- `<f>.api.ts` with one interface of callable operations and its `featureApi` token,
+- `<f>.api.ts` with one interface of callable operations and its `moduleApi` token,
   exported from the root; a service-valued member, getter or lookup method on it.
 - Server artifacts in contract source; an abstract service; framework imports;
   `@langwatch/runtime-composition` imported from anywhere but `/contract`.
@@ -157,7 +157,7 @@ grep -rn "@langwatch/$F-server" apps/api/src apps/worker/src apps/tasks/src | gr
 grep -rn "$F" apps/api/src/app-trpc/app-trpc.features.ts apps/ui/src/features/installed-ui-features.ts apps/ui/src/features/catalogue.json
 ```
 
-- The installer booted through `createApp(...).withFeature(<f>Server)` with every declared
+- The installer booted through `createApp(...).withModule(<f>Server)` with every declared
   token provided; an app constructed by hand, a service passed around instead of the token.
 - A `refusing*` / `Unavailable*` / `Logged*Absence` added for new work, or an optional
   collaborator nobody passes (inert leg). **What does the composition root actually pass?**

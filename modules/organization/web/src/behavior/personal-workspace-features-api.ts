@@ -1,5 +1,5 @@
 import type { PersonalFeatures } from "@langwatch/organization-contract";
-import { createFeatureApi } from "@langwatch/api/web";
+import { createModuleApi } from "@langwatch/api/web";
 
 export type PersonalWorkspaceFeaturesApiMap = {
   personalWorkspaceFeatures: {
@@ -10,4 +10,4 @@ export type PersonalWorkspaceFeaturesApiMap = {
 };
 
 /** The organization-owned progressive unlock for a caller's personal workspace. */
-export const personalWorkspaceFeaturesApi = createFeatureApi<PersonalWorkspaceFeaturesApiMap>();
+export const personalWorkspaceFeaturesApi = createModuleApi<PersonalWorkspaceFeaturesApiMap>();

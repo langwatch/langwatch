@@ -24,7 +24,7 @@ function process() {
     .withProvided(OrganizationApi, createApiFixture<OrganizationApi>())
     .withProvided(AuthzApi, createApiFixture<AuthzApi>())
     .withProvided(FeatureFlagApi, createApiFixture<FeatureFlagApi>())
-    .withFeature(dataPrivacyServer, { infrastructure: dataPrivacyTestInfrastructure() });
+    .withModule(dataPrivacyServer, { infrastructure: dataPrivacyTestInfrastructure() });
 }
 
 describe("data privacy app installation", () => {
@@ -34,7 +34,7 @@ describe("data privacy app installation", () => {
     try {
       const app = runtime.service(DataPrivacyApi);
 
-      expect(runtime.feature(dataPrivacyServer).provided).toBe(app);
+      expect(runtime.module(dataPrivacyServer).provided).toBe(app);
 
       await expect(app.getResolvedForProject({ projectId: PROJECT_ID })).resolves.toEqual(
         PLATFORM_DEFAULT_DATA_PRIVACY,

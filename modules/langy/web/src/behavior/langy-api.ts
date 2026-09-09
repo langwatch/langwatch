@@ -7,7 +7,7 @@ import type {
   LangyConversationListItemDto,
 } from "@langwatch/langy-contract";
 import type { ModelDefaultResolvedTrpcOutput } from "@langwatch/model-provider-contract";
-import { createFeatureApi, type OutputsFromMap } from "@langwatch/api/web";
+import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 
 /**
  * A payload no contract package publishes yet.
@@ -150,7 +150,7 @@ type InputsOf<TNode> = TNode extends { query: { input: infer TIn } }
       ? TIn
       : { [K in keyof TNode]: InputsOf<TNode[K]> };
 
-export const api = createFeatureApi<LangyApiMap>();
+export const api = createModuleApi<LangyApiMap>();
 
 /** The same object, under the name the process shell mounts it by. */
 export const langyApi = api;

@@ -92,10 +92,10 @@ export async function installApiUser(options: {
     .withInfrastructure({})
     .withProvided(OrganizationApi, organizations)
     .withProvided(OpsApi, adminAccess)
-    .withFeature(apiAuthSessionServer, {
+    .withModule(apiAuthSessionServer, {
       infrastructure: { prisma, redis: options.redis ?? null },
     })
-    .withFeature(userServer, {
+    .withModule(userServer, {
       infrastructure: userInfrastructure({
         ...options,
         logger,
@@ -106,8 +106,8 @@ export async function installApiUser(options: {
     })
     .boot({ role: "api" });
 
-  const app = runtime.feature(userServer).provided;
-  const auth = runtime.feature(apiAuthSessionServer).provided;
+  const app = runtime.module(userServer).provided;
+  const auth = runtime.module(apiAuthSessionServer).provided;
 
   return {
     app,
@@ -188,7 +188,9 @@ function userInfrastructure(options: {
       // not hold. Both halves refuse together: a lookup that answered would
       // only reach a change that cannot.
       findDatabaseAccount: () =>
-        Promise.reject(unavailable("Auth0 tenant credentials, so it cannot read an Auth0 identity")),
+        Promise.reject(
+          unavailable("Auth0 tenant credentials, so it cannot read an Auth0 identity"),
+        ),
       changePassword: () =>
         Promise.reject(
           unavailable("Auth0 tenant credentials, so it cannot change an Auth0 password"),

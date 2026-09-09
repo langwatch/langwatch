@@ -5,11 +5,7 @@
  * subscription-wire appendix.
  */
 
-import {
-  type FeatureApiClient,
-  type FeatureApiMap,
-  type RouterFromMap,
-} from "@langwatch/api/web";
+import { type ModuleApiClient, type ModuleApiMap, type RouterFromMap } from "@langwatch/api/web";
 import type { QueryClient } from "@tanstack/react-query";
 import {
   createTRPCClient,
@@ -46,7 +42,7 @@ function subscriptionOrigin(): string {
 const MAX_BATCHED_URL_LENGTH = 4000;
 
 /** The untyped client every feature Provider is handed. */
-export type UiFeatureApiTransport = FeatureApiClient<FeatureApiMap>;
+export type UiFeatureApiTransport = ModuleApiClient<ModuleApiMap>;
 
 export type UiFeatureApiClientOptions = {
   /** Overridden only by a test; production is always same-origin. */
@@ -100,7 +96,7 @@ export function createUiFeatureApiClient(
   options: UiFeatureApiClientOptions = {},
 ): UiFeatureApiTransport {
   return getUntypedClient(
-    createTRPCClient<RouterFromMap<FeatureApiMap>>({ links: uiFeatureApiLinks(options) }),
+    createTRPCClient<RouterFromMap<ModuleApiMap>>({ links: uiFeatureApiLinks(options) }),
   );
 }
 

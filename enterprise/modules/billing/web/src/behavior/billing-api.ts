@@ -4,7 +4,7 @@
  */
 
 import type { subscriptionTrpc, currencyTrpc } from "@langwatch/enterprise-billing-contract";
-import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { Plan } from "@langwatch/entitlement-contract";
 import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
 import type { OrganizationUserRole, PricingModel, TeamUserRole } from "../model/prisma-types.ts";
@@ -94,10 +94,12 @@ type BorrowedProcedures = {
 };
 
 /** Everything this family calls: the declared namespaces plus the borrowed four. */
-export type BillingApiMap = ContractApiMap<typeof subscriptionTrpc> & ContractApiMap<typeof currencyTrpc> & BorrowedProcedures;
+export type BillingApiMap = ContractApiMap<typeof subscriptionTrpc> &
+  ContractApiMap<typeof currencyTrpc> &
+  BorrowedProcedures;
 
 /**
  * The billing family's typed tRPC hooks. Same machinery, same transport and
  * same React Query cache as the application's `api` proxy.
  */
-export const billingApi = createFeatureApi<BillingApiMap>();
+export const billingApi = createModuleApi<BillingApiMap>();
