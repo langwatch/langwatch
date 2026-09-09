@@ -3,24 +3,9 @@ import type {
   PasskeyRemovalOutcome,
   PasskeyRemovalPort,
 } from "@langwatch/identity-server/better-auth";
-import { z } from "zod";
 import { Prisma, type PrismaClient } from "~/generated/prisma/client";
 import { isUsableCredential } from "../../../users/credential-user";
-
-const MAX_SERIALIZATION_ATTEMPTS = 4;
-
-const driverWriteConflictSchema = z.object({
-  name: z.literal("DriverAdapterError"),
-  cause: z.object({ kind: z.literal("TransactionWriteConflict") }),
-});
-
-function isSerializationConflict(error: unknown): boolean {
-  return (
-    (error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2034") ||
-    driverWriteConflictSchema.safeParse(error).success
-  );
-}
+import { withSerializationRetry } from "./serializable-retry";
 
 export interface PrismaPasskeyRemovalRepositoryDeps {
   prisma: Pick<PrismaClient, "$transaction">;
@@ -48,20 +33,7 @@ export class PrismaPasskeyRemovalRepository implements PasskeyRemovalPort {
   }: {
     passkeyId: string;
   }): Promise<PasskeyRemovalOutcome> {
-    for (let attempt = 0; attempt < MAX_SERIALIZATION_ATTEMPTS; attempt++) {
-      try {
-        return await this.deleteOnce(passkeyId);
-      } catch (error) {
-        if (
-          attempt + 1 < MAX_SERIALIZATION_ATTEMPTS &&
-          isSerializationConflict(error)
-        ) {
-          continue;
-        }
-        throw error;
-      }
-    }
-    throw new Error("unreachable: passkey removal retries exhausted");
+    return await withSerializationRetry(() => this.deleteOnce(passkeyId));
   }
 
   private async deleteOnce(passkeyId: string): Promise<PasskeyRemovalOutcome> {
