@@ -22,12 +22,12 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
-    "@langwatch/time": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/otlp": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
-    "zod": "^4.4.3"
+    "@langwatch/time": "workspace:*",
+    "zod": "^4.4.3",
+    "@langwatch/otlp": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
