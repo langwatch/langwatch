@@ -1120,7 +1120,26 @@ export function findScenarioAnnotations(
   return found;
 }
 
-function isFollowedByTestCall(src: string, start: number): boolean {
+/**
+ * Whether an extracted annotation actually binds to a test.
+ *
+ * Exported because extraction is not the rule. An annotation this returns
+ * false for is dropped at the call site with no diagnostic — it is not an
+ * unknown scenario, it is not an unbound one, it is nothing at all, and the
+ * run stays green. That silence is the whole reason a guard exists over this,
+ * and a guard that checks extraction instead measures a different question.
+ *
+ * THE WALK CANNOT LEAVE A COMMENT IT STARTS INSIDE. It begins at the end of
+ * the match and skips whitespace, block comments and line comments. An
+ * annotation that closes its own comment starts the walk outside, where the
+ * next thing is the test. One written as a line WITHIN a longer block starts
+ * the walk on the prose that follows it, which is none of those three, so the
+ * walk falls through to the test-call match, fails it, and returns false.
+ *
+ * So the authoring rule is "the annotation must CLOSE its comment", not "open
+ * it" — putting it on the first line of a thirty-line block binds nothing.
+ */
+export function isFollowedByTestCall(src: string, start: number): boolean {
   const len = src.length;
   let i = start;
   while (i < len) {
