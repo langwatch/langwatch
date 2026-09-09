@@ -295,6 +295,19 @@ describe("Feature: voice-session ports composition", () => {
     });
   });
 
+  describe("given recordCallTraces", () => {
+    describe("when the ports are composed", () => {
+      it("binds the trace writer as the recordCallTraces port", () => {
+        const ports = createVoiceSessionPortsFromServices({
+          agentService: fakeAgentService({}),
+          scenarioService: fakeScenarioService({}),
+        });
+
+        expect(typeof ports.recordCallTraces).toBe("function");
+      });
+    });
+  });
+
   describe("given audioProxyUrl", () => {
     describe("when the proxy url is built", () => {
       it("builds the same-origin proxy path carrying the project", () => {

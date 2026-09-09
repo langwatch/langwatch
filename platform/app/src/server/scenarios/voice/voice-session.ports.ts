@@ -28,6 +28,7 @@ import {
 import { getOnPlatformSetId } from "~/server/scenarios/internal-set-id";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
+import { recordVoiceCallTraces } from "./voice-call-trace-writer";
 import { writeVoiceCallRun } from "./voice-run-writer";
 import type { VoiceSessionPorts } from "./voice-session.service";
 import { signVoiceSessionToken } from "./voice-session-token";
@@ -137,6 +138,8 @@ export function createVoiceSessionPortsFromServices({
       });
       return { id: created.id };
     },
+
+    recordCallTraces: recordVoiceCallTraces,
 
     writeCallRun: writeVoiceCallRun,
 

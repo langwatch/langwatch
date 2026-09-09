@@ -53,6 +53,11 @@ function fakePorts({
     })),
     findExistingRun: vi.fn(async () => null),
     createVoiceAgent: vi.fn(async () => ({ id: "agent_created" })),
+    // One deterministic trace id per turn, so a caller/assertion can read them
+    // back off the writeCallRun call.
+    recordCallTraces: vi.fn(async ({ record }: { record: CallRecord }) => ({
+      turnTraceIds: record.turns.map((_, index) => `trace_${index}`),
+    })),
     writeCallRun: vi.fn(async () => {}),
     audioProxyUrl: ({ conversationId, projectId }) =>
       `/api/voice/session/${conversationId}/audio?projectId=${projectId}`,
@@ -883,6 +888,116 @@ describe("finishVoiceSession", () => {
         expect(result.hasFetchFailed).toBe(true);
         expect(result.source).toBe("browser");
         expect(result.hasAudio).toBe(false);
+      });
+    });
+
+    describe("when a fresh call is finished", () => {
+      /** @scenario "A finished browser call writes one trace per exchange and every message links to its exchange's trace" */
+      it("records the call traces before writing the run and passes the ids through", async () => {
+        const recordCallTraces = vi.fn(async () => ({
+          turnTraceIds: ["trace_x"],
+        }));
+        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+          async () => {},
+        );
+        const ports = fakePorts({
+          runner: fakeRunner(),
+          over: { recordCallTraces, writeCallRun },
+        });
+
+        await finishVoiceSession({
+          ports,
+          ...FINISH_BASE,
+          token: { ...TOKEN, agentId: "agent_row" },
+        });
+
+        expect(recordCallTraces).toHaveBeenCalledTimes(1);
+        // Ordering: the traces are recorded before the run is written.
+        expect(
+          (recordCallTraces.mock.invocationCallOrder[0] ?? 0) <
+            (writeCallRun.mock.invocationCallOrder[0] ?? 0),
+        ).toBe(true);
+        // The record and run id the run write sees are the ones the traces were
+        // recorded from.
+        expect(recordCallTraces.mock.calls[0]?.[0]).toMatchObject({
+          projectId: "p1",
+          scenarioRunId: writeCallRun.mock.calls[0]?.[0].scenarioRunId,
+        });
+        expect(writeCallRun.mock.calls[0]?.[0].turnTraceIds).toEqual([
+          "trace_x",
+        ]);
+      });
+    });
+
+    describe("when the finish short-circuits on a terminal run", () => {
+      /** @scenario "A retried hang-up leaves a terminal run untouched" */
+      it("records no traces and writes no run", async () => {
+        const recordCallTraces = vi.fn(async () => ({ turnTraceIds: [] }));
+        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+          async () => {},
+        );
+        const ports = fakePorts({
+          runner: fakeRunner(),
+          over: {
+            recordCallTraces,
+            writeCallRun,
+            findExistingRun: vi.fn(async () => ({
+              agentId: "agent_existing",
+              status: ScenarioRunStatus.SUCCESS,
+              source: "provider" as const,
+              audioUrl: null,
+              scenarioId: null,
+              scenarioSetId: null,
+            })),
+          },
+        });
+
+        await finishVoiceSession({
+          ports,
+          ...FINISH_BASE,
+          token: { ...TOKEN, agentId: "agent_row" },
+        });
+
+        expect(recordCallTraces).not.toHaveBeenCalled();
+        expect(writeCallRun).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a half-written run is re-driven", () => {
+      /** @scenario "A re-driven finish writes the same trace ids" */
+      it("records the call traces again so the deterministic ids re-attach", async () => {
+        const recordCallTraces = vi.fn(async () => ({
+          turnTraceIds: ["trace_x"],
+        }));
+        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+          async () => {},
+        );
+        const ports = fakePorts({
+          runner: fakeRunner(),
+          over: {
+            recordCallTraces,
+            writeCallRun,
+            findExistingRun: vi.fn(async () => ({
+              agentId: "agent_row",
+              status: ScenarioRunStatus.IN_PROGRESS,
+              source: "provider" as const,
+              audioUrl: null,
+              scenarioId: null,
+              scenarioSetId: null,
+            })),
+          },
+        });
+
+        await finishVoiceSession({
+          ports,
+          ...FINISH_BASE,
+          token: { ...TOKEN, agentId: "agent_row" },
+        });
+
+        expect(recordCallTraces).toHaveBeenCalledTimes(1);
+        expect(writeCallRun.mock.calls[0]?.[0].turnTraceIds).toEqual([
+          "trace_x",
+        ]);
       });
     });
   });
