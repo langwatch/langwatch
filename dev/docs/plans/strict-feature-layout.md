@@ -406,26 +406,34 @@ guarding things outside the package, 29 failing, 17 policies untested).
 
 | Lane | Brief | Started |
 | --- | --- | --- |
-| Auto-mount: `withTransports({ rest, trpc })` on `createApp`, declarations mount at boot, per-namespace tRPC record goes live, registry shrinks to process-owned doors, two-path boot gate (entrypoint and dev-runtime), worker user record | `$CLAUDE_JOB_DIR/tmp/AUTO-MOUNT-BRIEF.md` + `TRPC-LIVE-BRIEF.md` | 09-09 20:0x, Opus, RUNNING |
-| apidiff main vs committed HEAD (`9c7cb5ff5e`, detached worktree under `tmp/apidiff/branch`), tool patched to address the ClickHouse server and never derive Redis DB 0 | `tools/apidiff/README.md` | 09-09 21:1x, background run; Haiku reads the report after |
-| QUEUED behind auto-mount: `publicEnv` procedure goes, `NEXTAUTH_PROVIDER` ships in the HTML shell | `tmp/PUBLIC-ENV-SHELL-BRIEF.md` | Sonnet |
-| QUEUED behind auto-mount: wiring 3b as install lines (analytics, model-provider, evaluation, prompt, workflow, automation, ops), then the test pass on committed HEAD (curl the families, drive the app in the browser) BEFORE any further conversion (Alex 20:4x: "we want to test a little first") | `tmp/wiring/*.md` | Opus |
-| QUEUED: persistence wave (the 791 `ports/`/`adapters/` files; automation's four adapters are worker-constructed, workflow's by both apps, prompt's repository reaches into model-provider inside a transaction) | per-module notes in `tmp/wiring/*.md` | Opus, after the test pass |
-| QUEUED small Haiku jobs: shutdown logging (requested and complete lines, api, worker, dev-runtime), the unlevelled fatal-boot line, gateway's `tryGetDeliverable` type | `tmp/HAIKU-QUEUE.md` | Haiku |
+| Auto-mount: `withTransports({ rest, trpc })` on `createApp`, declarations mount at boot, per-namespace tRPC record live (45 mounted, 49 named absences), ops install line | `tmp/AUTO-MOUNT-BRIEF.md` | DONE `8303615a73`; the nine converted modules keep their mount files until the REST runtime and tRPC root move to the top of `ApiProductionComposition.compose` (decision for Alex, §9) |
+| Tree rename: `packages/features` to `modules/`, `packages/enterprise` to `enterprise/{modules,packages}`; vocabulary `defineModule`/`withModule`/`runtime.module`/`moduleApi`/`ModuleApiToken`/`ModuleName`/`ModuleApi*` | `tmp/RENAME-BRIEF.md`, `dev/docs/plans/modules-rename.md` | DONE `3eb6c56657` (tree, 11,927 renames) + `ade8e7c115` (vocabulary, 279 files); lint ids and baseline keys keep `feature-*` by Alex's ruling |
+| `publicEnv` procedure gone; `authProvider` ships in the HTML shell; ops-sidebar boolean deleted | `tmp/PUBLIC-ENV-SHELL-BRIEF.md` | DONE (in `3eb6c56657`, close-out `b296291289`). Follow-up QUEUED: public config as per-module config objects handed to each web module at install (Alex 22:2x) |
+| Structured logs: Prisma events through the process logger; dev backend lane sets observability up once | `tmp/STRUCTURED-LOGS-BRIEF.md` | DONE `e28c2e6cb2` |
+| Generated project references + drift lint; 179 typecheck scripts path-free; Prisma client un-committed | `tmp/TSCONFIG-REFERENCES-BRIEF.md` | DONE `6edf217226`, `5f9cf03ae9`, `a054de0589` |
+| pnpm catalogs: one version per dependency, named catalog for the SDK toolchain, enforcement test | `tmp/CATALOGS-BRIEF.md` | RUNNING (Sonnet) |
+| Persistence wave, Tier B (§4a): api-key, project, user first; then auth, evaluator, model-provider; then ops, github, coding-agent, automation, workflow, analytics, authz, identity, billing, licensing, scim, managed-provider | `tmp/PERSISTENCE-WAVE-BRIEF.md` + `tmp/wiring/<m>.md` | RUNNING (three Opus lanes, one module each) |
+| Web maps derived from converted contracts (Haiku, one file each) | `tmp/WEB-MAP-BRIEF.md` | github `de84c467f0`, scim `29a7141c47`, licensing `81ca1564af` DONE; ops, workflow RUNNING; 13 wait on their contracts |
+| Wiring 3b as install lines for converted-but-unmounted families (scim, model-provider, analytics, automation, workflow, evaluation), which apidiff names as the routes main serves and this branch 404s | `tmp/wiring/*.md`, `tmp/apidiff/out/haiku-report.md` | QUEUED behind the three persistence lanes (same composition file) |
+| apidiff: `-env-file`, psql search path, `ensure:built`; first full run at `e28c2e6cb2`: 604 union operations, 280 probed, 79 equal, 39 routes main serves that this branch 404s (all unmounted families), 300 skipped for unmintable path ids | `tools/apidiff`, `tmp/run-apidiff.sh` | DONE tooling; QUEUED: per-family fixtures so the harness can mint ids (Sonnet) |
+| Tier A conversions (§4a): governance, trace, scenario, langy, gateway, organization, agent, experiment, prompt, webhook | convert.md + wiring notes | QUEUED, one Opus lane per module beside Tier B, largest last |
+| Main fold: 52 real commits, 2,116 paths, 1,088 conflicts at `8303615a73` (251 delete/modify in the deleted monolith) | `tmp/main-delta.txt`, `tmp/merge-status.txt` | QUEUED as a porting wave after the rename; not a merge |
+
+| QUEUED small Haiku jobs: shutdown logging (requested and complete lines, api, worker, dev-runtime), the unlevelled fatal-boot line, gateway's `tryGetDeliverable` type, the nine Tier C one-row modules once each is confirmed one-step | `tmp/HAIKU-QUEUE.md` | Haiku |
 
 Live briefs kept as work orders: `wave4-process-wiring.md` (landed `9697edd1f5`; its Wave 5 section is the open work order),
-`api-rest-runtime-gaps-3.md` (part A RUNNING, B and C QUEUED), `api-package-rebuild.md` (phase 3
-deletion list, QUEUED for after the last family converts),
-`modules-rename.md` (DECISION then QUEUED), `agent-server-cleanup.md` (QUEUED
-with the agent conversion), `architecture-lint-review-2026-09-08.md` (L3 to
+`api-rest-runtime-gaps-3.md` (parts D and E landed, remaining parts QUEUED), `api-package-rebuild.md` (phase 3
+deletion list, QUEUED for after the last family converts), `modules-rename.md` (LANDED, both phases),
+`agent-server-cleanup.md` (QUEUED with the agent conversion), `architecture-lint-review-2026-09-08.md` (L3 to
 L8). Every landed brief is retired in section 14.
 
-Rules every lane runs under: Opus for shape choices, Sonnet for cross-file renames and repoints, Haiku for single-file remaps (scored 09-09, `tmp/model-compare.md`); every remap runs `.claude/skills/module/references/remap.md`; Read/Edit/Write, no scripted rewrites,
-read before delete, `mv` not `git mv`; no git writes; no root typecheck, lint or
-format; no baseline edits (the root session does them); the spec wins; a
-memory twin ships with a contract test; `source-folder-shape` applies; one
-`pnpm install` per package.json change; report in the skill's shape with exact
-wiring lines for the root session.
+Rules every lane runs under: Opus for shape choices, Sonnet for cross-file renames and repoints, Haiku for
+single-file remaps (scored 09-09, `tmp/model-compare.md`; Haiku's record is clean on one-file remaps only);
+every remap runs `.claude/skills/module/references/remap.md`; lift and shift; read before delete; `mv` not
+`git mv`; no git writes; no root typecheck, lint or format; no baseline edits (the root session does them);
+the spec wins; a memory twin ships with a contract test; `source-folder-shape` applies; one `pnpm install`
+per package.json change; a lane running beside others re-reads before every edit; report in the skill's
+shape with exact wiring lines for the root session. Root session commits through `tmp/commit-slice-fast.sh`.
 
 ## 8a. Wire deltas against main recorded by the conversion lanes (09-09)
 
