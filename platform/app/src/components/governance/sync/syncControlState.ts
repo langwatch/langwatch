@@ -34,22 +34,22 @@ export type GovernanceSyncStatus =
  */
 export function governanceSyncStatus({
   canManage,
-  sourcesLoading,
+  isLoadingSources,
   sourceCount,
   isAsking,
-  asked,
+  hasAsked,
 }: {
   canManage: boolean;
-  sourcesLoading: boolean;
+  isLoadingSources: boolean;
   sourceCount: number;
   isAsking: boolean;
   /** A request was recorded in this page's lifetime. */
-  asked: boolean;
+  hasAsked: boolean;
 }): GovernanceSyncStatus {
   if (isAsking) return { state: "asking" };
-  if (asked) return { state: "asked" };
+  if (hasAsked) return { state: "asked" };
   if (!canManage) return { state: "unavailable", because: "no_grant" };
-  if (sourcesLoading) return { state: "unavailable", because: "checking" };
+  if (isLoadingSources) return { state: "unavailable", because: "checking" };
   if (sourceCount === 0) {
     return { state: "unavailable", because: "no_provider" };
   }
