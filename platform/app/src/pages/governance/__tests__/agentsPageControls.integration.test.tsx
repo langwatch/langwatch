@@ -173,6 +173,16 @@ afterEach(() => {
   window.sessionStorage.clear();
 });
 
+/** @scenario "Switching governance tabs unmounts the inactive content" */
+it("unmounts the agent cards when switching to Applications", async () => {
+  renderAgentsAt();
+  const card = screen.getAllByTestId("governance-agent-card")[0]!;
+  await userEvent
+    .setup()
+    .click(screen.getByRole("tab", { name: "Applications" }));
+  await waitFor(() => expect(card).not.toBeInTheDocument());
+});
+
 describe("the agents page sample cards", () => {
   describe("when a governance viewer opens a page with nothing measured on it", () => {
     /** @scenario "The empty agents page shows samples when requested" */

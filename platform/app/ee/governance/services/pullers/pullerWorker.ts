@@ -34,6 +34,7 @@ import {
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
+import { azureBillSourceId } from "../activity-monitor/azureBillIdentity";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
 import type { SourceType } from "../activity-monitor/ingestionSource.service";
 import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
@@ -407,6 +408,7 @@ export async function runIngestionPull(params: {
 /** The IngestionSource fields the write paths below actually read. */
 type PullingSource = {
   id: string;
+  parserConfig?: unknown;
   sourceType: string;
   organizationId: string;
   teamId: string | null;
@@ -909,7 +911,13 @@ async function recordPulledUsageFor({
     record = buildPulledUsageRecord({
       event,
       source: {
-        ingestionSourceId: source.id,
+        // Only the subscription bill shares history with a retired source.
+        // Conversation usage and audit records keep the current source id.
+        ingestionSourceId:
+          source.sourceType === "copilot_studio_dataverse" &&
+          event.source_event_id.startsWith("azure_cost:")
+            ? azureBillSourceId(source)
+            : source.id,
         sourceType: source.sourceType,
         organizationId: source.organizationId,
         teamId: source.teamId,

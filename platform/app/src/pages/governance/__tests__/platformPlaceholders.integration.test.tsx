@@ -18,6 +18,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -166,6 +167,23 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+});
+
+/** @scenario "Switching governance tabs unmounts the inactive content" */
+it("unmounts Explore when switching to Dashboards", async () => {
+  const user = userEvent.setup();
+  renderPage(AnalyticsPage);
+  fireEvent.click(screen.getByRole("button", { name: "Requests by model" }));
+  const content = screen.getByRole("tabpanel", {
+    name: "Explore",
+  }).firstElementChild;
+  expect(content).toBeInTheDocument();
+  await user.click(screen.getByRole("tab", { name: /Dashboards/ }));
+  await waitFor(() => expect(content).not.toBeInTheDocument());
+  await user.click(screen.getByRole("tab", { name: "Explore" }));
+  expect(
+    await screen.findByText("usage | summarize count() by model, bin(1d)"),
+  ).toBeInTheDocument();
 });
 
 describe("given the billed-cost flag is off for a permitted viewer", () => {

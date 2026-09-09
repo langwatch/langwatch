@@ -148,6 +148,44 @@ function fold(events: unknown[]): GovernanceCostRollupState {
 }
 
 describe("the restatement marker", () => {
+  describe("when one pull revises two items in the same cell", () => {
+    /** @scenario "One pull revising several items preserves the previous whole-cell total" */
+    it.each([
+      false,
+      true,
+    ])("rewinds both revisions with reversed delivery %s", (reverse) => {
+      const opening = [
+        observedEvent({
+          restatementKey: "a",
+          costNanoMinor: 10_000_000_000,
+          observedAtMs: FIRST_PULL,
+        }),
+        observedEvent({
+          restatementKey: "b",
+          costNanoMinor: 20_000_000_000,
+          observedAtMs: FIRST_PULL,
+        }),
+      ];
+      const revisions = [
+        observedEvent({
+          restatementKey: "a",
+          costNanoMinor: 15_000_000_000,
+          observedAtMs: SECOND_PULL,
+        }),
+        observedEvent({
+          restatementKey: "b",
+          costNanoMinor: 30_000_000_000,
+          observedAtMs: SECOND_PULL,
+        }),
+      ];
+      const state = fold([
+        ...opening,
+        ...(reverse ? revisions.reverse() : revisions),
+      ]);
+      expect(state.previousAmountNanoUsd).toBe(30_000_000_000);
+    });
+  });
+
   describe("given the provider restates a day at a different amount", () => {
     /** @scenario "A restated day shows what it was before" */
     it("names the amount the day held before, and when the change was seen", () => {

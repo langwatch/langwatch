@@ -28,6 +28,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
@@ -187,6 +188,16 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("the inventory tab shell", () => {
+  /** @scenario "Switching governance tabs unmounts the inactive content" */
+  it("unmounts the catalog content when switching to Sources", async () => {
+    const user = userEvent.setup();
+    renderInventoryAt(["/governance/inventory"]);
+    const content = screen.getByRole("tabpanel").firstElementChild;
+    expect(content).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: /^Sources/ }));
+    await waitFor(() => expect(content).not.toBeInTheDocument());
+  });
+
   describe("when an admin opens the bare address", () => {
     /** @scenario "The inventory default tab stays out of the address" */
     it("selects Catalog, mounts the tools catalog, and writes no tab parameter", () => {

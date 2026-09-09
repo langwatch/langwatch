@@ -54,6 +54,9 @@ function AnalyticsPage() {
   const [timeWindow, setTimeWindow] = useState<ExploreWindow>(
     DEFAULT_EXPLORE_WINDOW,
   );
+  const [selection, setSelection] = useState<ExploreSelection>(
+    DEFAULT_EXPLORE_SELECTION,
+  );
 
   return (
     <GovernanceLayout pageTitle="Analytics · AI Governance · LangWatch">
@@ -77,7 +80,12 @@ function AnalyticsPage() {
           />
         </HStack>
 
-        <Tabs.Root defaultValue="explore" variant="line">
+        <Tabs.Root
+          defaultValue="explore"
+          variant="line"
+          lazyMount
+          unmountOnExit
+        >
           <Tabs.List>
             <Tabs.Trigger
               value="explore"
@@ -98,7 +106,12 @@ function AnalyticsPage() {
             </Tabs.Trigger>
           </Tabs.List>
           <Tabs.Content value="explore" paddingTop={4}>
-            <ExploreTab orgName={orgName} timeWindow={timeWindow} />
+            <ExploreTab
+              orgName={orgName}
+              timeWindow={timeWindow}
+              selection={selection}
+              onSelectionChange={setSelection}
+            />
           </Tabs.Content>
           <Tabs.Content value="dashboards" paddingTop={4}>
             <Text color="fg.muted">No dashboards yet.</Text>
@@ -113,19 +126,20 @@ function AnalyticsPage() {
 function ExploreTab({
   orgName,
   timeWindow,
+  selection,
+  onSelectionChange,
 }: {
   orgName: string;
   timeWindow: ExploreWindow;
+  selection: ExploreSelection;
+  onSelectionChange: (selection: ExploreSelection) => void;
 }) {
-  const [selection, setSelection] = useState<ExploreSelection>(
-    DEFAULT_EXPLORE_SELECTION,
-  );
   const patch = (next: Partial<ExploreSelection>) =>
-    setSelection((current) => ({ ...current, ...next }));
+    onSelectionChange({ ...selection, ...next });
 
   return (
     <VStack align="stretch" gap={4}>
-      <TemplateChips selection={selection} onPick={setSelection} />
+      <TemplateChips selection={selection} onPick={onSelectionChange} />
       <HStack
         gap={4}
         flexWrap="wrap"

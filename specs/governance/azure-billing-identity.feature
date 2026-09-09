@@ -23,6 +23,14 @@ Feature: Azure billing identity — the bill is read with its own credential
     Given a Copilot Studio source that reads a tenant's conversations
     And the tenant's spend is billed to an Azure subscription
 
+  @unit @regression
+  Scenario: A replacement Azure source restates the original bill
+    Given an archived source recorded 100 dollars for an Azure subscription and day
+    When a replacement source reads the same bill revised to 125 dollars
+    Then the daily cost total is 125 dollars
+    And the replacement inherits the original source's billing identity
+    And its conversation records still belong to the replacement source
+
   @unit
   Scenario: The bill is asked for with the billing credential, not the conversation one
     Given the source holds a billing credential beside the conversation one
