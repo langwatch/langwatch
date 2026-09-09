@@ -182,4 +182,40 @@ describe("given the cards built from the registry", () => {
       expect(vendorForTool(assistant("custom"))).toBe("Vendor not recorded");
     });
   });
+
+  describe("when a registry row carries a type this build has never heard of", () => {
+    // Reachable without anyone writing a bug. `AiToolEntry.type` is a bare
+    // String column, the admin payload is double-cast on its way in, and the
+    // union here does not derive from the service's SUPPORTED_TILE_TYPES:
+    // adding a fourth member there compiles clean, and this build would then
+    // meet a type its row map has no key for. It must degrade, not throw.
+    const unknownType = {
+      id: "t-unknown",
+      displayName: "Some MCP server",
+      type: "mcp_server",
+      iconAsset: null,
+      enabled: true,
+      config: {},
+    } as unknown as Parameters<typeof applicableRowsForTool>[0];
+
+    it("still returns the rows that do not depend on the type", () => {
+      expect(() => applicableRowsForTool(unknownType)).not.toThrow();
+      // The activity rows survive: they are properties of the traffic, and
+      // nothing about them needed to know what kind of tool this is.
+      expect(applicableRowsForTool(unknownType)).toEqual([
+        "eventsLast24Hours",
+        "usage30Days",
+        "attributed",
+        "topDepartment",
+      ]);
+    });
+
+    it("builds a card for it rather than taking the pane down", () => {
+      const cards = buildRegisteredToolCards({ tools: [unknownType] });
+      expect(cards).toHaveLength(1);
+      expect(cards[0]!.name).toBe("Some MCP server");
+      // No billing model was claimed on its behalf.
+      expect(cards[0]!.badges).toEqual([]);
+    });
+  });
 });

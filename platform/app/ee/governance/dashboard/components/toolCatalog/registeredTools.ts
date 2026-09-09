@@ -193,7 +193,15 @@ export function applicableRowsForTool(
   const rows = new Set<ToolCardRow>([
     ...BILLING_ROWS[billingForTool(tool)],
     ...ACTIVITY_ROWS,
-    ...TYPE_ROWS[tool.type],
+    // `?? []` because this lookup is NOT total, however much the type says it
+    // is. `type` is a bare String column, the payload reaches us through a
+    // double cast that validates nothing, and `AiToolTileType` is a
+    // hand-written union that does not derive from the service's
+    // SUPPORTED_TILE_TYPES — adding a fourth member there typechecks clean.
+    // A key this map has not heard of would otherwise spread `undefined` and
+    // throw, taking the whole Catalog pane down over one unrecognised row.
+    // Degrading to "no type-specific rows" loses two rows on one card.
+    ...(TYPE_ROWS[tool.type] ?? []),
   ]);
   return TOOL_CARD_ROWS.filter((row) => rows.has(row));
 }
