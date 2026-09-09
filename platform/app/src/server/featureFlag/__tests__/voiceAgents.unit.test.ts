@@ -17,7 +17,7 @@ import { VOICE_AGENTS_FLAG_KEY } from "../voiceAgents.message";
 
 const isEnabledMock = vi.fn();
 vi.mock("~/server/featureFlag", async (importOriginal) => {
-  const actual = await importOriginal<FeatureFlagModule>();
+  const actual = await importOriginal<typeof FeatureFlagModule>();
   return {
     ...actual,
     featureFlagService: {
