@@ -5,6 +5,10 @@
  */
 import type { LicenseData } from "@langwatch/enterprise-licensing-contract";
 import { planQuantities } from "@langwatch/plans";
+import { ResourceScope } from "@langwatch/runtime-composition";
+import { LicensingApp, type LicensingInfrastructure } from "./app/licensing.app.ts";
+import { LicenseStoragePort, type StoredLicense } from "./ports/license-storage.port.ts";
+import { TEST_PUBLIC_KEY } from "./fixtures/license-keys.fixture.ts";
 
 /**
  * Base license data template - PRO plan. Used for reference in tests to know
@@ -117,3 +121,60 @@ export const FORGED_EXPIRED_LICENSE_KEY =
 export const MALFORMED_BASE64 = "not-valid-base64!!!";
 export const INVALID_JSON_BASE64 = Buffer.from("not json").toString("base64");
 export const GARBAGE_DATA = "garbage-data";
+
+class TestLicenseStorage extends LicenseStoragePort {
+  private license: string | null = null;
+
+  async tryReadLicense(): Promise<string | null> {
+    return this.license;
+  }
+
+  async findOrganizationsWithLicense() {
+    return this.license ? [{ organizationId: "org-456", licenseKey: this.license }] : [];
+  }
+
+  async organizationExists(): Promise<boolean> {
+    return true;
+  }
+
+  async storeLicense(_organizationId: string, license: StoredLicense): Promise<void> {
+    this.license = license.licenseKey;
+  }
+
+  async removeLicense(): Promise<void> {
+    this.license = null;
+  }
+
+  async getMemberCount(): Promise<number> {
+    return 0;
+  }
+
+  async getMembersLiteCount(): Promise<number> {
+    return 0;
+  }
+}
+
+export function createTestLicensingApp(
+  checkLimit: LicensingInfrastructure["checkLimit"] = async () => ({
+    allowed: true,
+    current: 0,
+    max: 1,
+    limitType: "members",
+  }),
+  reportError: LicensingInfrastructure["reportError"] = () => {},
+): LicensingApp {
+  return LicensingApp.create({
+    dependencies: {},
+    infrastructure: {
+      repository: new TestLicenseStorage(),
+      configuredAuthProvider: () => null,
+      platformSsoAllowed: async () => true,
+      authProviderIsMounted: () => true,
+      reportSigningFailure: () => {},
+      checkLimit,
+      reportError,
+    },
+    config: { publicKey: TEST_PUBLIC_KEY },
+    resources: new ResourceScope(),
+  });
+}

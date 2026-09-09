@@ -11,7 +11,7 @@ import {
   LicenseEnforcementTrpcApi,
   type LicenseEnforcementTrpcContext,
 } from "../license-enforcement.api.ts";
-import { LicensingApp } from "../../../app/licensing.app.ts";
+import { createTestLicensingApp } from "../../../testing.ts";
 
 const checkLimit = vi.fn();
 const notifyResourceLimitReached = vi.fn();
@@ -33,28 +33,7 @@ const router = LicenseEnforcementTrpcApi.create(trpc, {
  * as a refusal rather than a stub: if this surface ever starts asking one of
  * them, the test says so out loud instead of quietly answering.
  */
-const licensing = LicensingApp.create({
-  checkLimit,
-  reportError,
-  licenses: () => {
-    throw new Error("the limit surface does not read the license service");
-  },
-  cryptography: () => {
-    throw new Error("the limit surface does not sign anything");
-  },
-  configuredAuthProvider: () => {
-    throw new Error("the limit surface does not read the auth provider");
-  },
-  platformSsoAllowed: () => {
-    throw new Error("the limit surface does not read the single sign-on gate");
-  },
-  authProviderIsMounted: () => {
-    throw new Error("the limit surface does not read the auth provider");
-  },
-  reportSigningFailure: () => {
-    throw new Error("the limit surface signs nothing to fail");
-  },
-});
+const licensing = createTestLicensingApp(checkLimit, reportError);
 
 const caller = router.createCaller({
   app: { licensing, usageLimits: { notifyResourceLimitReached } },
