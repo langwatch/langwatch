@@ -236,6 +236,7 @@ registry into `security.ts`, idempotency out of `request.ts`. That is ten files
 where the fold promised nine: **DECISION D-o.**
 
 | Round three A: `withRawBody`, `withRawResponse({ produces })`, `.methods([...])` with a HEAD twin, `.anyMethod()` + `declined()`, the 405 guard with `Allow`, discriminated-union outputs | `6789a94a1d` |
+| Boot round: every process graph loads and the api listens; 66 REST families declared absent at their mount sites until their modules convert; health probes on `defineRestRouter`; ops snapshot reader owned by the resource scope (handover `Boot graph at 14:2x`) | `e6e9202953`, `ffd77bba33` |
 
 | Round three B: `withAddressing("literal")`, `{ generation }`, `session` and `instanceAdminKey` doors, `optionalCredential`, `deferredScope`, `withMultipart`, two 2xx in `responds`, `withRateLimit`/`withCache` with mount-supplied stores, method guards recognised by `assertEveryRouteDeclared` | `3f7db75a6b` |
 
