@@ -53,6 +53,7 @@ var (
 			{"--filter", "@langwatch/prisma-client", "run", "prisma:generate"},
 			{"--filter", "langwatch", "build"},
 			{"--filter", "@langwatch/mcp-server", "run", "build"},
+			{"run", "ensure:built"},
 		},
 		prismaMigrateArgv:     []string{"run", "prisma:migrate"},
 		clickhouseMigrateArgv: []string{"run", "clickhouse:migrate"},
