@@ -247,6 +247,61 @@ describe("governanceCost.spenders — router integration", () => {
     return appRouter.createCaller(ctx);
   }
 
+  /** @scenario "Provider totals use corrected rollup cells within the selected window" */
+  it("aggregates only surviving pulled cells by provider, including unnamed costs", async () => {
+    const repo = new GovernanceCostRollupClickHouseRepository(async () => ch);
+    const providerTenant = `providers-${ns}`;
+    const stamp = Date.now();
+    const seed = (overrides: Partial<GovernanceCostRollupRow>) =>
+      repo.upsert(
+        cell({ TenantId: providerTenant, EventTimestamp: stamp, ...overrides }),
+      );
+    await seed({ AmountNanoUsd: 10 * NANO });
+    await seed({ AmountNanoUsd: 6 * NANO, EventTimestamp: stamp + 1 });
+    await seed({ RawActorId: "named-person", AmountNanoUsd: 3 * NANO });
+    await seed({ Model: "refund", AmountNanoUsd: -2 * NANO });
+    await seed({ Provider: "anthropic_admin", AmountNanoUsd: 20 * NANO });
+    await seed({
+      Provider: "anthropic_admin",
+      AmountNanoUsd: null,
+      EventTimestamp: stamp + 1,
+    });
+    await seed({
+      CostSource: GOVERNANCE_COST_SOURCE.GATEWAY,
+      AmountNanoUsd: 500 * NANO,
+    });
+    await seed({
+      Day: new Date(Date.parse(day) - 86_400_000).toISOString().slice(0, 10),
+      AmountNanoUsd: 500 * NANO,
+    });
+    await seed({
+      Version: "old-projection",
+      Model: "old",
+      AmountNanoUsd: 500 * NANO,
+    });
+
+    expect(
+      await repo.sumWindowByProvider({
+        tenantId: providerTenant,
+        fromDay: day,
+        toDay: day,
+      }),
+    ).toEqual([
+      {
+        provider: "anthropic_admin",
+        amountNanoUsd: null,
+        cellsWithoutAmount: 1,
+        currenciesWithoutUsdAmount: [],
+      },
+      {
+        provider: "openai_admin",
+        amountNanoUsd: 7 * NANO,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+      },
+    ]);
+  });
+
   describe("given pulled cost recorded under a spender discovery has seen", () => {
     /** @scenario The cost screen shows who spent the pulled money */
     it("lists that spender with their window total, labeled with the display text", async () => {
@@ -285,6 +340,9 @@ describe("governanceCost.spenders — router integration", () => {
         windowDays: 30,
       });
       expect(summary.unavailableReason).toBeNull();
+      expect(summary.providers).toEqual([
+        { provider: "openai_admin", amountUsd: 7, cellsWithoutAmount: 0 },
+      ]);
     });
   });
 });

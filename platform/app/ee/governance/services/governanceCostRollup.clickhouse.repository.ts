@@ -566,6 +566,69 @@ export class GovernanceCostRollupClickHouseRepository {
     }));
   }
 
+  /** Current pulled costs by provider, including cells without a named actor.
+   * Collapse replacements before summing so retries and corrections do not
+   * double the bill. Tuple-wrapping preserves corrections to a null amount.
+   */
+  async sumWindowByProvider(input: {
+    tenantId: string;
+    /** Inclusive, YYYY-MM-DD. */
+    fromDay: string;
+    /** Inclusive, YYYY-MM-DD. */
+    toDay: string;
+  }): Promise<
+    Array<{
+      provider: string;
+      amountNanoUsd: number | null;
+      cellsWithoutAmount: number;
+      currenciesWithoutUsdAmount: string[];
+    }>
+  > {
+    const client = await this.resolveClient(input.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          Provider,
+          sumOrNull(LatestAmountNanoUsd) AS AmountNanoUsd,
+          countIf(LatestAmountNanoUsd IS NULL) AS CellsWithoutAmount,
+          arraySort(groupUniqArrayIf(${UNPRICED_CURRENCY_SAMPLE_LIMIT})(
+            CurrencyCode,
+            LatestAmountNanoUsd IS NULL AND CurrencyCode != {usd:String}
+          )) AS CurrenciesWithoutUsdAmount
+        FROM (
+          SELECT
+            ${KEY_COLUMNS.join(", ")},
+            argMax(tuple(AmountNanoUsd), EventTimestamp).1 AS LatestAmountNanoUsd
+          FROM ${GOVERNANCE_COST_ROLLUP_TABLE}
+          WHERE TenantId = {tenantid:String}
+            AND Day >= {fromday:Date}
+            AND Day <= {today:Date}
+            AND CostSource = {costsource:String}
+            AND Version = {version:String}
+          GROUP BY ${KEY_COLUMNS.join(", ")}
+        )
+        GROUP BY Provider
+        ORDER BY Provider
+      `,
+      query_params: {
+        usd: GOVERNANCE_COST_CURRENCY_USD,
+        tenantid: input.tenantId,
+        fromday: input.fromDay,
+        today: input.toDay,
+        costsource: GOVERNANCE_COST_SOURCE.PULLED,
+        version: GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Record<string, unknown>[];
+    return rows.map((row) => ({
+      provider: str(row.Provider),
+      amountNanoUsd: nullableInt(row.AmountNanoUsd),
+      cellsWithoutAmount: int(row.CellsWithoutAmount),
+      currenciesWithoutUsdAmount: strArray(row.CurrenciesWithoutUsdAmount),
+    }));
+  }
+
   /**
    * Whether ONE source put any cell at all into a lane over a day range —
    * priced or not.

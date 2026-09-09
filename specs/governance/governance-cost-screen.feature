@@ -22,6 +22,30 @@ Feature: One cost screen, three honest lanes
     Given an organization with billed and gateway cost available
 
   @integration
+  Scenario: A cost-only viewer sees provider costs inside the billed card
+    Given OpenAI and Anthropic have recorded costs without named people
+    And the viewer holds governanceCost:view without identity or activity access
+    When the viewer opens Costs
+    Then the billed card shows its combined total and a labeled bar for each provider
+    And gateway costs are not included in those bars
+
+  @integration
+  Scenario: Provider totals use corrected rollup cells within the selected window
+    Given multiple cost cells, corrections, and a refund for one provider
+    And another provider has an unpriced cell
+    When provider costs are read for the organization and selected window
+    Then only the latest current-projection pulled cells in that window are counted
+    And named and unnamed spending both contribute to their provider
+    And the unpriced provider's amount is unavailable
+
+  @integration
+  Scenario: Missing provider prices are not displayed as zero
+    Given a provider has no complete USD amount
+    When the viewer opens Costs
+    Then that provider is labeled with an unavailable USD amount
+    And a recorded refund keeps its negative amount
+
+  @integration
   Scenario: The department filter explains that it changes only the department breakdown
     Given cost activity in two departments
     And the viewer holds both governanceCost:view and activityMonitor:view

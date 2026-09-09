@@ -1,9 +1,9 @@
 import { Box, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-
 import type {
   GovernanceSeatLaneDto,
   GovernanceSeatPoolDto,
 } from "@ee/governance/services/governanceCost.service";
+import type { ReactNode } from "react";
 
 import type { TimeInterval } from "~/components/governance/filters";
 import { MeterBar } from "~/components/ui/MeterBar";
@@ -44,6 +44,7 @@ export function CostLanePanel({
   interval,
   sample = false,
   testId,
+  children,
 }: {
   label: string;
   description: string;
@@ -83,6 +84,8 @@ export function CostLanePanel({
    */
   sample?: boolean;
   testId: string;
+  /** Optional detail belonging to this lane, below its trend. */
+  children?: ReactNode;
 }) {
   const badge = laneTrendBadge(trendPct ?? null);
   return (
@@ -130,6 +133,7 @@ export function CostLanePanel({
             and the question a single figure always raises is which way it has
             been moving — so the space holds the window's own shape. */}
         {trend && <LaneSparkline points={trend} interval={interval} />}
+        {children}
         {/* The claim sits at the top of the card and what it means sits at the
             bottom, so three cards of different content still agree on two
             lines. `marginTop="auto"` takes the slack in the middle: a card

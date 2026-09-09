@@ -79,6 +79,15 @@ export function sampleCostSummary(periods: string[]): GovernanceCostSummaryDto {
       cellsWithoutAmount: 0,
       currenciesWithoutUsdAmount: [],
     },
+    providers: [
+      { provider: "openai_admin", share: 0.6 },
+      { provider: "anthropic_admin", share: 0.4 },
+    ].map(({ provider, share }) => ({
+      provider,
+      amountUsd:
+        series.reduce((sum, day) => sum + (day.billedUsd ?? 0), 0) * share,
+      cellsWithoutAmount: 0,
+    })),
     gateway: {
       amountUsd: series.reduce((sum, day) => sum + (day.gatewayUsd ?? 0), 0),
       cellsWithoutAmount: 0,
