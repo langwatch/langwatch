@@ -7899,6 +7899,9 @@ importers:
 
   packages/features/ops/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
@@ -8705,6 +8708,9 @@ importers:
 
   packages/features/prompt/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
@@ -10799,6 +10805,12 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
+      '@langwatch/authz-contract':
+        specifier: workspace:*
+        version: link:../../authz/contract
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
