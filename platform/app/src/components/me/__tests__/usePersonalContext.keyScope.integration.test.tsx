@@ -85,7 +85,6 @@ describe("given the personal-credentials card on /me", () => {
   });
 
   describe("when the signed-in user is known", () => {
-    /** @scenario /me asks only for the signed-in user's own personal keys */
     it("names the signed-in user as the principal the keys belong to", () => {
       mockSession.current = { user: { id: "usr_signed_in" } };
 
@@ -99,7 +98,6 @@ describe("given the personal-credentials card on /me", () => {
   });
 
   describe("when the session has not resolved yet", () => {
-    /** @scenario /me asks only for the signed-in user's own personal keys */
     it("withholds the request rather than asking with no principal", () => {
       mockSession.current = null;
 
@@ -109,6 +107,18 @@ describe("given the personal-credentials card on /me", () => {
       // sweep this surface must never take, so an unresolved session has to
       // block the request instead of falling back to the server default.
       expect(listCall()?.options?.enabled).toBe(false);
+    });
+
+    it("still names a target, so a flipped gate could not fall into the sweep", () => {
+      mockSession.current = null;
+
+      renderHook(() => usePersonalContext());
+
+      // Belt and braces for the assertion above. `undefined` is the literal
+      // value that means "sweep the org", so the input must not carry it
+      // even while the request is withheld — otherwise the guarantee rests
+      // on `enabled` alone and one refactor reopens the hole.
+      expect(listCall()?.input).toMatchObject({ targetUserId: "" });
     });
   });
 });
