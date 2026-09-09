@@ -255,13 +255,13 @@ describe("the cost screen in sample mode", () => {
     it("shows an invented spender list rather than the failure", async () => {
       await renderInSampleMode();
 
-      const panel = panelFor("Billed spend by API key");
+      const panel = panelFor("Provider-reported spend by user");
 
-      // Invented keys in the panel, not a badge on it. The masked tail is what
-      // makes a row recognisable as a credential rather than a person, and it
-      // is in the rows themselves rather than in a mark that can be
-      // suppressed.
-      expect(within(panel).getAllByText(/· sk-/).length).toBeGreaterThan(0);
+      expect(within(panel).getAllByText("ada@acme.test")).toHaveLength(2);
+      expect(within(panel).queryByText(/· sk-/)).not.toBeInTheDocument();
+      expect(
+        within(panel).queryByText(/anthropic|microsoft/),
+      ).not.toBeInTheDocument();
       expect(
         screen.queryByText(/could not be loaded/i),
       ).not.toBeInTheDocument();

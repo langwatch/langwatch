@@ -425,6 +425,52 @@ describe("the governance cost screen", () => {
     });
   });
 
+  describe("given a year in which every day cost exactly the same", () => {
+    /** @scenario "A window whose spend never moved says level on both money lanes" */
+    it("shows level on both money lanes rather than a rise off the calendar", () => {
+      // A full year, every day identical. The interval in view buckets it by
+      // the calendar, and the calendar hands back buckets of different sizes —
+      // a part-month at each end, quarters of 90 to 92 days. Measured on those
+      // buckets the card reported a large rise, on spending that never moved.
+      const start = Date.UTC(2026, 0, 15);
+      const series = Array.from({ length: 365 }, (_, index) => ({
+        day: new Date(start + index * 86_400_000).toISOString().slice(0, 10),
+        billedUsd: 1000,
+        gatewayUsd: 500,
+        billedCellsWithoutAmount: 0,
+        gatewayCellsWithoutAmount: 0,
+      }));
+      harness.query = {
+        data: summaryFixture({
+          billed: {
+            amountUsd: 365_000,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+          gateway: {
+            amountUsd: 182_500,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+          series,
+          windowDays: 365,
+        }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      // Mounted, not computed in isolation: the defect was never in the
+      // percentage helper alone, it was in which series the screen handed it.
+      expect(screen.getByTestId("cost-lane-billed-trend")).toHaveTextContent(
+        "level",
+      );
+      expect(screen.getByTestId("cost-lane-gateway-trend")).toHaveTextContent(
+        "level",
+      );
+    });
+  });
+
   describe("given a lane whose total was withheld over a foreign currency", () => {
     /** @scenario "A lane with no total says why instead of showing a figure" */
     it("shows no amount and names the currency behind the missing total", () => {

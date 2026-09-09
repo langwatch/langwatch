@@ -107,48 +107,29 @@ export function sampleCostSummary(periods: string[]): GovernanceCostSummaryDto {
 }
 
 /**
- * Billed spend attributed to API keys, as the provider's own bill reports it.
- *
- * KEYS, NOT PEOPLE. The pulled lane reads a provider invoice, and a provider
- * invoice does not know who anybody is — it knows which credential was
- * presented. This list used to name people, which quietly promised an
- * attribution the billing pipeline cannot make: a shared key used by four
- * engineers appeared on the screen as one person's spend. Naming the key says
- * exactly as much as the bill does, and the reader who wants a person follows
- * the key to whoever holds it.
- *
- * Keys are named for the workload they serve, the way a team names them, and
- * the canonical agents keep their spelling — a key called `checkout-agent` is
- * the one the Agents screen has heard of. The masked tail is what a provider
- * console shows and what an admin matches against; the secret itself is not a
- * thing this product ever holds, let alone invents.
- *
- * The last row is the not-named bucket, which is where money the provider
- * attributed to no key gathers. It is here rather than rounded away because
- * it is on every real version of this list and a sample without it would show
- * a tidier screen than the product can deliver.
+ * Sample provider-reported users, matching the real spender query.
+ * Keep unnamed spend in the remainder so the sample does not suggest every
+ * provider can identify a user for every cost row.
  */
 export function sampleSpenderRows(): SpenderRow[] {
   // Scaled to a twelve-month window, so this list sums to roughly what the
   // billed lane above it reports. Two panels describing the same bill an order
   // of magnitude apart is the incoherence the rest of the sample data was just
   // fixed for.
-  // `name · sk-tail`, not `name (sk-…tail)`. The row is half a panel wide and
-  // carries a provider badge as well, so the parenthesised form truncated to
-  // "checkout-agent (sk-…" — the mask, which is the whole reason a reader can
-  // tell this is a credential and not an agent, was the first thing cut.
-  const keys: Array<[string, string, number]> = [
-    ["openai", "checkout-agent · sk-9f2a", 50_160],
-    ["anthropic", "support-copilot · sk-41c7", 43_680],
-    ["openai", "docs-rag · sk-0b83", 34_920],
-    ["microsoft", "fraud-triage · sk-7d15", 25_800],
-    ["anthropic", "notebooks · sk-c604", 20_640],
-    ["openai", "ci-evals · sk-2e98", 13_260],
+  // Match the read's user grouping. Providers that do not report a user
+  // belong in the unattributed remainder, not under an invented key.
+  const users: Array<[string, string, number]> = [
+    ["openai_admin", "ada@acme.test", 50_160],
+    ["databricks_genie", "grace@acme.test", 43_680],
+    ["openai_admin", "alan@acme.test", 34_920],
+    ["databricks_genie", "edsger@acme.test", 25_800],
+    ["openai_admin", "barbara@acme.test", 20_640],
+    ["databricks_genie", "ada@acme.test", 13_260],
   ];
   return [
-    ...keys.map(([provider, label, amountUsd], index) => ({
+    ...users.map(([provider, label, amountUsd], index) => ({
       provider,
-      rawActorId: `sample-key-${index}`,
+      rawActorId: `sample-user-${index}`,
       label,
       agentId: "",
       amountUsd,

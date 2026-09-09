@@ -12,7 +12,6 @@ import { CHART_SEAT_FILL } from "./chartTheme";
 import {
   formatLaneUsd,
   laneTrendBadge,
-  laneTrendPct,
   laneWithheldTotalNote,
   seatPoolName,
 } from "./costLaneFormat";
@@ -41,6 +40,7 @@ export function CostLanePanel({
   currenciesWithoutUsdAmount,
   laneNote,
   trend,
+  trendPct,
   interval,
   sample = false,
   testId,
@@ -66,6 +66,14 @@ export function CostLanePanel({
    * series, in which case the card simply has no sparkline.
    */
   trend?: Array<{ day: string; value: number | null }>;
+  /**
+   * Which way this lane is running, already measured. Passed in rather than
+   * derived from `trend`, because `trend` is folded to the calendar and a
+   * calendar bucket is not a unit of time you may compare: a partial January
+   * beside a full April reports change that is a property of the months. The
+   * caller measures on the unfolded series, where every period is one period.
+   */
+  trendPct?: number | null;
   /** The bucket width in view, for the sparkline's tooltip heading. */
   interval?: TimeInterval;
   /**
@@ -76,8 +84,7 @@ export function CostLanePanel({
   sample?: boolean;
   testId: string;
 }) {
-  const changePct = trend ? laneTrendPct(trend) : null;
-  const badge = laneTrendBadge(changePct);
+  const badge = laneTrendBadge(trendPct ?? null);
   return (
     <Box
       data-testid={testId}
@@ -112,7 +119,7 @@ export function CostLanePanel({
               color="fg.muted"
               fontVariantNumeric="tabular-nums"
               data-testid={`${testId}-trend`}
-              title="The later half of this window against the earlier half."
+              title="An average period in the later half of this window against an average period in the earlier half."
             >
               {badge}
             </Text>

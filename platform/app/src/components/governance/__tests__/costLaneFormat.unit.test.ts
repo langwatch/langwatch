@@ -136,4 +136,21 @@ describe("laneTrendPct", () => {
     // report a rise that never happened.
     expect(laneTrendPct(withheld)).toBe(laneTrendPct(withoutIt));
   });
+
+  /** @scenario "An odd number of periods does not invent a rise out of the split" */
+  it("reports level when every period is equal and the count is odd", () => {
+    // Five equal periods split three-against-two. Compared as sums, the larger
+    // half wins on nothing but holding one more period, and the card reports a
+    // rise on a window where nothing changed.
+    const flat = [
+      { value: 100 },
+      { value: 100 },
+      { value: 100 },
+      { value: 100 },
+      { value: 100 },
+    ];
+
+    expect(laneTrendPct(flat)).toBe(0);
+    expect(laneTrendBadge(laneTrendPct(flat))).toBe("level");
+  });
 });

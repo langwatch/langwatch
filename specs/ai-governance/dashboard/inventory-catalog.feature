@@ -169,7 +169,7 @@ Feature: The Inventory catalog is the tools the organization runs
 
   @integration
   Scenario: Money and prose rows are never shortened
-    Given a card carrying a monthly licence cost and a seat sentence
+    Given a card carrying a usage cost and a seat sentence
     When the card renders
     Then both read exactly as written, with no shortening applied
     # Counts are stored as numbers and formatted at render; anything already
