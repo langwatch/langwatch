@@ -7,9 +7,11 @@ import type {
   Prisma,
   PrismaClient,
 } from "@langwatch/prisma-client/generated";
+import { uniqueConstraintTargets } from "@langwatch/prisma-client";
 import {
   SchemaVersion,
   NotFoundError,
+  PromptHandleTakenError,
   type PromptCopySource,
   type PromptCopySummary,
   type PromptScope,
@@ -404,7 +406,51 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
   /**
    * Update an LLM config's metadata (name only)
    */
-  async updateConfig(
+  updateConfig(
+    idOrHandle: string,
+    projectId: string,
+    data: Partial<CreateLlmConfigParams>,
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<LlmPromptConfig> {
+    return this.#refusingTakenHandle(() =>
+      this.#writeConfig(idOrHandle, projectId, data, options),
+    );
+  }
+
+  updateConfigAndCreateVersion(
+    params: Parameters<LlmConfigRepository["updateConfigAndCreateVersion"]>[0],
+  ): Promise<LlmConfigWithLatestVersion> {
+    return this.#refusingTakenHandle(() => this.#writeConfigAndVersion(params));
+  }
+
+  createConfigWithInitialVersion(
+    params: Parameters<LlmConfigRepository["createConfigWithInitialVersion"]>[0],
+  ): Promise<LlmConfigWithLatestVersion> {
+    return this.#refusingTakenHandle(() => this.#writeConfigWithInitialVersion(params));
+  }
+
+  /**
+   * The handle is unique per project (or per organization for an org-scoped
+   * prompt), and storage is where that is enforced. A caller reusing one is
+   * making a mistake it can correct, so the violation becomes a named refusal
+   * here rather than travelling on as an unrecognised database failure.
+   */
+  async #refusingTakenHandle<Result>(write: () => Promise<Result>): Promise<Result> {
+    try {
+      return await write();
+    } catch (error) {
+      if (uniqueConstraintTargets(error).some((target) => target.includes("handle"))) {
+        throw new PromptHandleTakenError();
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Update an LLM config's metadata (name only)
+   */
+  async #writeConfig(
     idOrHandle: string,
     projectId: string,
     data: Partial<CreateLlmConfigParams>,
@@ -482,7 +528,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
    * database transaction. The service has already normalized and validated the
    * domain input before it reaches this persistence boundary.
    */
-  async updateConfigAndCreateVersion(params: {
+  async #writeConfigAndVersion(params: {
     idOrHandle: string;
     projectId: string;
     data: { handle?: string; scope?: PromptScope };
@@ -493,7 +539,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     runtimeParameters?: Record<string, unknown>;
   }): Promise<LlmConfigWithLatestVersion> {
     return this.prisma.$transaction(async (tx) => {
-      const updatedConfig = await this.updateConfig(
+      const updatedConfig = await this.#writeConfig(
         params.idOrHandle,
         params.projectId,
         params.data,
@@ -598,7 +644,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
    * Create config with initial version
    * @deprecated This is a bad pattern. We should only create drafts via the UI/API/Clients.
    */
-  async createConfigWithInitialVersion(params: {
+  async #writeConfigWithInitialVersion(params: {
     configData: CreateLlmConfigParams;
     /**
      * If no version data is provided, we'll create a default version. If version data is
@@ -849,7 +895,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       const normalized1 = parseResult1.data;
       const normalized2 = parseResult2.data;
 
-      // Strip response_format before comparison — it is derived from outputs
+      // Strip response_format before comparison - it is derived from outputs
       // at read time and never stored in new data. Older CLIs may still send it
       // alongside outputs, causing a false diff against the server's
       // remoteConfigData which never includes it.

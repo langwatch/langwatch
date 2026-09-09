@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { handleSchema } from "@langwatch/prompt-contract";
-import { toHandleSlug } from "../prompt-handle-slug.port.ts";
+import { toHandleSlug } from "../prompt-handle-slug.rules.ts";
 
 describe("toHandleSlug", () => {
   describe("given text a handle already accepts", () => {

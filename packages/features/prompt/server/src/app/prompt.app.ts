@@ -23,26 +23,51 @@ import {
   type UpdatePromptHandleCommand,
   type VersionedPrompt,
 } from "@langwatch/prompt-contract";
+import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
+import type { PromptCopyChoice, PromptPushToCopiesResult } from "@langwatch/prompt-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 
 /**
- * Whether the caller may manage prompts in one project. Asked of whatever
- * credential the request arrived on — a session user at the tRPC door, the
- * API key itself at the REST one — so the policy below is written once and
- * neither transport carries its own copy.
+ * The credential a tag write arrived on. A tag definition is one organization
+ * row whose assignments cascade across the organization, so the caller has to
+ * be allowed to act on every project the catalogue reaches - and which answer
+ * "allowed" means depends on what presented itself. A legacy project key names
+ * no key row, so it can only ever answer for the project it is pinned to.
  */
-export type PromptTagCatalogAuthorizer = (input: { projectId: string }) => Promise<boolean>;
+export type PromptTagCatalogPrincipal =
+  | Readonly<{ type: "user"; userId: string }>
+  | Readonly<{
+      type: "apiKey";
+      apiKeyId: string;
+      userId: string | null;
+      organizationId: string;
+    }>
+  | Readonly<{ type: "legacyProjectKey"; projectId: string }>;
 
 /** Who a write is attributed to. */
 export interface PromptCaller {
   readonly id: string;
 }
 
+/**
+ * What the PROCESS supplies that prompts do not own: where a project's new
+ * prompt is announced, and the model a write that named none falls back to.
+ */
+export interface PromptInfrastructure {
+  /**
+   * The lifecycle nurturing that fires when a project gains a prompt, whether
+   * written, copied or duplicated. Fire-and-forget: it may not fail a create.
+   */
+  afterPromptCreated(input: { projectId: string; userId?: string | null }): void;
+}
+
 /** What the process composes this feature's application from. */
 export interface PromptAppDependencies {
   prompts: PromptService;
   projects: Pick<ProjectService, "getOrganizationId" | "listIdsByOrganization">;
+  permissions: Pick<AuthzApi, "hasPermission" | "getApiKeyProjectDecision">;
+  infrastructure: PromptInfrastructure;
 }
 
 /** A tag name the organization's catalog does not accept. */
@@ -454,11 +479,11 @@ export class PromptApp implements PromptApi {
    */
   async assertMayManageTagCatalog(input: {
     projectId: string;
-    mayManage: PromptTagCatalogAuthorizer;
+    by: PromptTagCatalogPrincipal;
   }): Promise<void> {
     const projectIds = await this.projectsSharingTagCatalog({ projectId: input.projectId });
     for (const projectId of projectIds) {
-      if (await input.mayManage({ projectId })) continue;
+      if (await this.#mayManagePromptsIn({ by: input.by, projectId })) continue;
 
       throw new PermissionDeniedError({
         permission: "prompts:manage",
@@ -466,6 +491,225 @@ export class PromptApp implements PromptApi {
         denialReason: "no-binding",
       });
     }
+  }
+
+  /**
+   * Whether the CREDENTIAL this request arrived on - not the person who minted
+   * it - may manage prompts in one project. A legacy project key resolves no
+   * key row, so it answers only for the project it is pinned to; a write that
+   * reaches a sibling project is refused rather than assumed.
+   */
+  async #mayManagePromptsIn(input: {
+    by: PromptTagCatalogPrincipal;
+    projectId: string;
+  }): Promise<boolean> {
+    const { by, projectId } = input;
+
+    if (by.type === "legacyProjectKey") return by.projectId === projectId;
+
+    if (by.type === "user") {
+      return this.#dependencies.permissions.hasPermission({
+        userId: by.userId,
+        permission: "prompts:manage",
+        projectId,
+      });
+    }
+
+    const decision = await this.#dependencies.permissions.getApiKeyProjectDecision({
+      apiKeyId: by.apiKeyId,
+      userId: by.userId,
+      organizationId: by.organizationId,
+      projectId,
+      permission: "prompts:manage",
+    });
+
+    return decision.outcome === "allowed";
+  }
+
+  /**
+   * Whether one person holds a permission in a SECOND project this request
+   * names. The door's declared check covers the project the input named; copy,
+   * push and sync each reach another, and this is the probe for it.
+   */
+  #mayUserAct(input: {
+    by: PromptCaller;
+    permission: AuthzPermission;
+    projectId: string;
+  }): Promise<boolean> {
+    return this.#dependencies.permissions.hasPermission({
+      userId: input.by.id,
+      permission: input.permission,
+      projectId: input.projectId,
+    });
+  }
+
+  /**
+   * A project gained a prompt. Announced by the door that took the write, so a
+   * peer module creating one on the caller's behalf leaves no marketing trail.
+   */
+  announceCreated(input: { projectId: string; userId?: string | null }): void {
+    this.#dependencies.infrastructure.afterPromptCreated(input);
+  }
+
+  /**
+   * The copies of a prompt this caller may push to, for the picker. Each copy
+   * lives in a SECOND project, which the door's declared check does not cover,
+   * so standing is probed one copy at a time and the rest are not offered.
+   */
+  async listCopyTargets(
+    input: { idOrHandle: string; projectId: string },
+    by: PromptCaller,
+  ): Promise<PromptCopyChoice[]> {
+    const prompt = await this.getByIdOrHandle(input);
+    const copies = await this.listCopies({ sourcePromptId: prompt.id });
+
+    const choices = await Promise.all(
+      copies.map(async (copy) => ({
+        id: copy.id,
+        handle: copy.handle ?? copy.id,
+        projectId: copy.projectId,
+        projectName: copy.projectName,
+        teamName: copy.teamName,
+        organizationName: copy.organizationName,
+        fullPath: `${copy.organizationName} / ${copy.teamName} / ${copy.projectName}`,
+        hasPermission: await this.#mayUserAct({
+          by,
+          permission: "prompts:update",
+          projectId: copy.projectId,
+        }),
+      })),
+    );
+
+    return choices.filter((choice) => choice.hasPermission);
+  }
+
+  /**
+   * Copies a prompt out of a SECOND project this input names, refusing a
+   * caller who may not create prompts there.
+   */
+  async copyFromProject(
+    input: { idOrHandle: string; sourceProjectId: string; targetProjectId: string },
+    by: PromptCaller,
+  ): Promise<VersionedPrompt & { copiedFromPromptId: string }> {
+    await this.#assertMayReach({
+      by,
+      permission: "prompts:create",
+      projectId: input.sourceProjectId,
+    });
+
+    return this.copyToProject(input, by);
+  }
+
+  /**
+   * Brings a copied prompt back in line with its source. The copy's project
+   * was gated by the door; the SOURCE project is a second one, so it is probed
+   * here. A prompt that was never copied raises `prompt_not_a_copy`.
+   */
+  async syncFromSource(
+    input: { idOrHandle: string; projectId: string },
+    by: PromptCaller,
+  ): Promise<VersionedPrompt> {
+    const copy = await this.getByIdOrHandle(input);
+    const copySource = await this.getCopySource({ promptId: copy.id });
+
+    await this.#assertMayReach({
+      by,
+      permission: "prompts:view",
+      projectId: copySource.sourceProjectId,
+    });
+
+    const source = await this.getByIdOrHandle({
+      idOrHandle: copySource.sourcePromptId,
+      projectId: copySource.sourceProjectId,
+    });
+
+    return this.applySourceToCopy(
+      {
+        source,
+        targetIdOrHandle: input.idOrHandle,
+        targetProjectId: input.projectId,
+        commitMessage: PromptApp.commitMessageFor("synced", source),
+      },
+      by,
+    );
+  }
+
+  /**
+   * Pushes a source prompt out to the copies made from it. A copy the caller
+   * cannot update is skipped rather than failing the whole push; a push that
+   * reached none of them is refused.
+   */
+  async pushToCopies(
+    input: { idOrHandle: string; projectId: string; copyIds?: string[] },
+    by: PromptCaller,
+  ): Promise<PromptPushToCopiesResult> {
+    const source = await this.getByIdOrHandle({
+      idOrHandle: input.idOrHandle,
+      projectId: input.projectId,
+    });
+
+    const copies = await this.listCopies({ sourcePromptId: source.id });
+    if (copies.length === 0) throw new PromptHasNoCopiesError();
+
+    const selected = input.copyIds
+      ? copies.filter((copy) => input.copyIds?.includes(copy.id))
+      : copies;
+
+    if (selected.length === 0) throw new PromptNoCopiesSelectedError();
+
+    const commitMessage = PromptApp.commitMessageFor("pushed", source);
+    const results: PromptPushToCopiesResult["results"] = [];
+
+    for (const copy of selected) {
+      const permitted = await this.#mayUserAct({
+        by,
+        permission: "prompts:update",
+        projectId: copy.projectId,
+      });
+      if (!permitted) continue;
+
+      const updated = await this.applySourceToCopy(
+        {
+          source,
+          targetIdOrHandle: copy.id,
+          targetProjectId: copy.projectId,
+          commitMessage,
+        },
+        by,
+      );
+
+      results.push({ copyId: copy.id, copyName: copy.handle ?? copy.id, prompt: updated });
+    }
+
+    if (results.length === 0) {
+      throw new PermissionDeniedError({
+        permission: "prompts:update",
+        scope: { type: "project", id: input.projectId },
+        denialReason: "no-binding",
+      });
+    }
+
+    return {
+      pushedTo: results.length,
+      totalCopies: copies.length,
+      selectedCopies: selected.length,
+      results,
+    };
+  }
+
+  /** The refusal a second project's missing grant answers with. */
+  async #assertMayReach(input: {
+    by: PromptCaller;
+    permission: AuthzPermission;
+    projectId: string;
+  }): Promise<void> {
+    if (await this.#mayUserAct(input)) return;
+
+    throw new PermissionDeniedError({
+      permission: input.permission,
+      scope: { type: "project", id: input.projectId },
+      denialReason: "no-binding",
+    });
   }
 
   /** Renames a tag and every assignment that carries it. */

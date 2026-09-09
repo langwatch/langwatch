@@ -3,27 +3,14 @@
  * list, create and delete a custom prompt tag.
  * @see specs/features/prompts/custom-prompt-tags.feature
  */
-import {
-  createAppRestSecurity,
-  type AppRestSecurity,
-  type PlatformUrlBuilder,
-  type RestApiServicePorts,
-} from "@langwatch/api/rest";
 import type { PromptTag } from "@langwatch/prisma-client/generated";
-import type { ErrorHandler, MiddlewareHandler } from "hono";
-import { HTTPException } from "hono/http-exception";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { PrismaPromptTagRepository } from "../../../repositories/prisma/prisma.prompt-tag.repository.ts";
-import type { PromptTagDatabase } from "../../../repositories/prisma/prisma.prompt-tag.repository.ts";
-import { PromptTagService } from "../../../services/prompt-tag.service.ts";
-import {
-  createPromptsRestApp,
-  type PromptRestPorts,
-  type PromptRestService,
-} from "../prompt.api.ts";
-
-const ORGANIZATION_ID = "org_tags";
+import { PrismaPromptTagRepository } from "../../repositories/prisma/prisma.prompt-tag.repository.ts";
+import type { PromptTagDatabase } from "../../repositories/prisma/prisma.prompt-tag.repository.ts";
+import { PromptTagService } from "../../services/prompt-tag.service.ts";
+import { mountPromptRest, PROMPT_TEST_ORGANIZATION } from "./prompt-rest.harness.ts";
 
 /** The unique-constraint failure Prisma raises on (organizationId, name). */
 class DuplicateTagError extends Error {
@@ -109,82 +96,37 @@ function inMemoryTagDatabase() {
   return client as unknown as PromptTagDatabase;
 }
 
-/** Hono's own refusal wins; anything else degrades to the generic unknown. */
-const boundaryErrorHandler: ErrorHandler = (error, c) => {
-  if (error instanceof HTTPException) return error.getResponse();
-  return c.json({ error: "Internal Server Error" }, 500);
-};
-
-function testSecurity(): AppRestSecurity {
-  const pass: MiddlewareHandler = async (_c, next) => next();
-  const asProject: MiddlewareHandler = async (c, next) => {
-    c.set("project", { id: "project_tags", slug: "project-tags" });
-    await next();
-  };
-  const ports: RestApiServicePorts = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: boundaryErrorHandler,
-    canonicalErrorHandler: boundaryErrorHandler,
-    authenticateProject: () => asProject,
-    authorizeProjectPermission: () => pass,
-    authorizeApiKeyCeiling: () => pass,
-    authenticateOrganization: () => pass,
-    authorizeOrganizationPermission: () => pass,
-    authorizeRouteTeamPermission: () => pass,
-    authorizeRouteProjectPermission: () => pass,
-    authenticateOrganizationThrowing: pass,
-    authorizeOrganizationPermissionThrowing: () => pass,
-  };
-  return createAppRestSecurity(ports);
-}
-
 function buildApi() {
   const repository = PrismaPromptTagRepository.create({ prisma: inMemoryTagDatabase() });
   const tags = PromptTagService.create(repository);
 
   // The three tag operations the routes reach, delegated exactly as
-  // `PromptService` delegates them. Cast once, here at the seam.
-  const service = {
+  // `PromptApp` delegates them, plus the cascade guard the two writes ask.
+  const app = {
     listTags: (input: { organizationId: string }) => tags.getAll(input),
     createTag: (input: { organizationId: string; name: string }) => tags.create(input),
     tryDeleteTagByName: (input: { organizationId: string; name: string }) =>
       tags.tryDeleteByName(input),
-  } as unknown as PromptRestService;
+    assertMayManageTagCatalog: async () => undefined,
+  } as unknown as PromptApi;
 
-  const ports: PromptRestPorts = {
-    mayManagePromptsIn: async () => true,
-    organizationMiddleware: async (c, next) => {
-      c.set("organization", { id: ORGANIZATION_ID });
-      await next();
-    },
-    platformUrl: (() => "https://app.test") as unknown as PlatformUrlBuilder,
-    afterPromptCreated: () => undefined,
-    uniqueConstraintTargets: () => [],
-  };
-
-  const app = createPromptsRestApp({
-    security: testSecurity(),
-    prompts: () => service,
-    tagCatalog: () => ({ assertMayManageTagCatalog: async () => undefined }),
-    ports,
-  });
+  const family = mountPromptRest({ app });
 
   return {
     repository,
     listTagNames: async (): Promise<string[]> => {
-      const response = await app.request("/api/prompts/tags");
+      const response = await family.request("/api/prompts/tags");
       const body = (await response.json()) as { name: string }[];
       return body.map((tag) => tag.name);
     },
     createTag: (name: string) =>
-      app.request("/api/prompts/tags", {
+      family.request("/api/prompts/tags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       }),
-    deleteTag: (name: string) => app.request(`/api/prompts/tags/${name}`, { method: "DELETE" }),
+    deleteTag: (name: string) =>
+      family.request(`/api/prompts/tags/${name}`, { method: "DELETE" }),
   };
 }
 
@@ -193,7 +135,7 @@ describe("the prompt tag routes", () => {
 
   beforeEach(async () => {
     api = buildApi();
-    await api.repository.seedForOrg({ organizationId: ORGANIZATION_ID });
+    await api.repository.seedForOrg({ organizationId: PROMPT_TEST_ORGANIZATION });
   });
 
   describe('given an organization with the seeded "production" and "staging" tags', () => {

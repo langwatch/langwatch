@@ -1,11 +1,8 @@
 /**
- * Unit tests for the REST handler that maps system-prompt HandledErrors
- * thrown by the prompt service to Hono HTTP exceptions.
- *
- * Pinned by Issue #3196 so a future refactor of either error class can
- * not silently regress the 400/409 mapping. The toast at AC 6 sources
- * its copy from this handler's forwarded `error.message`, so the
- * "friendly message, no stack trace" assertion lives here.
+ * The REST mapping of the two system-prompt refusals onto their statuses,
+ * pinned by Issue #3196 so a refactor of either class cannot regress it. The
+ * toast at AC 6 forwards `error.message`, which is why the "friendly message,
+ * no stack trace" assertion lives here.
  */
 
 import { HTTPException } from "hono/http-exception";
@@ -13,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { SystemPromptConflictError, SystemPromptRequiredError } from "@langwatch/prompt-contract";
 
-import { handleSystemPromptHandledErrors } from "../prompt.api.ts";
+import { handleSystemPromptHandledErrors } from "../prompt.rest.ts";
 
 describe("handleSystemPromptHandledErrors", () => {
   describe("when given a SystemPromptRequiredError (Issue #3196)", () => {

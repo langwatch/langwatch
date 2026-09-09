@@ -11,28 +11,30 @@ export {
   PromptTagTakenError,
   type PromptAppDependencies,
   type PromptCaller,
+  type PromptInfrastructure,
+  type PromptTagCatalogPrincipal,
 } from "./app/prompt.app.ts";
-// The two tRPC transports are not exported: they still name the deleted legacy
-// builder. Their context vocabulary below is framework-free and stays.
-export type {
-  PromptTrpcContext,
-  PromptTrpcPorts,
-  PromptTrpcProcedures,
-} from "./rules/prompt-trpc-context.rules.ts";
+/** The three declarations a process mounts, and the wire shapes REST publishes. */
 export {
+  apiResponsePromptTagSchema,
   apiResponsePromptWithVersionDataSchema,
+  buildStandardSuccessResponse,
   createPromptInputSchema,
-  createPromptsRestApp,
-  registerPromptRoutes,
+  handlePossibleConflictError,
+  handleSystemPromptHandledErrors,
+  promptRest,
+  promptRestCredential,
+  promptRestFacts,
+  updateHandleInputSchema,
   updatePromptInputSchema,
+  versionInputSchema,
   type ApiResponsePrompt,
-  type PromptAppVariables,
-  type PromptOrganizationVariables,
-  type PromptRestCredential,
-  type PromptRestPorts,
-  type PromptRestService,
-  type PromptTagCatalogAuthorization,
-} from "./transport/api-rest/prompt.api.ts";
+} from "./transport/prompt.rest.ts";
+export { promptTrpcTransport } from "./transport/prompt.trpc.ts";
+export { promptTagTrpcTransport } from "./transport/prompt-tag.trpc.ts";
+// The playground's execution door still runs on the deleted builder: its
+// refusals have no registered handled codes and its seven process capabilities
+// are functions, which neither a fact nor `PromptApi` can carry.
 export {
   createPromptExecuteRestApp,
   CrossOriginRefusedError,

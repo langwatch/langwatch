@@ -34,14 +34,9 @@ export function buildCamelToSnakeMapping(): Record<string, string> {
 }
 
 /**
- * Transform an object's camelCase keys to snake_case.
- *
- * The 'reasoning' field passes through unchanged as the canonical field.
- * Provider-specific mapping happens at the boundary layer (reasoningBoundary.ts)
- * when making actual LLM API calls.
- *
- * @param data - Object with potentially camelCase keys
- * @returns Object with snake_case keys
+ * Transform an object's camelCase keys to snake_case. `reasoning` passes
+ * through unchanged as the canonical field; provider-specific mapping happens
+ * at the boundary layer (reasoningBoundary.ts) when calling an LLM API.
  */
 export function transformCamelToSnake(data: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = { ...data };
@@ -88,10 +83,4 @@ export function transformSnakeToCamel(data: Record<string, unknown>): Record<str
   delete result.response_format;
 
   return result;
-}
-
-/** Nominal boundary over this module's camelCase/snake_case transforms. */
-export abstract class PromptTransformDbPort {
-  abstract toDb(data: Record<string, unknown>): Record<string, unknown>;
-  abstract fromDb(data: Record<string, unknown>): Record<string, unknown>;
 }

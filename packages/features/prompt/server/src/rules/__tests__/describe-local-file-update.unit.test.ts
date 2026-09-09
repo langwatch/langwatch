@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeLocalFileUpdate } from "../prompt-describe-local-file-update.port.ts";
+import { describeLocalFileUpdate } from "../prompt-describe-local-file-update.rules.ts";
 
 describe("describeLocalFileUpdate()", () => {
   describe("given no differences were computed", () => {

@@ -11,8 +11,3 @@ export function describeLocalFileUpdate(differences: string[] | undefined): stri
   }
   return `Updated from local file (${differences.join("; ")})`;
 }
-
-/** Nominal boundary over {@link describeLocalFileUpdate}. */
-export abstract class PromptDescribeLocalFileUpdatePort {
-  abstract describe(differences: string[] | undefined): string;
-}

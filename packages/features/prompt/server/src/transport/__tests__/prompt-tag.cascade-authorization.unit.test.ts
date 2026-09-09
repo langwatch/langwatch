@@ -1,17 +1,17 @@
 /**
  * Finding H8 of the 2026-09-04 feature-surface security pass: a prompt tag is one
- * ORGANIZATION row whose assignments cascade to every project in that organization, while
+ * ORGANIZATION row whose assignments cascade to every project in that organization.
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
-import { initTRPC, TRPCError } from "@trpc/server";
+import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { PromptApp } from "#app/prompt.app";
-import { PromptTagTrpcApi } from "../prompt-tag.api.ts";
-import type { PromptTrpcContext } from "../../../rules/prompt-trpc-context.rules.ts";
+import { promptTagTrpcTransport } from "../prompt-tag.trpc.ts";
+import { promptTrpcCaller } from "./prompt-trpc.fixture.ts";
 
 const ORGANIZATION_PROJECTS = ["project_a", "project_b"];
 
@@ -20,12 +20,21 @@ const ORGANIZATION_PROJECTS = ["project_a", "project_b"];
  * door also calls rather than a second copy written for the test.
  */
 function buildCaller(options: { manageable: readonly string[] }) {
+  const hasPermission = vi.fn(async (check: { projectId?: string }) =>
+    options.manageable.includes(check.projectId ?? ""),
+  );
+
   const prompts = PromptApp.create({
     prompts: {} as unknown as PromptService,
     projects: {
       getOrganizationId: async () => "organization_1",
       listIdsByOrganization: async () => ORGANIZATION_PROJECTS,
     } as unknown as ProjectService,
+    permissions: {
+      hasPermission,
+      getApiKeyProjectDecision: async () => ({ outcome: "denied" }),
+    } as unknown as Pick<AuthzApi, "hasPermission" | "getApiKeyProjectDecision">,
+    infrastructure: { afterPromptCreated: () => undefined },
   });
 
   const renameTagForProject = vi.spyOn(prompts, "renameTagForProject").mockResolvedValue({
@@ -39,28 +48,11 @@ function buildCaller(options: { manageable: readonly string[] }) {
     name: "production",
   } as never);
 
-  const can = vi.fn(async (_permission: AuthzPermission, target: { projectId: string }) =>
-    options.manageable.includes(target.projectId),
-  );
-
-  const context: PromptTrpcContext = {
-    app: { prompts },
-    actor: () => ({ id: "user_1" }),
-    can,
-  };
-
-  const trpc = initTRPC.context<PromptTrpcContext>().create();
-  const router = PromptTagTrpcApi.create(trpc, {
-    protected: trpc.procedure,
-    policy: () => (procedure) => procedure,
-    validateOutput: true,
-  });
-
   return {
-    caller: router.createCaller(context),
+    caller: promptTrpcCaller({ declaration: promptTagTrpcTransport, app: prompts }),
     renameTagForProject,
     deleteTagForProject,
-    can,
+    hasPermission,
   };
 }
 
@@ -80,15 +72,27 @@ describe("promptTags.rename and promptTags.delete", () => {
   });
 
   describe("given a caller who may manage prompts in one project only", () => {
+    /**
+     * FORBIDDEN, not the UNAUTHORIZED this door used to spell by hand: the
+     * runtime reads the wire code off the handled cause's own status, and
+     * `PermissionDeniedError` is a 403 - the caller IS authenticated, they
+     * lack the grant.
+     */
     /** @scenario Renaming a prompt tag demands the permission across the organization */
     it("refuses the rename, and renames nothing", async () => {
-      const { caller, renameTagForProject, can } = buildCaller({ manageable: ["project_a"] });
+      const { caller, renameTagForProject, hasPermission } = buildCaller({
+        manageable: ["project_a"],
+      });
 
       await expect(
         caller.rename({ projectId: "project_a", oldName: "staging", newName: "release" }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
       expect(renameTagForProject).not.toHaveBeenCalled();
-      expect(can).toHaveBeenCalledWith("prompts:manage", { projectId: "project_b" });
+      expect(hasPermission).toHaveBeenCalledWith({
+        userId: "user_1",
+        permission: "prompts:manage",
+        projectId: "project_b",
+      });
     });
 
     /** @scenario Deleting a prompt tag demands the permission across the organization */

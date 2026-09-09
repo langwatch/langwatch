@@ -22,6 +22,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/api": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",

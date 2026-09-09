@@ -8,10 +8,12 @@ import type {
   UpdatePromptHandleCommand,
 } from "./prompt.commands.ts";
 import type {
+  PromptCopyChoice,
   PromptCopySource,
   PromptCopySummary,
   PromptDeleteResult,
   PromptModifyPermission,
+  PromptPushToCopiesResult,
   PromptSyncResult,
   PromptTag,
   PromptTagAssignment,
@@ -19,6 +21,21 @@ import type {
 } from "./prompt.ts";
 
 export type PromptApiCaller = Readonly<{ id: string }>;
+
+/**
+ * The credential a tag-catalogue write arrived on: a signed-in person at the
+ * browser door, the API key itself at the REST one, or a legacy project key
+ * that names no key row and so answers only for its own project.
+ */
+export type PromptTagCatalogPrincipal =
+  | Readonly<{ type: "user"; userId: string }>
+  | Readonly<{
+      type: "apiKey";
+      apiKeyId: string;
+      userId: string | null;
+      organizationId: string;
+    }>
+  | Readonly<{ type: "legacyProjectKey"; projectId: string }>;
 
 export type PromptCreateInput = {
   projectId: string;
@@ -33,8 +50,6 @@ export type PromptUpdateInput = {
   projectId: string;
   data: { commitMessage: string } & PromptConfigFields;
 };
-
-export type PromptTagCatalogAuthorizer = (input: { projectId: string }) => Promise<boolean>;
 
 /** Callable prompt operations shared by process peers after composition. */
 export interface PromptApi {
@@ -155,8 +170,26 @@ export interface PromptApi {
   projectsSharingTagCatalog(input: { projectId: string }): Promise<string[]>;
   assertMayManageTagCatalog(input: {
     projectId: string;
-    mayManage: PromptTagCatalogAuthorizer;
+    by: PromptTagCatalogPrincipal;
   }): Promise<void>;
+  /** A project gained a prompt: the nurturing trail the door leaves. */
+  announceCreated(input: { projectId: string; userId?: string | null }): void;
+  listCopyTargets(
+    input: { idOrHandle: string; projectId: string },
+    by: PromptApiCaller,
+  ): Promise<PromptCopyChoice[]>;
+  copyFromProject(
+    input: { idOrHandle: string; sourceProjectId: string; targetProjectId: string },
+    by: PromptApiCaller,
+  ): Promise<VersionedPrompt & { copiedFromPromptId: string }>;
+  syncFromSource(
+    input: { idOrHandle: string; projectId: string },
+    by: PromptApiCaller,
+  ): Promise<VersionedPrompt>;
+  pushToCopies(
+    input: { idOrHandle: string; projectId: string; copyIds?: string[] },
+    by: PromptApiCaller,
+  ): Promise<PromptPushToCopiesResult>;
   renameTagForProject(input: {
     projectId: string;
     oldName: string;

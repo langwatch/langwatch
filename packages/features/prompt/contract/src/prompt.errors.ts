@@ -48,6 +48,18 @@ export class PromptTagProtectedError extends Error {
     this.name = "PromptTagProtectedError";
   }
 }
+/**
+ * The handle this write asked for is already in use at the scope it was asked
+ * for. Raised by persistence, where the uniqueness actually lives; the door
+ * that took the write names the scope in the message a caller reads.
+ */
+export class PromptHandleTakenError extends Error {
+  readonly code = "prompt_handle_taken";
+  constructor() {
+    super("Prompt handle already exists");
+    this.name = "PromptHandleTakenError";
+  }
+}
 export class PromptHandleGenerationError extends Error {
   readonly code = "prompt_handle_generation_failed";
   constructor(message: string) {

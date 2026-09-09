@@ -7,15 +7,26 @@ interface PromptInput {
   type: LlmConfigInputType;
 }
 
+/** Every template variable the prompt text and the messages name. */
+function detectedVariableNames(
+  prompt: string,
+  messages: Array<{ role: string; content: string }>,
+): Set<string> {
+  const detected = new Set<string>();
+
+  for (const text of [prompt, ...messages.map((message) => message.content)]) {
+    if (!text) continue;
+
+    for (const name of extractLiquidVariables(text).inputVariables) detected.add(name);
+  }
+
+  return detected;
+}
+
 /**
- * Auto-detects template variables from prompt text and messages,
- * then merges them with explicitly provided inputs.
- *
- * - Extracts variables from the `prompt` field and all `messages[*].content`
- * - Explicit inputs preserve their type (e.g., "json" is not overwritten to "str")
- * - New auto-detected variables default to type "str"
- * - The locked "input" variable always sorts first
- * - Remaining inputs are sorted alphabetically for deterministic ordering
+ * Auto-detected template variables merged with the explicit inputs. An explicit
+ * input keeps its own type, a detected one defaults to "str", the locked
+ * "input" variable sorts first and the rest sort alphabetically.
  */
 export function mergeAutoDetectedInputs({
   prompt,
@@ -26,25 +37,7 @@ export function mergeAutoDetectedInputs({
   messages: Array<{ role: string; content: string }>;
   inputs: PromptInput[];
 }): PromptInput[] {
-  const detectedNames = new Set<string>();
-
-  // Extract from prompt text
-  if (prompt) {
-    const { inputVariables } = extractLiquidVariables(prompt);
-    for (const name of inputVariables) {
-      detectedNames.add(name);
-    }
-  }
-
-  // Extract from all message contents
-  for (const message of messages) {
-    if (message.content) {
-      const { inputVariables } = extractLiquidVariables(message.content);
-      for (const name of inputVariables) {
-        detectedNames.add(name);
-      }
-    }
-  }
+  const detectedNames = detectedVariableNames(prompt, messages);
 
   // Merge: explicit inputs keep their type, auto-detected get "str"
   const mergedMap = new Map<string, LlmConfigInputType>();
@@ -69,13 +62,4 @@ export function mergeAutoDetectedInputs({
       if (b.identifier === "input") return 1;
       return a.identifier.localeCompare(b.identifier);
     });
-}
-
-/** Nominal boundary over {@link mergeAutoDetectedInputs}. */
-export abstract class PromptMergeAutoDetectedInputsPort {
-  abstract merge(input: {
-    prompt: string;
-    messages: Array<{ role: string; content: string }>;
-    inputs: PromptInput[];
-  }): PromptInput[];
 }

@@ -13,7 +13,7 @@ import {
   parseRuntimeParameters,
 } from "@langwatch/prompt-contract";
 import type { z } from "zod";
-import { transformCamelToSnake } from "../ports/prompt-transform-db.port.ts";
+import { transformCamelToSnake } from "../rules/prompt-transform-db.rules.ts";
 import type {
   LlmConfigRepository,
   LlmConfigWithLatestVersion,
