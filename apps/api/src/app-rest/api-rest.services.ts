@@ -1,16 +1,14 @@
 /**
- * The REST families the API process mounts from its OWN graph. This is the ONE list.
+ * What this process composed for the families it owns: one provider per family,
+ * so naming a family in the door registry never forces its service to be built.
+ * The doors themselves are `api-rest.doors.ts`; nothing here mounts anything.
  */
 import type { AnnotationApi } from "@langwatch/annotation-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import type {
   AppRestManagementAuditPort,
-  AppRestSecurity,
-  MountableRestApp,
+  PlatformUrlBuilder,
+  RestErrorHandler,
 } from "@langwatch/api/rest";
-import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
-import type { Logger } from "@langwatch/observability";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import type { AdminRestPorts, BugReportRestPorts } from "@langwatch/ops-server";
 import type { UnsubscribeRestPorts } from "@langwatch/automation-server";
@@ -54,20 +52,8 @@ import type { ApiAuthoringRestComposition } from "../app/api-authoring-rest.comp
 import type { ApiExperimentV3RestCollaborators } from "../features/experiment/experiment-v3-rest.mount.ts";
 import type { ApiExperimentInitRestCollaborators } from "../features/experiment/experiment-init-rest.mount.ts";
 import type { ApiWorkflowRunRestCollaborators } from "../features/workflow/workflow-run-rest.mount.ts";
-import { mountAnnotationRest } from "../features/annotation/annotation-rest.mount.ts";
-import { mountApiDiscoveryRest } from "../features/discovery/api-discovery-rest.mount.ts";
-import { mountGatewayOpenApiRest } from "../features/discovery/gateway-openapi-rest.mount.ts";
-import { mountRootDiscoveryRest } from "../features/discovery/root-discovery-rest.mount.ts";
-import {
-  mountImageProxyRest,
-  type ImageProxyRestPorts,
-} from "../features/image-proxy/image-proxy-rest.mount.ts";
-import { mountRumRest } from "../features/rum/rum-rest.mount.ts";
-import { mountStoredObjectRest } from "../features/stored-object/stored-object-rest.mount.ts";
-import {
-  mountHealthProbeRest,
-  type HealthProbeRestPorts,
-} from "../features/health/health-probe-rest.mount.ts";
+import type { ImageProxyRestPorts } from "../features/image-proxy/image-proxy-rest.mount.ts";
+import type { HealthProbeRestPorts } from "../features/health/health-probe-rest.mount.ts";
 import type { RumRateLimiter } from "../features/rum/rum-ingest.service.ts";
 import type { OtlpIngestRestPorts } from "@langwatch/trace-server/api-rest/otlp-ingest";
 import type { CollectorRestPorts } from "@langwatch/trace-server/api-rest/collector";
@@ -81,42 +67,19 @@ import type {
 } from "../features/trace/trace-rest.mount.ts";
 import type { OpsClickHouseExplainRestPorts } from "@langwatch/ops-server";
 import type { DspyStepsRestPorts } from "@langwatch/experiment-server";
-import {
-  mountMcpAuthorizeRest,
-  type McpAuthorizeRestPorts,
-} from "../features/mcp/mcp-authorize-rest.mount.ts";
-import {
-  mountApiPackagedRestFamilies,
-  type ApiPackagedRestAbsenceReport,
-  type ApiPackagedRestCollaborators,
-} from "./app-rest.packaged-families.ts";
-
-/**
- * The project credential a handler-managed family resolves through.
- *
- * The resolved token travels with the answer because a family that asks a
- * SECOND permission question of its caller — costs, say — has to ask it of the
- * credential and not of whoever holds it.
- */
-export type ApiHandlerManagedCredentialPort = (input: {
-  request: Request;
-  permission: AuthzPermission;
-}) => Promise<
-  | Readonly<{
-      ok: true;
-      project: Readonly<{ id: string }>;
-      resolved: ResolvedApiKeyCredential;
-      markUsed: () => void;
-    }>
-  | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>
->;
+import type { McpAuthorizeRestPorts } from "../features/mcp/mcp-authorize-rest.mount.ts";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { PlatformHealthApi } from "@langwatch/platform-health-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
+import type { ApiHandlerManagedCredentialPort } from "./api-rest.runtime.ts";
 
 /**
  * The product services this process may or may not have composed. Each is a
  * provider for the same reason the packaged list's are: mounting a family must
  * not force its service to be constructed.
  */
-export type ApiProcessRestServices = Readonly<{
+export type ApiRestServices = Readonly<{
   /** The reviewer's comments `/api/annotations` reads and writes. */
   annotations?: (() => AnnotationApi) | undefined;
   /** The charted reads `/api/analytics/timeseries` answers from. */
@@ -223,30 +186,44 @@ export type ApiProcessRestServices = Readonly<{
    */
   workflowRun?: ApiWorkflowRunRestCollaborators | undefined;
   /**
-   * The families that live in a FEATURE PACKAGE, and the services this process composed
-   * for them.
+   * The deployment's own liveness report, or none. The monitoring key the
+   * family reads it under is the module's own declared fact, not a port.
    */
-  packaged?: ApiPackagedRestCollaborators | undefined;
-  /**
-   * The deployment's own liveness report, or none. A mounted family rather
-   * than a service: the door is the feature's own mount, already bound to the
-   * secret this process reads it under.
-   */
-  platformHealth?: MountableRestApp | undefined;
+  platformHealth?: (() => PlatformHealthApi) | undefined;
   /**
    * The public stored-object family's application, or none. The SAME one
    * `/api/files` reads bytes through, so an object confirmed on one door is
    * the object the other serves.
    */
   storedObjects?: (() => StoredObjectApi) | undefined;
+  /** The rows `/api/dataset` reads and writes, or none. */
+  datasets?: (() => DatasetApi) | undefined;
+  /**
+   * The stored credentials `/api/secret` and `/api/secrets` answer over, or
+   * none: a door over a store this process cannot decrypt is worse than no door.
+   */
+  secrets?: (() => SecretApi) | undefined;
+  /**
+   * The application behind `/api/v1/run-plans`, `/api/v1/test-suites` and the
+   * deprecated `/api/suites` alias, or none. All three read it, so the fallback
+   * order and the resolved organization never disagree between doors.
+   */
+  suites?: (() => SuiteApi) | undefined;
 }>;
 
-export type ApiProcessRestPorts = Readonly<{
+export type ApiRestPorts = Readonly<{
   /**
    * Resolves a project API key and enforces one permission as a key ceiling,
    * answering the legacy refusal bodies the handler-managed families publish.
    */
   handlerManagedCredential: ApiHandlerManagedCredentialPort;
+  /**
+   * The process's own error envelope, which a family that names none of its
+   * own answers every refusal in.
+   */
+  errors: RestErrorHandler;
+  /** The external UI address a read or write links back to. */
+  platformUrl: PlatformUrlBuilder;
   /**
    * The process's ONE fixed-window counter. Shared rather than per-family: two
    * instances would give one caller two budgets for the same rule.
@@ -348,203 +325,3 @@ export type ApiProcessRestPorts = Readonly<{
    */
   imageProxy?: ImageProxyRestPorts | undefined;
 }>;
-
-/**
- * Which process-owned families this process left out because their transport is
- * still written against the deleted REST builders, and so cannot be built.
- */
-export abstract class ApiProcessRestAbsenceReport {
-  abstract unconverted(family: ApiProcessRestFamilyName): void;
-}
-
-/** Every process-owned family that is named when it is not mounted. */
-export type ApiProcessRestFamilyName =
-  | "admin"
-  | "analytics"
-  | "api-keys"
-  | "auth"
-  | "auth-cli-device-flow"
-  | "billing-webhook"
-  | "bug-reports"
-  | "collector"
-  | "cron"
-  | "dspy-steps"
-  | "elevenlabs-webhook"
-  | "evaluations-legacy"
-  | "experiment-init"
-  | "experiment-workbench"
-  | "gateway-internal"
-  | "gateway-platform"
-  | "gateway-spend"
-  | "github"
-  | "governance-cli"
-  | "governance-ingest"
-  | "langwatch-ql"
-  | "langy"
-  | "ops-clickhouse-explain"
-  | "organization-management"
-  | "otlp-ingest"
-  | "playground"
-  | "prompts"
-  | "query"
-  | "scenario-generate"
-  | "scenario-run-export"
-  | "scim"
-  | "sse-subscriptions"
-  | "trace-export"
-  | "trace-legacy"
-  | "traces"
-  | "unsubscribe"
-  | "workflow-run"
-  | "workflow-studio";
-
-/**
- * Every REST family this process builds for itself, in mount order. ORDERING is
- * load-bearing and is the order of this array.
- */
-export function createApiProcessRestFeatures(options: {
-  security: AppRestSecurity;
-  services?: ApiProcessRestServices;
-  ports: ApiProcessRestPorts;
-  /** Names the packaged families this process left out, once, at boot. */
-  packagedAbsence?: ApiPackagedRestAbsenceReport | undefined;
-  /** Names the process-owned families whose transport is unconverted. */
-  processAbsence?: ApiProcessRestAbsenceReport | undefined;
-}): MountableRestApp[] {
-  const { ports } = options;
-  const services = options.services ?? {};
-  const features: MountableRestApp[] = [];
-  const report = options.processAbsence;
-
-  /** Pushes the family, or names it in the boot report and leaves it off. */
-  const mount = (
-    family: ApiProcessRestFamilyName,
-    build: (() => MountableRestApp | MountableRestApp[]) | null,
-  ): void => {
-    if (!build) {
-      report?.unconverted(family);
-      return;
-    }
-    const built = build();
-    features.push(...(Array.isArray(built) ? built : [built]));
-  };
-
-  // The two locations the API description is published at. The gateway one is
-  // FIRST so a later parameterised sibling under `/api/gateway/v1` cannot
-  // shadow it.
-  features.push(mountGatewayOpenApiRest());
-  features.push(mountApiDiscoveryRest());
-  // The root-level locations, at both spellings of each path.
-  features.push(mountRootDiscoveryRest());
-  // The browser's own telemetry intake, over the process's ONE counter.
-  features.push(mountRumRest({ rateLimit: ports.rateLimit }));
-
-  // The subsystem probes. `/api/health` is claimed by the process's lifecycle
-  // surface at exactly that path and by nothing deeper, so the five
-  // sub-paths neither shadow it nor are shadowed by it.
-  const healthProbes = ports.healthProbes;
-  if (healthProbes) {
-    features.push(mountHealthProbeRest({ ports: healthProbes }));
-  }
-
-  // The deployment's own report on itself, beside the five probes: the same
-  // subsystems asked at once, for an operator rather than for a load balancer.
-  if (services.platformHealth) features.push(services.platformHealth);
-
-  mount("analytics", null);
-  mount("langwatch-ql", null);
-  mount("query", null);
-  mount("prompts", null);
-  mount("organization-management", null);
-  mount("trace-export", null);
-  mount("scenario-run-export", null);
-  mount("workflow-studio", null);
-  mount("scenario-generate", null);
-  mount("playground", null);
-  mount("experiment-workbench", null);
-  mount("experiment-init", null);
-  mount("workflow-run", null);
-
-  const annotations = services.annotations;
-  if (annotations) {
-    features.push(mountAnnotationRest({ annotations, credential: ports.handlerManagedCredential }));
-  }
-
-  // `/api/stored-objects/2026-08-22/*`: the upload confirmation, the read and
-  // the delete, over the same project key every other declared family opens.
-  const storedObjects = services.storedObjects;
-  if (storedObjects) {
-    features.push(
-      mountStoredObjectRest({ storedObjects, credential: ports.handlerManagedCredential }),
-    );
-  }
-
-  mount("admin", null);
-  mount("bug-reports", null);
-  mount("unsubscribe", null);
-  // The internal cron family. Its gate is a builder-level shared-secret
-  // middleware rather than a declared route access, so it converts with the
-  // `internalSecret` door rather than with the probes; until then a
-  // destructive door stays shut.
-  mount("cron", null);
-  mount("github", null);
-  mount("langy", null);
-  mount("auth-cli-device-flow", null);
-  mount("governance-cli", null);
-  mount("auth", null);
-  mount("governance-ingest", null);
-  mount("scim", null);
-  mount("traces", null);
-  mount("trace-legacy", null);
-  mount("evaluations-legacy", null);
-
-  // The packaged families, each conditional on the service this process composed for it
-  // and on its own transport having been converted.
-  const packaged = services.packaged;
-  if (packaged) {
-    features.push(
-      ...mountApiPackagedRestFamilies({
-        security: options.security,
-        collaborators: packaged,
-        ...(options.packagedAbsence ? { report: options.packagedAbsence } : {}),
-      }),
-    );
-  }
-
-  mount("ops-clickhouse-explain", null);
-  mount("dspy-steps", null);
-  // The hosted MCP OAuth approval step, where this process composed a browser
-  // session to authenticate the approving person and a cipher to write the
-  // credential the code embeds.
-  const mcpAuthorize = ports.mcpAuthorize;
-  if (mcpAuthorize) features.push(mountMcpAuthorizeRest(mcpAuthorize));
-  // The public image relay, where this deployment declared an egress policy.
-  const imageProxy = ports.imageProxy;
-  if (imageProxy) features.push(mountImageProxyRest(imageProxy));
-  mount("collector", null);
-  // The OTLP receiver and the two aliases that forward into it. They travel
-  // together: an alias mounted without the receiver would answer a path that
-  // leads nowhere, which is one silent, unretryable data loss per batch.
-  mount("otlp-ingest", null);
-
-  return features;
-}
-
-/** Writes each unconverted family to the process log, once, by name. */
-export class LoggedApiProcessRestAbsence extends ApiProcessRestAbsenceReport {
-  static create(logger: Pick<Logger, "warn">): LoggedApiProcessRestAbsence {
-    return new LoggedApiProcessRestAbsence(logger);
-  }
-
-  private constructor(private readonly logger: Pick<Logger, "warn">) {
-    super();
-  }
-
-  unconverted(family: ApiProcessRestFamilyName): void {
-    this.logger.warn(
-      { family },
-      `API process serves no ${family} REST family: its transport is still written against ` +
-        "the deleted REST builders, so the family is not mounted at all.",
-    );
-  }
-}

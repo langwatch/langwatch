@@ -3,17 +3,16 @@
  * Spec: specs/ai-gateway/governance/cli-login-personal-guard.feature
  * Spec: specs/ai-gateway/governance/cli-login.feature
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import {
   CliDeviceSessionService,
   CliDeviceSessionStorePort,
   type AuthCliDeviceFlowRestPorts,
   type AuthDirectoryPort,
 } from "@langwatch/auth-server";
-import { Hono, type ErrorHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { openTestRestDoors } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 
 const USER_ID = "user-guard";
 const OTHER_USER_ID = "user-other";
@@ -426,8 +425,7 @@ function guardWorld(
 
 function mount(world: ReturnType<typeof guardWorld>) {
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     ports: {
       handlerManagedCredential: () => {
         throw new Error("the device grant resolves its own credential.");
@@ -450,32 +448,4 @@ function mount(world: ReturnType<typeof guardWorld>) {
         body: JSON.stringify(body),
       }),
   };
-}
-
-/** A failure here must be legible rather than swallowed into a generic 500. */
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
 }

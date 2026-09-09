@@ -13,7 +13,6 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/runtime-composition";
 
-import { mountDatasetRest } from "./dataset-rest.mount.ts";
 import {
   createBatchRecordTrpcRouter,
   createDatasetRecordTrpcRouter,
@@ -29,19 +28,11 @@ export type DatasetPeers = Readonly<{
   permissions: AuthzApiContract;
 }>;
 
-/** What the REST family answers through: the door, its envelope and the URLs. */
-export type DatasetRestPorts = Readonly<{
-  credential: Parameters<typeof mountDatasetRest>[0]["credential"];
-  platformUrl: Parameters<typeof mountDatasetRest>[0]["platformUrl"];
-  errors: Parameters<typeof mountDatasetRest>[0]["errors"];
-}>;
-
 /** Installs the dataset surfaces over this process's own graph. */
 export async function installApiDataset(options: {
   prisma: PrismaClient;
   peers: DatasetPeers;
   infrastructure: DatasetInfrastructure;
-  rest: DatasetRestPorts;
 }): Promise<ComposedDatasetFeature> {
   const runtime = await createApp({ name: "langwatch-api" })
     .withPersistence("postgres", { prisma: options.prisma })
@@ -60,6 +51,5 @@ export async function installApiDataset(options: {
       batchRecord: createBatchRecordTrpcRouter(mount.runtime),
     }),
     app,
-    rest: mountDatasetRest({ datasets: () => app, ...options.rest }),
   };
 }

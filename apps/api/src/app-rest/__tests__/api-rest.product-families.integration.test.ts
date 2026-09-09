@@ -1,9 +1,7 @@
 /**
  * The product REST families this process composes for itself, driven through the real
- * Hono app `createApiProcessRestFeatures` returns.
+ * Hono app the door registry opens.
  */
-import { createErrorHandler } from "@langwatch/api";
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { AnalyticsApp } from "@langwatch/analytics-server";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -15,13 +13,10 @@ import type {
 import type { ProjectService } from "@langwatch/project-contract";
 import type { PromptRestService } from "@langwatch/prompt-server";
 import type { ShareApi } from "@langwatch/share-contract";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../app-rest.process-features.ts";
-
-const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
-
+import { openTestRestDoors } from "./support/rest-doors.harness.ts";
 describe("given the analytics timeseries door this process composes", () => {
   describe("when a project credential posts a series", () => {
     it("answers the application's own reading, with the project taken from the credential", async () => {
@@ -244,8 +239,7 @@ type MountOptions = {
 function mount(options: MountOptions) {
   const hono = new Hono();
   const management = options.organizationManagement;
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     services: {
       ...(options.analytics ? { analytics: () => options.analytics! } : {}),
       ...(options.prompts
@@ -304,57 +298,3 @@ function mount(options: MountOptions) {
       hono.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
-
-/**
- * Enforcement that authenticates every caller as the same project and the same
- * organization. The families' own access declarations still run; what is faked
- * is only the credential resolution the process would have done.
- */
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const asProject: MiddlewareHandler = async (c, next) => {
-    c.set("project", project);
-    await next();
-  };
-  const asOrganization: MiddlewareHandler = async (c, next) => {
-    c.set("organization", { id: "organization-1" });
-    c.set("apiKeyUserId", "user-1");
-    await next();
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    // The framework's own renderer: a family declaring the canonical envelope
-    // must be answered in it, and a stub rendering the flat legacy body for
-    // both made every `code` assertion read `undefined`.
-    canonicalErrorHandler: createErrorHandler(),
-    authenticateProject: () => asProject,
-    authorizeProjectPermission: () => noop,
-    authorizeApiKeyCeiling: () => noop,
-    authenticateOrganization: () => asOrganization,
-    authorizeOrganizationPermission: () => noop,
-    authorizeRouteTeamPermission: () => noop,
-    authorizeRouteProjectPermission: () => noop,
-    authenticateOrganizationThrowing: asOrganization,
-    authorizeOrganizationPermissionThrowing: () => noop,
-  } as never);
-}
-
-/**
- * A handled refusal must reach the caller at its own status with its own code;
- * anything else is legible rather than swallowed into a generic 500.
- */
-const renderHandled: ErrorHandler = (error, c) => {
-  const handled = error as { httpStatus?: number; code?: string; message?: string };
-  if (typeof handled.httpStatus === "number") {
-    return c.json(
-      { error: handled.code ?? "error", message: handled.message ?? "" },
-      handled.httpStatus as never,
-    );
-  }
-  return c.json({ error: String(error) }, 500);
-};

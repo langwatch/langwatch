@@ -1,9 +1,7 @@
 /**
  * The role-bindings REST family (`/api/role-bindings`), driven through the real Hono app
- * `createApiProcessRestFeatures` returns.
+ * the door registry opens.
  */
-import { createErrorHandler } from "@langwatch/api";
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import {
   ApiKeyNotInOrganizationError,
   AuthzPersonalWorkspaceNotManagedHereError,
@@ -16,11 +14,11 @@ import {
   type AuthzManagedOrganizationBinding,
   type AuthzService,
 } from "@langwatch/authz-contract";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../app-rest.process-features.ts";
-import type { ApiPackagedRestCollaborators } from "../app-rest.packaged-families.ts";
+import { openTestRestDoors } from "./support/rest-doors.harness.ts";
+import type { ApiPackagedRestCollaborators } from "../api-rest.packaged-services.ts";
 
 const ORG_ID = "organization-1";
 
@@ -456,9 +454,8 @@ function mount(services: ApiPackagedRestCollaborators["services"]) {
     permissions: services.permissions ?? (() => defaultAuthzService),
     authzGrants: services.authzGrants ?? (() => defaultAuthzGrants),
   };
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
-    services: { packaged: { services: merged, ports: fullPorts() } },
+  for (const app of openTestRestDoors({
+    packaged: { services: merged, ports: fullPorts() },
     ports: {
       handlerManagedCredential: () => {
         throw new Error("This family authenticates through the framework chain.");
@@ -507,44 +504,3 @@ function fullPorts(): ApiPackagedRestCollaborators["ports"] {
     triggerWorkflowEvaluation: () => Promise.reject(new Error("no runner")),
   } as ApiPackagedRestCollaborators["ports"];
 }
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const asOrganization: MiddlewareHandler = async (c, next) => {
-    c.set("organization", { id: ORG_ID });
-    c.set("apiKeyUserId", "user-1");
-    await next();
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    // The framework's own renderer, not a second hand-rolled one: these
-    // families publish the canonical envelope, and a stub that answered the
-    // flat legacy body for both made every `code` assertion read `undefined`.
-    canonicalErrorHandler: createErrorHandler(),
-    authenticateProject: () => noop,
-    authorizeProjectPermission: () => noop,
-    authorizeApiKeyCeiling: () => noop,
-    authenticateOrganization: () => asOrganization,
-    authorizeOrganizationPermission: () => noop,
-    authorizeRouteTeamPermission: () => noop,
-    authorizeRouteProjectPermission: () => noop,
-    authenticateOrganizationThrowing: asOrganization,
-    authorizeOrganizationPermissionThrowing: () => noop,
-  } as never);
-}
-
-const renderHandled: ErrorHandler = (error, c) => {
-  const handled = error as { httpStatus?: number; code?: string; message?: string };
-  if (typeof handled.httpStatus === "number") {
-    return c.json(
-      { error: handled.code ?? "error", message: handled.message ?? "" },
-      handled.httpStatus as never,
-    );
-  }
-  return c.json({ error: String(error) }, 500);
-};

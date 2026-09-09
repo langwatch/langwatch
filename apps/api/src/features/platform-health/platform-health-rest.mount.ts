@@ -4,12 +4,7 @@
  * compares this deployment's key itself.
  */
 import { createErrorHandler } from "@langwatch/api";
-import {
-  bindRestHeader,
-  createRestRuntime,
-  type MountableRestApp,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import { bindRestHeader, type MountableRestApp, type RestErrorHandler } from "@langwatch/api/rest";
 import {
   type PlatformHealthApi,
   PlatformHealthSubsystemNotFoundError,
@@ -17,21 +12,14 @@ import {
 } from "@langwatch/platform-health-contract";
 import { platformHealthAuthorization, platformHealthRest } from "@langwatch/platform-health-server";
 
-/** `/api/v1/platform-health` and `/api/v1/platform-health/:check`. */
-export function mountPlatformHealthRest(options: {
-  platformHealth: () => PlatformHealthApi;
-}): MountableRestApp {
-  const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => {
-        throw new Error("A platform-health route answers with no credential resolved.");
-      },
-    },
-  });
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 
-  return runtime.mount(platformHealthRest.router(), {
-    app: options.platformHealth,
-    credential: "public",
+/** `/api/v1/platform-health` and `/api/v1/platform-health/:check`. */
+export function mountPlatformHealthRest(
+  runtime: ApiRestRuntime,
+  platformHealth: () => PlatformHealthApi,
+): MountableRestApp {
+  return runtime.mount(platformHealthRest.router(), platformHealth, {
     onError: platformHealthErrors,
     facts: [bindRestHeader(platformHealthAuthorization, "authorization")],
   });

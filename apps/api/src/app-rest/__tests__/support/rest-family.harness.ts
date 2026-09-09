@@ -9,19 +9,19 @@ import {
 } from "@langwatch/api/rest";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 
-import { unavailableIdempotentRunner } from "../../../app/api-idempotency.composition.ts";
 import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
+import {
+  openApiRestDoors,
+  type ApiRestAbsenceReport,
+  type ApiRestFamilyName,
+} from "../../api-rest.doors.ts";
+import { createApiRestRuntime } from "../../api-rest.runtime.ts";
 import type {
-  ApiPackagedRestAbsenceReport,
   ApiPackagedRestCollaborators,
-  ApiPackagedRestFamilyName,
   ApiPackagedRestPorts,
   ApiPackagedRestServices,
-} from "../../app-rest.packaged-families.ts";
-import {
-  createApiProcessRestFeatures,
-  type ApiProcessRestServices,
-} from "../../app-rest.process-features.ts";
+} from "../../api-rest.packaged-services.ts";
+import type { ApiRestServices } from "../../api-rest.services.ts";
 
 /** The project every project-scoped route in these suites is called for. */
 export const TEST_PROJECT = {
@@ -167,35 +167,43 @@ export type MountedRestFamily = {
 export function mountRestFamily(options: {
   packaged?: ApiPackagedRestServices | undefined;
   packagedPorts?: Partial<ApiPackagedRestPorts> | undefined;
-  services?: Omit<ApiProcessRestServices, "packaged"> | undefined;
+  services?: ApiRestServices | undefined;
   /** Process-level ports a family reads instead of a service (`scim`, ...). */
   processPorts?: Record<string, unknown> | undefined;
   caller?: RestFamilyCaller | undefined;
-  security?: AppRestSecurity | undefined;
-  absence?: ApiPackagedRestAbsenceReport | undefined;
+  absence?: ApiRestAbsenceReport | undefined;
 }): MountedRestFamily {
   const hono = new Hono();
+  const ports = packagedRestPorts(options.packagedPorts ?? {});
   const packaged: ApiPackagedRestCollaborators | undefined = options.packaged
-    ? { services: options.packaged, ports: packagedRestPorts(options.packagedPorts ?? {}) }
+    ? { services: options.packaged, ports }
     : undefined;
+  const runtime = createApiRestRuntime({
+    projectCredential: () => {
+      throw new Error("These families authenticate through the framework chain.");
+    },
+    errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
+    ...(ports.dualAuth ? { dualCredential: ports.dualAuth } : {}),
+  });
 
-  for (const app of createApiProcessRestFeatures({
-    security:
-      options.security ??
-      createRestFamilySecurity(options.caller ?? {}, { idempotency: unavailableIdempotentRunner }),
-    services: {
-      ...options.services,
-      ...(packaged ? { packaged } : {}),
-    } as ApiProcessRestServices,
-    ports: {
-      handlerManagedCredential: () => {
-        throw new Error("These families authenticate through the framework chain.");
-      },
-      rateLimit: async () => ({ allowed: true }),
-      publicBaseUrl: "https://app.langwatch.test",
-      ...options.processPorts,
-    } as never,
-    ...(options.absence ? { packagedAbsence: options.absence } : {}),
+  for (const app of openApiRestDoors({
+    ...(options.absence ? { report: options.absence } : {}),
+    context: {
+      runtime,
+      packaged,
+      services: (options.services ?? {}) as ApiRestServices,
+      ports: {
+        handlerManagedCredential: () => {
+          throw new Error("These families authenticate through the framework chain.");
+        },
+        rateLimit: async () => ({ allowed: true }),
+        errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
+        platformUrl: ({ projectSlug, path }: { projectSlug: string; path: string }) =>
+          `https://app.langwatch.test/${projectSlug}${path}`,
+        publicBaseUrl: "https://app.langwatch.test",
+        ...options.processPorts,
+      } as never,
+    },
   })) {
     hono.route("/", app);
   }
@@ -227,15 +235,17 @@ export function mountRestFamily(options: {
   };
 }
 
-/** A family name the mount left out, collected so a suite can name it. */
+/** A family name the registry left out, collected so a suite can name it. */
 export function absenceRecorder(): {
-  report: ApiPackagedRestAbsenceReport;
-  absent: ApiPackagedRestFamilyName[];
+  report: ApiRestAbsenceReport;
+  absent: ApiRestFamilyName[];
 } {
-  const absent: ApiPackagedRestFamilyName[] = [];
+  const absent: ApiRestFamilyName[] = [];
   return {
     absent,
-    report: { absent: (family) => absent.push(family) } as ApiPackagedRestAbsenceReport,
+    report: {
+      absent: (family: string) => absent.push(family as ApiRestFamilyName),
+    } as ApiRestAbsenceReport,
   };
 }
 

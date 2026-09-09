@@ -1,6 +1,5 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
 import type { ScenarioApp } from "@langwatch/scenario-server";
-import type { MountableRestApp } from "@langwatch/api/rest";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type {
   ScenarioService,
@@ -25,11 +24,9 @@ export type ComposedScenarioFeature = Readonly<{
    * through it.
    */
   simulations: SimulationService;
-  /** For `ctx.app.suites`. */
-  suites: SuiteApi;
   /**
-   * The three suite REST families, bound to this process's project-key door.
-   * Routed by the process beside its other declared families.
+   * For `ctx.app.suites`, and for the three suite REST families the door
+   * registry opens over the same application.
    */
-  suiteRest: readonly MountableRestApp[];
+  suites: SuiteApi;
 }>;

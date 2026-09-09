@@ -3,6 +3,9 @@
  * @vitest-environment node
  */
 import { Hono } from "hono";
+
+import { openTestRestRuntime } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
+import { mountPlatformHealthRest } from "../platform-health-rest.mount.ts";
 import { describe, expect, it, vi } from "vitest";
 
 import type { HealthProbeRestPorts } from "../../health/health-probe-rest.mount.ts";
@@ -187,7 +190,10 @@ async function mount(options: { collectorRefuses?: boolean } = {}) {
   });
   if (!composed) throw new Error("the family must compose from a configured deployment");
 
-  const hono = new Hono().route("/", composed.rest);
+  const hono = new Hono().route(
+    "/",
+    mountPlatformHealthRest(openTestRestRuntime(), () => composed.app),
+  );
 
   return {
     fetchSpy,

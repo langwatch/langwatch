@@ -8,7 +8,6 @@ import { buildIngestKeyReceiverPolicies } from "../../../../../packages/enterpri
  * `POST /api/otel/v1/traces` end to end, through the real Hono app this process mounts
  * and the real ingestion service it composes.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { UsageLimitResult } from "@langwatch/entitlement-server";
 import { HandledError } from "@langwatch/handled-error";
 import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
@@ -18,12 +17,11 @@ import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,
 } from "@langwatch/observability/metrics/testing";
-import { Hono, type ErrorHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../app-rest/app-rest.process-features.ts";
+import { openTestRestDoors } from "../../app-rest/__tests__/support/rest-doors.harness.ts";
 import type { ApiHandlerManagedCredentials } from "../api-handler-managed-credential.ts";
-import { ApiRestObservabilityComposition } from "../api-rest-observability.composition.ts";
 import {
   composeApiTraceIngest,
   type ApiTraceIngestAllowance,
@@ -379,8 +377,7 @@ describe("given the API process composed no command queue", () => {
       expect(ports).toBeUndefined();
 
       const hono = new Hono();
-      for (const app of createApiProcessRestFeatures({
-        security: passThroughSecurity(),
+      for (const app of openTestRestDoors({
         ports: {
           handlerManagedCredential: () => {
             throw new Error("unreachable");
@@ -435,8 +432,7 @@ function mount(overrides: MountOverrides = {}) {
   const otlpIngest = ingest.otlp;
 
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     ports: {
       handlerManagedCredential: () => {
         throw new Error("the OTLP family resolves its credential through its own port.");
@@ -586,41 +582,6 @@ function protobufExport(attributes: unknown[] = []): ArrayBuffer {
   // write and the receiver answers 400.
   return Uint8Array.from(encoded).buffer as ArrayBuffer;
 }
-
-/**
- * A failure here must be legible rather than swallowed into a generic 500 — EXCEPT a
- * handled one, which is rendered by the process's own legacy renderer.
- */
-const renderUnexpected: ErrorHandler = (error, c) =>
-  HandledError.isHandled(error)
-    ? ApiRestObservabilityComposition.create().legacyErrorHandler(error, c)
-    : c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}
-
 describe("given the API process composed edge media extraction", () => {
   describe("when the extraction fails open on a span carrying media", () => {
     /** @scenario "The receiver publishes the edge media fail-open series" */

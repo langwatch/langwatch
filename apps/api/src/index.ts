@@ -73,7 +73,6 @@ export type {
   DashboardProcessPorts,
 } from "./features/dashboard/dashboard.composition.ts";
 export type { ComposedDashboardFeature } from "./features/dashboard/dashboard.composition.types.ts";
-export { mountDashboardRest } from "./features/dashboard/dashboard-rest.mount.ts";
 /**
  * The AI Gateway, composed as its own feature: one application for its six
  * tRPC namespaces, its `ctx.app` slice and its two REST families.

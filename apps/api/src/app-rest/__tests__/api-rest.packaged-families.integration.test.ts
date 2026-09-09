@@ -1,9 +1,8 @@
 /**
  * The families that live in a FEATURE PACKAGE, driven through the real Hono app
- * `createApiProcessRestFeatures` returns. The retired platform router mounted all of
+ * the door registry opens. The retired platform router mounted all of
  * these through ONE all-or-nothing call over thirty-two product services.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
@@ -15,25 +14,18 @@ import {
 } from "@langwatch/trace-server";
 import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
 import type { UserAvatarObjectReader } from "@langwatch/user-server";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { generateSpecs } from "hono-openapi";
-import { HTTPException } from "hono/http-exception";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  type ApiPackagedRestCollaborators,
-  type ApiPackagedRestFamilyName,
-} from "../app-rest.packaged-families.ts";
-import { createApiProcessRestFeatures } from "../app-rest.process-features.ts";
+import type { ApiPackagedRestCollaborators } from "../api-rest.packaged-services.ts";
+import type { ApiRestFamilyName } from "../api-rest.doors.ts";
+import { openTestRestDoors } from "./support/rest-doors.harness.ts";
 import { createApiDualCredentialAuth } from "../../app/api-dual-credential-auth.ts";
-import { unavailableIdempotentRunner } from "../../app/api-idempotency.composition.ts";
 import { createApiTrackedEventPorts } from "../../features/trace/tracked-event-ports.adapter.ts";
-
-const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
-
 /** Every base path the packaged list can claim, and the family that owns it. */
-const FAMILY_PATHS: ReadonlyArray<readonly [ApiPackagedRestFamilyName, string]> = [
+const FAMILY_PATHS: ReadonlyArray<readonly [ApiRestFamilyName, string]> = [
   ["agent-cache", "/api/agent-cache"],
   ["agents", "/api/agents"],
   ["agents-v1", "/api/v1/agents"],
@@ -98,14 +90,13 @@ describe("given a process that composed none of the packaged services", () => {
 
   describe("when the absence report is read", () => {
     it("names every family it left out, so the gap is visible at boot rather than at a 404", () => {
-      const absent: ApiPackagedRestFamilyName[] = [];
+      const absent: ApiRestFamilyName[] = [];
       mount(emptyCollaborators(), { absent: (family) => absent.push(family) });
 
-      expect(new Set(absent)).toEqual(
-        new Set([
-          ...new Set(FAMILY_PATHS.map(([family]) => family)),
-          // The one this process cannot build at all, named unconditionally.
-        ]),
+      // A superset assertion, deliberately: the report covers every door on
+      // the registry, and this suite composes only the packaged ones.
+      expect([...new Set(absent)]).toEqual(
+        expect.arrayContaining([...new Set(FAMILY_PATHS.map(([family]) => family))]),
       );
     });
   });
@@ -414,20 +405,19 @@ describe("given the tracked-event family", () => {
 // Harness
 // ---------------------------------------------------------------------------
 
-type MountReport = { absent(family: ApiPackagedRestFamilyName): void };
+type MountReport = { absent(family: ApiRestFamilyName): void };
 
 function mount(collaborators: ApiPackagedRestCollaborators, report?: MountReport) {
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
-    services: { packaged: collaborators },
+  for (const app of openTestRestDoors({
+    packaged: collaborators,
     ports: {
       handlerManagedCredential: () => {
         throw new Error("These families authenticate through the framework chain.");
       },
       rateLimit: async () => ({ allowed: true }),
     },
-    ...(report ? { packagedAbsence: report as never } : {}),
+    ...(report ? { absence: report } : {}),
   })) {
     hono.route("/", app);
   }
@@ -660,67 +650,3 @@ function fullPorts(): ApiPackagedRestCollaborators["ports"] {
     triggerWorkflowEvaluation: () => Promise.reject(new Error("no runner")),
   };
 }
-
-/**
- * Enforcement that authenticates every caller as the same project and the same
- * organization. The families' own access declarations still run; what is faked
- * is only the credential resolution the process would have done.
- */
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const asProject: MiddlewareHandler = async (c, next) => {
-    c.set("project", project);
-    c.set("resolvedToken", {
-      type: "apiKey",
-      apiKeyId: "key_test",
-      userId: "user_test",
-      organizationId: "organization_test",
-      project,
-    });
-    c.set("apiKeyId", "key_test");
-    c.set("apiKeyUserId", "user_test");
-    await next();
-  };
-  const asOrganization: MiddlewareHandler = async (c, next) => {
-    c.set("organization", { id: "organization-1" });
-    c.set("apiKeyUserId", "user-1");
-    await next();
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: () => asProject,
-    authorizeProjectPermission: () => noop,
-    authorizeApiKeyCeiling: () => noop,
-    authenticateOrganization: () => asOrganization,
-    authorizeOrganizationPermission: () => noop,
-    authorizeRouteTeamPermission: () => noop,
-    authorizeRouteProjectPermission: () => noop,
-    authenticateOrganizationThrowing: asOrganization,
-    authorizeOrganizationPermissionThrowing: () => noop,
-    // The port the keyed creates are built against. This world composes no
-    // receipt store, so it takes the runner a process with no ledger takes:
-    // an unkeyed create runs, and a key would be refused by name.
-    idempotency: unavailableIdempotentRunner,
-  } as never);
-}
-
-/** A handled refusal must reach the caller at its own status with its own code. */
-const renderHandled: ErrorHandler = (error, c) => {
-  // Hono's own transport-level refusal — what the dual-credential verifier
-  // raises for a request carrying no credential — carries its response with it.
-  if (error instanceof HTTPException) return error.getResponse();
-  const handled = error as { httpStatus?: number; code?: string; message?: string };
-  if (typeof handled.httpStatus === "number") {
-    return c.json(
-      { error: handled.code ?? "error", message: handled.message ?? "" },
-      handled.httpStatus as never,
-    );
-  }
-  return c.json({ error: String(error) }, 500);
-};

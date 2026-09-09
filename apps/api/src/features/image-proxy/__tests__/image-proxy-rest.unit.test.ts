@@ -5,6 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { openTestRestRuntime } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 import { mountImageProxyRest } from "../image-proxy-rest.mount.ts";
 
 const egress = vi.hoisted(() => ({ fetchValidatedDestination: vi.fn() }));
@@ -15,7 +16,10 @@ vi.mock("@langwatch/egress", () => ({
 }));
 
 function proxy() {
-  return mountImageProxyRest({ blockLocalHttpCalls: true, allowedHosts: [] });
+  return mountImageProxyRest(openTestRestRuntime(), {
+    blockLocalHttpCalls: true,
+    allowedHosts: [],
+  });
 }
 
 /** An upstream that answers with the given media type and body. */

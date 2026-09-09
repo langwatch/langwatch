@@ -1,14 +1,13 @@
 /**
  * The `/api/auth` family's membership in this process's REST app, driven through the real
- * Hono app `createApiProcessRestFeatures` returns. Membership is the whole subject.
+ * Hono app the door registry opens. Membership is the whole subject.
  * Spec: specs/auth/auth-rest-family-mounted.feature
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { AuthCliDeviceFlowRestPorts } from "@langwatch/auth-server";
-import { Hono, type ErrorHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { openTestRestDoors } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 import { composeApiAuthRest } from "../auth-rest.mount.ts";
 
 const BASE_URL = "https://app.test";
@@ -159,8 +158,7 @@ function mount(
   if (!auth) throw new Error("The auth family must compose when the instance is composed.");
 
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     ports: {
       handlerManagedCredential: () => {
         throw new Error("the auth family resolves its own credential.");
@@ -185,32 +183,4 @@ function mount(
         body: JSON.stringify({}),
       }),
   };
-}
-
-/** A failure here must be legible rather than swallowed into a generic 500. */
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
 }

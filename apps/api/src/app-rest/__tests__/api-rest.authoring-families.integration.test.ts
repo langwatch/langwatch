@@ -1,15 +1,14 @@
 /**
  * The four AUTHORING doors this process composes, driven through the real Hono app
- * `createApiProcessRestFeatures` returns.
+ * the door registry opens.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS } from "@langwatch/scenario-server/api-rest/scenario-generate";
 import type { WorkflowApp } from "@langwatch/workflow-server";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../app-rest.process-features.ts";
+import { openTestRestDoors } from "./support/rest-doors.harness.ts";
 import type { ApiAuthoringRestComposition } from "../../app/api-authoring-rest.composition.ts";
 import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session.ts";
 
@@ -341,8 +340,7 @@ function mountWithout() {
 
 function build(input: { authoring?: ApiAuthoringRestComposition }) {
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     services: input.authoring ? { authoring: input.authoring } : {},
     ports: {
       handlerManagedCredential: () => {
@@ -435,39 +433,3 @@ function neverAnsweringModel(): never {
     },
   } as never;
 }
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}
-
-const renderHandled: ErrorHandler = (error, c) => {
-  const handled = error as { httpStatus?: number; code?: string; message?: string };
-  if (typeof handled.httpStatus === "number") {
-    return c.json(
-      { error: handled.code ?? "error", message: handled.message ?? "" },
-      handled.httpStatus as never,
-    );
-  }
-  return c.json({ error: String(error) }, 500);
-};

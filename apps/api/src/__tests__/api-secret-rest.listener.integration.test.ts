@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiApplication, NoApiTrpcFeatures } from "../api.application.ts";
 import { ApiHttpListener } from "../api-http.listener.ts";
 import { ApiHandlerManagedCredentials } from "../app/api-handler-managed-credential.ts";
-import { mountSecretRest } from "../features/secret/secret-rest.mount.ts";
+import { openTestRestDoors } from "../app-rest/__tests__/support/rest-doors.harness.ts";
 
 const secret: Secret = {
   id: "secret-1",
@@ -228,9 +228,9 @@ async function startApi(caller: { userId?: string | null } = {}) {
     authz: authz.service,
   });
   const rest = new Hono();
-  for (const app of mountSecretRest({
-    secrets: () => secrets,
-    credential: (input) => managed.authenticate(input),
+  for (const app of openTestRestDoors({
+    services: { secrets: () => secrets },
+    ports: { handlerManagedCredential: (input) => managed.authenticate(input) },
   })) {
     rest.route("/", app);
   }

@@ -3,14 +3,11 @@
  * rather than assumed: a self-hosted install legitimately proxies an image from
  * a host on its own network, and one that always refused would be useless there.
  */
-import {
-  createRestRuntime,
-  type MountableRestApp,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import type { MountableRestApp, RestErrorHandler } from "@langwatch/api/rest";
 import { createSsrfUrlValidator, fetchValidatedDestination } from "@langwatch/egress";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 import {
   imageProxyRest,
   ImageProxyNotAnImageError,
@@ -29,18 +26,11 @@ export type ImageProxyRestPorts = Readonly<{
 }>;
 
 /** `/api/image-proxy`, bound to one process's egress policy. */
-export function mountImageProxyRest(ports: ImageProxyRestPorts): MountableRestApp {
-  const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => {
-        throw new Error("The image relay answers with no credential resolved.");
-      },
-    },
-  });
-
-  return runtime.mount(imageProxyRest.router(), {
-    app: () => imageProxyApp(ports),
-    credential: "public",
+export function mountImageProxyRest(
+  runtime: ApiRestRuntime,
+  ports: ImageProxyRestPorts,
+): MountableRestApp {
+  return runtime.mount(imageProxyRest.router(), () => imageProxyApp(ports), {
     onError: imageProxyErrors,
   });
 }

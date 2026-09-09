@@ -1,11 +1,7 @@
 import { EnterpriseApiAuditLog, EnterpriseApiSso } from "@langwatch/enterprise-api";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import {
-  createApp,
-  LocalFeatureApis,
-  type BootedRuntime,
-} from "@langwatch/runtime-composition";
+import { LocalFeatureApis, type BootedRuntime } from "@langwatch/runtime-composition";
 import { AgentApi } from "@langwatch/agent-contract";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import type { PrismaConnection } from "@langwatch/prisma-client";
@@ -204,7 +200,6 @@ import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.
 import type { ApiGatewayIdempotencyPort } from "./api-gateway.composition.ts";
 import {
   composeApiIdempotency,
-  unavailableIdempotentRunner,
   type ApiIdempotencyComposition,
 } from "./api-idempotency.composition.ts";
 import {
@@ -293,11 +288,7 @@ import {
 import { installApiSecret } from "../features/secret/secret.composition.ts";
 import type { ComposedSecretFeature } from "../features/secret/secret.composition.types.ts";
 import { ApiRestSecurity, type ApiRestProjectPolicy } from "../api-rest.security.ts";
-import type {
-  AppRestManagementAuditPort,
-  AppRestSecurityPorts,
-  RestCredentialPrincipal,
-} from "@langwatch/api/rest";
+import type { AppRestManagementAuditPort, RestCredentialPrincipal } from "@langwatch/api/rest";
 import { ApiRateLimitInfrastructure } from "../platform/infrastructure/api-rate-limit.infrastructure.ts";
 import {
   ApiAuthAbsenceReportPort,
@@ -314,17 +305,12 @@ import {
   type ApiBillingWebhookComposition,
 } from "./api-billing-webhook.composition.ts";
 import { ApiHandlerManagedSession } from "./api-handler-managed-session.ts";
-import {
-  createApiProcessRestFeatures,
-  LoggedApiProcessRestAbsence,
-} from "../app-rest/app-rest.process-features.ts";
+import { LoggedApiRestAbsence, openApiRestDoors } from "../app-rest/api-rest.doors.ts";
+import { createApiRestRuntime } from "../app-rest/api-rest.runtime.ts";
 import type { CronRestPorts } from "../features/cron/cron-rest.ts";
 import type { NlpLambdaCleanupService } from "@langwatch/workflow-server";
 import { composeNlpLambdaCleanup } from "../features/cron/cron.composition.ts";
-import {
-  composeApiPackagedRest,
-  LoggedApiPackagedRestAbsence,
-} from "./api-packaged-rest.composition.ts";
+import { composeApiPackagedRest } from "./api-packaged-rest.composition.ts";
 import {
   composeApiOpsExplainRest,
   type ApiOpsExplainRest,
@@ -1523,12 +1509,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const database = this.composedDatabase;
     if (!database || !encryption) return undefined;
 
-    return await installApiSecret({
-      prisma: database.connection.client,
-      encryption,
-      // The SAME door every packaged REST family authenticates through.
-      credential: (input) => this.composedHandlerCredentials.authenticate(input),
-    });
+    return await installApiSecret({ prisma: database.connection.client, encryption });
   }
 
   private allocateAgent(options: ApiRuntimeCompositionOptions): AgentApi {
@@ -1702,35 +1683,23 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     publicBaseUrl: string | undefined,
     nlpServiceUrl: string | undefined,
   ): { rest: Hono } {
-    // The one report that names every family this process leaves off because
-    // its transport is still written against the deleted REST builders.
-    const restAbsence = LoggedApiProcessRestAbsence.create(createLogger(serviceName));
-    // One credential resolution for both doors: the enforcement port record
-    // every packaged REST family is built from, and the four-callable
-    // projection the additive public-REST builder takes. Both wrap the same
-    // `ApiRestSecurity`, so they cannot enforce differently.
+    // The ONE report that names every family this process does not serve,
+    // whether its transport is unconverted or this process composed no service
+    // for it. The registry decides which sentence each gets.
+    const restAbsence = LoggedApiRestAbsence.create(createLogger(serviceName));
+    // One credential resolution for every door: the API-key ceiling a route
+    // installs on top of its access policy resolves through the same graph the
+    // project door itself does, so the two cannot enforce differently.
     const credentials = {
       apiKeys: tenancy.apiKeys,
       authz,
       organizations: tenancy.organizations,
       audit: this.resolveAudit(),
     };
-    const restSecurity: AppRestSecurityPorts = ApiRestSecurity.create({
-      ...credentials,
-      observability: ApiRestObservabilityComposition.create(),
-      // The one ledger every keyed create on this process dispatches through,
-      // supplied here so a family declares `withIdempotency(...)` and wires
-      // nothing. A process with no database or no cipher composed no ledger and
-      // takes the runner that refuses a key by name: omitting the port instead
-      // fails the BUILD of every family declaring it, and so the whole process.
-      idempotency: this.composedIdempotency?.run ?? unavailableIdempotentRunner,
-    });
     const projectRestPolicy: ApiRestProjectPolicy = ApiRestSecurity.projectPolicy(credentials);
-    // The process-owned families FIRST, and specifically before anything that
-    // could claim a parameterised segment at the root of a namespace one of
-    // them owns a literal path in — the gateway spec document is the standing
-    // example. Their own relative order is the array's; see
-    // `createApiProcessRestFeatures`.
+    // Every door on the registry, in the registry's own order — the
+    // description locations first, so nothing with a parameterised segment can
+    // shadow one. See `api-rest.doors.ts`.
     const rest = new Hono();
     // The process's ONE credential door, resolved before this method ran
     // because the secret families install over it.
@@ -1773,12 +1742,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ...(payloads ? { payloads } : {}),
       report: LoggedApiTraceIngestAbsence.create(createLogger(serviceName)),
     });
-    // The gateway's public family and the billing reconciliation family beside
-    // it. Both are built by transports still written against the deleted REST
-    // builders, so neither is mounted; the gateway application itself is
-    // composed and the browser's own namespaces read it unchanged.
-    restAbsence.unconverted("gateway-platform");
-    restAbsence.unconverted("gateway-spend");
     // The spend pipeline, registered producer-only. Registered BEFORE the
     // internal family is composed because that family's `/spend-commands`
     // route is the only reason a producer exists on this tier, and the voice
@@ -1788,12 +1751,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       processName: serviceName,
       report: LoggedApiGatewaySpendPipelineAbsence.create(createLogger(serviceName)),
     });
-    // The Go data plane's control-plane calls, and the other half of a brokered
-    // voice call: the vendor's post-call delivery. Both are unconverted, so
-    // neither is mounted — a settlement this process cannot receive is a call
-    // nothing bills, which the spend pipeline above reports on its own.
-    restAbsence.unconverted("gateway-internal");
-    restAbsence.unconverted("elevenlabs-webhook");
     const bugReports = this.composeBugReports(tenancy);
     const unsubscribe = this.composeUnsubscribe();
     const cron = this.composeCron();
@@ -2228,97 +2185,97 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       instanceAdminKey: this.composedFeaturePorts?.instanceAdminKey ?? (() => undefined),
       logger: createLogger(serviceName),
     });
-    for (const processRestApp of createApiProcessRestFeatures({
-      security: restSecurity,
-      packagedAbsence: LoggedApiPackagedRestAbsence.create(createLogger(serviceName)),
-      processAbsence: restAbsence,
-      services: {
+    // The process's ONE REST runtime: every door on the registry is opened
+    // through it, so identity, refusal rendering and the project facts are
+    // resolved once for the whole process rather than once per family.
+    const restRuntime = createApiRestRuntime({
+      projectCredential: (input) => handlerManagedCredentials.authenticate(input),
+      errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
+      ...(packaged.ports.dualAuth ? { dualCredential: packaged.ports.dualAuth } : {}),
+    });
+
+    // Taken once rather than read off the root inside a provider: the three
+    // are already composed at this line, and a provider that read them later
+    // would be a second answer to whether the door exists at all.
+    const platformHealth = this.composedPlatformHealth?.app;
+    const secrets = this.composedSecret?.app;
+    const suites = this.composedScenario.suites;
+
+    for (const openedDoor of openApiRestDoors({
+      report: restAbsence,
+      context: {
+        runtime: restRuntime,
         packaged,
-        ...this.composedAnnotation.restServices,
-        ...this.composedStoredObject.restServices,
-        analytics: () => analytics,
-        ...(langWatchQL ? { langWatchQL } : {}),
-        ...(promptApp
-          ? {
-              prompts: {
-                service: () => promptApp.promptService,
-                tagCatalog: () => promptApp,
-                permissions: () => authz,
-              },
-            }
-          : {}),
-        ...(organizationManagement ? { organizationManagement } : {}),
-        ...(traceExport ? { traceExport } : {}),
-        ...(scenarioRunExport ? { scenarioRunExport } : {}),
-        ...(authoring ? { authoring } : {}),
-        ...(experimentWorkbench ? { experimentWorkbench } : {}),
-        ...(experimentInit ? { experimentInit } : {}),
-        ...(evaluationBatch ? { evaluationBatch } : {}),
-        ...(evaluationRun ? { evaluationRun } : {}),
-        ...(workflowRun ? { workflowRun } : {}),
-        ...(traceReads ? { traceReads } : {}),
-        ...(traceLegacy ? { traceLegacy } : {}),
-        organizations: () => tenancy.organizations,
-        ...(this.composedPlatformHealth
-          ? { platformHealth: this.composedPlatformHealth.rest }
-          : {}),
-      },
-      ports: {
-        handlerManagedCredential: (input) => handlerManagedCredentials.authenticate(input),
-        // The SAME counter the packaged REST families and the identity
-        // throttles meter through, so a caller has one budget per rule.
-        rateLimit: (request) => this.rateLimiter.consume(request),
-        ...(otlpIngest ? { otlpIngest: otlpIngest.otlp } : {}),
-        ...(collector ? { collector } : {}),
-        ...(bugReports ? { bugReports } : {}),
-        ...(unsubscribe ? { unsubscribe } : {}),
-        ...(cron ? { cron } : {}),
-        ...(langyRest ? { langy: langyRest } : {}),
-        ...(githubRest ? { github: githubRest } : {}),
-        ...(adminRest ? { admin: adminRest } : {}),
-        ...(authCliDeviceFlow ? { authCliDeviceFlow } : {}),
-        ...(governanceCli ? { governanceCli } : {}),
-        ...(authRest ? { auth: authRest } : {}),
-        ...(governanceIngest ? { governanceIngest } : {}),
-        ...(scim ? { scim } : {}),
-        ...(publicBaseUrl ? { publicBaseUrl } : {}),
-        ...(healthProbes ? { healthProbes } : {}),
-        ...(this.composedOpsExplain ? { opsClickHouseExplain: this.composedOpsExplain.ports } : {}),
-        ...(dspySteps ? { dspySteps } : {}),
-        ...(mcpAuthorize ? { mcpAuthorize } : {}),
-        imageProxy: {
-          blockLocalHttpCalls: this.composedRestEnvironment.blockLocalHttpCalls,
-          allowedHosts: this.composedRestEnvironment.allowedProxyHosts,
+        services: {
+          ...this.composedAnnotation.restServices,
+          ...this.composedStoredObject.restServices,
+          analytics: () => analytics,
+          ...(langWatchQL ? { langWatchQL } : {}),
+          ...(promptApp
+            ? {
+                prompts: {
+                  service: () => promptApp.promptService,
+                  tagCatalog: () => promptApp,
+                  permissions: () => authz,
+                },
+              }
+            : {}),
+          ...(organizationManagement ? { organizationManagement } : {}),
+          ...(traceExport ? { traceExport } : {}),
+          ...(scenarioRunExport ? { scenarioRunExport } : {}),
+          ...(authoring ? { authoring } : {}),
+          ...(experimentWorkbench ? { experimentWorkbench } : {}),
+          ...(experimentInit ? { experimentInit } : {}),
+          ...(evaluationBatch ? { evaluationBatch } : {}),
+          ...(evaluationRun ? { evaluationRun } : {}),
+          ...(workflowRun ? { workflowRun } : {}),
+          ...(traceReads ? { traceReads } : {}),
+          ...(traceLegacy ? { traceLegacy } : {}),
+          organizations: () => tenancy.organizations,
+          // The three applications the process used to route after everything
+          // else. They are entries on the registry now, so their doors are
+          // ordered with the rest rather than appended to them.
+          ...(platformHealth ? { platformHealth: () => platformHealth } : {}),
+          ...(secrets ? { secrets: () => secrets } : {}),
+          suites: () => suites,
+        },
+        ports: {
+          handlerManagedCredential: (input) => handlerManagedCredentials.authenticate(input),
+          // The SAME counter the packaged REST families and the identity
+          // throttles meter through, so a caller has one budget per rule.
+          rateLimit: (request) => this.rateLimiter.consume(request),
+          // The envelope every family that names none of its own answers in.
+          errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
+          platformUrl: createPlatformUrlBuilder(publicBaseUrl),
+          ...(otlpIngest ? { otlpIngest: otlpIngest.otlp } : {}),
+          ...(collector ? { collector } : {}),
+          ...(bugReports ? { bugReports } : {}),
+          ...(unsubscribe ? { unsubscribe } : {}),
+          ...(cron ? { cron } : {}),
+          ...(langyRest ? { langy: langyRest } : {}),
+          ...(githubRest ? { github: githubRest } : {}),
+          ...(adminRest ? { admin: adminRest } : {}),
+          ...(authCliDeviceFlow ? { authCliDeviceFlow } : {}),
+          ...(governanceCli ? { governanceCli } : {}),
+          ...(authRest ? { auth: authRest } : {}),
+          ...(governanceIngest ? { governanceIngest } : {}),
+          ...(scim ? { scim } : {}),
+          ...(publicBaseUrl ? { publicBaseUrl } : {}),
+          ...(healthProbes ? { healthProbes } : {}),
+          ...(this.composedOpsExplain
+            ? { opsClickHouseExplain: this.composedOpsExplain.ports }
+            : {}),
+          ...(dspySteps ? { dspySteps } : {}),
+          ...(mcpAuthorize ? { mcpAuthorize } : {}),
+          imageProxy: {
+            blockLocalHttpCalls: this.composedRestEnvironment.blockLocalHttpCalls,
+            allowedHosts: this.composedRestEnvironment.allowedProxyHosts,
+          },
         },
       },
     })) {
-      rest.route("/", processRestApp);
+      rest.route("/", openedDoor);
     }
-    // `/api/dataset`, declared by the dataset module and bound to this
-    // process's project-key door. Absent on a process that installed no
-    // dataset feature, which has no rows for the family to answer over.
-    if (this.composedDataset) rest.route("/", this.composedDataset.rest);
-    // `/api/secret` and `/api/secrets`, each with its `/api/v1` twin. Nothing
-    // is mounted on a process that installed no secret feature: a door over a
-    // store it cannot decrypt is worse than no door.
-    for (const secretRestApp of this.composedSecret?.rest ?? []) {
-      rest.route("/", secretRestApp);
-    }
-    // `/api/v1/run-plans`, `/api/v1/test-suites` and the deprecated
-    // `/api/suites` alias. All three read the SAME application, so the fallback
-    // order and the resolved organization never disagree between doors.
-    for (const suiteRestApp of this.composedScenario.suiteRest) {
-      rest.route("/", suiteRestApp);
-    }
-    // The API-key management family and the payment provider's callback: both
-    // unconverted, and both left off rather than mounted over a builder that
-    // is gone. A missing Stripe callback means an unacknowledged webhook the
-    // provider retries, which is recoverable; a half-built one is not.
-    restAbsence.unconverted("api-keys");
-    restAbsence.unconverted("billing-webhook");
-    // The one streaming route this process serves is declared on the same
-    // deleted builder, so the process names no subscription mount at all.
-    restAbsence.unconverted("sse-subscriptions");
 
     return { rest };
   }
@@ -3231,15 +3188,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     return await composeScenarioFeature({
       prisma: database.client,
       resources: options.resources,
-      // The three suite families answer through the SAME project-key door
-      // every other declared family on this process opens.
-      suiteRest: {
-        credential: (input) => this.composedHandlerCredentials.authenticate(input),
-        platformUrl: createPlatformUrlBuilder(
-          options.config.infrastructure.execution.publicBaseUrl,
-        ),
-        errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
-      },
       authz,
       agents,
       connectedPresence: (input) => agents.getPresence(input),
@@ -4166,15 +4114,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       prisma: infrastructure.prisma,
       peers: { experiments: this.deferredApis.reference(ExperimentApi), permissions },
       infrastructure: {},
-      // `/api/dataset` answers through the SAME project-key door every other
-      // declared family on this process opens.
-      rest: {
-        credential: (input) => this.composedHandlerCredentials.authenticate(input),
-        platformUrl: createPlatformUrlBuilder(
-          options.config.infrastructure.execution.publicBaseUrl,
-        ),
-        errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
-      },
     });
     const datasets = this.composedDataset.app;
     this.composedDatasets = datasets;

@@ -2,27 +2,16 @@
  * The API process's REST surface, composed for description rather than for service.
  */
 import { Hono } from "hono";
-import type { ErrorHandler, MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import { createApiKeysRestApp } from "@langwatch/api-key-server";
 import type { AuthRestPorts } from "@langwatch/auth-server";
-import { createGatewayPlatformRestApp } from "@langwatch/gateway-server/api-rest/gateway-platform";
-import { createGatewaySpendRestApp } from "@langwatch/gateway-server/api-rest/gateway-spend";
 import type { GovernanceIngestRestPorts } from "@langwatch/enterprise-governance-server";
 
 
-import { mountSecretRest } from "../../features/secret/secret-rest.mount.ts";
-import { mountSuiteRest } from "../../features/suite/suite-rest.mount.ts";
-import {
-  createApiProcessRestFeatures,
-  type ApiProcessRestPorts,
-  type ApiProcessRestServices,
-} from "../../app-rest/app-rest.process-features.ts";
-import type {
-  ApiPackagedRestCollaborators,
-  ApiPackagedRestFamilyName,
-} from "../../app-rest/app-rest.packaged-families.ts";
+import { openApiRestDoors } from "../../app-rest/api-rest.doors.ts";
+import { createApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
+import type { ApiRestPorts, ApiRestServices } from "../../app-rest/api-rest.services.ts";
+import type { ApiPackagedRestCollaborators } from "../../app-rest/api-rest.packaged-services.ts";
 
 /** A family the process serves that this composition cannot describe, and why. */
 export type OpenApiSurfaceAbsence = Readonly<{
@@ -63,37 +52,6 @@ const noopMiddleware: MiddlewareHandler = async (_c, next) => {
 };
 
 /**
- * Enforcement that authenticates nobody. The middleware chain is still BUILT for every
- * route, which is what registers each route's access policy in the route registry — and
- * that registry is what stamps per-operation security onto the generated document.
- */
-function descriptionOnlySecurity(): AppRestSecurity {
-  const refuseAtRuntime: ErrorHandler = (error) => {
-    throw error;
-  };
-  return createAppRestSecurity({
-    appContext: noopMiddleware,
-    requestLogger: () => noopMiddleware,
-    requestTracer: () => noopMiddleware,
-    legacyErrorHandler: refuseAtRuntime,
-    canonicalErrorHandler: refuseAtRuntime,
-    authenticateProject: () => noopMiddleware,
-    authorizeProjectPermission: () => noopMiddleware,
-    authorizeApiKeyCeiling: () => noopMiddleware,
-    authenticateOrganization: () => noopMiddleware,
-    authorizeOrganizationPermission: () => noopMiddleware,
-    authorizeRouteTeamPermission: () => noopMiddleware,
-    authorizeRouteProjectPermission: () => noopMiddleware,
-    authenticateOrganizationThrowing: noopMiddleware,
-    authorizeOrganizationPermissionThrowing: () => noopMiddleware,
-    // The document is built with no process behind it, so the ledger is present
-    // only to satisfy the families that declare a replayable create; nothing
-    // here ever dispatches a request through it.
-    idempotency: refuseAtRuntime,
-  } as never);
-}
-
-/**
  * The deployment origin the document's example links are built from. The hosted product's
  * own, because that is what an integrator reading the published document is looking at.
  */
@@ -112,7 +70,9 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
       codingAgents: refuse("Coding agents"),
       codingAgentAudit: refuse("Coding agent audit"),
       dashboard: refuse("Dashboards"),
-      datasets: refuse("Datasets"),
+      // NOT stood up: `/api/dataset`'s eight undeclarable routes are still
+      // described from the frozen document, and mounting the declared half here
+      // would publish a half of the family the document does not have.
       evaluators: refuse("Evaluators"),
       experiments: refuse("Experiments"),
       governance: refuse("Governance"),
@@ -168,10 +128,14 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
 }
 
 /** The process's own product services, all present so every family is mounted. */
-function processServices(): ApiProcessRestServices {
+function processServices(): ApiRestServices {
   return {
-    packaged: packagedCollaborators(),
     annotations: refuse("Annotations"),
+    // The monitoring-keyed liveness report is deliberately NOT described: it
+    // publishes no operation an integrator can call, and standing it up here
+    // would add a family to the document the previous surface never carried.
+    secrets: refuse("The secret store"),
+    suites: refuse("The suite application"),
     analytics: refuse("Analytics"),
     langWatchQL: {
       collaborators: opaque(),
@@ -230,10 +194,12 @@ function processServices(): ApiProcessRestServices {
 }
 
 /** The process's own capabilities, all present so every family is mounted. */
-function processPorts(): ApiProcessRestPorts {
+function processPorts(): ApiRestPorts {
   return {
     handlerManagedCredential: refuse("Handler-managed credentials") as never,
     rateLimit: refuse("Rate limiting") as never,
+    errors: refuse("Error rendering") as never,
+    platformUrl: ({ projectSlug, path }) => `${PUBLIC_BASE_URL}/${projectSlug}${path}`,
     otlpIngest: {
       credential: refuse("Ingestion credentials") as never,
       usageLimit: refuse("The usage meter") as never,
@@ -300,64 +266,15 @@ function processPorts(): ApiProcessRestPorts {
 }
 
 /**
- * The families the process mounts BESIDE `createApiProcessRestFeatures`.
- * `api-production.composition.ts` routes five more apps after that list, and four of them
- * publish operations.
+ * Every family the process mounts, in one app, described and never served.
  */
-function mountProcessTailFamilies(options: {
-  app: Hono;
-  security: AppRestSecurity;
-  absences: OpenApiSurfaceAbsence[];
-}): void {
-  const { app, security } = options;
-
-  for (const secretApp of mountSecretRest({
-    secrets: refuse("The secret store"),
-    credential: refuse("The project credential door"),
-  })) {
-    app.route("/", secretApp);
-  }
-
-  // The three suite families: the two published ones and the deprecated
-  // `/api/suites` alias that predates their split.
-  for (const suiteApp of mountSuiteRest({
-    suites: refuse("The suite application"),
-    credential: refuse("The project credential door"),
-    platformUrl: () => "",
-    errors: refuse("Error rendering") as never,
-  })) {
-    app.route("/", suiteApp);
-  }
-
-  app.route(
-    "/",
-    createApiKeysRestApp({
-      security,
-      apiKeys: refuse("API keys"),
-      permissions: refuse("Authorization"),
-      audit: () => {},
-    }) as unknown as Hono,
-  );
-
-  app.route(
-    "/",
-    createGatewayPlatformRestApp({
-      security,
-      gateway: refuse("The gateway control plane"),
-    }) as unknown as Hono,
-  );
-
-  app.route(
-    "/",
-    createGatewaySpendRestApp({
-      security,
-      billingPlanGate: noopMiddleware,
-      canonicalError: refuse("Canonical error rendering") as never,
-      spend: refuse("Gateway spend"),
-    }) as unknown as Hono,
-  );
-
-  options.absences.push(
+export function composeOpenApiDocumentSurface(): OpenApiDocumentSurface {
+  const app = new Hono();
+  // The two families the registry does not name at all: both read a live
+  // Prisma connection and their service graph at BUILD time rather than per
+  // request, and neither carries a `describeRoute`, so leaving them out costs
+  // the document no operation.
+  const absences: OpenApiSurfaceAbsence[] = [
     {
       family: "gateway-internal",
       because:
@@ -368,35 +285,28 @@ function mountProcessTailFamilies(options: {
       because:
         "the same live Prisma connection at build time; the route is a vendor callback and carries no describeRoute, so it publishes no operations either",
     },
-  );
-}
+  ];
+  const runtime = createApiRestRuntime({
+    projectCredential: refuse("The project credential door"),
+    errors: refuse("Error rendering") as never,
+    dualCredential: noopMiddleware,
+  });
 
-/**
- * Every family the process mounts, in one app, described and never served.
- */
-export function composeOpenApiDocumentSurface(): OpenApiDocumentSurface {
-  const security = descriptionOnlySecurity();
-  const app = new Hono();
-  const absences: OpenApiSurfaceAbsence[] = [];
-
-  for (const family of createApiProcessRestFeatures({
-    security,
-    services: processServices(),
-    ports: processPorts(),
-    packagedAbsence: {
-      absent: (family: ApiPackagedRestFamilyName) => {
-        absences.push({
-          family,
-          because:
-            "the packaged mount named it absent at boot; see mountApiPackagedRestFamilies for what this process cannot build it from",
-        });
+  for (const door of openApiRestDoors({
+    context: {
+      runtime,
+      services: processServices(),
+      ports: processPorts(),
+      packaged: packagedCollaborators(),
+    },
+    report: {
+      absent: (family: string, because: string) => {
+        absences.push({ family, because });
       },
     },
   })) {
-    app.route("/", family);
+    app.route("/", door);
   }
-
-  mountProcessTailFamilies({ app, security, absences });
 
   return { app, absences };
 }

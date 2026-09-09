@@ -10,8 +10,6 @@
  *
  * @see specs/langy/langy-local-control.feature
  */
-import { createErrorHandler } from "@langwatch/api";
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import {
@@ -21,11 +19,11 @@ import {
   type LocalControlRuntime,
 } from "@langwatch/langy-server";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createApiProcessRestFeatures } from "../app-rest.process-features.ts";
+import { openTestRestDoors } from "./support/rest-doors.harness.ts";
 
 const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
 const OWNER = "user-1";
@@ -197,13 +195,25 @@ function mount() {
   });
   const longPoll = new LocalControlLongPoll({ core });
 
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     services: {},
     ports: {
-      handlerManagedCredential: () => {
-        throw new Error("This family authenticates through the framework chain.");
-      },
+      // The acting person each scenario names: local control answers a
+      // teammate none of the caller's own requests.
+      handlerManagedCredential: async () => ({
+        ok: true as const,
+        project,
+        resolved: {
+          type: "apiKey" as const,
+          apiKeyId: "key-langy-control",
+          userId: actingUserId,
+          organizationId: "organization-1",
+          ingestSourceType: null,
+          ingestionTemplateId: null,
+          project,
+        },
+        markUsed: () => {},
+      }),
       rateLimit: async () => ({ allowed: true }),
       publicBaseUrl: "https://app.langwatch.test",
       langy: {
@@ -242,57 +252,3 @@ function mount() {
       hono.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
-
-/**
- * Enforcement that authenticates every caller as the same project, with the
- * acting person the test names. The family's own access declarations still
- * run; what is faked is only the credential resolution.
- */
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const asProject: MiddlewareHandler = async (c, next) => {
-    c.set("project", project);
-    c.set("apiKeyUserId", actingUserId);
-    // The whole resolved credential, as the process's own authentication
-    // installs it: handlers read their caller off this, never off loose keys.
-    c.set("resolvedToken", {
-      type: "apiKey",
-      apiKeyId: "key-langy-control",
-      userId: actingUserId,
-      organizationId: "organization-1",
-      ingestSourceType: null,
-      ingestionTemplateId: null,
-      project,
-    });
-    await next();
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: createErrorHandler(),
-    authenticateProject: () => asProject,
-    authorizeProjectPermission: () => noop,
-    authorizeApiKeyCeiling: () => noop,
-    authenticateOrganization: () => noop,
-    authorizeOrganizationPermission: () => noop,
-    authorizeRouteTeamPermission: () => noop,
-    authorizeRouteProjectPermission: () => noop,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: () => noop,
-  } as never);
-}
-
-const renderHandled: ErrorHandler = (error, c) => {
-  const handled = error as { httpStatus?: number; code?: string; message?: string };
-  if (typeof handled.httpStatus === "number") {
-    return c.json(
-      { error: handled.code ?? "error", message: handled.message ?? "" },
-      handled.httpStatus as never,
-    );
-  }
-  return c.json({ error: String(error) }, 500);
-};

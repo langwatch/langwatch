@@ -6,11 +6,10 @@
  * travel together: a process holding the dashboards but not the graphs would
  * publish a dashboard whose panels cannot be read.
  */
-import {
-  createRestRuntime,
-  type MountableRestApp,
-  type RequestValidationError,
-  type RestErrorHandler,
+import type {
+  MountableRestApp,
+  RequestValidationError,
+  RestErrorHandler,
 } from "@langwatch/api/rest";
 import {
   DashboardNotFoundError,
@@ -20,51 +19,17 @@ import {
 } from "@langwatch/dashboard-contract";
 import { dashboardRest, graphRest } from "@langwatch/dashboard-server";
 import type { Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import type { ApiHandlerManagedCredentialPort } from "../../app-rest/app-rest.process-features.ts";
-
-class DashboardRefusal extends Error {
-  constructor(
-    readonly status: ContentfulStatusCode,
-    readonly body: object,
-  ) {
-    super("dashboard request refused");
-    this.name = "DashboardRefusal";
-  }
-}
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 
 /** Mounts `/api/dashboards` and `/api/graphs` with their historical bodies. */
-export function mountDashboardRest(options: {
-  dashboard: () => DashboardApi;
-  credential: ApiHandlerManagedCredentialPort;
-}): MountableRestApp[] {
-  const runtime = createRestRuntime({
-    identity: {
-      authenticate: async ({ request, permission }) => {
-        const credential = await options.credential({ request, permission });
-        if (!credential.ok) throw new DashboardRefusal(credential.status, credential.body);
-
-        return {
-          actor: null,
-          scope: { tier: "project", id: credential.project.id },
-          markUsed: credential.markUsed,
-        };
-      },
-    },
-  });
-
+export function mountDashboardRest(
+  runtime: ApiRestRuntime,
+  dashboard: () => DashboardApi,
+): readonly MountableRestApp[] {
   return [
-    runtime.mount(dashboardRest.router(), {
-      app: options.dashboard,
-      credential: "projectKey",
-      onError: dashboardErrorHandler,
-    }),
-    runtime.mount(graphRest.router(), {
-      app: options.dashboard,
-      credential: "projectKey",
-      onError: graphErrorHandler,
-    }),
+    runtime.mount(dashboardRest.router(), dashboard, { onError: dashboardErrorHandler }),
+    runtime.mount(graphRest.router(), dashboard, { onError: graphErrorHandler }),
   ];
 }
 
@@ -76,8 +41,6 @@ export function mountDashboardRest(options: {
  * was: reconciling it changes a published status.
  */
 const dashboardErrorHandler: RestErrorHandler = (error, context) => {
-  if (error instanceof DashboardRefusal) return context.json(error.body, error.status);
-
   if (error instanceof DashboardReorderUnknownIdsError) {
     return context.json({ error: error.message }, 400);
   }
@@ -93,8 +56,6 @@ const dashboardErrorHandler: RestErrorHandler = (error, context) => {
 
 /** The graphs family's own refusals, in the bare `{ error }` body they had. */
 const graphErrorHandler: RestErrorHandler = (error, context) => {
-  if (error instanceof DashboardRefusal) return context.json(error.body, error.status);
-
   if (error instanceof GraphNotFoundError) return context.json({ error: "Graph not found" }, 404);
 
   if (error instanceof DashboardNotFoundError) {

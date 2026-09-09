@@ -16,7 +16,7 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type { ApiEvaluatorExecution } from "../../app/api-evaluator-execution.composition.ts";
-import type { ApiHandlerManagedCredentialPort } from "../../app-rest/app-rest.process-features.ts";
+import type { ApiHandlerManagedCredentialPort } from "../../app-rest/api-rest.runtime.ts";
 import { listCustomEvaluators } from "../../platform/infrastructure/postgres.custom-evaluators.adapter.ts";
 
 /** Everything `POST /api/evaluations/batch/log_results` binds to. */

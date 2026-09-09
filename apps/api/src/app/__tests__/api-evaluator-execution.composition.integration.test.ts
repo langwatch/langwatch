@@ -4,7 +4,6 @@
  * @see specs/ai-gateway/guardrail-check-endpoint.feature
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { ExperimentService } from "@langwatch/experiment-contract";
@@ -19,10 +18,10 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../app-rest/app-rest.process-features.ts";
+import { openTestRestDoors } from "../../app-rest/__tests__/support/rest-doors.harness.ts";
 import { ApiRestSecurity } from "../../api-rest.security.ts";
 import {
   composeApiEvaluatorExecution,
@@ -334,8 +333,7 @@ function mountProcessRest() {
   } as unknown as PrismaClient;
 
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     services: {
       evaluationRun: {
         prisma,
@@ -370,30 +368,3 @@ function mountProcessRest() {
       hono.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}
-
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);

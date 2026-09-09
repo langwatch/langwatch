@@ -3,12 +3,8 @@
  * credential opens the door — the consent page arrives on a browser session,
  * which the route reads as a declared fact and answers its own 401 for.
  */
-import {
-  bindRestMiddleware,
-  createRestRuntime,
-  type MountableRestApp,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import { bindRestMiddleware, type MountableRestApp, type RestErrorHandler } from "@langwatch/api/rest";
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 import {
   McpAuthorizationService,
   mcpAuthorizeApprover,
@@ -45,18 +41,11 @@ export interface McpAuthorizeRestPorts {
 }
 
 /** `POST /api/mcp/authorize`, bound to one process's session and cipher. */
-export function mountMcpAuthorizeRest(ports: McpAuthorizeRestPorts): MountableRestApp {
-  const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => {
-        throw new Error("The MCP approval step answers with no credential resolved.");
-      },
-    },
-  });
-
-  return runtime.mount(mcpAuthorizeRest.router(), {
-    app: () => mcpAuthorizeApp(ports),
-    credential: "public",
+export function mountMcpAuthorizeRest(
+  runtime: ApiRestRuntime,
+  ports: McpAuthorizeRestPorts,
+): MountableRestApp {
+  return runtime.mount(mcpAuthorizeRest.router(), () => mcpAuthorizeApp(ports), {
     onError: mcpAuthorizeErrors,
     facts: [
       bindRestMiddleware(mcpAuthorizeApprover, (context) => ports.resolveSession(context.req.raw)),

@@ -1,16 +1,15 @@
 /**
  * The three trace REST doors this process mounts, driven through the real Hono app
- * `createApiProcessRestFeatures` builds.
+ * the door registry opens.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { UsageLimitResult } from "@langwatch/entitlement-server";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { RecordSpanCommandData, Trace } from "@langwatch/trace-contract";
 import type { TraceApp } from "@langwatch/trace-server";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { openTestRestDoors } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 import type { ApiHandlerManagedCredentials } from "../../../app/api-handler-managed-credential.ts";
 import {
   composeApiTraceIngest,
@@ -325,8 +324,7 @@ function mount(overrides: MountOverrides) {
   } as unknown as ShareApi;
 
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     services: {
       traceReads: {
         reads,
@@ -453,61 +451,3 @@ function credentialsStub(
         })),
   } as never;
 }
-
-/**
- * Enforcement that authenticates every framework-chain caller as the same
- * project. The families' own access declarations still run; what is faked is
- * only the credential resolution the process would have done.
- */
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  // The whole resolved credential, as the process's own authentication
-  // installs it: handlers read their caller off this, never off loose keys.
-  const asProject: MiddlewareHandler = async (c, next) => {
-    c.set("project", PROJECT);
-    c.set("resolvedToken", { type: "legacyProjectKey", project: PROJECT });
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: () => asProject,
-    authorizeProjectPermission: () => noop,
-    authorizeApiKeyCeiling: () => noop,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: () => noop,
-    authorizeRouteProjectPermission: () => noop,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}
-
-/**
- * A handled refusal must reach the caller at its own status with its own code;
- * anything else is legible rather than swallowed into a generic 500.
- */
-const renderHandled: ErrorHandler = (error, c) => {
-  const handled = error as {
-    httpStatus?: number;
-    status?: number;
-    code?: string;
-    message?: string;
-  };
-  const status = handled.httpStatus ?? handled.status;
-  if (typeof status === "number") {
-    return c.json(
-      { error: handled.code ?? "error", message: handled.message ?? "" },
-      status as never,
-    );
-  }
-  return c.json({ error: String(error) }, 500);
-};

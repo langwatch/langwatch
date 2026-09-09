@@ -57,7 +57,7 @@ import {
   SuiteRunModelsService,
 } from "@langwatch/suite-server";
 
-import { installApiSuite, type SuiteRestPorts } from "../suite/suite.composition.ts";
+import { installApiSuite } from "../suite/suite.composition.ts";
 import type {
   ScenarioService,
   ScenarioTabRegistry,
@@ -177,8 +177,6 @@ export type ScenarioFeatureCollaborators = Readonly<{
   pipelines: ApiAgentPipelines;
   /** Names this process in every refusal below. */
   processName: string;
-  /** What the three suite REST families answer through. */
-  suiteRest: SuiteRestPorts;
   report?: ApiScenarioAbsenceReport;
 }>;
 
@@ -246,7 +244,6 @@ export async function composeScenarioFeature(
       }),
       generateId: () => `suite_${nanoid()}`,
     },
-    rest: options.suiteRest,
   });
   const suiteApp = suite.app;
 
@@ -289,7 +286,6 @@ export async function composeScenarioFeature(
     scenarioTabs,
     simulations,
     suites: suiteApp,
-    suiteRest: suite.rest,
   };
 }
 
@@ -314,7 +310,6 @@ export function refusingScenarioFeature(): ComposedScenarioFeature {
     scenarioTabs: refuse<ScenarioTabRegistry>("The scenario tab registry"),
     simulations: refuse<SimulationService>("The simulation run store"),
     suites: refuse<SuiteApi>("The suite surface"),
-    suiteRest: [],
   };
 }
 

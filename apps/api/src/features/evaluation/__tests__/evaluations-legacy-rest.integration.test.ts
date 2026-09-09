@@ -1,13 +1,12 @@
 /**
  * The legacy evaluation family as this process mounts it, driven through the real Hono
- * app `createApiProcessRestFeatures` builds. Two facts are worth pinning, and they are
+ * app the door registry opens. Two facts are worth pinning, and they are
  * the two halves of the mount's decision.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { openTestRestDoors } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 
 describe("given the evaluator catalogue this process compiles in", () => {
   describe("when an unauthenticated caller reads it", () => {
@@ -69,8 +68,7 @@ describe("given a process that composed no evaluator runtime", () => {
 
 function mount() {
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     ports: {
       handlerManagedCredential: () =>
         Promise.resolve({
@@ -92,30 +90,3 @@ function mount() {
       hono.fetch(new Request(`http://api.test${path}`, init)),
   };
 }
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}
-
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);

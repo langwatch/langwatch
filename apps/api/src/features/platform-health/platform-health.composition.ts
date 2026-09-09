@@ -3,14 +3,12 @@
  * own probes. Nothing is structural: no monitoring key cannot tell a monitor
  * from anyone else, and no probe credential cannot author a canary.
  */
-import type { MountableRestApp } from "@langwatch/api/rest";
 import type { PlatformHealthApi } from "@langwatch/platform-health-contract";
 import { platformHealthServer } from "@langwatch/platform-health-server";
 import { createApp } from "@langwatch/runtime-composition";
 import { fromDate } from "@langwatch/time";
 
 import type { HealthProbeRestPorts } from "../health/health-probe-rest.mount.ts";
-import { mountPlatformHealthRest } from "./platform-health-rest.mount.ts";
 
 /** What this process brings to the platform-health family. */
 export type ApiPlatformHealthOptions = Readonly<{
@@ -25,10 +23,12 @@ export type ApiPlatformHealthOptions = Readonly<{
   probes: HealthProbeRestPorts | undefined;
 }>;
 
-/** The platform-health application and the one family it answers on. */
+/**
+ * The platform-health application. `/api/v1/platform-health` is opened from the
+ * door registry over it, never from here.
+ */
 export type ComposedPlatformHealthFeature = Readonly<{
   app: PlatformHealthApi;
-  rest: MountableRestApp;
 }>;
 
 /** Installs the platform-health surface over this process's own graph. */
@@ -64,5 +64,5 @@ export async function installApiPlatformHealth(
 
   const app = runtime.feature(platformHealthServer).provided;
 
-  return { app, rest: mountPlatformHealthRest({ platformHealth: () => app }) };
+  return { app };
 }

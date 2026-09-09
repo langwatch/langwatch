@@ -10,6 +10,7 @@
  * See packages/api/specs/api-discovery.feature.
  */
 
+import type { RestErrorHandler } from "@langwatch/api/rest";
 import { featureApi } from "@langwatch/runtime-composition";
 
 import { apiDocumentBytes, apiDocumentETag } from "./openapi-document.ts";
@@ -117,3 +118,11 @@ export function respondWithApiDocument({ ifNoneMatch }: { ifNoneMatch: string | 
 
 /** The document server every discovery location in this process answers from. */
 export const apiDocument: ApiDocumentApi = { readDocument: respondWithApiDocument };
+
+/**
+ * The flat legacy body the three description locations have always published.
+ * An unanticipated failure never puts its own message in front of a caller, and
+ * the document these routes serve carries no tenant data to leak in one.
+ */
+export const discoveryErrors: RestErrorHandler = (_error, context) =>
+  context.json({ error: "Internal Server Error", message: "An unknown error occurred" }, 500);

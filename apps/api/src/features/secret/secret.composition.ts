@@ -7,8 +7,6 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/runtime-composition";
 import { secretServer, type SecretEncryptionPort } from "@langwatch/secret-server";
 
-import type { ApiHandlerManagedCredentialPort } from "../../app-rest/app-rest.process-features.ts";
-import { mountSecretRest } from "./secret-rest.mount.ts";
 import type { ComposedSecretFeature } from "./secret.composition.types.ts";
 import { createSecretTrpcRouter } from "./secret-trpc.mount.ts";
 
@@ -18,8 +16,6 @@ export async function installApiSecret(options: {
   prisma: PrismaClient;
   /** The stored-secret cipher this process composed from its configured key. */
   encryption: SecretEncryptionPort;
-  /** The project API key the REST families authenticate through. */
-  credential: ApiHandlerManagedCredentialPort;
 }): Promise<ComposedSecretFeature> {
   const runtime = await createApp({ name: "langwatch-api" })
     .withPersistence("postgres", { prisma: options.prisma })
@@ -32,6 +28,5 @@ export async function installApiSecret(options: {
   return {
     routers: (mount) => ({ secrets: createSecretTrpcRouter(mount.runtime) }),
     app,
-    rest: mountSecretRest({ secrets: () => app, credential: options.credential }),
   };
 }

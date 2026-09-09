@@ -3,18 +3,14 @@
  * resolves no credential through the door — the probes accept a project API
  * key in either of two headers — so the routes read the key themselves.
  */
-import {
-  bindRestHeader,
-  createRestRuntime,
-  type MountableRestApp,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import { bindRestHeader, type MountableRestApp, type RestErrorHandler } from "@langwatch/api/rest";
 import {
   SubsystemProbeService,
   type SubsystemProbeOutcome,
 } from "@langwatch/platform-health-server";
 import { fromDate } from "@langwatch/time";
 
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 import {
   HealthProbeFailedError,
   type HealthProbeAnswer,
@@ -49,20 +45,11 @@ export interface HealthProbeRestPorts {
 }
 
 /** `/api/health/collector` and its four siblings, bound to one process. */
-export function mountHealthProbeRest(options: {
-  ports: HealthProbeRestPorts;
-}): MountableRestApp {
-  const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => {
-        throw new Error("A health probe route answers with no credential resolved.");
-      },
-    },
-  });
-
-  return runtime.mount(healthProbeRest.router(), {
-    app: () => healthProbeApp(options.ports),
-    credential: "public",
+export function mountHealthProbeRest(
+  runtime: ApiRestRuntime,
+  ports: HealthProbeRestPorts,
+): MountableRestApp {
+  return runtime.mount(healthProbeRest.router(), () => healthProbeApp(ports), {
     onError: healthProbeErrors,
     facts: [
       bindRestHeader(healthProbeAuthToken, "x-auth-token"),

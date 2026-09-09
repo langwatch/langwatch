@@ -66,11 +66,7 @@ import {
   ApiRestCapabilityUnavailableError,
   createOrganizationMiddleware,
 } from "./api-rest-ports.ts";
-import type {
-  ApiPackagedRestCollaborators,
-  ApiPackagedRestFamilyName,
-} from "../app-rest/app-rest.packaged-families.ts";
-import { ApiPackagedRestAbsenceReport } from "../app-rest/app-rest.packaged-families.ts";
+import type { ApiPackagedRestCollaborators } from "../app-rest/api-rest.packaged-services.ts";
 import type { ApiConnectedAgentsComposition } from "./api-connected-agents.composition.ts";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
@@ -423,30 +419,4 @@ export const REGISTRY_RBAC_VOCABULARY: AppRestRbacVocabulary = {
       ? !bindingScopeCanGrantPermission({ scopeType: "PROJECT", permission: sample })
       : false;
   },
-};
-
-/** Writes each absent family to the process log, with what it costs. */
-export class LoggedApiPackagedRestAbsence extends ApiPackagedRestAbsenceReport {
-  static create(logger: Pick<Logger, "warn">): LoggedApiPackagedRestAbsence {
-    return new LoggedApiPackagedRestAbsence(logger);
-  }
-
-  private constructor(private readonly logger: Pick<Logger, "warn">) {
-    super();
-  }
-
-  absent(family: ApiPackagedRestFamilyName): void {
-    this.logger.warn(
-      { family },
-      CONSEQUENCE[family] ??
-        `API process composed no service for the ${family} REST family: it is not mounted.`,
-    );
-  }
-}
-
-const CONSEQUENCE: Partial<Record<ApiPackagedRestFamilyName, string>> = {
-  "user-avatar":
-    "API process serves no /api/user-avatar: it composed no stored-object read, or no dual-credential verifier for the browser to load an image with. Every member list, annotation and presence bar falls back to initials rather than the photo a person uploaded.",
-  "tracked-events":
-    "API process serves neither /api/events/track nor /api/track_event: recording a feedback event needs the trace command queue this process did not register, and a door mounted without one would answer 200 to a rating it then dropped.",
 };

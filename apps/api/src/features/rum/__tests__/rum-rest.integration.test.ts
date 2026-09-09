@@ -6,6 +6,7 @@ import { RUM_SESSION_HEADER } from "@langwatch/react-rum/constants";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { openTestRestRuntime } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 import { mountRumRest } from "../rum-rest.mount.ts";
 import { rumCallerKey } from "../rum.rest.ts";
 import type { RumRateLimiter } from "../rum-ingest.service.ts";
@@ -115,7 +116,7 @@ describe("given a caller to be named for the rate-limit bucket", () => {
 });
 
 function mount(rateLimit: RumRateLimiter = async () => ({ allowed: true })) {
-  const hono = new Hono().route("/", mountRumRest({ rateLimit }));
+  const hono = new Hono().route("/", mountRumRest(openTestRestRuntime(), { rateLimit }));
 
   return {
     fetch: (path: string, init?: RequestInit) =>

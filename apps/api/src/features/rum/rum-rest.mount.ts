@@ -3,16 +3,12 @@
  * resolves no credential — a browser has none to present — so the payload is
  * treated as untrusted and the caller is named only for the rate-limit bucket.
  */
-import {
-  bindRestHeader,
-  createRestRuntime,
-  type MountableRestApp,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import { bindRestHeader, type MountableRestApp, type RestErrorHandler } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { RUM_SESSION_HEADER } from "@langwatch/react-rum/constants";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 import {
   ingestBrowserTraces,
   readCappedBody,
@@ -21,30 +17,27 @@ import {
 import { rumForwardedFor, rumRest, rumSession } from "./rum.rest.ts";
 
 /** `/api/rum/v1/traces`, bound to one process's fixed-window counter. */
-export function mountRumRest(options: { rateLimit: RumRateLimiter }): MountableRestApp {
-  const runtime = createRestRuntime({
-    identity: {
-      authenticate: () => {
-        throw new Error("The browser telemetry intake answers with no credential resolved.");
-      },
-    },
-  });
-
-  return runtime.mount(rumRest.router(), {
-    app: () => ({
+export function mountRumRest(
+  runtime: ApiRestRuntime,
+  options: { rateLimit: RumRateLimiter },
+): MountableRestApp {
+  return runtime.mount(
+    rumRest.router(),
+    () => ({
       acceptExport: async ({ request, callerKey }) => {
         const body = await readCappedBody(request);
 
         await ingestBrowserTraces({ body, callerKey, rateLimit: options.rateLimit });
       },
     }),
-    credential: "public",
-    onError: rumErrors,
-    facts: [
-      bindRestHeader(rumSession, RUM_SESSION_HEADER),
-      bindRestHeader(rumForwardedFor, "x-forwarded-for"),
-    ],
-  });
+    {
+      onError: rumErrors,
+      facts: [
+        bindRestHeader(rumSession, RUM_SESSION_HEADER),
+        bindRestHeader(rumForwardedFor, "x-forwarded-for"),
+      ],
+    },
+  );
 }
 
 /**

@@ -5,7 +5,7 @@
  */
 import { createHash, createHmac } from "node:crypto";
 
-import { createAppRestSecurity, getRoutePolicy, type AppRestSecurity } from "@langwatch/api/rest";
+import { getRoutePolicy } from "@langwatch/api/rest";
 import {
   EventSourcing,
   type EventSourcedQueueDefinition,
@@ -14,10 +14,10 @@ import {
 } from "@langwatch/eventing";
 import type { IdentityEventingPort } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
-import { Hono, type ErrorHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { openTestRestDoors } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 import { ApiEventingIdentityAdapter } from "../../../app/api-identity-eventing.adapter.ts";
 import { composeApiIdentityPipelines } from "../../../app/api-identity-pipelines.composition.ts";
 import {
@@ -770,8 +770,7 @@ function auth0CreateEvent() {
 
 function mount(scim: ApiScimRestPorts | undefined) {
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     ports: {
       handlerManagedCredential: () => {
         throw new Error("the SCIM families resolve their own credential.");
@@ -818,32 +817,4 @@ function mount(scim: ApiScimRestPorts | undefined) {
       });
     },
   };
-}
-
-/** A failure here must be legible rather than swallowed into a generic 500. */
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A SCIM family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
 }

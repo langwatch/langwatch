@@ -2,19 +2,13 @@
  * Characterisation of the three discovery locations, through the real Hono app the API
  * process serves.
  */
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
-import { AuthzService } from "@langwatch/authz-contract";
-import { OrganizationService } from "@langwatch/organization-contract";
-import type { AppRestSecurity } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ApiApplication, NoApiTrpcFeatures } from "../../../api.application.ts";
 import { ApiHttpListener } from "../../../api-http.listener.ts";
-import { ApiRestSecurity } from "../../../api-rest.security.ts";
-import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { openTestRestDoors } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 import { isRootDiscoveryPath } from "../discovery-locations.ts";
 import { Hono } from "hono";
 
@@ -232,15 +226,8 @@ function unreachablePort(what: string): never & (() => never) {
 }
 
 async function startApi() {
-  const security: AppRestSecurity = ApiRestSecurity.create({
-    apiKeys: new Proxy({} as ApiKeyApi, {}),
-    authz: new Proxy(AuthzService.prototype, {}),
-    organizations: new Proxy(OrganizationService.prototype, {}),
-    observability: ApiRestObservabilityComposition.create(),
-  });
   const rest = new Hono();
-  for (const feature of createApiProcessRestFeatures({
-    security,
+  for (const feature of openTestRestDoors({
     ports: {
       handlerManagedCredential: unreachablePort("credential resolution"),
       rateLimit: unreachablePort("the rate limiter"),

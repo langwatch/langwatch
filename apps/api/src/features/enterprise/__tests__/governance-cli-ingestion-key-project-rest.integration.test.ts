@@ -2,16 +2,15 @@
  * The named-project branch of `POST /api/auth/cli/governance/ingestion-key`.
  * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type {
   GovernanceCliCaller,
   GovernanceCliRestPorts,
   GovernanceDirectoryPort,
 } from "@langwatch/enterprise-governance-server";
-import { Hono, type ErrorHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { openTestRestDoors } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 
 const USER_ID = "user-1";
 const ORGANIZATION_ID = "org-1";
@@ -248,8 +247,7 @@ function ingestionKeyWorld(
 
 function mount(world: ReturnType<typeof ingestionKeyWorld>) {
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     ports: {
       handlerManagedCredential: () => {
         throw new Error("the governance CLI family resolves its own credential.");
@@ -275,32 +273,4 @@ function mount(world: ReturnType<typeof ingestionKeyWorld>) {
         body: JSON.stringify(body),
       }),
   };
-}
-
-/** A failure here must be legible rather than swallowed into a generic 500. */
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
 }

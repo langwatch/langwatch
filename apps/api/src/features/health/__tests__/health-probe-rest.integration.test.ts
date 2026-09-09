@@ -4,6 +4,7 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
+import { openTestRestRuntime } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 import {
   mountHealthProbeRest,
   type HealthProbeRestPorts,
@@ -129,17 +130,15 @@ describe("given a deployment that declared no public origin", () => {
 function mount(overrides: Partial<HealthProbeRestPorts> = {}) {
   const hono = new Hono().route(
     "/",
-    mountHealthProbeRest({
-      ports: {
-        resolveProjectByApiKey: async () => ({ id: "project-1" }),
-        publicBaseUrl: "https://app.langwatch.test",
-        automation: () => ({
-          tryGetById: async () => null,
-          getRecentFires: async () => [],
-        }),
-        workflowExists: async () => true,
-        ...overrides,
-      },
+    mountHealthProbeRest(openTestRestRuntime(), {
+      resolveProjectByApiKey: async () => ({ id: "project-1" }),
+      publicBaseUrl: "https://app.langwatch.test",
+      automation: () => ({
+        tryGetById: async () => null,
+        getRecentFires: async () => [],
+      }),
+      workflowExists: async () => true,
+      ...overrides,
     }),
   );
 

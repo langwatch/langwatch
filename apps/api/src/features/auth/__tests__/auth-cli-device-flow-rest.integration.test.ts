@@ -2,7 +2,6 @@
  * The RFC 8628 CLI device grant end to end, through the real Hono app this process mounts
  * and the real session service it composes.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import {
   CliDeviceSessionService,
   CliDeviceSessionStorePort,
@@ -10,12 +9,10 @@ import {
   type AuthDirectoryPort,
 } from "@langwatch/auth-server";
 import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
-import { HandledError } from "@langwatch/handled-error";
-import { Hono, type ErrorHandler } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
-import { createApiProcessRestFeatures } from "../../../app-rest/app-rest.process-features.ts";
+import { openTestRestDoors } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 
 const USER_ID = "user-1";
 const ORGANIZATION_ID = "org-1";
@@ -420,8 +417,7 @@ function deviceFlowWorld(
 
 function mount(world: ReturnType<typeof deviceFlowWorld>) {
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     ports: {
       handlerManagedCredential: () => {
         throw new Error("the device grant resolves its own credential.");
@@ -445,44 +441,4 @@ function mount(world: ReturnType<typeof deviceFlowWorld>) {
         body: JSON.stringify(body),
       }),
   };
-}
-
-/**
- * A failure here must be legible rather than swallowed into a generic 500.
- * A `HandledError` thrown by a port (e.g. a ceiling violation) renders with
- * its own code and status, matching the real canonical error handler.
- */
-const renderUnexpected: ErrorHandler = (error, c) => {
-  if (error instanceof HandledError) {
-    return c.json(
-      { error: error.code, error_description: error.message, ...error.meta },
-      error.httpStatus as ContentfulStatusCode,
-    );
-  }
-  return c.json({ error: String(error) }, 500);
-};
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A handler-managed family must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
 }

@@ -1,16 +1,15 @@
 /**
  * The families the retired `routes/misc.ts` and `routes/ops.ts` held, driven through the
- * real Hono app `createApiProcessRestFeatures` returns.
+ * real Hono app the door registry opens.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createApiProcessRestFeatures,
-  type ApiProcessRestPorts,
-  type ApiProcessRestServices,
-} from "../app-rest.process-features.ts";
+  type ApiRestPorts,
+  type ApiRestServices,
+} from "../api-rest.services.ts";
+import { openTestRestDoors } from "./support/rest-doors.harness.ts";
 
 const project = { id: "project-1", slug: "acme", teamId: "team-1", name: "Acme" };
 
@@ -284,12 +283,11 @@ describe("given the operator ClickHouse EXPLAIN endpoint", () => {
 // ---------------------------------------------------------------------------
 
 function mount(options: {
-  services?: ApiProcessRestServices;
-  ports?: Partial<ApiProcessRestPorts>;
+  services?: ApiRestServices;
+  ports?: Partial<ApiRestPorts>;
 }) {
   const hono = new Hono();
-  for (const app of createApiProcessRestFeatures({
-    security: passThroughSecurity(),
+  for (const app of openTestRestDoors({
     services: options.services ?? {},
     ports: {
       handlerManagedCredential: async () => ({
@@ -299,7 +297,7 @@ function mount(options: {
       }),
       rateLimit: async () => ({ allowed: true }),
       ...options.ports,
-    } as ApiProcessRestPorts,
+    } as ApiRestPorts,
   })) {
     hono.route("/", app);
   }
@@ -316,7 +314,7 @@ type StoredDspyStep = { llmCalls: { cost?: number | undefined }[] };
 
 function dspyPorts(input: {
   upsertDspyStep: (step: StoredDspyStep) => Promise<void>;
-}): Partial<ApiProcessRestPorts> {
+}): Partial<ApiRestPorts> {
   return {
     dspySteps: {
       authenticateCredential: async () => ({ ok: true, project, markUsed: () => {} }),
@@ -380,45 +378,3 @@ function fakeRedis(seed: Record<string, string> = {}) {
     },
   };
 }
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop: MiddlewareHandler = async (_c, next) => {
-    await next();
-  };
-  const asProject: MiddlewareHandler = async (c, next) => {
-    c.set("project", project);
-    await next();
-  };
-  const asOrganization: MiddlewareHandler = async (c, next) => {
-    c.set("organization", { id: "organization-1" });
-    c.set("apiKeyUserId", "user-1");
-    await next();
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderHandled,
-    canonicalErrorHandler: renderHandled,
-    authenticateProject: () => asProject,
-    authorizeProjectPermission: () => noop,
-    authorizeApiKeyCeiling: () => noop,
-    authenticateOrganization: () => asOrganization,
-    authorizeOrganizationPermission: () => noop,
-    authorizeRouteTeamPermission: () => noop,
-    authorizeRouteProjectPermission: () => noop,
-    authenticateOrganizationThrowing: asOrganization,
-    authorizeOrganizationPermissionThrowing: () => noop,
-  } as never);
-}
-
-const renderHandled: ErrorHandler = (error, c) => {
-  const handled = error as { httpStatus?: number; code?: string; message?: string };
-  if (typeof handled.httpStatus === "number") {
-    return c.json(
-      { error: handled.code ?? "error", message: handled.message ?? "" },
-      handled.httpStatus as never,
-    );
-  }
-  return c.json({ error: String(error) }, 500);
-};

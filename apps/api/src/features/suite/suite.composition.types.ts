@@ -3,7 +3,6 @@
  * installer: the scenario surface reads `suites` for `ctx.app`, and the run
  * dialog's own composition names this type without booting the feature.
  */
-import type { MountableRestApp } from "@langwatch/api/rest";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { createSuiteTrpcRouter } from "./suite-trpc.mount.ts";
@@ -19,9 +18,4 @@ export type ComposedSuiteFeature = Readonly<{
    * and for the three REST families that answer out of the same application.
    */
   app: SuiteApi;
-  /**
-   * `/api/v1/run-plans`, `/api/v1/test-suites` and the deprecated
-   * `/api/suites` alias, bound to this process's project-key door.
-   */
-  rest: readonly MountableRestApp[];
 }>;

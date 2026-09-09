@@ -1,58 +1,27 @@
 /** Binds the annotation REST declaration to this process's credential boundary. */
 import { AnnotationNotFoundError, type AnnotationApi } from "@langwatch/annotation-contract";
 import { annotationRest } from "@langwatch/annotation-server";
-import {
-  createRestRuntime,
-  type MountableRestApp,
-  type RequestValidationError,
-  type RestErrorHandler,
+import type {
+  MountableRestApp,
+  RequestValidationError,
+  RestErrorHandler,
 } from "@langwatch/api/rest";
 import type { Context } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import type { ApiHandlerManagedCredentialPort } from "../../app-rest/app-rest.process-features.ts";
-
-class AnnotationRefusal extends Error {
-  constructor(
-    readonly status: ContentfulStatusCode,
-    readonly body: object,
-  ) {
-    super("annotation request refused");
-    this.name = "AnnotationRefusal";
-  }
-}
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 
 /** Mounts `/api/annotations` with its historical refusal bodies. */
-export function mountAnnotationRest(options: {
-  annotations: () => AnnotationApi;
-  credential: ApiHandlerManagedCredentialPort;
-}): MountableRestApp {
-  const runtime = createRestRuntime({
-    identity: {
-      authenticate: async ({ request, permission }) => {
-        const credential = await options.credential({ request, permission });
-        if (!credential.ok) throw new AnnotationRefusal(credential.status, credential.body);
-
-        return {
-          actor: null,
-          scope: { tier: "project", id: credential.project.id },
-          markUsed: credential.markUsed,
-        };
-      },
-    },
-  });
-
-  return runtime.mount(annotationRest.router(), {
-    app: options.annotations,
-    credential: "projectKey",
+export function mountAnnotationRest(
+  runtime: ApiRestRuntime,
+  annotations: () => AnnotationApi,
+): MountableRestApp {
+  return runtime.mount(annotationRest.router(), annotations, {
     onError: annotationErrorHandler,
   });
 }
 
 /** Every refusal these routes raise, in the bodies this family has always answered. */
 const annotationErrorHandler: RestErrorHandler = (error, context) => {
-  if (error instanceof AnnotationRefusal) return context.json(error.body, error.status);
-
   if (error instanceof AnnotationNotFoundError) {
     return context.json({ status: "error", message: "Annotation not found." }, 404);
   }
