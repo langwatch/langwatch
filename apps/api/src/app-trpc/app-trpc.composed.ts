@@ -5,7 +5,6 @@
  */
 import type { ComposedGatewayFeature } from "../features/gateway/gateway.composition.types.ts";
 import type { ComposedLangyFeature } from "../features/langy/langy.composition.types.ts";
-import type { ComposedBugReportFeature } from "../features/bug-report/bug-report.composition.types.ts";
 import type { ComposedDataPrivacyFeature } from "../features/data-privacy/data-privacy.composition.types.ts";
 import type { ComposedAnnotationFeature } from "../features/annotation/annotation.composition.types.ts";
 import type { ComposedDashboardFeature } from "../features/dashboard/dashboard.composition.types.ts";
@@ -91,8 +90,6 @@ export type ComposedApiFeatures = Readonly<{
   dataRetention: ComposedDataRetentionFeature;
   /** One namespace and the `ctx.app.monitors` slice the monitor REST family reads. */
   monitor: ComposedMonitorFeature;
-  /** One namespace: the support inbox the back office reads. */
-  bugReport: ComposedBugReportFeature;
   /** One namespace: the privacy rules a project's scopes are redacted under. */
   dataPrivacy: ComposedDataPrivacyFeature;
   /** One namespace: the setup checklist the onboarding screens render. */

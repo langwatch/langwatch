@@ -15,10 +15,13 @@ export type ApiTrpcCollaborators = Readonly<{
 }>;
 
 /**
- * Reports the composition decision a missing application would otherwise hide. Three
- * reasons, and none is a list of the individual capabilities: they are one graph.
- * `unconverted-transports` is the state of the record itself, not of this deployment.
+ * Reports the composition decision a missing application would hide. The first
+ * two reasons are one graph; `unconverted-namespace` names ONE namespace the
+ * record could not carry, which is that module's state, not this deployment's.
  */
 export abstract class ApiTrpcCollaboratorsAbsence {
-  abstract absent(reason: "no-collaborators" | "no-database" | "unconverted-transports"): void;
+  abstract absent(
+    reason: "no-collaborators" | "no-database" | "unconverted-namespace",
+    namespace?: Readonly<{ namespace: string; reason: string }>,
+  ): void;
 }

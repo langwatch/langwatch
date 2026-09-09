@@ -7,8 +7,10 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   EvaluatorWorkflowVersionRequiredError,
+  type EvaluatorApi,
   type EvaluatorService,
 } from "@langwatch/evaluator-contract";
+import { HandledError } from "@langwatch/handled-error";
 import {
   EvaluatorApp,
   EvaluatorGraphPort,
@@ -91,6 +93,40 @@ export function composeEvaluatorFeature(options: {
     app,
     restServices: { evaluators: () => app },
   };
+}
+
+/**
+ * The evaluator namespace on a process that composed no evaluator store. It
+ * still mounts and every call refuses by name, so a reader is told the
+ * deployment cannot reach their evaluators rather than shown none.
+ */
+export function refusingEvaluatorFeature(): ComposedEvaluatorFeature {
+  const refuse = (): never => {
+    throw new ApiEvaluatorUnavailableError();
+  };
+  const app = new Proxy({} as EvaluatorApi, { get: () => refuse, has: () => true });
+
+  return {
+    router: (mount) => createEvaluatorTrpcRouter(mount.runtime),
+    app,
+    restServices: { evaluators: () => app },
+  };
+}
+
+/**
+ * A deployment with no evaluator store. `fault: "platform"` because nothing
+ * the customer sent caused it.
+ */
+export class ApiEvaluatorUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super("service_unavailable", "This deployment composes no evaluator store.", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ApiEvaluatorUnavailableError";
+  }
 }
 
 /**

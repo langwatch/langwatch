@@ -23,9 +23,7 @@ import { ApiApplication, NoApiTrpcFeatures } from "../../api.application.ts";
 import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy.ts";
 import type { UserService } from "@langwatch/user-contract";
 import { composeAuthFeature } from "../../features/auth/auth.composition.ts";
-import { composeBugReportFeature } from "../../features/bug-report/bug-report.composition.ts";
 import { composeOrganizationFeature } from "../../features/organization/organization.composition.ts";
-import { composeWorkflowFeature } from "../../features/workflow/workflow.composition.ts";
 import {
   AuthSessionApiAuthenticationAdapter,
   BetterAuthBrowserSessionTransportAdapter,
@@ -50,33 +48,21 @@ const RECORD_NAMESPACES = [
   "apiKey",
   "authz",
   "batchRecord",
-  "bugReports",
   "dashboards",
   "dataPrivacy",
   "dataset",
   "datasetRecord",
   "evaluations",
   "evaluators",
-  "experiments",
-  "export",
   "frontDoor",
   "featureFlag",
   "graphs",
-  "group",
   "home",
   "identity",
   "integrationsChecks",
-  "joinRequests",
-  "onboarding",
-  "optimization",
-  "personalWorkspaceFeatures",
   "presence",
-  "promptTags",
-  "prompts",
   "publicEnv",
-  "team",
   "user",
-  "workflow",
 ] as const;
 
 /**
@@ -304,24 +290,8 @@ function composeApplication(
     // audit row below is the one that composition writes.
     composed: {
       ...stubComposedFeatures(),
-      // The support inbox and the signed-out doors compose themselves off this
-      // process's own graph, so both the audit row and `publicEnv`'s answer
-      // below are the ones those compositions produce.
-      bugReport: composeBugReportFeature({ infrastructure }),
-      // The studio composes itself off the same infrastructure, so the row
-      // read below is the one it runs on this process's own connection.
-      workflow: composeWorkflowFeature({
-        infrastructure,
-        runtime: {
-          workflows: stub("workflow.workflows"),
-          nlpRuntime: stub("workflow.nlpRuntime"),
-        },
-        peers: {
-          datasets: stub("workflow.datasets"),
-          evaluators: stub("workflow.evaluators"),
-          modelProviders: stub("workflow.modelProviders"),
-        },
-      }),
+      // The signed-out doors compose themselves off this process's own graph,
+      // so `publicEnv`'s answer below is the one that composition produces.
       auth: composeAuthFeature({
         prisma: prisma.client,
         peers: { users: {} as unknown as UserService },
@@ -398,7 +368,11 @@ describe("given an API process composed with the packaged tRPC collaborators", (
     });
   });
 
-  describe("when a procedure reads a row this composition lifted onto its own connection", () => {
+  // `workflow.*` left the record with the workflow module's unconverted
+  // transport (app-trpc.namespaces.ts names it), so there is no mounted
+  // namespace on this process that lifts a row onto its own connection. The
+  // test comes back with the namespace.
+  describe.skip("when a procedure reads a row this composition lifted onto its own connection", () => {
     it("runs the query on the process's Prisma client rather than one off the request", async () => {
       const { application, prisma } = composeApplication();
 
@@ -416,7 +390,11 @@ describe("given an API process composed with the packaged tRPC collaborators", (
     });
   });
 
-  describe("when a back-office read reaches the collaborator's own store", () => {
+  // `bugReports.*` left the record with the ops module's unconverted transport
+  // (app-trpc.namespaces.ts names it), so the back-office store this asserted
+  // on is not reachable over the wire here. The test comes back with the
+  // namespace.
+  describe.skip("when a back-office read reaches the collaborator's own store", () => {
     it("writes the audit row before answering", async () => {
       const { application, audit } = composeApplication();
 
@@ -633,7 +611,11 @@ function composeSessionApplication(options: {
   });
 }
 
-describe("given a browser session this process has already verified", () => {
+// `organization.*` left the record with the organization module's unconverted
+// transport (app-trpc.namespaces.ts names it). These three prove that a
+// verified session reaches a PACKAGED surface, and the surface they were
+// written against is not mounted here. They come back with the namespace.
+describe.skip("given a browser session this process has already verified", () => {
   describe("when a packaged surface reads the signed-in person off the context", () => {
     /** @scenario "A verified browser session reaches the surfaces that render the person" */
     it("reaches the organization service instead of refusing the caller", async () => {

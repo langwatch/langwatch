@@ -42,7 +42,6 @@ import { refusingEvaluatorFeature } from "../../../features/evaluator/evaluator.
 import { refusingPromptFeature } from "../../../features/prompt/prompt.composition.ts";
 import { refusingHomeFeature } from "../../../features/project/home.composition.ts";
 import { refusingScenarioFeature } from "../../../features/scenario/scenario.composition.ts";
-import { refusingBugReportFeature } from "../../../features/bug-report/bug-report.composition.ts";
 import { refusingIntegrationsChecksFeature } from "../../../features/project/integrations-checks.composition.ts";
 import { refusingAnnotationFeature } from "../../../features/annotation/annotation-absence.ts";
 import { refusingHttpProxyFeature } from "../../../features/agent/http-proxy.composition.ts";
@@ -140,6 +139,9 @@ export function buildAppTrpcMount(options: { authenticate?: boolean } = {}) {
       procedure: options.authenticate
         ? trpc.procedure.use(authentication as never)
         : trpc.procedure,
+      // The process's PUBLIC procedure, as the real root hands one over: a
+      // declaration that answers with no caller is refused at mount without it.
+      anonymousProcedure: trpc.procedure,
       ports: runtimePorts,
     }),
     // Test processes check every declared output: a shape that drifted from
@@ -186,7 +188,6 @@ export function buildAppTrpcFeatures(
       home: refusingHomeFeature(),
       role: stubRoleFeature(),
       storedObject: stubStoredObjectFeature(),
-      bugReport: refusingBugReportFeature(),
       dataPrivacy: stubDataPrivacyFeature(),
       integrationsChecks: refusingIntegrationsChecksFeature(),
       annotation: refusingAnnotationFeature(),

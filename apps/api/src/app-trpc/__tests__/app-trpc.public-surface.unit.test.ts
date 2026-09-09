@@ -12,10 +12,9 @@ import { buildAppTrpcFeatures, buildAppTrpcMount } from "./support/app-trpc-feat
  * unauthenticated caller, and why can't it be a protected procedure?
  */
 const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
-  // Email unsubscribe links land here from a mail client — no session exists.
-  // Both are gated by the single-purpose unsubscribe token in the URL.
-  "emailSuppression.confirmUnsubscribe",
-  "emailSuppression.resolveUnsubscribeToken",
+  // `emailSuppression.*` and `sharedTrace.get` are NOT here while the
+  // automation and trace modules' transports are unconverted: this list is
+  // what this process MOUNTS, so each returns to it with its own namespace.
   // The signed-out front door (ADR-117). Each answers a question asked BEFORE
   // a session exists, and each carries its own per-IP rate limit.
   "frontDoor.completeSignUpVerification",
@@ -27,9 +26,6 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
   "frontDoor.route",
   // Client bootstrap: exposes only the PUBLIC_* env whitelist, no tenant data.
   "publicEnv",
-  // The one anonymous trace read: token-gated by the share service, answering
-  // the explicit share-safe payload (ADR-057).
-  "sharedTrace.get",
   // Sign-up — necessarily pre-session.
   "user.register",
 ];

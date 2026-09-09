@@ -18,6 +18,7 @@ import {
   RoleContributionError,
 } from "./boot-errors.ts";
 import type {
+  FeatureTransportDescriptor,
   InstallableServerFeature,
   InstalledFeatureState,
   FeatureInstallArguments,
@@ -25,6 +26,12 @@ import type {
   ServerFeatureDeclaration,
   ServerRole,
 } from "./feature-installer.ts";
+import {
+  mountDeclaredTransports,
+  type DeclaredTransports,
+  type FeatureTransportHosts,
+  type MountedTransports,
+} from "./transport-mounting.ts";
 import { ResourceScope } from "./resource-scope.ts";
 import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
 import { FeatureApiToken, type FeatureApiIdentity } from "./feature-api-token.ts";
@@ -49,12 +56,17 @@ export interface InstalledFeature<Provided, Rest, Trpc, Worker> {
 }
 
 /** A booted application: everything constructed, nothing serving yet. */
-export class BootedRuntime<Infrastructure> {
+export class BootedRuntime<Infrastructure, Rest = never, Trpc = never> {
   private readonly lifecycle: RuntimeLifecycle;
   constructor(
     readonly name: string,
     readonly role: ServerRole,
     readonly infrastructure: Infrastructure,
+    /**
+     * Every declared transport this process mounted, in install order for REST
+     * and by namespace for tRPC. Empty where the application was given no door.
+     */
+    readonly transports: MountedTransports<Rest, Trpc>,
     private readonly installed: ReadonlyMap<string, InstalledFeatureState>,
     private readonly provided: ReadonlyMap<TokenIdentity, unknown>,
     scope: ResourceScope,
@@ -123,9 +135,23 @@ export class BootedRuntime<Infrastructure> {
   }
 }
 
+/** What one install states beyond the feature's own declaration. */
+export type FeatureInstallOptions = Readonly<{
+  /**
+   * One binding per module-specific fact this feature's declarations name. A
+   * standard fact the process's own runtime binds needs nothing here.
+   */
+  facts?: readonly unknown[];
+  /** Family-level REST options the declaration itself cannot carry. */
+  rest?: Readonly<{ onError?: unknown }>;
+}>;
+
 /** One feature declared on an application, before boot looks at it. */
 interface DeclaredFeature {
   readonly name: string;
+  readonly transports: readonly FeatureTransportDescriptor[];
+  readonly facts: readonly unknown[];
+  readonly restErrorHandler: unknown;
   readonly repositories?: FeatureRepositories;
   readonly repositoryRegistry?: RepositoryRegistry<
     Record<
@@ -141,35 +167,69 @@ interface DeclaredFeature {
   readonly install: (args: FeatureInstallArguments<unknown>) => InstalledFeatureState;
 }
 
-/** An application with its infrastructure named, collecting declarations. */
-export class ApplicationBuilder<Infrastructure> {
-  private readonly features: DeclaredFeature[] = [];
-  private readonly preProvided = new Map<TokenIdentity, unknown>();
-  private readonly services: RuntimeService[] = [];
-  private persistence:
+/** What a builder collects, shared when one is re-parameterised by its doors. */
+interface BuilderState<Rest, Trpc> {
+  readonly features: DeclaredFeature[];
+  readonly preProvided: Map<TokenIdentity, unknown>;
+  readonly services: RuntimeService[];
+  persistence:
     | Readonly<{ backend: string; infrastructure: Readonly<Record<string, unknown>> }>
     | undefined;
+  hosts: FeatureTransportHosts<Rest, Trpc>;
+}
+
+/** An application with its infrastructure named, collecting declarations. */
+export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
+  private readonly state: BuilderState<Rest, Trpc>;
 
   constructor(
     private readonly name: string,
     private readonly infrastructure: Infrastructure,
-  ) {}
+    state?: BuilderState<Rest, Trpc>,
+  ) {
+    this.state = state ?? {
+      features: [],
+      preProvided: new Map(),
+      services: [],
+      persistence: undefined,
+      hosts: {},
+    };
+  }
+
+  /**
+   * The doors this process opens. Every transport an installed feature
+   * declares is mounted on them at boot, and a feature declaring one for a
+   * protocol named here is refused by name.
+   */
+  withTransports<NextRest, NextTrpc>(
+    hosts: FeatureTransportHosts<NextRest, NextTrpc>,
+  ): ApplicationBuilder<Infrastructure, NextRest, NextTrpc> {
+    return new ApplicationBuilder<Infrastructure, NextRest, NextTrpc>(
+      this.name,
+      this.infrastructure,
+      { ...this.state, hosts },
+    );
+  }
 
   /** Declares one feature. Constructs nothing. */
-  withFeature(declaration: InstallableServerFeature<Infrastructure>): this;
-  withFeature<FeatureInfrastructure>(
-    declaration: InstallableServerFeature<FeatureInfrastructure>,
-    options: { infrastructure: FeatureInfrastructure },
+  withFeature(
+    declaration: InstallableServerFeature<Infrastructure>,
+    options?: FeatureInstallOptions,
   ): this;
   withFeature<FeatureInfrastructure>(
     declaration: InstallableServerFeature<FeatureInfrastructure>,
-    options?: { infrastructure: FeatureInfrastructure },
+    options: FeatureInstallOptions & { infrastructure: FeatureInfrastructure },
+  ): this;
+  withFeature<FeatureInfrastructure>(
+    declaration: InstallableServerFeature<FeatureInfrastructure>,
+    options?: FeatureInstallOptions & { infrastructure?: FeatureInfrastructure },
   ): this {
-    if (options) return this.addFeature(declaration, options.infrastructure);
-    return this.addFeature(
-      declaration,
-      this.infrastructure as Infrastructure & FeatureInfrastructure,
-    );
+    const featureInfrastructure =
+      options && "infrastructure" in options && options.infrastructure !== undefined
+        ? options.infrastructure
+        : (this.infrastructure as Infrastructure & FeatureInfrastructure);
+
+    return this.addFeature(declaration, featureInfrastructure, options);
   }
 
   /** Selects one persistence backend for repository-aware feature installers. */
@@ -178,16 +238,20 @@ export class ApplicationBuilder<Infrastructure> {
     infrastructure: Readonly<Record<string, unknown>>,
   ): this {
     if (backend.trim().length === 0) throw new Error("A persistence backend needs a name.");
-    this.persistence = Object.freeze({ backend, infrastructure });
+    this.state.persistence = Object.freeze({ backend, infrastructure });
     return this;
   }
 
   private addFeature<FeatureInfrastructure>(
     declaration: InstallableServerFeature<FeatureInfrastructure>,
     featureInfrastructure: FeatureInfrastructure,
+    options: FeatureInstallOptions | undefined,
   ): this {
-    this.features.push({
+    this.state.features.push({
       name: declaration.name,
+      transports: declaration.transports ?? [],
+      facts: options?.facts ?? [],
+      restErrorHandler: options?.rest?.onError,
       repositories: snapshotRepositories(declaration.repositories),
       repositoryRegistry: declaration.repositoryRegistry,
       apiContract: declaration.apiContract,
@@ -202,16 +266,17 @@ export class ApplicationBuilder<Infrastructure> {
 
   /** Supplies an existing implementation while its installer is being migrated. */
   withProvided<Instance>(token: DependencyToken<Instance>, instance: NoInfer<Instance>): this {
-    if (this.preProvided.has(token)) {
+    const provided = this.state.preProvided;
+    if (provided.has(token)) {
       throw new DuplicateProviderError(tokenName(token), ["<already provided>"]);
     }
-    this.preProvided.set(token, instance);
+    provided.set(token, instance);
     return this;
   }
 
   /** Something the runtime starts and stops around the feature graph. */
   withService(service: RuntimeService): this {
-    this.services.push(service);
+    this.state.services.push(service);
     return this;
   }
 
@@ -220,25 +285,20 @@ export class ApplicationBuilder<Infrastructure> {
     role: ServerRole;
     /** One slice per feature name, for the features that declared a config. */
     config?: Readonly<Record<string, unknown>>;
-  }): Promise<BootedRuntime<Infrastructure>> {
+  }): Promise<BootedRuntime<Infrastructure, Rest, Trpc>> {
     const { role } = options;
     const config = options.config ?? {};
+    const persistence = this.state.persistence;
 
-    const declarations = this.features;
-    for (const declaration of declarations) {
-      if (!declaration.repositoryRegistry) continue;
-      if (!this.persistence) {
-        throw new Error(`Feature "${declaration.name}" requires process persistence.`);
-      }
-      validateRepositorySelection(declaration.repositoryRegistry, this.persistence);
-    }
+    const declarations = this.state.features;
+    assertRepositoryBackend(declarations, persistence);
     assertRepositoryOwnership(
       declarations.map((declaration) => ({
         ...declaration,
         repositories: {
-          ...(declaration.repositories ?? {}),
-          ...(declaration.repositoryRegistry && this.persistence
-            ? selectedRepositoryOwnership(declaration.repositoryRegistry, this.persistence)
+          ...declaration.repositories,
+          ...(declaration.repositoryRegistry && persistence
+            ? selectedRepositoryOwnership(declaration.repositoryRegistry, persistence)
             : {}),
         },
       })),
@@ -255,9 +315,11 @@ export class ApplicationBuilder<Infrastructure> {
     const scope = new ResourceScope();
     const featureServices: RuntimeService[] = [];
     const installed = new Map<string, InstalledFeatureState>();
-    const provided = new Map<TokenIdentity, unknown>(this.preProvided);
+    const provided = new Map<TokenIdentity, unknown>(this.state.preProvided);
     const apis = new LocalFeatureApis();
+    const declared: DeclaredTransports[] = [];
     this.allocateApiClients(apis, providerOf, provided);
+    let transports: MountedTransports<Rest, Trpc> = { rest: [], trpc: {} };
     try {
       for (const declaration of order) {
         const resources = new ResourceScope();
@@ -266,31 +328,51 @@ export class ApplicationBuilder<Infrastructure> {
           resources,
           config: config[declaration.name],
           infrastructure: this.infrastructure,
-          persistence: this.persistence,
+          persistence,
           role,
           resolve: (token) =>
             token instanceof FeatureApiToken ? apis.reference(token) : provided.get(token),
         });
         featureServices.push(...resources.sealServices());
         this.bindProviders(declaration, state, apis, provided);
-        installed.set(
-          declaration.name,
-          declaration.apiContract
-            ? { ...state, provided: apis.reference(declaration.apiContract) }
-            : state,
-        );
+        const installedState = declaration.apiContract
+          ? { ...state, provided: apis.reference(declaration.apiContract) }
+          : state;
+        installed.set(declaration.name, installedState);
+        declared.push(...declaredTransportsOf(declaration, installedState));
       }
       apis.ready();
       scope.own("feature API bindings", () => apis.close());
+      // After every application exists, so a handler reaching a peer through
+      // its own app gets the same instance every other caller holds.
+      if (this.opensDoors(role)) {
+        transports = mountDeclaredTransports({ declared, hosts: this.state.hosts });
+      }
     } catch (error) {
       apis.close();
       return cleanupAfterFailure(error, () => scope.close());
     }
 
-    return new BootedRuntime(this.name, role, this.infrastructure, installed, provided, scope, [
-      ...featureServices,
-      ...this.services,
-    ]);
+    return new BootedRuntime<Infrastructure, Rest, Trpc>(
+      this.name,
+      role,
+      this.infrastructure,
+      transports,
+      installed,
+      provided,
+      scope,
+      [...featureServices, ...this.state.services],
+    );
+  }
+
+  /**
+   * Whether this application mounts what its features declared. Only a process
+   * that named a door does, and only in the role that serves one.
+   */
+  private opensDoors(role: ServerRole): boolean {
+    if (role !== "api") return false;
+
+    return this.state.hosts.rest !== undefined || this.state.hosts.trpc !== undefined;
   }
 
   private allocateApiClients(
@@ -301,7 +383,7 @@ export class ApplicationBuilder<Infrastructure> {
     for (const token of providerOf.keys()) {
       if (token instanceof FeatureApiToken) apis.declare(token);
     }
-    for (const [token, value] of this.preProvided) {
+    for (const [token, value] of this.state.preProvided) {
       if (!(token instanceof FeatureApiToken)) continue;
       apis.bind(token, value);
       provided.set(token, apis.reference(token));
@@ -348,7 +430,7 @@ export class ApplicationBuilder<Infrastructure> {
       if (token instanceof FeatureApiToken) apiOwners.set(token.name, owner);
       providerOf.set(token, owner);
     };
-    for (const token of this.preProvided.keys()) {
+    for (const token of this.state.preProvided.keys()) {
       register(token, "<provided by the application root>");
     }
     for (const declaration of declarations) {
@@ -429,6 +511,38 @@ export function createApp(options: { name: string }): {
       return new ApplicationBuilder<Infrastructure>(name, infrastructure);
     },
   };
+}
+
+/** Each repository-aware feature has a backend the process selected for it. */
+function assertRepositoryBackend(
+  declarations: readonly DeclaredFeature[],
+  persistence: Readonly<{ backend: string; infrastructure: Readonly<Record<string, unknown>> }> | undefined,
+): void {
+  for (const declaration of declarations) {
+    if (!declaration.repositoryRegistry) continue;
+    if (!persistence) {
+      throw new Error(`Feature "${declaration.name}" requires process persistence.`);
+    }
+    validateRepositorySelection(declaration.repositoryRegistry, persistence);
+  }
+}
+
+/** What one feature contributes to the process's doors, or nothing. */
+function declaredTransportsOf(
+  declaration: DeclaredFeature,
+  state: InstalledFeatureState,
+): readonly DeclaredTransports[] {
+  if (declaration.transports.length === 0) return [];
+
+  return [
+    {
+      feature: declaration.name,
+      transports: declaration.transports,
+      provided: () => state.provided,
+      facts: declaration.facts,
+      restErrorHandler: declaration.restErrorHandler,
+    },
+  ];
 }
 
 /** Every token one feature needs in this role, with the key that names it. */

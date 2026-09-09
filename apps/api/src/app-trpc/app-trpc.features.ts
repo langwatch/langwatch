@@ -1,21 +1,8 @@
 /**
- * Every tRPC surface this package owns, mounted on one process's root.
+ * Every tRPC namespace this process serves, one entry each, on one mount. A
+ * namespace is here exactly when its module's transport is converted; every
+ * other one is on the absence list beside this file and named at boot.
  */
-import type { ApiTrpcContext, ApiTrpcFeatureMount } from "../api.application.ts";
-import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure.ts";
-import type { ComposedApiFeatures } from "./app-trpc.composed.ts";
-
-import { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount.ts";
-import { createDatasetRecordTrpcRouter } from "../features/dataset/dataset-trpc.mount.ts";
-import { createExportTrpcRouter } from "../features/export/export-trpc.mount.ts";
-import { createPersonalWorkspaceFeaturesTrpcRouter } from "../features/organization/organization-trpc.mount.ts";
-import { createPromptTagTrpcRouter } from "../features/prompt/prompt-trpc.mount.ts";
-import { createSsoConnectionTrpcRouter } from "../features/sso/sso-trpc.mount.ts";
-import { composeGithubTrpcRouter } from "../features/github/github.composition.ts";
-import {
-  createLicenseEnforcementTrpcRouter,
-  createLicenseTrpcRouter,
-} from "../features/enterprise/licensing-trpc.mount.ts";
 import { bindTrpcFact } from "@langwatch/api/trpc";
 import {
   billingCallerEmailFact,
@@ -24,278 +11,156 @@ import {
   subscriptionTrpcTransport,
   type BillingSubscriptionApi,
 } from "@langwatch/enterprise-billing-server";
-import {
-  scimTokenTrpcTransport,
-  webhookEndpointTrpcTransport,
-} from "@langwatch/enterprise-api";
+import { scimTokenTrpcTransport, webhookEndpointTrpcTransport } from "@langwatch/enterprise-api";
 import { HandledError } from "@langwatch/handled-error";
-import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount.ts";
-import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition.ts";
+
+import type { ApiTrpcContext, ApiTrpcFeatureMount } from "../api.application.ts";
+import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure.ts";
+import type { ComposedApiFeatures } from "./app-trpc.composed.ts";
+import { createAuthzTrpcRouter } from "../features/authz/authz-trpc.mount.ts";
+import { createSsoConnectionTrpcRouter } from "../features/sso/sso-trpc.mount.ts";
+import { composeGithubTrpcRouter } from "../features/github/github.composition.ts";
+import {
+  createLicenseEnforcementTrpcRouter,
+  createLicenseTrpcRouter,
+} from "../features/enterprise/licensing-trpc.mount.ts";
 
 /**
- * Builds every tRPC surface this package owns against one process's mount.
+ * Builds every namespace this process owns against one mount. Nothing here is
+ * conditional: each composed feature has a refusing twin, so a deployment that
+ * composed no application for one still answers its namespace by name.
  */
 export function createAppTrpcFeatures(options: {
   mount: ApiTrpcFeatureMount;
   /** What a feature composes ITSELF from, for the features composed here. */
   infrastructure: ApiTrpcInfrastructure;
   /**
-   * The features the process composed BEFORE the mount existed, because their doors are not only tRPC: the
-   * gateway's application is read by `ctx.app` and by two REST families, so the process composes it once and hands
-   * the router half here.
+   * The features composed BEFORE the mount existed, because their doors are
+   * not only tRPC: the annotation application is read by `ctx.app` and by a
+   * REST family, so the process composes it once and hands the router half here.
    */
   composed: ComposedApiFeatures;
 }) {
   const { mount, composed, infrastructure } = options;
-  const gateway = composed.gateway.router(mount);
-  const langyRouters = composed.langy.routers(mount);
-  const scenarioRouters = composed.scenario.routers(mount);
   const annotationRouters = composed.annotation.routers(mount);
-  const entitlementRouters = composed.entitlement.routers(mount);
-  const modelProviderRouters = composed.modelProvider.routers(mount);
-  const workflowRouters = composed.workflow.routers(mount);
-  const traceRouters = composed.trace.routers(mount);
-  const shareRouters = composed.share.routers(mount);
-  const analyticsRouters = composed.analytics.routers(mount);
+  const authRouters = composed.auth.routers(mount);
   const dashboardRouters = composed.dashboard.routers(mount);
   const datasetRouters = composed.dataset.routers(mount);
+  const entitlementRouters = composed.entitlement.routers(mount);
   const evaluationRouters = composed.evaluation.routers(mount);
   const monitorRouters = composed.monitor.routers(mount);
   const roleRouters = composed.role.routers(mount);
   const secretRouters = composed.secret.routers(mount);
-  const governance = createEnterpriseGovernanceTrpcRouters(mount);
-  const automationRouters = composed.automation.routers(mount);
-  const authRouters = composed.auth.routers(mount);
+  const shareRouters = composed.share.routers(mount);
   const userRouters = composed.user.routers(mount);
-  const membershipRouters = composed.organization.routers(mount);
-  // `personalDashboard` is not a namespace of its own: `user:` below merges
-  // it into `user.*`, which is the name the /me page and the CLI call it by.
-  const { personalDashboard } = governance;
 
   return {
+    // A reviewer's comments and their scores, over the same application the
+    // `/api/annotations` family answers from.
+    annotation: annotationRouters.annotation,
+    annotationScore: annotationRouters.annotationScore,
+    // A tenant's credentials, over the application the two REST families read.
+    apiKey: composed.apiKey.router(mount),
+    // What the caller may do at one scope, as the product reports their own
+    // standing back to them. It takes no ports: the answer comes from the same
+    // AuthZ service every declared check on this root already runs on.
+    authz: createAuthzTrpcRouter(mount.runtime),
+    batchRecord: datasetRouters.batchRecord,
+    codingAgents: composed.codingAgent.router(mount),
     costs: entitlementRouters.costs,
+    // The two Enterprise billing surfaces. Both mount on every deployment: the
+    // quoted currency is public reference data, and a deployment that composed
+    // no payment provider refuses `subscription.*` by name rather than
+    // dropping the namespace out from under its client.
+    currency: mount.runtime.mount(currencyTrpcTransport, (ctx) => ctx.app.billingCurrency, {
+      facts: [bindTrpcFact(currencyRequestHeadersFact, (ctx) => ctx.req?.headers ?? null)],
+    }),
+    dashboards: dashboardRouters.dashboards,
+    // A project's datasets and the rows inside them: three wire names for one
+    // application, because the rows are only reachable through the dataset
+    // that holds them.
+    dataset: datasetRouters.dataset,
+    datasetRecord: datasetRouters.datasetRecord,
+    // The scoped privacy rules: the cascade is resolved through the project
+    // and organization directories, and both writes anchor the target scope
+    // before they authorize it.
+    dataPrivacy: composed.dataPrivacy.router(mount),
+    dataRetention: composed.dataRetention.router(mount),
+    // One trace re-scored, on the same `evaluation_processing` producer the
+    // workbench's own runs report on.
+    evaluations: evaluationRouters.evaluations,
+    // The evaluators a project defines, beside the `evaluations.*` surface
+    // that RUNS them: a definition and a result are two things.
+    evaluators: composed.evaluator.router(mount),
+    // Which rollouts this tenant is inside. No declared-permission policy and
+    // no ports, and both are the same decision: every procedure authorizes the
+    // exact tenant target it was asked for inside the module's own resolver.
+    featureFlag: composed.featureFlag.router(mount),
+    frontDoor: authRouters.frontDoor,
+    // The GitHub App an organization connected, and the pull requests its
+    // coding agents opened.
+    github: composeGithubTrpcRouter({ mount, infrastructure }),
+    graphs: dashboardRouters.graphs,
+    home: composed.home.router(mount),
     httpProxy: composed.httpProxy.router(mount),
+    identity: userRouters.identity,
+    // The setup checklist: nine other verticals' evidence plus the project's
+    // own two columns, and no one module holds it.
+    integrationsChecks: composed.integrationsChecks.router(mount),
+    // What this instance is licensed for, and the ceilings that licence sets.
+    // The procedures are declared in the module's own contract, and
+    // `ctx.app.licensing` is the one application that answers both.
+    license: createLicenseTrpcRouter(mount.runtime),
+    licenseEnforcement: createLicenseEnforcementTrpcRouter(mount.runtime),
     limits: entitlementRouters.limits,
-    llmModelCost: modelProviderRouters.llmModelCost,
-    modelProvider: modelProviderRouters.modelProvider,
-    // Both share surfaces take no ports: a link and a pin are rows this
-    // deployment owns outright, reached through `ctx.app.share`.
+    monitors: monitorRouters.monitors,
     pinnedTrace: shareRouters.pinnedTrace,
-    // What this organization is on. No ports either — the plan is resolved off
+    // What this organization is on. No ports either: the plan is resolved off
     // the one entitlement application, because ONE answer to "which plan" is
     // the whole point of a plan provider.
     plan: entitlementRouters.plan,
+    // Who else is looking at this project, and where their cursor is. In this
+    // record rather than beside it because two of its four procedures are
+    // subscriptions: a namespace mounted outside the record would be callable
+    // over `/api/trpc` and un-watchable over `/api/sse`.
+    presence: composed.presence.router(mount),
+    project: composed.project.router(mount),
+    // A procedure rather than a router: the client calls `publicEnv({})` at
+    // the root, and giving it a namespace would rename it.
+    publicEnv: authRouters.publicEnv,
+    // Custom role definitions, and the bindings that hand them out: who holds
+    // a role and what that role grants are one question asked from two ends.
+    role: roleRouters.role,
+    roleBinding: roleRouters.roleBinding,
     savedViews: dashboardRouters.savedViews,
+    // The directory-sync credentials the settings page mints, over the SAME
+    // application the `/api/scim-tokens` family answers from.
+    scimToken: mount.runtime.mount(scimTokenTrpcTransport, (ctx) => ctx.app.scim),
     // A project's stored credentials. In the record rather than beside it: the
     // namespace used to be mounted on the root directly, which put it outside
     // every audit that reads this list.
     secrets: secretRouters.secrets,
     share: shareRouters.share,
-    // ADR-057's single anonymous trace read. It takes the process's PUBLIC
-    // procedure and a `noPermission` declaration rather than a permission: the
-    // share token in the input is the whole authorization, and the declaration
-    // is what keeps the procedure reviewable rather than merely unchecked.
-    sharedTrace: traceRouters.sharedTrace,
-    spans: traceRouters.spans,
-    topics: composed.topic.router(mount),
-    traceEditOverlay: traceRouters.traceEditOverlay,
-    // Carries `onTraceUpdate`. In the record rather than beside it: a
-    // subscription mounted beside the record would be callable over
-    // `/api/trpc` and un-watchable over `/api/sse`.
-    traces: traceRouters.traces,
-    // Carries `onDiscoverUpdate`, for the same reason.
-    tracesV2: traceRouters.tracesV2,
-    translate: modelProviderRouters.translate,
-    automation: automationRouters.automation,
-    codingAgents: composed.codingAgent.router(mount),
-    // The unsubscribe pair arrives from a mail client with no session, so this
-    // one takes the process's PUBLIC procedure as well. In the record rather
-    // than beside it for the same reason every other public surface here is:
-    // a namespace mounted outside the list would serve traffic from outside
-    // every audit that reads it.
-    emailSuppression: automationRouters.emailSuppression,
-    // What this instance is licensed for, and the ceilings that licence sets.
-    // Mounted by the process rather than forwarded from the Enterprise
-    // composition: the procedures are declared in the feature's own contract,
-    // and `ctx.app.licensing` is the one application that answers both.
-    license: createLicenseTrpcRouter(mount.runtime),
-    licenseEnforcement: createLicenseEnforcementTrpcRouter(mount.runtime),
-    organization: composed.organization.router(mount),
-    project: composed.project.router(mount),
-    // The directory-sync credentials the settings page mints, over the SAME
-    // application the `/api/scim-tokens` management family answers from.
-    // OWED: the Enterprise plan gate — see `scim-rest.mount.ts`.
-    scimToken: mount.runtime.mount(scimTokenTrpcTransport, (ctx) => ctx.app.scim),
-    // The back office's connection ledger. Mounted by the process rather than
-    // forwarded from the Enterprise composition: the procedures are declared in
-    // the feature's own contract, and `ctx.app.sso` is what answers them.
+    // The back office's connection ledger. The procedures are declared in the
+    // module's own contract, and `ctx.app.sso` is what answers them.
     ssoConnections: createSsoConnectionTrpcRouter(mount.runtime),
-    // Carries `onConversationUpdate` and `onTurnStream`. In the record rather
-    // than beside it: a subscription mounted beside the record would be
-    // callable over `/api/trpc` and un-watchable over `/api/sse`.
-    langy: langyRouters.langy,
-    // Beside the conversation surface because both carry the same two gates
-    // and the same application; the wire name stays `langyEgress`.
-    langyEgress: langyRouters.langyEgress,
-    ops: composed.ops.router(mount),
-    // Carries `onSimulationUpdate`, for the same reason.
-    scenarios: scenarioRouters.scenarios,
-    setupSkills: scenarioRouters.setupSkills,
-    // Takes no ports either — a suite, its folders and its runs are all read
-    // through `ctx.app.suites`.
-    suites: scenarioRouters.suites,
-    dataRetention: composed.dataRetention.router(mount),
-    monitors: monitorRouters.monitors,
     storedObjects: composed.storedObject.router(mount),
-    // The six core AI Gateway surfaces — one entry per namespace, straight off
-    // `createGatewayTrpcRouters`. Composed over this process's own Prisma and
-    // ClickHouse (see `composeApiGateway`); nothing here is a port any more.
-    virtualKeys: gateway.virtualKeys,
-    gatewayBudgets: gateway.gatewayBudgets,
-    gatewayCacheRules: gateway.gatewayCacheRules,
-    gatewayGuardrails: gateway.gatewayGuardrails,
-    gatewaySpendEvents: gateway.gatewaySpendEvents,
-    gatewayUsage: gateway.gatewayUsage,
-    // `personalDashboard` is not mounted under its own name here — see `user:` below.
-    activityMonitor: governance.activityMonitor,
-    aiTools: governance.aiTools,
-    anomalyRules: governance.anomalyRules,
-    departments: governance.departments,
-    ingestionKey: governance.ingestionKey,
-    ingestionSources: governance.ingestionSources,
-    ingestionTemplates: governance.ingestionTemplates,
-    personalSessions: governance.personalSessions,
-    personalVirtualKeys: governance.personalVirtualKeys,
-    routingPolicy: governance.routingPolicy,
-    sessionPolicy: governance.sessionPolicy,
-    // Where a spend event is delivered. The entitlement gate is inside the
-    // handlers now, so nothing decorates this mount.
-    webhookEndpoints: mount.runtime.mount(webhookEndpointTrpcTransport, (ctx) => ctx.app.webhooks),
-    // `governance` has two owners on one wire name: the five packaged
-    // procedures above and this process's own `/` landing decision. Merged
-    // HERE rather than inside either mount, so nothing outside this record can
-    // add a third door onto the same name.
-    governance: mount.root.mergeRouters(
-      governance.governance,
-      composeGovernanceHomeTrpcRouter({ mount, infrastructure }),
-    ),
-    // The two Enterprise billing surfaces. Both are mounted on every
-    // deployment: the quoted currency is public reference data, and a
-    // deployment that composed no payment provider refuses `subscription.*` by
-    // name rather than dropping the namespace out from under its client.
-    currency: mount.runtime.mount(currencyTrpcTransport, (ctx) => ctx.app.billingCurrency, {
-      facts: [bindTrpcFact(currencyRequestHeadersFact, (ctx) => ctx.req?.headers ?? null)],
-    }),
     subscription: mount.runtime.mount(subscriptionTrpcTransport, requireSaasBilling, {
       facts: [bindTrpcFact(billingCallerEmailFact, (ctx) => ctx.session?.user.email ?? null)],
     }),
-    // One wire namespace assembled from two features, exactly as the client has always called it: the charted
-    // reads at `analytics.*`, the workbench at `analytics.lwql`, and the DASHBOARD's saved charts at
-    // `analytics.savedWorkbenchCharts`. Merged here rather than at either caller so the whole namespace is one
-    // entry in this list, and so nothing outside it can add a third door onto the same name.
-    analytics: mount.root.mergeRouters(
-      analyticsRouters.analytics,
-      mount.root.router({ savedWorkbenchCharts: dashboardRouters.savedWorkbenchCharts }),
-    ),
-    // A reviewer's comments, their scores and the queues they travel in,
-    // composed by the feature itself over this process's connection, its
-    // ClickHouse and the trace-side senders it registered once.
-    annotation: annotationRouters.annotation,
-    annotationScore: annotationRouters.annotationScore,
-    apiKey: composed.apiKey.router(mount),
-    // What the caller may do at one scope, as the product reports their own
-    // standing back to them. It takes no ports: the answer comes from the same
-    // AuthZ service every declared check on this root already runs on, so a
-    // second one here would be a second answer to one question.
-    authz: createAuthzTrpcRouter(mount.runtime),
-    batchRecord: datasetRouters.batchRecord,
-    // The support inbox, composed by the feature itself: the reports are a
-    // global table with no tenant column, read by the back office under the
-    // staff declaration the package writes.
-    bugReports: composed.bugReport.router(mount),
-    dashboards: dashboardRouters.dashboards,
-    // A project's datasets and the rows inside them: two wire names for one
-    // application, because the rows are only reachable through the dataset
-    // that holds them and a second service over them could disagree about
-    // what one contains.
-    dataset: datasetRouters.dataset,
-    datasetRecord: createDatasetRecordTrpcRouter(mount),
-    // The scoped privacy rules, composed by the feature itself: the cascade is
-    // resolved through the project and organization directories, and both
-    // writes anchor the target scope before they authorize it.
-    dataPrivacy: composed.dataPrivacy.router(mount),
-    // One trace re-scored, composed by the feature itself: the same
-    // `evaluation_processing` producer the workbench's own runs report on.
-    evaluations: evaluationRouters.evaluations,
-    // The evaluators a project defines, beside the `evaluations.*` surface
-    // that RUNS them. Two namespaces, two owners, one wire: an evaluator is a
-    // definition and an evaluation is a result.
-    evaluators: composed.evaluator.router(mount),
-    experiments: composed.experiment.router(mount),
-    // The two export-progress relays. This one surface owns its procedures rather than delegating to a feature
-    // package — one relay over a channel the PROCESS owns, distinguished only by the permission each demands — so
-    // it takes no ports; see the mount's own docblock. It is in this list because a subscription mounted beside
-    // the list would serve traffic from outside every audit that reads it.
-    export: createExportTrpcRouter(mount),
-    frontDoor: authRouters.frontDoor,
-    // Which rollouts this tenant is inside. No declared-permission policy and
-    // no ports, and both are the same decision: every procedure authorizes the
-    // exact tenant target it was asked for inside the package's own resolver,
-    // which is not the scope id the input carries. The mount declares that
-    // claim once for the whole surface.
-    featureFlag: composed.featureFlag.router(mount),
-    graphs: dashboardRouters.graphs,
-    group: membershipRouters.group,
-    // The GitHub App an organization connected, and the pull requests its
-    // coding agents opened. Composed by the feature itself off the shared
-    // infrastructure: one namespace, two answers nobody else owns, and no
-    // graph shared with anything beside it.
-    github: composeGithubTrpcRouter({ mount, infrastructure }),
-    home: composed.home.router(mount),
-    identity: userRouters.identity,
-    // The setup checklist, composed by the feature itself: nine other
-    // verticals' evidence plus the project's own two columns, and no one
-    // feature package holds it.
-    integrationsChecks: composed.integrationsChecks.router(mount),
-    joinRequests: membershipRouters.joinRequests,
-    // The sign-up ceremony, beside the `organization.createAndAssign` it is
-    // built on: same package, same questionnaire schema, same opt-out reason.
-    onboarding: membershipRouters.onboarding,
-    // Who else is looking at this project, and where their cursor is. It takes
-    // no ports — every answer is read off the request context's own
-    // application slice — and it is in this list because two of its four
-    // procedures are subscriptions: a namespace mounted beside the record
-    // would be callable over `/api/trpc` and un-watchable over `/api/sse`.
-    presence: composed.presence.router(mount),
-    // A procedure rather than a router: the client calls `publicEnv({})` at
-    // the root, and giving it a namespace would rename it.
-    publicEnv: authRouters.publicEnv,
-    // Two namespaces for one feature. `optimization.*` is not a second
-    // workflow surface bolted on: those procedures are the optimization
-    // studio's, and the name is the one its pages have always called.
-    optimization: workflowRouters.optimization,
-    // What a PERSONAL workspace may switch on. Same package and same
-    // organization directory as `organization.*`, and it takes no ports for
-    // the same reason `presence` does not: every answer is read off the
-    // request context's own application slice.
-    personalWorkspaceFeatures: createPersonalWorkspaceFeaturesTrpcRouter(mount),
-    // A project's prompt library and, beside it, the organization's tag
-    // catalogue those prompts are labelled from. One package, two wire names,
-    // because the catalogue is the ORGANIZATION's and the library is the
-    // project's — and only one of them takes a port.
-    prompts: composed.prompt.router(mount),
-    promptTags: createPromptTagTrpcRouter(mount),
-    // Custom role definitions, and the bindings that hand them out. Two wire
-    // names for one application, because who holds a role and what that role
-    // grants are the same question asked from two ends.
-    role: roleRouters.role,
-    roleBinding: roleRouters.roleBinding,
-    team: membershipRouters.team,
-    // The signed-in person's own account. The process merges the Enterprise
-    // /me dashboard reads into the same namespace, so `user.*` answers from
-    // two owners on one wire name.
-    user: mount.root.mergeRouters(userRouters.user, personalDashboard),
-    workflow: workflowRouters.workflow,
+    topics: composed.topic.router(mount),
+    // The signed-in person's own account.
+    user: userRouters.user,
+    // Where a spend event is delivered. The entitlement gate is inside the
+    // handlers, so nothing decorates this mount.
+    webhookEndpoints: mount.runtime.mount(webhookEndpointTrpcTransport, (ctx) => ctx.app.webhooks),
+    // One wire namespace assembled from two modules, exactly as the client has
+    // always called it. Only the DASHBOARD's half is converted, so the charted
+    // reads and the workbench under the same name answer 404 until the
+    // analytics module's transport lands; the saved charts answer now.
+    analytics: mount.root.router({
+      savedWorkbenchCharts: dashboardRouters.savedWorkbenchCharts,
+    }),
   };
 }
 

@@ -5,7 +5,9 @@
  * experiment's runs are summarised by.
  */
 import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import { datasetServer, type DatasetInfrastructure } from "@langwatch/dataset-server";
+import { HandledError } from "@langwatch/handled-error";
 import {
   ExperimentApi,
   type ExperimentApi as ExperimentApiContract,
@@ -52,4 +54,40 @@ export async function installApiDataset(options: {
     }),
     app,
   };
+}
+
+/**
+ * The three dataset namespaces on a process that composed no dataset store.
+ * All three still mount and every call refuses by name, so a reader is told
+ * the deployment cannot reach their rows rather than shown none.
+ */
+export function refusingDatasetFeature(): ComposedDatasetFeature {
+  const refuse = (): never => {
+    throw new ApiDatasetUnavailableError();
+  };
+
+  return {
+    routers: (mount) => ({
+      dataset: createDatasetTrpcRouter(mount.runtime),
+      datasetRecord: createDatasetRecordTrpcRouter(mount.runtime),
+      batchRecord: createBatchRecordTrpcRouter(mount.runtime),
+    }),
+    app: new Proxy({} as DatasetApi, { get: () => refuse, has: () => true }),
+  };
+}
+
+/**
+ * A deployment with no dataset store. `fault: "platform"` because nothing the
+ * customer sent caused it.
+ */
+export class ApiDatasetUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super("service_unavailable", "This deployment composes no dataset store.", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ApiDatasetUnavailableError";
+  }
 }

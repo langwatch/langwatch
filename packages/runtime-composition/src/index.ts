@@ -2,9 +2,23 @@ export {
   ApplicationBuilder,
   BootedRuntime,
   createApp,
+  type FeatureInstallOptions,
   type InstalledFeature,
   type RuntimeService,
 } from "./application.ts";
+export {
+  DuplicateTransportNamespaceError,
+  MissingTransportHostError,
+  mountDeclaredTransports,
+  type DeclaredTransports,
+  type FeatureRestHost,
+  type FeatureRestMountOptions,
+  type FeatureTransportHosts,
+  type FeatureTrpcHost,
+  type FeatureTrpcMountOptions,
+  type MountableTransport,
+  type MountedTransports,
+} from "./transport-mounting.ts";
 export {
   DependencyCycleError,
   DuplicateFeatureError,

@@ -5,15 +5,26 @@
 import {
   OpsClickHouseRuntime,
   OpsExplainClickHouseRepository,
-  OpsExplainClientPort,
   OpsExplainService,
   type OpsExplainClientResolution,
-  type OpsClickHouseExplainRestPorts,
+  type OpsExplainClients,
 } from "@langwatch/ops-server";
+
+/** What the operator-only EXPLAIN family reaches, as this process supplies it. */
+export interface OpsClickHouseExplainRestPorts {
+  /** The deployment's own operator secret, compared in constant time. */
+  opsApiKey(): string;
+  /** The decision service behind the endpoint. */
+  explain(): OpsExplainService;
+  /** Whether this deployment is production, for the service's fail-closed rule. */
+  isProduction: boolean;
+}
 
 /** The family's collaborators and the connection they hold, or nothing. */
 export type ApiOpsExplainRest = Readonly<{
   ports: OpsClickHouseExplainRestPorts;
+  /** The ClickHouse account an operator EXPLAIN runs as. */
+  clients: OpsExplainClients;
   /** Released with the process: the lazily-opened ops ClickHouse client. */
   close(): Promise<void>;
 }>;
@@ -35,13 +46,13 @@ export function composeApiOpsExplainRest(options: {
   if (!url || !apiKey) return undefined;
 
   const runtime = OpsClickHouseRuntime.create({ url, buildTime: false });
+  const clients = new ApiOpsExplainClients(runtime);
   const service = OpsExplainService.create({
-    repository: OpsExplainClickHouseRepository.create({
-      resolver: new ApiOpsExplainClientPort(runtime),
-    }),
+    repository: OpsExplainClickHouseRepository.create({ resolver: clients }),
   });
 
   return {
+    clients,
     ports: {
       opsApiKey: () => apiKey,
       explain: () => service,
@@ -54,13 +65,12 @@ export function composeApiOpsExplainRest(options: {
 /**
  * The dedicated account, and never a fallback.
  */
-class ApiOpsExplainClientPort extends OpsExplainClientPort {
-  constructor(private readonly runtime: OpsClickHouseRuntime) {
-    super();
-  }
+class ApiOpsExplainClients implements OpsExplainClients {
+  constructor(private readonly runtime: OpsClickHouseRuntime) {}
 
-  tryResolve(): OpsExplainClientResolution | null {
+  findClient(): OpsExplainClientResolution | null {
     const client = this.runtime.resolveClient();
+
     return client ? { client, usingFallback: false } : null;
   }
 }

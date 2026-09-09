@@ -3,6 +3,7 @@
  * fleet over its own Postgres, and the ops snapshot over its own Redis
  * (specs/ops/process-manager-visibility.feature, specs/ops/shared-ops-snapshot.feature).
  */
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuthService } from "@langwatch/auth-contract";
@@ -53,9 +54,9 @@ class RecordingAbsence extends ApiOpsAbsenceReport {
   }
 }
 
-function compose(options: { prisma: PrismaClient; redis?: RedisConnection | null }) {
+async function compose(options: { prisma: PrismaClient; redis?: RedisConnection | null }) {
   const report = new RecordingAbsence();
-  const feature = composeOpsFeature({
+  const feature = await composeOpsFeature({
     infrastructure: {
       prisma: options.prisma,
       authz: {} as never,
@@ -69,8 +70,10 @@ function compose(options: { prisma: PrismaClient; redis?: RedisConnection | null
       users: {} as unknown as UserService,
       auth: {} as unknown as AuthService,
       projects: {} as unknown as ProjectService,
+      apiKeys: createApiFixture<ApiKeyApi>(),
     },
     adminEmails: ["operator@acme.test"],
+    rateLimit: () => Promise.resolve({ allowed: true }),
     eventLogClient: null,
     eventing: undefined,
     redis: options.redis ?? null,
@@ -99,7 +102,7 @@ describe("given the API process composes the operator back office", () => {
           },
         ],
       });
-      const { feature } = compose({ prisma });
+      const { feature } = await compose({ prisma });
 
       const fleet = await feature.app.getFleetSummary();
 
@@ -129,7 +132,7 @@ describe("given the API process composes the operator back office", () => {
       const redis = readingRedis();
       const { prisma } = fleetPrisma({ instances: [], outbox: [] });
 
-      const { report } = compose({ prisma, redis: redis.connection });
+      const { report } = await compose({ prisma, redis: redis.connection });
       await vi.waitFor(() => expect(redis.asked.length).toBeGreaterThan(0));
 
       expect(redis.asked).toContain("ops:{snapshot}:live");
@@ -140,10 +143,10 @@ describe("given the API process composes the operator back office", () => {
 
   describe("when the process holds no Redis connection", () => {
     /** @scenario "A process with no snapshot store says so rather than reporting an all-clear" */
-    it("names the absence and answers the badge with no computed time", () => {
+    it("names the absence and answers the badge with no computed time", async () => {
       const { prisma } = fleetPrisma({ instances: [], outbox: [] });
 
-      const { feature, report } = compose({ prisma, redis: null });
+      const { feature, report } = await compose({ prisma, redis: null });
 
       expect(report.reported).toContain("ops-snapshot");
       expect(feature.app.badgeCounts()).toEqual({

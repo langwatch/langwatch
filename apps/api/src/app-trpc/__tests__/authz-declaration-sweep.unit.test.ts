@@ -277,10 +277,9 @@ describe("the app tRPC authz declaration sweep", () => {
       expect(stale).toEqual([]);
     });
 
-    /** The trace grid takes its list parser as a PORT, which this record's
-     *  refusing trace feature answers with a stand-in rather than the real
-     *  parser, so those six read as unreadable here. Named rather than
-     *  skipped: any seventh unreadable input is a procedure whose scope ids
+    /** Empty while `traces.*` is off the record: the trace grid's six reads
+     *  took their list parser as a PORT, and a stand-in parser is what read as
+     *  unreadable. Any unreadable input here is a procedure whose scope ids
      *  nothing proved, and it fails this list.
      *  @scenario "A procedure whose input cannot be inspected fails the sweep" */
     it("reads the input schema of every procedure that takes one", () => {
@@ -289,14 +288,7 @@ describe("the app tRPC authz declaration sweep", () => {
         .map((procedure) => procedure.path)
         .sort();
 
-      expect(opaque).toEqual([
-        "traces.getAllForDownload",
-        "traces.getAllForProject",
-        "traces.getCustomersAndLabels",
-        "traces.getSampleTraces",
-        "traces.getSampleTracesDataset",
-        "traces.getTopicCounts",
-      ]);
+      expect(opaque).toEqual([]);
     });
   });
 

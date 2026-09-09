@@ -26,7 +26,6 @@ import { refusingHomeFeature } from "../../features/project/home.composition.ts"
 import { createRoleBindingTrpcRouter, createRoleTrpcRouter } from "../../features/role/role-trpc.mount.ts";
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition.ts";
 import { createStoredObjectTrpcRouter } from "../../features/stored-object/stored-object-trpc.mount.ts";
-import { refusingBugReportFeature } from "../../features/bug-report/bug-report.composition.ts";
 import { refusingAnnotationFeature } from "../../features/annotation/annotation-absence.ts";
 import {
   createDashboardTrpcRouter,
@@ -359,7 +358,6 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     home: refusingHomeFeature(),
     role: stubRoleFeature(),
     storedObject: stubStoredObjectFeature(),
-    bugReport: refusingBugReportFeature(),
     annotation: refusingAnnotationFeature(),
     dashboard: stubDashboardFeature(),
     entitlement: stubEntitlementFeature(),

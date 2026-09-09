@@ -77,6 +77,8 @@ export type AppDefinitionWithoutConfig<
 /** An inert API descriptor retained for the process root to mount later. */
 export type FeatureTransportDescriptor = Readonly<{
   readonly protocol: "rest" | "trpc";
+  /** The family's path segment, or the tRPC namespace the record keys it by. */
+  readonly namespace?: string;
   readonly router: (...args: never[]) => object;
 }>;
 
@@ -169,6 +171,8 @@ export interface FeatureInstallArguments<Infrastructure> {
  */
 export interface InstallableServerFeature<Infrastructure> {
   readonly name: string;
+  /** Every door this feature declared, for the process root to mount at boot. */
+  readonly transports?: readonly FeatureTransportDescriptor[];
   readonly repositories?: FeatureRepositories;
   readonly repositoryRegistry?: RepositoryRegistry<
     Record<

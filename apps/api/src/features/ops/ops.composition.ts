@@ -11,6 +11,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   AdminAuditSink,
   EventExplorerClickHouseRepository,
+  opsServer,
   EventExplorerService,
   EventingOpsIntrospectionAdapter,
   ManagerExplorerService,
@@ -23,14 +24,19 @@ import {
   RedisOpsSnapshotAdapter,
   type OpsCapability,
   type OpsEventExplorer,
+  type OpsExplainClients,
   type OpsProcessExplorer,
   type OpsReplayRunner,
+  type OpsSystemMigrationRunner,
 } from "@langwatch/ops-server";
-import type { ProjectService } from "@langwatch/project-contract";
-import type { UserService } from "@langwatch/user-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { AuthApi } from "@langwatch/auth-contract";
+import { ProjectApi, type ProjectService } from "@langwatch/project-contract";
+import { UserApi, type UserService } from "@langwatch/user-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { createApp, ResourceScope } from "@langwatch/runtime-composition";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiAuditPort } from "../../api-request.policy.ts";
@@ -43,6 +49,8 @@ export type OpsPeers = Readonly<{
   auth: AuthService;
   /** The projects a scheduled job and a back-office row are scoped to. */
   projects: ProjectService;
+  /** The credentials a filed report is linked to a project through. */
+  apiKeys: ApiKeyApi;
 }>;
 
 /** Everything the operator surface is composed from besides its peers. */
@@ -55,6 +63,7 @@ export type OpsFeatureCollaborators = Readonly<{
   users: UserService;
   auth: AuthService;
   projects: ProjectService;
+  apiKeys: ApiKeyApi;
   /** The deployment's operator allow-list, matched on a person's email. */
   adminEmails: readonly string[];
   /**
@@ -70,6 +79,12 @@ export type OpsFeatureCollaborators = Readonly<{
    * live stream are all one artifact the writer already computed.
    */
   redis: RedisConnection | null;
+  /** The process's fixed-window counter, which the public report intake meters on. */
+  rateLimit(input: {
+    key: string;
+    windowSeconds: number;
+    max: number;
+  }): Promise<{ allowed: boolean }>;
   logger: Logger;
 }>;
 
@@ -103,7 +118,7 @@ const OPS_CONSEQUENCE = {
 } as const;
 
 /** Composes the operator surface over this process's own graph. */
-export function composeOpsFeature(options: {
+export async function composeOpsFeature(options: {
   infrastructure: ApiTrpcInfrastructure;
   peers: OpsPeers;
   adminEmails: readonly string[];
@@ -111,6 +126,12 @@ export function composeOpsFeature(options: {
   eventing: EventSourcing | undefined;
   /** The connection the worker publishes the ops snapshot on, where one exists. */
   redis?: RedisConnection | null;
+  /** The process's fixed-window counter, which the public report intake meters on. */
+  rateLimit(input: {
+    key: string;
+    windowSeconds: number;
+    max: number;
+  }): Promise<{ allowed: boolean }>;
   /**
    * The process's own scope, which the snapshot reader's poll is registered on.
    * Without it the interval outlives a failed boot and keeps reading a Redis
@@ -118,7 +139,9 @@ export function composeOpsFeature(options: {
    */
   resources?: ResourceScope;
   report?: ApiOpsAbsenceReport;
-}): ComposedOpsFeature {
+  /** The operator EXPLAIN account and secret, where this deployment has both. */
+  explain?: ApiOpsExplainCollaborators;
+}): Promise<ComposedOpsFeature> {
   const collaborators: OpsFeatureCollaborators = {
     prisma: options.infrastructure.prisma,
     featureFlags: options.infrastructure.featureFlags,
@@ -127,20 +150,29 @@ export function composeOpsFeature(options: {
     users: options.peers.users,
     auth: options.peers.auth,
     projects: options.peers.projects,
+    apiKeys: options.peers.apiKeys,
     adminEmails: options.adminEmails,
     eventLogClient: options.eventLogClient,
     eventing: options.eventing,
     redis: options.redis ?? null,
+    rateLimit: (input) => options.rateLimit(input),
     logger: createLogger("langwatch:api:ops"),
   };
   // Unconditional: no replay runtime exists in the tree for any process to
   // compose, whatever this one is configured with.
   options.report?.absent("replay-runtime");
   if (!collaborators.redis) options.report?.absent("ops-snapshot");
-  const app = composeOps(collaborators, collaborators.logger, options.resources);
+  const app = await composeOps(collaborators, collaborators.logger, options);
 
   return { app };
 }
+
+/** The operator EXPLAIN account and the secret its caller presents. */
+export type ApiOpsExplainCollaborators = Readonly<{
+  clients: OpsExplainClients;
+  findApiKey(): string | null;
+  isProduction: boolean;
+}>;
 
 /**
  * The operator surface on a process that composed no graph to run it over. The
@@ -171,11 +203,12 @@ function refusingOps<T>(): T {
 /**
  * The operator application, over this process's own connections.
  */
-function composeOps(
+async function composeOps(
   options: OpsFeatureCollaborators,
   logger: Logger,
-  resources: ResourceScope | undefined,
-): OpsApp {
+  install: Readonly<{ resources?: ResourceScope; explain?: ApiOpsExplainCollaborators }>,
+): Promise<OpsApp> {
+  const resources = install.resources;
   const snapshots = options.redis
     ? RedisOpsSnapshotAdapter.create({ redis: ApiOpsSnapshotRedis.create(options.redis) })
     : null;
@@ -189,14 +222,9 @@ function composeOps(
   // this process drains or its composition fails half-built.
   if (snapshots) resources?.own("api ops snapshot reader", () => snapshots.stop());
 
-  return OpsApp.create({
-    dependencies: {
-      users: options.users,
-      auth: options.auth,
-      projects: options.projects,
-      auditLog: options.auditLog,
-    },
-    infrastructure: {
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withPersistence("postgres", { prisma: options.prisma })
+    .withInfrastructure({
       createCapability: (peers): OpsCapability => {
         const operations = PostgresOpsAdapter.create({
           adminEmails: options.adminEmails,
@@ -221,8 +249,11 @@ function composeOps(
           },
         }).build();
 
-        return {
-          ...operations,
+        // Proxied rather than spread: the operations service is a class, and
+        // spreading one drops every method on its prototype. Each member below
+        // is this process's own; everything else forwards to the service bound
+        // to itself, so its private state survives the indirection.
+        const composed: Record<string, unknown> = {
           eventExplorer: composeEventExplorer(options),
           managerExplorer: composeManagerExplorer(options),
           replay: unavailableOperatorRuntime<OpsReplayRunner>("the projection replay runner"),
@@ -230,15 +261,55 @@ function composeOps(
           // a second writer would publish a second answer for one fleet.
           snapshots,
         };
+
+        return new Proxy(operations, {
+          get(target, property) {
+            if (typeof property === "string" && property in composed) return composed[property];
+
+            const member: unknown = Reflect.get(target, property);
+
+            return typeof member === "function" ? member.bind(target) : member;
+          },
+          has: (target, property) =>
+            (typeof property === "string" && property in composed) || property in target,
+        }) as OpsCapability;
       },
       featureFlags: options.featureFlags,
       eventingIntrospection: EventingOpsIntrospectionAdapter.create(
         () => options.eventing?.definitions ?? [],
       ),
-    },
-    config: undefined,
-    resources: new ResourceScope(),
-  });
+      // Four operator readings this process composes nothing for. Each answers
+      // its empty shape rather than refusing: the back office renders the page
+      // and shows nothing registered, which is what is true here.
+      pipelines: { listRegistrations: () => ({ projections: [], subscribers: [] }) },
+      eventLogWindow: {
+        read: () => ({ searchLookbackDays: 7, hotTierDays: null, hotTierEnvVar: null }),
+      },
+      grafana: { findLinkConfig: () => null },
+      systemMigrations: unavailableOperatorRuntime<OpsSystemMigrationRunner>(
+        "the system migration runner",
+      ),
+      // The process's ONE counter, the same one every other public rule meters
+      // through: two limiters would give one address two flood budgets.
+      bugReportRateLimiter: { consume: (input) => options.rateLimit(input) },
+      // This deployment alerts nowhere: intake already succeeded, and a
+      // notifier that threw would fail a report that was written.
+      bugReportNotifier: { notify: () => Promise.resolve() },
+      explainClients: install.explain?.clients ?? { findClient: () => null },
+      findOpsApiKey: () => install.explain?.findApiKey() ?? null,
+      isProduction: install.explain?.isProduction ?? false,
+    })
+    .withProvided(UserApi, options.users)
+    .withProvided(AuthApi, options.auth)
+    .withProvided(ProjectApi, options.projects)
+    .withProvided(AuditLogApi, options.auditLog)
+    .withProvided(ApiKeyApi, options.apiKeys)
+    .withFeature(opsServer)
+    .boot({ role: "api" });
+
+  resources?.own("api operator back office", () => runtime.stop());
+
+  return runtime.feature(opsServer).provided;
 }
 
 /**

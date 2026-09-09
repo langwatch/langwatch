@@ -244,11 +244,22 @@ import {
   composeApiTraceProducerCommands,
   type ApiTraceProducerCommands,
 } from "../features/trace/trace-producer.composition.ts";
-import type { ApiSimulationEvidencePort } from "../features/project/integrations-checks.composition.ts";
+import {
+  composeIntegrationsChecksFeature,
+  refusingIntegrationsChecksFeature,
+  type ApiSimulationEvidencePort,
+} from "../features/project/integrations-checks.composition.ts";
+import { composeHomeFeature, refusingHomeFeature } from "../features/project/home.composition.ts";
+import { PostgresModelProviderEvidenceAdapter } from "@langwatch/model-provider-server";
+import type { ComposedHomeFeature } from "../features/project/home.composition.types.ts";
+import type { ComposedIntegrationsChecksFeature } from "../features/project/integrations-checks.composition.types.ts";
 import { ApiScenarioSimulationEvidence } from "../features/project/scenario-simulation-evidence.ts";
 import { TraceSpanIngestPort } from "@langwatch/trace-server";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
-import { LoggedApiTrpcFeaturesAbsence } from "./api-trpc-features.composition.ts";
+import {
+  ApiTrpcFeaturesComposition,
+  LoggedApiTrpcFeaturesAbsence,
+} from "./api-trpc-features.composition.ts";
 import {
   generateClickHouseFilterConditions,
   LwqlKeyMapClickHouseRepository,
@@ -330,12 +341,8 @@ import {
 } from "./api-trace-ingest.composition.ts";
 import { composeApiTraceSpool } from "./api-trace-spool.composition.ts";
 import { ApiTraceMediaStore } from "./api-packaged-rest.composition.ts";
-import {
-  AdminAccessService,
-  PrismaBugReportRepository,
-  SilentBugReportNotifier,
-  type BugReportRestPorts,
-} from "@langwatch/ops-server";
+import { AdminAccessService, PrismaBugReportRepository } from "@langwatch/ops-server";
+import type { BugReportRestPorts } from "../features/bug-report/bug-report-rest.ports.ts";
 import type { UnsubscribeRestPorts } from "@langwatch/automation-server";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -691,6 +698,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * ledger behind it.
    */
   private composedRole: ComposedRoleFeature | undefined;
+  private composedHome!: ComposedHomeFeature;
 
   /**
    * How long a project's scopes keep what they captured, or none. There is no
@@ -714,6 +722,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * process that opened no database resolves no policy.
    */
   private composedDataPrivacy: ComposedDataPrivacyFeature | undefined;
+  private composedIntegrationsChecks!: ComposedIntegrationsChecksFeature;
   private composedAnnotation!: ComposedAnnotationFeature;
   private composedNotification: ComposedNotificationFeature | undefined;
   /**
@@ -1175,8 +1184,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             plans: this.resolvePlanProvider(options),
           })
         : undefined;
-    // `home.*` is not composed: its tRPC transport is unconverted, and the
-    // feature had no other door.
+    this.composedHome = infrastructure
+      ? composeHomeFeature({ infrastructure })
+      : refusingHomeFeature();
     // The invitation half, composed here rather than inside the org-group half because BOTH
     // doors need it: `organization.*` administers invitations over tRPC and
     // `/api/organization/{id}/invites` over REST, and the REST doors are composed further down.
@@ -1252,10 +1262,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             },
           })
         : refusingPromptFeature();
-    this.composedOps = this.composeOps(options, infrastructure, directory);
-    // The support inbox the back office reads over tRPC is not composed: its
-    // transport is unconverted, and the feature had no other door. The public
-    // `POST /api/bug-reports` intake is a REST family and is unaffected.
+    this.composedOps = await this.composeOps(options, infrastructure, directory);
     // The setup checklist. Its provider step is answered by the model-provider feature's OWN
     // persistence rather than by a `prisma.modelProvider` read written in the checklist: the
     // question is one existence read over the project's scope cascade, and that table holds
@@ -1332,8 +1339,20 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           ),
         })
       : refusingModelProviderFeature();
-    // The setup checklist is not composed: its tRPC transport is unconverted,
-    // and the feature had no other door.
+    const simulationEvidence = this.resolveSimulationEvidence();
+    this.composedIntegrationsChecks =
+      infrastructure && directory
+        ? composeIntegrationsChecksFeature({
+            infrastructure,
+            modelProviders: PostgresModelProviderEvidenceAdapter.create({
+              database: infrastructure.prisma,
+              projects: directory.projects,
+            }).build(),
+            // Whether this project has run a simulation, off the SAME
+            // simulation service the scenario surfaces read.
+            ...(simulationEvidence ? { simulations: simulationEvidence } : {}),
+          })
+        : refusingIntegrationsChecksFeature();
     // The conversation panel and the egress allow-list beside it. It used to
     // ride inside the agent half, so a process missing any scenario
     // collaborator lost both Langy surfaces with it.
@@ -1363,14 +1382,161 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // command is recorded on before it runs.
     const sso = await this.composeSso(options);
     if (sso) options.resources.own("api single sign-on", () => sso.stop());
-    // The packaged tRPC record is NOT composed. Every namespace it carried is
-    // built by a transport that still names a deleted legacy builder, so this
-    // process mounts none of them and says so once, by name.
+    // The eleven features with no refusing twin. None mounts without its own
+    // application - `ctx.app.share`, `ctx.app.secrets`, `ctx.app.topics`,
+    // `ctx.app.sso`, `ctx.app.dashboard`, `ctx.app.evaluations`, the resolved
+    // privacy policy, the retention window and the one plan answer are all read
+    // by surfaces those features do not own - so the record refuses whole
+    // rather than serving slices with nothing behind.
+    const share = this.composedShare;
+    const entitlement = this.composedEntitlement;
+    const dataRetention = this.composedDataRetention;
+    const featureFlag = this.composedFeatureFlag;
+    const secret = this.composedSecret;
+    const topic = this.composedTopic;
+    const dataPrivacy = this.composedDataPrivacy;
+    const dashboard = this.composedDashboard;
+    const evaluation = this.composedEvaluation;
+    const role = this.composedRole;
+    // The caller's own grants, as `authz.*` reports them back. The same
+    // application every declared check on this root already runs on.
+    const permissions = this.composedAuthz?.app;
     const trpcAbsence = LoggedApiTrpcFeaturesAbsence.create(
       createLogger(options.config.serviceName),
     );
-    trpcAbsence.absent("unconverted-transports");
-    const features = undefined;
+    if (
+      infrastructure &&
+      (!share ||
+        !entitlement ||
+        !dataRetention ||
+        !featureFlag ||
+        !secret ||
+        !topic ||
+        !dataPrivacy ||
+        !dashboard ||
+        !evaluation ||
+        !role ||
+        !permissions ||
+        !sso)
+    ) {
+      trpcAbsence.absent("no-collaborators");
+    }
+    const features =
+      share &&
+      entitlement &&
+      dataRetention &&
+      featureFlag &&
+      secret &&
+      topic &&
+      dataPrivacy &&
+      dashboard &&
+      evaluation &&
+      role &&
+      permissions &&
+      sso
+        ? ApiTrpcFeaturesComposition.tryCompose({
+            // What a feature composes ITSELF out of, built once above and handed to
+            // every `compose<Feature>()` the record's literal names.
+            infrastructure,
+            // The features whose doors are not only tRPC, composed before the mount
+            // existed. Absent infrastructure there is no record either, so the
+            // refusing gateway stands in rather than a second condition here.
+            composed: {
+              analytics: this.composedAnalytics,
+              featureFlag,
+              dataset: this.composedDataset,
+              evaluator: this.composedEvaluator,
+              prompt: this.composedPrompt,
+              gateway: this.composedGateway,
+              langy: this.composedLangy,
+              ops: this.composedOps,
+              scenario: this.composedScenario,
+              dataRetention,
+              home: this.composedHome,
+              role,
+              monitor: this.composedMonitor,
+              storedObject: this.composedStoredObject,
+              dataPrivacy,
+              integrationsChecks: this.composedIntegrationsChecks,
+              annotation: this.composedAnnotation,
+              dashboard,
+              entitlement,
+              httpProxy: this.composedHttpProxy,
+              modelProvider: this.composedModelProvider,
+              share,
+              topic,
+              trace: this.composedTrace,
+              workflow: this.composedWorkflow,
+              experiment: this.composedExperiment,
+              evaluation,
+              organization: this.composedOrganization,
+              project: this.composedProject,
+              codingAgent: this.composedCodingAgent,
+              automation: this.composedAutomation,
+              enterprise: this.composedEnterprise,
+              auth: this.composedAuthFeature,
+              user: this.composedUser,
+              presence: this.composedPresence,
+              apiKey: this.composedApiKey,
+              secret,
+            },
+            // The ONE application every packaged surface reads off `ctx.app`. One
+            // literal, and every slice on it is contributed by the feature that
+            // composed it, or by that feature's named refusal.
+            collaborators: {
+              application: {
+                apiKeys: this.composedApiKey.app,
+                broadcast: this.composedPresence.emitter,
+                config: this.composedUser.config,
+                organizations: this.composedOrganization.app,
+                presence: this.composedPresence.app,
+                users: this.composedUser.app,
+                analytics: this.composedAnalytics.analytics,
+                annotation: this.composedAnnotation.app,
+                modelProviders: this.composedModelProvider.app,
+                dataRetention: dataRetention.service,
+                // The booted entitlement application, which resolves the plan off
+                // the SAME sources this process's own provider does.
+                planProvider: entitlement.app,
+                secrets: secret.app,
+                share: share.app,
+                topics: topic.app,
+                dataPrivacy: dataPrivacy.app,
+                sso: sso.sso(),
+                traces: this.composedTrace.traces,
+                workflows: this.composedWorkflow.app,
+                experiments: this.composedExperiment.app,
+                evaluations: evaluation.app,
+                automation: this.composedAutomation.app,
+                codingAgentApp: this.composedCodingAgent.app,
+                projects: this.composedProject.app,
+                ...this.composedEnterprise.application,
+                // The checkout, portal, invoice and seat-change half of
+                // `subscription.*`. Empty off Stripe, which is what makes the
+                // surface report that this deployment does not bill.
+                ...this.composedBillingWebhook.application,
+                authzApp: permissions,
+                dashboard: dashboard.app,
+                dataset: this.composedDataset.app,
+                evaluatorApp: this.composedEvaluator.app,
+                featureFlag: featureFlag.app,
+                prompts: this.composedPrompt.app,
+                gateway: this.composedGateway.app,
+                github,
+                langy: this.composedLangy.app,
+                ops: this.composedOps.app,
+                monitors: this.composedMonitor.app,
+                permissions: authz,
+                roles: role.app,
+                scenarios: this.composedScenario.scenarios,
+                storedObjectApp: this.composedStoredObject.app,
+                suites: this.composedScenario.suites,
+                ...composeEnterpriseGovernanceApplication(this.resolveEnterprise()),
+              },
+            },
+            report: trpcAbsence,
+          })
+        : undefined;
     // The hosted Model Context Protocol endpoint, served off the Node server ahead of the Hono
     // application because its Streamable HTTP and Server-Sent Events transports hold the raw
     // response for a session's life.
@@ -2542,7 +2708,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // The process's ONE counter, the same one every other public rule meters
       // through: two limiters would give one address two flood budgets.
       rateLimiter: { consume: (input) => this.rateLimiter.consume(input) },
-      notifier: new SilentBugReportNotifier(),
+      // This deployment alerts nowhere: intake already succeeded, and a
+      // notifier that threw would fail a report that was written.
+      notifier: { notify: () => Promise.resolve() },
       credentials: (request) => extractApiKeyRequestCredentials(request),
       apiKeys: () => tenancy.apiKeys,
     };
@@ -3850,17 +4018,36 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * user directory a back-office row names, the browser session an impersonation is started and
    * stopped against, and the project directory a scheduled job is scoped to.
    */
-  private composeOps(
+  private async composeOps(
     options: ApiRuntimeCompositionOptions,
     infrastructure: ApiTrpcInfrastructure | undefined,
     tenancy: ApiTenancyComposition | undefined,
-  ): ComposedOpsFeature {
+  ): Promise<ComposedOpsFeature> {
     const auth = this.composedAuth?.compose();
     if (!infrastructure || !auth || !tenancy) return refusingOpsFeature();
 
-    return composeOpsFeature({
+    return await composeOpsFeature({
       infrastructure,
-      peers: { users: auth.users, auth: auth.auth, projects: tenancy.projects },
+      peers: {
+        users: auth.users,
+        auth: auth.auth,
+        projects: tenancy.projects,
+        apiKeys: tenancy.apiKeys,
+      },
+      // The process's ONE counter, so a report and every other public rule
+      // share one flood budget per address.
+      rateLimit: (input) => this.rateLimiter.consume(input),
+      // The operator EXPLAIN account and the secret its caller presents, where
+      // this deployment provisioned both.
+      ...(this.composedOpsExplain
+        ? {
+            explain: {
+              clients: this.composedOpsExplain.clients,
+              findApiKey: () => this.composedOpsExplain?.ports.opsApiKey() ?? null,
+              isProduction: this.composedOpsExplain.ports.isProduction,
+            },
+          }
+        : {}),
       // The SAME allow-list the user feature already parsed and published as
       // `config.opsSidebarEmails`. Taken rather than re-read: the operator gate
       // and the menu that shows the operator link must never disagree about who

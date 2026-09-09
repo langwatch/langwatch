@@ -10,7 +10,8 @@ import type {
   RestErrorHandler,
 } from "@langwatch/api/rest";
 
-import type { AdminRestPorts, BugReportRestPorts } from "@langwatch/ops-server";
+import type { AdminRestPorts } from "@langwatch/ops-server";
+import type { BugReportRestPorts } from "../features/bug-report/bug-report-rest.ports.ts";
 import type { UnsubscribeRestPorts } from "@langwatch/automation-server";
 import type { GithubInstallApi } from "@langwatch/github-server";
 import type { BillingStripeWebhookApi } from "@langwatch/enterprise-billing-server";
@@ -64,7 +65,7 @@ import type {
   ApiTraceLegacyRestCollaborators,
   ApiTracesRestCollaborators,
 } from "../features/trace/trace-rest.mount.ts";
-import type { OpsClickHouseExplainRestPorts } from "@langwatch/ops-server";
+import type { OpsClickHouseExplainRestPorts } from "../features/ops/ops-clickhouse-explain-rest.mount.ts";
 import type { DspyStepsRestPorts } from "@langwatch/experiment-server";
 import type { McpAuthorizeRestPorts } from "../features/mcp/mcp-authorize-rest.mount.ts";
 import type { DatasetApi } from "@langwatch/dataset-contract";
