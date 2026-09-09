@@ -39,10 +39,13 @@ Feature: Team detail — what one team's page shows today
   Scenario: The links describe where they land in the reader's own words
     Given the team has spend in the last 30 days
     When the member opens that team's detail page
-    Then the traces link is described as opening this team's data, with a
-      "Viewing as admin" banner on screen and the access recorded in the
-      audit log
+    Then the traces link is described as opening this team's data
     And the chart link is described as showing this team's spend next to
       every other team's
+    # The line stops there deliberately. It used to promise a "Viewing as
+    # admin" banner and an audit-log entry, and a team drill-through gets
+    # neither: both key off a personal workspace owned by somebody else, and
+    # an org team is not one. See admin-trace-access.feature, which says no
+    # banner renders because an org admin's membership cascades to every team.
     # Neither line may name an internal route, spell "and" as a plus sign,
     # or reach for "orthogonal lens" and "drilldown" to say "view".

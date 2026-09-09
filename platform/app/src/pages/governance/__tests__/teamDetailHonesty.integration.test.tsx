@@ -118,11 +118,17 @@ describe("given a team with spend in the window", () => {
       screen.getByRole("link", { name: /workspace traces/ }),
     ).toHaveAttribute("href", `/${PROJECT_SLUG}/traces`);
     expect(
-      screen.getByText(/A 'Viewing as admin' banner stays on screen/),
+      screen.getByText(/The trace explorer opens with this team's data/),
     ).toBeInTheDocument();
     expect(
       screen.getByText(/shows this team's spend next to every other team's/),
     ).toBeInTheDocument();
+    // The promise that used to sit here — a "Viewing as admin" banner and an
+    // audit-log entry — is not kept for a team. Both key off a personal
+    // workspace owned by somebody else, so asserting the copy was requiring
+    // the page to keep saying something untrue.
+    expect(screen.queryByText(/Viewing as admin/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/audit log/i)).not.toBeInTheDocument();
 
     const shown = document.body.textContent ?? "";
     // The guard: prove the page rendered before asserting these absences.
