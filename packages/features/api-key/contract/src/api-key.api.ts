@@ -37,6 +37,15 @@ import type {
 import type { ApiKeyVisibleProjects, ApiKeyVisibleProjectsInput } from "./api-key.visibility.ts";
 
 export type ApiKeyManagementCaller = Readonly<{ id: string }>;
+/**
+ * The credential an organization door resolved: the key itself, and the member
+ * it acts as — null for a service key, which acts as nobody.
+ */
+export type ApiKeyCredentialCheck = Readonly<{
+  apiKeyId: string;
+  userId: string | null;
+  organizationId: string;
+}>;
 export type CreateApiKeyManagementInput = Readonly<{
   organizationId: string;
   name: string;
@@ -79,6 +88,12 @@ export interface ApiKeyApi {
   ensureCallerIsOrgMember(input: ApiKeyMembershipInput): Promise<void>;
   assertSelectionWithinCeiling(input: ApiKeySelectionInput): Promise<void>;
   isOrgAdmin(input: ApiKeyMembershipInput): Promise<boolean>;
+  /**
+   * Whether the credential a request arrived with holds `organization:manage`
+   * here. Asked of the KEY and the member it acts as together, so a narrowed
+   * key cannot borrow the reach of whoever created it.
+   */
+  credentialCanManageOrganization(input: ApiKeyCredentialCheck): Promise<boolean>;
   isOrgAdminApiKey(input: ApiKeyAdminKeyInput): Promise<boolean>;
   findById(input: ApiKeyIdInput): Promise<ApiKey | null>;
   getByIdForCaller(input: ApiKeyCallerReadInput): Promise<ApiKeyDetail>;

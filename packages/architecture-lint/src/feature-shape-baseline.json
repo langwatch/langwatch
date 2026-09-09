@@ -87,10 +87,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "api-key|legacy-transport-runtime",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "api-key|nested-web-entry",
       "measured": "2026-09-08"
     },

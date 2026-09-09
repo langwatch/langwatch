@@ -43,5 +43,5 @@ export {
   type UpdateApiKeyRequest,
 } from "./app/api-key.app.ts";
 export { apiKeyServer } from "./api-key.server.ts";
-export { createApiKeysRestApp } from "./transport/api-rest/api-key.api.ts";
+export { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
 export { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";

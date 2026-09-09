@@ -1,79 +1,27 @@
 /**
- * The published operations for this family, moved out of the hand-maintained
- * document and into the app that serves them.
- *
- * These were authored by hand in `openapiLangWatch.json` while the routes
- * themselves carried a one-line `describeRoute`, so the generator could not
- * produce them and the document had to keep them by not being regenerated over
- * them. Two routes that had no hand-written entry -- reading and regenerating
- * a project's API key -- were therefore unpublishable without this move.
- *
- * They are reproduced verbatim, `operationId` included: the ids are load
- * bearing, since `openapi-python-client` turns them into the Python SDK's
- * function names, and `security` is restated because this family takes an
- * organization admin key rather than the project key the document requires at
- * its root.
- *
- * `$ref`s point at components that stay in the JSON; `paths` is replaced on
- * merge but `components` is merged, so they keep resolving.
- *
- * Request bodies are NOT declared here: the generator builds them from each
- * route's zod schema and overwrites whatever this file says, so a body written
- * out by hand can only ever be a second copy that drifts.
+ * This family's five published operations, verbatim from `openapiLangWatch.json`
+ * minus what the framework derives: operation id, security, path parameters and
+ * request body. `$ref`s resolve against components the document merges.
  */
 
-import type { DescribeRouteOptions } from "hono-openapi";
-import type { OpenAPIV3_1 } from "openapi-types";
+import type { RestTransportDocs, RouteResponse } from "@langwatch/api/rest";
 
-type ResponseSpec = NonNullable<DescribeRouteOptions["responses"]>[string];
-
-/**
- * Accepts a schema written the 3.0 way in a 3.1 document.
- *
- * `nullable: true` was removed in OpenAPI 3.1 in favour of a type array
- * (`type: ["string", "null"]`), and this document declares `openapi: 3.1.0`.
- * hono-openapi v0.4's types were loose enough not to notice; v1 types responses
- * as `OpenAPIV3_1.SchemaObject` and rejects the key outright.
- *
- * The keys stay as they are. They are already published — 80 of them across the
- * document, most from the hand-maintained JSON rather than this file — and
- * rewriting them changes what generators emit for those fields. That is a
- * correctness fix worth making on its own, against the whole document and with
- * the client-side change understood; smuggling it into a library upgrade would
- * mean shipping it unannounced.
- */
-const legacySchema = (schema: object): OpenAPIV3_1.SchemaObject =>
-  schema as OpenAPIV3_1.SchemaObject;
-
-/** The organization admin key every operation in this family takes. */
-const ADMIN_KEY_SECURITY: DescribeRouteOptions["security"] = [{ admin_api_key: [] }];
-
-/** The path parameter the by-id operations share. */
-const ID_PARAMETER: DescribeRouteOptions["parameters"] = [
-  {
-    name: "id",
-    in: "path",
-    required: true,
-    schema: { type: "string" },
-    description: "API key ID",
-  },
-];
+/** Every operation in this family is filed under one tag. */
+const TAGS = ["API Keys"] as const;
 
 const BINDING_ROLES = ["ADMIN", "MEMBER", "VIEWER", "CUSTOM"];
 const BINDING_SCOPE_TYPES = ["ORGANIZATION", "TEAM", "PROJECT"];
 
 /**
- * One key, as `GET /{id}` and `PATCH /{id}` both report it.
- *
- * `roleBindings` is the shape the listing publishes; `bindings` is the same
- * set in the shape a write accepts, so a key can be read back and compared to
- * what was sent without translating between two vocabularies.
+ * One key, as `GET /{id}` and `PATCH /{id}` both report it. `roleBindings` is
+ * the shape the listing publishes; `bindings` is the same set in the shape a
+ * write accepts, so a key reads back comparable to what was sent.
  */
-const apiKeyDetailResponse = (description: string): ResponseSpec => ({
+const apiKeyDetailResponse = (description: string): RouteResponse => ({
   description,
   content: {
     "application/json": {
-      schema: legacySchema({
+      schema: {
         type: "object",
         properties: {
           id: { type: "string" },
@@ -96,18 +44,9 @@ const apiKeyDetailResponse = (description: string): ResponseSpec => ({
               "The resource:action permissions a restricted key grants. Empty for the other modes.",
           },
           createdAt: { type: "string", format: "date-time" },
-          expiresAt: {
-            type: ["string", "null"],
-            format: "date-time",
-          },
-          lastUsedAt: {
-            type: ["string", "null"],
-            format: "date-time",
-          },
-          revokedAt: {
-            type: ["string", "null"],
-            format: "date-time",
-          },
+          expiresAt: { type: ["string", "null"], format: "date-time" },
+          lastUsedAt: { type: ["string", "null"], format: "date-time" },
+          revokedAt: { type: ["string", "null"], format: "date-time" },
           roleBindings: {
             type: "array",
             items: {
@@ -132,19 +71,23 @@ const apiKeyDetailResponse = (description: string): ResponseSpec => ({
             },
           },
         },
-      }),
+      },
     },
   },
 });
 
-export const LIST_API_KEYS: DescribeRouteOptions = {
-  operationId: "listApiKeys",
+const INVALID_TOKEN: RouteResponse = {
+  description: "Invalid or missing API key token",
+  content: {},
+};
+
+export const LIST_API_KEYS: RestTransportDocs = {
+  tags: TAGS,
   summary: "List API keys",
   description:
     "List all API keys owned by the authenticated user in this organization. Requires organization:view permission.",
-  security: ADMIN_KEY_SECURITY,
   responses: {
-    "200": {
+    200: {
       description: "List of API keys",
       content: {
         "application/json": {
@@ -153,34 +96,30 @@ export const LIST_API_KEYS: DescribeRouteOptions = {
             properties: {
               data: {
                 type: "array",
-                items: {
-                  $ref: "#/components/schemas/ApiKeyInfo",
-                },
+                items: { $ref: "#/components/schemas/ApiKeyInfo" },
               },
             },
           },
         },
       },
     },
-    "401": {
-      description: "Invalid or missing API key token",
-    },
-    "403": {
+    401: INVALID_TOKEN,
+    403: {
       description: "Insufficient permissions (requires organization:view)",
+      content: {},
     },
   },
 };
 
-export const CREATE_API_KEY: DescribeRouteOptions = {
-  operationId: "createApiKey",
+export const CREATE_API_KEY: RestTransportDocs = {
+  tags: TAGS,
   summary: "Create an API key",
   description:
-    'Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId to mint the key for another member, and permissionMode:"restricted" with a permissions list to grant exactly those permissions. Minting a service key or a key for another member requires organization admin rights. The plaintext token is returned once \u2014 store it securely.',
-  security: ADMIN_KEY_SECURITY,
+    'Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId to mint the key for another member, and permissionMode:"restricted" with a permissions list to grant exactly those permissions. Minting a service key or a key for another member requires organization admin rights. The plaintext token is returned once — store it securely.',
   responses: {
-    "201": {
+    201: {
       description:
-        "API key created. The token field contains the plaintext key \u2014 it is only shown once.",
+        "API key created. The token field contains the plaintext key — it is only shown once.",
       content: {
         "application/json": {
           schema: {
@@ -189,21 +128,14 @@ export const CREATE_API_KEY: DescribeRouteOptions = {
               token: {
                 type: "string",
                 description:
-                  "Plaintext API key token (sk-lw-...). Store securely \u2014 shown only once.",
+                  "Plaintext API key token (sk-lw-...). Store securely — shown only once.",
               },
               apiKey: {
                 type: "object",
                 properties: {
-                  id: {
-                    type: "string",
-                  },
-                  name: {
-                    type: "string",
-                  },
-                  createdAt: {
-                    type: "string",
-                    format: "date-time",
-                  },
+                  id: { type: "string" },
+                  name: { type: "string" },
+                  createdAt: { type: "string", format: "date-time" },
                 },
               },
             },
@@ -211,105 +143,89 @@ export const CREATE_API_KEY: DescribeRouteOptions = {
         },
       },
     },
-    "401": {
-      description: "Invalid or missing API key token",
-    },
-    "403": {
+    401: INVALID_TOKEN,
+    403: {
       description:
-        "Requested binding exceeds the creator's own permissions, or the scope does not belong to this organization (api_key_scope_violation); a service key or a key for another member was requested without organization admin rights (insufficient_permissions)",
+        "Requested binding exceeds the creator's own permissions, or the scope does not belong to this organization (api_key_scope_violation); a service key or a key for another member was requested without organization admin rights (api_key_admin_required)",
+      content: {},
     },
-    "422": {
+    422: {
       description:
         "Validation error, for example a missing name or empty bindings (validation_error), or a name LangWatch reserves for its own keys (api_key_reserved_name)",
+      content: {},
     },
   },
 };
 
-export const GET_API_KEY: DescribeRouteOptions = {
-  operationId: "getApiKey",
+export const GET_API_KEY: RestTransportDocs = {
+  tags: TAGS,
   summary: "Get an API key",
   description:
     "Read one API key by id, including its role bindings, permission mode and explicit permissions. Returns your own keys; organization admins may read any key in the organization. The secret is never returned. An id that does not exist, belongs to another organization, or belongs to another member all answer 404 api_key_not_found, so the response cannot be used to probe for keys.",
-  security: ADMIN_KEY_SECURITY,
-  parameters: ID_PARAMETER,
   responses: {
-    "200": apiKeyDetailResponse("The API key"),
-    "401": {
-      description: "Invalid or missing API key token",
-    },
-    "403": {
+    200: apiKeyDetailResponse("The API key"),
+    401: INVALID_TOKEN,
+    403: {
       description: "Insufficient permissions (requires organization:view)",
+      content: {},
     },
-    "404": {
-      description: "API key not found (api_key_not_found)",
-    },
+    404: { description: "API key not found (api_key_not_found)", content: {} },
   },
 };
 
-export const UPDATE_API_KEY: DescribeRouteOptions = {
-  operationId: "updateApiKey",
+export const UPDATE_API_KEY: RestTransportDocs = {
+  tags: TAGS,
   summary: "Update an API key",
   description:
     "Update an API key's name, description, permission mode, permissions or bindings. Every field is optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns. You may update your own keys; organization admins may update any key in the organization. Bindings can never exceed the access of the member the key belongs to. The token itself never changes.",
-  security: ADMIN_KEY_SECURITY,
-  parameters: ID_PARAMETER,
   responses: {
-    "200": apiKeyDetailResponse("The updated API key"),
-    "401": {
-      description: "Invalid or missing API key token",
-    },
-    "403": {
+    200: apiKeyDetailResponse("The updated API key"),
+    401: INVALID_TOKEN,
+    403: {
       description:
         "Insufficient permissions (requires organization:manage), the requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation)",
+      content: {},
     },
-    "404": {
+    404: {
       description: "API key not found, or not yours to edit (api_key_not_found)",
+      content: {},
     },
-    "409": {
+    409: {
       description: "API key is already revoked (api_key_already_revoked)",
+      content: {},
     },
-    "422": {
+    422: {
       description:
         "Validation error, for example restricted mode without a permissions list (validation_error)",
+      content: {},
     },
   },
 };
 
-export const REVOKE_API_KEY: DescribeRouteOptions = {
-  operationId: "revokeApiKey",
+export const REVOKE_API_KEY: RestTransportDocs = {
+  tags: TAGS,
   summary: "Revoke an API key",
   description:
     "Revoke (soft-delete) an API key. Revoked keys can no longer authenticate. Requires organization:manage permission.",
-  security: ADMIN_KEY_SECURITY,
-  parameters: ID_PARAMETER,
   responses: {
-    "200": {
+    200: {
       description: "API key revoked successfully",
       content: {
         "application/json": {
-          schema: {
-            type: "object",
-            properties: {
-              success: {
-                type: "boolean",
-              },
-            },
-          },
+          schema: { type: "object", properties: { success: { type: "boolean" } } },
         },
       },
     },
-    "401": {
-      description: "Invalid or missing API key token",
-    },
-    "403": {
+    401: INVALID_TOKEN,
+    403: {
       description:
         "Not authorized to revoke this API key, which belongs to another member (api_key_not_owned)",
+      content: {},
     },
-    "404": {
-      description: "API key not found (api_key_not_found)",
-    },
-    "409": {
+    404: { description: "API key not found (api_key_not_found)", content: {} },
+    409: {
       description: "API key is already revoked (api_key_already_revoked)",
+      content: {},
     },
   },
 };

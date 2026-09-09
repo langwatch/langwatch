@@ -16,6 +16,7 @@ import {
   type UpdateApiKeyInput,
   ApiKeyApi,
   type ApiKeyBindingNames,
+  type ApiKeyCredentialCheck,
   type ApiKeyDetail,
   type ApiKeyListEnrichment,
   type ApiKeyVerification,
@@ -98,14 +99,17 @@ export class ApiKeyApp implements ApiKeyApi {
         organizations: setup.dependencies.organizations,
         projects: setup.dependencies.projects,
       }).build(),
+      setup.dependencies.authorization,
     );
   }
 
-  private constructor(service: ApiKeyService) {
+  private constructor(service: ApiKeyService, authorization: AuthzApi) {
     this.#service = service;
+    this.#authorization = authorization;
   }
 
   readonly #service: ApiKeyService;
+  readonly #authorization: AuthzApi;
 
   /**
    * The service itself, for the one thing this application deliberately is not about: turning a
@@ -160,6 +164,20 @@ export class ApiKeyApp implements ApiKeyApi {
   }
   async isOrgAdminApiKey(input: { apiKeyId: string; organizationId: string }): Promise<boolean> {
     return this.#service.isOrgAdminApiKey(input);
+  }
+  /**
+   * The question a management door asks about the credential in front of it,
+   * rather than about a member: the key's own ceiling caps the answer, so a
+   * narrowed key cannot borrow the reach of whoever created it.
+   */
+  async credentialCanManageOrganization(input: ApiKeyCredentialCheck): Promise<boolean> {
+    return this.#authorization.hasApiKeyPermission({
+      apiKeyId: input.apiKeyId,
+      userId: input.userId,
+      organizationId: input.organizationId,
+      scope: { type: "org", id: input.organizationId },
+      permission: "organization:manage",
+    });
   }
   async findById(input: { id: string }) {
     return this.#service.findById(input);

@@ -8,6 +8,8 @@ export class TestApiKeyService implements ApiKeyApi {
   assertSelectionWithinCeiling = unsupported<ApiKeyApi["assertSelectionWithinCeiling"]>();
   create = unsupported<ApiKeyApi["create"]>();
   createKey = unsupported<ApiKeyApi["createKey"]>();
+  credentialCanManageOrganization =
+    unsupported<ApiKeyApi["credentialCanManageOrganization"]>();
   enrichApiKeyList = unsupported<ApiKeyApi["enrichApiKeyList"]>();
   enrichBindingsWithNames = unsupported<ApiKeyApi["enrichBindingsWithNames"]>();
   ensureCallerIsOrgMember = unsupported<ApiKeyApi["ensureCallerIsOrgMember"]>();

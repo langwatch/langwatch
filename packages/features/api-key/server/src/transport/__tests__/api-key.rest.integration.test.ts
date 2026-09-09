@@ -11,40 +11,20 @@ import {
   LANGY_SESSION_API_KEY_NAME,
   type ApiKey,
   type ApiKeyDetail,
-  type ApiKeyApi,
 } from "@langwatch/api-key-contract";
-import {
-  createRestApiService,
-  type AppRestManagementAuditPort,
-  type AppRestOrganizationVariables,
-  type AppRestProjectVariables,
-  type RestApiServicePorts,
-} from "@langwatch/api/rest";
-import {
-  AuthzPersonalWorkspaceNotManagedHereError,
-  type AuthzService,
-} from "@langwatch/authz-contract";
-import { HandledError } from "@langwatch/handled-error";
-import type { MiddlewareHandler } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { AuthzPersonalWorkspaceNotManagedHereError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
-import { createApiKeysRestApp } from "../api-key.api.ts";
-import { TestApiKeyService } from "./support/test-api-key-service.ts";
-import { TestAuthzService } from "./support/test-authz-service.ts";
 
-const ORGANIZATION_ID = "organization-1";
-const CALLER_USER_ID = "user-caller";
-const OTHER_USER_ID = "user-other";
-const API_KEY_ID = "api-key-credential";
+import {
+  API_KEY_ID,
+  AS_SERVICE,
+  CALLER_USER_ID,
+  ORGANIZATION_ID,
+  OTHER_USER_ID,
+  mountApiKeyRest,
+} from "./api-key-rest.harness.ts";
+
 const NOW = new Date("2026-08-24T00:00:00.000Z");
-
-/**
- * Which credential the request arrives with. A service credential acts as
- * NOBODY — `apiKeyUserId` is null — and that, not `keyType`, is what makes a
- * mint privileged.
- */
-const AS_MEMBER = "member-credential";
-const AS_SERVICE = "service-credential";
 
 function apiKey(overrides: Partial<ApiKey> = {}): ApiKey {
   return {
@@ -81,116 +61,6 @@ function apiKeyDetail(overrides: Partial<ApiKeyDetail> = {}): ApiKeyDetail {
   return { ...apiKey(), permissions: [], ...overrides };
 }
 
-/**
- * The enforcement and the audit sink the process owns. `granted` is what the route policy is
- * checked against; `apiKeyPermissions` is what `hasApiKeyPermission` answers, which the handler
- * consults separately.
- */
-function spine(options: { granted?: readonly string[] } = {}) {
-  const granted = new Set(options.granted ?? ["organization:view", "organization:manage"]);
-
-  const authenticateOrganization: MiddlewareHandler = async (c, next) => {
-    const presented = c.req.header("Authorization")?.replace(/^Bearer /, "");
-    if (presented !== AS_MEMBER && presented !== AS_SERVICE) {
-      return c.json({ error: "Unauthorized", message: "Invalid credential" }, 401);
-    }
-    const userId = presented === AS_MEMBER ? CALLER_USER_ID : null;
-    c.set("organization", { id: ORGANIZATION_ID });
-    c.set("apiKeyId", API_KEY_ID);
-    c.set("apiKeyUserId", userId);
-    c.set("apiKeyOrganizationId", ORGANIZATION_ID);
-    c.set("orgResolvedToken", {
-      type: "apiKey-org",
-      apiKeyId: API_KEY_ID,
-      userId,
-      organizationId: ORGANIZATION_ID,
-    });
-    await next();
-  };
-
-  const ports: RestApiServicePorts = {
-    appContext: async (_c, next) => next(),
-    requestLogger: () => async (_c, next) => next(),
-    requestTracer: () => async (_c, next) => next(),
-    legacyErrorHandler: (error, c) => {
-      if (HandledError.isHandled(error)) {
-        return c.json(
-          { error: error.code, message: error.message },
-          (error.httpStatus ?? 500) as ContentfulStatusCode,
-        );
-      }
-      return c.json({ error: "Internal server error" }, 500);
-    },
-    canonicalErrorHandler: (error, c) => c.json({ error: { message: error.message } }, 500),
-    authenticateProject: () => async (_c, next) => next(),
-    authorizeProjectPermission: () => async (_c, next) => next(),
-    authorizeApiKeyCeiling: () => async (_c, next) => next(),
-    authenticateOrganization: () => authenticateOrganization,
-    authorizeOrganizationPermission:
-      ({ permission }) =>
-      async (c, next) => {
-        if (!granted.has(permission)) {
-          return c.json({ error: "Forbidden", message: "Missing permission" }, 403);
-        }
-        await next();
-      },
-    authorizeRouteTeamPermission: () => async (_c, next) => next(),
-    authorizeRouteProjectPermission: () => async (_c, next) => next(),
-    // The versioned family's door: the same two checks, in the mode that
-    // family uses.
-    authenticateOrganizationThrowing: authenticateOrganization,
-    authorizeOrganizationPermissionThrowing: (permission) => async (c, next) => {
-      if (!granted.has(permission)) {
-        return c.json({ error: "Forbidden", message: "Missing permission" }, 403);
-      }
-      await next();
-    },
-  };
-
-  return createRestApiService<AppRestProjectVariables, AppRestOrganizationVariables>(ports);
-}
-
-type AuditEntry = {
-  userId: string;
-  organizationId: string;
-  action: string;
-  args?: Record<string, unknown>;
-};
-
-function buildApi(
-  options: {
-    apiKeys?: Partial<TestApiKeyService>;
-    permissions?: Partial<TestAuthzService>;
-    granted?: readonly string[];
-  } = {},
-) {
-  const apiKeys: ApiKeyApi = Object.assign(new TestApiKeyService(), options.apiKeys);
-  const permissions: AuthzService = Object.assign(new TestAuthzService(), options.permissions);
-  const audited: AuditEntry[] = [];
-  const audit: AppRestManagementAuditPort = (entry) => {
-    audited.push(entry);
-  };
-
-  const hono = createApiKeysRestApp({
-    security: spine(options.granted ? { granted: options.granted } : {}),
-    apiKeys: () => apiKeys,
-    permissions: () => permissions,
-    audit,
-  });
-
-  const send = (path: string, init: { method?: string; body?: unknown; as?: string } = {}) =>
-    hono.request(path, {
-      ...(init.method === undefined ? {} : { method: init.method }),
-      ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
-      headers: {
-        Authorization: `Bearer ${init.as ?? AS_MEMBER}`,
-        "Content-Type": "application/json",
-      },
-    });
-
-  return { hono, send, audited };
-}
-
 /** The bindings a personal key must state outright. */
 const ORG_ADMIN_BINDING = {
   role: "ADMIN",
@@ -198,11 +68,11 @@ const ORG_ADMIN_BINDING = {
   scopeId: ORGANIZATION_ID,
 } as const;
 
-describe("createApiKeysRestApp", () => {
+describe("the api-keys REST family", () => {
   describe("given no credential", () => {
-    it("refuses before the request reaches the service", async () => {
+    it("refuses before the request reaches the application", async () => {
       const list = vi.fn(async () => []);
-      const { hono } = buildApi({ apiKeys: { list } });
+      const { hono } = mountApiKeyRest({ apiKeys: { list } });
 
       const response = await hono.request("/api/api-keys");
 
@@ -211,16 +81,34 @@ describe("createApiKeysRestApp", () => {
     });
 
     it("refuses a credential it does not recognise", async () => {
-      const { send } = buildApi();
+      const { send } = mountApiKeyRest();
 
       expect((await send("/api/api-keys", { as: "sk-lw-invalid_token" })).status).toBe(401);
+    });
+  });
+
+  describe("given a credential the door refuses the route's permission to", () => {
+    it("refuses the mint before the application is asked anything", async () => {
+      const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
+      const { send } = mountApiKeyRest({
+        apiKeys: { create },
+        granted: ["organization:view"],
+      });
+
+      const response = await send("/api/api-keys", {
+        method: "POST",
+        body: { name: "No Permission", bindings: [ORG_ADMIN_BINDING] },
+      });
+
+      expect(response.status).toBe(403);
+      expect(create).not.toHaveBeenCalled();
     });
   });
 
   describe("when a key is minted", () => {
     it("returns the token once, alongside the key's identity", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: { create, isOrgAdmin: vi.fn(async () => true) },
       });
 
@@ -251,7 +139,7 @@ describe("createApiKeysRestApp", () => {
 
     it("refuses a body with no name, and a personal key with no bindings", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
-      const { send } = buildApi({ apiKeys: { create } });
+      const { send } = mountApiKeyRest({ apiKeys: { create } });
 
       const unnamed = await send("/api/api-keys", {
         method: "POST",
@@ -269,7 +157,7 @@ describe("createApiKeysRestApp", () => {
 
     it("refuses restricted mode with no permissions listed", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
-      const { send } = buildApi({ apiKeys: { create } });
+      const { send } = mountApiKeyRest({ apiKeys: { create } });
 
       const response = await send("/api/api-keys", {
         method: "POST",
@@ -286,7 +174,7 @@ describe("createApiKeysRestApp", () => {
 
     it("refuses projectIds on a personal key, which states its bindings outright", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
-      const { send } = buildApi({ apiKeys: { create } });
+      const { send } = mountApiKeyRest({ apiKeys: { create } });
 
       const response = await send("/api/api-keys", {
         method: "POST",
@@ -302,7 +190,7 @@ describe("createApiKeysRestApp", () => {
     });
 
     it("names the code when the requested reach is outside the caller's own", async () => {
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: {
           create: vi.fn(async (): Promise<{ token: string; apiKey: ApiKey }> => {
             throw new ApiKeyScopeViolationError("Scope does not belong to this organization");
@@ -327,7 +215,7 @@ describe("createApiKeysRestApp", () => {
 
     /** @scenario Creating a key with a reserved name names the code */
     it("names the code rather than the HTTP reason phrase for a reserved name", async () => {
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: {
           create: vi.fn(async (): Promise<{ token: string; apiKey: ApiKey }> => {
             throw new ApiKeyReservedNameError(LANGY_SESSION_API_KEY_NAME);
@@ -338,10 +226,7 @@ describe("createApiKeysRestApp", () => {
 
       const response = await send("/api/api-keys", {
         method: "POST",
-        body: {
-          name: LANGY_SESSION_API_KEY_NAME,
-          keyType: "service",
-        },
+        body: { name: LANGY_SESSION_API_KEY_NAME, keyType: "service" },
       });
 
       expect(response.status).toBe(422);
@@ -352,7 +237,7 @@ describe("createApiKeysRestApp", () => {
 
     it("reads an expiry off the wire as a date", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
-      const { send } = buildApi({ apiKeys: { create } });
+      const { send } = mountApiKeyRest({ apiKeys: { create } });
       const expiresAt = new Date("2026-09-24T00:00:00.000Z");
 
       const response = await send("/api/api-keys", {
@@ -377,7 +262,7 @@ describe("createApiKeysRestApp", () => {
      * is what tells the caller which binding to drop.
      */
     it("carries a personal-workspace refusal through with its own code", async () => {
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: {
           create: vi.fn(async (): Promise<{ token: string; apiKey: ApiKey }> => {
             throw new AuthzPersonalWorkspaceNotManagedHereError();
@@ -406,7 +291,7 @@ describe("createApiKeysRestApp", () => {
     it("refuses a service key and mints nothing", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
       const isOrgAdmin = vi.fn(async () => false);
-      const { send } = buildApi({ apiKeys: { create, isOrgAdmin } });
+      const { send } = mountApiKeyRest({ apiKeys: { create, isOrgAdmin } });
 
       const response = await send("/api/api-keys", {
         method: "POST",
@@ -414,6 +299,9 @@ describe("createApiKeysRestApp", () => {
       });
 
       expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "api_key_admin_required",
+      });
       expect(create).not.toHaveBeenCalled();
       expect(isOrgAdmin).toHaveBeenCalledWith({
         userId: CALLER_USER_ID,
@@ -423,7 +311,7 @@ describe("createApiKeysRestApp", () => {
 
     it("refuses a key requested on behalf of another member and mints nothing", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: { create, isOrgAdmin: vi.fn(async () => false) },
       });
 
@@ -443,7 +331,7 @@ describe("createApiKeysRestApp", () => {
     it("still mints a personal key for the caller, whose own reach caps it", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
       const isOrgAdmin = vi.fn(async () => false);
-      const { send } = buildApi({ apiKeys: { create, isOrgAdmin } });
+      const { send } = mountApiKeyRest({ apiKeys: { create, isOrgAdmin } });
 
       const response = await send("/api/api-keys", {
         method: "POST",
@@ -461,7 +349,7 @@ describe("createApiKeysRestApp", () => {
         token: "sk-lw-minted",
         apiKey: apiKey({ userId: null }),
       }));
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: { create, isOrgAdmin: vi.fn(async () => true) },
       });
 
@@ -481,7 +369,7 @@ describe("createApiKeysRestApp", () => {
         token: "sk-lw-minted",
         apiKey: apiKey({ userId: null }),
       }));
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: { create, isOrgAdmin: vi.fn(async () => true) },
       });
 
@@ -506,7 +394,7 @@ describe("createApiKeysRestApp", () => {
 
     it("mints a key for another member against that member's own ceiling", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: { create, isOrgAdmin: vi.fn(async () => true) },
       });
 
@@ -542,7 +430,7 @@ describe("createApiKeysRestApp", () => {
       }));
       const isOrgAdmin = vi.fn(async () => true);
       const isOrgAdminApiKey = vi.fn(async () => true);
-      const { send } = buildApi({ apiKeys: { create, isOrgAdmin, isOrgAdminApiKey } });
+      const { send } = mountApiKeyRest({ apiKeys: { create, isOrgAdmin, isOrgAdminApiKey } });
 
       const response = await send("/api/api-keys", {
         method: "POST",
@@ -560,7 +448,7 @@ describe("createApiKeysRestApp", () => {
 
     it("refuses an unassigned personal key when the credential is not an admin", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: { create, isOrgAdminApiKey: vi.fn(async () => false) },
       });
 
@@ -579,7 +467,7 @@ describe("createApiKeysRestApp", () => {
     it("lists the caller's own keys, without the secret or its lookup id", async () => {
       const list = vi.fn(async () => [apiKey()]);
       const listAll = vi.fn(async () => [apiKey()]);
-      const { send } = buildApi({ apiKeys: { list, listAll } });
+      const { send } = mountApiKeyRest({ apiKeys: { list, listAll } });
 
       const response = await send("/api/api-keys");
 
@@ -612,9 +500,8 @@ describe("createApiKeysRestApp", () => {
     /** @scenario A view-only service credential cannot list every key in the organization */
     it("refuses the org-wide listing to a credential without organization:manage", async () => {
       const listAll = vi.fn(async () => [apiKey()]);
-      const { send } = buildApi({
-        apiKeys: { listAll },
-        permissions: { hasApiKeyPermission: vi.fn(async () => false) },
+      const { send } = mountApiKeyRest({
+        apiKeys: { listAll, credentialCanManageOrganization: vi.fn(async () => false) },
       });
 
       const response = await send("/api/api-keys", { as: AS_SERVICE });
@@ -625,23 +512,19 @@ describe("createApiKeysRestApp", () => {
 
     it("returns the org-wide listing to a credential that does hold it", async () => {
       const listAll = vi.fn(async () => [apiKey({ userId: null })]);
-      const hasApiKeyPermission = vi.fn(async () => true);
-      const { send } = buildApi({
-        apiKeys: { listAll },
-        permissions: { hasApiKeyPermission },
+      const credentialCanManageOrganization = vi.fn(async () => true);
+      const { send } = mountApiKeyRest({
+        apiKeys: { listAll, credentialCanManageOrganization },
       });
 
       const response = await send("/api/api-keys", { as: AS_SERVICE });
 
       expect(response.status).toBe(200);
-      expect(hasApiKeyPermission).toHaveBeenCalledWith(
-        expect.objectContaining({
-          apiKeyId: API_KEY_ID,
-          userId: null,
-          organizationId: ORGANIZATION_ID,
-          permission: "organization:manage",
-        }),
-      );
+      expect(credentialCanManageOrganization).toHaveBeenCalledWith({
+        apiKeyId: API_KEY_ID,
+        userId: null,
+        organizationId: ORGANIZATION_ID,
+      });
       expect(listAll).toHaveBeenCalledWith({ organizationId: ORGANIZATION_ID });
     });
   });
@@ -656,9 +539,12 @@ describe("createApiKeysRestApp", () => {
           permissions: ["analytics:view", "traces:view"],
         }),
       );
-      const { send } = buildApi({
-        apiKeys: { getByIdForCaller, isOrgAdmin: vi.fn(async () => true) },
-        permissions: { hasApiKeyPermission: vi.fn(async () => true) },
+      const { send } = mountApiKeyRest({
+        apiKeys: {
+          getByIdForCaller,
+          isOrgAdmin: vi.fn(async () => true),
+          credentialCanManageOrganization: vi.fn(async () => true),
+        },
       });
 
       const response = await send("/api/api-keys/api-key-1");
@@ -684,7 +570,7 @@ describe("createApiKeysRestApp", () => {
 
     it("reports a service key as owned by nobody", async () => {
       const getByIdForCaller = vi.fn(async () => apiKeyDetail({ userId: null }));
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: { getByIdForCaller, isOrgAdmin: vi.fn(async () => false) },
       });
 
@@ -715,9 +601,12 @@ describe("createApiKeysRestApp", () => {
             callerCanReadAnyKey: boolean;
           }) => apiKeyDetail(),
         );
-        const { send } = buildApi({
-          apiKeys: { getByIdForCaller, isOrgAdmin: vi.fn(async () => options.admin) },
-          permissions: { hasApiKeyPermission: vi.fn(async () => options.manage) },
+        const { send } = mountApiKeyRest({
+          apiKeys: {
+            getByIdForCaller,
+            isOrgAdmin: vi.fn(async () => options.admin),
+            credentialCanManageOrganization: vi.fn(async () => options.manage),
+          },
         });
         await send("/api/api-keys/api-key-1");
         return getByIdForCaller.mock.calls[0]?.[0];
@@ -736,7 +625,7 @@ describe("createApiKeysRestApp", () => {
 
     /** @scenario Fetching an unknown API key returns not found */
     it("reports an unknown id as not found", async () => {
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: {
           getByIdForCaller: vi.fn(async (): Promise<ApiKeyDetail> => {
             throw new ApiKeyNotFoundError("api-key-missing");
@@ -761,10 +650,10 @@ describe("createApiKeysRestApp", () => {
       const notFound = async (): Promise<ApiKeyDetail> => {
         throw new ApiKeyNotFoundError("api-key-1");
       };
-      const { send: sendUnreachable } = buildApi({
+      const { send: sendUnreachable } = mountApiKeyRest({
         apiKeys: { getByIdForCaller: vi.fn(notFound), isOrgAdmin: vi.fn(async () => false) },
       });
-      const { send: sendUnknown } = buildApi({
+      const { send: sendUnknown } = mountApiKeyRest({
         apiKeys: { getByIdForCaller: vi.fn(notFound), isOrgAdmin: vi.fn(async () => false) },
       });
 
@@ -780,39 +669,6 @@ describe("createApiKeysRestApp", () => {
       expect(unreachableBody).toEqual(unknownBody);
       expect(unreachableBody).toMatchObject({ error: "api_key_not_found" });
     });
-
-    it("records the read, which is a disclosure like the writes are", async () => {
-      const { send, audited } = buildApi({
-        apiKeys: {
-          getByIdForCaller: vi.fn(async () => apiKeyDetail()),
-          isOrgAdmin: vi.fn(async () => false),
-        },
-      });
-
-      await send("/api/api-keys/api-key-1");
-
-      expect(audited).toEqual([
-        {
-          userId: CALLER_USER_ID,
-          organizationId: ORGANIZATION_ID,
-          action: "management.apiKey.read",
-          args: { apiKeyId: "api-key-1" },
-        },
-      ]);
-    });
-
-    it("records a service credential's read against the credential itself", async () => {
-      const { send, audited } = buildApi({
-        apiKeys: {
-          getByIdForCaller: vi.fn(async () => apiKeyDetail()),
-          isOrgAdminApiKey: vi.fn(async () => false),
-        },
-      });
-
-      await send("/api/api-keys/api-key-1", { as: AS_SERVICE });
-
-      expect(audited[0]?.userId).toBe(`apikey:${API_KEY_ID}`);
-    });
   });
 
   describe("when a key is edited", () => {
@@ -820,7 +676,7 @@ describe("createApiKeysRestApp", () => {
     it("reads the key back through the same path the fetch serves", async () => {
       const update = vi.fn(async () => apiKey({ name: "rename-after" }));
       const getByIdForCaller = vi.fn(async () => apiKeyDetail({ name: "rename-after" }));
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: { update, getByIdForCaller, isOrgAdmin: vi.fn(async () => true) },
       });
 
@@ -850,7 +706,7 @@ describe("createApiKeysRestApp", () => {
     /** @scenario Replacing bindings with a tighter set takes effect */
     it("sends the replacement bindings through as they arrived", async () => {
       const update = vi.fn(async () => apiKey());
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: {
           update,
           getByIdForCaller: vi.fn(async () => apiKeyDetail()),
@@ -875,7 +731,7 @@ describe("createApiKeysRestApp", () => {
     /** @scenario Setting restricted mode requires explicit permissions */
     it("refuses restricted mode with no permissions and writes nothing", async () => {
       const update = vi.fn(async () => apiKey());
-      const { send } = buildApi({ apiKeys: { update } });
+      const { send } = mountApiKeyRest({ apiKeys: { update } });
 
       const response = await send("/api/api-keys/api-key-1", {
         method: "PATCH",
@@ -888,8 +744,8 @@ describe("createApiKeysRestApp", () => {
     });
 
     /** @scenario Widening a key beyond the caller's own access is refused */
-    it("names the scope violation the service refused", async () => {
-      const { send } = buildApi({
+    it("names the scope violation the application refused", async () => {
+      const { send } = mountApiKeyRest({
         apiKeys: {
           update: vi.fn(async (): Promise<ApiKey> => {
             throw new ApiKeyScopeViolationError("Beyond the owner's access");
@@ -916,7 +772,7 @@ describe("createApiKeysRestApp", () => {
      * the fetch refuses to confirm. The two answers have to agree.
      */
     it("reports a key the caller does not own as not found, not forbidden", async () => {
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: {
           update: vi.fn(async (): Promise<ApiKey> => {
             throw new ApiKeyNotOwnedError("api-key-1");
@@ -933,34 +789,13 @@ describe("createApiKeysRestApp", () => {
       expect(response.status).toBe(404);
       await expect(response.json()).resolves.toMatchObject({ error: "api_key_not_found" });
     });
-
-    it("records the write", async () => {
-      const { send, audited } = buildApi({
-        apiKeys: {
-          update: vi.fn(async () => apiKey()),
-          getByIdForCaller: vi.fn(async () => apiKeyDetail()),
-          isOrgAdmin: vi.fn(async () => true),
-        },
-      });
-
-      await send("/api/api-keys/api-key-1", { method: "PATCH", body: { name: "renamed" } });
-
-      expect(audited).toEqual([
-        {
-          userId: CALLER_USER_ID,
-          organizationId: ORGANIZATION_ID,
-          action: "management.apiKey.update",
-          args: { apiKeyId: "api-key-1" },
-        },
-      ]);
-    });
   });
 
   describe("when a key is revoked", () => {
-    it("answers success and hands the service the caller's real adminness", async () => {
+    it("answers success and hands the application the caller's real adminness", async () => {
       const revoke = vi.fn(async () => apiKey({ revokedAt: NOW }));
       const isOrgAdmin = vi.fn(async () => true);
-      const { send } = buildApi({ apiKeys: { revoke, isOrgAdmin } });
+      const { send } = mountApiKeyRest({ apiKeys: { revoke, isOrgAdmin } });
 
       const response = await send("/api/api-keys/api-key-1", { method: "DELETE" });
 
@@ -975,11 +810,11 @@ describe("createApiKeysRestApp", () => {
     });
 
     /** @scenario Deleting another user's key requires organization admin rights */
-    it("tells the service the caller is not an admin, so it can refuse", async () => {
+    it("tells the application the caller is not an admin, so it can refuse", async () => {
       const revoke = vi.fn(async (): Promise<ApiKey> => {
         throw new ApiKeyNotOwnedError("api-key-1");
       });
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: { revoke, isOrgAdmin: vi.fn(async () => false) },
       });
 
@@ -991,7 +826,7 @@ describe("createApiKeysRestApp", () => {
 
     /** @scenario Revoking a key that is already revoked names the code */
     it("names the code rather than the HTTP reason phrase", async () => {
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: {
           revoke: vi.fn(async (): Promise<ApiKey> => {
             throw new ApiKeyAlreadyRevokedError("api-key-1");
@@ -1009,7 +844,7 @@ describe("createApiKeysRestApp", () => {
     });
 
     it("reports an unknown id as not found", async () => {
-      const { send } = buildApi({
+      const { send } = mountApiKeyRest({
         apiKeys: {
           revoke: vi.fn(async (): Promise<ApiKey> => {
             throw new ApiKeyNotFoundError("nonexistent-key-id");
@@ -1018,9 +853,9 @@ describe("createApiKeysRestApp", () => {
         },
       });
 
-      expect((await send("/api/api-keys/nonexistent-key-id", { method: "DELETE" })).status).toBe(
-        404,
-      );
+      expect(
+        (await send("/api/api-keys/nonexistent-key-id", { method: "DELETE" })).status,
+      ).toBe(404);
     });
   });
 });

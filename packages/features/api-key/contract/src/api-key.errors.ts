@@ -14,23 +14,30 @@ export class ApiKeyNotFoundError extends NotFoundError {
   }
 }
 
+/** The privilege a mint asked for and the caller did not hold. */
+export type ApiKeyAdminRequiredAction =
+  | "create-service-key"
+  | "assign-to-another-user"
+  | "create-unowned-key";
+
+const ADMIN_REQUIRED_MESSAGES: Readonly<Record<ApiKeyAdminRequiredAction, string>> = {
+  "create-service-key": "Only organization admins can create service API keys",
+  "assign-to-another-user": "Only organization admins can create API keys for other users",
+  "create-unowned-key": "Only organization admins can create API keys that no member owns",
+};
+
 /**
- * The caller asked for a key that is not their own to hold.
- *
- * A service key belongs to the organization rather than to a person, and a key
- * minted for somebody else is a credential the caller will never see again —
- * both are administrative acts, so both take organization admin. Named as one
- * refusal with the act in `meta`, because it is one rule with two subjects.
+ * The caller asked for a key that is not their own to hold: a service key, one
+ * minted for somebody else, or one no member owns. Three administrative acts,
+ * all taking organization admin — one rule, so one refusal, act in `meta`.
  */
 export class ApiKeyAdminRequiredError extends HandledError {
   declare readonly code: "api_key_admin_required";
 
-  constructor(action: "create-service-key" | "assign-to-another-user") {
+  constructor(action: ApiKeyAdminRequiredAction) {
     super(
       "api_key_admin_required",
-      action === "create-service-key"
-        ? "Only organization admins can create service API keys"
-        : "Only organization admins can create API keys for other users",
+      ADMIN_REQUIRED_MESSAGES[action],
       {
         meta: { action },
         httpStatus: 403,
