@@ -11,7 +11,7 @@
  * and wrong for a screen, so these cases assert the two never collapse again —
  * at the type, at the mappers, and at the two `fetch` boundaries.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   agentsListed,
@@ -22,6 +22,7 @@ import {
 import {
   copilotBotsAsAgents,
   listCopilotAgents,
+  MAX_BOT_PAGES,
   readBotRows,
   readCopilotBots,
 } from "../copilotBots";
@@ -43,6 +44,14 @@ const reply = (params: { ok: boolean; status: number; body?: unknown }) =>
 
 const environmentUrl = "https://org1.crm.dynamics.com";
 const workspaceUrl = "https://adb-1.azuredatabricks.net";
+
+// The mock is module-level, so a queued `mockResolvedValueOnce` a case never
+// consumed, or a persistent `mockResolvedValue`, is still installed for the
+// next one. A paging case that counts requests reads those leftovers as its
+// own, and a case asserting a refusal can be answered by someone else's reply.
+beforeEach(() => {
+  fetchMock.mockReset();
+});
 
 describe("agent listing outcomes", () => {
   describe("given a provider that listed none", () => {
@@ -203,6 +212,119 @@ describe("readCopilotBots", () => {
         copilotBotsAsAgents({ rows: read.rows, environmentUrl })[0]?.rawAgentId,
       ).toBe("BOT-1");
       expect(read.hasMorePages).toBe(true);
+    });
+  });
+
+  describe("given the environment has more than one page of bots", () => {
+    it("walks to the end when the caller asked for every page", async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          reply({
+            ok: true,
+            status: 200,
+            body: {
+              value: [{ botid: "BOT-1", name: "Sales Copilot" }],
+              "@odata.nextLink": `${environmentUrl}/api/data/v9.2/bots?$skiptoken=2`,
+            },
+          }),
+        )
+        .mockResolvedValueOnce(
+          reply({
+            ok: true,
+            status: 200,
+            body: { value: [{ botid: "BOT-2", name: "Support Copilot" }] },
+          }),
+        );
+
+      const read = await readCopilotBots({
+        environmentUrl,
+        token: "t",
+        followPages: true,
+      });
+
+      expect(read.ok).toBe(true);
+      if (!read.ok) return;
+      expect(
+        copilotBotsAsAgents({ rows: read.rows, environmentUrl }).map(
+          (a) => a.rawAgentId,
+        ),
+      ).toEqual(["BOT-1", "BOT-2"]);
+      expect(read.hasMorePages).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("reads one page when the caller did not ask for more", async () => {
+      fetchMock.mockResolvedValue(
+        reply({
+          ok: true,
+          status: 200,
+          body: {
+            value: [{ botid: "BOT-1" }],
+            "@odata.nextLink": `${environmentUrl}/next`,
+          },
+        }),
+      );
+
+      const read = await readCopilotBots({ environmentUrl, token: "t" });
+
+      expect(read.ok).toBe(true);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    // The continuation URL arrives in the response body and the next request
+    // carries the token, so following one off-origin would hand the credential
+    // to whoever answers.
+    it("refuses rather than follow a link off the environment", async () => {
+      fetchMock.mockResolvedValueOnce(
+        reply({
+          ok: true,
+          status: 200,
+          body: {
+            value: [{ botid: "BOT-1" }],
+            "@odata.nextLink": "https://attacker.example.com/next",
+          },
+        }),
+      );
+
+      const read = await readCopilotBots({
+        environmentUrl,
+        token: "t",
+        followPages: true,
+      });
+
+      expect(read).toEqual({
+        ok: false,
+        refusal: { reason: "malformed_response", status: null },
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("listCopilotAgents paging", () => {
+  describe("given the environment holds more agents than the walk could read", () => {
+    it("refuses rather than present a first page as the inventory", async () => {
+      // Every page carries a link, so the walk spends its budget and still has
+      // somewhere to go. Pressing Sync again would start at this same first
+      // page, so the missing agents are not discoverable by repeating it.
+      fetchMock.mockResolvedValue(
+        reply({
+          ok: true,
+          status: 200,
+          body: {
+            value: [{ botid: "BOT-1" }],
+            "@odata.nextLink": `${environmentUrl}/api/data/v9.2/bots?$skiptoken=x`,
+          },
+        }),
+      );
+
+      const listing = await listCopilotAgents({ environmentUrl, token: "t" });
+
+      expect(listing).toEqual({
+        outcome: "refused",
+        refusal: { reason: "unavailable", status: null },
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(MAX_BOT_PAGES);
     });
   });
 });
