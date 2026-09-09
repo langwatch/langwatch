@@ -13,11 +13,12 @@
  * compared a source type against a source id forever after. No error, no
  * empty field, a rule that simply never fires.
  *
- * The assertion is on the submit control rather than on the mutation payload,
- * because that is the earliest point where the two fields disagree and the
- * only one an admin can see: a scope with no id yet chosen cannot be
- * submitted. The enabled-then-disabled pair is deliberate — an assertion that
- * the button is disabled passes just as loudly on a composer that never opened.
+ * Asserted twice, at both ends. The submit control is where the two fields
+ * first disagree in a way an admin can see, and the mutation payload is what
+ * actually reaches the server — `{ scope: "source_type", scopeId: "src-genie" }`
+ * before the fix. Each is paired with a positive control, because "the button
+ * is disabled" and "nothing was sent" both pass just as loudly on a composer
+ * that never opened.
  *
  * Spec: specs/ai-governance/dashboard/governance-ui-controls.feature
  */
@@ -31,6 +32,8 @@ import { hasPermissionWithHierarchy } from "~/server/api/rbac";
 
 const harness = vi.hoisted(() => ({
   permissions: [] as string[],
+  /** What the create mutation was actually asked to persist. */
+  create: vi.fn(),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => {
@@ -77,9 +80,9 @@ const SOURCES = [
 ];
 
 vi.mock("~/utils/api", () => {
-  const mutation = () => ({
+  const mutation = (mutate = vi.fn()) => ({
     useMutation: () => ({
-      mutate: vi.fn(),
+      mutate,
       mutateAsync: vi.fn(),
       isPending: false,
       variables: undefined,
@@ -97,7 +100,7 @@ vi.mock("~/utils/api", () => {
         list: {
           useQuery: () => ({ data: [], isLoading: false, error: null }),
         },
-        create: mutation(),
+        create: mutation(harness.create),
         update: mutation(),
         archive: mutation(),
       },
@@ -149,6 +152,7 @@ function submitButton() {
 
 beforeEach(() => {
   harness.permissions = ["anomalyRules:view", "anomalyRules:manage"];
+  harness.create.mockClear();
 });
 
 afterEach(() => {
@@ -233,6 +237,56 @@ describe("given a manager composing a rule scoped to one ingestion source", () =
       });
 
       expect(submitButton()).toBeEnabled();
+    });
+
+    /*
+     * The one that fails against the unfixed composer. Pressing submit with
+     * the scope changed and no new id chosen sent
+     * `{ scope: "source_type", scopeId: "src-genie" }` — the pair the
+     * subscriber could never match. The control below proves a finished rule
+     * does reach the mutation, so this absence is not the absence of a
+     * working form.
+     */
+    it("sends nothing while the scope has no id of its own", async () => {
+      const user = userEvent.setup();
+      await composeSourceScopedRule(user);
+
+      await chooseOption({
+        user,
+        picker: "Scope",
+        option: /ingestion source type/i,
+      });
+      await user.click(submitButton());
+
+      expect(harness.create).not.toHaveBeenCalled();
+    });
+
+    /*
+     * The control, and the guard that outlives the disabled rule: whatever
+     * the form does on the way there, the pair that reaches the server has
+     * to agree.
+     */
+    it("persists the chosen source type, never the source id it replaced", async () => {
+      const user = userEvent.setup();
+      await composeSourceScopedRule(user);
+
+      await chooseOption({
+        user,
+        picker: "Scope",
+        option: /ingestion source type/i,
+      });
+      await chooseOption({
+        user,
+        picker: "Source type",
+        option: /Claude Code/i,
+      });
+      await user.click(submitButton());
+
+      await waitFor(() => expect(harness.create).toHaveBeenCalledTimes(1));
+      expect(harness.create.mock.calls[0]?.[0]).toMatchObject({
+        scope: "source_type",
+        scopeId: "claude_code",
+      });
     });
   });
 });
