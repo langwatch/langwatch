@@ -98,6 +98,115 @@ Feature: Provider rows become discovered people
     # Same contract as the seat read, including naming HTTP 403 for what it
     # is: consent never granted, not a role misassigned.
 
+  # ── What one directory page is worth ──────────────────────────────────────
+  # The read is one paged listing of a tenant's own people, and the ways it
+  # goes wrong all look alike from the outside: an empty tenant, a page the
+  # reader could not parse, and a page that arrived from somewhere else all
+  # deliver zero people. Telling them apart is the whole job below, because
+  # only one of the three is a fact about the tenant.
+
+  @unit
+  Scenario: A directory page hands back its rows and the link to the next one
+    Given a directory page of people that names a next page
+    When the page is read
+    Then the people on it are returned
+    And the link to the next page is returned beside them
+
+  @unit
+  Scenario: A directory row that cannot be read costs the row, not the page
+    Given a directory page carrying one readable person and one row that is not
+    When the page is read
+    Then the readable person is returned
+    And the unreadable row is counted
+    # Dropping the page instead would lose a whole tenant's morning over one
+    # malformed record, and counting it is what makes the loss visible.
+
+  @unit
+  Scenario: A directory row carrying nothing but an id is still a person
+    Given a directory row that carries an id and no other field
+    When the page is read
+    Then that person is returned
+    And no row is counted as unreadable
+    # The directory omits fields it has no value for rather than sending them
+    # empty, so a sparse row is the ordinary case, not a broken one.
+
+  @unit
+  Scenario: A directory answer that is not a page is malformed, not an empty tenant
+    Given an answer to the directory read that is not a page of people at all
+    When the answer is read
+    Then the answer is called malformed
+    And no people are returned
+    # An empty tenant and an unreadable answer both yield nobody. Recording
+    # the second as the first would report a company as having no staff.
+
+  @unit
+  Scenario: A directory answer that is not a page holds the day rather than emptying the tenant
+    Given a Copilot source with the directory read switched on
+    When the directory answers with something that is not a page of people
+    Then no directory rows are recorded
+    And the directory day is held to be retried, not marked read
+
+  @unit
+  Scenario: A directory row is recorded against the person and the day
+    Given the directory names a person, their address and their department
+    When the row is shaped into a record
+    Then the record is identified by that person and that day
+    And the record names the person by their directory id, not their address
+    And the record carries what the directory said about them
+    # The id is what the tenant's other rows call the same human, and what an
+    # erasure of this provider suppresses. An address is neither.
+
+  @unit
+  Scenario: A directory field the tenant left empty is recorded empty
+    Given a directory row whose name, address and department are all absent
+    When the row is shaped into a record
+    Then each absent field is recorded as empty text
+    # Never the word "undefined". These land in display text a person reads.
+
+  @unit
+  Scenario: A directory read records a row per person beside the conversations
+    Given a Copilot source with the directory read switched on
+    When the source runs
+    Then a directory record is delivered for each person
+    And the conversations are delivered alongside them
+    And the day is marked read
+
+  @unit
+  Scenario: The directory read asks only for the fields it records
+    Given a Copilot source with the directory read switched on
+    When the source reads the directory
+    Then the request names only the fields the record carries
+    And the request refuses to follow a redirect
+    # The request carries the tenant's token; a redirect would hand it to
+    # whoever answered. Asking for nothing more than is recorded keeps the
+    # blast radius of that token to what the feature actually needs.
+
+  @unit
+  Scenario: A directory spanning pages is read to the end and counted as one day
+    Given a directory whose people span two pages
+    When the source reads it
+    Then everybody on both pages is recorded
+    And the day is marked read once
+
+  @unit
+  Scenario: A next-page link is followed only when it is Microsoft Graph over https
+    Given candidate next-page links, one of them the real directory over https
+    When each is checked before being followed
+    Then only the real directory over https is accepted
+    # Plain http, a lookalike host, an embedded credential and a stray port
+    # are each refused on their own. The token rides this request, so the
+    # check is on the authority, not on the text of the link.
+
+  @unit
+  Scenario: A directory next-page link off Microsoft Graph is refused and the day held
+    Given a Copilot source with the directory read switched on
+    And the directory answers with a next-page link that is not the directory
+    When the source reads it
+    Then the link is not followed
+    And no directory rows are recorded
+    And the conversations are still delivered
+    And the directory day is held to be retried, not marked read
+
   @integration
   Scenario: A directory row enriches a discovered person's display text
     Given a discovered person whose display text is a bare directory id

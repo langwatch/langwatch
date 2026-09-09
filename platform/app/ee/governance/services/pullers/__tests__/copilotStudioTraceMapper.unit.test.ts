@@ -890,17 +890,23 @@ describe("given a tool call the agent ran", () => {
 
 describe("given what the agent was running", () => {
   /** @scenario "The trace names the product, never the model the agent was running" */
-  it("names the product and reports no configured model", () => {
+  it("labels the turn with the product and reports no model of its own", () => {
     const events = [
       copilotEvent(transcriptRow({ activities: CHAT }), {
         botModifiedOn: "2026-08-20T10:00:00Z",
       }),
     ];
     const attrs = attrsOf(spansOf(events)[0]!);
-    // The `bot` table has no model column — see BotFacts. Asserting the
-    // absence rather than deleting the case: the previous version of this
-    // test injected a `botModel` no query produces and passed on data
-    // production cannot emit.
+    // Nothing the adapter reads names a model — the `bot` read asks for
+    // `botid,name,modifiedon` and the transcript row carries the conversation,
+    // not the agent's settings; see BotFacts. That is an absent field in what
+    // is read, not proof the agent has no configured model: the model does
+    // sit on the same `bot` row, in the `configuration` column this query does
+    // not request, and it is left unread because a per-agent series name is
+    // neither an exact model nor tied to the turn being priced.
+    // Asserting the absence rather than deleting the case: the previous
+    // version of this test injected a `botModel` no query here produces and
+    // passed on data production cannot emit.
     expect(attrs["copilot_studio.agent_model"]).toBeUndefined();
     expect(attrs["copilot_studio.agent_changed_since"]).toBeUndefined();
 
@@ -926,7 +932,7 @@ describe("given what the agent was running", () => {
     expect(attrs["copilot_studio.agent_changed_since"]).toBe("true");
   });
 
-  it("never prices a conversation — the agent name resolves to no model", () => {
+  it("leaves a conversation unpriced because the product label matches no price row", () => {
     const turns = turnSpansOf([
       copilotEvent(transcriptRow({ activities: CHAT })),
     ]);

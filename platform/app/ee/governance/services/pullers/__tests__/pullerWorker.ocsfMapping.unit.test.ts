@@ -57,9 +57,12 @@ describe("given a pulled provider event", () => {
       expect(row.traceId).toBe("pull:copilot_studio:src-1:evt-123");
     });
 
-    it("uses the org's hidden governance project id as tenantId", () => {
-      // Same key the trace-fold subscriber + OCSF export service use, so pull
-      // events surface alongside trace-derived events on the SIEM export path.
+    it("carries the tenant id it was handed through untouched", () => {
+      // The caller passes the org's hidden internal_governance project id —
+      // the same key the trace-fold subscriber and the OCSF export service
+      // use, so pull events surface alongside trace-derived ones on the SIEM
+      // export path. Which id that is, is the caller's decision and is not
+      // established here; all the mapping owes is to not rewrite it.
       const row = mapToOcsfRow({
         event: baseEvent,
         tenantId: "gov-proj-acme-42",
@@ -124,10 +127,18 @@ describe("given a provider that names the actor by an address", () => {
 
 describe("given a provider that names the actor by an opaque id", () => {
   describe("when the row is mapped", () => {
-    it("keeps the id out of the actor email field", () => {
-      // The OpenAI cost report names a person only by `user-…` and sends no
-      // address at all. An id in an email-named column is not proof of an
-      // address, and the SIEM export ships that column to customer tooling.
+    it("routes the id to the actor id field, not the email field", () => {
+      // What is pinned here is the placement rule, not a permanently empty
+      // column: the mapper places the actor string by what that string IS, and
+      // an opaque id is not an address. The SIEM export ships the email column
+      // to a customer's own tooling, which reads it as an address.
+      //
+      // The OpenAI cost report does send a `user_email` beside the `user-…`
+      // id — every one of the 2,720 captured rows carries both — but the
+      // adapter deliberately puts the id in `actor`, so an address is not what
+      // this mapping is handed. Whether the column should instead be filled
+      // from the payload's address is an open question about the adapter, and
+      // this case does not settle it either way.
       const row = mapEvent({ ...baseEvent, actor: "user-A1b2C3d4E5" });
 
       expect(row.actorEmail).toBe("");

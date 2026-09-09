@@ -57,8 +57,9 @@ export const COPILOT_CONVERSATION_ACTION = "copilot_conversation" as const;
 /**
  * Agent identity on every turn. A product label, not a priced model: cost
  * enrichment runs on `llm` spans and must find no price row here. The model
- * the agent was actually running is recorded separately, as an attribute,
- * because it cannot be trusted enough to price anything.
+ * the agent runs on IS recorded in the environment, but nothing this adapter
+ * reads names it — see `BotFacts` — so this label is the only thing on the
+ * span, and it is not trusted enough to price a conversation.
  */
 const COPILOT_AGENT_MODEL = "microsoft/copilot-studio" as const;
 
@@ -159,12 +160,34 @@ interface TranscriptRow {
 /**
  * What the adapter supplies about the agent, read from the joined bot row.
  *
- * There is no model here, and that is a finding rather than an omission. The
- * `bot` table carries `name`, `schemaname`, `language`, `authenticationmode`,
- * `statecode`, `publishedon` and `modifiedon` — and nothing naming a model.
- * An earlier draft emitted `copilot_studio.agent_model` from a field no query
- * could ever populate, which is worse than saying nothing: a reader would have
- * taken its absence as "not configured" rather than "not knowable from here".
+ * There is no model here, and that is a finding rather than an omission — but
+ * a narrow one, and the two halves must not be run together.
+ *
+ * What is verified is that nothing this adapter reads names a model. The `bot`
+ * read asks for `botid,name,modifiedon`, and the transcript row carries the
+ * conversation rather than the agent's settings — a sweep of all 35 distinct
+ * scalar leaf paths in transcript `content` matches nothing model-shaped.
+ *
+ * What is NOT claimed is that the environment cannot say. It can: the model
+ * sits on this same `bot` row, in the `configuration` JSON at
+ * `agentSettings.model.series`, one column the `$select` above does not
+ * request. Reading it needs no permission the source does not already hold.
+ *
+ * It is deliberately not requested, because it would not answer the question a
+ * priced span asks. It is a SERIES, a family name with no build, date or
+ * deployment id, so it is not an exact model identifier. It is CURRENT
+ * configuration rather than history, so a month-old transcript would silently
+ * be labelled with today's model; `modifiedon` against the transcript's
+ * `createdon` detects that drift (which is what `agent_changed_since` reports)
+ * but Dataverse keeps no version history of the column, so it can never be
+ * repaired. And it is PER AGENT, not per turn: orchestration falling back to
+ * another model for some turns is not observable at all.
+ *
+ * So the absence recorded here is "this adapter did not read one", never "the
+ * agent has none". An earlier draft emitted `copilot_studio.agent_model` from
+ * a field no query here could populate, which is worse than saying nothing: a
+ * reader would have taken its absence as "not configured" rather than "not
+ * read from here".
  */
 interface BotFacts {
   botName?: string;

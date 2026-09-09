@@ -81,6 +81,47 @@ describe("shell route classification", () => {
     });
   });
 
+  describe("when the reader's sticky scope is their own personal workspace", () => {
+    // The control, and the reason the two below are not vacuous: this input
+    // does put the reader in the personal shell wherever it is allowed to.
+    it("puts a project page in the personal shell", () => {
+      const route = resolveShellRoute({
+        ...base,
+        isOnOwnPersonalProject: true,
+        pathname: "/[project]/traces",
+      });
+
+      expect(route.isPersonalScopeRoute).toBe(true);
+      expect(route.activeProductId).toBe("me");
+    });
+
+    /** @scenario "A sticky personal workspace does not follow me onto an org-wide page" */
+    it("leaves a Gateway page organization-scoped", () => {
+      const route = resolveShellRoute({
+        ...base,
+        isOnOwnPersonalProject: true,
+        pathname: "/gateway/virtual-keys",
+      });
+
+      expect(route.isPersonalScopeRoute).toBe(false);
+      expect(route.activeProductId).toBe("gateway");
+      expect(route.isOrgScopeRoute).toBe(true);
+    });
+
+    /** @scenario "A sticky personal workspace does not follow me onto an org-wide page" */
+    it("leaves a Governance page organization-scoped", () => {
+      const route = resolveShellRoute({
+        ...base,
+        isOnOwnPersonalProject: true,
+        pathname: "/governance/costs",
+      });
+
+      expect(route.isPersonalScopeRoute).toBe(false);
+      expect(route.activeProductId).toBe("governance");
+      expect(route.isOrgScopeRoute).toBe(true);
+    });
+  });
+
   describe("when the address is an internal ops page", () => {
     /** @scenario Internal ops pages render in the new settings shell */
     it("takes the settings detour so the settings shell draws around it", () => {
