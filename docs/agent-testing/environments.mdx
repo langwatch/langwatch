@@ -41,7 +41,7 @@ The run dialog shows teammates' personal agents disabled. The tooltip on the car
 For a development machine the whole team runs suites against, give it its own environment name and it is shared like any other:
 
 ```bash
-LANGWATCH_AGENT_ENVIRONMENT=dev-shared
+export LANGWATCH_AGENT_ENVIRONMENT=dev-shared
 ```
 
 ## Containers and the machine identity
@@ -55,7 +55,7 @@ Two ways to keep one row:
 **Name the environment.** Give it a value other than `development`:
 
 ```bash
-LANGWATCH_AGENT_ENVIRONMENT=dev-alex
+export LANGWATCH_AGENT_ENVIRONMENT=dev-alex
 ```
 
 The row is then shared by everyone on the project who uses the same value, so a per-person value keeps people apart.
