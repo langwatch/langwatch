@@ -194,16 +194,15 @@ function renderPage() {
 const A_SAMPLE_INSIGHT =
   "Three registered agents have run without a named owner since May.";
 
-/** The hero's ways in, by label, in the order they are drawn. */
-const WAY_IN_LABELS = [
-  "Add department",
-  "Add agent",
-  "Add tool",
-  "Configure sources",
-] as const;
+/**
+ * The hero's shortcut row, by label, in the order it is drawn. All three add
+ * something; the fourth way in configures, and lives at the foot of the
+ * source menu rather than in this row.
+ */
+const WAY_IN_LABELS = ["Add department", "Add agent", "Add tool"] as const;
 
-/** The three that add something, as opposed to the one that configures. */
-const ADD_LABELS = ["Add department", "Add agent", "Add tool"] as const;
+/** The same three, read as the adds they are. */
+const ADD_LABELS = WAY_IN_LABELS;
 
 const wayInLinks = () =>
   screen
@@ -366,10 +365,16 @@ afterEach(() => cleanup());
 describe("governance overview", () => {
   describe("when the overview renders", () => {
     /** @scenario "The hero offers four ways in, three to add and one to configure" */
-    it("offers the three adds first and configure sources last", () => {
+    it("offers three add shortcuts in the row and no configure chip beside them", () => {
       renderPage();
 
       expect(wayInLabels()).toEqual([...WAY_IN_LABELS]);
+      // The fourth way in sits at the foot of the source menu. A chip here as
+      // well would be the same destination offered twice, one of them under a
+      // pill the reader has to open to find it.
+      expect(
+        screen.queryByText("Configure sources"),
+      ).not.toBeInTheDocument();
     });
 
     /** @scenario "Each add shortcut opens the flow that adds the thing it names" */
@@ -401,20 +406,30 @@ describe("governance overview", () => {
     });
 
     /** @scenario "A shortcut leads through to every source the product can pull from" */
-    it("leads through to the sources tab, whatever the viewer may add", () => {
+    it("puts configure sources at the foot of the source menu and nowhere else", async () => {
+      harness.permissions = [...VIEWER, "ingestionSources:manage"];
       renderPage();
+      await openSourceMenu();
 
-      const configure = screen.getByRole("link", { name: "Configure sources" });
+      // Last row of the menu, under the three vendors, still carrying the
+      // address the chip carried.
+      const configure = screen.getAllByRole("menuitem").at(-1);
+      if (!configure) throw new Error("the source menu drew no items");
+      expect(configure).toHaveTextContent("Configure sources");
       expect(configure).toHaveAttribute(
         "href",
         "/governance/inventory?tab=sources",
       );
-      // Last, because it configures rather than adds.
-      expect(wayInLabels().at(-1)).toBe("Configure sources");
-      // Drawn for a viewer holding nothing that manages: unlike the pill, it
-      // opens no add flow, so the tab it lands on reads without that grant.
-      // `VIEWER` is what beforeEach set, and it holds no manage grant.
-      expect(harness.permissions).not.toContain("ingestionSources:manage");
+
+      cleanup();
+
+      // And the cost of the move, asserted rather than left to be found: the
+      // row rides the grant that draws the pill, so a viewer who may not add a
+      // source now has no way to the sources tab from this page at all.
+      harness.permissions = [...VIEWER];
+      renderPage();
+      expect(sourcePill()).toBeUndefined();
+      expect(screen.queryByText("Configure sources")).not.toBeInTheDocument();
     });
 
     /** @scenario "No shortcut points at a tab the page would not honour" */
@@ -483,9 +498,16 @@ describe("governance overview", () => {
       renderPage();
       const user = await openSourceMenu();
 
+      // The three vendors and nothing else that names one. The trailing row
+      // is the way through to the full catalog, not a fourth vendor.
       expect(
         screen.getAllByRole("menuitem").map((item) => item.textContent),
-      ).toEqual(["Anthropic", "OpenAI", "Microsoft Copilot"]);
+      ).toEqual([
+        "Anthropic",
+        "OpenAI",
+        "Microsoft Copilot",
+        "Configure sources",
+      ]);
 
       await user.click(screen.getByRole("menuitem", { name: "OpenAI" }));
       expect(harness.push).toHaveBeenCalledWith(
@@ -508,7 +530,7 @@ describe("governance overview", () => {
 
   describe("when the viewer cannot manage ingestion sources", () => {
     /** @scenario "Adding a source is offered only to whoever may add one" */
-    it("offers no Add source control and the same four ways in", () => {
+    it("offers no Add source control and the same three shortcuts", () => {
       renderPage();
 
       expect(sourcePill()).toBeUndefined();
@@ -532,7 +554,7 @@ describe("governance overview", () => {
 
   describe("when the viewer cannot ask Langy", () => {
     /** @scenario "The field offers Langy to whoever may ask" */
-    it("offers search without Langy and the same four ways in", () => {
+    it("offers search without Langy and the same three shortcuts", () => {
       renderPage();
 
       expect(harness.placeholder).toBe("Search, or jump to anything");

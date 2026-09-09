@@ -1,4 +1,4 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { SourceTypeIconGlyph } from "@ee/governance/dashboard/components/ingestionSourceCatalog";
 import type { SourceType } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { Building2 } from "lucide-react";
@@ -8,6 +8,7 @@ import { AskChip } from "~/components/home/AskChip";
 import { HeroAskField } from "~/components/home/HeroAskField";
 import { HeroLeadPill } from "~/components/home/HeroLeadPill";
 import { WelcomeHeader } from "~/components/home/WelcomeHeader";
+import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { useCanAskLangy } from "~/features/langy/hooks/useCanAskLangy";
 import { useRouter } from "~/utils/compat/next-router";
@@ -17,8 +18,9 @@ import { useRouter } from "~/utils/compat/next-router";
  * with: a greeting, one field, and the short ways in. The field is the
  * command palette mounted inline, the pill is the one action a governance
  * admin takes first (connect a vendor), and the chips under it are the things
- * they set up next — a department, an agent, a tool — plus the way through to
- * the whole source catalog.
+ * they set up next — a department, an agent, a tool. The way through to the
+ * whole source catalog is the last row of the pill's own menu, not a fourth
+ * chip.
  *
  * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
  */
@@ -74,13 +76,16 @@ export const addSourceHref = (sourceType: SourceType) =>
   `${INVENTORY_SOURCES_HREF}&add=${sourceType}`;
 
 /**
- * The ways in under the pill. The first three are the order a surface is set
- * up in: the group people belong to, the agents that group runs, then the
- * tools those agents reach. The fourth is a different kind of thing and sits
- * last for that reason — it opens the full list of everything the product can
- * pull from, which is the answer to "my vendor is not one of the three on the
- * pill". It is the move the model picker makes with its own "Configure
- * available models" row at the foot of the menu.
+ * The ways in under the pill: the order a surface is set up in — the group
+ * people belong to, the agents that group runs, then the tools those agents
+ * reach. Every one of them ADDS something, which is why they read as one row
+ * of three rather than as a list with an odd one on the end.
+ *
+ * Configuring sources is not among them. It configures rather than adds, and
+ * it belongs to the source pill above: it is the answer to "my vendor is not
+ * one of the three in this menu", so it is the last row of that menu (see
+ * `AddSourcePill`) the way the model picker keeps "Configure available
+ * models" at the foot of its own list.
  *
  * Every href here that carries a `?tab=` must name a tab its page actually
  * has, and every `&add=1` must name a pane that opens something on arrival. A
@@ -112,12 +117,6 @@ const LEAD_CHIPS: ReadonlyArray<{
     label: "Add tool",
     href: ADD_TOOL_HREF,
     icon: <LuPackageOpen size={12} />,
-  },
-  {
-    key: "configure-sources",
-    label: "Configure sources",
-    href: INVENTORY_SOURCES_HREF,
-    icon: <LuSettings2 size={12} />,
   },
 ];
 
@@ -170,9 +169,19 @@ export function GovernanceHero({
  * arrives with are named up front, each opening the inventory's Sources tab
  * on that vendor's add flow. The rest of the catalog is not repeated here —
  * the Sources tab's own Add source menu is the full list, and a hero that
- * offered both would be asking the reader to choose between two menus. The
- * "Configure sources" chip under the pill is how a reader whose vendor is not
- * one of these three reaches that list.
+ * offered both would be asking the reader to choose between two menus.
+ *
+ * "Configure sources" is the last row of this menu, under a separator, and is
+ * how a reader whose vendor is not one of these three reaches that list. It
+ * is the shape `ModelSelector` and `LangyModelPill` both use for "Configure
+ * available models": a full-width row at the foot of the open list, ruled off
+ * from the options above it, carrying a settings glyph and plain muted text
+ * rather than a bold or accented label.
+ *
+ * It is a `Menu.Item` where the model picker uses a bare control in a
+ * `Select`/`Combobox` footer, because this list is a menu: an element that is
+ * not an item inside one is out of arrow-key reach. It renders as an anchor,
+ * so the address survives a right-click the way it did while this was a chip.
  *
  * OUTLINE, NOT FILLED. Everything in this section that creates something is
  * an outline control, so the one on the overview cannot be the exception —
@@ -221,6 +230,29 @@ function AddSourcePill() {
             </HStack>
           </Menu.Item>
         ))}
+
+        {/* Cancels `Menu.Content`'s own padding so the rule runs the full
+            width of the menu, the way the model picker's footer rule runs the
+            full width of its list. */}
+        <Box marginX={-1} marginY={1}>
+          <Menu.Separator />
+        </Box>
+        <Menu.Item value="configure-sources" paddingY={2} asChild>
+          <Link
+            href={INVENTORY_SOURCES_HREF}
+            display="flex"
+            alignItems="center"
+            gap={2.5}
+            width="full"
+            color="fg.muted"
+            _hover={{ textDecoration: "none" }}
+          >
+            <LuSettings2 size={14} />
+            <Text textStyle="xs" fontWeight="500">
+              Configure sources
+            </Text>
+          </Link>
+        </Menu.Item>
       </Menu.Content>
     </Menu.Root>
   );

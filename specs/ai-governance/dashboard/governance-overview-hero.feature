@@ -10,7 +10,7 @@ Feature: The governance overview opens with a hero and nothing else
   error alert before they met the page.
 
   The panels live on the pages that own them. What is left is the greeting,
-  one field, the one action that starts everything (connect a vendor), four
+  one field, the one action that starts everything (connect a vendor), three
   shortcuts under it, and the two lists that fill once there is something to
   put in them. The page reads nothing of its own, which is why nothing on it
   can fail.
@@ -45,7 +45,7 @@ Feature: The governance overview opens with a hero and nothing else
     Given I also hold `ingestionSources:manage`
     When I open the "Add source" menu
     Then it offers "Anthropic", "OpenAI" and "Microsoft Copilot", in that order
-    And nothing else, because the sources tab holds the full catalog
+    And no other vendor, because the sources tab holds the full catalog
     And picking one opens the sources tab on that vendor's add flow
 
   @integration
@@ -53,7 +53,7 @@ Feature: The governance overview opens with a hero and nothing else
     Given I do not hold `ingestionSources:manage`
     When the overview renders
     Then no "Add source" control is offered, because the add flow would refuse me
-    And the four shortcuts are offered just the same
+    And the three shortcuts are offered just the same
 
   # A shortcut used to read "Add anomaly rule" and point at
   # /governance/inventory?tab=anomaly-rules. Anomaly rules stopped being an
@@ -64,10 +64,13 @@ Feature: The governance overview opens with a hero and nothing else
   @integration
   Scenario: The hero offers four ways in, three to add and one to configure
     When the overview renders
-    Then the hero offers "Add department", "Add agent", "Add tool" and "Configure sources", in that order
+    Then the shortcut row offers "Add department", "Add agent" and "Add tool", in that order
     And no other shortcut is offered beside them
-    And the three that add come first, in the order a surface is set up:
+    And they read in the order a surface is set up:
       the group people belong to, the agents it runs, the tools those reach
+    And the fourth way in configures rather than adds, so it is not a chip at all:
+      it is the last row of the "Add source" menu, the way the model picker keeps
+      "Configure available models" at the foot of its own list
 
   # Landing on the right page is not the same as arriving somewhere useful.
   # Two of these shortcuts used to land on the correct page and open nothing,
@@ -82,13 +85,22 @@ Feature: The governance overview opens with a hero and nothing else
     And "Add tool" leads to the catalog tab of the inventory, asking it to open its add flow
     And a shortcut that lands on the right page and opens nothing is a broken shortcut
 
+  # It used to be a fourth chip, offered to every reader. Moving it into the
+  # menu ties it to `ingestionSources:manage`, since that grant is what draws
+  # the pill: a reader without it now has no shortcut to the sources tab from
+  # this page. That is the cost of the move and it is stated rather than left
+  # to be discovered.
+
   @integration
   Scenario: A shortcut leads through to every source the product can pull from
-    When the overview renders
-    Then a "Configure sources" shortcut leads to the sources tab of the inventory
-    And it sits last in the row, because it configures rather than adds
-    And it is offered whether or not I may add a source, because that tab reads without the grant
-    And it is how a reader whose vendor is not one of the three on the pill reaches the rest
+    Given I also hold `ingestionSources:manage`
+    When I open the "Add source" menu
+    Then a "Configure sources" row sits at the foot of the menu, under a rule
+    And it leads to the sources tab of the inventory
+    And it carries a settings mark and plain muted text, not a bold or accented label
+    And it is how a reader whose vendor is not one of the three above it reaches the rest
+    But when I do not hold `ingestionSources:manage` there is no menu to open
+    And no "Configure sources" row is offered anywhere on the page
 
   @integration
   Scenario: No shortcut points at a tab the page would not honour
@@ -104,7 +116,7 @@ Feature: The governance overview opens with a hero and nothing else
     Then the field offers to ask Langy
     But when I cannot ask Langy
     Then the field offers search without Langy
-    And the same four ways in are offered
+    And the same three shortcuts are offered
 
   @integration
   Scenario: Insights and recent activity wait under the hero
