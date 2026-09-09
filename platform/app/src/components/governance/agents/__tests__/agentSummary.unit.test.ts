@@ -82,8 +82,13 @@ describe("summarizeAgentFleet", () => {
     it("draws one point per month of the last year, ending at the whole fleet", () => {
       expect(summary.fleet.registrations).toHaveLength(12);
       expect(summary.fleet.registrations.at(-1)).toBe(SAMPLE_AGENT_ROWS.length);
+      // The label has to say CUMULATIVE, because the series is: the first
+      // point already counts every agent registered before the window opened,
+      // so a label promising registrations within it names a smaller number
+      // than the line draws. This string is the sparkline's whole description
+      // for a reader who cannot see it.
       expect(summary.fleet.registrationsLabel).toBe(
-        "Agents registered over the last 12 months",
+        "Total agents registered, by month over the last 12 months",
       );
     });
 
