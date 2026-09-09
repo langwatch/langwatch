@@ -331,11 +331,12 @@ In flight on the same branch:
 
 ## Admin oversight on real data
 
-Once a source is `active` and events are flowing, the admin
-oversight dashboard at `/governance` queries
-`gateway_activity_events` via the `api.activityMonitor.*` tRPC
-procedures. Empty data renders a setup checklist; data present
-renders live cards + per-user table + source-health strip.
+Once a source is `active` and events are flowing, its events land in
+`gateway_activity_events`, and the governance screens read them
+through the `api.activityMonitor.*` tRPC procedures. The overview at
+`/governance` issues no such read of its own: the spend cards, the
+per-user table and the source-health strip sit on the screens that
+own them, and the overview is the way in.
 
 Tier 2, Tier 5 are deferred; the architecture doesn't preclude them
 and the control-plane primitives already accommodate them.

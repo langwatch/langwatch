@@ -11875,11 +11875,12 @@ In flight on the same branch:
 
 ## Admin oversight on real data
 
-Once a source is `active` and events are flowing, the admin
-oversight dashboard at `/governance` queries
-`gateway_activity_events` via the `api.activityMonitor.*` tRPC
-procedures. Empty data renders a setup checklist; data present
-renders live cards + per-user table + source-health strip.
+Once a source is `active` and events are flowing, its events land in
+`gateway_activity_events`, and the governance screens read them
+through the `api.activityMonitor.*` tRPC procedures. The overview at
+`/governance` issues no such read of its own: the spend cards, the
+per-user table and the source-health strip sit on the screens that
+own them, and the overview is the way in.
 
 Tier 2, Tier 5 are deferred; the architecture doesn't preclude them
 and the control-plane primitives already accommodate them.
@@ -13798,22 +13799,24 @@ Turning on the Enterprise feature surface takes a real signed license key. There
 
 ---
 title: AI Governance
-description: An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
+description: An inventory of every AI tool and source in the company, the people who use them, the agents they run, and a personal home page for each developer.
 sidebarTitle: Overview
-keywords: ai governance, ai inventory, ingestion sources, tool catalog, anomaly rules, departments, langwatch
+keywords: ai governance, ai inventory, ingestion sources, tool catalog, agents, departments, langwatch
 ---
 
 AI Governance is the part of LangWatch where you administer the AI tools your company uses. It is for the platform or IT team that approves those tools and watches their use, and it gives every developer one page with the tools they may use and their own usage.
 
-The section is in the sidebar under **AI Governance**, with three pages: **Overview**, **Inventory** and **People**. Opening them needs the `governance:view` permission, which an organization Admin holds. Each developer also has a personal home page at `/me`.
+The section is in the sidebar under **AI Governance**, with four pages: **Overview**, **Inventory**, **Agents** and **People**. Opening them needs the `governance:view` permission, which an organization Admin holds. Each developer also has a personal home page at `/me`.
 
 ## The overview page
 
-The overview at `/governance` shows the last 30 days: spend over time, the spend share across teams, the top teams and users by spend, spend by department, the recent anomalies and the status of each ingestion source. The panels roll up the events of your ingestion sources. LangWatch AI Gateway traffic is under **Gateway > Usage**.
+The overview at `/governance` is the way into the section rather than a dashboard of its own. It opens with a greeting, one field for asking a question or jumping to a screen, an **Add Source** action for admins who may manage ingestion sources, and shortcuts to add people, an agent or a tool.
 
-Until the first ingestion source reports an event, the page shows a setup checklist instead: add tools to the catalog, define a routing policy, connect an ingestion source and define anomaly rules.
+Under those sit two lists. **Insights** fills once your ingestion sources are pulling, and **Recent activity** lists the screens you were last on. LangWatch AI Gateway traffic is under **Gateway > Usage**.
 
-<Frame caption="The overview before the first ingestion source reports an event: the setup checklist with all four steps complete.">
+Before your first ingestion source reports an event the page looks the same: each of the two lists carries one line saying what will fill it.
+
+<Frame caption="The overview as an earlier build drew it, with a setup checklist. The page no longer shows this checklist.">
   ![The AI Governance overview with the setup checklist](/images/ai-governance/governance-overview.png)
 </Frame>
 
@@ -13829,14 +13832,6 @@ The inventory has two tabs. **Sources** lists the systems that report AI activit
 
 <Frame caption="The Catalog tab after the starter pack import: four coding assistants and four model providers, each scoped to the organization.">
   ![The Catalog tab of the inventory](/images/ai-governance/governance-inventory-catalog.png)
-</Frame>
-
-## Anomaly Rules
-
-Rules are grouped by severity: Critical, Warning and Info. Each rule has a type, a description and a scope.
-
-<Frame caption="One Warning rule of type spend_spike, scoped to the organization.">
-  ![The Anomaly Rules page with one rule](/images/ai-governance/governance-anomaly-rule.png)
 </Frame>
 
 ## Personal home page
@@ -13857,7 +13852,7 @@ Rules are grouped by severity: Critical, Warning and Info. Each rule has a type,
     The coding assistants, model providers and internal tools that developers see on their personal home page. Import the starter pack, then scope each tile to the whole organization or to departments.
   </Card>
   <Card title="Anomaly Rules" icon="triangle-exclamation" href="/ai-governance/anomaly-rules">
-    Rules with a severity (Critical, Warning or Info) and a scope (the organization, one source type or one source) that raise an alert when activity crosses a threshold. Available on Enterprise plans.
+    What the anomaly detector evaluates and what a rule is made of. Rules cannot be created or edited in LangWatch today. Available on Enterprise plans.
   </Card>
   <Card title="People" icon="users" href="/ai-governance/people">
     Departments: the accounting label that spend rolls up by. Assign people, teams and projects to a department, and personal AI use follows the person.
