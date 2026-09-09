@@ -1,6 +1,23 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
+
+// `vi.hoisted` because `vi.mock` is lifted above every const in the module, so
+// a plainly declared spy is not initialised yet when the factory runs.
+const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
+
+// The durable event carries a reason and no message, on purpose: a provider's
+// reply can quote a token or a person's name and that event reaches a screen.
+// That makes the log the only record of WHY, so this suite has to be able to
+// read it -- otherwise the terminal attempt losing its detail is invisible.
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => ({
+    warn,
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
 
 import { LISTING_FAILED_REASON } from "../../schemas/constants";
 import {
@@ -56,6 +73,13 @@ function handlerFor({
 }
 
 describe("people listing outbox effect", () => {
+  // The spy is module-level, so a call from one case would otherwise still be
+  // there for the next and a case asserting a log could pass on someone
+  // else's.
+  beforeEach(() => {
+    warn.mockClear();
+  });
+
   describe("when the provider names people", () => {
     it("records both counts against the request that asked", async () => {
       const recordPeopleListed = vi.fn();
@@ -265,6 +289,31 @@ describe("people listing outbox effect", () => {
         reason: LISTING_FAILED_REASON,
         status: null,
       });
+    });
+
+    it("logs why the terminal attempt failed, since the event cannot say", async () => {
+      const handler = createPeopleListingHandler({
+        runPort: { run: () => Promise.reject(new Error("unused")) },
+        agentListingPort: { list: () => Promise.reject(new Error("unused")) },
+        peopleListingPort: {
+          list: vi.fn().mockRejectedValue(new Error("postgres is down")),
+        },
+        commands: () => commandsStub({ recordPeopleListingRefused: vi.fn() }),
+        clock: () => 200,
+        maxAttempts: 3,
+      });
+
+      await handler(intent, context(3));
+
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceId: "source-1",
+          requestId: "req-1",
+          attempt: 3,
+          error: "postgres is down",
+        }),
+        expect.stringContaining("attempts spent"),
+      );
     });
 
     /**
