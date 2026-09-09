@@ -130,9 +130,11 @@ Read the one that matches the layer you are about to touch. Each is short.
   are deleted; a file still naming one is conversion debt (`legacy-transport-runtime`).
 - `index.ts` of a server package exports the installer and the transport declarations.
   Never a repository, store, projection, service or app (`private-runtime-export`).
-- A `ports/*.port.ts` is for technical infrastructure only (encryption, object storage, a
-  clock) and is an abstract class ending in `Port` (`strict-port-module`). A peer module
-  is never a port: name its `*Api` token in `static dependencies`.
+- Technical infrastructure (encryption, object storage, a clock, an audit sink) is a
+  member of `<F>Infrastructure`, a plain interface declared beside the app and supplied by
+  the process in `withInfrastructure`. A finished module has no `ports/` and no
+  `adapters/` folder (`strict-port-module` still tolerates old ones until the lint flips).
+  A peer module is never infrastructure: name its `*Api` token in `static dependencies`.
 - Test builders live in `app/__tests__/<f>.fixture.ts`; there is no `fixtures/` and no
   `testing.ts` in a server package (`feature-shape: fixtures-directory`, `testing-entry`).
 - A module exists to be installed: `<f>.server.ts` is its installer, `app/<f>.app.ts` its

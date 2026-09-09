@@ -13,13 +13,12 @@ import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { CodingAgentApp } from "#app/coding-agent.app";
-import { CodingAgentAuditPort } from "#ports/coding-agent-audit.port";
+import type { CodingAgentAuditPort, CodingAgentViewerVisibilityPort } from "../../app/coding-agent.app.ts";
 import {
   CodingAgentCallerScopeDirectoryPort,
   CodingAgentScopePermissionsPort,
   type CodingAgentScopeCaller,
 } from "#ports/coding-agent-caller-scope.port";
-import { CodingAgentViewerVisibilityPort } from "#ports/coding-agent-viewer-visibility.port";
 import {
   TestBillingPolicy,
   TestGithubService,
@@ -95,7 +94,7 @@ class ProjectForRest extends TestProjectService {
   }
 }
 
-class NoVisibility extends CodingAgentViewerVisibilityPort {
+class NoVisibility implements CodingAgentViewerVisibilityPort {
   readVisibility(): Promise<{ canReadCapturedContent: boolean; canSeeCosts: boolean }> {
     return Promise.resolve({ canReadCapturedContent: true, canSeeCosts: true });
   }
@@ -158,7 +157,7 @@ function mount({
     }
   }
 
-  class RecordingAudit extends CodingAgentAuditPort {
+  class RecordingAudit implements CodingAgentAuditPort {
     async auditLog(entry: Record<string, unknown>): Promise<void> {
       audits.push(entry);
     }

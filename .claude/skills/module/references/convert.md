@@ -90,9 +90,12 @@ For each `adapters/postgres.<x>.adapter.ts` (and each repository the adapter wir
    `repositories/memory/memory.<f>.repositories.ts` (`static readonly requires = [] as const`,
    `static create(): <F>Repositories`) and
    `repositories/<f>-repositories.registry.ts` (`defineRepositories({ postgres, memory })`).
-5. Delete the adapter. A Redis, eventing or object-storage adapter is not persistence: it
-   implements an abstract `ports/<x>.port.ts` and arrives through `FeatureSetup`'s
-   infrastructure parameter, so it moves to the process that owns that client.
+5. Delete the adapter and the `ports/` file it implemented. A Redis, eventing or
+   object-storage client is not persistence: the module names what it needs as a member of
+   `<F>Infrastructure` (a plain `interface`, declared beside the app in `app/<f>.app.ts`,
+   never an abstract class in a `ports/` folder) and the process that owns that client
+   supplies an object satisfying it through `withInfrastructure`. A finished module has no
+   `ports/` and no `adapters/` folder: `repositories/`, `services/`, `app/`, `transport/`.
 
 Annotation's memory twins are the contract of "same behaviour": `MemoryAnnotationScoreRepository`
 parses with the same contract schema the Prisma one returns rows through.
@@ -133,8 +136,10 @@ export class ApiKeyApp implements ApiKeyApi {
 - Peers are `*Api` tokens in `static dependencies`, never ports, never imported services,
   never optional. If a peer was optional before ("absent" adapter, `Logged*Absence`),
   it is required now and the process provides it; delete the absence adapter.
-- Technical infrastructure (a token hasher, a key share, a clock) stays an abstract
-  `ports/<x>.port.ts` and is the third `FeatureSetup` parameter.
+- Technical infrastructure (a token hasher, a key share, a clock, an audit sink, a
+  viewer-protections lookup) is a member of `<F>Infrastructure`, the third `FeatureSetup`
+  parameter: a plain interface beside the app, never a `ports/<x>.port.ts` file. The
+  process supplies it in `withInfrastructure`; a test supplies a literal object.
 - Orchestration that lived in a transport class or in the api composition (enrichment
   with users, authorization decisions, audit recording, cross-entity workflows) lands
   here, as private methods if it needs a name.

@@ -72,12 +72,12 @@ export {
 } from "./transport/coding-agent.rest.ts";
 export { codingAgentV1Rest, codingAgentV1RestCaller } from "./transport/coding-agent-v1.rest.ts";
 export { codingAgentTrpcTransport } from "./transport/coding-agent.trpc.ts";
-export { CodingAgentAuditPort } from "./ports/coding-agent-audit.port.ts";
-export {
-  CodingAgentViewerVisibilityPort,
-  type CodingAgentViewerVisibility,
-} from "./ports/coding-agent-viewer-visibility.port.ts";
 export {
   CODING_AGENT_SESSION_LIST_READ_METRIC_NAME,
   OtelCodingAgentReadMetricsAdapter,
 } from "./adapters/coding-agent-read-metrics.adapter.ts";
+export type {
+  CodingAgentAuditPort,
+  CodingAgentViewerVisibility,
+  CodingAgentViewerVisibilityPort,
+} from "./app/coding-agent.app.ts";

@@ -65,7 +65,8 @@ API or another service. Repositories are interfaces in `repositories/`, a Prisma
 implementation in `repositories/prisma/`, a memory twin of the same observable behaviour
 in `repositories/memory/`, chosen once at boot by `repositories/<name>-repositories.registry.ts`
 (`defineRepositories({ postgres, memory })`). Only `repositories/prisma/**` names Prisma.
-Technical infrastructure (encryption, object storage, a clock) is an abstract `ports/*.port.ts`,
+Technical infrastructure (encryption, object storage, a clock) is a member of `<F>Infrastructure`,
+a plain interface beside the app that the process supplies; no `ports/` or `adapters/` folder,
 never a peer module. `index.ts` exports the installer and the transport declarations, nothing
 runtime.
 

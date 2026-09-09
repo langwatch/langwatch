@@ -33,8 +33,6 @@ import type {
 import type { CodingAgentScopeCaller } from "#ports/coding-agent-caller-scope.port";
 import type { CodingAgentClickHousePort } from "#ports/coding-agent-clickhouse.port";
 import type { CodingAgentBillingPolicyPort } from "#ports/coding-agent-billing.port";
-import type { CodingAgentAuditPort } from "#ports/coding-agent-audit.port";
-import type { CodingAgentViewerVisibilityPort } from "#ports/coding-agent-viewer-visibility.port";
 import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
@@ -95,6 +93,29 @@ export interface CodingAgentScopePorts {
     caller: CodingAgentScopeCaller;
     organizationId: string;
   }): Promise<CodingAgentCallerScope>;
+}
+
+/** What one viewer may see of one project: the generated titles travel under content visibility. */
+export type CodingAgentViewerVisibility = Readonly<{
+  canReadCapturedContent: boolean;
+  canSeeCosts: boolean;
+}>;
+
+/** Resolves one viewer's protections over one project; throws when the policy cannot be resolved. */
+export interface CodingAgentViewerVisibilityPort {
+  readVisibility(input: { userId: string; projectId: string }): Promise<CodingAgentViewerVisibility>;
+}
+
+/** Where a read that names people is written down; the application builds the entry. */
+export interface CodingAgentAuditPort {
+  auditLog(entry: {
+    userId: string;
+    organizationId: string;
+    action: string;
+    targetKind: string;
+    targetId: string;
+    args: Record<string, unknown>;
+  }): Promise<void>;
 }
 
 /** What the process composes this feature's application from. */
