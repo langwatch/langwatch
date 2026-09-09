@@ -57,7 +57,7 @@ vi.mock("../../../behavior/hard-redirect.ts", () => ({
   hardRedirect: hardRedirectSpy,
 }));
 
-import Accept from "../invite-accept.screen.tsx";
+import Accept from "../invite-accept-screen.tsx";
 
 function renderAccept() {
   return render(

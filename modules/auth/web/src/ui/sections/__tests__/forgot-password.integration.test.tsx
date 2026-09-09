@@ -36,7 +36,7 @@ vi.mock("../../../ui/elements/router-link.tsx", () => ({
   ),
 }));
 
-import ForgotPassword from "../forgot-password.screen.tsx";
+import ForgotPassword from "../forgot-password-screen.tsx";
 
 const renderPage = () =>
   render(

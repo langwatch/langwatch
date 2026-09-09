@@ -8,9 +8,10 @@
   ],
   "type": "module",
   "exports": {
-    "./screens/auth": {
-      "types": "./dist/screens/auth/index.d.ts",
-      "default": "./src/screens/auth/index.ts"
+    "./auth": {
+      "langwatch-declaration-source": "./src/auth.ts",
+      "types": "./dist/auth.d.ts",
+      "default": "./src/auth.ts"
     }
   },
   "scripts": {

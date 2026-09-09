@@ -582,7 +582,7 @@
         "modules/api-key/server/src/app/api-key.app.ts",
         "modules/api-key/server/src/services/api-key-grant-policy.service.ts",
         "modules/auth/web/src/behavior/auth-client.tsx",
-        "modules/auth/web/src/screens/auth/signup.screen.tsx",
+        "modules/auth/web/src/ui/sections/signup-screen.tsx",
         "modules/auth/web/src/ui/sections/sign-up-credential-form.tsx",
         "modules/authz/contract/src/authz.commands.ts",
         "modules/authz/contract/src/walk.ts",

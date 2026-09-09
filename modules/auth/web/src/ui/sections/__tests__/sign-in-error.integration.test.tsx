@@ -48,7 +48,7 @@ vi.mock("../../../behavior/use-public-env.ts", () => ({
   usePublicEnv: () => ({ data: publicEnvRef.current }),
 }));
 
-import Error from "../sign-in-error.screen.tsx";
+import Error from "../sign-in-error-screen.tsx";
 
 const setReferrer = (value: string) => {
   Object.defineProperty(document, "referrer", { value, configurable: true });

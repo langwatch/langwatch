@@ -3,7 +3,7 @@
  *
  * The /auth/verify-email landing page renders under Chakra; only the URL
  * search-params hook is mocked. The page must never complete a verification
- * on its own — a scanner following the link sees exactly what a person does —
+ * on its own - a scanner following the link sees exactly what a person does  - 
  * and it must never copy the link's proof into the DOM, where session-replay
  * and RUM collectors scrape attributes.
  */
@@ -21,7 +21,7 @@ vi.mock("../../../behavior/use-route.ts", () => ({
   useSearchParams: () => searchParamsRef.current,
 }));
 
-import VerifyEmail from "../verify-email.screen.tsx";
+import VerifyEmail from "../verify-email-screen.tsx";
 
 const renderPage = () =>
   render(

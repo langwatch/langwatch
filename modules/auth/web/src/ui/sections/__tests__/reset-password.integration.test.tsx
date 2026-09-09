@@ -33,7 +33,7 @@ vi.mock("../../../ui/elements/router-link.tsx", () => ({
   ),
 }));
 
-import ResetPassword from "../reset-password.screen.tsx";
+import ResetPassword from "../reset-password-screen.tsx";
 
 const setToken = (token: string | null) => {
   searchParamsRef.current = token ? new URLSearchParams(`token=${token}`) : new URLSearchParams("");

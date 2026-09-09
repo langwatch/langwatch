@@ -4,7 +4,7 @@
  * `useUiAddress`, not route reading, since `react-router` is sealed off here.
  */
 
-import { AuthHostProvider, type AuthHostPort } from "@langwatch/auth-web/screens/auth";
+import { AuthHostProvider, type AuthHostPort } from "@langwatch/auth-web/auth";
 import { readPublicAppConfig, toPublicEnvironment } from "@langwatch/ui/public-config";
 import { useMemo, type ReactNode } from "react";
 

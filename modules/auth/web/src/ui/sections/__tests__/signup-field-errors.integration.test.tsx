@@ -62,7 +62,7 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
   },
 }));
 
-import SignUp from "../signup.screen.tsx";
+import SignUp from "../signup-screen.tsx";
 
 const renderPage = () =>
   render(

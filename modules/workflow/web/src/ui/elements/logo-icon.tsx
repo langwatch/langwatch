@@ -4,7 +4,7 @@
  * A DUPLICATE, and it is worth saying exactly how it became one. This file
  * lived at `platform/app/src/components/icons/LogoIcon.tsx` and was the
  * studio's; the auth front-door lane moved it into `@langwatch/auth-web` while
- * this move was in flight, and that package publishes only `./screens/auth`.
+ * this move was in flight, and that package publishes only `./auth`.
  * Two families needed the same twenty lines and only one of them could take the
  * original. It stops being a duplicate the day the mark lands in
  * `@langwatch/design-system`, where both families would have taken it from.

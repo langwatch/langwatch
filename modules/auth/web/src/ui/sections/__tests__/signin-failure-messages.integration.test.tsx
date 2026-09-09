@@ -53,7 +53,7 @@ vi.mock("../../../ui/elements/router-link.tsx", () => ({
   ),
 }));
 
-import SignIn from "../signin.screen.tsx";
+import SignIn from "../signin-screen.tsx";
 
 /** What the server puts on the wire for the sign-in call. */
 const serverAnswers = (status: number, body: Record<string, unknown>) => {

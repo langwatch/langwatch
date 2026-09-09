@@ -92,7 +92,7 @@
       "id": "auth",
       "root": "auth",
       "uses": {
-        "screens": ["@langwatch/auth-web/screens/auth"],
+        "screens": ["@langwatch/auth-web/auth"],
         "surfaces": []
       }
     },

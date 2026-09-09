@@ -123,10 +123,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "auth|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "automation|contract-service",
       "measured": "2026-09-08"
     },
@@ -196,10 +192,6 @@
     },
     {
       "key": "coding-agent|fixtures-directory",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "coding-agent|nested-web-entry",
       "measured": "2026-09-08"
     },
     {

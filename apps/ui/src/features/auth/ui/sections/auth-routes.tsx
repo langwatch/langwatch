@@ -4,7 +4,7 @@
  * out person reaches, so a permission gate would block the way in.
  */
 
-import { authScreens } from "@langwatch/auth-web/screens/auth";
+import { authScreens } from "@langwatch/auth-web/auth";
 import type { ComponentType } from "react";
 
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

@@ -3,7 +3,7 @@ import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract
 import { useEffect, useRef, useState } from "react";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
-import { normalizeErrorCode, SignInError } from "../../screens/auth/sign-in-error.screen.tsx";
+import { normalizeErrorCode, SignInError } from "./sign-in-error-screen.tsx";
 import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
 import { replaceLocation } from "../../behavior/browser-navigation.ts";
 import Link from "../elements/router-link.tsx";

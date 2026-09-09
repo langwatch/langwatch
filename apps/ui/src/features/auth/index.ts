@@ -4,7 +4,7 @@
  * yet when these pages render.
  */
 
-import { authApi } from "@langwatch/auth-web/screens/auth";
+import { authApi } from "@langwatch/auth-web/auth";
 import { uiFeature } from "../../behavior/ui-feature";
 import { authPageLoaders } from "./ui/sections/auth-routes";
 

@@ -26,7 +26,7 @@ import { HorizontalFormControl } from "../../ui/elements/horizontal-form-control
 import { LogoIcon } from "../../ui/elements/logo-icon.tsx";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { authFailureMessage } from "../../model/auth-failure-message.ts";
-import { isStableAuthError, normalizeErrorCode, SignInError } from "./sign-in-error.screen.tsx";
+import { isStableAuthError, normalizeErrorCode, SignInError } from "./sign-in-error-screen.tsx";
 
 /**
  * Which sign-in screen this deployment has (ADR-117 §7).

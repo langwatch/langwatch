@@ -119,9 +119,9 @@ vi.mock("../../../ui/elements/router-link.tsx", () => ({
   ),
 }));
 
-import ForgotPassword from "../forgot-password.screen.tsx";
-import SignIn from "../signin.screen.tsx";
-import SignUp from "../signup.screen.tsx";
+import ForgotPassword from "../forgot-password-screen.tsx";
+import SignIn from "../signin-screen.tsx";
+import SignUp from "../signup-screen.tsx";
 
 const federatedPicker: RoutingDecision = {
   outcome: "method_picker",

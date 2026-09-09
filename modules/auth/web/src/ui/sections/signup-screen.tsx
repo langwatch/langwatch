@@ -56,7 +56,7 @@ export default function SignUp() {
       // card itself is the same on every installation.
       //
       // Nothing sits under the tagline. `trustStrip` stayed empty because the
-      // one thing that belongs there is a customer — a quote or a logo row —
+      // one thing that belongs there is a customer - a quote or a logo row  - 
       // and both are somebody else's decision to be named. A row of INTEGRATION
       // marks was tried in that slot and is the wrong module for this page: it
       // argues we are compatible, when the question a stranger is asking is
@@ -166,7 +166,7 @@ function SignUpForm() {
       accountWasJustCreated = false;
     }
 
-    // The account exists from here on, so this leg fails on its own terms —
+    // The account exists from here on, so this leg fails on its own terms  - 
     // and it has no alert of its own, which is why it toasts.
     //
     // next-auth answers with ITS OWN identifiers (`CredentialsSignin`,

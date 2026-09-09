@@ -26,29 +26,29 @@
       "default": "./src/testing.tsx"
     },
     "./surfaces/session-table": {
-      "langwatch-declaration-source": "./src/surfaces/session-table.ts",
-      "types": "./dist/surfaces/session-table.d.ts",
-      "default": "./src/surfaces/session-table.ts"
+      "langwatch-declaration-source": "./src/session-table.ts",
+      "types": "./dist/session-table.d.ts",
+      "default": "./src/session-table.ts"
     },
     "./surfaces/pull-requests": {
-      "langwatch-declaration-source": "./src/surfaces/pull-requests.ts",
-      "types": "./dist/surfaces/pull-requests.d.ts",
-      "default": "./src/surfaces/pull-requests.ts"
+      "langwatch-declaration-source": "./src/pull-requests.ts",
+      "types": "./dist/pull-requests.d.ts",
+      "default": "./src/pull-requests.ts"
     },
     "./surfaces/agent-identity": {
-      "langwatch-declaration-source": "./src/surfaces/agent-identity.ts",
-      "types": "./dist/surfaces/agent-identity.d.ts",
-      "default": "./src/surfaces/agent-identity.ts"
+      "langwatch-declaration-source": "./src/agent-identity.ts",
+      "types": "./dist/agent-identity.d.ts",
+      "default": "./src/agent-identity.ts"
     },
     "./surfaces/agent-metrics": {
-      "langwatch-declaration-source": "./src/surfaces/agent-metrics.ts",
-      "types": "./dist/surfaces/agent-metrics.d.ts",
-      "default": "./src/surfaces/agent-metrics.ts"
+      "langwatch-declaration-source": "./src/agent-metrics.ts",
+      "types": "./dist/agent-metrics.d.ts",
+      "default": "./src/agent-metrics.ts"
     },
     "./surfaces/agent-traces": {
-      "langwatch-declaration-source": "./src/surfaces/agent-traces.ts",
-      "types": "./dist/surfaces/agent-traces.d.ts",
-      "default": "./src/surfaces/agent-traces.ts"
+      "langwatch-declaration-source": "./src/agent-traces.ts",
+      "types": "./dist/agent-traces.d.ts",
+      "default": "./src/agent-traces.ts"
     }
   },
   "scripts": {

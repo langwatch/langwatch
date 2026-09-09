@@ -64,7 +64,7 @@ vi.mock("../../../behavior/auth-api.ts", () => ({
   },
 }));
 
-import SignUp from "../signup.screen.tsx";
+import SignUp from "../signup-screen.tsx";
 
 /**
  * What a tRPC rejection carrying a handled error looks like on the wire: the

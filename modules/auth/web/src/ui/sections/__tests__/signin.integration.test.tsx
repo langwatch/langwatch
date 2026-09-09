@@ -32,7 +32,7 @@ vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
 
 // The page leaves the SPA for the callback target, and a full-page navigation
 // goes through this seam rather than `window.location`. It has to: jsdom
-// defines `location` and its methods as non-configurable, so replacing them —
+// defines `location` and its methods as non-configurable, so replacing them  - 
 // which this test used to do — throws outright in a VM realm, and assigning for
 // real is a navigation jsdom does not implement and therefore cannot record.
 // Mocking the module is the only way to see the redirect, in any environment.
@@ -60,7 +60,7 @@ vi.mock("../../../ui/elements/router-link.tsx", () => ({
   ),
 }));
 
-import SignIn from "../signin.screen.tsx";
+import SignIn from "../signin-screen.tsx";
 
 const renderPage = () => {
   const view = render(
