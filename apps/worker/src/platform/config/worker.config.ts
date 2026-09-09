@@ -15,6 +15,7 @@ import {
 } from "@langwatch/config";
 import { assertAuthServerConfig, authServerConfigDefinition } from "@langwatch/auth-contract";
 import { authzServerConfigDefinition } from "@langwatch/authz-contract";
+import { agentServerConfigDefinition, type AgentServerConfig } from "@langwatch/agent-contract";
 import { automationServerConfigDefinition } from "@langwatch/automation-contract";
 import {
   assertBillingServerConfig,
@@ -39,7 +40,7 @@ import { saasServerConfigDefinition } from "@langwatch/enterprise-saas-contract"
 import { secretServerConfigDefinition } from "@langwatch/secret-contract";
 import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
 import { traceServerConfigDefinition } from "@langwatch/trace-contract";
-import { webhookServerConfigDefinition } from "@langwatch/enterprise-webhook-contract";
+import { webhookServerConfigDefinition } from "@langwatch/webhook-contract";
 import {
   otlpMetricsExportOptionsFrom,
   type OtlpMetricsExportOptions,
@@ -55,6 +56,7 @@ import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatc
 import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { z } from "zod";
+import { resolveWorkerEvaluationEnvironment } from "./worker-evaluation.config.ts";
 
 const DEFAULT_LOCAL_STORAGE_ROOT = "/var/lib/langwatch/objects";
 /** The model a scenario target that names none falls back to. */
@@ -223,6 +225,7 @@ export const workerConfigDefinition = RuntimeConfig.define({
    */
   retention: { ...dataRetentionServerConfigDefinition },
   infrastructure: {
+    connectedAgents: agentServerConfigDefinition,
     /**
      * App's own spelling: the process store, every ledger head and every
      * read-side repository live in the database the control plane writes.
@@ -315,6 +318,7 @@ export type WorkerStorageConfig = Readonly<{
  */
 export type WorkerExecutionConfig = Readonly<{
   langwatchEndpoint: string | undefined;
+  publicBaseUrl: string | undefined;
   defaultModel: string;
 }>;
 
@@ -335,6 +339,7 @@ export type WorkerOpsConfig = Readonly<{
 }>;
 
 export type WorkerInfrastructureConfig = Readonly<{
+  connectedAgents: AgentServerConfig;
   database: WorkerDatabaseConfig;
   execution: WorkerExecutionConfig;
   clickhouse: WorkerClickHouseConfig;
@@ -541,6 +546,8 @@ export type WorkerGithubConfig = Readonly<{
   appId?: string;
   privateKey?: string;
   host?: string;
+  appSlug?: string;
+  webhookSecret?: string;
 }>;
 
 /**
@@ -573,6 +580,9 @@ export type WorkerConfig = Readonly<{
   /** Absent when the deployment named no `BASE_HOST`; see `resolveWorkerMailConfig`. */
   mail?: WorkerMailConfig;
   automation: WorkerAutomationConfig;
+  /** Uses the same persisted API-key hashing secret as the API process. */
+  apiKeyPepper: string;
+  githubSigningKey: string;
   authz: WorkerAuthzConfig;
   tracePrivacy: WorkerTracePrivacyConfig;
   /**
@@ -602,6 +612,7 @@ export type WorkerConfig = Readonly<{
    * No variable here that the app doesn't already read.
    */
   featureFlags: FeatureFlagConfig;
+  evaluationEnvironment: Readonly<Record<string, string | undefined>>;
 }>;
 
 export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): WorkerConfig {
@@ -642,6 +653,8 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       value.automation,
       value.secret.encryptionKey ?? value.browserSession.sessionSecret,
     ),
+    apiKeyPepper: value.secret.encryptionKey ?? value.browserSession.sessionSecret ?? "",
+    githubSigningKey: value.secret.encryptionKey ?? value.browserSession.sessionSecret ?? "",
     authz: value.authz,
     tracePrivacy: resolveWorkerTracePrivacyConfig({
       tracePrivacy: value.tracePrivacy,
@@ -682,12 +695,14 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     },
     eventing: value.eventing,
     infrastructure: {
+      connectedAgents: value.infrastructure.connectedAgents,
       database: { url: value.infrastructure.database.url },
       execution: {
         // The SAME variable this process's own telemetry is exported to, read
         // once and projected here: a prepared scenario child reports its run
         // events to the deployment's own collector.
         langwatchEndpoint: value.observability.endpoint?.trim() || undefined,
+        publicBaseUrl: value.mail.baseHost?.trim() || void 0,
         // A blank override is not a model. It resolves to the registry
         // flagship rather than to an empty string, which a child would carry
         // to the provider as a model named "".
@@ -748,6 +763,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
       ),
     },
     featureFlags: resolveFeatureFlagConfig(source),
+    evaluationEnvironment: resolveWorkerEvaluationEnvironment(source),
   };
 }
 

@@ -1,8 +1,6 @@
-import { AnnotationAnnotatorReferenceInvalidError } from "@langwatch/annotation-server";
-import type { AnnotationQueueService } from "@langwatch/annotation-contract";
+import { AnnotationAnnotatorReferenceInvalidError } from "@langwatch/annotation-contract";
 import type {
   AutomationPersistCapBreach,
-  AutomationPlanProvider,
   DatasetActionParams,
 } from "@langwatch/automation-contract";
 import {
@@ -50,7 +48,7 @@ import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { EmailDeliveryPort } from "@langwatch/notification-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
@@ -136,8 +134,8 @@ export type WorkerAutomationDatasetWriter = Pick<DatasetService, "batchCreateRec
  * The annotation-queue write, and the trace-existence check it asks for.
  */
 export type WorkerAutomationPlanSource = Readonly<{
-  plans: AutomationPlanProvider;
-  projects: ProjectService;
+  plans: import("@langwatch/entitlement-contract").EntitlementApi;
+  projects: ProjectApi;
 }>;
 
 /**
@@ -155,7 +153,11 @@ export type WorkerAutomationContainment = Readonly<{
   nextStep?: WorkerAutomationNextStepResolver | undefined;
 }>;
 
-export type WorkerAutomationAnnotationWriter = AnnotationQueueService;
+export interface WorkerAutomationAnnotationWriter {
+  queueTraces(
+    input: import("@langwatch/annotation-contract").QueueAnnotationTracesInput,
+  ): Promise<void>;
+}
 
 /**
  * What this process CANNOT do about a settled match, said once at composition.

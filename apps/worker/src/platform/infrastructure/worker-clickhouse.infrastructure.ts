@@ -182,6 +182,8 @@ export class WorkerClickHouseInfrastructure {
   readonly resolveClient = (tenantId: string): Promise<ClickHouseClient> =>
     this.connection.resolve(tenantId);
 
+  readonly eventLogClient = (): ClickHouseClient => this.connection.shared();
+
   /**
    * Every physical endpoint this deployment configured, the shared one and each private route, each
    * labelled with the target it serves. The one question above deliberately answers "the client for

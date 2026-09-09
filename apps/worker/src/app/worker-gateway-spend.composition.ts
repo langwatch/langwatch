@@ -23,7 +23,7 @@ import {
   type WebhookDeliveryProcessDeps,
   type WebhookDispatchRequest,
   type WebhookEndpointServiceOptions,
-} from "@langwatch/enterprise-webhook-server";
+} from "@langwatch/webhook-server";
 import {
   ClickHouseGatewayOpenAdmissionsAdapter,
   EventingGatewaySpendAdapter,
@@ -39,7 +39,7 @@ import {
   type SpendSettlementProcessDeps,
 } from "@langwatch/gateway-server";
 import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
-import { WEBHOOK_DELIVERY_PROCESS_NAME } from "@langwatch/enterprise-webhook-server";
+import { WEBHOOK_DELIVERY_PROCESS_NAME } from "@langwatch/webhook-server";
 import { GATEWAY_DEBITS_PROCESS_NAME } from "@langwatch/enterprise-governance-server";
 import type { WebhookDispatchRateLimiterPort, WebhookEgressService } from "@langwatch/egress";
 import type { PlanProvider } from "@langwatch/entitlement-contract";

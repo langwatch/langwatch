@@ -25,6 +25,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { PrismaGatewayRealtimeSessionRepository } from "@langwatch/gateway-server/composition/gateway-realtime-sessions";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 /**
@@ -82,7 +83,7 @@ export function tryCreateWorkerRealtimeSessionPoller(
     conversations: WorkerElevenLabsConversations.create(),
     logger,
     config: realtimeSessionReconciliationConfig,
-    clock: { now: () => new Date() },
+    clock: { now: () => nowInstant() },
   });
 }
 
@@ -102,7 +103,7 @@ class WorkerRealtimeSessionRepository {
     private readonly collaborators: GatewayRealtimeSessionCollaborators,
   ) {}
 
-  expireStaleSessions(input: { now: Date }): Promise<number> {
+  expireStaleSessions(input: { now: Instant }): Promise<number> {
     return realtimeSessions.expireStaleRealtimeSessions({
       now: input.now,
       collaborators: this.collaborators,
@@ -110,7 +111,7 @@ class WorkerRealtimeSessionRepository {
   }
 
   async listOpenElevenLabsSessions(input: {
-    mintedBefore: Date;
+    mintedBefore: Instant;
     limit: number;
   }): Promise<GatewayRealtimeSessionRecord[]> {
     return this.database.gatewayRealtimeSession.findMany({
@@ -118,7 +119,7 @@ class WorkerRealtimeSessionRepository {
         vendor: "elevenlabs",
         status: "OPEN",
         vendorConversationId: { not: null },
-        mintedAt: { lt: input.mintedBefore },
+        mintedAt: { lt: toDate(input.mintedBefore) },
       },
       orderBy: { mintedAt: "asc" },
       take: input.limit,

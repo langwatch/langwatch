@@ -39,6 +39,7 @@ import {
 import type { ReportTraceRow } from "@langwatch/automation-contract";
 import type { WorkerAutomationDeliveryComposition } from "./worker-automation-graph.composition.ts";
 import type { AutomationProjectIdentityPort } from "@langwatch/automation-server";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 /**
  * What a scheduled report reads its traces through. Narrow on purpose.
@@ -335,9 +336,9 @@ class WorkerReportScheduleJobs extends ScheduledJobStorePort {
     targetId: string;
     cron: string;
     timezone: string;
-    nextRunAt: Date;
+    nextRunAt: Instant;
   }): Promise<void> {
-    return this.store.upsertForTarget(input);
+    return this.store.upsertForTarget({ ...input, nextRunAt: toDate(input.nextRunAt) });
   }
 
   deactivateForTarget(input: {
@@ -355,8 +356,8 @@ class WorkerReportScheduleJobs extends ScheduledJobStorePort {
     const rows = await this.store.findAllForProject(input);
     return rows.map((row) => ({
       targetId: row.targetId,
-      nextRunAt: row.nextRunAt,
-      lastSlot: row.lastSlot,
+      nextRunAt: fromDate(row.nextRunAt),
+      lastSlot: row.lastSlot === null ? null : fromDate(row.lastSlot),
       active: row.active,
     }));
   }

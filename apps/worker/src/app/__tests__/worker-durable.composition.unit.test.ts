@@ -104,7 +104,7 @@ describe("createWorkerDurableComposition", () => {
       const resources = new ResourceScope();
 
       try {
-        const composition = compose(resources);
+        const composition = await compose(resources);
 
         expect(composition.infrastructure?.redis).toBe(redis);
         expect(eventingCreate.mock.calls[0]?.[0].groupQueue).toBe(
@@ -122,7 +122,7 @@ describe("createWorkerDurableComposition", () => {
       const resources = new ResourceScope();
 
       try {
-        compose(resources);
+        await compose(resources);
 
         expect(eventingCreate.mock.calls[0]?.[0].consumersEnabled).toBe(false);
       } finally {
@@ -136,7 +136,7 @@ describe("createWorkerDurableComposition", () => {
       const resources = new ResourceScope();
 
       try {
-        expect(() => compose(resources, { defaultRetentionDays: 0 })).toThrow();
+        await expect(compose(resources, { defaultRetentionDays: 0 })).rejects.toThrow();
       } finally {
         await resources.close();
         redis.disconnect.mockClear();
@@ -145,7 +145,7 @@ describe("createWorkerDurableComposition", () => {
 
     it("releases every client it constructed when the resource scope closes", async () => {
       const resources = new ResourceScope();
-      const composition = compose(resources);
+      const composition = await compose(resources);
       const infrastructure = composition.infrastructure;
       if (!infrastructure) {
         throw new Error("Expected the durable composition to construct infrastructure");

@@ -10,7 +10,7 @@ import {
   AutomationPersistCapService,
   AutomationTraceRecordUnavailableError,
 } from "@langwatch/automation-server";
-import { AnnotationAnnotatorReferenceInvalidError } from "@langwatch/annotation-server";
+import { AnnotationAnnotatorReferenceInvalidError } from "@langwatch/annotation-contract";
 import { PLAN_LIMITS, PlanTypes } from "@langwatch/enterprise-billing-contract";
 import { PlanLimitsPlanCatalogueAdapter } from "@langwatch/enterprise-billing-server";
 import { PlanNextStepService } from "@langwatch/entitlement-server";
@@ -45,6 +45,7 @@ const ENVIRONMENT = {
   NODE_ENV: "test",
   BASE_HOST: "https://app.langwatch.test",
   NEXTAUTH_SECRET: "0f".repeat(32),
+  NEXTAUTH_URL: "https://app.langwatch.test",
 } as const;
 
 const RECORDED: {

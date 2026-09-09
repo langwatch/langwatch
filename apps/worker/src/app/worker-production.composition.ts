@@ -10,8 +10,18 @@ import {
 import type { Logger } from "@langwatch/observability";
 import type { ProcessObservability } from "@langwatch/observability/node";
 import type { PrismaConnection } from "@langwatch/prisma-client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { LocalFeatureApis, ResourceScope } from "@langwatch/runtime-composition";
-import { PostgresAnnotationAdapter } from "@langwatch/annotation-server";
+import { TraceApi } from "@langwatch/trace-contract";
+import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import { Deferred } from "@langwatch/eventing";
+import type { QueueAnnotationTracesInput } from "@langwatch/annotation-contract";
+import type { TraceProcessingCommands } from "@langwatch/trace-server";
+import { EventingAuthzCommandDispatcherAdapter } from "@langwatch/authz-server";
+import { createWorkerFoundationApps } from "./worker-foundation-apps.composition.ts";
+import { createWorkerObservabilityApps } from "./worker-observability-apps.composition.ts";
+import { createWorkerGithubRedis } from "./worker-github-redis.composition.ts";
+import { WorkerEvaluationProcessingResult } from "./worker-evaluation-server.composition.ts";
 import {
   type AgentSandboxKeyReapDatabase,
   PostgresAgentSandboxKeyReapAdapter,
@@ -157,7 +167,6 @@ import {
 } from "@langwatch/automation-server";
 import { ExperimentEventingAdapter } from "@langwatch/experiment-server";
 import {
-  ClickHouseTraceExistenceRepository,
   ClickHouseTraceStoredSpanReaderAdapter,
   TraceProcessingServerInstallerAdapter,
 } from "@langwatch/trace-server";
@@ -181,10 +190,6 @@ import {
   WorkerModelProviderAbsenceReportPort,
 } from "./worker-model-provider.composition.ts";
 import {
-  tryCreateWorkerTenancy,
-  WorkerTenancyAbsenceReportPort,
-} from "./worker-tenancy.composition.ts";
-import {
   createWorkerPlanProvider,
   LoggedWorkerEntitlementAbsence,
 } from "./worker-plan-provider.composition.ts";
@@ -192,7 +197,6 @@ import {
   createWorkerEvaluationProcessing,
   WorkerEvaluationAbsenceReportPort,
 } from "./worker-evaluation-processing.composition.ts";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { WorkerProjectStorageDatabase } from "./worker-object-storage.composition.ts";
 import type { WorkerTraceCapabilityDatabase } from "./worker-trace-capability-services.composition.ts";
 import {
@@ -200,11 +204,13 @@ import {
   createWorkerDatasetWrites,
 } from "./worker-dataset-normalization.composition.ts";
 import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { installWorkerFeatureFlags } from "./worker-feature-flags.composition.ts";
 import { createWorkerGovernanceRollups } from "./worker-governance-rollups.composition.ts";
 import { createWorkerObjectStorage } from "./worker-object-storage.composition.ts";
 import { createWorkerSpanStorage } from "./worker-span-storage.composition.ts";
 import { WorkerCodingAgentTraceProcessingAdapter } from "../features/coding-agent/coding-agent-trace-processing.adapter.ts";
+import { WorkerGithubProjectActivityAdapter } from "./worker-github-activity.composition.ts";
 import {
   tryCreateWorkerAutomationGraphComposition,
   resolveWorkerStoredSecretCipher,
@@ -224,7 +230,6 @@ import {
 import { createWorkerTraceSpool } from "./worker-trace-blob.composition.ts";
 import { tryCreateWorkerTraceBroadcast } from "./worker-trace-broadcast.composition.ts";
 import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition.ts";
-import { installWorkerConnectedAgentRuntime } from "./worker-connected-agent-runtime.composition.ts";
 import {
   createWorkerLangyConversation,
   WorkerLangyAbsenceReportPort,
@@ -246,11 +251,11 @@ import {
   type WorkerRealtimeSessionAbsenceReportPort,
 } from "./worker-realtime-session.composition.ts";
 import {
-  createWorkerScenarioExecution,
   LoggedWorkerScenarioExecutionAbsence,
   resolveWorkerScenarioExecutionPrerequisites,
   type WorkerScenarioExecutionAbsenceReportPort,
 } from "./worker-scenario-execution.composition.ts";
+import { createWorkerAgentApps } from "./worker-agent-apps.composition.ts";
 import {
   createWorkerGatewaySpend,
   WorkerGatewaySpendAbsenceReportPort,
@@ -362,6 +367,10 @@ type WorkerProductionCompositionBaseOptions = {
    * The SAME client, as the typed connection the tenancy graph needs.
    */
   connection?: PrismaConnection;
+  featureClickHouse?: {
+    resolveClient: (tenantId: string) => Promise<ClickHouseClient>;
+    eventLogClient: () => ClickHouseClient;
+  };
   /**
    * Pipeline groups whose features have moved out of the legacy registry. Each stays optional until
    * every group in Wave 4 has landed: the shared `event-sourcing/jobs` queue still belongs to the
@@ -393,7 +402,9 @@ export type WorkerProductionCompositionOptions =
  * consumer is off unless the caller asks for it.
  */
 export class WorkerProductionComposition {
-  static create(options: WorkerProductionCompositionOptions): WorkerProductionComposition {
+  static async create(
+    options: WorkerProductionCompositionOptions,
+  ): Promise<WorkerProductionComposition> {
     const infrastructure = options.infrastructure
       ? WorkerInfrastructureAdapter.create({
           ...options.infrastructure,
@@ -407,13 +418,6 @@ export class WorkerProductionComposition {
     // connections would give one process two fold caches, two dedup keyspaces and two tenant
     // broadcast channels.
     const processRedis = infrastructure?.redis ?? eventingOptions.groupQueue.redis;
-    // The experiment feature's connected cell dispatches through
-    // `ConnectedAgentRuntimeAdapter.get()` too (ADR-128); without Redis installed
-    // here it can never see an instance the API process registered.
-    installWorkerConnectedAgentRuntime({
-      redis: processRedis,
-      ...(options.resources ? { resources: options.resources } : {}),
-    });
     const mail = tryCreateWorkerMailComposition({
       config: options.config,
       ...(infrastructure ? { aws: infrastructure.aws } : {}),
@@ -464,11 +468,11 @@ export class WorkerProductionComposition {
       : undefined;
 
     // The flag answer, handed out before the feature is installed. The Eventing
-    // runtime below reads it, the tenant directories are composed over that
-    // runtime, and a tenant-targeted flag read is authorized against those same
-    // directories — so the reference is what lets one order exist. ONE per
-    // process, which is what keeps the cache tier shared and two callers from
-    // disagreeing for a TTL about whether a switch is thrown.
+    // runtime below reads it, the foundation apps are composed over that
+    // runtime, and a tenant-targeted flag read is authorized against the
+    // directories those apps boot — so the reference is what lets one order
+    // exist. ONE per process, which is what keeps the cache tier shared and two
+    // callers from disagreeing for a TTL about whether a switch is thrown.
     const featureFlagApis = new LocalFeatureApis();
     featureFlagApis.declare(FeatureFlagApi);
     const featureFlags = featureFlagApis.reference(FeatureFlagApi);
@@ -522,6 +526,7 @@ export class WorkerProductionComposition {
     if (!githubConfig.appId || !githubConfig.privateKey) {
       WorkerProductionComposition.githubAbsence(options)?.withoutAppCredentials();
     }
+    const githubRedis = createWorkerGithubRedis(processRedis);
     const github = GithubWorkerFeatureInstaller.create({
       eventing,
       branchMaintenance: PostgresGithubBranchMaintenanceAdapter.create({
@@ -530,7 +535,7 @@ export class WorkerProductionComposition {
           appId: githubConfig.appId ?? "",
           privateKey: githubConfig.privateKey ?? "",
         },
-        redis: processRedis,
+        redis: githubRedis,
         ...(githubConfig.host ? { hostConfig: { host: githubConfig.host } } : {}),
       }).build(),
     });
@@ -541,6 +546,7 @@ export class WorkerProductionComposition {
     const codingAgentActivity = PostgresCodingAgentActivityAdapter.create({
       database: options.database,
     }).build();
+    const githubProjectActivity = WorkerGithubProjectActivityAdapter.create(codingAgentActivity);
     const codingAgent = CodingAgentWorkerFeatureInstaller.create({
       eventing,
       installer: ClickHouseCodingAgentProcessingAdapter.create({
@@ -555,9 +561,9 @@ export class WorkerProductionComposition {
             appId: githubConfig.appId ?? "",
             privateKey: githubConfig.privateKey ?? "",
           },
-          redis: processRedis,
+          redis: githubRedis,
           ...(githubConfig.host ? { hostConfig: { host: githubConfig.host } } : {}),
-          project: codingAgentActivity,
+          project: githubProjectActivity,
         }).build(),
         ...(options.config.eventing.foldCacheTtlSeconds === undefined
           ? {}
@@ -717,7 +723,18 @@ export class WorkerProductionComposition {
       database: traceDatabase,
       ...(options.resources ? { resources: options.resources } : {}),
     });
-    const traceServices = createWorkerTraceCapabilityServices({ database: traceDatabase });
+    // The privacy resolution the record path redacts by, held as a reference:
+    // the Data Privacy application boots with the observability half further
+    // down, and this is where the record path is built. Bound the moment that
+    // half returns; a call before then refuses by name rather than answering
+    // off a second resolution.
+    const dataPrivacyApis = new LocalFeatureApis();
+    dataPrivacyApis.declare(DataPrivacyApi);
+    options.resources?.own("worker record-path data privacy peer", () => dataPrivacyApis.close());
+    const traceServices = createWorkerTraceCapabilityServices({
+      database: traceDatabase,
+      dataPrivacy: dataPrivacyApis.reference(DataPrivacyApi),
+    });
     // ONE publisher, three producers. Trace, Langy and Scenario all advance
     // projections a tenant's tabs are watching, and all three publish the same
     // object onto the same channel — so the process composes the publisher once
@@ -736,20 +753,33 @@ export class WorkerProductionComposition {
         })
       : undefined;
     if (!traceBroadcast) traceAbsence?.withoutBroadcast();
-    // The tenancy graph: the organization, project and permission services,
-    // composed ONCE from the typed client and handed to every consumer that
-    // derives a scope. It is built above the model gateway because the gateway
-    // takes it whole, and above nothing else that would care about the order.
-    const tenancy = tryCreateWorkerTenancy({
-      connection: options.connection,
-      encryption: resolveWorkerStoredSecretCipher(options.config),
-      redis: processRedis,
-      config: options.config,
-      ...(WorkerProductionComposition.tenancyAbsence(options)
-        ? { absence: WorkerProductionComposition.tenancyAbsence(options)! }
-        : {}),
-      ...(options.observability ? { logger: options.observability.logger } : {}),
-    });
+    // Allocate the cyclic foundation APIs before their factories retain peer clients.
+    const authzDispatcher = EventingAuthzCommandDispatcherAdapter.create();
+    const topicRequest = new Deferred<
+      (input: {
+        tenantId: string;
+        occurredAt: number;
+        trigger: "manual";
+        requestedByUserId: string;
+      }) => Promise<void>
+    >("worker.topic.requestClustering");
+    const foundation =
+      options.connection && options.featureClickHouse && plans && options.resources
+        ? await createWorkerFoundationApps({
+            connection: options.connection,
+            config: options.config,
+            redis: processRedis,
+            storage: objectStorage,
+            eventing,
+            clickhouse: options.featureClickHouse,
+            plans,
+            featureFlags,
+            resources: options.resources,
+            authzDispatcher,
+            topicClustering: { requestClustering: topicRequest.fn },
+          })
+        : void 0;
+    const tenancy = foundation?.tenancy;
     // The rollout flags, installed now that the three directories a
     // tenant-targeted read is authorized against are open, and bound to the
     // reference every half above already holds. Every flag read before this
@@ -887,16 +917,34 @@ export class WorkerProductionComposition {
       installer: scenarioProcessing,
       eventing,
     });
-    const scenarioExecution =
-      scenarioExecutionPrerequisites && scenarioExecutionPool
-        ? ScenarioExecutionWorkerFeatureInstaller.create({
-            processor: createWorkerScenarioExecution({
-              prerequisites: scenarioExecutionPrerequisites,
-              pool: scenarioExecutionPool,
-              simulations: scenarioProcessing.simulations,
-            }),
+    const agentTracePeers = new LocalFeatureApis();
+    agentTracePeers.declare(TraceApi);
+    options.resources?.own("worker scenario trace peer", () => agentTracePeers.close());
+    if (
+      scenarioExecutionPrerequisites &&
+      (!foundation || !options.featureClickHouse || !options.resources)
+    ) {
+      throw new Error("Scenario execution requires the worker feature foundation and lifecycle.");
+    }
+    const agentApps =
+      scenarioExecutionPrerequisites &&
+      scenarioExecutionPool &&
+      foundation &&
+      options.featureClickHouse &&
+      options.resources
+        ? await createWorkerAgentApps({
+            prerequisites: scenarioExecutionPrerequisites,
+            foundation,
+            traces: agentTracePeers.reference(TraceApi),
+            pool: scenarioExecutionPool,
+            simulations: scenarioProcessing.simulations,
+            resolveClickHouseClient: options.featureClickHouse.resolveClient,
+            resources: options.resources,
           })
-        : undefined;
+        : void 0;
+    const scenarioExecution = agentApps
+      ? ScenarioExecutionWorkerFeatureInstaller.create({ processor: agentApps.processor })
+      : void 0;
     // The three operational loops: the enqueue-rate tick, the anonymous daily
     // usage report and the ClickHouse storage gauges. Composed here because
     // all three read substrates this graph already holds, and installed as one
@@ -991,28 +1039,12 @@ export class WorkerProductionComposition {
             storage: objectStorage,
           })
         : undefined;
-    // `ADD_TO_ANNOTATION_QUEUE`'s write, on the same typed client the dataset half stands on — but
-    // NOT on the record read, because a queue item is a trace id and a pointer rather than a copy
-    // of the content. Which of the ids sent address a trace this project holds is trace storage's
-    // answer, not Annotation's — the same split the application made, over this process's own
-    // ClickHouse.
-    const traceExistence = ClickHouseTraceExistenceRepository.create({
-      resolveClient: options.eventing.resolveClickHouseClient as unknown as Parameters<
-        typeof ClickHouseTraceExistenceRepository.create
-      >[0]["resolveClient"],
-    });
+    // Boot connects annotation dispatch before settlement consumes jobs.
+    const annotationQueueDispatch = new Deferred<
+      (input: QueueAnnotationTracesInput) => Promise<void>
+    >("worker.annotation.queueTraces");
     const automationAnnotations =
-      options.connection && tenancy
-        ? {
-            annotations: PostgresAnnotationAdapter.create({
-              database: options.connection.client,
-              projects: tenancy.projects,
-              organizations: tenancy.organizations,
-            }).build(),
-            findExistingTraceIds: (input: { projectId: string; traceIds: string[] }) =>
-              traceExistence.findExistingTraceIds(input),
-          }
-        : undefined;
+      foundation && modelProviders ? { queueTraces: annotationQueueDispatch.fn } : void 0;
     // ONE trace reader for both halves of this process's Automation work.
     // The settlement digest and Evaluation's alert subscriber ask it the same
     // two questions — a trace's summary and whether a saved filter reads
@@ -1138,31 +1170,127 @@ export class WorkerProductionComposition {
       prisma: traceDatabase,
       clock: automationClock,
     });
-    const evaluation = EvaluationWorkerFeatureInstaller.create({
-      installer: createWorkerEvaluationProcessing({
-        resolveClickHouseClient: options.eventing.resolveClickHouseClient,
-        defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
-        analytics: createWorkerAnalytics({
-          resolveClickHouseClient: options.eventing
-            .resolveClickHouseClient as unknown as Parameters<
-            typeof createWorkerAnalytics
-          >[0]["resolveClickHouseClient"],
+    const recordSpanDispatch = new Deferred<TraceProcessingCommands["recordSpan"]>(
+      "worker.trace.recordSpan",
+    );
+    const renameTraceDispatch = new Deferred<TraceProcessingCommands["changeTraceName"]>(
+      "worker.trace.changeTraceName",
+    );
+    const addAnnotationDispatch = new Deferred<TraceProcessingCommands["addAnnotation"]>(
+      "worker.trace.addAnnotation",
+    );
+    const removeAnnotationDispatch = new Deferred<TraceProcessingCommands["removeAnnotation"]>(
+      "worker.trace.removeAnnotation",
+    );
+    const traceCommands: TraceProcessingCommands = {
+      recordSpan: recordSpanDispatch.fn,
+      changeTraceName: renameTraceDispatch.fn,
+      addAnnotation: addAnnotationDispatch.fn,
+      removeAnnotation: removeAnnotationDispatch.fn,
+    };
+    const evaluationAnalytics = options.featureClickHouse
+      ? createWorkerAnalytics({
+          resolveClickHouseClient: options.featureClickHouse.resolveClient,
           defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+        })
+      : void 0;
+    const evaluationAutomation = {
+      triggers: evaluationTriggerCatalogue,
+      graphActivity: graphActivity ?? new AbsentEvaluationGraphActivity(),
+      triggerMatches: automation.triggerMatches,
+    };
+    const observabilityApps =
+      foundation &&
+      options.connection &&
+      options.featureClickHouse &&
+      modelProviders &&
+      plans &&
+      options.resources &&
+      evaluationAnalytics
+        ? await createWorkerObservabilityApps({
+            connection: options.connection,
+            config: options.config,
+            redis: processRedis,
+            storage: objectStorage,
+            resolveClickHouseClient: options.featureClickHouse.resolveClient,
+            foundation: {
+              projects: foundation.tenancy.projects,
+              organizations: foundation.tenancy.organizations,
+              authorization: foundation.tenancy.authorization,
+              users: foundation.users,
+              retention: foundation.retention,
+              shares: foundation.tenancy.shares,
+              topics: foundation.tenancy.topics,
+            },
+            models: modelProviders,
+            githubSigningKey: options.config.githubSigningKey,
+            plans,
+            featureFlags,
+            resources: options.resources,
+            canonicalisation: traceCanonicalisation,
+            summaryStore: traceStores.traceSummaryStore,
+            commands: traceCommands,
+            evaluation: {
+              database: options.connection.client,
+              modelProviders: modelProviders.modelProviders,
+              models: modelProviders,
+              secretDecryptor: resolveWorkerStoredSecretCipher(options.config),
+              nlpServiceUrl: options.config.infrastructure.modelProvider.nlpServiceUrl,
+              payloadStaging: objectStorage.payloadStaging,
+              featureFlags,
+              storage: objectStorage,
+              langevalsEndpoint: options.config.langevals.endpoint,
+              evaluationEnvironment: options.config.evaluationEnvironment,
+              resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+              defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+              analytics: evaluationAnalytics,
+              traces: settlementTraceReader,
+              automation: evaluationAutomation,
+              redis: processRedis,
+              foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds,
+              processing: new WorkerEvaluationProcessingResult(),
+            },
+          })
+        : void 0;
+    if (observabilityApps) {
+      agentTracePeers.bind(TraceApi, observabilityApps.traces);
+      agentTracePeers.ready();
+      dataPrivacyApis.bind(DataPrivacyApi, observabilityApps.dataPrivacy);
+      dataPrivacyApis.ready();
+      annotationQueueDispatch.resolve(async (input) => {
+        await observabilityApps.annotations.queueTraces(input);
+      });
+    }
+    if (agentApps && !observabilityApps) {
+      throw new Error("Agent scenario execution requires the installed TraceApi.");
+    }
+    const evaluation = EvaluationWorkerFeatureInstaller.create({
+      installer:
+        observabilityApps?.evaluationProcessing ??
+        createWorkerEvaluationProcessing({
+          resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+          defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+          analytics: createWorkerAnalytics({
+            resolveClickHouseClient: options.eventing
+              .resolveClickHouseClient as unknown as Parameters<
+              typeof createWorkerAnalytics
+            >[0]["resolveClickHouseClient"],
+            defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+          }),
+          traces: settlementTraceReader,
+          automation: {
+            triggers: evaluationTriggerCatalogue,
+            graphActivity: graphActivity ?? new AbsentEvaluationGraphActivity(),
+            triggerMatches: automation.triggerMatches,
+          },
+          redis: eventingOptions.groupQueue.redis,
+          ...(options.config.eventing.foldCacheTtlSeconds === undefined
+            ? {}
+            : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
+          ...(WorkerProductionComposition.evaluationAbsence(options)
+            ? { absence: WorkerProductionComposition.evaluationAbsence(options)! }
+            : {}),
         }),
-        traces: settlementTraceReader,
-        automation: {
-          triggers: evaluationTriggerCatalogue,
-          graphActivity: graphActivity ?? new AbsentEvaluationGraphActivity(),
-          triggerMatches: automation.triggerMatches,
-        },
-        redis: eventingOptions.groupQueue.redis,
-        ...(options.config.eventing.foldCacheTtlSeconds === undefined
-          ? {}
-          : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
-        ...(WorkerProductionComposition.evaluationAbsence(options)
-          ? { absence: WorkerProductionComposition.evaluationAbsence(options)! }
-          : {}),
-      }),
       eventing,
     });
     const experimentIdLookup = ExperimentEventingAdapter.create({
@@ -1242,6 +1370,10 @@ export class WorkerProductionComposition {
     // The one dispatch Trace makes into itself: the tracked-event reactor mints
     // a synthetic span and sends it the way an SDK export would, so it can only
     // be wired once the definition that contains the reactor is registered.
+    recordSpanDispatch.resolve(trace.commands.recordSpan);
+    renameTraceDispatch.resolve(trace.commands.changeTraceName);
+    addAnnotationDispatch.resolve(trace.commands.addAnnotation);
+    removeAnnotationDispatch.resolve(trace.commands.removeAnnotation);
     trackedEvents.connect(trace.commands.recordSpan);
     // Topic's runtime, composed here rather than received. Its execution
     // ports are this process's own — the tenant-keyed ClickHouse client the
@@ -1267,6 +1399,7 @@ export class WorkerProductionComposition {
       execution: topicRuntime.execution,
       metrics: topicRuntime.metrics,
     });
+    topicRequest.resolve((input) => topicServer.commandDispatch.requestClustering(input));
     const topic = TopicWorkerFeatureInstaller.create({
       installer: topicServer,
       eventing,
@@ -1327,13 +1460,10 @@ export class WorkerProductionComposition {
       eventing,
     });
     billingReportingInstallerHolder.current = billingReporting;
-    // Unconditional, on the same footing as the identity ledgers below: the grants ledger's
-    // CONSUMER half takes exactly two Postgres bindings — the read model's guarded writer and the
-    // insert-only audit trail — over the one Prisma client this process opened, so there is no
-    // graph in which it is present but unbuildable. Its producer half stays with the application,
-    // which is the process that writes grants.
+    // Pipeline registration connects this shared dispatcher before consumption.
     const authz = AuthzWorkerFeatureInstaller.create({
       installer: {
+        dispatcher: authzDispatcher,
         pipeline: PostgresAuthzPipelineAdapter.create({
           database: options.database,
         }).build(),
@@ -1408,6 +1538,9 @@ export class WorkerProductionComposition {
       eventing,
       lifecycle: options.lifecycle,
       transport: options.transport,
+      featureApps: new WorkerFeatureAppsInstaller(
+        ...[observabilityApps, agentApps].filter((app) => app !== void 0),
+      ),
       automation,
       eventingMaintenance,
       langyMaintenance,
@@ -1608,15 +1741,6 @@ export class WorkerProductionComposition {
   }
 
   /** The boot logger, as the one place the model gateway's absences are declared. */
-  private static tenancyAbsence(
-    options: WorkerProductionCompositionOptions,
-  ): WorkerTenancyAbsenceReportPort | undefined {
-    return options.observability
-      ? LoggedWorkerTenancyAbsence.create(options.observability.logger)
-      : undefined;
-  }
-
-  /** The boot logger, as the one place the model gateway's absences are declared. */
   private static modelProviderAbsence(
     options: WorkerProductionCompositionOptions,
   ): WorkerModelProviderAbsenceReportPort | undefined {
@@ -1661,6 +1785,7 @@ export class WorkerProductionComposition {
     eventing: WorkerEventingRuntime;
     lifecycle: WorkerLifecyclePort;
     transport: WorkerTransportPort;
+    featureApps?: WorkerFeatureInstallerPort;
     automation?: AutomationWorkerFeatureInstaller;
     eventingMaintenance?: EventingMaintenanceWorkerFeatureInstaller;
     langyConversation?: LangyConversationWorkerFeatureInstaller;
@@ -1840,6 +1965,7 @@ function orderedFeatureInstallers(
     options.ssoConnection,
     options.scimSync,
     options.joinRequest,
+    options.featureApps,
   ].filter((installer) => installer !== undefined);
 }
 
@@ -2205,27 +2331,6 @@ export class LoggedWorkerTopicAbsence extends WorkerTopicAbsenceReportPort {
   }
 }
 
-/**
- * Names the model gateway's absences once, at boot, rather than leaving them inferred from a
- * clustering schedule that never advances.
-/** Names the one half of the tenancy graph this tier does not serve. */
-export class LoggedWorkerTenancyAbsence extends WorkerTenancyAbsenceReportPort {
-  static create(logger: Pick<Logger, "info">): LoggedWorkerTenancyAbsence {
-    return new LoggedWorkerTenancyAbsence(logger);
-  }
-
-  private constructor(private readonly logger: Pick<Logger, "info">) {
-    super();
-  }
-
-  withoutGrantWrites(): void {
-    this.logger.info(
-      { reason: "consumer-only-ledger" },
-      "worker composed the tenancy graph for reads: it folds grant events rather than producing them, so a grant change for an organization already on the ledger would refuse by name here",
-    );
-  }
-}
-
 export class LoggedWorkerModelProviderAbsence extends WorkerModelProviderAbsenceReportPort {
   static create(logger: Pick<Logger, "warn" | "info">): LoggedWorkerModelProviderAbsence {
     return new LoggedWorkerModelProviderAbsence(logger);
@@ -2325,5 +2430,19 @@ export class LoggedWorkerTraceAbsence extends WorkerTraceAbsenceReportPort {
 class AbsentTraceTriggerMatches extends AutomationTriggerMatchRecorderPort {
   async send(): Promise<void> {
     throw new Error("Trace processing recorded a trigger match, but Automation is not composed.");
+  }
+}
+
+class WorkerFeatureAppsInstaller implements WorkerFeatureInstallerPort {
+  readonly name = "feature-apps";
+  readonly #apps: readonly { start(): Promise<void> }[];
+
+  constructor(...apps: { start(): Promise<void> }[]) {
+    this.#apps = apps;
+  }
+
+  async install() {
+    for (const app of this.#apps) await app.start();
+    return void 0;
   }
 }

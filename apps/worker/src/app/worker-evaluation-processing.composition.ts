@@ -38,21 +38,14 @@ import type {
   EvaluationExecutionResult,
   ExecuteEvaluationCommand as ExecuteEvaluationCommandInput,
 } from "@langwatch/evaluation-contract";
-import { mappingStateSchema } from "@langwatch/trace-contract";
+import { mappingStateSchema } from "@langwatch/dataset-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { EvaluationWorkerCapability } from "../features/evaluation/evaluation-worker-feature.installer.ts";
 import { TraceAnalyticsAttributePolicy } from "../features/evaluation/evaluation-analytics-attribute-policy.adapter.ts";
+import { createWorkerEvaluationClickHouseResolver } from "./worker-evaluation-app.composition.ts";
 
-/**
- * Reports the composition decision an unrunnable evaluator would otherwise hide.
- */
 export abstract class WorkerEvaluationAbsenceReportPort {
   abstract withoutEvaluatorExecution(): void;
-
-  /**
-   * Reported when the online path IS composed but its durable execution receipt is not: a
-   * redelivery after a crash calls the evaluator a second time.
-   */
   abstract withoutExecutionReceiptLedger(): void;
 }
 
@@ -97,9 +90,16 @@ export type WorkerEvaluationProcessingOptions = Readonly<{
   /** `LANGWATCH_FOLD_CACHE_TTL_SECONDS`, read once by the process. */
   foldCacheTtlSeconds?: number;
   absence?: WorkerEvaluationAbsenceReportPort;
-  /** Absent on a process that cannot run an evaluator itself. */
   execution?: WorkerEvaluationExecutionCollaborators;
 }>;
+
+/**
+ * Evaluation's worker graph after its durable pipeline and direct execution
+ * capability have been composed. The application-facing Evaluation service
+ * reuses `execution`; it never constructs a second evaluator engine.
+ */
+export type WorkerEvaluationProcessing = EvaluationWorkerCapability<EvaluationProcessingEvent> &
+  Readonly<{ execution?: EvaluationExecutionPort }>;
 
 /**
  * Evaluation's durable processing pipeline, composed from this process's own
@@ -107,14 +107,20 @@ export type WorkerEvaluationProcessingOptions = Readonly<{
  * analytics fold, and the automation trigger-match reactor.
  */
 export function createWorkerEvaluationProcessing(
+  options: WorkerEvaluationProcessingOptions & {
+    execution: WorkerEvaluationExecutionCollaborators;
+  },
+): WorkerEvaluationProcessing & Readonly<{ execution: EvaluationExecutionPort }>;
+export function createWorkerEvaluationProcessing(
   options: WorkerEvaluationProcessingOptions,
-): EvaluationWorkerCapability<EvaluationProcessingEvent> {
+): WorkerEvaluationProcessing;
+export function createWorkerEvaluationProcessing(
+  options: WorkerEvaluationProcessingOptions,
+): WorkerEvaluationProcessing {
   const stores = EvaluationEventingAdapter.create({
     evaluation: EvaluationRunProjectionService.create({
       repository: ClickHouseEvaluationRepository.create({
-        resolveClient: options.resolveClickHouseClient as unknown as Parameters<
-          typeof ClickHouseEvaluationRepository.create
-        >[0]["resolveClient"],
+        resolveClient: createWorkerEvaluationClickHouseResolver(options.resolveClickHouseClient),
         retentionFloor: new WorkerEvaluationRetentionFloor(options.defaultRetentionDays),
       }),
     }),
@@ -134,6 +140,7 @@ export function createWorkerEvaluationProcessing(
   });
 
   return {
+    ...(execution.direct ? { execution: execution.direct } : {}),
     buildProcessing: () =>
       createEvaluationProcessingPipeline({
         evalRunStore: stores.evalRunStore,
@@ -143,7 +150,7 @@ export function createWorkerEvaluationProcessing(
           options,
         ),
         evaluationAnalyticsRollupAppendStore: stores.evaluationAnalyticsRollupAppendStore,
-        executeEvaluationCommand: ExecuteEvaluationCommand.create(execution),
+        executeEvaluationCommand: ExecuteEvaluationCommand.create(execution.intent),
         automations,
       }),
   };
@@ -153,31 +160,33 @@ export function createWorkerEvaluationProcessing(
  * The ONLINE path, composed for real when the process handed in the whole bundle and refused by
  * name when it did not.
  */
-function createEvaluationExecutionIntent(
-  options: WorkerEvaluationProcessingOptions,
-): EvaluationExecutionIntentPort {
+function createEvaluationExecutionIntent(options: WorkerEvaluationProcessingOptions): Readonly<{
+  intent: EvaluationExecutionIntentPort;
+  direct?: EvaluationExecutionPort;
+}> {
   const collaborators = options.execution;
   if (!collaborators) {
     options.absence?.withoutEvaluatorExecution();
-
-    return new AbsentEvaluatorExecution();
+    return { intent: new AbsentEvaluatorExecution() };
   }
 
   options.absence?.withoutExecutionReceiptLedger();
-
   const engine = EvaluationExecutionService.create(collaborators.engine);
 
-  return EvaluationExecutionIntentService.create({
+  const direct = new WorkerEvaluationEngine(engine);
+  const intent = EvaluationExecutionIntentService.create({
     monitors: collaborators.monitors,
     traces: collaborators.evidence,
     azureSafetyCredentials: collaborators.azureSafetyCredentials,
     settingsRecovery: collaborators.settingsRecovery,
     inputsOffload: collaborators.inputsOffload,
     executionReceipt: DirectEvaluationExecutionReceiptAdapter.create({
-      execution: new WorkerEvaluationEngine(engine),
+      execution: direct,
       costs: collaborators.costs,
     }),
   });
+
+  return { intent, direct };
 }
 
 /**
@@ -186,23 +195,21 @@ function createEvaluationExecutionIntent(
  * engine reads a parsed `MappingState`.
  */
 class WorkerEvaluationEngine extends EvaluationExecutionPort {
-  constructor(private readonly engine: EvaluationExecutionService) {
+  #engine: EvaluationExecutionService;
+
+  constructor(engine: EvaluationExecutionService) {
     super();
+    this.#engine = engine;
   }
 
   execute(input: ExecuteEvaluationCommandInput): Promise<EvaluationExecutionResult> {
-    return this.engine.executeForTrace({
+    return this.#engine.executeForTrace({
       ...input,
       mappings: input.mappings === null ? null : mappingStateSchema.parse(input.mappings),
     });
   }
 }
 
-/**
- * The one named absence: running the evaluator. The command class itself is real — its schema,
- * aggregate id, span attributes and the job id that deduplicates a thread's evaluations are all the
- * package's own, so the routing key is claimed and a redelivery still collapses onto one job.
- */
 class AbsentEvaluatorExecution extends EvaluationExecutionIntentPort {
   execute(input: ExecuteEvaluationCommandData): Promise<never> {
     return Promise.reject(
@@ -219,12 +226,15 @@ class AbsentEvaluatorExecution extends EvaluationExecutionIntentPort {
  * a second number would let the fold read back runs the writer had already expired.
  */
 class WorkerEvaluationRetentionFloor extends EvaluationRetentionFloorPort {
-  constructor(private readonly defaultRetentionDays: number) {
+  #defaultRetentionDays: number;
+
+  constructor(defaultRetentionDays: number) {
     super();
+    this.#defaultRetentionDays = defaultRetentionDays;
   }
 
   async getFloorMs(): Promise<number> {
-    return Date.now() - this.defaultRetentionDays * 24 * 60 * 60 * 1000;
+    return Date.now() - this.#defaultRetentionDays * 24 * 60 * 60 * 1000;
   }
 }
 

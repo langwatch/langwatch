@@ -275,7 +275,7 @@ describe("WorkerProductionComposition", () => {
     it("starts the spend spike evaluator over this process's own substrates", async () => {
       vi.useFakeTimers();
       const database = anomalyDatabase(LOOPBACK_DESTINATION);
-      const composition = WorkerProductionComposition.create({
+      const composition = await WorkerProductionComposition.create({
         config: resolveWorkerConfig({ NODE_ENV: "test" }),
         eventing: {
           database: createWorkerProcessDatabase(),

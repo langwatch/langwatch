@@ -1,11 +1,17 @@
 import { Deferred } from "@langwatch/eventing";
-import { TraceProcessingInstallerPort } from "@langwatch/trace-server";
+import {
+  TraceProcessingInstallerPort,
+  type TraceProcessingCommands,
+} from "@langwatch/trace-server";
 import {
   type AssignTopicCommandData,
   type RecordSpanCommandData,
   TraceTopicAssignmentPort,
 } from "@langwatch/trace-contract";
-import type { WorkerFeatureCloser, WorkerFeatureInstallerPort } from "../worker-feature.installer.ts";
+import type {
+  WorkerFeatureCloser,
+  WorkerFeatureInstallerPort,
+} from "../worker-feature.installer.ts";
 import type { WorkerEventingRuntime } from "../../platform/eventing/worker-eventing.runtime.ts";
 
 class WorkerTraceTopicAssignments extends TraceTopicAssignmentPort {
@@ -38,6 +44,15 @@ export class TraceWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
   private readonly recordSpan = new Deferred<(data: RecordSpanCommandData) => Promise<unknown>>(
     "trace.recordSpan",
   );
+  readonly #changeTraceName = new Deferred<TraceProcessingCommands["changeTraceName"]>(
+    "trace.changeTraceName",
+  );
+  readonly #addAnnotation = new Deferred<TraceProcessingCommands["addAnnotation"]>(
+    "trace.addAnnotation",
+  );
+  readonly #removeAnnotation = new Deferred<TraceProcessingCommands["removeAnnotation"]>(
+    "trace.removeAnnotation",
+  );
 
   /**
    * The registered `recordSpan` command, as a callable proxy.
@@ -48,8 +63,11 @@ export class TraceWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
    * contains the reactor has been registered. The proxy closes that circle in
    * one place rather than making every caller carry a late-bound reference.
    */
-  readonly commands: { recordSpan: (data: RecordSpanCommandData) => Promise<unknown> } = {
+  readonly commands: TraceProcessingCommands = {
     recordSpan: this.recordSpan.fn,
+    changeTraceName: this.#changeTraceName.fn,
+    addAnnotation: this.#addAnnotation.fn,
+    removeAnnotation: this.#removeAnnotation.fn,
   };
 
   private installed = false;
@@ -64,6 +82,9 @@ export class TraceWorkerFeatureInstaller implements WorkerFeatureInstallerPort {
       const installed = this.installer.install(this.eventing.eventSourcing);
       this.traceAssignments.connect(installed.traceAssignments);
       this.recordSpan.resolve(installed.commands.recordSpan);
+      this.#changeTraceName.resolve(installed.commands.changeTraceName);
+      this.#addAnnotation.resolve(installed.commands.addAnnotation);
+      this.#removeAnnotation.resolve(installed.commands.removeAnnotation);
       this.installed = true;
     }
     return undefined;

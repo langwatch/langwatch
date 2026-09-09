@@ -58,7 +58,7 @@ type Substrate = {
   source?: Record<string, unknown>;
 };
 
-function compositionFor(substrate: Substrate = {}): WorkerProductionComposition {
+function compositionFor(substrate: Substrate = {}): Promise<WorkerProductionComposition> {
   const redis = substrate.redis ?? createWorkerProcessRedis();
   const database = substrate.database ?? createProcessPersistenceDatabase();
   return WorkerProductionComposition.create({
@@ -121,7 +121,7 @@ describe("given a worker that composes every capability for itself", () => {
    */
   /** @scenario "A worker routes every key the frozen registry names" */
   it("routes every key the frozen job registry names, with no capability handed in", async () => {
-    const composition = compositionFor({
+    const composition = await compositionFor({
       source: { IS_SAAS: "true", STRIPE_SECRET_KEY: "sk_test_worker" },
     });
 
@@ -135,7 +135,7 @@ describe("given a worker that composes every capability for itself", () => {
    */
   /** @scenario "A worker routes every key the frozen registry names" */
   it("mounts all five previously synthesized capabilities", async () => {
-    const composition = compositionFor();
+    const composition = await compositionFor();
     const routed = await installedRoutingKeys(composition);
     // The two substrate sweeps declare no event types, so they register no
     // routing key at all — their presence is asserted through the installer
@@ -169,7 +169,7 @@ describe("given a worker that composes every capability for itself", () => {
     const redis = createWorkerProcessRedis({ smembers });
     const create = vi.spyOn(EventingMaintenanceWorkerFeatureInstaller, "create");
     try {
-      compositionFor({ redis });
+      await compositionFor({ redis });
       const options = create.mock.calls[0]?.[0];
       expect(options, "the composition built no eventing-maintenance installer").toBeDefined();
 
@@ -189,7 +189,7 @@ describe("given a worker that composes every capability for itself", () => {
    */
   /** @scenario "Online evaluation refuses by name rather than reporting a result" */
   it("registers the evaluation execute command and refuses to run one", async () => {
-    const composition = compositionFor();
+    const composition = await compositionFor();
     const routed = await installedRoutingKeys(composition);
 
     expect(routed).toContain("evaluation_processing:command:executeEvaluation");

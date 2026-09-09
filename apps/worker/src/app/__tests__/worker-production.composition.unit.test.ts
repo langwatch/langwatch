@@ -23,7 +23,14 @@ import { point } from "./metric-point.fixture.ts";
 import { EmailDeliveryAdapter } from "@langwatch/notification-server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { ProjectService } from "@langwatch/project-contract";
-import { TraceTopicAssignmentPort, type AssignTopicCommandData } from "@langwatch/trace-contract";
+import {
+  TraceTopicAssignmentPort,
+  type AnnotationAddedEventData,
+  type AnnotationRemovedEventData,
+  type AssignTopicCommandData,
+  type RecordSpanCommandData,
+  type TraceNameChangedEventData,
+} from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   saasBillableEventsMeter,
@@ -94,12 +101,46 @@ class TraceAssignments extends TraceTopicAssignmentPort {
 }
 
 class TraceInstaller {
+  readonly recordSpan = vi.fn(async (_input: RecordSpanCommandData) => undefined);
+  readonly changeTraceName = vi.fn(async (_input: TraceNameChangedEventData) => undefined);
+  readonly addAnnotation = vi.fn(async (_input: AnnotationAddedEventData) => undefined);
+  readonly removeAnnotation = vi.fn(async (_input: AnnotationRemovedEventData) => undefined);
+
   readonly install = vi.fn((_eventSourcing: EventSourcing) => ({
     traceAssignments: this.traceAssignments,
-    commands: { recordSpan: async () => undefined },
+    commands: {
+      recordSpan: this.recordSpan,
+      changeTraceName: this.changeTraceName,
+      addAnnotation: this.addAnnotation,
+      removeAnnotation: this.removeAnnotation,
+    },
   }));
 
   constructor(private readonly traceAssignments: TraceTopicAssignmentPort) {}
+}
+
+function traceRecordSpan(): RecordSpanCommandData {
+  return {
+    tenantId: "project-1",
+    span: {
+      traceId: "trace-1",
+      spanId: "span-1",
+      name: "worker proxy span",
+      kind: 1,
+      startTimeUnixNano: "1",
+      endTimeUnixNano: "2",
+      attributes: [],
+      events: [],
+      links: [],
+      status: { message: null, code: null },
+      droppedAttributesCount: 0,
+      droppedEventsCount: 0,
+      droppedLinksCount: 0,
+    },
+    resource: null,
+    instrumentationScope: null,
+    occurredAt: 2,
+  };
 }
 
 function createProcessPersistenceDatabase() {
@@ -252,14 +293,14 @@ function canonicalLogRecord(): CanonicalLogRecord {
 }
 
 describe("WorkerProductionComposition", () => {
-  it("composes one canonical durable Eventing graph with consumers disabled", () => {
+  it("composes one canonical durable Eventing graph with consumers disabled", async () => {
     const createServer = EventingServerRuntime.create.bind(EventingServerRuntime);
     const create = vi
       .spyOn(EventingServerRuntime, "create")
       .mockImplementation((options) => createServer(options));
 
     try {
-      const composition = WorkerProductionComposition.create({
+      const composition = await WorkerProductionComposition.create({
         config: resolveWorkerConfig({ NODE_ENV: "test" }),
         eventing: {
           database: createProcessPersistenceDatabase(),
@@ -299,7 +340,7 @@ describe("WorkerProductionComposition", () => {
         .sort();
     }
 
-    function compositionFor(source: Record<string, unknown>): WorkerProductionComposition {
+    function compositionFor(source: Record<string, unknown>): Promise<WorkerProductionComposition> {
       return WorkerProductionComposition.create({
         config: resolveWorkerConfig({ NODE_ENV: "test", ...source }),
         eventing: {
@@ -333,9 +374,15 @@ describe("WorkerProductionComposition", () => {
      * one of them for redelivery while every health signal stays green.
      */
     /** @scenario "A worker mounts the meter only where the deployment is SaaS" */
-    it("mounts the billable-events meter pair a SaaS install produces into", () => {
+    it("mounts the billable-events meter pair a SaaS install produces into", async () => {
       expect(
-        globalRoutingKeys(compositionFor({ IS_SAAS: "true", STRIPE_SECRET_KEY: "sk_test_worker" })),
+        globalRoutingKeys(
+          await compositionFor({
+            IS_SAAS: "true",
+            STRIPE_SECRET_KEY: "sk_test_worker",
+            STRIPE_WEBHOOK_SECRET: "whsec_test_worker",
+          }),
+        ),
       ).toEqual(expectedGlobalRoutingKeys());
     });
 
@@ -346,8 +393,8 @@ describe("WorkerProductionComposition", () => {
      * per project that no Stripe customer answers.
      */
     /** @scenario "A worker mounts the meter only where the deployment is SaaS" */
-    it("mounts neither where the deployment is not SaaS", () => {
-      expect(globalRoutingKeys(compositionFor({}))).toEqual([]);
+    it("mounts neither where the deployment is not SaaS", async () => {
+      expect(globalRoutingKeys(await compositionFor({}))).toEqual([]);
     });
 
     /**
@@ -361,7 +408,16 @@ describe("WorkerProductionComposition", () => {
     /** @scenario "A worker routes the meter by organization, not by tenant" */
     it("resolves the meter's ClickHouse client for the organization, not the tenant", async () => {
       const resolveClickHouseClient = vi.fn(async () => ({ insert: async () => undefined }));
-      const registered: { store?: AppendStore<{ tenantId: string }> } = {};
+      const registered: {
+        store?: AppendStore<{
+          organizationId: string;
+          tenantId: string;
+          eventId: string;
+          eventType: string;
+          deduplicationKey: string;
+          eventTimestamp: number;
+        }>;
+      } = {};
       saasBillableEventsMeter({
         database: {
           project: { findUnique: async () => ({ team: { organizationId: "org_private" } }) },
@@ -370,13 +426,32 @@ describe("WorkerProductionComposition", () => {
         resolveClickHouseClient: resolveClickHouseClient as never,
         getDispatch: () => async () => void 0,
       })({
-        registerMapProjection: (projection: { store: AppendStore<{ tenantId: string }> }) => {
+        registerMapProjection: (projection: {
+          store: AppendStore<{
+            organizationId: string;
+            tenantId: string;
+            eventId: string;
+            eventType: string;
+            deduplicationKey: string;
+            eventTimestamp: number;
+          }>;
+        }) => {
           registered.store = projection.store;
         },
         registerMapSubscriber: () => void 0,
       } as never);
 
-      await registered.store?.append({ tenantId: "project_alpha" } as never, {} as never);
+      await registered.store?.append(
+        {
+          organizationId: "org_private",
+          tenantId: "project_alpha",
+          eventId: "event-1",
+          eventType: "lw.trace.span.received",
+          deduplicationKey: "event-1",
+          eventTimestamp: 1_700_000_000_000,
+        },
+        {} as never,
+      );
 
       expect(resolveClickHouseClient).toHaveBeenCalledWith("org_private");
       expect(resolveClickHouseClient).not.toHaveBeenCalledWith("project_alpha");
@@ -395,8 +470,10 @@ describe("WorkerProductionComposition", () => {
      */
     /** @scenario "A SaaS worker refuses to compose without the credential its reports are sent with" */
     /** @scenario "A SaaS worker refuses to meter without a pipeline to report through" */
-    it("refuses to compose a SaaS graph with no Stripe secret to report through", () => {
-      expect(() => compositionFor({ IS_SAAS: "true" })).toThrow(/Stripe secret key is required/);
+    it("refuses to compose a SaaS graph with no Stripe secret to report through", async () => {
+      await expect(compositionFor({ IS_SAAS: "true" })).rejects.toThrow(
+        /Stripe secret key is required/,
+      );
     });
 
     /**
@@ -408,11 +485,13 @@ describe("WorkerProductionComposition", () => {
      * redelivery forever while every health signal stayed green.
      */
     /** @scenario "The monthly roll-up is registered on every install" */
-    it("mounts the reporting pipeline on a self-hosted install too, with no sender", () => {
-      const features = compositionFor({}).featureInstallers.map((installer) => installer.name);
+    it("mounts the reporting pipeline on a self-hosted install too, with no sender", async () => {
+      const features = (await compositionFor({})).featureInstallers.map(
+        (installer) => installer.name,
+      );
 
       expect(features).toContain("billing-reporting");
-      expect(globalRoutingKeys(compositionFor({}))).toEqual([]);
+      expect(globalRoutingKeys(await compositionFor({}))).toEqual([]);
     });
   });
 
@@ -528,6 +607,61 @@ describe("WorkerProductionComposition", () => {
     );
   });
 
+  it("binds every Trace command proxy to the canonical registered pipeline", async () => {
+    const queue = new Queue();
+    const eventing = WorkerEventingRuntime.create({
+      eventStore: EventStoreMemory.createForTesting(),
+      queueFactory: () => queue,
+      processStore: InMemoryProcessStore.createForTesting(),
+      executionTarget: "worker",
+      warnWhenProjectionsRunInline: false,
+      consumers: { enabled: false },
+    });
+    const traceFeature = createTraceFeature(eventing);
+    const topic = TopicWorkerFeatureInstaller.create({
+      installer: new TopicCapability(),
+      eventing,
+      traceAssignments: traceFeature.trace.traceAssignments,
+    });
+    const composition = WorkerProductionComposition.createFromPorts({
+      config: resolveWorkerConfig({ NODE_ENV: "test" }),
+      eventing,
+      lifecycle: new Lifecycle(),
+      transport: new Transport(),
+      trace: traceFeature.trace,
+      topic,
+    });
+
+    await composition.application.start();
+
+    const span = traceRecordSpan();
+    const name: TraceNameChangedEventData = {
+      traceId: "trace-1",
+      newName: "Renamed trace",
+      changedByUserId: "user-1",
+    };
+    const annotation: AnnotationAddedEventData = {
+      traceId: "trace-1",
+      annotationId: "annotation-1",
+    };
+    const removal: AnnotationRemovedEventData = {
+      traceId: "trace-1",
+      annotationId: "annotation-1",
+    };
+
+    await traceFeature.trace.commands.recordSpan(span);
+    await traceFeature.trace.commands.changeTraceName(name);
+    await traceFeature.trace.commands.addAnnotation(annotation);
+    await traceFeature.trace.commands.removeAnnotation(removal);
+
+    expect(traceFeature.installer.recordSpan).toHaveBeenCalledWith(span);
+    expect(traceFeature.installer.changeTraceName).toHaveBeenCalledWith(name);
+    expect(traceFeature.installer.addAnnotation).toHaveBeenCalledWith(annotation);
+    expect(traceFeature.installer.removeAnnotation).toHaveBeenCalledWith(removal);
+
+    await composition.application.close();
+  });
+
   it("routes manual Topic dispatch through the Eventing command sender", async () => {
     const queue = new Queue();
     const eventing = WorkerEventingRuntime.create({
@@ -610,7 +744,7 @@ describe("WorkerProductionComposition", () => {
    * and the revoke behind its schedule reaches the client this root was given.
    */
   describe("when the API-key sweep is composed", () => {
-    function compositionWith(database: object, topicDatabase: object) {
+    async function compositionWith(database: object, topicDatabase: object) {
       return WorkerProductionComposition.create({
         config: resolveWorkerConfig({ NODE_ENV: "test" }),
         eventing: {
@@ -657,7 +791,7 @@ describe("WorkerProductionComposition", () => {
       const unused = vi.fn(async () => ({ count: 0 }));
 
       await sweepThrough(
-        compositionWith({ apiKey: { updateMany } }, { apiKey: { updateMany: unused } }),
+        await compositionWith({ apiKey: { updateMany } }, { apiKey: { updateMany: unused } }),
       );
 
       expect(updateMany).toHaveBeenCalledTimes(1);
@@ -671,7 +805,7 @@ describe("WorkerProductionComposition", () => {
     it("falls back to the client Topic was given when no database is named", async () => {
       const updateMany = vi.fn(async () => ({ count: 0 }));
 
-      await sweepThrough(compositionWith({}, { apiKey: { updateMany } }));
+      await sweepThrough(await compositionWith({}, { apiKey: { updateMany } }));
 
       expect(updateMany).toHaveBeenCalledTimes(1);
     });
@@ -683,7 +817,7 @@ describe("WorkerProductionComposition", () => {
    * wrote and needs no credentials at all.
    */
   describe("when the GitHub branch sweep is composed", () => {
-    function compositionWith(input: {
+    async function compositionWith(input: {
       source?: Record<string, unknown>;
       database?: object;
       observability?: object;
@@ -730,7 +864,7 @@ describe("WorkerProductionComposition", () => {
       const findMany = vi.fn(async () => []);
 
       await recheckThrough(
-        compositionWith({ database: { githubBranchPullRequestCheck: { findMany } } }),
+        await compositionWith({ database: { githubBranchPullRequestCheck: { findMany } } }),
       );
 
       expect(findMany).toHaveBeenCalledTimes(1);
@@ -742,7 +876,7 @@ describe("WorkerProductionComposition", () => {
       const findMany = vi.fn(async () => []);
 
       await recheckThrough(
-        compositionWith({
+        await compositionWith({
           database: { githubBranchPullRequestCheck: { findMany } },
           observability: { logger: { info: vi.fn(), warn } },
         }),
@@ -758,7 +892,7 @@ describe("WorkerProductionComposition", () => {
       const warn = vi.fn();
 
       await recheckThrough(
-        compositionWith({
+        await compositionWith({
           source: { GITHUB_LANGY_APP_ID: "1234", GITHUB_LANGY_PRIVATE_KEY: "-----BEGIN-----" },
           database: { githubBranchPullRequestCheck: { findMany: vi.fn(async () => []) } },
           observability: { logger: { info: vi.fn(), warn } },
@@ -781,7 +915,7 @@ describe("WorkerProductionComposition", () => {
    * The Langy session-key sweep, composed here rather than handed over built.
    */
   describe("when the Langy session-key sweep is composed", () => {
-    function compositionWith(database: object, topicDatabase: object) {
+    async function compositionWith(database: object, topicDatabase: object) {
       return WorkerProductionComposition.create({
         config: resolveWorkerConfig({ NODE_ENV: "test" }),
         eventing: {
@@ -828,7 +962,7 @@ describe("WorkerProductionComposition", () => {
       const unused = vi.fn(async () => ({ count: 0 }));
 
       await sweepThrough(
-        compositionWith({ apiKey: { updateMany } }, { apiKey: { updateMany: unused } }),
+        await compositionWith({ apiKey: { updateMany } }, { apiKey: { updateMany: unused } }),
       );
 
       expect(updateMany).toHaveBeenCalledTimes(1);
@@ -839,7 +973,7 @@ describe("WorkerProductionComposition", () => {
     it("sweeps only the reserved Langy session name", async () => {
       const updateMany = vi.fn(async (_update: { where: { name: string } }) => ({ count: 0 }));
 
-      await sweepThrough(compositionWith({ apiKey: { updateMany } }, {}));
+      await sweepThrough(await compositionWith({ apiKey: { updateMany } }, {}));
 
       expect(updateMany.mock.calls[0]![0].where.name).toBe("Langy session");
     });
@@ -851,7 +985,7 @@ describe("WorkerProductionComposition", () => {
     it("falls back to the client Topic was given when no database is named", async () => {
       const updateMany = vi.fn(async () => ({ count: 0 }));
 
-      await sweepThrough(compositionWith({}, { apiKey: { updateMany } }));
+      await sweepThrough(await compositionWith({}, { apiKey: { updateMany } }));
 
       expect(updateMany).toHaveBeenCalledTimes(1);
     });
@@ -862,7 +996,7 @@ describe("WorkerProductionComposition", () => {
    * already resolved, and that the ADR-056 edge into Coding Agent is either
    */
   describe("when metric and log processing are composed", () => {
-    function compositionWith(
+    async function compositionWith(
       input: {
         resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
         source?: Record<string, unknown>;
@@ -874,7 +1008,7 @@ describe("WorkerProductionComposition", () => {
         contributeMetricFacts: vi.fn(async () => undefined),
         contributeLogFacts: vi.fn(async () => undefined),
       };
-      const composition = WorkerProductionComposition.create({
+      const composition = await WorkerProductionComposition.create({
         config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
         eventing: {
           database: createProcessPersistenceDatabase(),
@@ -913,7 +1047,7 @@ describe("WorkerProductionComposition", () => {
 
     /** @scenario "The processing pipeline composes from one tenant-keyed client" */
     it("mounts both pipelines from this graph's own ClickHouse client", async () => {
-      const { composition } = compositionWith();
+      const { composition } = await compositionWith();
 
       for (const feature of ["metric", "log"] as const) {
         const { installer, registered } = definitionsFrom(composition, feature);
@@ -936,7 +1070,7 @@ describe("WorkerProductionComposition", () => {
           insert,
           query: async () => ({ json: async () => [] }),
         }));
-        const { composition } = compositionWith({ resolveClickHouseClient });
+        const { composition } = await compositionWith({ resolveClickHouseClient });
         const stores: AppendStore<never>[] = [];
         const eventSourcing = composition.eventing.eventSourcing;
         vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
@@ -964,7 +1098,7 @@ describe("WorkerProductionComposition", () => {
 
     /** @scenario "The ADR-056 edge is mounted rather than declared missing" */
     it("mounts the coding-agent dispatch subscribers, because the pipeline is always there", async () => {
-      const { composition } = compositionWith();
+      const { composition } = await compositionWith();
 
       const metric = definitionsFrom(composition, "metric");
       await metric.installer.install();
@@ -980,10 +1114,10 @@ describe("WorkerProductionComposition", () => {
     });
 
     /** @scenario "The ADR-056 edge is mounted rather than declared missing" */
-    it("says nothing at boot about a missing Coding Agent pipeline", () => {
+    it("says nothing at boot about a missing Coding Agent pipeline", async () => {
       const warn = vi.fn();
 
-      const { composition } = compositionWith({
+      const { composition } = await compositionWith({
         observability: { logger: { info: vi.fn(), warn } },
       });
 
@@ -998,7 +1132,7 @@ describe("WorkerProductionComposition", () => {
 
     /** @scenario "Producer and consumer clamp one lane count" */
     it("shards the command lanes on the same variables the App reads", async () => {
-      const { composition } = compositionWith({
+      const { composition } = await compositionWith({
         source: { METRIC_PROCESSING_SHARDS: "4", LOG_PROCESSING_SHARDS: "2" },
       });
       const lanes = new Map<string, Set<string>>();
@@ -1088,9 +1222,9 @@ describe("WorkerProductionComposition", () => {
       return { database, calls, identifierUpsert, cursorUpsert, reservationDeleteMany, scimUpsert };
     }
 
-    function compositionWith(
+    async function compositionWith(
       input: { database?: object; identity?: object } = {},
-    ): WorkerProductionComposition {
+    ): Promise<WorkerProductionComposition> {
       return WorkerProductionComposition.create({
         config: resolveWorkerConfig({ NODE_ENV: "test" }),
         eventing: {
@@ -1119,11 +1253,20 @@ describe("WorkerProductionComposition", () => {
       expect(installer, `the composition mounted no ${feature} feature`).toBeDefined();
       const names: string[] = [];
       const definitions: Record<string, unknown>[] = [];
+      const send = vi.fn(async () => undefined);
+      const commands = {
+        attachGrant: { send },
+        changeGrantRole: { send },
+        revokeGrant: { send },
+        defineRole: { send },
+        changeRolePermissions: { send },
+        deleteRole: { send },
+      };
       const eventSourcing = composition.eventing.eventSourcing;
       vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
         names.push(definition.metadata.name);
         definitions.push(definition as unknown as Record<string, unknown>);
-        return {} as never;
+        return { commands } as never;
       });
       await installer!.install();
       return { names, definitions };
@@ -1136,7 +1279,7 @@ describe("WorkerProductionComposition", () => {
      */
     /** @scenario "The worker mounts the identity and directory-sync ledgers itself" */
     it("mounts both without being handed a capability", async () => {
-      const composition = compositionWith();
+      const composition = await compositionWith();
 
       expect(await registeredThrough(composition, "identity")).toMatchObject({
         names: ["identity"],
@@ -1161,8 +1304,10 @@ describe("WorkerProductionComposition", () => {
      * subject of the block below.
      */
     /** @scenario "The worker mounts the identity and directory-sync ledgers itself" */
-    it("mounts all three identity ledgers without being handed a capability", () => {
-      const mounted = compositionWith().featureInstallers.map((installer) => installer.name);
+    it("mounts all three identity ledgers without being handed a capability", async () => {
+      const mounted = (await compositionWith()).featureInstallers.map(
+        (installer) => installer.name,
+      );
       expect(
         mounted.filter((name) => ["identity", "sso-connection", "scim-sync"].includes(name)),
       ).toEqual(["identity", "sso-connection", "scim-sync"]);
@@ -1171,7 +1316,7 @@ describe("WorkerProductionComposition", () => {
     /** @scenario "The worker builds the identity ledger from its own client" */
     it("folds identifier heads onto the one Prisma client this process opened", async () => {
       const recording = identityDatabase();
-      const composition = compositionWith({ database: recording.database });
+      const composition = await compositionWith({ database: recording.database });
       const { definitions } = await registeredThrough(composition, "identity");
       const store = (
         definitions[0] as unknown as {
@@ -1229,7 +1374,7 @@ describe("WorkerProductionComposition", () => {
     /** @scenario "The worker builds the directory-sync ledger from its own client" */
     it("folds directory-sync state onto that same client", async () => {
       const recording = identityDatabase();
-      const composition = compositionWith({ database: recording.database });
+      const composition = await compositionWith({ database: recording.database });
       const { definitions } = await registeredThrough(composition, "scim-sync");
       const store = (
         definitions[0] as unknown as {
@@ -1305,9 +1450,9 @@ describe("WorkerProductionComposition", () => {
       };
     }
 
-    function compositionWith(
+    async function compositionWith(
       substrate: ReturnType<typeof reportingSubstrate>,
-    ): WorkerProductionComposition {
+    ): Promise<WorkerProductionComposition> {
       return WorkerProductionComposition.create({
         config: resolveWorkerConfig({ NODE_ENV: "test" }),
         eventing: {
@@ -1323,7 +1468,7 @@ describe("WorkerProductionComposition", () => {
     }
 
     async function reportOneMonth(substrate: ReturnType<typeof reportingSubstrate>): Promise<void> {
-      const composition = compositionWith(substrate);
+      const composition = await compositionWith(substrate);
       const installer = composition.featureInstallers.find(
         (candidate) => candidate.name === "billing-reporting",
       );
@@ -1419,7 +1564,7 @@ describe("WorkerProductionComposition", () => {
       return { database, executeRaw, roleBindingUpsert, auditCreateMany };
     }
 
-    function compositionWith(database: object = {}): WorkerProductionComposition {
+    async function compositionWith(database: object = {}): Promise<WorkerProductionComposition> {
       return WorkerProductionComposition.create({
         config: resolveWorkerConfig({ NODE_ENV: "test" }),
         eventing: {
@@ -1446,11 +1591,20 @@ describe("WorkerProductionComposition", () => {
       expect(installer, "the composition mounted no authz feature").toBeDefined();
       const names: string[] = [];
       const definitions: Record<string, unknown>[] = [];
+      const send = vi.fn(async () => undefined);
+      const commands = {
+        attachGrant: { send },
+        changeGrantRole: { send },
+        revokeGrant: { send },
+        defineRole: { send },
+        changeRolePermissions: { send },
+        deleteRole: { send },
+      };
       const eventSourcing = composition.eventing.eventSourcing;
       vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
         names.push(definition.metadata.name);
         definitions.push(definition as unknown as Record<string, unknown>);
-        return {} as never;
+        return { commands } as never;
       });
       await installer!.install();
       return { names, definition: definitions[0]! };
@@ -1465,7 +1619,7 @@ describe("WorkerProductionComposition", () => {
      */
     /** @scenario "The worker mounts the grants ledger itself" */
     it("mounts the grants ledger without being handed a capability", async () => {
-      const composition = compositionWith(grantsDatabase().database);
+      const composition = await compositionWith(grantsDatabase().database);
 
       expect(await registeredGrantsPipeline(composition)).toMatchObject({
         names: ["authz_grant"],
@@ -1482,7 +1636,7 @@ describe("WorkerProductionComposition", () => {
     /** @scenario "The worker builds the grants ledger from its own client" */
     it("expands a grant onto the one Prisma client this process opened", async () => {
       const recording = grantsDatabase();
-      const composition = compositionWith(recording.database);
+      const composition = await compositionWith(recording.database);
       const { definition } = await registeredGrantsPipeline(composition);
       const projection = (
         definition as unknown as {
@@ -1530,7 +1684,7 @@ describe("WorkerProductionComposition", () => {
   });
 
   describe("when suite-run processing is composed", () => {
-    function compositionWith(
+    async function compositionWith(
       input: {
         resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
         redis?: object;
@@ -1618,7 +1772,7 @@ describe("WorkerProductionComposition", () => {
 
     /** @scenario "The worker mounts the pipeline rather than being handed one" */
     it("mounts suite without being handed a capability, and registers its pipeline", async () => {
-      const composition = compositionWith();
+      const composition = await compositionWith();
       const installer = composition.featureInstallers.find(
         (candidate) => candidate.name === "suite",
       );
@@ -1645,7 +1799,7 @@ describe("WorkerProductionComposition", () => {
         query: async () => ({ json: async () => [] }),
       }));
 
-      await storeFoldedRunState(compositionWith({ resolveClickHouseClient }));
+      await storeFoldedRunState(await compositionWith({ resolveClickHouseClient }));
 
       expect(resolveClickHouseClient).toHaveBeenCalledWith("project_alpha");
       // 49 is the substrate's own `retention.defaultRetentionDays` above, not
@@ -1662,7 +1816,7 @@ describe("WorkerProductionComposition", () => {
       const set = vi.fn(async (..._args: unknown[]) => "OK");
       const redis = createWorkerProcessRedis({ get: vi.fn(async () => null), set });
 
-      await storeFoldedRunState(compositionWith({ redis }));
+      await storeFoldedRunState(await compositionWith({ redis }));
 
       // The connection this graph's queue already holds, under the prefix the
       // App's registry also caches by. A second connection would work and a
@@ -1677,7 +1831,7 @@ describe("WorkerProductionComposition", () => {
       const redis = createWorkerProcessRedis({ get: vi.fn(async () => null), set });
 
       await storeFoldedRunState(
-        compositionWith({ redis, source: { LANGWATCH_FOLD_CACHE_TTL_SECONDS: "900" } }),
+        await compositionWith({ redis, source: { LANGWATCH_FOLD_CACHE_TTL_SECONDS: "900" } }),
       );
 
       // The same variable the App reads. Two graphs caching one keyspace under
@@ -1693,7 +1847,7 @@ describe("WorkerProductionComposition", () => {
    * The ADR-056 session pipeline, composed here rather than handed over built.
    */
   describe("when coding-agent session processing is composed", () => {
-    function compositionWith(
+    async function compositionWith(
       input: {
         resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
         redis?: object;
@@ -1766,7 +1920,7 @@ describe("WorkerProductionComposition", () => {
 
     /** @scenario "The worker mounts the pipeline rather than being handed one" */
     it("mounts coding-agent without being handed a capability, and registers its pipeline", async () => {
-      const composition = compositionWith();
+      const composition = await compositionWith();
       const installer = composition.featureInstallers.find(
         (candidate) => candidate.name === "coding-agent",
       );
@@ -1785,7 +1939,7 @@ describe("WorkerProductionComposition", () => {
 
     /** @scenario "The worker mounts the pipeline rather than being handed one" */
     it("wires the GitHub demand path into the definition it registers", async () => {
-      const composition = compositionWith();
+      const composition = await compositionWith();
       const subscribers: string[] = [];
       const eventSourcing = composition.eventing.eventSourcing;
       vi.spyOn(eventSourcing, "register").mockImplementation((definition) => {
@@ -1807,8 +1961,8 @@ describe("WorkerProductionComposition", () => {
     });
 
     /** @scenario "The worker mounts the pipeline rather than being handed one" */
-    it("mounts it before metric, log and trace, whose subscribers dispatch into it", () => {
-      const names = compositionWith().featureInstallers.map((installer) => installer.name);
+    it("mounts it before metric, log and trace, whose subscribers dispatch into it", async () => {
+      const names = (await compositionWith()).featureInstallers.map((installer) => installer.name);
       const codingAgent = names.indexOf("coding-agent");
 
       // Not a preference: the dispatch subscribers Metric, Log and Trace mount
@@ -1831,7 +1985,7 @@ describe("WorkerProductionComposition", () => {
         query: async () => ({ json: async () => [] }),
       }));
 
-      await storeFoldedSession(compositionWith({ resolveClickHouseClient }));
+      await storeFoldedSession(await compositionWith({ resolveClickHouseClient }));
 
       expect(resolveClickHouseClient).toHaveBeenCalledWith("project_alpha");
       // 49 is the substrate's own `retention.defaultRetentionDays` above, not
@@ -1849,7 +2003,7 @@ describe("WorkerProductionComposition", () => {
       const set = vi.fn(async (..._args: unknown[]) => "OK");
       const redis = createWorkerProcessRedis({ get: vi.fn(async () => null), set });
 
-      await storeFoldedSession(compositionWith({ redis }));
+      await storeFoldedSession(await compositionWith({ redis }));
 
       expect(set.mock.calls[0]![0]).toBe("fold:coding_agent_sessions:project_alpha:session_1");
     });
@@ -1859,7 +2013,7 @@ describe("WorkerProductionComposition", () => {
       const updateMany = vi.fn(async () => ({ count: 1 }));
       const database = { ...createProcessPersistenceDatabase(), project: { updateMany } };
 
-      await storeFoldedSession(compositionWith({ database }));
+      await storeFoldedSession(await compositionWith({ database }));
 
       // The stamp is fire-and-forget behind the commit; what this holds is
       // that it lands on this process's own client rather than on a project
@@ -1871,7 +2025,7 @@ describe("WorkerProductionComposition", () => {
   });
 
   describe("when experiment-run processing is composed", () => {
-    function compositionWith(
+    async function compositionWith(
       input: {
         resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
         redis?: object;
@@ -1964,7 +2118,7 @@ describe("WorkerProductionComposition", () => {
 
     /** @scenario "The worker mounts the pipeline rather than being handed one" */
     it("mounts experiment without being handed a capability, and registers its pipeline", async () => {
-      const composition = compositionWith();
+      const composition = await compositionWith();
       const installer = composition.featureInstallers.find(
         (candidate) => candidate.name === "experiment",
       );
@@ -1991,7 +2145,7 @@ describe("WorkerProductionComposition", () => {
         query: async () => ({ json: async () => [] }),
       }));
 
-      await storeFoldedRunState(compositionWith({ resolveClickHouseClient }));
+      await storeFoldedRunState(await compositionWith({ resolveClickHouseClient }));
 
       expect(resolveClickHouseClient).toHaveBeenCalledWith("project_alpha");
       // 49 is the substrate's own `retention.defaultRetentionDays` above, not
@@ -2009,7 +2163,7 @@ describe("WorkerProductionComposition", () => {
       const set = vi.fn(async (..._args: unknown[]) => "OK");
       const redis = createWorkerProcessRedis({ get: vi.fn(async () => null), set });
 
-      await storeFoldedRunState(compositionWith({ redis }));
+      await storeFoldedRunState(await compositionWith({ redis }));
 
       // The connection this graph's queue already holds, under the prefix the
       // App's registry also caches by. A second connection would work and a
@@ -2024,7 +2178,7 @@ describe("WorkerProductionComposition", () => {
       const redis = createWorkerProcessRedis({ get: vi.fn(async () => null), set });
 
       await storeFoldedRunState(
-        compositionWith({ redis, source: { LANGWATCH_FOLD_CACHE_TTL_SECONDS: "900" } }),
+        await compositionWith({ redis, source: { LANGWATCH_FOLD_CACHE_TTL_SECONDS: "900" } }),
       );
 
       // The same variable the App reads. Two graphs caching one keyspace under
@@ -2062,7 +2216,7 @@ describe("given a worker that composes the join-request ledger", () => {
       resources?: ResourceScope;
       consumers?: boolean;
     } = {},
-  ): WorkerProductionComposition {
+  ): Promise<WorkerProductionComposition> {
     return WorkerProductionComposition.create({
       config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
       eventing: {
@@ -2102,7 +2256,7 @@ describe("given a worker that composes the join-request ledger", () => {
   describe("when the deployment named a host and the graph owns a resource scope", () => {
     /** @scenario "A worker with a mail gateway mounts the join-request ledger itself" */
     it("mounts it and routes exactly the keys the job registry names", async () => {
-      const composition = compositionFor({
+      const composition = await compositionFor({
         source: mailSource,
         resources: new ResourceScope(),
       });
@@ -2111,8 +2265,8 @@ describe("given a worker that composes the join-request ledger", () => {
     });
 
     /** @scenario "A worker with a mail gateway mounts the join-request ledger itself" */
-    it("no longer takes the pipeline from the application", () => {
-      const composition = compositionFor({
+    it("no longer takes the pipeline from the application", async () => {
+      const composition = await compositionFor({
         source: mailSource,
         resources: new ResourceScope(),
       });
@@ -2135,7 +2289,7 @@ describe("given a worker that composes the join-request ledger", () => {
       const close = vi.spyOn(EmailDeliveryAdapter.prototype, "close").mockResolvedValue(undefined);
       try {
         const resources = new ResourceScope();
-        compositionFor({ source: mailSource, resources });
+        await compositionFor({ source: mailSource, resources });
         expect(close).not.toHaveBeenCalled();
 
         await resources.close();
@@ -2156,7 +2310,7 @@ describe("given a worker that composes the join-request ledger", () => {
      */
     /** @scenario "A producer-only worker without mail still routes every key" */
     it("still mounts the ledger and routes every key the registry names", async () => {
-      const composition = compositionFor({ resources: new ResourceScope() });
+      const composition = await compositionFor({ resources: new ResourceScope() });
 
       expect(await routingKeysFor(composition)).toEqual(expectedJoinRequestRoutingKeys());
     });
@@ -2179,10 +2333,10 @@ describe("given a worker that composes the join-request ledger", () => {
     });
 
     /** @scenario "A consuming worker without mail refuses to compose" */
-    it("refuses to compose a graph that would claim the shared queue", () => {
-      expect(() => compositionFor({ resources: new ResourceScope(), consumers: true })).toThrow(
-        /will not claim event-sourcing\/jobs without outbound mail/,
-      );
+    it("refuses to compose a graph that would claim the shared queue", async () => {
+      await expect(
+        compositionFor({ resources: new ResourceScope(), consumers: true }),
+      ).rejects.toThrow(/will not claim event-sourcing\/jobs without outbound mail/);
     });
 
     /**
@@ -2193,19 +2347,19 @@ describe("given a worker that composes the join-request ledger", () => {
      * graph rather than a misconfigured deployment.
      */
     /** @scenario "A consuming worker without mail refuses to compose" */
-    it("lets a scope-less composition through rather than refusing a fixture", () => {
-      expect(() => compositionFor({ consumers: true })).not.toThrow();
+    it("lets a scope-less composition through rather than refusing a fixture", async () => {
+      await expect(compositionFor({ consumers: true })).resolves.toBeDefined();
     });
 
     /** @scenario "A consuming worker without mail refuses to compose" */
-    it("composes the same graph once the host is named", () => {
-      expect(() =>
+    it("composes the same graph once the host is named", async () => {
+      await expect(
         compositionFor({
           source: mailSource,
           resources: new ResourceScope(),
           consumers: true,
         }),
-      ).not.toThrow();
+      ).resolves.toBeDefined();
     });
   });
 });
@@ -2247,18 +2401,15 @@ describe("the model gateway on the production graph", () => {
 
   describe("given the typed connection this process opened", () => {
     /** @scenario "A worker holding the tenancy graph composes the model gateway" */
-    it("says nothing about a missing tenancy graph", () => {
+    it("reports missing tenancy when a connection lacks ClickHouse resource context", async () => {
       const warn = vi.fn();
 
-      compositionWithConnection({
+      await compositionWithConnection({
         connection: createWorkerProcessDatabase(),
         observability: { logger: { info: vi.fn(), warn } },
       });
 
-      // Scoped to the gateway's own reason rather than to the logger: this
-      // graph declares other absences honestly, and a bare "never warned"
-      // would pass only until the next one.
-      expect(warn).not.toHaveBeenCalledWith(
+      expect(warn).toHaveBeenCalledWith(
         { reason: "no-tenancy" },
         expect.stringContaining("composed no model gateway"),
       );
@@ -2273,10 +2424,10 @@ describe("the model gateway on the production graph", () => {
      * customer as unlicensed. The absence it reports is what says so.
      */
     /** @scenario "A worker holding its connection composes the licence source" */
-    it("says nothing about a missing licence source, because it composed one", () => {
+    it("says nothing about a missing licence source, because it composed one", async () => {
       const warn = vi.fn();
 
-      compositionWithConnection({
+      await compositionWithConnection({
         connection: createWorkerProcessDatabase(),
         observability: { logger: { info: vi.fn(), warn } },
       });
@@ -2287,10 +2438,10 @@ describe("the model gateway on the production graph", () => {
 
   describe("when the root was given no typed connection", () => {
     /** @scenario "A worker with no tenancy graph composes no model gateway" */
-    it("names the missing tenancy graph at boot", () => {
+    it("names the missing tenancy graph at boot", async () => {
       const warn = vi.fn();
 
-      compositionWithConnection({ observability: { logger: { info: vi.fn(), warn } } });
+      await compositionWithConnection({ observability: { logger: { info: vi.fn(), warn } } });
 
       expect(warn).toHaveBeenCalledWith(
         { reason: "no-tenancy" },

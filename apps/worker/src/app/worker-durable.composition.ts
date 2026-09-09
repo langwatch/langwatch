@@ -73,7 +73,7 @@ export type WorkerDurableCompositionOptions = Readonly<{
  */
 export function createWorkerDurableComposition(
   options: WorkerDurableCompositionOptions,
-): WorkerProductionComposition {
+): Promise<WorkerProductionComposition> {
   const infrastructure = createWorkerPrivateInfrastructureComposition({
     config: options.config,
     ports: options.storage,

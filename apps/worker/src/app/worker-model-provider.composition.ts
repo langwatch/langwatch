@@ -1,7 +1,7 @@
 /**
  * The model gateway, composed over this process's own graph.
  */
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import {
   AwsStsManagedProviderCredentialAdapter,
@@ -28,8 +28,8 @@ import {
   type PostgresModelProviderAdapterOptions,
 } from "@langwatch/model-provider-server";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
@@ -61,11 +61,11 @@ export type WorkerModelProviderCompositionOptions = Readonly<{
    */
   database: PostgresModelProviderAdapterOptions["database"];
   /** Resolves a project's team and organization, for scope derivation. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /** Resolves an organization, for the organization-scoped provider rows. */
-  organizations: OrganizationService;
+  organizations: OrganizationApi;
   /** Decides who may read and write a provider row. */
-  authorization: AuthzService;
+  authorization: AuthzApi;
   /**
    * The deployment's stored-secret cipher. Required rather than optional: a gateway composed
    * without one could not read a single stored credential, and every provider would look
@@ -92,9 +92,9 @@ export type WorkerModelProviders = Readonly<{
  * organization service, and the permission service answers for both.
  */
 export type WorkerModelProviderTenancy = Readonly<{
-  projects: ProjectService;
-  organizations: OrganizationService;
-  authorization: AuthzService;
+  projects: ProjectApi;
+  organizations: OrganizationApi;
+  authorization: AuthzApi;
 }>;
 
 /**
@@ -194,7 +194,7 @@ export function createWorkerModelProviders(
 
 /** Composes the Enterprise managed-provider service over this process's projects. */
 function composeWorkerManagedProviders(input: {
-  projects: ProjectService;
+  projects: ProjectApi;
   environment: Readonly<Record<string, string | undefined>>;
   logger: Logger;
 }): ManagedProviderService {

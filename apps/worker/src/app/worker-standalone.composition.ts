@@ -29,7 +29,7 @@ export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort
     super();
   }
 
-  compose(context: WorkerProcessFactoryContext): WorkerProcessComposition {
+  async compose(context: WorkerProcessFactoryContext): Promise<WorkerProcessComposition> {
     const { config, resources, observability } = context;
 
     const database = WorkerDatabaseInfrastructure.create({
@@ -57,7 +57,7 @@ export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort
     // runtime both route through; composed once so both answer the same way.
     const objectStorage = createWorkerObjectStorage({ config, database: prisma, resources });
 
-    const composition = WorkerProductionComposition.create({
+    const composition = await WorkerProductionComposition.create({
       config,
       resources,
       lifecycle: new NoApplicationLifecycle(),
@@ -89,6 +89,7 @@ export class WorkerStandaloneComposition extends WorkerExecutableCompositionPort
       // the generated `PrismaClient` by type, so it crosses whole rather than
       // through the structural intersection above.
       connection: database.connection,
+      featureClickHouse: clickhouse,
       observability,
     });
 

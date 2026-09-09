@@ -86,7 +86,7 @@ describe("WorkerProductionComposition infrastructure seam", () => {
     const resources = new ResourceScope();
 
     try {
-      const composition = WorkerProductionComposition.create({
+      const composition = await WorkerProductionComposition.create({
         config: resolveWorkerConfig({ NODE_ENV: "test" }),
         resources,
         infrastructure: {

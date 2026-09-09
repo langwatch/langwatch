@@ -16,6 +16,32 @@
  * boundary — faking it would hide the failure this test exists to catch.
  */
 import { randomUUID } from "node:crypto";
+import { AgentApi } from "@langwatch/agent-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzGrantsCommandDispatcherPort } from "@langwatch/authz-server";
+import type {
+  DataRetentionDirectoryPort,
+  DataRetentionPlanPort,
+} from "@langwatch/data-retention-server";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import type { ProjectInfrastructure } from "@langwatch/project-server";
+import { createApp, LocalFeatureApis, ResourceScope } from "@langwatch/runtime-composition";
+import type { ScenarioExecutionPrefetcherService } from "@langwatch/scenario-server";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TopicClusteringSchedulePort } from "@langwatch/topic-server";
+import type { TraceApi } from "@langwatch/trace-contract";
+import { UserApi } from "@langwatch/user-contract";
+import {
+  WorkflowApp,
+  PrismaWorkflowRowAdapter,
+  type WorkflowAgentMappingPort,
+  type WorkflowStudioDslPort,
+} from "@langwatch/workflow-server";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -26,17 +52,16 @@ import {
 } from "@langwatch/prisma-client";
 import { AbsentPayloadStagingAdapter } from "@langwatch/stored-object-server";
 import { CODEX_DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { SimulationService, type TargetConfig } from "@langwatch/scenario-contract";
+import type { ScenarioApi, SimulationService, TargetConfig } from "@langwatch/scenario-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { resolveWorkerStoredSecretCipher } from "../app/worker-automation-graph.composition.ts";
 import { createWorkerModelProviders } from "../app/worker-model-provider.composition.ts";
-import {
-  createWorkerScenarioExecutionPrefetcher,
-  type WorkerScenarioPrefetcherPrerequisites,
-} from "../app/worker-scenario-execution.composition.ts";
-import { createWorkerTenancy } from "../app/worker-tenancy.composition.ts";
+import { createWorkerScenarioExecutionGraph } from "../app/worker-scenario-execution.composition.ts";
+import { installWorkerAgent } from "../app/worker-agent.composition.ts";
+import { createWorkerTenancyInfrastructure } from "../app/worker-tenancy-infrastructure.composition.ts";
+import { installWorkerTenancy } from "../app/worker-tenancy.composition.ts";
 import { resolveWorkerConfig, type WorkerConfig } from "../platform/config/worker.config.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -72,7 +97,8 @@ let workflowId = "";
 let workflowAgentId = "";
 let codeAgentId = "";
 let httpAgentId = "";
-let prerequisites: WorkerScenarioPrefetcherPrerequisites;
+let prefetcher: ScenarioExecutionPrefetcherService;
+const resources = new ResourceScope();
 
 function workerConfig(): WorkerConfig {
   return resolveWorkerConfig({
@@ -81,6 +107,38 @@ function workerConfig(): WorkerConfig {
     LANGWATCH_NLP_SERVICE: "http://localhost:5561",
     BASE_HOST: "http://localhost:5560",
   });
+}
+
+async function composeTenancy(config: WorkerConfig) {
+  if (!connection) throw new Error("The integration database must be configured.");
+  const builder = createApp({ name: "codex-model-tenancy-test" })
+    .withPersistence("postgres", { prisma: connection.client })
+    .withInfrastructure({})
+    .withProvided(UserApi, createApiFixture<UserApi>());
+  installWorkerTenancy(
+    builder,
+    createWorkerTenancyInfrastructure({
+      connection,
+      config,
+      redis: null,
+      plans: createApiFixture<PlanProvider>(),
+      authzDispatcher: createApiFixture<AuthzGrantsCommandDispatcherPort>(),
+      topicClustering: createApiFixture<ProjectInfrastructure["topicClustering"]>(),
+      topicSchedule: createApiFixture<TopicClusteringSchedulePort>(),
+      dataRetention: {
+        directory: createApiFixture<DataRetentionDirectoryPort>({}, "retention directory"),
+        plans: createApiFixture<DataRetentionPlanPort>({}, "retention plans"),
+        resolveClickHouseClient: null,
+      },
+    }),
+  );
+  const runtime = await builder.boot({
+    role: "worker",
+    config: { "data-retention": { platformDefaultRetentionDays: 28 } },
+  });
+  resources.own("integration tenancy", () => runtime.stop());
+
+  return runtime;
 }
 
 describe.skipIf(!databaseUrl)(
@@ -114,20 +172,15 @@ describe.skipIf(!databaseUrl)(
 
       const config = workerConfig();
       const encryption = resolveWorkerStoredSecretCipher(config);
-      const tenancy = createWorkerTenancy({
-        connection: connection!,
-        encryption,
-        redis: null,
-        config,
-      });
+      const tenancy = await composeTenancy(config);
       const { modelProviders } = createWorkerModelProviders({
         config,
         database: db,
         redis: null,
         encryption,
-        projects: tenancy.projects,
-        organizations: tenancy.organizations,
-        authorization: tenancy.authorization,
+        projects: tenancy.service(ProjectApi),
+        organizations: tenancy.service(OrganizationApi),
+        authorization: tenancy.service(AuthzApi),
       });
 
       // A real, enabled OpenAI provider so the DEFAULT role — which the
@@ -254,22 +307,65 @@ describe.skipIf(!databaseUrl)(
       });
       httpAgentId = httpAgent.id;
 
-      prerequisites = {
-        config,
-        payloadStaging: AbsentPayloadStagingAdapter.create(),
+      const peers = new LocalFeatureApis();
+      peers.declare(AgentApi);
+      resources.own("integration Agent peer", () => peers.close());
+      const agents = peers.reference(AgentApi);
+      const scenarios = createApiFixture<ScenarioApi>();
+      const graph = await createWorkerScenarioExecutionGraph({
+        agents,
+        scenarioApi: scenarios,
+        simulations: createApiFixture<SimulationService>(),
+        traces: createApiFixture<TraceApi>({ resolveIngestWaitTimeout: async () => 0 }),
+        resources,
+        prerequisites: {
+          config,
+          payloadStaging: AbsentPayloadStagingAdapter.create(),
+          connection: connection!,
+          modelProviders,
+          projects: tenancy.service(ProjectApi),
+          // Never dialled: the prefetch resolves a target, its models and its
+          // credentials, and reads no trace.
+          resolveClickHouseClient: async () => {
+            throw new Error("the prefetch must not read traces");
+          },
+          defaultRetentionDays: 30,
+          langwatchEndpoint: "http://localhost:5560",
+          nlpServiceUrl: "http://localhost:5561",
+          encryptionKey: ENCRYPTION_KEY,
+        },
+      });
+      const workflows = WorkflowApp.create({
+        dependencies: {},
+        infrastructure: {
+          workflows: graph.workflows,
+          datasets: graph.datasets,
+          evaluators: createApiFixture<EvaluatorApi>(),
+          studioDsl: createApiFixture<WorkflowStudioDslPort>(),
+          agentMappings: createApiFixture<WorkflowAgentMappingPort>(),
+          workflowRows: PrismaWorkflowRowAdapter.create({ database: db }),
+        },
+        config: void 0,
+        resources,
+      });
+      const agent = await installWorkerAgent({
         connection: connection!,
-        modelProviders,
-        projects: tenancy.projects,
-        // Never dialled: the prefetch resolves a target, its models and its
-        // credentials, and reads no trace.
-        resolveClickHouseClient: (() => {
-          throw new Error("the prefetch must not read traces");
-        }) as never,
-        defaultRetentionDays: 30,
-        langwatchEndpoint: "http://localhost:5560",
-        nlpServiceUrl: "http://localhost:5561",
-        encryptionKey: ENCRYPTION_KEY,
-      };
+        infrastructure: {},
+        config: { publicBaseUrl: "http://localhost:5560", connected: null },
+        peers: {
+          apiKeys: tenancy.service(ApiKeyApi),
+          auditLog: createApiFixture<AuditLogApi>(),
+          permissions: tenancy.service(AuthzApi),
+          projects: tenancy.service(ProjectApi),
+          scenarios,
+          users: tenancy.service(UserApi),
+          workflows,
+        },
+      });
+      resources.own("integration Agent App", () => agent.runtime.stop());
+      peers.bind(AgentApi, agent.agents);
+      peers.ready();
+      prefetcher = graph.prefetcher;
     }, 120_000);
 
     afterAll(async () => {
@@ -298,6 +394,7 @@ describe.skipIf(!databaseUrl)(
           ]);
         }
       } finally {
+        await resources.close();
         await connection?.closeOnce();
       }
     });
@@ -307,12 +404,8 @@ describe.skipIf(!databaseUrl)(
       { label: "code" as const, referenceId: () => codeAgentId },
       { label: "http" as const, referenceId: () => httpAgentId },
     ])("when the run is against a $label target", ({ label, referenceId }) => {
-      /** @scenario "A project whose FAST/coding default is codex still runs workflow, code, and http simulations" */
+      /** @see specs/scenarios/simulation-run-model-resolution.feature */
       it("prefetches successfully instead of hitting the codex coding-assistant backstop", async () => {
-        const prefetcher = createWorkerScenarioExecutionPrefetcher({
-          prerequisites,
-          simulations: Object.create(SimulationService.prototype) as SimulationService,
-        });
         const target: TargetConfig = { type: label, referenceId: referenceId() };
 
         const result = await prefetcher.prefetch({
