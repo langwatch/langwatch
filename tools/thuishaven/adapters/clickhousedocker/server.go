@@ -180,9 +180,7 @@ func (s *Server) pull(ctx context.Context, dockerHost string) error {
 		return nil
 	}
 	fmt.Printf("pulling %s (first run only) ...\n", s.image)
-	cmd := s.rt.Docker(ctx, dockerHost, "pull", s.image)
-	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
-	if err := cmd.Run(); err != nil {
+	if err := s.rt.DockerLane(ctx, colima.DockerRun{Lane: "clickhouse", Host: dockerHost, Args: []string{"pull", s.image}}); err != nil {
 		return fmt.Errorf("docker pull %s: %w", s.image, err)
 	}
 	return nil

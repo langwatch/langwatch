@@ -10,8 +10,10 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
 
 // dashModel builds a viewer with the session dashboard wired to a fixed
@@ -832,5 +834,52 @@ func TestViewerHidesStaleCaptures(t *testing.T) {
 	}
 	if !m.hasGroup("backend") {
 		t.Fatalf("groups = %v, want backend", m.groups)
+	}
+}
+
+func TestWrapLogLineIndentsContinuationToTheMessageColumn(t *testing.T) {
+	line := logfmt.Render(
+		`{"level":"info","msg":"one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen"}`,
+		logfmt.Options{Lane: "backend", Time: time.Date(2026, 9, 9, 22, 30, 0, 0, time.UTC)},
+	)
+	rows := wrapLogLine(line, 60)
+	if len(rows) < 2 {
+		t.Fatalf("expected the line to wrap, got %d row(s): %q", len(rows), rows)
+	}
+	indent := strings.Repeat(" ", logfmt.MessageColumn)
+	for i, row := range rows {
+		if ansi.StringWidth(row) > 60 {
+			t.Fatalf("row %d is %d cells wide: %q", i, ansi.StringWidth(row), row)
+		}
+		if i > 0 && !strings.HasPrefix(row, indent+"") {
+			t.Fatalf("row %d is not indented to the message column: %q", i, row)
+		}
+		if i > 0 && strings.HasPrefix(strings.TrimPrefix(row, indent), " ") {
+			t.Fatalf("row %d starts with a stray space: %q", i, row)
+		}
+	}
+	if !strings.Contains(rows[0], "  backend    info   one") {
+		t.Fatalf("first row lost its columns: %q", rows[0])
+	}
+}
+
+func TestWrapLogLineLeavesNarrowLinesAlone(t *testing.T) {
+	line := "22:30:00.000  backend    info   short"
+	if rows := wrapLogLine(line, 80); len(rows) != 1 || rows[0] != line {
+		t.Fatalf("narrow line changed: %q", rows)
+	}
+	if rows := wrapLogLine(line, 0); len(rows) != 1 || rows[0] != line {
+		t.Fatalf("unsized terminal changed the line: %q", rows)
+	}
+}
+
+func TestWrapVisibleLinesKeepsTheNewestRows(t *testing.T) {
+	wide := "22:30:00.000  backend    info   " + strings.Repeat("word ", 40)
+	rows := wrapVisibleLines([]string{wide, "22:30:01.000  backend    info   last"}, 60, 3)
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 rows, got %d", len(rows))
+	}
+	if !strings.HasSuffix(rows[2], "last") {
+		t.Fatalf("the newest line fell off the screen: %q", rows)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -839,11 +840,52 @@ func (m *viewerModel) View() string {
 	if len(lines) == 0 {
 		b.WriteString(" \x1b[2mwaiting for output…\x1b[0m\n")
 	}
-	for _, l := range lines {
+	for _, l := range wrapVisibleLines(lines, m.width-1, m.bodyHeight()) {
 		b.WriteString(" " + highlightMatches(l, m.searchQuery) + "\n")
 	}
 	b.WriteString("\n " + m.logFooter(group) + "\n")
 	return b.String()
+}
+
+// wrapVisibleLines wraps every line wider than width and keeps the last
+// `body` rows, so the newest output stays on screen rather than the top of a
+// long line pushing it off. width of zero or less (no size yet) wraps nothing.
+func wrapVisibleLines(lines []string, width, body int) []string {
+	rows := make([]string, 0, len(lines))
+	for _, l := range lines {
+		rows = append(rows, wrapLogLine(l, width)...)
+	}
+	if len(rows) > body {
+		rows = rows[len(rows)-body:]
+	}
+	return rows
+}
+
+// wrapLogLine breaks one rendered line to width cells. The continuation rows
+// are indented to the message column so they read as more of the same message
+// under the same time and lane, the way a stack trace already is. A terminal
+// too narrow to leave room for a message after that column hard-wraps instead.
+func wrapLogLine(line string, width int) []string {
+	if width <= 0 || ansi.StringWidth(line) <= width {
+		return []string{line}
+	}
+	room := width - logfmt.MessageColumn
+	if room < 20 {
+		return strings.Split(ansi.Hardwrap(line, width, true), "\n")
+	}
+	head := ansi.Cut(line, 0, logfmt.MessageColumn)
+	rest := ansi.Cut(line, logfmt.MessageColumn, ansi.StringWidth(line))
+	rows := strings.Split(ansi.Hardwrap(rest, room, true), "\n")
+	indent := strings.Repeat(" ", logfmt.MessageColumn)
+	out := make([]string, 0, len(rows))
+	for i, row := range rows {
+		if i == 0 {
+			out = append(out, head+row)
+			continue
+		}
+		out = append(out, indent+row)
+	}
+	return out
 }
 
 // tabsLine renders the group tabs, the selected one inverted, each numbered

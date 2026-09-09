@@ -40,6 +40,11 @@ const (
 // continuation of the line above rather than as more lines.
 const stackIndent = "    "
 
+// MessageColumn is the cell the message starts at on every rendered line:
+// the time, lane and level columns and the two-space gutters between them.
+// A viewer that wraps a wide line indents the continuation to it.
+const MessageColumn = len(TimeLayout) + 2 + LaneWidth + 2 + LevelWidth + 2
+
 // Level is the normalized severity of a line.
 type Level string
 
