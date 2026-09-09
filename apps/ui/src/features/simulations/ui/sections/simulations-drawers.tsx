@@ -5,33 +5,31 @@
  */
 
 import {
-  AgentCodeEditorDrawerFromUrl,
-  AgentHttpEditorDrawerFromUrl,
-  AgentListDrawer as AgentList,
   AgentTestingCaseEditorDrawer as AgentTestingCaseEditor,
-  AgentWorkflowEditorDrawer as AgentWorkflowEditor,
-  AgentWorkflowTargetEditorDrawer as AgentWorkflowTargetEditor,
-  ConnectedAgentDrawer as ConnectedAgent,
-  ConnectFromCodeDrawer as ConnectFromCode,
   ScenarioFormDrawerFromUrl,
   ScenarioRunDetailDrawer as ScenarioRunDetail,
   ScenarioVersionHistoryDrawer as ScenarioVersionHistory,
   SuiteFormDrawer as SuiteForm,
-  WorkflowSelectorDrawerFromUrl,
 } from "@langwatch/scenario-web/drawers";
 
 import { fromDrawerAddress } from "../../../../model/ui-drawer-address";
 import { withScenarioDrawerHost } from "./host";
+import {
+  ConnectedAgentDrawer as ConnectedAgent,
+  ConnectFromCodeDrawer as ConnectFromCode,
+} from "./connected-agent-drawers";
+import { AgentCodeEditorDrawer as CodeEditor } from "./agent-code-drawer";
+import { AgentHttpEditorDrawer as HttpEditor } from "./agent-http-drawer";
+import { AgentListDrawer as AgentList } from "./agent-list-drawer";
+import {
+  AgentWorkflowEditorDrawer as AgentWorkflowEditor,
+  AgentWorkflowTargetEditorDrawer as AgentWorkflowTargetEditor,
+} from "./agent-workflow-drawers";
+import { WorkflowSelectorDrawer as WorkflowSelector } from "./workflow-selector-drawer";
 
-export const AgentCodeEditorDrawer = withScenarioDrawerHost(
-  fromDrawerAddress(AgentCodeEditorDrawerFromUrl),
-);
-export const AgentHttpEditorDrawer = withScenarioDrawerHost(
-  fromDrawerAddress(AgentHttpEditorDrawerFromUrl),
-);
-export const WorkflowSelectorDrawer = withScenarioDrawerHost(
-  fromDrawerAddress(WorkflowSelectorDrawerFromUrl),
-);
+export const AgentCodeEditorDrawer = withScenarioDrawerHost(fromDrawerAddress(CodeEditor));
+export const AgentHttpEditorDrawer = withScenarioDrawerHost(fromDrawerAddress(HttpEditor));
+export const WorkflowSelectorDrawer = withScenarioDrawerHost(fromDrawerAddress(WorkflowSelector));
 export const AgentListDrawer = withScenarioDrawerHost(fromDrawerAddress(AgentList));
 export const AgentWorkflowTargetEditorDrawer = withScenarioDrawerHost(
   fromDrawerAddress(AgentWorkflowTargetEditor),
@@ -57,7 +55,9 @@ export const ScenarioRunDetailDrawer = withScenarioDrawerHost(fromDrawerAddress(
 export const ScenarioEditorDrawer = withScenarioDrawerHost(
   fromDrawerAddress(ScenarioFormDrawerFromUrl),
 );
-export const SuiteEditorDrawer = withScenarioDrawerHost(SuiteForm);
+export const SuiteEditorDrawer = withScenarioDrawerHost((props: { suiteId?: string }) => (
+  <SuiteForm {...props} renderHttpEditor={(editor) => <HttpEditor {...editor} />} />
+));
 export const AgentWorkflowEditorDrawer = withScenarioDrawerHost(
   fromDrawerAddress(AgentWorkflowEditor),
 );

@@ -1,0 +1,280 @@
+/**
+ * Integration tests for AgentCodeEditorDrawer Save gate — Issue #3412
+ * @vitest-environment jsdom
+ * @see specs/features/scenarios/minimal-input-mapping.feature
+ */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import type React from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ScenarioInputMappingSectionProps } from "../../../../../../../packages/features/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx";
+import { AgentCodeEditorDrawer } from "../sections/agent-code-drawer.tsx";
+
+// ── Hoisted mock state ────────────────────────────────────────────────────────
+
+const mocks = vi.hoisted(() => ({
+  agentData: null as Record<string, unknown> | null,
+  agentError: null as Error | null,
+}));
+
+// ── Module mocks ──────────────────────────────────────────────────────────────
+
+vi.mock(
+  "../../../../../../../packages/features/scenario/web/src/behavior/use-organization-team-project.ts",
+  () => ({
+    useOrganizationTeamProject: () => ({
+      project: { id: "test-project", slug: "test-project" },
+      organization: { id: "test-org" },
+      team: null,
+    }),
+  }),
+);
+
+vi.mock("@langwatch/ui-drawer", () => ({
+  useDrawer: () => ({
+    closeDrawer: vi.fn(),
+    openDrawer: vi.fn(),
+    drawerOpen: vi.fn(() => false),
+    canGoBack: false,
+    goBack: vi.fn(),
+  }),
+  useDrawerParams: () => ({}),
+  getComplexProps: () => ({}),
+  getFlowCallbacks: () => ({}),
+}));
+
+vi.mock("@langwatch/workflow-web/surfaces/code-editor-transport", () => ({
+  CodeEditor: () => null,
+  CodeEditorModal: () => null,
+}));
+
+vi.mock("@langwatch/workflow-web/surfaces/code-block-editor", () => ({
+  CodeBlockEditor: ({ code, onChange }: { code: string; onChange: (code: string) => void }) => (
+    <div data-testid="code-editor">
+      <textarea
+        data-testid="code-textarea"
+        value={code}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  ),
+}));
+
+// Partial mock: stub the heavy React component but keep the real
+// isScenarioMappingValid / hasScenarioInputMapping so the save-gate tests
+// exercise the actual predicate, not a mock.
+vi.mock(
+  "../../../../../../../packages/features/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx",
+  async (importOriginal) => {
+    const mod =
+      await importOriginal<
+        typeof import("../../../../../../../packages/features/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx")
+      >();
+    return {
+      ...mod,
+      ScenarioInputMappingSection: ({ inputs }: ScenarioInputMappingSectionProps) => (
+        <div data-testid="scenario-mapping-section">
+          {inputs.map((i) => (
+            <div key={i.identifier} data-testid={`scenario-mapping-input-${i.identifier}`}>
+              {i.identifier}
+            </div>
+          ))}
+        </div>
+      ),
+    };
+  },
+);
+
+vi.mock("../../../../../../../packages/features/agent/web/src/behavior/agent-api.ts", () => ({
+  agentApi: {
+    agents: {
+      getById: {
+        useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+          if (options?.enabled === false) {
+            return { data: undefined, isLoading: false, error: null };
+          }
+          return { data: mocks.agentData, isLoading: false, error: mocks.agentError };
+        },
+      },
+      create: {
+        useMutation: () => ({
+          mutateAsync: vi.fn().mockResolvedValue({ id: "new-agent-id" }),
+          isPending: false,
+        }),
+      },
+      update: {
+        useMutation: () => ({
+          mutateAsync: vi.fn().mockResolvedValue({}),
+          isPending: false,
+        }),
+      },
+      testTurn: {
+        useMutation: () => ({
+          mutate: vi.fn(),
+          isPending: false,
+          data: undefined,
+          error: null,
+        }),
+      },
+    },
+    useUtils: () => ({
+      agents: {
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+  },
+}));
+
+// ── Agent fixtures ────────────────────────────────────────────────────────────
+
+/**
+ * Code agent with a valid input mapping (userQuery → input), outputs present, but
+ * scenarioOutputField explicitly cleared ("").
+ */
+const CODE_AGENT_INPUT_MAPPED_OUTPUT_CLEARED = {
+  id: "code-agent-cleared",
+  name: "Code Agent Cleared Output",
+  type: "code" as const,
+  projectId: "test-project",
+  config: {
+    name: "Code",
+    description: "Python code block",
+    parameters: [
+      {
+        identifier: "code",
+        type: "code",
+        value:
+          "class Code:\n    def __call__(self, userQuery: str):\n        return {'response': userQuery}",
+      },
+    ],
+    inputs: [{ identifier: "userQuery", type: "str" }],
+    outputs: [{ identifier: "response", type: "str" }],
+    scenarioMappings: {
+      userQuery: {
+        type: "source" as const,
+        sourceId: "scenario",
+        path: ["input"],
+      },
+    },
+    scenarioOutputField: "", // explicitly cleared by user
+  },
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  description: null,
+  copiedFromAgentId: null,
+};
+
+/**
+ * Code agent where the mapping does NOT wire "input" or "messages" — only
+ * threadId. hasScenarioInputMapping returns false for this config.
+ */
+const CODE_AGENT_NO_INPUT_MAPPING = {
+  id: "code-agent-no-input",
+  name: "Code Agent No Input Mapping",
+  type: "code" as const,
+  projectId: "test-project",
+  config: {
+    name: "Code",
+    description: "Python code block",
+    parameters: [
+      {
+        identifier: "code",
+        type: "code",
+        value:
+          "class Code:\n    def __call__(self, sessionId: str):\n        return {'response': sessionId}",
+      },
+    ],
+    inputs: [{ identifier: "sessionId", type: "str" }],
+    outputs: [{ identifier: "response", type: "str" }],
+    scenarioMappings: {
+      sessionId: {
+        type: "source" as const,
+        sourceId: "scenario",
+        path: ["threadId"], // threadId only — not "input" or "messages"
+      },
+    },
+    scenarioOutputField: "response",
+  },
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  description: null,
+  copiedFromAgentId: null,
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+function renderDrawer(agentId: string) {
+  return render(<AgentCodeEditorDrawer open={true} agentId={agentId} />, {
+    wrapper: Wrapper,
+  });
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe("AgentCodeEditorDrawer save gate", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.agentError = null;
+  });
+
+  it("blocks editing when reading the existing agent fails", async () => {
+    mocks.agentData = null;
+    mocks.agentError = new Error("request_failed");
+    renderDrawer("missing-agent");
+
+    expect(await screen.findByText(/Couldn't load agent/)).toBeInTheDocument();
+    expect(screen.queryByTestId("code-editor")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /save/i })).toBeDisabled();
+  });
+  afterEach(cleanup);
+
+  // (a) RED → GREEN ────────────────────────────────────────────────────────────
+  describe("given a code agent with a valid input mapping but outputField explicitly cleared", () => {
+    beforeEach(() => {
+      mocks.agentData = CODE_AGENT_INPUT_MAPPED_OUTPUT_CLEARED;
+    });
+
+    describe("when the drawer renders with the pre-saved config", () => {
+      /** @scenario Save code agent when output mapping is cleared but input mapping present */
+      it("enables the Save Changes button", async () => {
+        renderDrawer("code-agent-cleared");
+
+        await waitFor(() => {
+          expect(screen.getByTestId("save-agent-button")).not.toBeDisabled();
+        });
+      });
+    });
+  });
+
+  // (b) FAIL-CLOSED ─────────────────────────────────────────────────────────────
+  describe("given a code agent with no input-field mapping", () => {
+    beforeEach(() => {
+      mocks.agentData = CODE_AGENT_NO_INPUT_MAPPING;
+    });
+
+    describe("when the drawer renders with threadId-only mapping", () => {
+      /** @scenario Save code agent stays blocked when no input mapping is configured */
+      it("keeps the Save Changes button disabled", async () => {
+        renderDrawer("code-agent-no-input");
+
+        await waitFor(() => {
+          expect(screen.getByTestId("save-agent-button")).toBeDisabled();
+        });
+      });
+    });
+  });
+});
+
+vi.mock("@langwatch/ui-host/capabilities", () => ({
+  useUiCapabilities: () => ({
+    session: { activeScope: () => ({ projectId: "test-project" }) },
+    feedback: { succeeded: vi.fn(), failed: vi.fn() },
+  }),
+}));
+import "@testing-library/jest-dom/vitest";
