@@ -1064,6 +1064,20 @@ func TestTheBodyIsExactlyTheRowsTheTerminalHas(t *testing.T) {
 		{name: "every line opened", width: 100, height: 24, set: func(m *viewerModel) { m.handleKey("x") }},
 		{name: "a narrow terminal", width: 40, height: 24, set: func(m *viewerModel) {}},
 		{name: "a short terminal", width: 100, height: 12, set: func(m *viewerModel) { m.handleKey("x") }},
+		// The ui lane writes records whose msg carries its own newlines - the
+		// Vite banner is three lines in one record. A row holding a newline is
+		// one row to the layout and three on the terminal, so the frame is
+		// taller than it counts and the banner falls off the top.
+		{name: "a record whose message carries its own newlines", width: 100, height: 24, set: func(m *viewerModel) {
+			m.logs.Observe(sources.LogLine{At: time.Now(), Lane: "ui", Level: "info", Text: `{"level":"info","msg":"VITE v8.1.2  ready in 412 ms
+
+  ➜  Local:   https://app.feat-x.langwatch.localhost/
+  ➜  Network: use --host to expose"}`})
+			m.logs.Observe(sources.LogLine{At: time.Now(), Lane: "ui", Level: "error",
+				Text: `{"level":"error","msg":"boom","stack":"at one (a.ts:1)
+at two (b.ts:2)
+at three (c.ts:3)"}`})
+		}},
 	}
 	for _, tc := range cases {
 		t.Run("when the logs tab is drawn "+tc.name, func(t *testing.T) {
@@ -1083,6 +1097,9 @@ func TestTheBodyIsExactlyTheRowsTheTerminalHas(t *testing.T) {
 			for i, line := range lines {
 				if ansi.StringWidth(line) > tc.width {
 					t.Errorf("line %d is %d cells wide, want at most %d: %q", i, ansi.StringWidth(line), tc.width, line)
+				}
+				if strings.Contains(line, "\n") {
+					t.Errorf("line %d carries a newline, so it paints as several rows: %q", i, line)
 				}
 			}
 		})
@@ -1153,4 +1170,105 @@ func payloadOf(row string) string {
 		return ""
 	}
 	return strings.Join(fields[len(fields)-2:], " ")
+}
+
+// subTabModel is a viewer on the logs tab with two applications behind it.
+func subTabModel(t *testing.T) *viewerModel {
+	t.Helper()
+	dir := t.TempDir()
+	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), dir)
+	m.width, m.height = 120, 24
+	appendCapture(t, dir, "ui", `{"level":"info","msg":"vite ready"}`)
+	appendCapture(t, dir, "go", `{"service":"langwatch-service-nlpgo","level":"info","msg":"ready"}`)
+	m.ingest()
+	m.selectTab("logs")
+	return m
+}
+
+// @scenario "Enter goes into a tab's sub-tabs and escape comes back up"
+func TestEnterGoesIntoSubTabsAndEscapeComesBackUp(t *testing.T) {
+	m := subTabModel(t)
+
+	t.Run("at the top level the footer offers the way in", func(t *testing.T) {
+		if !strings.Contains(stripPaint(m.navFooter()), "enter goes into this tab's") {
+			t.Errorf("footer = %q, want it to name enter", m.navFooter())
+		}
+	})
+
+	m.handleKey("enter")
+	if !m.inSubTabs {
+		t.Fatal("enter did not go into the logs tab's sub-tabs")
+	}
+	t.Run("inside, the footer says so and names the way out", func(t *testing.T) {
+		footer := stripPaint(m.navFooter())
+		if !strings.Contains(footer, "in "+m.logs.Selected()) || !strings.Contains(footer, "esc goes back") {
+			t.Errorf("footer = %q, want the level and the way out", footer)
+		}
+	})
+
+	m.handleKey("esc")
+	if m.inSubTabs {
+		t.Fatal("esc did not come back up to the tabs")
+	}
+	t.Run("and esc from the top level still detaches", func(t *testing.T) {
+		if _, cmd := m.handleKey("esc"); cmd == nil {
+			t.Error("esc at the top level must still leave the viewer")
+		}
+	})
+
+	t.Run("given a tab with no sub-tabs", func(t *testing.T) {
+		m.selectTab("stores")
+		m.handleKey("enter")
+		if m.inSubTabs {
+			t.Error("the stores tab has no second level to go into")
+		}
+		if strings.Contains(stripPaint(m.navFooter()), "enter goes into") {
+			t.Errorf("footer = %q, want it to offer nothing that is not there", m.navFooter())
+		}
+	})
+}
+
+// @scenario "Arrows move sub-tabs only inside the tab"
+func TestArrowsMoveSubTabsOnlyInsideTheTab(t *testing.T) {
+	m := subTabModel(t)
+
+	t.Run("at the top level the arrows move between tabs", func(t *testing.T) {
+		m.handleKey("right")
+		if m.currentTab() != "jobs" {
+			t.Errorf("right landed on %q, want the next tab", m.currentTab())
+		}
+		m.handleKey("left")
+	})
+
+	m.handleKey("enter")
+	before := m.logs.Selected()
+	m.handleKey("right")
+	if m.currentTab() != "logs" {
+		t.Errorf("the top row moved to %q while inside the tab", m.currentTab())
+	}
+	if m.logs.Selected() == before {
+		t.Errorf("the application stayed on %q, want the arrows to move it", before)
+	}
+	m.handleKey("left")
+	if m.logs.Selected() != before {
+		t.Errorf("left landed on %q, want it back on %q", m.logs.Selected(), before)
+	}
+
+	t.Run("the bracket keys still work from either level", func(t *testing.T) {
+		m.handleKey("]")
+		if m.logs.Selected() == before {
+			t.Error("] did not move the application")
+		}
+		m.handleKey("[")
+	})
+
+	t.Run("tab still moves between the tabs from inside", func(t *testing.T) {
+		m.handleKey("tab")
+		if m.currentTab() != "jobs" {
+			t.Errorf("tab landed on %q, want the next tab", m.currentTab())
+		}
+		if m.inSubTabs {
+			t.Error("leaving the tab must leave its level too")
+		}
+	})
 }

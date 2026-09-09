@@ -135,6 +135,21 @@ func (t *ProfilesTab) openInGrafana() {
 	}
 }
 
+// SubTabs is the services this tab moves between.
+func (t *ProfilesTab) SubTabs() []string {
+	out := make([]string, 0, len(t.services))
+	for _, service := range t.services {
+		out = append(out, service.Service)
+	}
+	return out
+}
+
+// SelectedSubTab is the service on screen.
+func (t *ProfilesTab) SelectedSubTab() string { return t.Selected() }
+
+// MoveSubTab cycles the services.
+func (t *ProfilesTab) MoveSubTab(delta int) { t.moveService(delta) }
+
 // Rows is every service's lists as plain data.
 func (t *ProfilesTab) Rows() any { return t.services }
 

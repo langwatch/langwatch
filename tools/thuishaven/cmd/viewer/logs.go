@@ -94,9 +94,20 @@ func (t *LogsTab) ingest(line sources.LogLine) {
 	if t.src.Render != nil {
 		rendered = t.src.Render(line)
 	}
-	row := Row{ID: t.pages.nextRowID(), Text: rendered, Source: line.Text}
-	t.pages.push(AllApps, row)
-	t.pages.push(line.App, row)
+	// A record's message can carry newlines of its own - the Vite banner is
+	// three lines in one msg - and so can a stack trace. One ring entry holding
+	// several physical lines counts as one row to the layout and paints as
+	// three on the terminal, which is a frame taller than the terminal thinks
+	// it is and a banner scrolled off the top. Each physical line is its own
+	// row; only the first carries the record, since only it has the fields.
+	for i, physical := range strings.Split(rendered, "\n") {
+		row := Row{ID: t.pages.nextRowID(), Text: physical}
+		if i == 0 {
+			row.Source = line.Text
+		}
+		t.pages.push(AllApps, row)
+		t.pages.push(line.App, row)
+	}
 }
 
 // noteLevel remembers when a line worth a mark on the tab bar arrived. Info is
@@ -124,6 +135,12 @@ func (t *LogsTab) Attention(since time.Time) Attention {
 	}
 	return AttentionNone
 }
+
+// SelectedSubTab is the application on screen, for the model's navigation.
+func (t *LogsTab) SelectedSubTab() string { return t.selected }
+
+// MoveSubTab cycles the application sub-tabs.
+func (t *LogsTab) MoveSubTab(delta int) { t.moveSubTab(delta) }
 
 // SubTabs is the applications with output, in the fixed order, "all" first.
 func (t *LogsTab) SubTabs() []string {

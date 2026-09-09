@@ -42,6 +42,22 @@ Feature: haven up viewer tabs
         lines off the top rather than half of a block
 
     @unit
+    Scenario: Enter goes into a tab's sub-tabs and escape comes back up
+      Given the logs tab, which has sub-tabs of its own
+      When the developer presses enter
+      Then the arrows move between the applications rather than between the tabs
+      And escape comes back up, where the arrows move between the tabs again
+      And the footer says which level the reader is on
+      And a tab with no sub-tabs has nothing to go into
+
+    @unit
+    Scenario: Arrows move sub-tabs only inside the tab
+      Given the reader has gone into the logs tab's sub-tabs
+      When the developer presses left or right
+      Then the application changes and the top row does not
+      And tab and shift+tab still move between the tabs from either level
+
+    @unit
     Scenario: A click opens the line that was drawn at that row
       Given a scrolled-back logs tab with one line already opened
       When the developer clicks a row

@@ -52,6 +52,19 @@ type Tab interface {
 	Attention(since time.Time) Attention
 }
 
+// SubTabbed is a tab with a second row of its own: the log tab's applications,
+// the profiles tab's services. Optional, because most tabs are one list and
+// giving them an empty second level would put a navigation step in front of
+// nothing.
+type SubTabbed interface {
+	// SubTabs is the second row, in order.
+	SubTabs() []string
+	// SelectedSubTab is the one on screen.
+	SelectedSubTab() string
+	// MoveSubTab cycles them, wrapping at either end.
+	MoveSubTab(delta int)
+}
+
 // Attention is how much a tab off screen wants to be looked at.
 type Attention int
 

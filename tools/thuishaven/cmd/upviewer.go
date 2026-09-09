@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -128,6 +129,11 @@ type viewerModel struct {
 	// seconds later, twenty rows further up, and must still be open. Switching
 	// tabs clears it.
 	expandedIDs map[int64]bool
+	// inSubTabs is whether the reader has gone down into the tab's own second
+	// row. Two levels, because the arrows can only mean one thing at a time:
+	// at the top they move between tabs, inside they move between the tab's own
+	// list, and enter and escape are how you say which you meant.
+	inSubTabs bool
 	// hoverRow is the body row the pointer is over, so a click has a visible
 	// target. -1 when the pointer is outside the body or the terminal sends no
 	// motion at all.
@@ -463,19 +469,25 @@ func (m *viewerModel) handleCommonKey(s string) (tea.Model, tea.Cmd) {
 		return m.handleEscape()
 	case "q", "ctrl+c":
 		return m, tea.Quit
+	case "enter":
+		m.enterSubTabs()
 	case "x":
 		tab := m.currentTab()
 		m.expandAll[tab] = !m.expandAll[tab]
 		m.expandedIDs = map[int64]bool{}
-	case "right", "l", "tab":
+	case "right", "l":
+		m.moveSideways(1)
+	case "left", "h":
+		m.moveSideways(-1)
+	case "tab":
 		m.moveTab(1)
-	case "left", "h", "shift+tab":
+	case "shift+tab":
 		m.moveTab(-1)
 	default:
 		if n := digitKey(s); n > 0 && n <= len(viewer.TabNames) {
 			m.preferred = ""
 			m.selected = n - 1
-			m.expandedIDs = map[int64]bool{}
+			m.leaveTab()
 		}
 	}
 	return m, nil
@@ -485,6 +497,10 @@ func (m *viewerModel) handleCommonKey(s string) (tea.Model, tea.Cmd) {
 // screen has had its own chance at it. Only the keys the banner actually names
 // (q, and ctrl+c as the usual interrupt) may destroy a play sandbox.
 func (m *viewerModel) handleEscape() (tea.Model, tea.Cmd) {
+	if m.inSubTabs {
+		m.inSubTabs = false
+		return m, nil
+	}
 	if m.destroyOnQuit {
 		m.setToast("press q to quit - it DESTROYS this sandbox")
 		return m, nil
@@ -496,15 +512,72 @@ func (m *viewerModel) moveTab(delta int) {
 	m.preferred = ""
 	count := len(viewer.TabNames)
 	m.selected = ((m.selected+delta)%count + count) % count
-	m.expandedIDs = map[int64]bool{}
+	m.leaveTab()
 }
+
+// moveSideways is what the arrows do at whichever level the reader is on.
+func (m *viewerModel) moveSideways(delta int) {
+	if sub, ok := m.subTabbed(); ok && m.inSubTabs {
+		sub.MoveSubTab(delta)
+		return
+	}
+	m.moveTab(delta)
+}
+
+// enterSubTabs goes down into a tab's own second row. A tab with no second row
+// has nothing to go into, and enter stays whatever that tab made of it.
+func (m *viewerModel) enterSubTabs() {
+	if _, ok := m.subTabbed(); ok {
+		m.inSubTabs = true
+	}
+}
+
+// subTabbed is the tab on screen if it has a second row of its own.
+func (m *viewerModel) subTabbed() (viewer.SubTabbed, bool) {
+	tab, ok := m.tabs[m.currentTab()]
+	if !ok {
+		return nil, false
+	}
+	sub, isSub := tab.(viewer.SubTabbed)
+	if !isSub || len(sub.SubTabs()) < 2 {
+		return nil, false
+	}
+	return sub, true
+}
+
+// leaveTab forgets everything that belonged to the tab being left: which rows
+// were open on it, and which level of it the reader was on.
+func (m *viewerModel) leaveTab() {
+	m.expandedIDs = map[int64]bool{}
+	m.inSubTabs = false
+}
+
+// navFooter is the row that says which level the reader is on and what the
+// arrows do there. Two levels are only navigable if the screen says which one
+// you are on.
+func (m *viewerModel) navFooter() string {
+	sub, ok := m.subTabbed()
+	switch {
+	case ok && m.inSubTabs:
+		return dimText("in " + sub.SelectedSubTab() + " · ←→ and [ ] move between them · esc goes back to the tabs")
+	case ok:
+		return dimText("←→ moves between tabs · enter goes into this tab's " + itoa(len(sub.SubTabs())) + " sub-tabs")
+	}
+	return dimText("←→ moves between tabs")
+}
+
+// dimText paints one string dim, the model's own half of the footer.
+func dimText(text string) string { return "\x1b[2m" + text + "\x1b[0m" }
+
+// itoa is strconv.Itoa under a shorter name, for building one footer string.
+func itoa(n int) string { return strconv.Itoa(n) }
 
 // selectTab moves to one tab by name.
 func (m *viewerModel) selectTab(name string) {
 	for i, tab := range viewer.TabNames {
 		if tab == name {
 			m.selected = i
-			m.expandedIDs = map[int64]bool{}
+			m.leaveTab()
 			return
 		}
 	}
@@ -645,7 +718,7 @@ func (m *viewerModel) View() string {
 		return strings.Join(m.clampToTerminal(append(chrome, m.dashboardRows()...)), "\n")
 	}
 	tab := m.tabs[m.currentTab()]
-	footer := m.footerRows(tab.Footer())
+	footer := m.footerRows(tab.Footer() + "\n " + m.navFooter())
 	header := m.headerRows(tab)
 	budget := m.bodyBudget(len(footer), len(header))
 	body := m.layOutBody(tab, header, budget)
@@ -849,9 +922,22 @@ func fitRows(rows []viewer.Row, opts fitOptions) []fittedRow {
 			blocks = append(blocks, expandRow(row, opts.width-gutterWidth))
 			continue
 		}
-		blocks = append(blocks, []fittedRow{{id: row.ID, text: cutRow(row.Text, opts.width-gutterWidth)}})
+		blocks = append(blocks, cutBlock(row, opts.width-gutterWidth))
 	}
 	return keepLastBlocks(blocks, opts.body)
+}
+
+// cutBlock is one unopened line: cut to the width, and split first on any
+// newline it carries. A painted row with a newline in it is one row to this
+// layout and two on the terminal, so the frame ends up taller than the count
+// says and the banner is what falls off the top.
+func cutBlock(row viewer.Row, room int) []fittedRow {
+	physical := strings.Split(row.Text, "\n")
+	out := make([]fittedRow, 0, len(physical))
+	for i, line := range physical {
+		out = append(out, fittedRow{id: row.ID, text: cutRow(line, room), rest: i > 0})
+	}
+	return out
 }
 
 // keepLastBlocks takes whole blocks from the bottom until the budget is full.
@@ -952,6 +1038,13 @@ func gutterFor(row fittedRow, hovered bool) string {
 // under the same time and lane, the way a stack trace already is. A terminal
 // too narrow to leave room for a message after that column hard-wraps instead.
 func wrapLogLine(line string, width int) []string {
+	if strings.Contains(line, "\n") {
+		var out []string
+		for _, physical := range strings.Split(line, "\n") {
+			out = append(out, wrapLogLine(physical, width)...)
+		}
+		return out
+	}
 	if width <= 0 || ansi.StringWidth(line) <= width {
 		return []string{line}
 	}
