@@ -57,13 +57,15 @@ function handlerFor({
 
 describe("people listing outbox effect", () => {
   describe("when the provider names people", () => {
-    it("records the count against the request that asked", async () => {
+    it("records both counts against the request that asked", async () => {
       const recordPeopleListed = vi.fn();
       const handler = handlerFor({
         port: {
-          list: vi
-            .fn()
-            .mockResolvedValue({ outcome: "listed", personCount: 42 }),
+          list: vi.fn().mockResolvedValue({
+            outcome: "listed",
+            directoryPersonCount: 42,
+            withheldPersonCount: 0,
+          }),
         },
         commands: commandsStub({ recordPeopleListed }),
       });
@@ -76,8 +78,38 @@ describe("people listing outbox effect", () => {
         sourceId: "source-1",
         requestId: "req-1",
         requestedAt: 100,
-        personCount: 42,
+        directoryPersonCount: 42,
+        withheldPersonCount: 0,
       });
+    });
+
+    /**
+     * The count the provider named must survive the handler even when almost
+     * none of it was stored. This is the assertion that would have caught the
+     * lossy event: a handler passing on only the survivors reports two people
+     * here, and a screen would then say the provider named two.
+     */
+    it("carries the provider's count through when suppression withheld most of it", async () => {
+      const recordPeopleListed = vi.fn();
+      const handler = handlerFor({
+        port: {
+          list: vi.fn().mockResolvedValue({
+            outcome: "listed",
+            directoryPersonCount: 500,
+            withheldPersonCount: 498,
+          }),
+        },
+        commands: commandsStub({ recordPeopleListed }),
+      });
+
+      await handler(intent, context(1));
+
+      expect(recordPeopleListed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          directoryPersonCount: 500,
+          withheldPersonCount: 498,
+        }),
+      );
     });
 
     it("does not touch the agent listing commands", async () => {
@@ -85,9 +117,11 @@ describe("people listing outbox effect", () => {
       const recordAgentsListingRefused = vi.fn();
       const handler = handlerFor({
         port: {
-          list: vi
-            .fn()
-            .mockResolvedValue({ outcome: "listed", personCount: 3 }),
+          list: vi.fn().mockResolvedValue({
+            outcome: "listed",
+            directoryPersonCount: 3,
+            withheldPersonCount: 0,
+          }),
         },
         commands: commandsStub({
           recordAgentsListed,
@@ -113,9 +147,11 @@ describe("people listing outbox effect", () => {
       const recordPeopleListingRefused = vi.fn();
       const handler = handlerFor({
         port: {
-          list: vi
-            .fn()
-            .mockResolvedValue({ outcome: "listed", personCount: 0 }),
+          list: vi.fn().mockResolvedValue({
+            outcome: "listed",
+            directoryPersonCount: 0,
+            withheldPersonCount: 0,
+          }),
         },
         commands: commandsStub({
           recordPeopleListed,
@@ -126,7 +162,10 @@ describe("people listing outbox effect", () => {
       await handler(intent, context(1));
 
       expect(recordPeopleListed).toHaveBeenCalledWith(
-        expect.objectContaining({ personCount: 0 }),
+        expect.objectContaining({
+          directoryPersonCount: 0,
+          withheldPersonCount: 0,
+        }),
       );
       expect(recordPeopleListingRefused).not.toHaveBeenCalled();
     });
@@ -300,9 +339,11 @@ describe("people listing outbox effect", () => {
     it("rethrows so the outbox redelivers rather than losing the outcome", async () => {
       const handler = handlerFor({
         port: {
-          list: vi
-            .fn()
-            .mockResolvedValue({ outcome: "listed", personCount: 2 }),
+          list: vi.fn().mockResolvedValue({
+            outcome: "listed",
+            directoryPersonCount: 2,
+            withheldPersonCount: 0,
+          }),
         },
         commands: commandsStub({
           recordPeopleListed: vi
