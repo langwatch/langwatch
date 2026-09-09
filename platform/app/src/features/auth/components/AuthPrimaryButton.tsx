@@ -1,5 +1,6 @@
 import { Button } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+import { SHAPE } from "../authTheme";
 import "../auth.css";
 
 /**
@@ -62,6 +63,37 @@ export function AuthPrimaryButton({
 }
 
 /**
+ * The SHAPE of a way through this card, with no colour in it.
+ *
+ * Split out because the primary is not the only one: a card that offers "send
+ * the link" over "use a different address" is offering two ways on, and they
+ * have to be the same object in two colours or the pair reads as a control and
+ * an afterthought. They had drifted — the second was a bare Chakra `Button`,
+ * so it took the theme's default height and the form's corner instead of these
+ * — and the difference was plainly visible with the two stacked.
+ *
+ * Everything here is geometry and type. Colour belongs to the styles below,
+ * which is what makes a secondary possible without a second copy of these
+ * five values.
+ */
+export const AUTH_ACTION_GEOMETRY = {
+  width: "full",
+  minHeight: "44px",
+  // The same size and weight the method rail is set in, because they are the
+  // same kind of thing: a way through this card. A primary that shouted in a
+  // heavier weight would be a different component wearing the colour.
+  fontSize: "14px",
+  fontWeight: 600,
+  // `SHAPE.control`, the same radius as `SHAPE.field`, because authTheme.ts
+  // settled that argument and this button had not heard: "a card holding 10px
+  // inputs under a fully-rounded pill is two shape languages arguing on one
+  // surface", and it names the primary button as one of the things cut to
+  // `control`. This hardcoded a 9999px pill against that, which is why the two
+  // actions on the sign-up card did not look like a pair.
+  borderRadius: SHAPE.control,
+} as const;
+
+/**
  * Every value the primary action is made of, in one object.
  *
  * Exported because two callers cannot use the component and must still be the
@@ -74,17 +106,7 @@ export function AuthPrimaryButton({
  */
 export const AUTH_PRIMARY_STYLE = {
   className: "lw-auth-primary",
-  width: "full",
-  minHeight: "44px",
-  // The same size and weight the method rail is set in, because they are the
-  // same kind of thing: a way through this card. A primary that shouted in a
-  // heavier weight would be a different component wearing the colour.
-  fontSize: "14px",
-  fontWeight: 600,
-  // The site's pill, not the card's box: `.btn-primary` on the marketing
-  // pages is rounded-full, and the primary is the one control on this card
-  // that speaks the site's own button language rather than the form's.
-  borderRadius: "9999px",
+  ...AUTH_ACTION_GEOMETRY,
   backgroundColor: "auth.action",
   color: "auth.onAction",
   // Every state is a change of COLOUR. One step along the brand ramp on hover

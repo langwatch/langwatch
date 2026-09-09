@@ -1,4 +1,4 @@
-import { Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
@@ -34,6 +34,7 @@ import { JOIN_BEFORE_CREATE_PATH } from "../logic/signUpDestination";
 import { useTwoStepChallenge } from "../logic/twoStepChallenge";
 import { AuthFinePrint } from "./AuthFinePrint";
 import { AuthPrimaryButton } from "./AuthPrimaryButton";
+import { AuthSecondaryButton } from "./AuthSecondaryButton";
 import { CheckYourEmail } from "./CheckYourEmail";
 import { CredentialSignInForm } from "./CredentialSignInForm";
 import { IdentifierStepForm } from "./IdentifierStepForm";
@@ -517,9 +518,9 @@ function NoAccountYet({
         >
           Send confirmation link
         </AuthPrimaryButton>
-        <Button variant="ghost" onClick={onUseDifferentEmail}>
+        <AuthSecondaryButton onClick={onUseDifferentEmail}>
           Use a different email
-        </Button>
+        </AuthSecondaryButton>
         <SignUpLink
           callbackUrl={callbackUrl}
           email={email}
