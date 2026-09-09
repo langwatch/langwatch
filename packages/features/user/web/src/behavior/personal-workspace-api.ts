@@ -1,9 +1,10 @@
 /**
- * The procedures this package calls, and the hooks that call them.
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
+ * Procedures this package calls: derived namespaces from contract, borrowed ones
+ * from features not yet split. Segment names are load-bearing for React Query cache.
  */
 
-import { createFeatureApi } from "@langwatch/api/web";
+import type { userTrpc, identityTrpc } from "@langwatch/user-contract";
+import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
 import type { CodingAgentUsageTotals } from "@langwatch/coding-agent-contract";
 import type { AiToolEntry } from "../model/ai-tool-catalog.ts";
 
@@ -40,7 +41,6 @@ export type PersonalUsageRollup = {
     completionTokens: number;
     mostUsedModel: { name: string; usagePct: number } | null;
   };
-  /** `day` is a calendar day, `"YYYY-MM-DD"`, not an instant. */
   dailyBuckets: Array<{
     day: string;
     spentUsd: number;
@@ -80,7 +80,6 @@ export type PersonalBudgetOverviewItem = {
   scopeId: string;
   scopeLabel: string;
   window: string;
-  /** Decimal strings, both. */
   limitUsd: string;
   spentUsd: string;
   onBreach: string;
@@ -91,9 +90,7 @@ export type PersonalBudgetOverviewItem = {
   managedByVirtualKeyId: string | null;
   scopeClass: "organization" | "team" | "project" | "personal" | "key" | "department" | "other";
   scopePhrase: string;
-  /** An ISO STRING, or null on a window that never resets. */
   resetsAt: string | null;
-  /** Only attached for a personal budget, and only when asked for. */
   topModels?: Array<{ model: string; spentUsd: number }>;
 };
 
@@ -160,11 +157,9 @@ export type IngestionTemplateView = {
   description: string | null;
   iconAsset: string | null;
   credentialSchema: string | null;
-  /** Always empty on this read: the rules are the administrator's business. */
   ottlRules: string;
   platformPublished: boolean;
   enabled: boolean;
-  /** Null on a platform-published row. */
   organizationId: string | null;
 };
 
@@ -191,29 +186,18 @@ export type PersonaResolutionView = {
   isOverride: boolean;
   governanceUiEnabled: boolean;
   intentPinned: boolean;
-  /** The resolver's own project — never a personal workspace (ADR-038 v6). */
   firstProjectSlug: string | null;
 };
 
 /**
  * The organization graph, narrowed to what this family reads. The procedure answers with the
- * stored Prisma rows — every organization column, every team column, every project column, and
- * every instant as the ISO 8601 string plain JSON carries.
+ * stored Prisma rows, every instant as an ISO 8601 string.
  */
 export type PersonalOrganizationGraph = {
   id: string;
   name: string;
   slug: string;
-  /**
-   * Narrowed to the caller's own row by the read itself. On a demo
-   * organization the demo user's row can appear beside it, so this is a list
-   * rather than one row.
-   */
   members: Array<{ userId: string; role: string }>;
-  /**
-   * The single sign-on provider the organization is pinned to, if any. A staff-set string
-   * column, not a licence fact.
-   */
   ssoProvider?: string | null;
   teams: Array<{
     id: string;
@@ -222,19 +206,13 @@ export type PersonalOrganizationGraph = {
   }>;
 };
 
-export type PersonalWorkspaceApiMap = {
+type BorrowedProcedures = {
   user: {
-    personalContext: {
-      query: { input: { organizationId: string }; output: PersonalWorkspaceContext };
-    };
     personalUsage: {
       query: {
         input: { organizationId: string; windowStartMs?: number; windowEndMs?: number };
         output: PersonalUsageRollup;
       };
-    };
-    personalBudget: {
-      query: { input: { organizationId: string }; output: PersonalBudgetState };
     };
     budgetOverview: {
       query: {
@@ -242,102 +220,13 @@ export type PersonalWorkspaceApiMap = {
         output: PersonalBudgetOverviewPayload;
       };
     };
-    requestBudgetIncrease: {
-      mutation: {
-        input: {
-          organizationId: string;
-          scope: string;
-          scopeId: string;
-          limitUsd: string;
-          spentUsd: string;
-          period?: string | undefined;
-          message?: string | undefined;
-        };
-        output: { ok: boolean; sentTo: string };
-      };
-    };
-    setAvatar: {
-      mutation: {
-        input: { organizationId: string; imageDataUrl: string };
-        output: { image: string };
-      };
-    };
-    removeAvatar: {
-      mutation: { input: Record<string, never>; output: { success: boolean } };
-    };
-    homePagePickerState: {
-      query: {
-        input: { organizationId: string };
-        output: { lastHomePath: string | null; firstProjectSlug: string | null };
-      };
-    };
-    setLastHomePath: {
-      mutation: { input: { path: string | null }; output: { ok: boolean } };
-    };
-
-    // -- the reader's own sign-in methods ------------------------------------ Settings >
-    // Authentication, and every one of them is keyed on the session's own user id rather than
-    // on a scope: `policy(OWN_ACCOUNT)` on the transport, no organization named in any input.
-    // That is why the page has never carried a permission guard. NOTHING BELOW CARRIES
-    // CREDENTIAL MATERIAL BACK.
-
-    /**
-     * Which sign-in methods this account holds. `providerAccountId` is the identifier at the
-     * provider — under Auth0 it is the `strategy|id` string the display name is derived from —
-     * and is not a secret. There is no token on this shape and there never has been.
-     */
-    getLinkedAccounts: {
-      query: {
-        input: Record<string, never>;
-        output: Array<{ id: string; provider: string; providerAccountId: string }>;
-      };
-    };
-
-    /**
-     * Removes one sign-in method. Refuses the LAST one: the count and the delete run in one
-     * serializable transaction on the server, so two concurrent unlinks cannot both observe two
-     * accounts and leave the reader with no way in.
-     */
-    unlinkAccount: {
-      mutation: { input: { accountId: string }; output: PersonalAcknowledgement };
-    };
-
-    /**
-     * Whether this account has a password at all. The boolean, never the hash.
-     */
-    hasPassword: {
-      query: { input: Record<string, never>; output: { hasPassword: boolean } };
-    };
-
-    /** Replaces an existing password. The plaintext goes out; nothing comes back. */
-    changePassword: {
-      mutation: {
-        input: { currentPassword: string; newPassword: string };
-        output: PersonalAcknowledgement;
-      };
-    };
-
-    /** Sets a FIRST password, for an account that has none. One-way, the same. */
-    setPassword: {
-      mutation: { input: { password: string }; output: PersonalAcknowledgement };
-    };
   };
-
-  /**
-   * Which sign-in mode this deployment is in.
-   * cache key is that one segment. ADR-027 makes it the single source of truth
-   */
   publicEnv: {
     query: {
       input: Record<string, never>;
       output: { NEXTAUTH_PROVIDER?: string; SHOW_OPS_IN_MAIN_SIDEBAR: boolean };
     };
   };
-
-  /**
-   * Why a deployment configured for single sign-on is not using it. AN ENTERPRISE PROCEDURE
-   * PATH, AND ONLY A PATH.
-   */
   license: {
     getSsoGateStatus: {
       query: {
@@ -346,12 +235,6 @@ export type PersonalWorkspaceApiMap = {
       };
     };
   };
-
-  /**
-   * Which plan the organization is on. Read for one boolean — whether a license unlocks the
-   * capabilities the self-hosted discovery section lists — so only `activePlan.type` is named.
-   * The rest of the usage payload belongs to the billing surfaces.
-   */
   limits: {
     getUsage: {
       query: {
@@ -360,7 +243,6 @@ export type PersonalWorkspaceApiMap = {
       };
     };
   };
-
   personalVirtualKeys: {
     list: {
       query: {
@@ -381,7 +263,6 @@ export type PersonalWorkspaceApiMap = {
       };
     };
   };
-
   personalSessions: {
     list: {
       query: { input: { organizationId: string }; output: PersonalCliSession[] };
@@ -399,7 +280,6 @@ export type PersonalWorkspaceApiMap = {
       };
     };
   };
-
   personalWorkspaceFeatures: {
     get: {
       query: { input: { projectId: string }; output: PersonalWorkspaceFeatures };
@@ -411,7 +291,6 @@ export type PersonalWorkspaceApiMap = {
       mutation: { input: { projectId: string }; output: PersonalWorkspaceFeatures };
     };
   };
-
   aiTools: {
     list: {
       query: { input: { organizationId: string }; output: AiToolEntry[] };
@@ -423,13 +302,11 @@ export type PersonalWorkspaceApiMap = {
       };
     };
   };
-
   ingestionTemplates: {
     list: {
       query: { input: { organizationId: string }; output: IngestionTemplateView[] };
     };
   };
-
   ingestionKey: {
     list: {
       query: { input: { organizationId: string }; output: PersonalIngestionKeyView[] };
@@ -447,13 +324,11 @@ export type PersonalWorkspaceApiMap = {
       };
     };
   };
-
   governance: {
     resolveHome: {
       query: { input: { organizationId: string }; output: PersonaResolutionView };
     };
   };
-
   codingAgents: {
     usageTotals: {
       query: {
@@ -462,17 +337,12 @@ export type PersonalWorkspaceApiMap = {
       };
     };
   };
-
   project: {
     getHasFirstMessage: {
       query: { input: { projectId: string }; output: { firstMessage: boolean } };
     };
   };
-
   organization: {
-    /**
-     * The organization graph the scope is resolved out of.
-     */
     getAll: {
       query: {
         input: { isDemo?: boolean };
@@ -482,15 +352,13 @@ export type PersonalWorkspaceApiMap = {
   };
 };
 
+export type PersonalWorkspaceApiMap = ContractApiMap<typeof userTrpc> & ContractApiMap<typeof identityTrpc> & BorrowedProcedures;
+
 /**
  * The personal workspace's typed tRPC hooks. Same machinery, same transport and same React
- * Query cache as the application's `api` proxy — see `createFeatureApi` for why separate
- * instances still share cache entries.
+ * Query cache as the application's `api` proxy.
  */
 export const personalWorkspaceApi = createFeatureApi<PersonalWorkspaceApiMap>();
 
-/**
- * The name the screens call it by. They were written against the application's `api` proxy and
- * are moved unchanged; the import line is what tells them which one they have.
- */
+/** The name the screens call it by. */
 export const api = personalWorkspaceApi;
