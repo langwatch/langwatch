@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AuthService } from "@langwatch/auth-server";
 import type { UserProfile } from "@langwatch/user-contract";
-import { UserService } from "@langwatch/user-contract";
+import { TestUserApi } from "./support/test-user-api.ts";
 import { IdentityEmailService } from "@langwatch/identity-contract";
 import { Temporal, type Instant } from "@langwatch/time";
 import { AuthClockPort } from "../auth-clock.port.ts";
@@ -14,90 +14,20 @@ class Clock extends AuthClockPort {
   }
 }
 
-class Users extends UserService {
-  async tryFindById({ id }: { id: string }): Promise<UserProfile | null> {
-    return {
-      id,
-      name: null,
-      email: `${id}@example.com`,
-      emailVerified: true,
-      image: null,
-      pendingSsoSetup: false,
-      createdAt: new Date(0),
-      updatedAt: new Date(0),
-      lastLoginAt: null,
-      deactivatedAt: null,
-    };
-  }
-  async getProfiles(): Promise<never> {
-    throw new Error("not used");
-  }
-  async tryFindByEmail(): Promise<never> {
-    throw new Error("not used");
-  }
-  async create(): Promise<never> {
-    throw new Error("not used");
-  }
-  async createCredentialUser(): Promise<never> {
-    throw new Error("not used");
-  }
-  async createPasskeyUser(): Promise<never> {
-    throw new Error("not used");
-  }
-  // `UserService` grew this and the fake did not follow.
-  async hasPassword(): Promise<never> {
-    throw new Error("not used by these tests");
-  }
-
-  async setFirstPassword(): Promise<never> {
-    throw new Error("not used");
-  }
-  async getPasskeyNudgeStatus(): Promise<never> {
-    throw new Error("not used");
-  }
-  async dismissPasskeyNudge(): Promise<never> {
-    throw new Error("not used");
-  }
-  async updateProfile(): Promise<never> {
-    throw new Error("not used");
-  }
-  async getAccountInfo(): Promise<never> {
-    throw new Error("not used");
-  }
-  async getSsoStatus(): Promise<never> {
-    throw new Error("not used");
-  }
-  async getTraceExplorerTourPreference(): Promise<never> {
-    throw new Error("not used");
-  }
-  async dismissTraceExplorerTourPreference(): Promise<never> {
-    throw new Error("not used");
-  }
-  async dismissTraceExplorerTour(): Promise<never> {
-    throw new Error("not used");
-  }
-  async updateLastLogin(): Promise<never> {
-    throw new Error("not used");
-  }
-  async tryGetLastHomePath(): Promise<never> {
-    throw new Error("not used");
-  }
-  async setLastHomePath(): Promise<never> {
-    throw new Error("not used");
-  }
-  async deactivate(): Promise<never> {
-    throw new Error("not used");
-  }
-  async reactivate(): Promise<never> {
-    throw new Error("not used");
-  }
-  async setAvatar(): Promise<never> {
-    throw new Error("not used");
-  }
-  async removeAvatar(): Promise<never> {
-    throw new Error("not used");
-  }
-}
+const users = new TestUserApi({
+  tryFindById: async ({ id }: { id: string }): Promise<UserProfile> => ({
+    id,
+    name: null,
+    email: `${id}@example.com`,
+    emailVerified: true,
+    image: null,
+    pendingSsoSetup: false,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    lastLoginAt: null,
+    deactivatedAt: null,
+  }),
+});
 
 class IdentityEmails extends IdentityEmailService {
   constructor(private readonly emails = new Map<string, string | null>()) {
@@ -174,7 +104,7 @@ function service(
       repository: sessions,
       secondaryStore: options.store === undefined ? new Store() : options.store,
       identityEmails: options.identityEmails ?? new IdentityEmails(),
-      users: new Users(),
+      users,
     }),
   };
 }

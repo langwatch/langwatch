@@ -5,13 +5,13 @@
  * caller arrives with a tenant, the organization has to be resolved from it,
  * and a mapping that finds a pull request marks the project as having seen
  * coding-agent activity. Two operations — and to reach them the service used
- * to take the whole `ProjectService`, which is composed from a Prisma
+ * to take the whole `ProjectApi`, which is composed from a Prisma
  * repository, an authorization service, a topic clustering port, a credentials
  * adapter and both transports' collaborators. A worker that maps a branch
  * needs neither, and naming the pair here is what lets it compose demand from
  * its own database without also composing the App.
  *
- * `ProjectService` satisfies it: the published service carries both methods
+ * `ProjectApi` satisfies it: the published service carries both methods
  * with these signatures, which is what keeps `PostgresGithubAdapter` and the
  * App's own composition compiling.
  */

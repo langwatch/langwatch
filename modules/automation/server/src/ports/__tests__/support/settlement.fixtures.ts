@@ -1,6 +1,7 @@
 import { AutomationService, type TriggerSummary } from "@langwatch/automation-contract";
 import type { IntentContext } from "@langwatch/eventing";
-import { ProjectService, type Project } from "@langwatch/project-contract";
+import type { Project } from "@langwatch/project-contract";
+import { TestProjectApi } from "./test-project-api.ts";
 import {
   TraceService,
   type DerivedTraceEvent,
@@ -172,7 +173,7 @@ class SettlementAutomationService extends AutomationService {
   getById(): never {
     return unavailable();
   }
-  tryGetIdentity(): never {
+  findIdentity(): never {
     return unavailable();
   }
   tryGetById(): never {
@@ -324,16 +325,7 @@ class SettlementAutomationService extends AutomationService {
   }
 }
 
-export class SettlementProjectService extends ProjectService {
-  // `ProjectService` grew these and this fixture did not follow.
-  tryGetIdentity(): never {
-    return unavailable();
-  }
-
-  tryGetOrganizationId(): never {
-    return unavailable();
-  }
-
+export class SettlementProjectService extends TestProjectApi {
   reads = 0;
   readonly project: Project = {
     id: "project-1",
@@ -366,92 +358,11 @@ export class SettlementProjectService extends ProjectService {
     lastCodingAgentPullRequestAt: null,
   };
 
-  tryFindInternal(): never {
-    return unavailable();
-  }
-  ensureInternal(): never {
-    return unavailable();
-  }
-  isPresenceEnabled(): never {
-    return unavailable();
-  }
-  updateSettings(): never {
-    return unavailable();
-  }
-  regenerateLegacyProjectKey(): never {
-    return unavailable();
-  }
-  requestTopicClustering(): never {
-    return unavailable();
-  }
-  getById(): never {
-    return unavailable();
-  }
-  async getOrganizationId(): Promise<string> {
+  override async getOrganizationId(): Promise<string> {
     return "organization-1";
   }
-  tryGetSummaryById(): never {
-    return unavailable();
-  }
-  getWithTeam(): never {
-    return unavailable();
-  }
-  tryGetWithTeam(): never {
-    return unavailable();
-  }
-  create(): never {
-    return unavailable();
-  }
-  update(): never {
-    return unavailable();
-  }
-  archive(): never {
-    return unavailable();
-  }
-  listByOrganization(): never {
-    return unavailable();
-  }
-  listByTeam(): never {
-    return unavailable();
-  }
-  listNamesByIds(): never {
-    return unavailable();
-  }
-  listIdsByOrganization(): never {
-    return unavailable();
-  }
-  listActiveByScopes(): never {
-    return unavailable();
-  }
-  updateMetadata(): never {
-    return unavailable();
-  }
-  touchCodingAgentSessionSeen(): never {
-    return unavailable();
-  }
-  touchCodingAgentPullRequestSeen(): never {
-    return unavailable();
-  }
-  searchByQuery(): never {
-    return unavailable();
-  }
-  tryGetTraceSharingConfig(): never {
-    return unavailable();
-  }
-  resolveOrgAdmin(): never {
-    return unavailable();
-  }
-  resolveTraceDestination(): never {
-    return unavailable();
-  }
-  tryGetTraceDestination(): never {
-    return unavailable();
-  }
-  listTraceDestinations(): never {
-    return unavailable();
-  }
 
-  async tryGetById(id: string): Promise<Project | null> {
+  override async tryGetById(id: string): Promise<Project | null> {
     this.reads += 1;
     return id === this.project.id ? this.project : null;
   }

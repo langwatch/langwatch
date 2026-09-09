@@ -21,7 +21,7 @@ import { createLogger } from "@langwatch/observability";
 import { AdminAccessService } from "@langwatch/ops-server";
 import { OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { createApp } from "@langwatch/runtime-composition";
@@ -46,7 +46,7 @@ export type UserPeers = Readonly<{
   /** The organization directory the support-contact read resolves through. */
   organizations: OrganizationService;
   /** The project a calling API key belongs to, for `/api/me/project`. */
-  projects: Pick<ProjectService, "tryGetIdentity">;
+  projects: Pick<ProjectApi, "findIdentity">;
   /** ADR-027's mode, resolved once by the feature that owns the signed-out doors. */
   resolveAuthProvider(): Promise<string>;
 }>;
@@ -146,7 +146,7 @@ export function refusingUserFeature(processName: string): ComposedUserFeature {
 function userInfrastructure(options: {
   prisma: PrismaClient;
   organizations: OrganizationService;
-  projects: Pick<ProjectService, "tryGetIdentity">;
+  projects: Pick<ProjectApi, "findIdentity">;
   peers: UserPeers;
   deployment: ApiPersonDeploymentFacts;
   eventing: IdentityEventingPort;
@@ -245,7 +245,7 @@ function userInfrastructure(options: {
         )?.slug ?? null,
     },
     projects: {
-      findById: ({ projectId }) => projects.tryGetIdentity(projectId),
+      findById: ({ projectId }) => projects.findIdentity(projectId),
       // The organization's hidden governance project is minted by Enterprise
       // governance, which this process does not compose. Absent is the honest
       // answer and the one the module already handles.

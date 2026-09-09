@@ -49,7 +49,7 @@ export type ApiKeyTokenResolutionInput = z.infer<typeof apiKeyTokenResolutionInp
  *
  * Resolution runs on every authenticated request, so this is the identity —
  * five indexed columns — and not the configured project with its team row.
- * A caller that needs configuration asks `ProjectService`.
+ * A caller that needs configuration asks `ProjectApi`.
  */
 const resolvedApiKeyProjectShape = {
   project: projectIdentitySchema,

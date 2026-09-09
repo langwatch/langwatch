@@ -61,7 +61,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -83,7 +83,7 @@ export type ApiAutomationCompositionOptions = Readonly<{
   /** The one guarded connection every trigger row is read and written on. */
   prisma: PrismaClient;
   /** The project directory a trigger's own project is named through. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /** The monitors a trigger watches, named in the trigger list. */
   monitors: MonitorService;
   /** The rollout gate the webhook channel is behind. */

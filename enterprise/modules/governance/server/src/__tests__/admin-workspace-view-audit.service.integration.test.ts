@@ -14,7 +14,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ADMIN_WORKSPACE_VIEW_ACTION } from "@langwatch/enterprise-governance-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import { AdminWorkspaceViewOcsfPort } from "../ports/admin-workspace-view-audit.port.ts";
 import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
@@ -54,7 +54,7 @@ class SpyOcsf extends AdminWorkspaceViewOcsfPort {
 
 const projects = {
   ensureInternal: async () => ({ id: GOV_PROJECT_ID }),
-} as unknown as ProjectService;
+} as unknown as ProjectApi;
 
 describe.skipIf(!databaseUrl)("AdminWorkspaceViewAuditService", () => {
   const service = () =>

@@ -21,7 +21,7 @@ import type {
   PersonalUsageWindow,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 /** The three answers one /me usage screen renders, resolved together. */
 export type PersonalUsageRollup = {
@@ -45,7 +45,7 @@ export type PersonalUsageDashboardServiceOptions = {
   /** The member's personal workspace, which is the tenant their traces land in. */
   organizations: Pick<OrganizationService, "tryFindPersonalWorkspace">;
   /** The organization's hidden governance project, which ingestion rows land in. */
-  projects: Pick<ProjectService, "tryFindInternal">;
+  projects: Pick<ProjectApi, "findInternal">;
 };
 
 /** What a member with no personal workspace yet is answered with. */
@@ -86,7 +86,7 @@ export class PersonalUsageDashboardService {
     // Read-only: a member reading their own dashboard must not provision the
     // organization's governance project. Absent, the union is simply the
     // personal tenant's own rows.
-    const governanceProject = await this.options.projects.tryFindInternal({
+    const governanceProject = await this.options.projects.findInternal({
       organizationId: input.organizationId,
       kind: "internal_governance",
     });

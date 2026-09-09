@@ -7,7 +7,7 @@
 import { type Instant, nowInstant } from "@langwatch/time";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   serializeRowForAudit,
   type GatewayAuditJson,
@@ -290,13 +290,13 @@ export class VirtualKeyValidationService {
   private constructor(
     private readonly repository: GatewayVirtualKeysPort,
     private readonly scopeResolution: GatewayScopeResolutionService,
-    private readonly projects: ProjectService,
+    private readonly projects: ProjectApi,
   ) {}
 
   static create(input: {
     repository: GatewayVirtualKeysPort;
     scopeResolution: GatewayScopeResolutionService;
-    projects: ProjectService;
+    projects: ProjectApi;
   }): VirtualKeyValidationService {
     return new VirtualKeyValidationService(input.repository, input.scopeResolution, input.projects);
   }
@@ -320,7 +320,7 @@ export class VirtualKeyValidationService {
 
   /**
    * Every key must SAY where its traces land (cases:
-   * `ProjectService.resolveTraceDestination`). Revocation is not guarded.
+   * `ProjectApi.resolveTraceDestination`). Revocation is not guarded.
    * Spec: specs/ai-gateway/virtual-key-creation.feature
    */
   async resolveStoredTraceDestination(

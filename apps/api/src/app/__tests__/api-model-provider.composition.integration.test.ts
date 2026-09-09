@@ -31,7 +31,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService, ProjectWithTeam } from "@langwatch/project-contract";
+import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
@@ -84,7 +84,7 @@ function testCipher(): SecretEncryptionPort {
   } as SecretEncryptionPort;
 }
 
-function testProjects(): ProjectService {
+function testProjects(): ProjectApi {
   const project = {
     id: "project-1",
     name: "Support",
@@ -99,7 +99,7 @@ function testProjects(): ProjectService {
   return {
     getWithTeam: async () => project,
     tryGetWithTeam: async () => project,
-  } as unknown as ProjectService;
+  } as unknown as ProjectApi;
 }
 
 function testOrganizations(): OrganizationService {

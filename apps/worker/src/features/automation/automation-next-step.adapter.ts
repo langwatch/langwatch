@@ -12,7 +12,7 @@ import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
 import type { PlanProvider, PricingModel } from "@langwatch/entitlement-contract";
 import type { PlanNextStepService } from "@langwatch/entitlement-server";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 /** Where the sales conversation happens for an organization the ladder cannot price. */
 const ACCOUNT_TEAM_CONTACT_URL = "https://langwatch.ai/contact";
@@ -34,7 +34,7 @@ export abstract class WorkerAutomationOrganizationPricingPort {
 
 export class WorkerAutomationNextStepAdapter {
   static create(options: {
-    projects: Pick<ProjectService, "getOrganizationId">;
+    projects: Pick<ProjectApi, "getOrganizationId">;
     plans: Pick<PlanProvider, "getActivePlan">;
     organizations: WorkerAutomationOrganizationPricingPort;
     nextStep: PlanNextStepService;
@@ -49,7 +49,7 @@ export class WorkerAutomationNextStepAdapter {
 
   private constructor(
     private readonly options: {
-      projects: Pick<ProjectService, "getOrganizationId">;
+      projects: Pick<ProjectApi, "getOrganizationId">;
       plans: Pick<PlanProvider, "getActivePlan">;
       organizations: WorkerAutomationOrganizationPricingPort;
       nextStep: PlanNextStepService;

@@ -3,6 +3,8 @@ import type {
   ChangeOwnPasswordInput,
   CompleteUserVerificationInput,
   CreateCredentialUserInput,
+  CreatePasskeyUserInput,
+  CreateUserInput,
   CreatedUser,
   RegisterCredentialAccountInput,
   RemoveUserAvatarInput,
@@ -14,6 +16,7 @@ import type {
   UserAvatarObjectRead,
   UserAvatarReadAllowance,
   UserCaller,
+  UserEmailInput,
   UserLinkedAccount,
   UserPasswordRotationOutcome,
   SetFirstUserPasswordInput,
@@ -72,7 +75,13 @@ export interface UserApi {
   isAdmin(identity: Readonly<{ email?: string | null }>): boolean;
   /** Whether the account behind an id is a platform operator, by its own address. */
   isOperator(input: { userId: string }): Promise<boolean>;
+  /** The account an address belongs to, or nothing when nobody holds it. */
+  findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
+  /** Mints a directory account with no sign-in method of its own. */
+  create(input: CreateUserInput): Promise<UserProfile>;
   createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser>;
+  /** Mints an account whose only sign-in method is the passkey about to be registered. */
+  createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser>;
   /** The signup form's whole path: the mode gate, the throttle and the mint. */
   registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser>;
   hasPassword(input: UserIdInput): Promise<boolean>;

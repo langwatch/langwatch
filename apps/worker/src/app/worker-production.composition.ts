@@ -212,7 +212,7 @@ import { createWorkerGovernanceRollups } from "./worker-governance-rollups.compo
 import { createWorkerObjectStorage } from "./worker-object-storage.composition.ts";
 import { createWorkerSpanStorage } from "./worker-span-storage.composition.ts";
 import { WorkerCodingAgentTraceProcessingAdapter } from "../features/coding-agent/coding-agent-trace-processing.adapter.ts";
-import { WorkerGithubProjectActivityAdapter } from "./worker-github-activity.composition.ts";
+import { WorkerProjectActivityAdapter } from "./worker-project-activity.composition.ts";
 import {
   tryCreateWorkerAutomationGraphComposition,
   resolveWorkerStoredSecretCipher,
@@ -548,7 +548,7 @@ export class WorkerProductionComposition {
     const codingAgentActivity = PostgresCodingAgentActivityAdapter.create({
       database: options.database,
     }).build();
-    const githubProjectActivity = WorkerGithubProjectActivityAdapter.create(codingAgentActivity);
+    const projectActivity = WorkerProjectActivityAdapter.create(codingAgentActivity);
     const codingAgent = CodingAgentWorkerFeatureInstaller.create({
       eventing,
       installer: ClickHouseCodingAgentProcessingAdapter.create({
@@ -556,7 +556,7 @@ export class WorkerProductionComposition {
         defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
         redis: eventingOptions.groupQueue.redis,
         traceCanonicalisation,
-        projectActivity: codingAgentActivity,
+        projectActivity,
         pullRequestMapping: PostgresGithubBranchDemandAdapter.create({
           database: options.database,
           config: {
@@ -565,7 +565,7 @@ export class WorkerProductionComposition {
           },
           redis: githubRedis,
           ...(githubConfig.host ? { hostConfig: { host: githubConfig.host } } : {}),
-          project: githubProjectActivity,
+          project: projectActivity,
         }).build(),
         ...(options.config.eventing.foldCacheTtlSeconds === undefined
           ? {}
@@ -838,7 +838,7 @@ export class WorkerProductionComposition {
     const langyTitleModels = tryCreateWorkerLangyTitleModel({
       modelProviders: modelProviders?.modelProviders,
       // The READ half of Project, which is the whole of what a model cascade
-      // asks of a project directory — the wide `ProjectService` the tenancy
+      // asks of a project directory — the wide `ProjectApi` the tenancy
       // graph now composes satisfies the same reads, and this path deliberately
       // asks for no more than it uses.
       projects: traceServices.projects,

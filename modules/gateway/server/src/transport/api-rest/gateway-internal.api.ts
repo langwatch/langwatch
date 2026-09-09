@@ -14,7 +14,7 @@ import {
   type MountableRestApp,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, Next } from "hono";
 import { z } from "zod";
@@ -68,7 +68,7 @@ export type GatewayInternalRestPorts = Readonly<{
   /** The SAME virtual-key service every other gateway door reads. */
   virtualKeys: () => VirtualKeyService;
   /** The project directory a key's trace destination is resolved through. */
-  projects: () => ProjectService;
+  projects: () => ProjectApi;
   /** Mints the short-lived credential the data plane presents onward. */
   jwt: () => GatewayJwtAdapter;
   /** The row reads no service on this package owns. */
@@ -863,7 +863,7 @@ export function createGatewayInternalRestApp(options: {
         // project to fall back to; the gateway then skips span export rather than
         // failing the auth handshake.
         const traceProject = vk.traceProjectId
-          ? await ports.projects().tryGetTraceDestination(vk.traceProjectId)
+          ? await ports.projects().findTraceDestination(vk.traceProjectId)
           : null;
 
         // notAfter ends the token at the key's expiration date when that arrives

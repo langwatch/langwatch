@@ -1,6 +1,6 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { GraphTriggerEvaluationResult, TriggerSummary } from "@langwatch/automation-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 import { PostgresAutomationGraphActivityAdapter } from "../../adapters/postgres.automation-graph-activity.adapter.ts";
 import {
@@ -72,7 +72,7 @@ describe("createGraphTriggerActivityHandler", () => {
         PostgresAutomationGraphActivityAdapter.create({
           prisma: database.prisma as never,
           clock: new FrozenClock(),
-          projects: new OneProject() as unknown as ProjectService,
+          projects: new OneProject() as unknown as ProjectApi,
           analytics: new BreachingAnalytics() as unknown as AnalyticsService,
           delivery,
           crypto: { encrypt: (value) => value, decrypt: (value) => value },

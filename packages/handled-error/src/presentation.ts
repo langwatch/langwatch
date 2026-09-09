@@ -1254,6 +1254,11 @@ const presentations = {
     title: "That name is taken",
     describe: () => "Another project in the selected team already uses it. Pick a different name.",
   },
+  project_creation_failed: {
+    title: "Your organization was created, but its first project was not",
+    describe: () =>
+      "Nothing is lost. Open the project list and create one, and the rest of the setup carries on from there.",
+  },
   project_destination_team_not_found: {
     // Names the KIND, never whether the team exists: a team id that belongs to
     // another organization is exactly what this refusal declines to confirm.
@@ -1598,6 +1603,16 @@ const presentations = {
         ? `${email} already has a pending invite. Revoke it first to send a new one.`
         : "A pending invite for this address already exists. Revoke it first to send a new one.";
     },
+  },
+  invite_already_accepted: {
+    title: "This invitation was already accepted",
+    describe: () =>
+      "You are already in this organization. Carry on to it, or ask an administrator to invite you again if you meant a different one.",
+  },
+  invite_not_ready: {
+    title: "This invitation cannot be accepted yet",
+    describe: () =>
+      "It is waiting on something else — an approval, or a payment. Ask whoever invited you to check on it.",
   },
   invite_expired: {
     title: "This invitation has expired",
@@ -2576,8 +2591,7 @@ const presentations = {
   },
   data_retention_length_not_on_plan: {
     title: "That retention length isn't on this plan",
-    describe: () =>
-      "Choose one of the offered lengths, or contact us to unlock more.",
+    describe: () => "Choose one of the offered lengths, or contact us to unlock more.",
   },
   data_retention_scope_write_forbidden: {
     // `meta.requiredPermission` is the exact permission the tier asks for, so

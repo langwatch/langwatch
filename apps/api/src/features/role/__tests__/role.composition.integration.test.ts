@@ -13,7 +13,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
 import { AuthzApp } from "@langwatch/authz-server";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { EventEmitter } from "node:events";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
@@ -176,7 +176,7 @@ async function composeApplication(options: { planType?: string } = {}) {
 
   const projects = {
     getOrganizationId: vi.fn(async () => ORGANIZATION_ID),
-  } as unknown as ProjectService;
+  } as unknown as ProjectApi;
 
   const datasets = PostgresDatasetAdapter.create({ database: prisma.client }).build();
 

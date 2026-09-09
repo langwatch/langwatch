@@ -7,13 +7,13 @@ import type {
 /**
  * The three things the `projectMetadata` subscriber does to a project.
  *
- * It named the whole `ProjectService` before, which is fourteen capabilities
+ * It named the whole `ProjectApi` before, which is fourteen capabilities
  * wide and reaches organizations, the LWQL ClickHouse key map and stored
  * objects. A background process that wanted to run this one subscriber had to
  * be able to build all of it — which is why this subscriber, and everything
  * queued behind it, could not leave the application.
  *
- * The published `ProjectService` satisfies this structurally, so the
+ * The published `ProjectApi` satisfies this structurally, so the
  * application keeps passing exactly what it passed before and a process that
  * holds only a project row and an org-admin lookup can now answer it too.
  */

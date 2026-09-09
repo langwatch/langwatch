@@ -7,7 +7,7 @@ import { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.re
 import { GatewayCacheRuleService } from "../services/gateway-cache-rule.service.ts";
 import { GatewayGuardrailService } from "../services/gateway-guardrail.service.ts";
 import { GatewayService } from "../services/gateway.service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 import type { GatewayBudgetCheckResult } from "@langwatch/gateway-contract";
 import { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -224,7 +224,7 @@ function serviceFor(result: GatewayBudgetCheckResult): {
   repository: FakeBudgetRepository;
 } {
   const repository = new FakeBudgetRepository(result);
-  const projects = new TestProjectService();
+  const projects = new TestProjectApi();
   return {
     service: GatewayService.create({
       repository,
@@ -250,7 +250,7 @@ function serviceOverCatalogues({
   cacheRules: unknown[];
   guardrails: Array<{ id: string }>;
 }): GatewayService {
-  const projects = new TestProjectService();
+  const projects = new TestProjectApi();
   const cacheRuleRepository = new EmptyCacheRuleRepository();
   const guardrailRepository = new EmptyGuardrailRepository();
   cacheRuleRepository.listEnabledForOrganization = (async () => cacheRules) as never;

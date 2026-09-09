@@ -32,8 +32,8 @@ import {
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthApi } from "@langwatch/auth-contract";
-import { ProjectApi, type ProjectService } from "@langwatch/project-contract";
-import { UserApi, type UserService } from "@langwatch/user-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import { UserApi } from "@langwatch/user-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { createApp, ResourceScope } from "@langwatch/runtime-composition";
@@ -44,11 +44,11 @@ import type { ApiAuditPort } from "../../api-request.policy.ts";
 /** The other features' services the operator surface reaches, named one by one. */
 export type OpsPeers = Readonly<{
   /** The people a back-office read names, and the impersonation subject. */
-  users: UserService;
+  users: UserApi;
   /** The browser session an impersonation is started and stopped against. */
   auth: AuthService;
   /** The projects a scheduled job and a back-office row are scoped to. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /** The credentials a filed report is linked to a project through. */
   apiKeys: ApiKeyApi;
 }>;
@@ -60,9 +60,9 @@ export type OpsFeatureCollaborators = Readonly<{
   audit: ApiAuditPort | undefined;
   /** The shared audit log every operator act is recorded on. */
   auditLog: ApiTrpcInfrastructure["auditLog"];
-  users: UserService;
+  users: UserApi;
   auth: AuthService;
-  projects: ProjectService;
+  projects: ProjectApi;
   apiKeys: ApiKeyApi;
   /** The deployment's operator allow-list, matched on a person's email. */
   adminEmails: readonly string[];

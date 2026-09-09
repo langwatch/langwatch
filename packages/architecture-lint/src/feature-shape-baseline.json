@@ -571,10 +571,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "project|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "project|nested-web-entry",
       "measured": "2026-09-08"
     },
@@ -712,10 +708,6 @@
     },
     {
       "key": "trace|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "user|contract-service",
       "measured": "2026-09-08"
     },
     {

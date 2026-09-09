@@ -6,7 +6,7 @@ import {
   type AdminWorkspaceTarget,
 } from "../admin-workspace-view-audit.port.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../../services/admin-workspace-view-audit.service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 class MemoryAuditRepository extends AdminWorkspaceViewAuditRepository {
   target: AdminWorkspaceTarget | null = {
@@ -23,8 +23,8 @@ class MemoryAuditRepository extends AdminWorkspaceViewAuditRepository {
   create = vi.fn(async () => ({ id: "audit", createdAtMs: 1_700_000_000_000 }));
 }
 
-class StubProjects extends TestProjectService {
-  tryFindInternal = (_input: InternalProjectQuery): Promise<InternalProject | null> =>
+class StubProjects extends TestProjectApi {
+  findInternal = (_input: InternalProjectQuery): Promise<InternalProject | null> =>
     Promise.resolve(null);
   ensureInternal = (_input: InternalProjectQuery): Promise<InternalProject> =>
     Promise.resolve({

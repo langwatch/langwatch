@@ -18,7 +18,7 @@ import {
 } from "../../services/ingestion-source-secret.service.ts";
 import { IngestionSourceService } from "../../services/ingestion-source.service.ts";
 import { PullDestinationService } from "../../services/pull-destination.service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 import { toDate } from "@langwatch/time";
 
 const NOW = Date.parse("2026-08-24T10:00:00.000Z");
@@ -87,8 +87,8 @@ class FakeSourceRepository extends IngestionSourceRepository {
   );
 }
 
-class FakeProjects extends TestProjectService {
-  tryFindInternal = vi.fn(
+class FakeProjects extends TestProjectApi {
+  findInternal = vi.fn(
     async (_input: InternalProjectQuery): Promise<InternalProject | null> => null,
   );
   ensureInternal = vi.fn(async (_input: InternalProjectQuery): Promise<InternalProject> => ({

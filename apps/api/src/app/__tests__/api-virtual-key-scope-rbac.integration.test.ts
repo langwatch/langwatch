@@ -29,8 +29,9 @@ import {
   TeamUserRole,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { PostgresProjectAdapter, ProjectCredentialsAdapter } from "@langwatch/project-server";
-import type { ProjectService } from "@langwatch/project-contract";
+import { ProjectCredentialsAdapter } from "@langwatch/project-server";
+import { createPrismaProjectApi } from "./support/prisma-project-api.ts";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { initTRPC } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -73,7 +74,7 @@ function buildAuthz(): AuthzService {
 
 /** The gateway application this process composes, wired to real Postgres. */
 function buildGateway() {
-  const projects = PostgresProjectAdapter.create({
+  const projects = createPrismaProjectApi({
     database: prisma,
     credentials: ProjectCredentialsAdapter.create(),
     // Personal-workspace provisioning is the organization service's, and no
@@ -82,7 +83,7 @@ function buildGateway() {
       ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),
       tryFindPersonalWorkspace: unreachable<OrganizationService["tryFindPersonalWorkspace"]>(),
     } as unknown as OrganizationService,
-  }).build() as ProjectService;
+  });
 
   return composeApiGateway({
     prisma,

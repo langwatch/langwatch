@@ -22,7 +22,7 @@ import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { point } from "./metric-point.fixture.ts";
 import { EmailDeliveryAdapter } from "@langwatch/notification-server";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { ProjectService } from "@langwatch/project-contract";
+import { TestProjectApi } from "./support/test-project-api.ts";
 import {
   TraceTopicAssignmentPort,
   type AnnotationAddedEventData,
@@ -159,41 +159,10 @@ function createTraceFeature(eventing: WorkerEventingRuntime): {
   };
 }
 
-class Projects extends ProjectService {
-  tryFindInternal = unavailable<ProjectService["tryFindInternal"]>();
-  ensureInternal = unavailable<ProjectService["ensureInternal"]>();
-  isPresenceEnabled = unavailable<ProjectService["isPresenceEnabled"]>();
-  getById = unavailable<ProjectService["getById"]>();
-  getOrganizationId = unavailable<ProjectService["getOrganizationId"]>();
-  tryGetOrganizationId = async (projectId: string): Promise<string | undefined> =>
-    projectId === "project-1" ? "org-1" : undefined;
-  tryGetIdentity = unavailable<ProjectService["tryGetIdentity"]>();
-  tryGetById = unavailable<ProjectService["tryGetById"]>();
-  tryGetSummaryById = unavailable<ProjectService["tryGetSummaryById"]>();
-  getWithTeam = unavailable<ProjectService["getWithTeam"]>();
-  tryGetWithTeam = unavailable<ProjectService["tryGetWithTeam"]>();
-  create = unavailable<ProjectService["create"]>();
-  update = unavailable<ProjectService["update"]>();
-  archive = unavailable<ProjectService["archive"]>();
-  listByOrganization = unavailable<ProjectService["listByOrganization"]>();
-  listByTeam = unavailable<ProjectService["listByTeam"]>();
-  listNamesByIds = unavailable<ProjectService["listNamesByIds"]>();
-  listIdsByOrganization = unavailable<ProjectService["listIdsByOrganization"]>();
-  listActiveByScopes = unavailable<ProjectService["listActiveByScopes"]>();
-  updateMetadata = unavailable<ProjectService["updateMetadata"]>();
-  touchCodingAgentSessionSeen = unavailable<ProjectService["touchCodingAgentSessionSeen"]>();
-  touchCodingAgentPullRequestSeen =
-    unavailable<ProjectService["touchCodingAgentPullRequestSeen"]>();
-  searchByQuery = unavailable<ProjectService["searchByQuery"]>();
-  tryGetTraceSharingConfig = unavailable<ProjectService["tryGetTraceSharingConfig"]>();
-  resolveOrgAdmin = unavailable<ProjectService["resolveOrgAdmin"]>();
-  resolveTraceDestination = unavailable<ProjectService["resolveTraceDestination"]>();
-  tryGetTraceDestination = unavailable<ProjectService["tryGetTraceDestination"]>();
-  listTraceDestinations = unavailable<ProjectService["listTraceDestinations"]>();
-}
-
-function unavailable<Method>(): Method {
-  return (() => Promise.reject(new Error("Not used by this test"))) as Method;
+class Projects extends TestProjectApi {
+  override async tryGetOrganizationId(projectId: string): Promise<string | undefined> {
+    return projectId === "project-1" ? "org-1" : undefined;
+  }
 }
 
 class Configuration {

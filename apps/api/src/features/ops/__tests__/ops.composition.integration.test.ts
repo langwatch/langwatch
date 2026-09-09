@@ -10,8 +10,8 @@ import type {
 } from "@langwatch/authz-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -99,9 +99,9 @@ async function composeOperatorApp(
   const ops = await composeOpsFeature({
     infrastructure,
     peers: {
-      users: stub<UserService>("users"),
+      users: stub<UserApi>("users"),
       auth: stub<AuthService>("auth"),
-      projects: stub<ProjectService>("projects"),
+      projects: stub<ProjectApi>("projects"),
       apiKeys: createApiFixture<ApiKeyApi>(),
     },
     adminEmails: options.adminEmails ?? [SESSION_USER.email],

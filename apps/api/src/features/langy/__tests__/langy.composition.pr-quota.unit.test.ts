@@ -13,7 +13,7 @@ import {
 } from "@langwatch/langy-server";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -99,7 +99,7 @@ function composedTurns(redis: RedisConnection | null): LangyTurnTechnicalPorts {
       audit: undefined,
       auditLog: createApiFixture<AuditLogApi>(),
     },
-    peers: { projects: {} as unknown as ProjectService },
+    peers: { projects: {} as unknown as ProjectApi },
     commands: {} as unknown as LangyConversationCommands,
     redis,
     publicBaseUrl: undefined,

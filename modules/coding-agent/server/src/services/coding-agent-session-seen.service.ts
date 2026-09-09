@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { Temporal, toDate } from "@langwatch/time";
+import { Temporal } from "@langwatch/time";
 import type { CodingAgentProjectActivityPort } from "../ports/coding-agent-project-activity.port.ts";
 import type { CodingAgentClockPort } from "../ports/coding-agent-clock.port.ts";
 
@@ -60,7 +60,7 @@ export class CodingAgentSessionSeenService {
     try {
       await this.projects.touchCodingAgentSessionSeen({
         projectId,
-        at: toDate(Temporal.Instant.fromEpochMilliseconds(at)),
+        at: Temporal.Instant.fromEpochMilliseconds(at),
       });
     } catch (error) {
       if (this.heldUntil.get(projectId) === holdSetTo) {

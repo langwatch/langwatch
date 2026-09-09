@@ -13,7 +13,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
@@ -26,7 +26,7 @@ import { PrismaGatewayBudgetOverviewRepository } from "../repositories/prisma/pr
 import type { GatewayService } from "../services/gateway.service.ts";
 import { TestFeatureFlags } from "./support/test-feature-flag-service.ts";
 import { TestOrganizationService } from "./support/test-organization-service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 import {
   BUDGET_ARCHIVED_ID,
   BUDGET_GROUP_ID,
@@ -61,8 +61,8 @@ const connection = databaseUrl
 const prisma = connection?.client as PrismaClient;
 
 /** The organization's projects, and the labels the scope targets carry. */
-class SuiteProjectService extends TestProjectService {
-  override async listIdsByOrganization(): ReturnType<ProjectService["listIdsByOrganization"]> {
+class SuiteProjectService extends TestProjectApi {
+  override async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
     return TENANTS;
   }
 
@@ -70,7 +70,7 @@ class SuiteProjectService extends TestProjectService {
     projectIds,
   }: {
     projectIds: string[];
-  }): ReturnType<ProjectService["listNamesByIds"]> {
+  }): ReturnType<ProjectApi["listNamesByIds"]> {
     const rows = await prisma.project.findMany({
       where: { id: { in: projectIds } },
       select: {

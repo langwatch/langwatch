@@ -666,7 +666,7 @@ async function scimWorld(
       },
     } as never,
     users: {
-      tryFindByEmail: ({ email }: { email: string }) =>
+      findByEmail: ({ email }: { email: string }) =>
         Promise.resolve(users.rows.get(email) ?? null),
       tryFindById: ({ id }: { id: string }) =>
         Promise.resolve([...users.rows.values()].find((row) => row.id === id) ?? null),

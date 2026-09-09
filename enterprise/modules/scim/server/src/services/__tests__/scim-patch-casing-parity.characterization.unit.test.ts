@@ -83,7 +83,7 @@ function userService(): ScimUserProvisioning {
     tryFindById: vi.fn(async () => ({ ...current, deactivatedAt: new Date() })),
     deactivate: vi.fn(async () => ({ ...current, deactivatedAt: new Date() })),
     reactivate: vi.fn(async () => current),
-    tryFindByEmail: vi.fn(notReached),
+    findByEmail: vi.fn(notReached),
     create: vi.fn(notReached),
     updateProfile: vi.fn(notReached),
   } satisfies ScimUserProvisioning;

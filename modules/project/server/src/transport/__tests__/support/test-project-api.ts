@@ -9,8 +9,7 @@ export class TestProjectApi implements ProjectApi {
   constructor(private readonly overrides: Partial<ProjectApi>) {}
 
   tryGetOrganizationId: ProjectApi["tryGetOrganizationId"] = (projectId) =>
-    this.overrides.tryGetOrganizationId?.(projectId) ??
-    this.unimplemented("tryGetOrganizationId");
+    this.overrides.tryGetOrganizationId?.(projectId) ?? this.unimplemented("tryGetOrganizationId");
 
   searchByQuery: ProjectApi["searchByQuery"] = (input) =>
     this.overrides.searchByQuery?.(input) ?? this.unimplemented("searchByQuery");
@@ -19,8 +18,7 @@ export class TestProjectApi implements ProjectApi {
     this.overrides.listNamesByIds?.(input) ?? this.unimplemented("listNamesByIds");
 
   listIdsByOrganization: ProjectApi["listIdsByOrganization"] = (input) =>
-    this.overrides.listIdsByOrganization?.(input) ??
-    this.unimplemented("listIdsByOrganization");
+    this.overrides.listIdsByOrganization?.(input) ?? this.unimplemented("listIdsByOrganization");
 
   listPaths: ProjectApi["listPaths"] = (input) =>
     this.overrides.listPaths?.(input) ?? this.unimplemented("listPaths");
@@ -81,6 +79,37 @@ export class TestProjectApi implements ProjectApi {
 
   touchCodingAgentPullRequestSeen: ProjectApi["touchCodingAgentPullRequestSeen"] = (input) =>
     this.overrides.touchCodingAgentPullRequestSeen?.(input) ?? Promise.resolve();
+
+  touchCodingAgentSessionSeen: ProjectApi["touchCodingAgentSessionSeen"] = (input) =>
+    this.overrides.touchCodingAgentSessionSeen?.(input) ?? Promise.resolve();
+
+  findInternal: ProjectApi["findInternal"] = (input) =>
+    this.overrides.findInternal?.(input) ?? Promise.resolve(null);
+
+  ensureInternal: ProjectApi["ensureInternal"] = (input) =>
+    this.overrides.ensureInternal?.(input) ?? this.unimplemented("ensureInternal");
+
+  findIdentity: ProjectApi["findIdentity"] = (id) =>
+    this.overrides.findIdentity?.(id) ?? Promise.resolve(null);
+
+  listActiveByScopes: ProjectApi["listActiveByScopes"] = (input) =>
+    this.overrides.listActiveByScopes?.(input) ?? Promise.resolve({ data: [], hasMore: false });
+
+  updateMetadata: ProjectApi["updateMetadata"] = (input) =>
+    this.overrides.updateMetadata?.(input) ?? this.unimplemented("updateMetadata");
+
+  resolveOrgAdmin: ProjectApi["resolveOrgAdmin"] = (projectId) =>
+    this.overrides.resolveOrgAdmin?.(projectId) ?? this.unimplemented("resolveOrgAdmin");
+
+  resolveTraceDestination: ProjectApi["resolveTraceDestination"] = (input) =>
+    this.overrides.resolveTraceDestination?.(input) ??
+    this.unimplemented("resolveTraceDestination");
+
+  findTraceDestination: ProjectApi["findTraceDestination"] = (projectId) =>
+    this.overrides.findTraceDestination?.(projectId) ?? Promise.resolve(null);
+
+  listTraceDestinations: ProjectApi["listTraceDestinations"] = (projectIds) =>
+    this.overrides.listTraceDestinations?.(projectIds) ?? Promise.resolve([]);
 
   private unimplemented(operation: string): Promise<never> {
     return Promise.reject(new Error(`TestProjectApi does not implement ${operation}`));

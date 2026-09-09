@@ -11,7 +11,7 @@ import {
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { Cluster, Redis } from "ioredis";
 import { AppAdminWorkspaceViewAuditAdapter } from "./admin-workspace-view-audit.adapter.ts";
 import { AppCliTokenRevocationAdapter } from "./cli-token-revocation.adapter.ts";
@@ -37,7 +37,7 @@ type GovernanceRuntimeOptions = {
   traceActivity?: AppGovernanceTraceActivityAdapter;
   personalUsage?: AppPersonalUsageReadAdapter;
   organizations: OrganizationService;
-  projects: ProjectService;
+  projects: ProjectApi;
   apiKeys: ApiKeyApi;
   gatewayBaseUrl: string;
   virtualKeys: GovernanceVirtualKeyPort;

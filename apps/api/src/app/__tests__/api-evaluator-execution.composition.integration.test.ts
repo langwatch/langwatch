@@ -15,7 +15,7 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { Hono } from "hono";
@@ -287,7 +287,7 @@ function gatewayInternalWithGuardrails() {
       spendEvents: undefined,
       budgetDecisions: {} as never,
     },
-    projects: {} as unknown as ProjectService,
+    projects: {} as unknown as ProjectApi,
     internalSecret: INTERNAL_SECRET,
     jwtSecret: JWT_SECRET,
     encryption: AesGcmSecretEncryptionAdapter.create({ key: CREDENTIALS_SECRET }),

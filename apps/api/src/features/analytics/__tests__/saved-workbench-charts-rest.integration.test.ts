@@ -56,7 +56,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { Hono } from "hono";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -218,13 +218,13 @@ const world = RestAuthWorld.create({
   ],
 });
 
-function projects(): ProjectService {
+function projects(): ProjectApi {
   return {
     getById: async (projectId: string) => ({ id: projectId, lwqlKey: `lwql-${projectId}` }),
     getOrganizationId: async (projectId: string) =>
       [openProject, gatedProject, otherProject].find((project) => project.id === projectId)
         ?.organizationId ?? null,
-  } as unknown as ProjectService;
+  } as unknown as ProjectApi;
 }
 
 function dashboardApp(): DashboardApp {

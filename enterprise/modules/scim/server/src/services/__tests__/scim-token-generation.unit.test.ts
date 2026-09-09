@@ -39,7 +39,7 @@ function service(repo: ScimRepositoryPort): ScimService {
     writer: new GrantsFake(),
     auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
     users: {
-      tryFindByEmail: vi.fn(async () => null),
+      findByEmail: vi.fn(async () => null),
       tryFindById: vi.fn(async () => null),
       create: vi.fn(),
       updateProfile: vi.fn(),

@@ -16,7 +16,7 @@ export type GatewayBudgetResolutionDatabase = GatewayBudgetDatabase;
  *
  * `AppGatewayGovernancePort` names the whole `GatewayService` and calls exactly
  * `resolveApplicableBudgets` on it. Composing the whole service to satisfy that
- * one call means building a `ProjectService`, an `EvaluatorService` and a
+ * one call means building a `ProjectApi`, an `EvaluatorService` and a
  * `MonitorService` — the write graph behind the budget CRUD, the guardrail
  * catalogue and the cache rules, none of which a spend debit reaches. That is
  * the same trade `worker-trace-capability-services.composition.ts` records for

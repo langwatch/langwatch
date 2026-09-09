@@ -41,7 +41,7 @@ import { PrismaSystemMigrationStateRepository } from "@langwatch/ops-server";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import type { ApiBrowserSessionConfig } from "../platform/config/api.config.ts";
 import type { ApiMailComposition } from "./api-mail.composition.ts";
@@ -483,7 +483,7 @@ export type ApiBetterAuthCompositionOptions = Readonly<{
   /** The Auth service whose sessions this instance mints and revokes. */
   auth: AuthService;
   /** The same user directory the rest of this process serves from. */
-  users: UserService;
+  users: UserApi;
   /** Better Auth's session cache lives here when this process has a Redis. */
   redis: RedisConnection | null;
   /** `"email"`, or the federated provider id this deployment mounted. */

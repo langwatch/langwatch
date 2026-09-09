@@ -14,7 +14,7 @@ export const PROJECT_METADATA_WINDOW_MS = 3_000;
 
 export interface ProjectMetadataSubscriberDeps {
   /**
-   * Narrowed from the whole `ProjectService` to the three capabilities this
+   * Narrowed from the whole `ProjectApi` to the three capabilities this
    * subscriber uses. The published service satisfies the port structurally, so
    * every existing caller passes what it already passed.
    */

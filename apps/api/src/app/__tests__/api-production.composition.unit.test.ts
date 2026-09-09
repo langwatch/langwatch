@@ -10,7 +10,7 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { LANGY_VK_SECRET_NAME } from "@langwatch/secret-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { OrganizationService } from "@langwatch/organization-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -1101,7 +1101,7 @@ class TestAuthComposition extends ApiAuthSessionCompositionPort {
     return {
       auth: new TestAuthService(),
       sessions: new TestSessionTransport(),
-      users: testUserService(),
+      users: testUserApi(),
     };
   }
 }
@@ -1109,8 +1109,8 @@ class TestAuthComposition extends ApiAuthSessionCompositionPort {
 /**
  * The user directory the Auth graph publishes, as a double.
  */
-function testUserService(): UserService {
-  return new Proxy({} as UserService, {
+function testUserApi(): UserApi {
+  return new Proxy({} as UserApi, {
     get(_target, property) {
       return () => {
         throw new Error(`the composition test reached users.${String(property)}`);

@@ -6,7 +6,7 @@ import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type { ApiBrowserSessionConfig } from "../platform/config/api.config.ts";
 import { ApiAuthenticationPort } from "../api-request.policy.ts";
 import type { ApiTrpcSession } from "../app-trpc/app-trpc.context.ts";
@@ -95,7 +95,7 @@ export type ApiAuthSessionDependencies = Readonly<{
    * The user directory the Auth service already resolves a signed-in person
    * through, in the shape SCIM and the back office still name it.
    */
-  users: UserService;
+  users: UserApi;
 }>;
 
 /**
@@ -122,7 +122,7 @@ export type ApiAuthCompositionOptions = {
    * The same user graph in the shape Better Auth's passkey ceremony, SCIM and
    * the back office still name it. One directory behind all three.
    */
-  directory: UserService;
+  directory: UserApi;
   /**
    * The organization service the user service resolves a person's workspaces
    * through — the same instance the rest of this process serves from, never a
@@ -234,7 +234,7 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
     options: ApiAuthCompositionOptions;
     database: PrismaConnection["client"];
     auth: AuthService;
-    users: UserService;
+    users: UserApi;
   }): ApiComposedBetterAuth {
     const configuration = options.browserSession;
     if (!configuration) {

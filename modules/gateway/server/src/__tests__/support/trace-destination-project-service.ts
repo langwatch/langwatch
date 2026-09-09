@@ -8,7 +8,7 @@ import {
   type TraceDestinationInput,
   type TraceDestinationProject,
 } from "@langwatch/project-contract";
-import { TestProjectService } from "./test-project-service.ts";
+import { TestProjectApi } from "./test-project-api.ts";
 
 const DESTINATION_SELECT = {
   id: true,
@@ -22,7 +22,7 @@ const DESTINATION_SELECT = {
  * mirrors PrismaProjectRepository's queries and resolveTraceDestination's
  * ladder, since gateway-server depends on the Project CONTRACT only.
  */
-export class TraceDestinationProjectService extends TestProjectService {
+export class TraceDestinationProjectService extends TestProjectApi {
   constructor(private readonly prisma: PrismaClient) {
     super();
   }
@@ -62,9 +62,7 @@ export class TraceDestinationProjectService extends TestProjectService {
     );
   }
 
-  override async tryGetTraceDestination(
-    projectId: string,
-  ): Promise<TraceDestinationProject | null> {
+  override async findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
     const row = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: DESTINATION_SELECT,

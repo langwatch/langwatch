@@ -120,7 +120,7 @@ async function insertGatewayTrace(args: {
 
 /**
  * The two narrow reads the usage surfaces make of Postgres, answered from
- * the rows this suite wrote. Narrower than ProjectService and the virtual-key
+ * the rows this suite wrote. Narrower than ProjectApi and the virtual-key
  * repository on purpose: the service declares only what it asks for.
  */
 function usageService(): GatewayUsageService {

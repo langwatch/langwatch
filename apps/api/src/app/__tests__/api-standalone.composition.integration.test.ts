@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthService } from "@langwatch/auth-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
@@ -257,7 +257,7 @@ class TestAuthComposition extends ApiAuthSessionCompositionPort {
     return {
       auth: new TestAuthService(),
       sessions: new TestSessionTransport(),
-      users: testUserService(),
+      users: testUserApi(),
     };
   }
 }
@@ -382,8 +382,8 @@ async function bindPort(port: number): Promise<void> {
  * too. It refuses on every call: nothing here exercises it, and a call would be
  * a test reaching past what it is describing.
  */
-function testUserService(): UserService {
-  return new Proxy({} as UserService, {
+function testUserApi(): UserApi {
+  return new Proxy({} as UserApi, {
     get(_target, property) {
       return () => {
         throw new Error(`the composition test reached users.${String(property)}`);

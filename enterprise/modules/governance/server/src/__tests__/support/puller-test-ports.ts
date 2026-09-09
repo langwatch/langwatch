@@ -21,7 +21,7 @@ import {
 } from "@langwatch/enterprise-governance-server";
 import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts";
 import { PullerRegistryService } from "../../services/puller-registry.service.ts";
-import { TestProjectService as CompleteTestProjectService } from "../../ports/__tests__/support/test-project-service.ts";
+import { TestProjectApi as CompleteTestProjectService } from "../../ports/__tests__/support/test-project-api.ts";
 
 export class TestHttpPort extends GovernanceHttpPort {
   constructor(

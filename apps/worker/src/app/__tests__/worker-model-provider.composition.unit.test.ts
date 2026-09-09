@@ -2,7 +2,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
@@ -76,7 +76,7 @@ const projects = {
   getWithTeam: async () => projectRow(),
   tryGetWithTeam: async () => projectRow(),
   listByOrganization: async () => ({ data: [], pagination: { total: 0 } }),
-} as unknown as ProjectService;
+} as unknown as ProjectApi;
 
 const organizations = {
   getBillingProfile: async () => ({ id: "organization-1", name: "Acme" }),

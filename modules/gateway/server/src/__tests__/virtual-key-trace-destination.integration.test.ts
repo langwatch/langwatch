@@ -471,7 +471,7 @@ describe.skipIf(!databaseUrl)("virtual keys must have a home for their traces (r
       // key's history across two projects, and failing would take its
       // traffic down. The materialiser follows the pointer as it stands.
       const vk = await service.tryGetById(virtualKey.id, ORG_ARCH_ID);
-      const followed = await projects.tryGetTraceDestination(vk!.traceProjectId!);
+      const followed = await projects.findTraceDestination(vk!.traceProjectId!);
       expect(followed?.id).toBe(ARCH_DOOMED_PROJECT_ID);
 
       // And the state is surfaced rather than acted on, which is the only

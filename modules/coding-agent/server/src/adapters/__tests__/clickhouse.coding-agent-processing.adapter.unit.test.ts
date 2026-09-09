@@ -225,7 +225,7 @@ describe("ClickHouseCodingAgentProcessingAdapter", () => {
 
       await storeThrough(pipeline);
 
-      // The stamp is why the pipeline used to demand the whole ProjectService.
+      // The stamp is why the pipeline used to demand the whole ProjectApi.
       // It is fire-and-forget behind the commit, so the assertion is that the
       // one-method seam this graph composed is the thing that receives it.
       expect(projectActivity.touched.map((entry) => entry.projectId)).toEqual(["project_alpha"]);

@@ -1,4 +1,4 @@
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { AdminWorkspaceViewOcsfPort } from "../ports/admin-workspace-view-audit.port.ts";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
 import {
@@ -11,7 +11,7 @@ export class PostgresAdminWorkspaceViewAuditAdapter {
   private constructor(
     private readonly options: {
       database: AdminWorkspaceViewAuditDatabase;
-      projects?: ProjectService;
+      projects?: ProjectApi;
       ocsf?: AdminWorkspaceViewOcsfPort;
       diagnostics?: GovernanceDiagnosticsPort;
       clock?: () => number;
@@ -20,7 +20,7 @@ export class PostgresAdminWorkspaceViewAuditAdapter {
 
   static create(options: {
     database: AdminWorkspaceViewAuditDatabase;
-    projects?: ProjectService;
+    projects?: ProjectApi;
     ocsf?: AdminWorkspaceViewOcsfPort;
     diagnostics?: GovernanceDiagnosticsPort;
     clock?: () => number;

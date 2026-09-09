@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { UserService } from "@langwatch/user-contract";
 import { BetterAuthAnnouncementsPort } from "../../../ports/better-auth.port.ts";
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   passkeySignUpRegistration,
+  type PasskeySignUpDirectory,
   type SignUpVerificationPort,
 } from "../passkey-sign-up.api.ts";
 
 const requestVerification = vi.fn();
 const createPasskeyUser = vi.fn();
-const tryFindByEmail = vi.fn();
-const users = { createPasskeyUser, tryFindByEmail } as unknown as UserService;
+const findByEmail = vi.fn();
+const users: PasskeySignUpDirectory = { createPasskeyUser, findByEmail };
 const verification: SignUpVerificationPort = { requestVerification };
 
 /** Records the announcements without letting one fail the ceremony. */
@@ -57,7 +57,7 @@ const afterVerification = registration.afterVerification;
 describe("given passkey sign-up, which creates an account with no session", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    tryFindByEmail.mockResolvedValue(null);
+    findByEmail.mockResolvedValue(null);
     createPasskeyUser.mockResolvedValue({ id: "user_1" });
     requestVerification.mockResolvedValue(void 0);
   });
@@ -71,7 +71,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
      */
     /** @scenario A passkey is never registered against an address that already has an account */
     it("refuses to start a ceremony for somebody else's address", async () => {
-      tryFindByEmail.mockResolvedValue({ id: "someone_else" });
+      findByEmail.mockResolvedValue({ id: "someone_else" });
 
       await expect(
         resolveUser({ ctx: fakeContext().ctx, context: "victim@corp.com" }),
@@ -82,7 +82,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
 
     it("refuses again after the ceremony, in case it was taken in between", async () => {
       const { ctx } = fakeContext();
-      tryFindByEmail.mockResolvedValue({ id: "someone_else" });
+      findByEmail.mockResolvedValue({ id: "someone_else" });
 
       await expect(afterVerification({ ctx, context: "victim@corp.com" })).rejects.toMatchObject({
         body: { code: PASSKEY_SIGNUP_EMAIL_TAKEN },
@@ -91,14 +91,14 @@ describe("given passkey sign-up, which creates an account with no session", () =
     });
 
     it("matches the address whatever case it was stored in", async () => {
-      tryFindByEmail.mockResolvedValue({ id: "someone_else" });
+      findByEmail.mockResolvedValue({ id: "someone_else" });
 
       await resolveUser({
         ctx: fakeContext().ctx,
         context: "victim@corp.com",
       }).catch(() => void 0);
 
-      expect(tryFindByEmail).toHaveBeenCalledWith({ email: "victim@corp.com" });
+      expect(findByEmail).toHaveBeenCalledWith({ email: "victim@corp.com" });
     });
   });
 

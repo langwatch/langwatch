@@ -24,7 +24,7 @@ import {
   type UpdateGatewayGuardrailInput,
 } from "@langwatch/gateway-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { ProjectIdentity, ProjectService } from "@langwatch/project-contract";
+import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { z } from "zod";
 
@@ -217,7 +217,7 @@ export interface GatewayAppDependencies {
   /** The spend-event ledger reader. Absent likewise. */
   spendEvents: GatewaySpendEventsService | undefined;
   /** Project reads: organization resolution and trace-destination facts. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /** The usage reader, already bound to the spend sources above. */
   usage: GatewayUsageService;
   /**

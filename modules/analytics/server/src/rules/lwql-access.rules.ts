@@ -1,5 +1,5 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 /**
  * The experimental gate over the whole LangWatchQL surface.
@@ -37,7 +37,7 @@ export async function lwqlEnabled({
 }: {
   featureFlags: FeatureFlagApi;
   projectId: string;
-  projects: ProjectService;
+  projects: ProjectApi;
 }): Promise<boolean> {
   const organizationId = await projects.getOrganizationId(projectId);
 

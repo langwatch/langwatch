@@ -39,7 +39,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import { GatewayBudgetDtoAdapter } from "../adapters/gateway-budget-dto.adapter.ts";
@@ -50,7 +50,7 @@ import {
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 const budgetDtos = GatewayBudgetDtoAdapter.create();
 class AllowTestQueries extends PrismaQueryGuard {
@@ -90,8 +90,8 @@ const ROUNDED_FIRST_NANO = 75_000;
 const LOOSE_LIMIT_USD = "5";
 
 /** The org's one project: the tenant every debit here lands in. */
-class SuiteProjectService extends TestProjectService {
-  override async listIdsByOrganization(): ReturnType<ProjectService["listIdsByOrganization"]> {
+class SuiteProjectService extends TestProjectApi {
+  override async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
     return [PROJECT_ID];
   }
 }

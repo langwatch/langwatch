@@ -5,7 +5,7 @@ import {
   type RecordWorkspaceViewResult,
   recordWorkspaceViewInputSchema,
 } from "@langwatch/enterprise-governance-contract";
-import { PROJECT_KIND, type ProjectService } from "@langwatch/project-contract";
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
 import type {
   AdminWorkspaceViewAuditRepository,
@@ -21,7 +21,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
   private constructor(
     private readonly repository: AdminWorkspaceViewAuditRepository,
     private readonly options: {
-      projects?: ProjectService;
+      projects?: ProjectApi;
       ocsf?: AdminWorkspaceViewOcsfPort;
       diagnostics?: GovernanceDiagnosticsPort;
       clock: () => number;
@@ -30,7 +30,7 @@ export class DefaultGovernanceAdminWorkspaceViewAuditService {
 
   static create(options: {
     repository: AdminWorkspaceViewAuditRepository;
-    projects?: ProjectService;
+    projects?: ProjectApi;
     ocsf?: AdminWorkspaceViewOcsfPort;
     diagnostics?: GovernanceDiagnosticsPort;
     clock?: () => number;

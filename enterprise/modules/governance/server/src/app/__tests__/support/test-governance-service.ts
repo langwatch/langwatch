@@ -6,7 +6,7 @@ const unsupported = <Method>(): Method =>
 /**
  * Complete Governance boundary for tests that only exercise a few methods.
  *
- * The same shape as {@link ../support/test-project-service.ts}: every member
+ * The same shape as {@link ../support/test-project-api.ts}: every member
  * of the contract is present and refuses, so a test that reaches one it did
  * not mean to reach fails loudly instead of reading `undefined`.
  */

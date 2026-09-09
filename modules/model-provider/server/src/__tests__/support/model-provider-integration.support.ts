@@ -9,7 +9,6 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
-  ProjectService,
   type PaginatedProjects,
   type Project,
   type ProjectIdentity,
@@ -17,6 +16,7 @@ import {
   type ProjectNamesByIdsInput,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
+import { TestProjectApi } from "./test-project-api.ts";
 import type {
   ModelDefaultScope,
   ModelProvider,
@@ -43,19 +43,15 @@ export function testNamespace(prefix: string): string {
   return `${prefix}-${randomBytes(5).toString("hex")}`;
 }
 
-const notImplemented = (): never => {
-  throw new Error("not implemented in this test fixture");
-};
-
 /**
  * Reads real project + team rows this integration suite created.
  */
-export class PrismaProjects extends ProjectService {
+export class PrismaProjects extends TestProjectApi {
   constructor(private readonly prisma: PrismaClient) {
     super();
   }
 
-  async tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
+  override async tryGetWithTeam(id: string): Promise<ProjectWithTeam | null> {
     const project = await this.prisma.project.findUnique({
       where: { id },
       include: { team: true },
@@ -63,13 +59,13 @@ export class PrismaProjects extends ProjectService {
     return project as unknown as ProjectWithTeam | null;
   }
 
-  async getWithTeam(id: string): Promise<ProjectWithTeam> {
+  override async getWithTeam(id: string): Promise<ProjectWithTeam> {
     const project = await this.tryGetWithTeam(id);
     if (!project) throw new Error("no project");
     return project;
   }
 
-  async listByOrganization(input: {
+  override async listByOrganization(input: {
     organizationId: string;
     page: number;
     limit: number;
@@ -93,7 +89,7 @@ export class PrismaProjects extends ProjectService {
     };
   }
 
-  async listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]> {
+  override async listIdsByOrganization(input: ProjectIdsByOrganizationInput): Promise<string[]> {
     const rows = await this.prisma.project.findMany({
       where: { team: { organizationId: input.organizationId } },
       select: { id: true },
@@ -101,7 +97,7 @@ export class PrismaProjects extends ProjectService {
     return rows.map((row) => row.id);
   }
 
-  async listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectIdentity[]> {
+  override async listNamesByIds(input: ProjectNamesByIdsInput): Promise<ProjectIdentity[]> {
     const rows = await this.prisma.project.findMany({
       where: { id: { in: input.projectIds } },
       include: { team: true },
@@ -119,30 +115,6 @@ export class PrismaProjects extends ProjectService {
         }) satisfies ProjectIdentity,
     );
   }
-
-  tryFindInternal = notImplemented;
-  ensureInternal = notImplemented;
-  isPresenceEnabled = notImplemented;
-  getById = notImplemented;
-  tryGetIdentity = notImplemented;
-  getOrganizationId = notImplemented;
-  tryGetOrganizationId = notImplemented;
-  tryGetById = notImplemented;
-  tryGetSummaryById = notImplemented;
-  create = notImplemented;
-  update = notImplemented;
-  archive = notImplemented;
-  listByTeam = notImplemented;
-  listActiveByScopes = notImplemented;
-  updateMetadata = notImplemented;
-  touchCodingAgentSessionSeen = notImplemented;
-  touchCodingAgentPullRequestSeen = notImplemented;
-  searchByQuery = notImplemented;
-  tryGetTraceSharingConfig = notImplemented;
-  resolveOrgAdmin = notImplemented;
-  resolveTraceDestination = notImplemented;
-  tryGetTraceDestination = notImplemented;
-  listTraceDestinations = notImplemented;
 }
 
 /** Round-trips credentials as plain JSON — the tests below never assert on ciphertext shape. */

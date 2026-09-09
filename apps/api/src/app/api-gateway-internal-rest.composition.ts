@@ -26,7 +26,7 @@ import { PrismaGatewayElevenLabsCredentialRepository } from "@langwatch/gateway-
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { EncryptedModelProviderCredentialAdapter } from "@langwatch/model-provider-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
 import type { ApiGatewayComposition } from "./api-gateway.composition.ts";
@@ -53,7 +53,7 @@ export type ApiGatewayInternalRestOptions = Readonly<{
   /** Everything the gateway composition opened, so both doors read one graph. */
   gateway: ApiGatewayComposition;
   /** The project directory a key's trace destination is resolved through. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /** The HMAC secret the data plane signs its calls with, where configured. */
   internalSecret: string | undefined;
   /** The key the credentials handed to the data plane are signed under. */

@@ -15,7 +15,7 @@ import type {
   PermissionDecision,
 } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
@@ -102,7 +102,7 @@ function testAuthz(): AuthzService {
 }
 
 /** The two project reads this half makes: the routing one and the policy one. */
-function testProjects(): ProjectService {
+function testProjects(): ProjectApi {
   return {
     getOrganizationId: async () => "organization-1",
     getWithTeam: async (id: string) => ({
@@ -112,7 +112,7 @@ function testProjects(): ProjectService {
       isPersonal: false,
       team: { organizationId: "organization-1" },
     }),
-  } as unknown as ProjectService;
+  } as unknown as ProjectApi;
 }
 
 function testResources(): ResourceScope {

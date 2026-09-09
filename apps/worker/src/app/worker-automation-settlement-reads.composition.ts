@@ -22,7 +22,7 @@ import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import {
   TraceNotFoundError,
@@ -141,7 +141,7 @@ export class WorkerTraceRecordReader {
      * organization that is.
      */
     plans: PlanProvider;
-    projects: Pick<ProjectService, "getOrganizationId">;
+    projects: Pick<ProjectApi, "getOrganizationId">;
     /** The SAME stateless derivation the record pipeline canonicalises with. */
     traceCanonicalisation: TraceCanonicalisationService;
     logger?: Logger;
@@ -165,7 +165,7 @@ export class WorkerTraceRecordReader {
     private readonly reads: TraceLegacyReadClickHouseRepository,
     private readonly dataPrivacy: DataPrivacyResolutionPort,
     private readonly window: VisibilityWindowService,
-    private readonly projects: Pick<ProjectService, "getOrganizationId">,
+    private readonly projects: Pick<ProjectApi, "getOrganizationId">,
     private readonly logger: Logger,
   ) {}
 

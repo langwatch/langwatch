@@ -31,8 +31,9 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PostgresProjectAdapter, ProjectCredentialsAdapter } from "@langwatch/project-server";
-import type { ProjectService } from "@langwatch/project-contract";
+import { ProjectCredentialsAdapter } from "@langwatch/project-server";
+import { createPrismaProjectApi } from "../../../app/__tests__/support/prisma-project-api.ts";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { WorkflowNlpRuntimePort } from "@langwatch/workflow-server";
 import type { WorkflowService } from "@langwatch/workflow-contract";
@@ -160,11 +161,11 @@ function mountEvaluatorsFamily() {
     grants: authz.grants,
     settingsSecrets: new UnreadSettingsSecrets(),
   }).build();
-  const projects = PostgresProjectAdapter.create({
+  const projects = createPrismaProjectApi({
     database: prisma,
     credentials: ProjectCredentialsAdapter.create(),
     organizations,
-  }).build() as ProjectService;
+  });
 
   const modelProviders = composeApiModelProviders({
     prisma,

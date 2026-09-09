@@ -61,7 +61,7 @@ function harness(
   const repo = options.repository ?? repository();
   let currentUser = options.currentUser ?? user();
   const users = {
-    tryFindByEmail: vi.fn(async () => options.existingUser ?? null),
+    findByEmail: vi.fn(async () => options.existingUser ?? null),
     tryFindById: vi.fn(async () => currentUser),
     create: vi.fn(async () => currentUser),
     updateProfile: vi.fn(async (_input: UpdateUserProfileInput) => currentUser),
@@ -145,7 +145,7 @@ describe("SCIM user parity", () => {
   it("creates a user and its organization membership", async () => {
     const created = user();
     const { repo, users, service } = harness({ currentUser: created });
-    vi.mocked(users.tryFindByEmail).mockResolvedValue(null);
+    vi.mocked(users.findByEmail).mockResolvedValue(null);
     vi.mocked(users.create).mockResolvedValue(created);
 
     await expect(

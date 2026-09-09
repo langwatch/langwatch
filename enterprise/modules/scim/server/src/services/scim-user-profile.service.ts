@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { AuthService } from "@langwatch/auth-contract";
-import type { UpdateUserProfileInput, UserProfile, UserService } from "@langwatch/user-contract";
+import type { UpdateUserProfileInput, UserProfile, UserApi } from "@langwatch/user-contract";
 
 /**
  * The one thing SCIM asks of Auth: drop a user's sessions after their email
@@ -15,7 +15,7 @@ export type ScimSessionRevocation = Pick<AuthService, "revokeAllBrowserSessions"
  * The two user reads and writes a SCIM profile update needs: the previous
  * profile, to see whether the email moved, and the write itself.
  */
-export type ScimUserProfileReadWrite = Pick<UserService, "tryFindById" | "updateProfile">;
+export type ScimUserProfileReadWrite = Pick<UserApi, "tryFindById" | "updateProfile">;
 
 /** Coordinates the session boundary that follows a SCIM-managed email change. */
 export class ScimUserProfileService {

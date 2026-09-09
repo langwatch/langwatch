@@ -58,10 +58,10 @@ export abstract class AutomationGraphActivityPort {
  * A dispatched alert names the project it is about — its name in the subject
  * line, its slug in every link back to the deployment — and that is the entire
  * project question the graph path asks. Naming it here rather than taking a
- * whole `ProjectService` is the same narrowing this file already does for
- * Automation itself: the write graph behind `ProjectService` drags a
+ * whole `ProjectApi` is the same narrowing this file already does for
+ * Automation itself: the write graph behind `ProjectApi` drags a
  * credentials port, an organization service and, through it, an authz service
- * into a process that only sends an alert. `ProjectService` and
+ * into a process that only sends an alert. `ProjectApi` and
  * `ProjectMetadataService` both satisfy this.
  */
 export abstract class AutomationProjectIdentityPort {

@@ -38,7 +38,7 @@ export type PostgresGithubBranchDemandOptions = {
   hostConfig?: { host?: string };
   /**
    * The organization read and the activity stamp, as the two project facts
-   * demand needs. `ProjectService` satisfies it, and so does the narrow
+   * demand needs. `ProjectApi` satisfies it, and so does the narrow
    * Postgres seam a worker composes from its own client.
    */
   project: GithubProjectActivityPort;

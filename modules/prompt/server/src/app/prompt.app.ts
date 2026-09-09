@@ -26,7 +26,7 @@ import {
 import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
 import type { PromptCopyChoice, PromptPushToCopiesResult } from "@langwatch/prompt-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 /**
  * The credential a tag write arrived on. A tag definition is one organization
@@ -65,7 +65,7 @@ export interface PromptInfrastructure {
 /** What the process composes this feature's application from. */
 export interface PromptAppDependencies {
   prompts: PromptService;
-  projects: Pick<ProjectService, "getOrganizationId" | "listIdsByOrganization">;
+  projects: Pick<ProjectApi, "getOrganizationId" | "listIdsByOrganization">;
   permissions: Pick<AuthzApi, "hasPermission" | "getApiKeyProjectDecision">;
   infrastructure: PromptInfrastructure;
 }

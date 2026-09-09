@@ -10,7 +10,7 @@ import {
   type MountableRestApp,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectManagementDirectory } from "@langwatch/project-server";
 import { projectRest, projectRestCredential } from "@langwatch/project-server";
 
 import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
@@ -19,7 +19,7 @@ import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 export function mountProjectRest(
   runtime: ApiRestRuntime,
   options: Readonly<{
-    projects: () => ProjectService;
+    projects: () => ProjectManagementDirectory;
     apiKeys: () => ApiKeyApi;
     /** The process envelope this family's own mapping is layered over. */
     errors: RestErrorHandler;

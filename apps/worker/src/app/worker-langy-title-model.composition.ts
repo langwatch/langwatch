@@ -10,7 +10,7 @@ import { LangyTitleModelPort } from "@langwatch/langy-server";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 
 /**
- * The project read the model cascade needs. Declared structurally rather than as `ProjectService`,
+ * The project read the model cascade needs. Declared structurally rather than as `ProjectApi`,
  * because what the cascade uses is these two reads and nothing else — and this process composes the
  * READ half of Project only.
  */

@@ -19,7 +19,7 @@ import {
   type OrganizationTeamPage,
 } from "@langwatch/organization-contract";
 import { TeamIdentityAdapter } from "@langwatch/organization-server";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectManagementDirectory } from "@langwatch/project-server";
 import { describe, expect, it } from "vitest";
 
 import { ApiRestObservabilityComposition } from "../../app/api-rest-observability.composition.ts";
@@ -766,7 +766,7 @@ function mountTeams(): { api: MountedRestFamily; directory: TeamDirectory } {
     packaged: {
       organizations: () => organizations,
       permissions: () => permissions,
-      projects: () => namedAbsences({}, "project") as ProjectService,
+      projects: () => namedAbsences({}, "project") as ProjectManagementDirectory,
     },
     security: ApiRestSecurity.create({
       apiKeys,

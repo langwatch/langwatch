@@ -49,6 +49,7 @@ export function createAppTrpcFeatures(options: {
   const entitlementRouters = composed.entitlement.routers(mount);
   const evaluationRouters = composed.evaluation.routers(mount);
   const monitorRouters = composed.monitor.routers(mount);
+  const organizationRouters = composed.organization.routers(mount);
   const roleRouters = composed.role.routers(mount);
   const secretRouters = composed.secret.routers(mount);
   const shareRouters = composed.share.routers(mount);
@@ -97,6 +98,9 @@ export function createAppTrpcFeatures(options: {
     // exact tenant target it was asked for inside the module's own resolver.
     featureFlag: composed.featureFlag.router(mount),
     frontDoor: authRouters.frontDoor,
+    // Every group an organization grants access through. Behind
+    // `organization:manage` throughout: a group IS an access grant.
+    group: organizationRouters.group,
     // The GitHub App an organization connected, and the pull requests its
     // coding agents opened.
     github: composeGithubTrpcRouter({ mount, infrastructure }),
@@ -107,6 +111,9 @@ export function createAppTrpcFeatures(options: {
     // The setup checklist: nine other verticals' evidence plus the project's
     // own two columns, and no one module holds it.
     integrationsChecks: composed.integrationsChecks.router(mount),
+    // Who is waiting to be let into an organization, and how colleagues on a
+    // matching domain get in at all.
+    joinRequests: organizationRouters.joinRequests,
     // What this instance is licensed for, and the ceilings that licence sets.
     // The procedures are declared in the module's own contract, and
     // `ctx.app.licensing` is the one application that answers both.
@@ -114,6 +121,17 @@ export function createAppTrpcFeatures(options: {
     licenseEnforcement: createLicenseEnforcementTrpcRouter(mount.runtime),
     limits: entitlementRouters.limits,
     monitors: monitorRouters.monitors,
+    // The sign-up ceremony. It runs before the caller belongs to anything, so
+    // it mounts beside the organization it is about to create.
+    onboarding: organizationRouters.onboarding,
+    // A tenant: the people in it, the teams they sit in, its settings, its
+    // audit trail and the invitations that put them there. The shell's first
+    // call is `organization.getAll`, and the project switcher, the active
+    // scope and every settings screen are read off its answer.
+    organization: organizationRouters.organization,
+    // What one person's own workspace offers. Not an organization permission:
+    // a personal workspace belongs to its owner, and the application proves it.
+    personalWorkspaceFeatures: organizationRouters.personalWorkspaceFeatures,
     pinnedTrace: shareRouters.pinnedTrace,
     // What this organization is on. No ports either: the plan is resolved off
     // the one entitlement application, because ONE answer to "which plan" is
@@ -142,6 +160,9 @@ export function createAppTrpcFeatures(options: {
     // module's own contract, and `ctx.app.sso` is what answers them.
     ssoConnections: createSsoConnectionTrpcRouter(mount.runtime),
     storedObjects: composed.storedObject.router(mount),
+    // The teams an organization carves itself into, owned by the organization
+    // module because a team belongs to exactly one organization.
+    team: organizationRouters.team,
     subscription: mount.runtime.mount(subscriptionTrpcTransport, requireSaasBilling, {
       facts: [bindTrpcFact(billingCallerEmailFact, (ctx) => ctx.session?.user.email ?? null)],
     }),

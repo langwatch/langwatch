@@ -9,7 +9,7 @@ import { GatewayConfigAssemblyPort } from "../ports/gateway-config-assembly.port
 import type { GatewayModelProviderCredentialsPort } from "../ports/gateway-model-provider-credentials.port.ts";
 import { resolveLangyMirrorTier } from "@langwatch/langy-contract";
 import { GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   budgetPeriodFloorMs,
   parseVirtualKeyConfig,
@@ -37,7 +37,7 @@ export class GatewayConfigMaterialiserService {
   private constructor(
     /** Which providers a key reaches, and in which dispatch order. */
     private readonly scopeResolution: GatewayScopeResolutionService,
-    private readonly projects: ProjectService,
+    private readonly projects: ProjectApi,
     private readonly chRepo: GatewayBudgetSpendPort | null,
     /**
      * The process's own gateway service. Required rather than defaulted: building one here meant
@@ -67,7 +67,7 @@ export class GatewayConfigMaterialiserService {
 
   static create(input: {
     scopeResolution: GatewayScopeResolutionService;
-    projects: ProjectService;
+    projects: ProjectApi;
     chRepo: GatewayBudgetSpendPort | null;
     budgetDecisions: GatewayService;
     credentials: GatewayModelProviderCredentialsPort;
@@ -135,7 +135,7 @@ export class GatewayConfigMaterialiserService {
   async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
     const eligibleProviders = await this.scopeResolution.eligibleModelProvidersForVk(vk);
     const traceProject = vk.traceProjectId
-      ? await this.projects.tryGetTraceDestination(vk.traceProjectId)
+      ? await this.projects.findTraceDestination(vk.traceProjectId)
       : null;
     const budgets = await this.applicableBudgets(vk, traceProject);
     const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);

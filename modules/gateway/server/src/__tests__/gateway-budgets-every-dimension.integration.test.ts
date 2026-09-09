@@ -40,7 +40,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import { budgetAppliesToProvider } from "@langwatch/gateway-contract";
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
@@ -54,7 +54,7 @@ import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { VirtualKeyService } from "../services/virtual-key.service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 import { PostgresVirtualKeyAdapter } from "../testing.ts";
 
@@ -85,10 +85,10 @@ const prisma = connection?.client as PrismaClient;
 /**
  * The three Project reads this suite makes (new key's landing, existing key's landing, scope reachability) — all answered from rows the suite itself writes.
  */
-class SuiteProjectService extends TestProjectService {
-  override async tryGetTraceDestination(
+class SuiteProjectService extends TestProjectApi {
+  override async findTraceDestination(
     projectId: string,
-  ): ReturnType<ProjectService["tryGetTraceDestination"]> {
+  ): ReturnType<ProjectApi["findTraceDestination"]> {
     return await prisma.project.findUnique({
       where: { id: projectId },
       select: { id: true, teamId: true, apiKey: true, archivedAt: true },
@@ -97,7 +97,7 @@ class SuiteProjectService extends TestProjectService {
 
   override async listTraceDestinations(
     projectIds: string[],
-  ): ReturnType<ProjectService["listTraceDestinations"]> {
+  ): ReturnType<ProjectApi["listTraceDestinations"]> {
     return await prisma.project.findMany({
       where: { id: { in: projectIds } },
       select: { id: true, teamId: true, apiKey: true, archivedAt: true },
@@ -105,11 +105,11 @@ class SuiteProjectService extends TestProjectService {
   }
 
   override async resolveTraceDestination(
-    input: Parameters<ProjectService["resolveTraceDestination"]>[0],
-  ): ReturnType<ProjectService["resolveTraceDestination"]> {
+    input: Parameters<ProjectApi["resolveTraceDestination"]>[0],
+  ): ReturnType<ProjectApi["resolveTraceDestination"]> {
     const projectId = input.traceProjectId ?? input.projectScopeIds[0];
     if (!projectId) return { outcome: "no_destination" };
-    const project = await this.tryGetTraceDestination(projectId);
+    const project = await this.findTraceDestination(projectId);
     return project ? { outcome: "resolved", project } : { outcome: "unknown" };
   }
 }

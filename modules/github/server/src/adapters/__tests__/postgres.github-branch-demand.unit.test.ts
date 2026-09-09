@@ -3,7 +3,7 @@
  * demand half of pull-request linkage.
  *
  * Demand was reachable only through `PostgresGithubAdapter`, which takes an
- * `OrganizationService` and a full `ProjectService`. It genuinely needs two
+ * `OrganizationService` and a full `ProjectApi`. It genuinely needs two
  * project facts — the organization a tenant belongs to, and the activity stamp
  * a successful mapping writes — and nothing else in either service. What
  * matters here is therefore not that it constructs: it is that a branch a

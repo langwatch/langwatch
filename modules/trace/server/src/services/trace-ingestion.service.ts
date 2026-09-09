@@ -311,7 +311,7 @@ export class TraceIngestionService {
  * only from the OTLP-request path — the tracked-event reactor, which is the
  * caller a background process needs, can never reach either. Composing the
  * whole class for it would have meant a process building a `CodingAgentService`
- * (and through it a `ProjectService`) to satisfy two arguments that are
+ * (and through it a `ProjectApi`) to satisfy two arguments that are
  * provably never read on the path it uses.
  *
  * `TraceIngestionService.create` still takes the same five options and builds

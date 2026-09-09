@@ -1,4 +1,3 @@
-import type { ProjectService as ProjectServiceContract } from "@langwatch/project-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type {
   ProjectCredentialsPort,
@@ -41,7 +40,7 @@ export class PostgresProjectAdapter {
     return new PostgresProjectAdapter(options);
   }
 
-  build(): ProjectServiceContract {
+  build(): ProjectService {
     return ProjectService.create({
       repository: PrismaProjectRepository.create({ prisma: this.options.database }),
       credentials: this.options.credentials,

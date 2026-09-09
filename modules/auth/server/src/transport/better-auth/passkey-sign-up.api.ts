@@ -1,10 +1,13 @@
 import { createHmac } from "node:crypto";
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
 import type { BetterAuthAnnouncementsPort } from "../../ports/better-auth.port.ts";
+
+/** Everything the passkey ceremony asks of the user directory. */
+export type PasskeySignUpDirectory = Pick<UserApi, "findByEmail" | "createPasskeyUser">;
 
 /**
  * What passkey sign-up needs from sign-up's address confirmation.
@@ -108,13 +111,13 @@ async function refuseIfRegistered({
   users,
   email,
 }: {
-  users: UserService;
+  users: PasskeySignUpDirectory;
   email: string;
 }): Promise<void> {
   // Case-insensitive for the same reason `user.register` is: rows written
   // before addresses were stored lowercased may carry capitals, and a
   // case-twin beside one is two Users answering for one person.
-  const existing = await users.tryFindByEmail({ email });
+  const existing = await users.findByEmail({ email });
   if (!existing) return;
 
   throw new APIError("BAD_REQUEST", {
@@ -138,7 +141,7 @@ async function resolveUser({
 }: {
   ctx: GenericEndpointContext;
   handleSecret: string;
-  users: UserService;
+  users: PasskeySignUpDirectory;
   context?: string | null | undefined;
 }): Promise<{ id: string; name: string; displayName: string }> {
   const email = requireEmail(context);
@@ -175,7 +178,7 @@ function createAfterVerification({
   verification,
 }: {
   announcements: BetterAuthAnnouncementsPort;
-  users: UserService;
+  users: PasskeySignUpDirectory;
   verification: SignUpVerificationPort;
 }) {
   return async function afterVerification({
@@ -229,7 +232,7 @@ function createAfterVerification({
 export function passkeySignUpRegistration(options: {
   announcements: BetterAuthAnnouncementsPort;
   handleSecret: string;
-  users: UserService;
+  users: PasskeySignUpDirectory;
   verification: SignUpVerificationPort;
 }) {
   return {

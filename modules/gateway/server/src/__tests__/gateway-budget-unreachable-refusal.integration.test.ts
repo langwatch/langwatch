@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import { GatewayBudgetDtoAdapter } from "../adapters/gateway-budget-dto.adapter.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 const budgetDtos = GatewayBudgetDtoAdapter.create();
 /**
@@ -93,7 +93,7 @@ describe.skipIf(!databaseUrl)(
     beforeAll(async () => {
       service = PrismaGatewayAdapter.create({
         database: prisma,
-        projects: new TestProjectService(),
+        projects: new TestProjectApi(),
         evaluators: {} as never,
         monitors: {} as never,
         changes: {} as never,

@@ -17,7 +17,7 @@
  */
 import { Temporal } from "@langwatch/time";
 import type { GatewayService } from "@langwatch/gateway-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { initTRPC } from "@trpc/server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -38,8 +38,8 @@ function budgetDecisionsStub(overrides: Partial<GatewayService>): GatewayService
   return overrides as GatewayService;
 }
 
-function projectsStub(overrides: Partial<ProjectService>): ProjectService {
-  return overrides as ProjectService;
+function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
+  return overrides as ProjectApi;
 }
 
 const ORG_ID = "org_1";

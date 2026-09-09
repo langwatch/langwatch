@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
-import { PROJECT_KIND, type ProjectService } from "@langwatch/project-contract";
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import {
   GovernanceDiagnosticsPort,
   QuarantineTenantPort,
@@ -17,11 +17,11 @@ type QuarantineSpanCountsQuery = {
 };
 
 export class AppQuarantineTenantPort extends QuarantineTenantPort {
-  private constructor(private readonly projects: ProjectService) {
+  private constructor(private readonly projects: ProjectApi) {
     super();
   }
 
-  static create(projects: ProjectService): AppQuarantineTenantPort {
+  static create(projects: ProjectApi): AppQuarantineTenantPort {
     return new AppQuarantineTenantPort(projects);
   }
 
@@ -58,13 +58,13 @@ export class AppQuarantineDiagnosticsPort extends GovernanceDiagnosticsPort {
 export class AppQuarantineFillEvaluatorAdapter {
   private constructor(
     private readonly options: {
-      projects: ProjectService;
+      projects: ProjectApi;
       traceActivity?: AppGovernanceTraceActivityAdapter;
     },
   ) {}
 
   static create(options: {
-    projects: ProjectService;
+    projects: ProjectApi;
     traceActivity?: AppGovernanceTraceActivityAdapter;
   }): AppQuarantineFillEvaluatorAdapter {
     return new AppQuarantineFillEvaluatorAdapter(options);

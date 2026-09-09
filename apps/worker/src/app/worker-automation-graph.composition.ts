@@ -27,12 +27,12 @@ import { nowInstant, toDate } from "@langwatch/time";
  * What this process still has to be HANDED before the graph vertical composes.
  *
  * ONE OF THE TWO CLEARED. `projects` was recorded here as a capability service
- * no background process could build — `ProjectService` needs a credentials
+ * no background process could build — `ProjectApi` needs a credentials
  * port, an organization service, the LWQL key map and stored objects. The
  * graph path asks it for one thing: the name and slug of the project an alert
  * is about. It is now `AutomationProjectIdentityPort`, which
  * `createWorkerTraceCapabilityServices` answers from a Prisma client and which
- * `ProjectService` still satisfies, so the application's own composition is
+ * `ProjectApi` still satisfies, so the application's own composition is
  * unchanged.
  *
  * `AnalyticsService` stays a parameter. It was never the wall — it is

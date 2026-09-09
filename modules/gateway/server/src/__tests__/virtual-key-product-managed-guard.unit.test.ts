@@ -8,7 +8,7 @@ import { Temporal, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 import { PostgresVirtualKeyAdapter } from "../testing.ts";
 
@@ -53,20 +53,14 @@ const mutationInput = {
 describe("VirtualKeyService product-managed guard", () => {
   describe("given a product-managed key", () => {
     it("reports it as absent on tryGetById", async () => {
-      const sut = createVirtualKeyServiceForTest(
-        mockPrisma(vkRow("LANGY")),
-        new TestProjectService(),
-      );
+      const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("LANGY")), new TestProjectApi());
 
       await expect(sut.tryGetById("vk_1", "org_1")).resolves.toBeNull();
     });
 
     /** @scenario "Product-managed virtual keys refuse customer mutations" */
     it("refuses update with NOT_FOUND", async () => {
-      const sut = createVirtualKeyServiceForTest(
-        mockPrisma(vkRow("LANGY")),
-        new TestProjectService(),
-      );
+      const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("LANGY")), new TestProjectApi());
 
       await expect(sut.update({ ...mutationInput, name: "renamed" })).rejects.toMatchObject({
         code: "NOT_FOUND",
@@ -74,10 +68,7 @@ describe("VirtualKeyService product-managed guard", () => {
     });
 
     it("refuses rotate with NOT_FOUND, so no fresh secret is minted", async () => {
-      const sut = createVirtualKeyServiceForTest(
-        mockPrisma(vkRow("LANGY")),
-        new TestProjectService(),
-      );
+      const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("LANGY")), new TestProjectApi());
 
       await expect(sut.rotate(mutationInput)).rejects.toMatchObject({
         code: "NOT_FOUND",
@@ -85,10 +76,7 @@ describe("VirtualKeyService product-managed guard", () => {
     });
 
     it("refuses revoke with NOT_FOUND", async () => {
-      const sut = createVirtualKeyServiceForTest(
-        mockPrisma(vkRow("LANGY")),
-        new TestProjectService(),
-      );
+      const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("LANGY")), new TestProjectApi());
 
       await expect(sut.revoke(mutationInput)).rejects.toMatchObject({
         code: "NOT_FOUND",
@@ -98,10 +86,7 @@ describe("VirtualKeyService product-managed guard", () => {
 
   describe("given a customer-owned key", () => {
     it("returns it from tryGetById", async () => {
-      const sut = createVirtualKeyServiceForTest(
-        mockPrisma(vkRow("USER")),
-        new TestProjectService(),
-      );
+      const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("USER")), new TestProjectApi());
 
       await expect(sut.tryGetById("vk_1", "org_1")).resolves.toMatchObject({
         id: "vk_1",
@@ -112,10 +97,7 @@ describe("VirtualKeyService product-managed guard", () => {
     it("lets a mutation past the guard", async () => {
       // Proves the guard is discriminating on purpose rather than refusing
       // everything: a USER key gets as far as the write transaction.
-      const sut = createVirtualKeyServiceForTest(
-        mockPrisma(vkRow("USER")),
-        new TestProjectService(),
-      );
+      const sut = createVirtualKeyServiceForTest(mockPrisma(vkRow("USER")), new TestProjectApi());
 
       await expect(sut.revoke(mutationInput)).rejects.toThrow(REACHED_TRANSACTION);
     });
@@ -127,7 +109,7 @@ describe("VirtualKeyService product-managed guard", () => {
       const findMany = vi.fn().mockResolvedValue([]);
       const sut = createVirtualKeyServiceForTest(
         mockPrisma(vkRow("USER"), findMany),
-        new TestProjectService(),
+        new TestProjectApi(),
       );
 
       await sut.getAll("org_1");
@@ -146,7 +128,7 @@ describe("VirtualKeyService product-managed guard", () => {
       const findMany = vi.fn().mockResolvedValue([]);
       const sut = createVirtualKeyServiceForTest(
         mockPrisma(vkRow("USER"), findMany),
-        new TestProjectService(),
+        new TestProjectApi(),
       );
 
       await sut.getAllForScope({ scopeType: "PROJECT", scopeId: "proj_1" });

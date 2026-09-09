@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type { ScimPatchOperation } from "@langwatch/enterprise-scim-contract";
 import { ScimCostCenterService } from "./scim-cost-center.service.ts";
 import { ScimDeprovisionService } from "./scim-deprovision.service.ts";
@@ -12,9 +12,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * What a SCIM `active` flag turns into: the directory says a user is on or off,
- * and that is the whole of what patching asks of `UserService`.
+ * and that is the whole of what patching asks of `UserApi`.
  */
-export type ScimUserActivation = Pick<UserService, "deactivate" | "reactivate">;
+export type ScimUserActivation = Pick<UserApi, "deactivate" | "reactivate">;
 
 /** Applies the mutable SCIM User attributes without owning user lookup or output. */
 export class ScimUserPatchService {

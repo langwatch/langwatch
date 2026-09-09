@@ -28,7 +28,7 @@ import type {
   OrganizationService,
 } from "@langwatch/organization-contract";
 import type { OrganizationProvisioningPort } from "@langwatch/organization-server";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectManagementDirectory } from "@langwatch/project-server";
 import type {
   ScenarioService,
   ScenarioTabRegistry,
@@ -93,7 +93,7 @@ export type ApiPackagedRestServices = Readonly<{
   organizationProvisioning?: (() => OrganizationService & OrganizationProvisioningPort) | undefined;
   /** Reading effective permissions and the bindings that confer them. */
   permissions?: (() => AuthzService) | undefined;
-  projects?: (() => ProjectService) | undefined;
+  projects?: (() => ProjectManagementDirectory) | undefined;
   scenarios?: (() => ScenarioService) | undefined;
   scenarioTabs?: (() => ScenarioTabRegistry) | undefined;
   /** The SCIM provisioning tokens an identity provider authenticates with. */

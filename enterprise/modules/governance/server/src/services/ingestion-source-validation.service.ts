@@ -9,12 +9,12 @@ import {
   pullScheduleSchema,
   type GovernanceIngestionSource,
 } from "@langwatch/enterprise-governance-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 export class IngestionSourceValidationService {
-  private constructor(private readonly projects: ProjectService) {}
+  private constructor(private readonly projects: ProjectApi) {}
 
-  static create({ projects }: { projects: ProjectService }): IngestionSourceValidationService {
+  static create({ projects }: { projects: ProjectApi }): IngestionSourceValidationService {
     return new IngestionSourceValidationService(projects);
   }
 

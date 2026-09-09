@@ -2,15 +2,21 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   ProjectNotFoundError,
   type Project,
-  type ProjectService,
   type TopicClusteringRequest,
   type UpdateProjectInput,
 } from "@langwatch/project-contract";
+import type { ProjectService } from "./project.service.ts";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 
+/** The four project operations these use cases orchestrate, and nothing else. */
+export type ProjectOperationsDirectory = Pick<
+  ProjectService,
+  "create" | "tryGetWithTeam" | "update" | "archive"
+>;
+
 type ProjectOperationsDependencies = Readonly<{
-  readonly projects: ProjectService;
+  readonly projects: ProjectOperationsDirectory;
   readonly apiKeys: ApiKeyApi;
   readonly share: ShareApi;
   readonly topics: TopicApi;

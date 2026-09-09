@@ -3,9 +3,12 @@
  * the same call the gateway bundle and the request-time check make, so the list cannot promise a
  * constraint that will not be enforced. Spend comes from the rollup the budgets page reads.
  */
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
-import { type BudgetSpendTarget, GatewayBudgetSpendPort } from "../ports/gateway-budget-spend.port.ts";
+import {
+  type BudgetSpendTarget,
+  GatewayBudgetSpendPort,
+} from "../ports/gateway-budget-spend.port.ts";
 import {
   budgetPeriodFloorMs,
   scopeTargetKey,
@@ -73,7 +76,7 @@ export class GatewayApplicableBudgetsService {
   }
 
   async resolveApplicableBudgetsForDraftKey(
-    projects: ProjectService,
+    projects: ProjectApi,
     draft: DraftVirtualKey,
     chRepo?: GatewayBudgetSpendPort,
   ): Promise<ApplicableBudget[]> {
@@ -84,7 +87,7 @@ export class GatewayApplicableBudgetsService {
     // project budgets kept enforcing. A draft previews the decision the save is about to make.
     const traceProject = draft.virtualKeyId
       ? draft.traceProjectId
-        ? await projects.tryGetTraceDestination(draft.traceProjectId)
+        ? await projects.findTraceDestination(draft.traceProjectId)
         : null
       : await decidedTraceProject({ projects, draft });
 
@@ -163,7 +166,7 @@ async function decidedTraceProject({
   projects,
   draft,
 }: {
-  projects: ProjectService;
+  projects: ProjectApi;
   draft: DraftVirtualKey;
 }) {
   const decision = await projects.resolveTraceDestination({

@@ -17,12 +17,13 @@ import {
   TeamIdentityAdapter,
 } from "@langwatch/organization-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
-import { ProjectApi, type ProjectService } from "@langwatch/project-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import {
   PostgresProjectAdapter,
   ProjectCredentialsAdapter,
   ProjectDiagnosticsPort,
   type ProjectKeyMapPort,
+  type ProjectManagementDirectory,
 } from "@langwatch/project-server";
 import { createApp, type ResourceScope } from "@langwatch/runtime-composition";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
@@ -35,6 +36,13 @@ export abstract class ApiTenancyAbsenceReportPort {
 
 export type ApiTenancyCompositionOptions = {
   database: PrismaConnection;
+  /**
+   * The project application this process installs, as a reference resolved once
+   * it is bound. The credential store reads a project through it, and the
+   * project module reads a credential back, so one of the two has to arrive as
+   * a reference rather than as an instance.
+   */
+  projectApi: ProjectApi;
   /** The two AuthZ services as one graph; see `ApiProductionComposition.authz`. */
   authz: { permissions: AuthzService; grants: AuthzGrantsService };
   /** The same cipher the stored-secret family runs under. */
@@ -86,6 +94,7 @@ export class ApiTenancyComposition {
     }
     return ApiTenancyComposition.compose({
       database: options.database,
+      projectApi: options.projectApi,
       authz: options.authz,
       encryption: options.encryption,
       pepper,
@@ -115,7 +124,7 @@ export class ApiTenancyComposition {
     // deleted here leaves the stored-object cleanup to the tier that owns it. `keyMap` is
     // not in that category — it is this process's own ClickHouse, and it is supplied
     // wherever one was opened.
-    const projects = PostgresProjectAdapter.create({
+    const projectDirectory = PostgresProjectAdapter.create({
       database,
       credentials: ProjectCredentialsAdapter.create(),
       organizations,
@@ -137,7 +146,7 @@ export class ApiTenancyComposition {
       })
       .withProvided(AuthzApi, options.authz.permissions)
       .withProvided(OrganizationApi, organizations)
-      .withProvided(ProjectApi, projects)
+      .withProvided(ProjectApi, options.projectApi)
       .withModule(apiKeyServer)
       .boot({ role: "api" });
 
@@ -145,14 +154,17 @@ export class ApiTenancyComposition {
 
     return new ApiTenancyComposition(
       organizations,
-      projects,
+      options.projectApi,
+      projectDirectory,
       runtime.module(apiKeyServer).provided,
     );
   }
 
   private constructor(
     readonly organizations: OrganizationService,
-    readonly projects: ProjectService,
+    readonly projects: ProjectApi,
+    /** The management door's writer: the five operations `/api/projects` calls. */
+    readonly projectDirectory: ProjectManagementDirectory,
     readonly apiKeyApp: ApiKeyApp,
   ) {}
 

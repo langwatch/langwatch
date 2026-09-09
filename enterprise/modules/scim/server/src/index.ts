@@ -14,10 +14,7 @@ export {
 // inert until a process mounts it on its own runtime.
 export { scimTokenRest, scimTokenRestActor } from "./transport/scim-token.rest.ts";
 export { scimTokenTrpcTransport } from "./transport/scim-token.trpc.ts";
-export {
-  scimProtocolErrorHandler,
-  scimProtocolRest,
-} from "./transport/scim-protocol.rest.ts";
+export { scimProtocolErrorHandler, scimProtocolRest } from "./transport/scim-protocol.rest.ts";
 export { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
 
 export { PostgresScimAdapter, type PostgresScimAdapterOptions } from "./adapters/scim.adapter.ts";
@@ -27,6 +24,7 @@ export {
   type ScimUserPushOperation,
 } from "./ports/scim-sync-lifecycle.port.ts";
 export { ScimDirectoryIdentityService } from "./services/scim-directory-identity.service.ts";
+export type { ScimUserProvisioning } from "./services/scim-provisioning.service.ts";
 
 /**
  * The durable directory-sync history: the SCIM boundary's own implementation of

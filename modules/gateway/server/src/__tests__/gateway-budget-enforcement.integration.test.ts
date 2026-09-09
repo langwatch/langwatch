@@ -14,7 +14,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import { NANO_USD_PER_USD } from "../adapters/model-catalog.gateway-spend-rating.adapter.ts";
@@ -24,7 +24,7 @@ import {
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -60,14 +60,14 @@ const COST_PER_REQUEST = 0.001;
  * organization's spend can land in, and where each key's traces go. Both are
  * answered from the rows this suite writes.
  */
-class SuiteProjectService extends TestProjectService {
-  override async listIdsByOrganization(): ReturnType<ProjectService["listIdsByOrganization"]> {
+class SuiteProjectService extends TestProjectApi {
+  override async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
     return [PROJECT_ID, IDLE_PROJECT_ID];
   }
 
   override async listTraceDestinations(
     projectIds: string[],
-  ): ReturnType<ProjectService["listTraceDestinations"]> {
+  ): ReturnType<ProjectApi["listTraceDestinations"]> {
     return await prisma.project.findMany({
       where: { id: { in: projectIds } },
       select: { id: true, teamId: true, apiKey: true, archivedAt: true },

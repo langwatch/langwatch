@@ -14,10 +14,10 @@ import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the
@@ -42,15 +42,15 @@ const prisma = connection?.client as PrismaClient;
  * The one Project read the budget guards make: a PROJECT-scoped budget is
  * refused unless its project's team belongs to the budget's org.
  */
-class SuiteProjectService extends TestProjectService {
-  override async tryGetWithTeam(id: string): ReturnType<ProjectService["tryGetWithTeam"]> {
+class SuiteProjectService extends TestProjectApi {
+  override async tryGetWithTeam(id: string): ReturnType<ProjectApi["tryGetWithTeam"]> {
     // The generated row types every JSON column as `JsonValue`, which is wider
     // than the contract's `JSONType` by the array case. The rows this suite
     // writes carry no JSON at all.
     return (await prisma.project.findUnique({
       where: { id },
       include: { team: true },
-    })) as Awaited<ReturnType<ProjectService["tryGetWithTeam"]>>;
+    })) as Awaited<ReturnType<ProjectApi["tryGetWithTeam"]>>;
   }
 }
 

@@ -6,7 +6,7 @@ import type {
   GovernanceService,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
 import { PostgresAnomalyRuleAdapter } from "./postgres.anomaly-rule.adapter.ts";
 import { PostgresDepartmentAdapter } from "./postgres.department.adapter.ts";
@@ -71,7 +71,7 @@ import { QuarantineFillEvaluatorService } from "../services/quarantine-fill.serv
 export type GovernanceInstallationOptions = {
   database: PrismaClient;
   organizations: OrganizationService;
-  projects: ProjectService;
+  projects: ProjectApi;
   gatewayBaseUrl: string;
   eventing: GovernanceEventingPort;
   activityClickhouse: GovernanceClickHouseResolverPort;

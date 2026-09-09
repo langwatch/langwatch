@@ -19,7 +19,7 @@ import {
 import type { GithubService } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
@@ -29,7 +29,7 @@ import { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount.ts";
 /** The other services and stores one project's coding agents are read over. */
 export type CodingAgentPeers = Readonly<{
   /** The project directory the tenancy graph composed. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /** The GitHub App this deployment registered, blank where it registered none. */
   github: GithubService;
   /** This process's ClickHouse, where the sessions are projected. */

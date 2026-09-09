@@ -10,7 +10,7 @@ import type {
   OrganizationRestInviteService,
   OrganizationRestService,
 } from "@langwatch/organization-server";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptRestService } from "@langwatch/prompt-server";
 import type { ShareApi } from "@langwatch/share-contract";
 import { Hono } from "hono";
@@ -269,7 +269,7 @@ function mount(options: MountOptions) {
                   getActivePlan: async () => ({ type: management.planType }),
                 }) as unknown as PlanProvider,
               shares: () => ({}) as ShareApi,
-              projects: () => ({}) as ProjectService,
+              projects: () => ({}) as ProjectApi,
               audit: () => {},
               ...(management.invites
                 ? {

@@ -6,7 +6,7 @@ import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
 import { SHARE_MAX_FULL_SPANS, type Span, type TraceSummaryData } from "@langwatch/trace-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -542,7 +542,7 @@ describe("given a process that composed no trace read stack", () => {
     const group = composeTraceFeature({
       prisma: {} as unknown as PrismaClient,
       authz: testAuthz(),
-      projects: stub<ProjectService>("projects"),
+      projects: stub<ProjectApi>("projects"),
       broadcast,
       peers: { share: stub("share"), topics: stub("topics") },
       resolveClickHouseClient: null,
@@ -645,7 +645,7 @@ describe("given an API process that composed the real observability collaborator
       projects: {
         tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
         tryGetById: async () => ({ id: "project-1" }),
-      } as unknown as ProjectService,
+      } as unknown as ProjectApi,
       broadcast,
       peers: { share: stub("share"), topics: stub("topics") },
       resolveClickHouseClient: clickHouse.resolveClient,
@@ -662,7 +662,7 @@ describe("given an API process that composed the real observability collaborator
           projects: {
             tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
             tryGetById: async () => ({ id: "project-1" }),
-          } as unknown as ProjectService,
+          } as unknown as ProjectApi,
           // The PLATFORM's own default policy, resolved by the real resolver
           // against an empty rule set: a hand-written policy shape here would
           // be a second declaration of Data Privacy's own contract.
@@ -967,7 +967,7 @@ describe("given the anonymous share read composed on this process", () => {
     const group = composeTraceFeature({
       prisma: testPrisma(),
       authz: testAuthz(),
-      projects: stub<ProjectService>("projects"),
+      projects: stub<ProjectApi>("projects"),
       broadcast,
       peers: { share: stub("share"), topics: stub("topics") },
       resolveClickHouseClient: null,
@@ -1165,7 +1165,7 @@ function realTraceReadMappers() {
     projects: {
       tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "org-1" } }),
       tryGetById: async () => ({ id: "project-1" }),
-    } as unknown as ProjectService,
+    } as unknown as ProjectApi,
     dataPrivacy: testDataPrivacyApi(
       resolveDataPrivacy({
         rows: [],
@@ -1306,7 +1306,7 @@ describe("given the anonymous share read assembles its payload", () => {
     const group = composeTraceFeature({
       prisma: testPrisma(),
       authz: testAuthz(),
-      projects: stub<ProjectService>("projects"),
+      projects: stub<ProjectApi>("projects"),
       broadcast,
       peers: { share: stub("share"), topics: stub("topics") },
       resolveClickHouseClient: null,

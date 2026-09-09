@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { PrismaGatewayAuditRepository } from "../repositories/prisma/prisma.gateway-audit.repository.ts";
 import { PrismaGatewayChangeEventsRepository } from "../repositories/prisma/prisma.gateway-change-event.repository.ts";
 import { PrismaGatewayKeyBudgetRepository } from "../repositories/prisma/prisma.gateway-key-budget.repository.ts";
@@ -17,7 +17,7 @@ import { PrismaGatewayTransactionAdapter } from "./postgres.gateway-transaction.
  */
 function createVirtualKeyServiceForTest(
   prisma: PrismaClient,
-  projects: ProjectService,
+  projects: ProjectApi,
 ): VirtualKeyService {
   return VirtualKeyService.create({
     transactions: PrismaGatewayTransactionAdapter.create({ database: prisma }),

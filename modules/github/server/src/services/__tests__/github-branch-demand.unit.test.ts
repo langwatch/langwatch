@@ -6,7 +6,7 @@
  * is pulled forward, and a mapping that finds a pull request is what marks the
  * project as having seen coding-agent activity. The fleet-wide sweep does none
  * of that — it has no project in hand — which is why the two are separate
- * services and only this one takes a `ProjectService`.
+ * services and only this one takes a `ProjectApi`.
  *
  * Spec: modules/github/specs/github-branch-maintenance.feature
  */

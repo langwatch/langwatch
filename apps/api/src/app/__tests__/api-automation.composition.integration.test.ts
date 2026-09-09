@@ -14,7 +14,7 @@ import { PrismaScheduledJobStore } from "@langwatch/eventing/server";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
@@ -136,7 +136,7 @@ function harness() {
 
   const automation = composeApiAutomationApp({
     prisma,
-    projects: refuse<ProjectService>("the project directory"),
+    projects: refuse<ProjectApi>("the project directory"),
     monitors: refuse<MonitorService>("the monitor directory"),
     featureFlags: refuse<FeatureFlagApi>("the rollout gate"),
     plans: refuse<AutomationPlanProvider>("the plan provider"),

@@ -33,7 +33,7 @@ import {
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import { nanoid } from "nanoid";
@@ -47,7 +47,7 @@ export type ApiModelProviderCompositionOptions = Readonly<{
   /** The one guarded connection every provider, default and cost row is read on. */
   prisma: PrismaClient;
   /** Resolves a project's team and organization, for scope derivation. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /** Resolves an organization, for the organization-scoped provider rows. */
   organizations: OrganizationService;
   /** Decides who may read and write a provider row. */
@@ -155,7 +155,7 @@ const UNCONFIGURED_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
 
 /** Composes the Enterprise managed-provider service over this process's projects. */
 function composeManagedProviders(input: {
-  projects: ProjectService;
+  projects: ProjectApi;
   environment: Readonly<Record<string, string | undefined>>;
   logger: Logger;
 }): ManagedProviderService {

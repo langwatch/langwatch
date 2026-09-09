@@ -18,10 +18,11 @@ import {
 } from "@langwatch/github-contract";
 import {
   type PaginatedProjects,
-  ProjectService,
   projectWithTeamSchema,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
+import type { Instant } from "@langwatch/time";
+import { TestProjectApi } from "./test-project-api.ts";
 import { CodingAgentBillingPolicyPort } from "../../ports/coding-agent-billing.port.ts";
 import { CodingAgentClockPort } from "../../ports/coding-agent-clock.port.ts";
 import { CodingAgentClickHousePort } from "../../ports/coding-agent-clickhouse.port.ts";
@@ -635,9 +636,9 @@ export class TestGithubService extends GithubService {
   }
 }
 
-export class TestProjectService extends ProjectService {
+export class TestProjectService extends TestProjectApi {
   projects: Array<{ id: string }> = [];
-  sessionActivity: Array<{ projectId: string; at: Date }> = [];
+  sessionActivity: Array<{ projectId: string; at: Instant }> = [];
   sessionActivityError: Error | null = null;
   organizationId = "organization-1";
   teamProject: ProjectWithTeam | null = projectWithTeamSchema.parse({
@@ -683,131 +684,26 @@ export class TestProjectService extends ProjectService {
     },
   });
 
-  async tryFindInternal(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async ensureInternal(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async isPresenceEnabled(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async getById(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async getOrganizationId(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  // Never implemented, and the class-wide assignability failure was hiding it:
-  // an abstract member left off a fake is a method the real service has and
-  // nothing here would notice going wrong.
-  async tryGetOrganizationId(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async tryGetIdentity(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async tryGetById(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async tryGetSummaryById(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async getWithTeam(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async tryGetWithTeam(): Promise<ProjectWithTeam | null> {
+  override async tryGetWithTeam(): Promise<ProjectWithTeam | null> {
     return this.teamProject;
   }
 
-  async create(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async update(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async archive(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  /**
-   * The contract's shape, not a convenient subset.
-   */
-  async listByOrganization(): Promise<PaginatedProjects> {
+  /** The contract's shape, not a convenient subset. */
+  override async listByOrganization(): Promise<PaginatedProjects> {
     return {
       data: this.projects as unknown as PaginatedProjects["data"],
       pagination: { page: 1, limit: this.projects.length, total: this.projects.length },
     };
   }
 
-  async listByTeam(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async listNamesByIds(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async listIdsByOrganization(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async listActiveByScopes(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async updateMetadata(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async touchCodingAgentSessionSeen(input: {
+  override async touchCodingAgentSessionSeen(input: {
     projectId: string;
-    at: Date;
+    at: Instant;
   }): Promise<void> {
     if (this.sessionActivityError) {
       throw this.sessionActivityError;
     }
 
     this.sessionActivity.push(input);
-  }
-
-  async touchCodingAgentPullRequestSeen(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async searchByQuery(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async tryGetTraceSharingConfig(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async resolveOrgAdmin(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async resolveTraceDestination(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async tryGetTraceDestination(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
-  }
-
-  async listTraceDestinations(): Promise<never> {
-    throw new Error("not used by Coding Agent tests");
   }
 }

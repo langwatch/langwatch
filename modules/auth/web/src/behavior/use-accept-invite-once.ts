@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { toaster } from "@langwatch/design-system/toaster";
-import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "../model/invite-messages.ts";
+import { isInviteAlreadyAccepted } from "../model/invite-messages.ts";
 import { authApi as api } from "./auth-api.ts";
 import { hardRedirect } from "./hard-redirect.ts";
 import { captureException, toError } from "./error-capture.ts";
@@ -119,7 +119,7 @@ export function useAcceptInviteOnce({
       hardRedirect(data.project?.slug ? `/${data.project.slug}` : "/");
     },
     onError: (error, variables) => {
-      if (error.message === INVITE_ALREADY_ACCEPTED_MESSAGE) {
+      if (isInviteAlreadyAccepted(error.message)) {
         recordInviteOutcome(variables.inviteCode, {
           status: "already-accepted",
           error: null,
@@ -170,9 +170,7 @@ function deriveStatus(
   if (!shouldTrigger) return "idle";
   if (mutation.isSuccess) return "success";
   if (mutation.isError) {
-    return mutation.error?.message === INVITE_ALREADY_ACCEPTED_MESSAGE
-      ? "already-accepted"
-      : "error";
+    return isInviteAlreadyAccepted(mutation.error?.message) ? "already-accepted" : "error";
   }
   // This instance's mutation is idle/loading, but a previous instance may
   // already have finished — after a page-subtree remount the one-shot guard

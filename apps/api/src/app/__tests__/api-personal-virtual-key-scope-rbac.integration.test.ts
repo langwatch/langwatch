@@ -44,8 +44,9 @@ import {
   TeamUserRole,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { PostgresProjectAdapter, ProjectCredentialsAdapter } from "@langwatch/project-server";
-import type { ProjectService } from "@langwatch/project-contract";
+import { ProjectCredentialsAdapter } from "@langwatch/project-server";
+import { createPrismaProjectApi } from "./support/prisma-project-api.ts";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { initTRPC } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -123,11 +124,11 @@ function buildGovernanceApp(): GovernanceApp {
     settingsSecrets: new UnreadSettingsSecrets(),
   }).build();
 
-  const projects = PostgresProjectAdapter.create({
+  const projects = createPrismaProjectApi({
     database: prisma,
     credentials: ProjectCredentialsAdapter.create(),
     organizations,
-  }).build() as ProjectService;
+  });
 
   const gateway = composeApiGateway({
     prisma,

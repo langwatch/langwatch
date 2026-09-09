@@ -10,7 +10,7 @@ import {
 } from "@langwatch/automation-server";
 import { HandledError } from "@langwatch/handled-error";
 import type { MonitorService } from "@langwatch/monitor-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 
@@ -20,7 +20,7 @@ import { composeApiAutomationApp } from "../../app/api-automation.composition.ts
 /** The other services and deployment facts a trigger is read and written over. */
 export type AutomationPeers = Readonly<{
   /** The project directory a trigger's own project is named through. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /** The monitors a trigger watches, named in the trigger list. */
   monitors: MonitorService;
   /** The deployment's cipher, for the stored credentials a channel carries. */

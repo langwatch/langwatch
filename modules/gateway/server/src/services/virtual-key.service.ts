@@ -5,7 +5,7 @@
  */
 
 import { type Instant, nowInstant } from "@langwatch/time";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
 import { GatewayChangeEventsPort } from "../ports/gateway-change-events.port.ts";
 import type { GatewayTransactionPort } from "../ports/gateway-transaction.port.ts";
@@ -44,7 +44,7 @@ export class VirtualKeyService {
     transactions: GatewayTransactionPort;
     keyBudgets: GatewayKeyBudgetRepository;
     scopeResolution: GatewayScopeResolutionService;
-    projects: ProjectService;
+    projects: ProjectApi;
     repository: GatewayVirtualKeysPort;
     changeEvents: GatewayChangeEventsPort;
     auditLog: GatewayAuditPort;

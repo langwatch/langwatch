@@ -62,7 +62,7 @@ export class ApiGovernanceIngestRateLimit extends GovernanceIngestRateLimitPort 
 export type ApiGovernanceIngestRestOptions = Readonly<{
   /** The Enterprise governance capability, where the deployment composed one. */
   governance: GovernanceService | undefined;
-  /** The internal governance project mint; `ProjectService` satisfies it. */
+  /** The internal governance project mint; `ProjectApi` satisfies it. */
   projects: Pick<GovernanceInternalProjectPort, "ensureInternal"> | undefined;
   /**
    * The trace collection the OTLP receiver composed, or none. Taken rather than built: it

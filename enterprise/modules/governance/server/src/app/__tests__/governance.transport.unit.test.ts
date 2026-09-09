@@ -15,7 +15,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectIdentity, ProjectService } from "@langwatch/project-contract";
+import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
@@ -143,7 +143,7 @@ function buildApi(
     governance,
     projects: {
       getOrganizationId,
-      tryFindInternal: unreachable<ProjectService["tryFindInternal"]>(),
+      findInternal: unreachable<ProjectApi["findInternal"]>(),
     },
     organizations: {
       ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),

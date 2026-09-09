@@ -1,6 +1,7 @@
 import { AuthService } from "@langwatch/auth-contract";
 import type { AdminOperationInput } from "@langwatch/ops-contract";
-import { UserService, type UserProfile } from "@langwatch/user-contract";
+import type { UserProfile } from "@langwatch/user-contract";
+import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
 import { describe, expect, it, vi } from "vitest";
 import { AdminBackofficeRepository } from "../admin-backoffice.repository.ts";
 import { AdminBackofficeService } from "../../services/admin-backoffice.service.ts";
@@ -19,38 +20,9 @@ const user: UserProfile = {
   deactivatedAt: null,
 };
 
-const notReached = async (): Promise<never> => {
-  throw new Error("not used by the admin backoffice");
-};
-
-class UserFake extends UserService {
-  getProfiles = vi.fn(async () => []);
-  tryFindById = vi.fn(async () => user);
-  tryFindByEmail = vi.fn(async () => null);
-  create = vi.fn(async () => user);
-  createCredentialUser = vi.fn(async () => ({ id: user.id }));
-  createPasskeyUser = vi.fn(async () => ({ id: user.id }));
-  hasPassword = vi.fn(async () => false);
-  updateProfile = vi.fn(async () => user);
-  getAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));
-  getSsoStatus = vi.fn(async () => ({ pendingSsoSetup: false }));
-  getTraceExplorerTourPreference = vi.fn(async () => ({ dismissed: false, dismissedAt: null }));
-  dismissTraceExplorerTour = vi.fn(async () => ({ dismissed: true, dismissedAt: new Date() }));
-  updateLastLogin = vi.fn(async () => undefined);
-  tryGetLastHomePath = vi.fn(async () => null);
-  setLastHomePath = vi.fn(async () => undefined);
-  deactivate = vi.fn(async () => user);
-  reactivate = vi.fn(async () => user);
-  setAvatar = vi.fn(async () => ({ image: "" }));
-  removeAvatar = vi.fn(async () => undefined);
-
-  // The backoffice reads and deactivates users; it has no business setting a
-  // first password or touching the passkey nudge. These throw rather than
-  // answer an invented shape, so if it ever reaches one the test says so.
-  setFirstPassword = vi.fn(notReached);
-  getPasskeyNudgeStatus = vi.fn(notReached);
-  dismissPasskeyNudge = vi.fn(notReached);
-}
+/** The one operation an operator's email edit reaches on the directory. */
+const updateProfileFake = (email = user.email) =>
+  vi.fn(async (): Promise<UserProfile> => ({ ...user, email }));
 
 class AuthFake extends AuthService {
   tryResolveBrowserSession = vi.fn(async () => null);
@@ -83,11 +55,11 @@ describe("AdminBackofficeService user email updates", () => {
   /** @scenario "An operator changing a user's email revokes their browser sessions" */
   it("persists an email before revoking browser sessions", async () => {
     const order: string[] = [];
-    const users = new UserFake();
-    users.updateProfile.mockImplementation(async () => {
+    const updateProfile = vi.fn(async (): Promise<UserProfile> => {
       order.push("profile");
       return { ...user, email: "new@example.com" };
     });
+    const users = new TestUserApi({ updateProfile, tryFindById: async () => user });
     const auth = new AuthFake();
     auth.revokeAllBrowserSessions.mockImplementation(async () => {
       order.push("sessions");
@@ -101,14 +73,15 @@ describe("AdminBackofficeService user email updates", () => {
 
     await service.execute(input(" NEW@example.com "));
 
-    expect(users.updateProfile).toHaveBeenCalledWith({ id: user.id, email: "new@example.com" });
+    expect(updateProfile).toHaveBeenCalledWith({ id: user.id, email: "new@example.com" });
     expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: user.id });
     expect(order).toEqual(["profile", "sessions"]);
   });
 
   /** @scenario "A change that only differs in case or spacing revokes nothing" */
   it("does not revoke sessions for a normalized case-only change", async () => {
-    const users = new UserFake();
+    const updateProfile = updateProfileFake();
+    const users = new TestUserApi({ updateProfile, tryFindById: async () => user });
     const auth = new AuthFake();
     const service = AdminBackofficeService.create({
       repository: new RepositoryFake(),
@@ -124,8 +97,8 @@ describe("AdminBackofficeService user email updates", () => {
 
   /** @scenario "A failed revocation still leaves the new backoffice email in place" */
   it("retains the profile update when browser-session revocation fails", async () => {
-    const users = new UserFake();
-    users.updateProfile.mockResolvedValue({ ...user, email: "new@example.com" });
+    const updateProfile = updateProfileFake("new@example.com");
+    const users = new TestUserApi({ updateProfile, tryFindById: async () => user });
     const auth = new AuthFake();
     auth.revokeAllBrowserSessions.mockRejectedValue(new Error("redis unavailable"));
     const service = AdminBackofficeService.create({
@@ -137,6 +110,6 @@ describe("AdminBackofficeService user email updates", () => {
 
     await expect(service.execute(input("new@example.com"))).rejects.toThrow("redis unavailable");
 
-    expect(users.updateProfile).toHaveBeenCalledWith({ id: user.id, email: "new@example.com" });
+    expect(updateProfile).toHaveBeenCalledWith({ id: user.id, email: "new@example.com" });
   });
 });

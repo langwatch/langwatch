@@ -72,7 +72,8 @@ import type { ApiConnectedAgentsComposition } from "./api-connected-agents.compo
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { ProjectManagementDirectory } from "@langwatch/project-server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { FilesRateLimiter } from "@langwatch/stored-object-server";
 import type { ApiAuditPort } from "../api-request.policy.ts";
@@ -134,7 +135,9 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   /** The credential pair and the project directory every family resolves through. */
   apiKeys: ApiKeyApi;
   organizations: OrganizationService;
-  projects: ProjectService | undefined;
+  projects: ProjectApi | undefined;
+  /** The management door's writer, which the API's read operations do not carry. */
+  projectDirectory: ProjectManagementDirectory | undefined;
   /** The provider gateway the two model families read, where one was composed. */
   modelProviders: ModelProviderService | undefined;
   /**
@@ -169,6 +172,7 @@ export function composeApiPackagedRest(
   const agentCache = composeAgentCache(options);
   const scim = options.scim;
   const storedObjectBytes = options.storedObject.bytes;
+  const projectDirectory = options.projectDirectory;
   const dualAuth = options.session
     ? createApiDualCredentialAuth({
         apiKeys: options.apiKeys,
@@ -205,7 +209,7 @@ export function composeApiPackagedRest(
         ? { organizationProvisioning: () => options.organization.provisioning! }
         : {}),
       organizations: () => options.organizations,
-      ...(options.projects ? { projects: () => options.projects! } : {}),
+      ...(projectDirectory ? { projects: () => projectDirectory } : {}),
       ...(options.monitor ? { monitors: options.monitor.restServices.monitors } : {}),
       storedObjects: () => options.storedObject.app,
       // The SAME application both user namespaces answer from: one answer to

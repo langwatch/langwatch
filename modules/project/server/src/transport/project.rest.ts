@@ -30,10 +30,10 @@ import {
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
   type Project,
-  type ProjectService,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
 import { moduleApi } from "@langwatch/runtime-composition";
+import type { ProjectService } from "../services/project.service.ts";
 import { z } from "zod";
 
 import {
@@ -51,8 +51,14 @@ import {
  * the credential service that mints a service key and rotates the ingestion
  * key. Two accessors, because those are the boundaries the routes call.
  */
+/** The five project operations the management door calls, and nothing else. */
+export type ProjectManagementDirectory = Pick<
+  ProjectService,
+  "listByOrganization" | "update" | "tryGetWithTeam" | "create" | "archive"
+>;
+
 export interface ProjectManagementApi {
-  projects(): ProjectService;
+  projects(): ProjectManagementDirectory;
   apiKeys(): ApiKeyApi;
 }
 

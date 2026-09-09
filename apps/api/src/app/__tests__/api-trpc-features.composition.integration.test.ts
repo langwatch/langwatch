@@ -21,7 +21,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { ApiApplication, NoApiTrpcFeatures } from "../../api.application.ts";
 import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy.ts";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { composeAuthFeature } from "../../features/auth/auth.composition.ts";
 import { composeOrganizationFeature } from "../../features/organization/organization.composition.ts";
 import {
@@ -292,7 +292,7 @@ function composeApplication(
       // The signed-out door composes itself off this process's own graph.
       auth: composeAuthFeature({
         prisma: prisma.client,
-        peers: { users: {} as unknown as UserService },
+        peers: { users: {} as UserApi },
         rateLimit: async () => ({ allowed: true, resetAt: Date.now() + 60_000 }),
         deployment: {},
         processName: "langwatch-api",
@@ -407,7 +407,6 @@ describe("given an API process composed with the packaged tRPC collaborators", (
       );
     });
   });
-
 });
 
 describe("given an API process with no collaborators for the record", () => {

@@ -5,7 +5,7 @@
  */
 import { HandledError } from "@langwatch/handled-error";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { PostgresPromptAdapter, PromptApp } from "@langwatch/prompt-server";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
@@ -21,7 +21,7 @@ export abstract class ApiPromptNurturingPort {
 /** The other feature's service the prompt surface reaches. */
 export type PromptPeers = Readonly<{
   /** The project directory a stored prompt's scope is resolved through. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /** The model gateway a stored prompt's model reference is resolved against. */
   modelProviders?: ModelProviderService;
 }>;

@@ -108,7 +108,7 @@ async function composeFeature() {
     prisma: prisma.client,
     peers: {
       organizations: {} as unknown as OrganizationService,
-      projects: { tryGetIdentity: async () => null },
+      projects: { findIdentity: async () => null },
       resolveAuthProvider: async () => "email",
     },
     eventing: new SilentEventing(),
@@ -205,9 +205,9 @@ describe("given the API process's user feature composed on its own connection", 
     it("finds the Auth0 database identity through the feature's own subject prefix", async () => {
       const { app, prisma } = await composeFeature();
 
-      await expect(
-        app.findAuth0DatabaseAccount({ userId: USER_ID }),
-      ).resolves.toEqual({ providerAccountId: "auth0|abc123" });
+      await expect(app.findAuth0DatabaseAccount({ userId: USER_ID })).resolves.toEqual({
+        providerAccountId: "auth0|abc123",
+      });
       expect(prisma.account.findFirst).toHaveBeenCalledWith({
         where: {
           userId: USER_ID,
@@ -243,5 +243,4 @@ describe("given the API process's user feature composed on its own connection", 
       expect(prisma.account.delete).not.toHaveBeenCalled();
     });
   });
-
 });

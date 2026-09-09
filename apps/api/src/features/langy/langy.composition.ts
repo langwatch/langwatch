@@ -32,7 +32,7 @@ import {
 import { LangyNotEnabledError, renderLangyTurnContext } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { ResourceScope } from "@langwatch/runtime-composition";
 
@@ -46,7 +46,7 @@ const LANGY_RELEASE_FLAG = "release_langy_enabled";
 /** The other feature's service the Langy gates reach, named on its own. */
 export type LangyPeers = Readonly<{
   /** The organization a project belongs to, which the rollout rule targets. */
-  projects: ProjectService;
+  projects: ProjectApi;
 }>;
 
 /** Everything the Langy feature is composed from besides its peer. */
@@ -54,7 +54,7 @@ export type LangyFeatureCollaborators = Readonly<{
   prisma: ApiTrpcInfrastructure["prisma"];
   featureFlags: ApiTrpcInfrastructure["featureFlags"];
   audit: ApiAuditPort | undefined;
-  projects: ProjectService;
+  projects: ProjectApi;
   /** All sixteen conversation writes, as this process produces them. */
   commands: LangyConversationCommands;
   /** The token buffer, the turn access store and the handoff store share it. */
@@ -136,7 +136,6 @@ export function refusingLangyFeature(): ComposedLangyFeature {
 
   return { app };
 }
-
 
 /** A Langy capability this process does not run, refused by name. */
 class ApiLangyUnavailableError extends HandledError {
@@ -253,8 +252,6 @@ function composeLangyRelay(
   };
 }
 
-
-
 /**
  * The page-action catalogue, absent. The only catalogue that exists is the experiments
  * workbench's, and it is a browser module: a Langy server package may not reach it and
@@ -265,8 +262,6 @@ class UnavailableApiLangyUiActionCatalog extends LangyUiActionCatalogPort {
     return null;
   }
 }
-
-
 
 /**
  * The daily pull-request counter, on this process's own Redis. `eval` is

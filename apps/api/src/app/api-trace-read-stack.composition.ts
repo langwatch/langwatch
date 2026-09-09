@@ -33,7 +33,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
   buildDisplayInput,
@@ -102,7 +102,7 @@ export type ApiTraceReadStackOptions = Readonly<{
   /** Decides whether this caller may see spend. */
   authz: AuthzService;
   /** Resolves a project's team and organization, for the window and the policy. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /**
    * The project's resolved data-privacy policy — the one every read redacts by. Composed from
    * `prisma` and `projects` when the process does not hand one in, so a caller cannot compose

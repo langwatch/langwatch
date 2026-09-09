@@ -23,7 +23,7 @@ import {
   IngestionSourceEntitlementsPort,
   IngestionSourceLifecyclePort,
 } from "../ports/ingestion-source.port.ts";
-import { TestProjectService } from "../ports/__tests__/support/test-project-service.ts";
+import { TestProjectApi } from "../ports/__tests__/support/test-project-api.ts";
 import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import {
@@ -90,7 +90,7 @@ describe.skipIf(!databaseUrl)("IngestionSourceService token-at-rest", () => {
   const service = () =>
     IngestionSourceService.create({
       repository: PrismaIngestionSourceRepository.create(prisma),
-      projects: new (class extends TestProjectService {
+      projects: new (class extends TestProjectApi {
         ensureInternal = async (_input: InternalProjectQuery): Promise<InternalProject> => ({
           id: `gov-project-${ns}`,
           name: "Governance (internal)",

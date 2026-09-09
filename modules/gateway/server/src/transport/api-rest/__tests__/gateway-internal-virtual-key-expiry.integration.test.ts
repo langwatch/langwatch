@@ -15,10 +15,10 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import { GatewayJwtAdapter } from "../../../adapters/jwt.gateway-token.adapter.ts";
-import { TestProjectService } from "../../../__tests__/support/test-project-service.ts";
+import { TestProjectApi } from "../../../__tests__/support/test-project-api.ts";
 import { VirtualKeyService } from "../../../services/virtual-key.service.ts";
 import {
   buildGatewayCanonicalString,
@@ -55,10 +55,10 @@ const USER_ID = `usr-vkex-${suffix}`;
 const SECRET = "0123456789abcdef0123456789abcdef";
 
 /** The three project reads this suite's subjects make, answered from its own rows. */
-class SuiteProjectService extends TestProjectService {
-  override async tryGetTraceDestination(
+class SuiteProjectService extends TestProjectApi {
+  override async findTraceDestination(
     projectId: string,
-  ): ReturnType<ProjectService["tryGetTraceDestination"]> {
+  ): ReturnType<ProjectApi["findTraceDestination"]> {
     return await prisma.project.findUnique({
       where: { id: projectId },
       select: { id: true, teamId: true, apiKey: true, archivedAt: true },
@@ -66,11 +66,11 @@ class SuiteProjectService extends TestProjectService {
   }
 
   override async resolveTraceDestination(
-    input: Parameters<ProjectService["resolveTraceDestination"]>[0],
-  ): ReturnType<ProjectService["resolveTraceDestination"]> {
+    input: Parameters<ProjectApi["resolveTraceDestination"]>[0],
+  ): ReturnType<ProjectApi["resolveTraceDestination"]> {
     const projectId = input.traceProjectId ?? input.projectScopeIds[0];
     if (!projectId) return { outcome: "no_destination" };
-    const project = await this.tryGetTraceDestination(projectId);
+    const project = await this.findTraceDestination(projectId);
     return project ? { outcome: "resolved", project } : { outcome: "unknown" };
   }
 }

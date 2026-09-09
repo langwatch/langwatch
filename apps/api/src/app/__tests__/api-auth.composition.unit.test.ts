@@ -7,7 +7,7 @@ import {
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { PrismaConnection } from "@langwatch/prisma-client";
 import type {
@@ -93,8 +93,8 @@ class TestAuthorization extends ApiAuthorizationPort {
  * describes how a verified browser session becomes an actor, and that path reads no user
  * through this seam — the identity half does.
  */
-function testUserService(): UserService {
-  return new Proxy({} as UserService, {
+function testUserApi(): UserApi {
+  return new Proxy({} as UserApi, {
     get(_target, property) {
       return () => {
         throw new Error(`the auth composition test reached users.${String(property)}`);
@@ -118,7 +118,7 @@ describe("API Auth/session composition", () => {
     const sessions = BetterAuthBrowserSessionTransportAdapter.create(
       transportLookingUp(getSession),
     );
-    const composition = new TestAuthComposition({ auth, sessions, users: testUserService() });
+    const composition = new TestAuthComposition({ auth, sessions, users: testUserApi() });
     const authentication = AuthSessionApiAuthenticationAdapter.create(composition.compose());
     const request = new Request("https://api.example.test/api/trpc", {
       headers: { cookie: "better-auth.session_token=token-1" },

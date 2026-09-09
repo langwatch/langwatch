@@ -16,13 +16,13 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { TraceService } from "@langwatch/trace-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication } from "../../../api.application.ts";
 import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse.ts";
@@ -191,7 +191,7 @@ function composeApplication(
     // Preparing a run reads the project's own ingestion key, which is what a
     // prepared child reports its scenario events with.
     tryGetById: vi.fn(async () => ({ id: PROJECT_ID, apiKey: "project-api-key" })),
-  } as unknown as ProjectService;
+  } as unknown as ProjectApi;
 
   // Registered once, as the process registers them, and shared by the scenario
   // half and the Langy feature below.
@@ -233,7 +233,7 @@ function composeApplication(
         throw new AgentNotFoundError(id, projectId);
       },
     }),
-    users: stub<UserService>("users"),
+    users: stub<UserApi>("users"),
     projects,
     broadcast,
     encryption:

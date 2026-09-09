@@ -9,7 +9,7 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import { sendAutomationLimitEmail } from "@langwatch/mail";
 import type { EmailDeliveryPort } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -24,7 +24,7 @@ import { nowInstant } from "@langwatch/time";
  * hop between the two is the project directory's answer.
  */
 export type WorkerAutomationRunawayDirectories = Readonly<{
-  projects: Pick<ProjectService, "getOrganizationId" | "tryGetById">;
+  projects: Pick<ProjectApi, "getOrganizationId" | "tryGetById">;
   authorization: Pick<AuthzService, "listOrganizationBindings">;
 }>;
 

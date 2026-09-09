@@ -1,5 +1,5 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
 import { PostgresAutomationGraphActivityAdapter } from "../postgres.automation-graph-activity.adapter.ts";
@@ -34,7 +34,7 @@ function compose(
   const adapter = PostgresAutomationGraphActivityAdapter.create({
     prisma: database.prisma as never,
     clock: new FrozenClock(),
-    projects: new OneProject() as unknown as ProjectService,
+    projects: new OneProject() as unknown as ProjectApi,
     analytics: new BreachingAnalytics() as unknown as AnalyticsService,
     delivery,
     crypto,

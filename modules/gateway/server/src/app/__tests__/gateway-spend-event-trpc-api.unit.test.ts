@@ -3,7 +3,7 @@
  * The gatewaySpendEvents transport: filter/cursor passthrough, VK display-name resolution, ClickHouse-absent degrade, declared scope. Refusal now stands on the policy the process hands in, not the app's RBAC middleware — asserts the handler never runs when the policy refuses.
  */
 import { Temporal } from "@langwatch/time";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,8 +26,8 @@ function spendEventsStub(overrides: Partial<GatewaySpendEventsService>): Gateway
   return overrides as GatewaySpendEventsService;
 }
 
-function projectsStub(overrides: Partial<ProjectService>): ProjectService {
-  return overrides as ProjectService;
+function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
+  return overrides as ProjectApi;
 }
 
 const PROJECT_ID = "project_1";

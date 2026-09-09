@@ -1,4 +1,4 @@
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
 import type {
   IngestionSourceEntitlementsPort,
@@ -18,7 +18,7 @@ export class PostgresIngestionSourceAdapter {
   private constructor(
     private readonly options: {
       database: IngestionSourceDatabase;
-      projects: ProjectService;
+      projects: ProjectApi;
       entitlements: IngestionSourceEntitlementsPort;
       lifecycle: IngestionSourceLifecyclePort;
       credentials: IngestionCredentialsService;
@@ -31,7 +31,7 @@ export class PostgresIngestionSourceAdapter {
 
   static create(options: {
     database: IngestionSourceDatabase;
-    projects: ProjectService;
+    projects: ProjectApi;
     entitlements: IngestionSourceEntitlementsPort;
     lifecycle: IngestionSourceLifecyclePort;
     credentials: IngestionCredentialsService;

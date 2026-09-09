@@ -31,7 +31,7 @@ import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.s
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
 import { PullerRegistryService } from "../../services/puller-registry.service.ts";
 import { PulledUsageRatePort } from "../pulled-usage-rate.port.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 function ingestionSource(
   overrides: Partial<GovernanceIngestionSource> = {},
@@ -89,12 +89,12 @@ class FakeSources extends IngestionPullSourcePort {
   }
 }
 
-class FakeProjects extends TestProjectService {
+class FakeProjects extends TestProjectApi {
   constructor(private readonly traceDestinationProject: ProjectWithTeam | null = null) {
     super();
   }
 
-  tryFindInternal = async (_input: InternalProjectQuery): Promise<InternalProject | null> => null;
+  findInternal = async (_input: InternalProjectQuery): Promise<InternalProject | null> => null;
 
   ensureInternal = async (_input: InternalProjectQuery): Promise<InternalProject> => ({
     id: "gov-project",

@@ -25,7 +25,7 @@ import {
  * service by parameter and NONE of the six was constructible here.
  *
  * WHAT CHANGED, AND WHY IT IS NOT A LOOPHOLE. The wall was never the reads —
- * it was the writes standing behind them. `ProjectService` requires a
+ * it was the writes standing behind them. `ProjectApi` requires a
  * credentials port and an `OrganizationService` because `create` mints an
  * ingestion key and `ensureInternal` resolves a team; `DataPrivacyApi`
  * requires an organization directory because `setForScope` has to decide which

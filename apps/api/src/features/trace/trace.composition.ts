@@ -11,7 +11,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { type Logger } from "@langwatch/observability";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import { TraceApp, type TraceAppDependencies } from "@langwatch/trace-server";
@@ -46,7 +46,7 @@ export type TraceFeatureOptions = Readonly<{
   /** The same AuthZ service the REST doors and the declared checks authorize through. */
   authz: AuthzService;
   /** Resolves a project's organization, team and department. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /**
    * The process's broadcast fabric. BOTH trace subscriptions stream off the
    * tenant emitter it hands out, which is why they keep working on a process

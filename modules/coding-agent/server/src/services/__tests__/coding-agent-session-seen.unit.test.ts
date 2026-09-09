@@ -9,6 +9,7 @@ import {
   CODING_AGENT_SESSION_SEEN_WINDOW_MS,
   CodingAgentSessionSeenService,
 } from "../coding-agent-session-seen.service.ts";
+import { Temporal } from "@langwatch/time";
 import { TestClock, TestProjectService } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 
 function createFixture(at = 1_000_000) {
@@ -38,7 +39,7 @@ describe("CodingAgentSessionSeenService", () => {
         expect(projects.sessionActivity).toEqual([
           {
             projectId: "proj-1",
-            at: new Date(1_000_000),
+            at: Temporal.Instant.fromEpochMilliseconds(1_000_000),
           },
         ]);
       });
@@ -65,8 +66,8 @@ describe("CodingAgentSessionSeenService", () => {
         await service.record(["proj-1", "proj-2"]);
 
         expect(projects.sessionActivity).toEqual([
-          { projectId: "proj-1", at: new Date(1_000_000) },
-          { projectId: "proj-2", at: new Date(1_000_000) },
+          { projectId: "proj-1", at: Temporal.Instant.fromEpochMilliseconds(1_000_000) },
+          { projectId: "proj-2", at: Temporal.Instant.fromEpochMilliseconds(1_000_000) },
         ]);
       });
     });

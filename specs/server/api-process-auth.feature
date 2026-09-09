@@ -172,3 +172,28 @@ Feature: The standalone API process composes its own Auth service
       Then the write refuses and names the process
       # Accepting the bytes and dropping them would answer a customer's upload
       # with success and no picture.
+
+  # The API process reads its user directory through the user application it
+  # installs. It used to wrap that application in an adapter that refused the
+  # address lookup and the two account mints, so passkey sign-up and directory
+  # provisioning were dead on this process while both modules behind them still
+  # worked. The directory is the application now, and it answers all three.
+  Rule: The process's user directory publishes the mints its ceremonies need
+
+    @integration
+    Scenario: A passkey ceremony mints its account through the process's directory
+      Given the API process composed its user application
+      When a passkey sign-up completes for an address nobody holds
+      Then the account is created and the ceremony is told which one it is
+
+    @integration
+    Scenario: A passkey ceremony is refused for an address that already has an account
+      Given the API process composed its user application
+      When a passkey sign-up starts for an address somebody already holds
+      Then it is refused before any account is minted
+
+    @integration
+    Scenario: A directory push mints an account through the process's directory
+      Given the API process composed its user application
+      When a directory push names somebody the deployment does not know
+      Then the address is looked up and the account is created

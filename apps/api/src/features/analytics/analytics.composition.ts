@@ -35,14 +35,11 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import type { ApiLangWatchQLConfigResolution } from "../../platform/config/api.config.ts";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
-import type {
-  AnalyticsFeaturePorts,
-  ApiAnalyticsReadPorts,
-} from "./analytics-trpc.routers.ts";
+import type { AnalyticsFeaturePorts, ApiAnalyticsReadPorts } from "./analytics-trpc.routers.ts";
 
 /**
  * The retention floor an evaluation read is bounded by when a project names no policy of
@@ -57,7 +54,7 @@ export type AnalyticsFeatureCollaborators = Readonly<{
   /** The same AuthZ service the REST doors and the declared checks authorize through. */
   authz: AuthzService;
   /** Resolves a project's organization, for the rollout gate's targeting. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /**
    * The SAME resolved privacy policy the trace read stack redacts by, taken
    * rather than built: a chart and the traces behind it must not disagree about

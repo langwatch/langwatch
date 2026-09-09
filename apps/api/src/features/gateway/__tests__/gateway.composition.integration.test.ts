@@ -13,7 +13,7 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { ApiApplication } from "../../../api.application.ts";
@@ -175,7 +175,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
     listTraceDestinations: vi.fn(async () => []),
     listIdsByOrganization: vi.fn(async () => [PROJECT_ID]),
     listNamesByIds: vi.fn(async () => []),
-  } as unknown as ProjectService;
+  } as unknown as ProjectApi;
 
   const infrastructure = {
     ...stubInfrastructureEntitlements(),

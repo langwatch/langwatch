@@ -75,7 +75,7 @@ function service(
     writer: new GrantsFake(),
     auth: { revokeAllBrowserSessions: vi.fn(async () => undefined) },
     users: {
-      tryFindByEmail: vi.fn(async () => null),
+      findByEmail: vi.fn(async () => null),
       tryFindById: vi.fn(async () => null),
       create: vi.fn(),
       updateProfile: vi.fn(),
@@ -242,7 +242,7 @@ describe("SCIM characterization: provisioning invariants", () => {
       listRoleBindings: vi.fn(async () => []),
     });
     const users = {
-      tryFindByEmail: vi.fn(async () => ({
+      findByEmail: vi.fn(async () => ({
         id: "user_1",
         email: "member@example.com",
         name: "Member",
@@ -316,7 +316,7 @@ describe("SCIM characterization: provisioning invariants", () => {
         };
         const writer = new GrantsFake();
         const users = {
-          tryFindByEmail: vi.fn(async () => null),
+          findByEmail: vi.fn(async () => null),
           tryFindById: vi.fn(async () => ({
             id: "user_1",
             email: "member@example.com",

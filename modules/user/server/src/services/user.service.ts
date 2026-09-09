@@ -1,6 +1,5 @@
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
-  UserService as UserServiceContract,
   UserNotFoundError,
   createCredentialUserInputSchema,
   createPasskeyUserInputSchema,
@@ -38,7 +37,7 @@ import type { UserAvatarStorage } from "../app/user.app.ts";
 import type { UserRepository } from "../repositories/user.repository.ts";
 import { UserAvatarCodecService } from "./user-avatar.service.ts";
 
-export class UserService extends UserServiceContract {
+export class UserService {
   private readonly avatars = UserAvatarCodecService.create();
   private constructor(
     private readonly repository: UserRepository,
@@ -47,9 +46,7 @@ export class UserService extends UserServiceContract {
     /** The issuer every credential account row this service mints is stored under. */
     private readonly credentialIssuer: string,
     private readonly now: () => Date,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(options: {
     repository: UserRepository;
@@ -79,7 +76,7 @@ export class UserService extends UserServiceContract {
     return this.repository.findById(parsed.id);
   }
 
-  tryFindByEmail(input: UserEmailInput): Promise<UserProfile | null> {
+  findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
     const parsed = userEmailInputSchema.parse(input);
 
     return this.repository.findByEmail(parsed.email);

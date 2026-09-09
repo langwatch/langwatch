@@ -4,6 +4,7 @@
 import { ApiKeyTokenAdapter } from "@langwatch/api-key-server";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { PrismaConnection } from "@langwatch/prisma-client";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
 import { ApiOrganizationSettingsSecretAdapter } from "../api-organization-settings-secret.adapter.ts";
@@ -20,6 +21,11 @@ function stubConnection(): PrismaConnection {
   const delegate = new Proxy({}, { get: () => refusingStatement });
   const client = new Proxy({}, { get: () => delegate });
   return PrismaConnection.create({ client: client as never, pool: client as never });
+}
+
+/** The project application the process installs; nothing here reaches it. */
+function stubProjectApi(): ProjectApi {
+  return new Proxy({}, {}) as ProjectApi;
 }
 
 function stubAuthz(): { permissions: AuthzService; grants: AuthzGrantsService } {
@@ -47,6 +53,7 @@ describe("ApiTenancyComposition", () => {
     it("composes the organization, project and API-key services as one graph", async () => {
       const composed = await ApiTenancyComposition.compose({
         database: stubConnection(),
+        projectApi: stubProjectApi(),
         authz: stubAuthz(),
         encryption: encryption(),
         pepper: "a-pepper",
@@ -69,6 +76,7 @@ describe("ApiTenancyComposition", () => {
 
       await ApiTenancyComposition.tryCompose({
         database: stubConnection(),
+        projectApi: stubProjectApi(),
         authz: stubAuthz(),
         encryption: encryption(),
         pepper: PEPPER,
@@ -88,6 +96,7 @@ describe("ApiTenancyComposition", () => {
 
       const composed = await ApiTenancyComposition.tryCompose({
         database: undefined,
+        projectApi: stubProjectApi(),
         authz: stubAuthz(),
         encryption: encryption(),
         pepper: "a-pepper",
@@ -104,6 +113,7 @@ describe("ApiTenancyComposition", () => {
 
       const composed = await ApiTenancyComposition.tryCompose({
         database: stubConnection(),
+        projectApi: stubProjectApi(),
         authz: undefined,
         encryption: encryption(),
         pepper: "a-pepper",
@@ -122,6 +132,7 @@ describe("ApiTenancyComposition", () => {
 
       const composed = await ApiTenancyComposition.tryCompose({
         database: stubConnection(),
+        projectApi: stubProjectApi(),
         authz: stubAuthz(),
         encryption: encryption(),
         pepper: "   ",

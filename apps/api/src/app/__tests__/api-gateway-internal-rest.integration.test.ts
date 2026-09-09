@@ -14,7 +14,7 @@ import {
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -110,7 +110,7 @@ function composeFamily(options: {
       spendEvents: undefined,
       budgetDecisions: {} as never,
     },
-    projects: {} as unknown as ProjectService,
+    projects: {} as unknown as ProjectApi,
     internalSecret: INTERNAL_SECRET,
     jwtSecret: JWT_SECRET,
     encryption: AesGcmSecretEncryptionAdapter.create({ key: CREDENTIALS_SECRET }),
@@ -472,7 +472,7 @@ describe("the gateway internal control plane", () => {
             spendEvents: undefined,
             budgetDecisions: {} as never,
           },
-          projects: {} as unknown as ProjectService,
+          projects: {} as unknown as ProjectApi,
           internalSecret: INTERNAL_SECRET,
           jwtSecret: undefined,
           encryption: AesGcmSecretEncryptionAdapter.create({ key: CREDENTIALS_SECRET }),

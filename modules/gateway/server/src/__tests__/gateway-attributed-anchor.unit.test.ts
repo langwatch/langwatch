@@ -9,7 +9,7 @@ import { GatewayScopeOrgMismatchError } from "../index.ts";
  *
  * `GatewayService` no longer takes a `PrismaClient`: the anchor guards run
  * inside `PrismaGatewayBudgetRepository.create`, and the project anchor is
- * proved through the `ProjectService` the service is built with. Building the
+ * proved through the `ProjectApi` the service is built with. Building the
  * pair the way `PrismaGatewayAdapter` builds it is what keeps both halves of
  * the validation under test rather than only the half that stayed put.
  */

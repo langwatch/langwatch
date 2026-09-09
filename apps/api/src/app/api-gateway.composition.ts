@@ -41,7 +41,7 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectIdentity, ProjectService } from "@langwatch/project-contract";
+import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { TRPCError } from "@trpc/server";
 import { PrismaGatewayKeyBudgetRepository } from "@langwatch/gateway-server/composition/gateway-key-budgets";
 import { PrismaVirtualKeyAuthorizationRepository } from "@langwatch/gateway-server/composition/gateway-virtual-key-authorization";
@@ -138,7 +138,7 @@ export type ApiGatewayCompositionOptions = Readonly<{
   /** The permission service every other surface on this process authorizes with. */
   authz: AuthzService;
   /** The project directory the tenancy graph composed. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /** The evaluators a guardrail rule runs, as the budget-decision store reads them. */
   evaluators: EvaluatorService;
   /** The monitors a guardrail attachment names. */

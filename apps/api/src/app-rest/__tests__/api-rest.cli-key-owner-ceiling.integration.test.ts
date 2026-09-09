@@ -3,7 +3,7 @@
  * ADR-092 §9 caps a CLI key at what its owner may still do, read at request
  * time: the project door refuses, the listing narrows instead of refusing.
  */
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiTracesRestCollaborators } from "../../features/trace/trace-rest.mount.ts";
@@ -28,7 +28,7 @@ const OTHER_TEAM_PROJECT: RestAuthProject = {
 };
 
 /**
- * One auth-world project as `ProjectService.listByOrganization` really returns
+ * One auth-world project as `ProjectApi.listByOrganization` really returns
  * it: a stored row, not the narrower fixture the auth world carries. The
  * listing publishes the setup fields and both timestamps, so a stub that omits
  * them describes a response the door never sends.
@@ -165,7 +165,7 @@ function mountProjects(options: {
       projects: () =>
         ({
           listByOrganization: options.listByOrganization,
-        }) as unknown as ProjectService,
+        }) as unknown as ProjectApi,
       apiKeys: () => options.world.apiKeys(),
     } as never,
   });

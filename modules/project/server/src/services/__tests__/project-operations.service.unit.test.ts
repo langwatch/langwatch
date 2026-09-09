@@ -5,80 +5,35 @@
  * here because it is the application's decision, not one door's.
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import {
-  ProjectService,
-  type Project,
-  type ProjectWithTeam,
-} from "@langwatch/project-contract";
+import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ProjectOperationsService } from "../project-operations.service.ts";
+import {
+  ProjectOperationsService,
+  type ProjectOperationsDirectory,
+} from "../project-operations.service.ts";
 
-type ProjectOperationsOverrides = {
-  tryGetWithTeam?: ProjectService["tryGetWithTeam"];
-  update?: ProjectService["update"];
-};
+/** A typed double for the two orchestration seams under characterization. */
+class CharacterizationProjectDirectory implements ProjectOperationsDirectory {
+  constructor(private readonly overrides: Partial<ProjectOperationsDirectory>) {}
 
-/** A typed service double for the two orchestration seams under characterization. */
-class CharacterizationProjectService extends ProjectService {
-  constructor(private readonly overrides: ProjectOperationsOverrides) {
-    super();
-  }
-
-  listPaths(): Promise<never> {
-    return this.unimplemented("listPaths");
-  }
-
-  tryGetWithTeam: ProjectService["tryGetWithTeam"] = (id) =>
+  tryGetWithTeam: ProjectOperationsDirectory["tryGetWithTeam"] = (id) =>
     this.overrides.tryGetWithTeam?.(id) ?? Promise.resolve(null);
-  update: ProjectService["update"] = (input) =>
+
+  update: ProjectOperationsDirectory["update"] = (input) =>
     this.overrides.update?.(input) ?? this.unimplemented("update");
 
-  tryFindInternal: ProjectService["tryFindInternal"] = () => this.unimplemented("tryFindInternal");
-  ensureInternal: ProjectService["ensureInternal"] = () => this.unimplemented("ensureInternal");
-  isPresenceEnabled: ProjectService["isPresenceEnabled"] = () =>
-    this.unimplemented("isPresenceEnabled");
-  getById: ProjectService["getById"] = () => this.unimplemented("getById");
-  tryGetIdentity: ProjectService["tryGetIdentity"] = () => this.unimplemented("tryGetIdentity");
-  getOrganizationId: ProjectService["getOrganizationId"] = () =>
-    this.unimplemented("getOrganizationId");
-  tryGetOrganizationId: ProjectService["tryGetOrganizationId"] = () =>
-    this.unimplemented("tryGetOrganizationId");
-  tryGetById: ProjectService["tryGetById"] = () => this.unimplemented("tryGetById");
-  tryGetSummaryById: ProjectService["tryGetSummaryById"] = () =>
-    this.unimplemented("tryGetSummaryById");
-  getWithTeam: ProjectService["getWithTeam"] = () => this.unimplemented("getWithTeam");
-  create: ProjectService["create"] = () => this.unimplemented("create");
-  archive: ProjectService["archive"] = () => this.unimplemented("archive");
-  listByOrganization: ProjectService["listByOrganization"] = () =>
-    this.unimplemented("listByOrganization");
-  listByTeam: ProjectService["listByTeam"] = () => this.unimplemented("listByTeam");
-  listNamesByIds: ProjectService["listNamesByIds"] = () => this.unimplemented("listNamesByIds");
-  listIdsByOrganization: ProjectService["listIdsByOrganization"] = () =>
-    this.unimplemented("listIdsByOrganization");
-  listActiveByScopes: ProjectService["listActiveByScopes"] = () =>
-    this.unimplemented("listActiveByScopes");
-  updateMetadata: ProjectService["updateMetadata"] = () => this.unimplemented("updateMetadata");
-  touchCodingAgentSessionSeen: ProjectService["touchCodingAgentSessionSeen"] = () =>
-    this.unimplemented("touchCodingAgentSessionSeen");
-  touchCodingAgentPullRequestSeen: ProjectService["touchCodingAgentPullRequestSeen"] = () =>
-    this.unimplemented("touchCodingAgentPullRequestSeen");
-  searchByQuery: ProjectService["searchByQuery"] = () => this.unimplemented("searchByQuery");
-  tryGetTraceSharingConfig: ProjectService["tryGetTraceSharingConfig"] = () =>
-    this.unimplemented("tryGetTraceSharingConfig");
-  resolveOrgAdmin: ProjectService["resolveOrgAdmin"] = () => this.unimplemented("resolveOrgAdmin");
-  resolveTraceDestination: ProjectService["resolveTraceDestination"] = () =>
-    this.unimplemented("resolveTraceDestination");
-  tryGetTraceDestination: ProjectService["tryGetTraceDestination"] = () =>
-    this.unimplemented("tryGetTraceDestination");
-  listTraceDestinations: ProjectService["listTraceDestinations"] = () =>
-    this.unimplemented("listTraceDestinations");
+  create: ProjectOperationsDirectory["create"] = (input) =>
+    this.overrides.create?.(input) ?? this.unimplemented("create");
+
+  archive: ProjectOperationsDirectory["archive"] = (input) =>
+    this.overrides.archive?.(input) ?? this.unimplemented("archive");
 
   private unimplemented(operation: string): Promise<never> {
     return Promise.reject(
-      new Error(`CharacterizationProjectService does not implement ${operation}`),
+      new Error(`CharacterizationProjectDirectory does not implement ${operation}`),
     );
   }
 }
@@ -109,18 +64,14 @@ class CharacterizationShareApi implements ShareApi {
 
 const refusingApiKeys = (): ApiKeyApi =>
   new Proxy({} as ApiKeyApi, {
-    get:
-      () =>
-      (): Promise<never> =>
-        Promise.reject(new Error("the api-key boundary is not configured for this test")),
+    get: () => (): Promise<never> =>
+      Promise.reject(new Error("the api-key boundary is not configured for this test")),
   });
 
 const refusingTopics = (): TopicApi =>
   new Proxy({} as TopicApi, {
-    get:
-      () =>
-      (): Promise<never> =>
-        Promise.reject(new Error("the topic boundary is not configured for this test")),
+    get: () => (): Promise<never> =>
+      Promise.reject(new Error("the topic boundary is not configured for this test")),
   });
 
 function characterizationProject(traceSharingEnabled: boolean): ProjectWithTeam {
@@ -174,11 +125,11 @@ function characterizationProject(traceSharingEnabled: boolean): ProjectWithTeam 
 }
 
 function characterizationOperations(options: {
-  projects: ProjectOperationsOverrides;
+  projects: Partial<ProjectOperationsDirectory>;
   revokeAllTraceShares: ShareApi["revokeAllTraceShares"];
 }): ProjectOperationsService {
   return ProjectOperationsService.create({
-    projects: new CharacterizationProjectService(options.projects),
+    projects: new CharacterizationProjectDirectory(options.projects),
     apiKeys: refusingApiKeys(),
     share: new CharacterizationShareApi(options.revokeAllTraceShares),
     topics: refusingTopics(),

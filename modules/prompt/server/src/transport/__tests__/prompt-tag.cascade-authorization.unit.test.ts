@@ -4,7 +4,7 @@
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
@@ -29,7 +29,7 @@ function buildCaller(options: { manageable: readonly string[] }) {
     projects: {
       getOrganizationId: async () => "organization_1",
       listIdsByOrganization: async () => ORGANIZATION_PROJECTS,
-    } as unknown as ProjectService,
+    } as unknown as ProjectApi,
     permissions: {
       hasPermission,
       getApiKeyProjectDecision: async () => ({ outcome: "denied" }),

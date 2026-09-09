@@ -1,7 +1,6 @@
 export * from "./project.ts";
 export * from "./project.errors.ts";
 export * from "./project.responses.ts";
-export * from "./project.service.ts";
 export * from "./project.api.ts";
 export * from "./project-trpc.schemas.ts";
 export * from "./project.trpc.ts";

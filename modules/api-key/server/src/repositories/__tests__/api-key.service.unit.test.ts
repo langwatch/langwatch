@@ -6,7 +6,7 @@ import type { OrganizationService } from "@langwatch/organization-contract";
 import {
   projectIdentitySchema,
   projectWithTeamSchema,
-  type ProjectService,
+  type ProjectApi,
 } from "@langwatch/project-contract";
 import { ApiKeyService, type ApiKeyDependencies } from "../../services/api-key.service.ts";
 import {
@@ -224,11 +224,11 @@ const resolvedIdentity = projectIdentitySchema.parse({
 });
 
 /** The project directory a key service reads, over one in-memory peer. */
-function projectPeer(memory: MemoryProjects): ProjectService {
+function projectPeer(memory: MemoryProjects): ProjectApi {
   return {
     getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
     tryGetWithTeam: vi.fn().mockResolvedValue(resolvedProject),
-    tryGetIdentity: vi.fn().mockResolvedValue(resolvedIdentity),
+    findIdentity: vi.fn().mockResolvedValue(resolvedIdentity),
     getById: vi.fn().mockResolvedValue(null),
     listByOrganization: vi.fn().mockResolvedValue({ data: [] }),
     listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: false }),
@@ -236,7 +236,7 @@ function projectPeer(memory: MemoryProjects): ProjectService {
     rotateLegacyApiKey: (input: { projectId: string; token: string }) =>
       memory.rotateLegacyApiKey(input),
     findPersonalWorkspaceOwner: () => memory.findPersonalWorkspaceOwner(),
-  } as unknown as ProjectService;
+  } as unknown as ProjectApi;
 }
 
 function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDependencies {
@@ -337,7 +337,7 @@ describe("API-key service", () => {
       type: "legacyProjectKey",
       project: { id: "project-1" },
     });
-    expect(projects.tryGetIdentity).toHaveBeenCalledWith(resolvedProject.id);
+    expect(projects.findIdentity).toHaveBeenCalledWith(resolvedProject.id);
   });
 
   it("keeps a deprecated project credential bound to its resolved project", async () => {
@@ -360,8 +360,8 @@ describe("API-key service", () => {
     const targetProject = { ...resolvedIdentity, id: "project-2" };
     const deps = dependencies();
     const projects = deps.projects;
-    const tryGetIdentity = vi.fn().mockResolvedValue(targetProject);
-    projects.tryGetIdentity = tryGetIdentity;
+    const findIdentity = vi.fn().mockResolvedValue(targetProject);
+    projects.findIdentity = findIdentity;
     const service = createService(new MemoryApiKeys(), { ...deps, projects });
     const created = await service.create({
       name: "organization key",
@@ -373,7 +373,7 @@ describe("API-key service", () => {
     await expect(
       service.findResolvedToken({ token: created.token, projectId: targetProject.id }),
     ).resolves.toMatchObject({ type: "apiKey", project: { id: targetProject.id } });
-    expect(tryGetIdentity).toHaveBeenCalledWith(targetProject.id);
+    expect(findIdentity).toHaveBeenCalledWith(targetProject.id);
   });
 
   /**
@@ -553,7 +553,7 @@ describe("API-key service", () => {
         team: { id: "team-1", organizationId: "org-1" },
       }),
       findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
-    } as unknown as ProjectService;
+    } as unknown as ProjectApi;
     const service = createService(
       new MemoryApiKeys(),
       dependencies({ authz, organizations, projects }),
@@ -648,7 +648,7 @@ describe("API-key service", () => {
       getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
       listActiveByScopes,
       findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
-    } as unknown as ProjectService;
+    } as unknown as ProjectApi;
     const service = createService(repository, dependencies({ authz, projects }));
     const created = await service.create({
       name: "scoped",
@@ -678,7 +678,7 @@ describe("API-key service", () => {
     const projects = {
       listActiveByScopes: vi.fn(),
       findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
-    } as unknown as ProjectService;
+    } as unknown as ProjectApi;
     const service = createService(repository, dependencies({ projects }));
     const created = await service.create({
       name: "organization",
@@ -707,7 +707,7 @@ describe("API-key service", () => {
       getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
       listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: true }),
       findPersonalWorkspaceOwner: vi.fn().mockResolvedValue(null),
-    } as unknown as ProjectService;
+    } as unknown as ProjectApi;
     const service = createService(repository, dependencies({ authz, projects }));
     const created = await service.create({
       name: "too-wide",

@@ -9,7 +9,7 @@ import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
 import {
   GatewayBudgetLedgerAdapter,
   PrismaGatewayAdapter,
-  TestProjectService,
+  TestProjectApi,
   type GatewayBudgetSpendPort,
   type GatewayService,
 } from "@langwatch/gateway-server/testing";
@@ -21,7 +21,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
@@ -86,14 +86,14 @@ class LedgerOverGatewayBudgets extends PulledUsageLedgerPort {
 }
 
 /** The two project reads the decision path makes, answered from this suite's rows. */
-class SuiteProjectService extends TestProjectService {
-  override async listIdsByOrganization(): ReturnType<ProjectService["listIdsByOrganization"]> {
+class SuiteProjectService extends TestProjectApi {
+  override async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
     return [APP_PROJECT_ID, GOV_PROJECT_ID];
   }
 
   override async listTraceDestinations(
     projectIds: string[],
-  ): ReturnType<ProjectService["listTraceDestinations"]> {
+  ): ReturnType<ProjectApi["listTraceDestinations"]> {
     return await prisma.project.findMany({
       where: { id: { in: projectIds } },
       select: { id: true, teamId: true, apiKey: true, archivedAt: true },

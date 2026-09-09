@@ -11,7 +11,8 @@ import {
   expandLatestAlias,
   ModelProviderCredentialsUnreadableError,
 } from "@langwatch/model-provider-contract";
-import { ProjectService, projectWithTeamSchema } from "@langwatch/project-contract";
+import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "./test-project-api.ts";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -331,76 +332,16 @@ const project = projectWithTeamSchema.parse({
   },
 });
 
-class Projects extends ProjectService {
-  private notUsed(): never {
-    throw new Error("Project method is not used by this test");
-  }
-
-  tryFindInternal() {
-    return this.notUsed();
-  }
-
-  tryGetOrganizationId() {
-    return this.notUsed();
-  }
-
-  ensureInternal() {
-    return this.notUsed();
-  }
-
-  isPresenceEnabled() {
-    return this.notUsed();
-  }
-
-  getById() {
-    return this.notUsed();
-  }
-
-  getOrganizationId() {
-    return this.notUsed();
-  }
-
-  tryGetIdentity() {
-    return this.notUsed();
-  }
-
-  tryGetById() {
-    return this.notUsed();
-  }
-
-  tryGetSummaryById() {
-    return this.notUsed();
-  }
-
-  getWithTeam() {
+class Projects extends TestProjectApi {
+  override getWithTeam(): ReturnType<ProjectApi["getWithTeam"]> {
     return Promise.resolve(project);
   }
 
-  tryGetWithTeam() {
+  override tryGetWithTeam(): ReturnType<ProjectApi["tryGetWithTeam"]> {
     return Promise.resolve(project);
   }
 
-  create() {
-    return this.notUsed();
-  }
-
-  update() {
-    return this.notUsed();
-  }
-
-  archive() {
-    return this.notUsed();
-  }
-
-  listByOrganization() {
-    return this.notUsed();
-  }
-
-  listByTeam() {
-    return this.notUsed();
-  }
-
-  listNamesByIds() {
+  override listNamesByIds(): ReturnType<ProjectApi["listNamesByIds"]> {
     return Promise.resolve([
       {
         id: project.id,
@@ -417,48 +358,8 @@ class Projects extends ProjectService {
     ]);
   }
 
-  listIdsByOrganization() {
+  override listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
     return Promise.resolve([project.id]);
-  }
-
-  listActiveByScopes() {
-    return this.notUsed();
-  }
-
-  updateMetadata() {
-    return this.notUsed();
-  }
-
-  touchCodingAgentSessionSeen() {
-    return this.notUsed();
-  }
-
-  touchCodingAgentPullRequestSeen() {
-    return this.notUsed();
-  }
-
-  searchByQuery() {
-    return this.notUsed();
-  }
-
-  tryGetTraceSharingConfig() {
-    return this.notUsed();
-  }
-
-  resolveOrgAdmin() {
-    return this.notUsed();
-  }
-
-  resolveTraceDestination() {
-    return this.notUsed();
-  }
-
-  tryGetTraceDestination() {
-    return this.notUsed();
-  }
-
-  listTraceDestinations() {
-    return this.notUsed();
   }
 }
 

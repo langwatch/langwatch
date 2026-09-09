@@ -2,12 +2,22 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   ProjectApi,
   type ProjectApi as ProjectApiContract,
+  type ActiveProjectsByScopes,
+  type ActiveProjectsByScopesInput,
+  type InternalProject,
+  type InternalProjectQuery,
+  type OrgAdminResolution,
   type Project,
+  type ProjectIdentity,
   type ProjectWithTeam,
   type PaginatedProjects,
   type TopicClusteringRequest,
+  type TraceDestinationDecision,
+  type TraceDestinationInput,
+  type TraceDestinationProject,
   type TraceSharingConfig,
   type UpdateProjectInput,
+  type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
@@ -179,7 +189,7 @@ export class ProjectApp implements ProjectApiContract {
   findTraceSharingConfig(
     input: Readonly<{ projectId: string }>,
   ): Promise<TraceSharingConfig | null> {
-    return this.#projectService.tryGetTraceSharingConfig(input.projectId);
+    return this.#projectService.findTraceSharingConfig(input.projectId);
   }
 
   findPersonalWorkspaceOwner(
@@ -200,5 +210,48 @@ export class ProjectApp implements ProjectApiContract {
       projectId: input.projectId,
       at: toDate(input.at),
     });
+  }
+
+  touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void> {
+    return this.#projectService.touchCodingAgentSessionSeen({
+      projectId: input.projectId,
+      at: toDate(input.at),
+    });
+  }
+
+  findInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
+    return this.#projectService.findInternal(input);
+  }
+
+  ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
+    return this.#projectService.ensureInternal(input);
+  }
+
+  findIdentity(id: string): Promise<ProjectIdentity | null> {
+    return this.#projectService.findIdentity(id);
+  }
+
+  listActiveByScopes(input: ActiveProjectsByScopesInput): Promise<ActiveProjectsByScopes> {
+    return this.#projectService.listActiveByScopes(input);
+  }
+
+  updateMetadata(input: UpdateProjectMetadataInput): Promise<void> {
+    return this.#projectService.updateMetadata(input);
+  }
+
+  resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution> {
+    return this.#projectService.resolveOrgAdmin(projectId);
+  }
+
+  resolveTraceDestination(input: TraceDestinationInput): Promise<TraceDestinationDecision> {
+    return this.#projectService.resolveTraceDestination(input);
+  }
+
+  findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
+    return this.#projectService.findTraceDestination(projectId);
+  }
+
+  listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
+    return this.#projectService.listTraceDestinations(projectIds);
   }
 }

@@ -1,5 +1,5 @@
 import { OrganizationService } from "@langwatch/organization-contract";
-import { ProjectService } from "@langwatch/project-contract";
+import { TestProjectApi } from "./test-project-api.ts";
 import type { Instant } from "@langwatch/time";
 
 function unsupported(): never {
@@ -166,28 +166,21 @@ export class TestOrganizationService extends OrganizationService {
   }
 }
 
-export class TestProjectService extends ProjectService {
-  readonly pullRequestActivity: Array<{ projectId: string; at: Date | Instant }> = [];
+export class TestProjectService extends TestProjectApi {
+  readonly pullRequestActivity: Array<{ projectId: string; at: Instant }> = [];
   pullRequestActivityError: Error | null = null;
 
   constructor(private readonly organizationId: string) {
     super();
   }
 
-  getOrganizationId(): Promise<string> {
+  override getOrganizationId(): Promise<string> {
     return Promise.resolve(this.organizationId);
   }
 
-  tryGetOrganizationId(): never {
-    return unsupported();
-  }
-
-  // Widened so one double satisfies both bases: `ProjectService` still states
-  // the stamp as a `Date`, while `GithubProjectActivityPort` now states it as
-  // the instant the demand path passes.
-  touchCodingAgentPullRequestSeen(input: {
+  override touchCodingAgentPullRequestSeen(input: {
     projectId: string;
-    at: Date | Instant;
+    at: Instant;
   }): Promise<void> {
     if (this.pullRequestActivityError) {
       return Promise.reject(this.pullRequestActivityError);
@@ -195,105 +188,5 @@ export class TestProjectService extends ProjectService {
 
     this.pullRequestActivity.push(input);
     return Promise.resolve();
-  }
-
-  tryFindInternal(): never {
-    return unsupported();
-  }
-
-  ensureInternal(): never {
-    return unsupported();
-  }
-
-  isPresenceEnabled(): never {
-    return unsupported();
-  }
-
-  getById(): never {
-    return unsupported();
-  }
-
-  tryGetIdentity(): never {
-    return unsupported();
-  }
-
-  tryGetById(): never {
-    return unsupported();
-  }
-
-  tryGetSummaryById(): never {
-    return unsupported();
-  }
-
-  getWithTeam(): never {
-    return unsupported();
-  }
-
-  tryGetWithTeam(): never {
-    return unsupported();
-  }
-
-  create(): never {
-    return unsupported();
-  }
-
-  update(): never {
-    return unsupported();
-  }
-
-  archive(): never {
-    return unsupported();
-  }
-
-  listByOrganization(): never {
-    return unsupported();
-  }
-
-  listByTeam(): never {
-    return unsupported();
-  }
-
-  listNamesByIds(): never {
-    return unsupported();
-  }
-
-  listIdsByOrganization(): never {
-    return unsupported();
-  }
-
-  listActiveByScopes(): never {
-    return unsupported();
-  }
-
-  updateMetadata(): never {
-    return unsupported();
-  }
-
-  touchCodingAgentSessionSeen(): never {
-    return unsupported();
-  }
-
-  searchByQuery(): never {
-    return unsupported();
-  }
-
-  tryGetTraceSharingConfig(): never {
-    return unsupported();
-  }
-
-  resolveOrgAdmin(): never {
-    return unsupported();
-  }
-
-  resolveTraceDestination(): never {
-    return unsupported();
-  }
-
-  tryGetTraceDestination(): never {
-    return unsupported();
-  }
-
-  listTraceDestinations(): never {
-    return unsupported();
   }
 }

@@ -24,7 +24,7 @@ export type CodingAgentSessionReads = Pick<CodingAgentSessionReadService, "listR
 
 /**
  * The one project read the backfill makes, and the one field it reads back.
- * `ProjectService` satisfies it; stating it this narrowly is what lets a
+ * `ProjectApi` satisfies it; stating it this narrowly is what lets a
  * caller compose the backfill without the whole project graph.
  */
 export type CodingAgentBackfillProjects = {

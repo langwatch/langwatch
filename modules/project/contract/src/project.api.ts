@@ -1,4 +1,9 @@
 import type {
+  ActiveProjectsByScopes,
+  ActiveProjectsByScopesInput,
+  InternalProject,
+  InternalProjectQuery,
+  OrgAdminResolution,
   PaginatedProjects,
   Project,
   ProjectIdentity,
@@ -6,8 +11,12 @@ import type {
   ProjectNamesByIdsInput,
   ProjectWithTeam,
   SearchProjectsResult,
+  TraceDestinationDecision,
+  TraceDestinationInput,
+  TraceDestinationProject,
   TraceSharingConfig,
   UpdateProjectInput,
+  UpdateProjectMetadataInput,
 } from "./project.ts";
 import type { TopicClusteringRequest } from "./project.responses.ts";
 import { moduleApi } from "@langwatch/runtime-composition";
@@ -78,6 +87,30 @@ export interface ProjectApi {
     by: Readonly<{ id: string }>,
   ): Promise<TopicClusteringRequest>;
   touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void>;
+  /** Stamps a project as having just seen coding-agent session activity. */
+  touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void>;
+  /** The organisation's internal governance project, or nothing when it has none. */
+  findInternal(input: InternalProjectQuery): Promise<InternalProject | null>;
+  /** The organisation's internal governance project, created on first ask. */
+  ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
+  /**
+   * Reads only who the project is, the value a request boundary carries.
+   *
+   * Five indexed columns and no team row, because this runs once per
+   * authenticated request. Absent when the project does not exist.
+   */
+  findIdentity(id: string): Promise<ProjectIdentity | null>;
+  /** Lists active projects reached by the supplied organisation/team/project scopes. */
+  listActiveByScopes(input: ActiveProjectsByScopesInput): Promise<ActiveProjectsByScopes>;
+  updateMetadata(input: UpdateProjectMetadataInput): Promise<void>;
+  /** The organisation and its first admin, as an ingested trace resolves them. */
+  resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution>;
+  /** Where a Gateway call's traces land, given the key's own project. */
+  resolveTraceDestination(input: TraceDestinationInput): Promise<TraceDestinationDecision>;
+  /** Follows a stored Gateway trace-destination pointer, including archived projects. */
+  findTraceDestination(projectId: string): Promise<TraceDestinationProject | null>;
+  /** Batch counterpart for Gateway listings; unknown ids are omitted. */
+  listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]>;
 }
 
 export const ProjectApi = moduleApi<ProjectApi>("project");

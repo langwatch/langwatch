@@ -1,6 +1,6 @@
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   TraceEvaluationMonitorPort,
   TraceModelCostCatalogPort,
@@ -26,7 +26,7 @@ import { createWorkerTraceNarrowPorts } from "../worker-trace-narrow-ports.compo
 const project = { id: "project-1", firstMessage: false, integrated: false };
 
 function services(): {
-  projects: ProjectService;
+  projects: ProjectApi;
   monitors: MonitorService;
   modelProviders: ModelProviderService;
   calls: {
@@ -47,7 +47,7 @@ function services(): {
     listCosts: vi.fn(async () => [{ id: "cost-1", model: "gpt-5-mini", regex: "^gpt-5" }]),
   };
   return {
-    projects: calls as unknown as ProjectService,
+    projects: calls as unknown as ProjectApi,
     monitors: calls as unknown as MonitorService,
     modelProviders: calls as unknown as ModelProviderService,
     calls,

@@ -2,7 +2,7 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { RoleBindingScopeType, TeamUserRole } from "@langwatch/authz-contract";
-import type { UserProfile, UserService } from "@langwatch/user-contract";
+import type { UserProfile, UserApi } from "@langwatch/user-contract";
 import {
   type ScimCreateUserRequest,
   type ScimListResponse,
@@ -12,7 +12,10 @@ import {
 import { ScimProtocolError } from "@langwatch/enterprise-scim-contract";
 import type { ScimRepositoryPort } from "../ports/scim-repository.port.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
-import { ScimCostCenterService, type ScimDepartmentAssignment } from "./scim-cost-center.service.ts";
+import {
+  ScimCostCenterService,
+  type ScimDepartmentAssignment,
+} from "./scim-cost-center.service.ts";
 import { ScimDeprovisionService } from "./scim-deprovision.service.ts";
 import { ScimUserPatchService, type ScimUserActivation } from "./scim-user-patch.service.ts";
 import {
@@ -22,14 +25,14 @@ import {
 } from "./scim-user-profile.service.ts";
 
 /**
- * Everything SCIM asks of `UserService`: the two reads that decide whether a
+ * Everything SCIM asks of `UserApi`: the two reads that decide whether a
  * directory user already exists here, the create, and what the leaf services
  * need to change a profile or flip `active`. Six of the contract's twenty-two
  * members.
  */
 export type ScimUserProvisioning = ScimUserActivation &
   ScimUserProfileReadWrite &
-  Pick<UserService, "tryFindByEmail" | "create">;
+  Pick<UserApi, "findByEmail" | "create">;
 import type { ScimSyncLifecyclePort } from "../ports/scim-sync-lifecycle.port.ts";
 import {
   isUniqueViolation,
@@ -146,7 +149,7 @@ export class ScimProvisioningService {
     const email = request.userName;
     const name = nameFromScimRequest(request);
 
-    const existingUser = await this.userService.tryFindByEmail({ email });
+    const existingUser = await this.userService.findByEmail({ email });
 
     if (existingUser) {
       return this.createExistingUser({ existingUser, organizationId, request });

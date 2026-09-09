@@ -21,7 +21,7 @@ import {
 } from "../../adapters/better-auth-secondary-storage.adapter.ts";
 import type { SignInMethodPolicy } from "@langwatch/identity-contract";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { compare, hash } from "bcrypt";
 import { type BetterAuthOptions, betterAuth } from "better-auth";
@@ -540,7 +540,7 @@ export type BetterAuthTransportOptions = Readonly<{
   /** The process's Redis, or null to keep sessions in the database alone. */
   redis: RedisConnection | null;
   signUpVerification: SignUpVerificationPort;
-  users: UserService;
+  users: UserApi;
 }>;
 
 /**

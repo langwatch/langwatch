@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthService } from "@langwatch/auth-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { configureLogger, createLogger } from "@langwatch/observability";
 import { OrganizationService } from "@langwatch/organization-contract";
@@ -265,7 +265,7 @@ class HostAuthComposition extends ApiAuthSessionCompositionPort {
     return {
       auth: new HostAuthService(),
       sessions: new HostSessionTransport(),
-      users: testUserService(),
+      users: testUserApi(),
     };
   }
 }
@@ -331,8 +331,8 @@ class RecordingHost implements ApiExecutableHost {
  * too. It refuses on every call: nothing here exercises it, and a call would be
  * a test reaching past what it is describing.
  */
-function testUserService(): UserService {
-  return new Proxy({} as UserService, {
+function testUserApi(): UserApi {
+  return new Proxy({} as UserApi, {
     get(_target, property) {
       return () => {
         throw new Error(`the composition test reached users.${String(property)}`);

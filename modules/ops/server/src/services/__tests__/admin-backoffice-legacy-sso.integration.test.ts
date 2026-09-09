@@ -12,7 +12,8 @@ import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { describe, expect, it } from "vitest";
 import { PostgresOpsAdapter } from "../../adapters/postgres.ops.adapter.ts";
-import { AuditStub, AuthStub, organizationEdit, UsersStub } from "./support/backoffice-doubles.ts";
+import { AuditStub, AuthStub, organizationEdit } from "./support/backoffice-doubles.ts";
+import { TestUserApi } from "./support/test-user-api.ts";
 
 /** Reached only if the refusal fails to happen; every call here is a failure. */
 const refuseEveryQuery = new Proxy(
@@ -38,7 +39,7 @@ function backoffice() {
     audit: new AuditStub(),
     auditLog: createApiFixture<AuditLogApi>(),
     adminEmails: ["olive@example.com"],
-    users: new UsersStub(),
+    users: new TestUserApi(),
     auth: new AuthStub(),
     legacySsoStringWritesRetired: true,
     scheduler: {

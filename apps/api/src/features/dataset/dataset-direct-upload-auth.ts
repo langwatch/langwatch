@@ -2,7 +2,7 @@
  * Auth for the browser -> S3 direct-upload routes (ADR-032 D4).
  */
 
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import { isCrossSiteRequest } from "../../api-rest.cross-site.ts";
 
@@ -50,7 +50,7 @@ export type DatasetDirectUploadAuthorizer = (
 export function createDatasetDirectUploadAuthorizer(options: {
   session: ApiHandlerManagedSessionPort;
   credentials: ApiHandlerManagedCredentials;
-  projects: () => ProjectService;
+  projects: () => ProjectApi;
 }): DatasetDirectUploadAuthorizer {
   const { session, credentials, projects } = options;
 

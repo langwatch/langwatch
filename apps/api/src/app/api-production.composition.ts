@@ -304,7 +304,6 @@ import {
 } from "./api-auth.composition.ts";
 import { createApiUserAvatarObjectReader } from "../features/user/user-avatar-objects.adapter.ts";
 import { ApiUserAvatarStorageAdapter } from "../features/user/user-avatar-storage.adapter.ts";
-import { createApiUserDirectory } from "../features/user/user-directory.adapter.ts";
 import { ApiInstanceAdminKeyAdapter } from "./api-instance-admin-key.adapter.ts";
 import { ApiRestObservabilityComposition } from "./api-rest-observability.composition.ts";
 import {
@@ -1961,6 +1960,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const analyticsFeature = this.composedAnalytics;
     const dashboardFeature = this.composedDashboard;
     const projects = this.composedTenancy?.projects;
+    const projectDirectory = this.composedTenancy?.projectDirectory;
     const langWatchQL =
       projects && dashboardFeature
         ? {
@@ -2344,6 +2344,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       apiKeys: tenancy.apiKeys,
       organizations: tenancy.organizations,
       projects,
+      projectDirectory,
       modelProviders,
       // The SAME ceiling the framework chain installs on a declared policy.
       requireApiKeyPermission: (permission) => projectRestPolicy.permissionMiddleware(permission),
@@ -2509,6 +2510,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const logger = createLogger(options.config.serviceName);
     this.composedTenancy = await ApiTenancyComposition.tryCompose({
       database: this.composedDatabase?.connection,
+      // The project application this process installs, as a reference: the
+      // credential store reads projects through it and the project module
+      // reads credentials back, so one side arrives before the other exists.
+      projectApi: this.deferredApis.reference(ProjectApi),
       // The process's own scope, so the credential store's runtime is stopped
       // when this process drains or its composition fails half-built.
       resources: options.resources,
@@ -2564,12 +2569,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const user = await this.installUser(options, tenancy);
     this.composedAuth = ApiAuthComposition.tryCompose({
       auth: user.auth,
-      // The SAME graph, in the shape Better Auth's passkey ceremony, SCIM and
-      // the back office still name it.
-      directory: createApiUserDirectory({
-        users: user.app,
-        processName: options.config.serviceName,
-      }),
+      // The SAME graph Better Auth's passkey ceremony, SCIM and the back
+      // office read through: the installed user application itself.
+      directory: user.app,
       database: this.composedDatabase?.connection,
       // The organization service this process actually serves from, injected
       // or composed. A second one here would resolve a person's workspaces

@@ -252,9 +252,9 @@ export abstract class ModelProviderIdService {
  * Model Provider scopes a cost, a default and a credential to a project, its
  * team and its organization, and all three ids are on the project row read
  * with its team. That one read is the only thing the derivation needs, so it
- * is named here rather than taken as a whole `ProjectService` — which would
+ * is named here rather than taken as a whole `ProjectApi` — which would
  * put the project write graph, an organization service and an authz service in
- * a process that only prices a span. `ProjectService` and
+ * a process that only prices a span. `ProjectApi` and
  * `ProjectMetadataService` both satisfy this.
  */
 export abstract class ModelCostProjectPort {

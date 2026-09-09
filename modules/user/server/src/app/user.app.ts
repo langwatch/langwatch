@@ -16,7 +16,10 @@ import type {
   ChangeOwnPasswordInput,
   CompleteUserVerificationInput,
   CreateCredentialUserInput,
+  CreatePasskeyUserInput,
+  CreateUserInput,
   CreatedUser,
+  UserEmailInput,
   MeProject,
   MePersonalCredential,
   MeUsage,
@@ -194,10 +197,7 @@ export interface UserOrganizationDirectory {
   getBudgetIncreaseRecipient(input: { organizationId: string }): Promise<string>;
   findName(input: { organizationId: string }): Promise<string | null>;
   /** The caller's first non-archived project in the organization, by age. */
-  findFirstProjectSlug(input: {
-    organizationId: string;
-    userId: string;
-  }): Promise<string | null>;
+  findFirstProjectSlug(input: { organizationId: string; userId: string }): Promise<string | null>;
 }
 
 /** The gateway budget check, at the caller's own personal workspace. */
@@ -426,6 +426,15 @@ export class UserApp implements UserApi {
     return this.#users.getProfiles(input);
   }
 
+  findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
+    return this.#users.findByEmail(input);
+  }
+
+  /** The directory mint: an account row with no sign-in method attached yet. */
+  create(input: CreateUserInput): Promise<UserProfile> {
+    return this.#users.create(input);
+  }
+
   /** Everything the account screen reads about one user. */
   getAccountInfo(input: UserIdInput): Promise<UserAccountInfo> {
     return this.#users.getAccountInfo(input);
@@ -481,6 +490,11 @@ export class UserApp implements UserApi {
   /** Mints an account that signs in with a password. */
   createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
     return this.#users.createCredentialUser(input);
+  }
+
+  /** Mints the account a passkey ceremony is about to register its key against. */
+  createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser> {
+    return this.#users.createPasskeyUser(input);
   }
 
   /**
@@ -720,7 +734,13 @@ export class UserApp implements UserApi {
    * stopped at the flag would leave a live session and a live CLI token
    * belonging to somebody the product says is gone.
    */
-  async deactivateAccount({ userId, caller }: { userId: string; caller: UserCaller }): Promise<void> {
+  async deactivateAccount({
+    userId,
+    caller,
+  }: {
+    userId: string;
+    caller: UserCaller;
+  }): Promise<void> {
     if (userId !== caller.id && !(await this.isOperator({ userId: caller.operatorId }))) {
       throw new UserAccountAccessDeniedError();
     }
@@ -731,7 +751,13 @@ export class UserApp implements UserApi {
   }
 
   /** Restoring is an operator's call alone. */
-  async reactivateAccount({ userId, caller }: { userId: string; caller: UserCaller }): Promise<void> {
+  async reactivateAccount({
+    userId,
+    caller,
+  }: {
+    userId: string;
+    caller: UserCaller;
+  }): Promise<void> {
     if (!(await this.isOperator({ userId: caller.operatorId }))) {
       throw new UserAccountAccessDeniedError();
     }

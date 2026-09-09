@@ -5,8 +5,8 @@ import {
   AuthStub,
   organizationEdit,
   RepositoryStub,
-  UsersStub,
 } from "../../services/__tests__/support/backoffice-doubles.ts";
+import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
 import {
   legacySsoStringColumnsIn,
   legacySsoStringWritesToRefuse,
@@ -16,7 +16,7 @@ function backoffice(retired: boolean) {
   const repository = new RepositoryStub();
   const service = AdminBackofficeService.create({
     repository,
-    users: new UsersStub(),
+    users: new TestUserApi(),
     auth: new AuthStub(),
     audit: new AuditStub(),
     legacySsoStringWritesRetired: retired,

@@ -13,12 +13,15 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import type { ProjectService } from "@langwatch/project-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { projectRest, projectRestCredential } from "../project.rest.ts";
+import {
+  projectRest,
+  projectRestCredential,
+  type ProjectManagementDirectory,
+} from "../project.rest.ts";
 import { TestApiKeyService } from "./support/test-api-key-service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectDirectory } from "./support/test-project-directory.ts";
 
 export const ORGANIZATION_ID = "organization-1";
 export const USER_ID = "user-1";
@@ -56,13 +59,13 @@ const renderRefusal: RestErrorHandler = (error, c) => {
  */
 export function mountProjectRest(
   options: {
-    projects?: Partial<TestProjectService>;
+    projects?: Partial<ProjectManagementDirectory>;
     apiKeys?: Partial<TestApiKeyService>;
     granted?: readonly string[];
     grantedOnProject?: Readonly<Record<string, readonly string[]>>;
   } = {},
 ) {
-  const projects: ProjectService = Object.assign(new TestProjectService(), options.projects);
+  const projects = new TestProjectDirectory(options.projects ?? {});
   const apiKeys: ApiKeyApi = Object.assign(new TestApiKeyService(), options.apiKeys);
   const granted = new Set<string>(options.granted ?? EVERY_PERMISSION);
   const grantedOnProject = options.grantedOnProject;

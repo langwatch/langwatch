@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LWQL_FLAG, lwqlEnabled } from "../../rules/lwql-access.rules.ts";
@@ -11,10 +11,10 @@ import { LWQL_FLAG, lwqlEnabled } from "../../rules/lwql-access.rules.ts";
  * `createTestApp().projects` with `vi.spyOn`, which needed a Prisma connection to build an app it then stubbed — and stopped working
  * entirely once the composed service was wrapped for tracing, since `spyOn` cannot replace a method reached through a proxy.
  */
-function projectsIn(organizationId: string): ProjectService {
+function projectsIn(organizationId: string): ProjectApi {
   return {
     getOrganizationId: vi.fn(async () => organizationId),
-  } as unknown as ProjectService;
+  } as unknown as ProjectApi;
 }
 
 /** One flag, answered; every other operation refuses by name. */

@@ -19,7 +19,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiAuditPort } from "../../../api-request.policy.ts";
 import { ApiApplication } from "../../../api.application.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService, ProjectWithTeam } from "@langwatch/project-contract";
+import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { composeApiModelProviders } from "../../../app/api-model-provider.composition.ts";
 import { composeDatasetService } from "../../dataset/dataset.composition.ts";
@@ -264,7 +264,7 @@ const evaluationOutcome = {
  * The project and organization reads the model gateway derives a scope chain
  * from: a default set on the project, its team or its organization.
  */
-function testProjects(): ProjectService {
+function testProjects(): ProjectApi {
   const project = {
     id: "project-1",
     name: "Support",
@@ -276,7 +276,7 @@ function testProjects(): ProjectService {
   return {
     getWithTeam: async () => project,
     tryGetWithTeam: async () => project,
-  } as unknown as ProjectService;
+  } as unknown as ProjectApi;
 }
 
 function testOrganizations(): OrganizationService {

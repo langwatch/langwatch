@@ -62,7 +62,7 @@ function serviceWith(fakes: Fakes = {}) {
       generateLegacyProjectKey: () => "generated",
     },
     projects: {
-      tryGetIdentity: async () => (fakes.identity === undefined ? project() : fakes.identity),
+      findIdentity: async () => (fakes.identity === undefined ? project() : fakes.identity),
       findIdByLegacyApiKey: async () => fakes.legacyProjectId ?? null,
       rotateLegacyApiKey: async () => true,
     },
@@ -384,7 +384,7 @@ describe("ApiKeyTokenResolutionService", () => {
         const service = ApiKeyTokenResolutionService.create({
           tokens: { generateLegacyProjectKey: () => "sk-lw-rotated-project-key" },
           projects: {
-            tryGetIdentity: async () => project(),
+            findIdentity: async () => project(),
             findIdByLegacyApiKey: async ({ token }: { token: string }) =>
               token === storedToken ? projectId : null,
             rotateLegacyApiKey: async (input: { projectId: string; token: string }) => {

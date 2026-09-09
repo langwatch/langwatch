@@ -17,9 +17,9 @@ import {
 } from "@langwatch/ops-server";
 import type { OpsService } from "@langwatch/ops-contract";
 import { AuthService } from "@langwatch/auth-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { ProjectService } from "@langwatch/project-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 
 const redisUrl = process.env.REDIS_URL ?? process.env.CI_REDIS_URL;
 const hasRedis = !!redisUrl;
@@ -37,7 +37,7 @@ const schedulerRepository: SchedulerOpsRepository = {
   listPausedForOps: async () => ({ rows: [], total: 0 }),
 };
 
-const projects: ProjectService = Object.create(ProjectService.prototype);
+const projects: ProjectApi = Object.create(ProjectApi.prototype);
 projects.listNamesByIds = async () => [];
 
 class NoopQueuePayloadDecoder extends QueuePayloadDecoderPort {
@@ -92,7 +92,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       adminEmails: [],
       audit: { record: async () => undefined },
       auditLog: createApiFixture<AuditLogApi>(),
-      users: {} as UserService,
+      users: {} as UserApi,
       auth: new NoopAuthService(),
       redis,
       queuePayloads: new NoopQueuePayloadDecoder(),

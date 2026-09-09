@@ -46,7 +46,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -138,7 +138,7 @@ function realModelProviders(prisma: PrismaClient): ModelProviderService {
           ownerUserId: row.ownerUserId,
         }));
       },
-    } as unknown as ProjectService,
+    } as unknown as ProjectApi,
     organizations: {
       getBillingProfile: async ({ organizationId }: { organizationId: string }) => {
         const organization = await prisma.organization.findUnique({
@@ -163,7 +163,7 @@ function realModelProviders(prisma: PrismaClient): ModelProviderService {
       isSaas: false,
     }),
     translation: VercelAiModelTranslationAdapter.create({
-      projects: {} as unknown as ProjectService,
+      projects: {} as unknown as ProjectApi,
       executionProxyBaseUrl: "http://langwatch_nlp:5561/go/proxy/v1",
     }),
     ids: PrefixedModelProviderIdAdapter.create({

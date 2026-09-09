@@ -38,7 +38,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import { budgetAppliesToProvider } from "@langwatch/gateway-contract";
 import { NANO_USD_PER_USD } from "../adapters/model-catalog.gateway-spend-rating.adapter.ts";
@@ -49,7 +49,7 @@ import {
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 /**
  * The tenancy guard names a project on every query. This suite writes the
@@ -82,7 +82,7 @@ const USER_ID = `usr-sib-${suffix}`;
  * onto the contract fake rather than subclassed, because the fake's stand-in
  * for this method is typed by its own empty answer.
  */
-const projects: ProjectService = Object.assign(new TestProjectService(), {
+const projects: ProjectApi = Object.assign(new TestProjectApi(), {
   listIdsByOrganization: () => Promise.resolve([PROJECT_ID]),
 });
 

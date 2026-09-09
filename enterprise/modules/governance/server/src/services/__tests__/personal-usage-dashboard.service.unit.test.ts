@@ -68,7 +68,7 @@ function build(
   const tryFindPersonalWorkspace = vi.fn(async () =>
     options.workspace === undefined ? personalWorkspace : options.workspace,
   );
-  const tryFindInternal = vi.fn(async () =>
+  const findInternal = vi.fn(async () =>
     options.internalProject === undefined ? governanceProject : options.internalProject,
   );
 
@@ -79,7 +79,7 @@ function build(
       personalUsageBreakdownByModel,
     },
     organizations: { tryFindPersonalWorkspace },
-    projects: { tryFindInternal },
+    projects: { findInternal },
   } as unknown as PersonalUsageDashboardServiceOptions;
 
   return {
@@ -87,7 +87,7 @@ function build(
     personalUsageDailyBuckets,
     personalUsageBreakdownByModel,
     tryFindPersonalWorkspace,
-    tryFindInternal,
+    findInternal,
     service: PersonalUsageDashboardService.create(dependencies),
   };
 }
@@ -113,12 +113,12 @@ describe("PersonalUsageDashboardService", () => {
       });
 
       it("asks the analytics store nothing, because there is no tenant to ask about", async () => {
-        const { service, personalUsageSummary, tryFindInternal } = build({ workspace: null });
+        const { service, personalUsageSummary, findInternal } = build({ workspace: null });
 
         await service.read({ userId: USER_ID, organizationId: ORGANIZATION_ID });
 
         expect(personalUsageSummary).not.toHaveBeenCalled();
-        expect(tryFindInternal).not.toHaveBeenCalled();
+        expect(findInternal).not.toHaveBeenCalled();
       });
     });
   });
@@ -154,11 +154,11 @@ describe("PersonalUsageDashboardService", () => {
       });
 
       it("resolves the governance project read-only, never provisioning one", async () => {
-        const { service, tryFindInternal } = build();
+        const { service, findInternal } = build();
 
         await service.read({ userId: USER_ID, organizationId: ORGANIZATION_ID });
 
-        expect(tryFindInternal).toHaveBeenCalledWith({
+        expect(findInternal).toHaveBeenCalledWith({
           organizationId: ORGANIZATION_ID,
           kind: "internal_governance",
         });

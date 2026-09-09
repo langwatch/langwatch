@@ -6,6 +6,8 @@ import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { PostgresAuthzAdapter } from "@langwatch/authz-server";
 import { createGatewayPlatformRestApp } from "@langwatch/gateway-server/api-rest/gateway-platform";
+import { TraceDestinationProjectService } from "@langwatch/gateway-server/testing";
+import { projectIdentitySchema, type ProjectIdentity } from "@langwatch/project-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -114,6 +116,7 @@ export async function mountGatewayPlatformRest(): Promise<GatewayRestHarness> {
 
   const tenancy = await ApiTenancyComposition.compose({
     database: connection,
+    projectApi: new HarnessProjectApi(prisma),
     authz: { permissions: authzBuild.authz, grants: authzBuild.grants },
     encryption,
     pepper: API_KEY_PEPPER,
@@ -152,4 +155,37 @@ export async function mountGatewayPlatformRest(): Promise<GatewayRestHarness> {
     encryption,
     apiKeyPepper: API_KEY_PEPPER,
   };
+}
+
+/**
+ * The project reads this suite's doors make against its own seeded rows: the
+ * identity an API key resolves through, and the trace-destination ladder the
+ * gateway follows. Everything else refuses by name, as the fake it extends does.
+ */
+class HarnessProjectApi extends TraceDestinationProjectService {
+  constructor(private readonly database: PrismaClient) {
+    super(database);
+  }
+
+  override async findIdentity(id: string): Promise<ProjectIdentity | null> {
+    const row = await this.database.project.findUnique({
+      where: { id },
+      include: { team: true },
+    });
+    return row
+      ? projectIdentitySchema.parse({
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          teamId: row.teamId,
+          organizationId: row.team.organizationId,
+          isPersonal: row.isPersonal,
+          ownerUserId: row.ownerUserId,
+        })
+      : null;
+  }
+
+  override async tryGetOrganizationId(projectId: string): Promise<string | undefined> {
+    return (await this.findIdentity(projectId))?.organizationId;
+  }
 }

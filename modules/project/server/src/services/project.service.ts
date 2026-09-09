@@ -1,6 +1,5 @@
 import {
   PROJECT_KIND,
-  ProjectService as ProjectServiceContract,
   activeProjectsByScopesInputSchema,
   createProjectInputSchema,
   internalProjectQuerySchema,
@@ -52,7 +51,7 @@ import type { ProjectRepository } from "../repositories/project.repository.ts";
 import { ProjectMetadataService } from "./project-metadata.service.ts";
 import { ProjectSlugService } from "./project-slug.service.ts";
 
-export class ProjectService extends ProjectServiceContract {
+export class ProjectService {
   listPaths(input: { projectIds: string[] }) {
     return this.repository.listPaths(input);
   }
@@ -65,9 +64,7 @@ export class ProjectService extends ProjectServiceContract {
     private readonly keyMap?: ProjectKeyMapPort,
     private readonly storedObjects?: ProjectStoredObjectsPort,
     private readonly diagnostics?: ProjectDiagnosticsPort,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(options: {
     repository: ProjectRepository;
@@ -91,7 +88,7 @@ export class ProjectService extends ProjectServiceContract {
     );
   }
 
-  tryFindInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
+  findInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
     const parsed = internalProjectQuerySchema.parse(input);
 
     return this.repository.tryFindInternalByOrganization(parsed.organizationId);
@@ -142,7 +139,7 @@ export class ProjectService extends ProjectServiceContract {
     return traceDestinationDecisionSchema.parse(decision);
   }
 
-  tryGetTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
+  findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
     return this.repository.tryGetTraceDestination(traceDestinationProjectIdSchema.parse(projectId));
   }
 
@@ -202,7 +199,7 @@ export class ProjectService extends ProjectServiceContract {
     return this.repository.tryGetOrganizationId(projectId);
   }
 
-  tryGetIdentity(id: string): Promise<ProjectIdentity | null> {
+  findIdentity(id: string): Promise<ProjectIdentity | null> {
     return this.repository.tryFindIdentity(id);
   }
 
@@ -452,7 +449,7 @@ export class ProjectService extends ProjectServiceContract {
    * declares it; the `find*` name a nullable answer earns lives on `ProjectApi`
    * and on the repository below.
    */
-  tryGetTraceSharingConfig(projectId: string): Promise<TraceSharingConfig | null> {
+  findTraceSharingConfig(projectId: string): Promise<TraceSharingConfig | null> {
     return this.repository.findTraceSharingConfig(projectId);
   }
 

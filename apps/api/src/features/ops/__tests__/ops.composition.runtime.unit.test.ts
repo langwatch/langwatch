@@ -9,9 +9,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AuthService } from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiOpsAbsenceReport, composeOpsFeature } from "../ops.composition.ts";
@@ -67,9 +67,9 @@ async function compose(options: { prisma: PrismaClient; redis?: RedisConnection 
       auditLog: createApiFixture<AuditLogApi>(),
     },
     peers: {
-      users: {} as unknown as UserService,
+      users: {} as UserApi,
       auth: {} as unknown as AuthService,
-      projects: {} as unknown as ProjectService,
+      projects: {} as unknown as ProjectApi,
       apiKeys: createApiFixture<ApiKeyApi>(),
     },
     adminEmails: ["operator@acme.test"],

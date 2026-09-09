@@ -25,7 +25,7 @@ import {
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/runtime-composition";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 
 /** Reports the composition decision an absent collaborator would otherwise hide. */
 export abstract class ApiScimAbsenceReport {
@@ -59,7 +59,7 @@ export type ApiScimCompositionOptions = Readonly<{
   /** The grant ledger a directory push's membership consequence is written to. */
   grants: AuthzGrantsService | undefined;
   /** The user directory the members screen and the invitation write through. */
-  users: UserService | undefined;
+  users: UserApi | undefined;
   /** The session boundary a SCIM-managed email change severs. */
   auth: AuthService | undefined;
   /** Enterprise governance's department owner, and this family's whole gate. */

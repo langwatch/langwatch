@@ -31,7 +31,7 @@ import {
   type UpdateGatewayCacheRuleInput,
   type UpdateGatewayGuardrailInput,
 } from "@langwatch/gateway-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   GatewayBudgetRepository,
   type ArchiveBudgetInput,
@@ -55,7 +55,7 @@ export class GatewayService extends GatewayServiceContract {
 
   private constructor(
     private readonly repository: GatewayBudgetRepository,
-    private readonly projects: ProjectService,
+    private readonly projects: ProjectApi,
     private readonly cacheRules: GatewayCacheRuleService,
     private readonly guardrails: GatewayGuardrailService,
   ) {
@@ -64,7 +64,7 @@ export class GatewayService extends GatewayServiceContract {
 
   static create(input: {
     repository: GatewayBudgetRepository;
-    projects: ProjectService;
+    projects: ProjectApi;
     cacheRules: GatewayCacheRuleService;
     guardrails: GatewayGuardrailService;
   }): GatewayService {

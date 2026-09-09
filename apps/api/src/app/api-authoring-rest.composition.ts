@@ -3,7 +3,7 @@
  */
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { Logger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { WorkflowApp, WorkflowStudioDispatchService } from "@langwatch/workflow-server";
 
 import type { ApiHandlerManagedSessionPort } from "./api-handler-managed-session.ts";
@@ -61,7 +61,7 @@ export function composeApiAuthoringRest(options: {
   /** The SAME gateway the execution half resolves a run's models through. */
   modelProviders: ModelProviderService | undefined;
   /** The project directory a model resolution names a tenant through. */
-  projects: ProjectService | undefined;
+  projects: ProjectApi | undefined;
   /** The workflow application the `workflow.*` namespace answers from. */
   workflows: WorkflowApp | undefined;
   /** The studio dispatch this process composed, opened per run. */

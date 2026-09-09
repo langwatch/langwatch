@@ -10,7 +10,7 @@ import type {
   SimulationQueueRun,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AgentTestService } from "../../services/agent-test.service.ts";
@@ -38,7 +38,7 @@ function harness() {
     scenarios: {} as ScenarioService,
     scenarioExecution: {} as ScenarioExecutionService,
     scenarioTabs: {} as ScenarioTabRegistry,
-    users: {} as UserService,
+    users: {} as UserApi,
     resultAtoms: {} as ResultAtomsService,
     runConfigurations: {} as RunConfigurationsService,
     broadcast: {

@@ -7,9 +7,9 @@ import type { ProjectWithTeam } from "@langwatch/project-contract";
  * A policy is inherited down organization → team → department → project, and
  * every id on that chain is on the project row read with its team. That one
  * read is the only thing the resolution needs, so it is named here rather than
- * taken as a whole `ProjectService` — which would put the project write graph
+ * taken as a whole `ProjectApi` — which would put the project write graph
  * and, through it, an organization service and an authz service in a process
- * that only redacts spans. `ProjectService` and `ProjectMetadataService` both
+ * that only redacts spans. `ProjectApi` and `ProjectMetadataService` both
  * satisfy this.
  */
 export abstract class DataPrivacyProjectPort {

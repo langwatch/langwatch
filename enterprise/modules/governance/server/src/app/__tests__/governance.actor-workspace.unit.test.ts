@@ -11,7 +11,7 @@
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { OrganizationService, PersonalWorkspace } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   GovernanceApp,
@@ -54,8 +54,8 @@ function buildApp(options: {
   const app = GovernanceApp.create({
     governance: new TestGovernanceService(),
     projects: {
-      getOrganizationId: unreachable<ProjectService["getOrganizationId"]>(),
-      tryFindInternal: unreachable<ProjectService["tryFindInternal"]>(),
+      getOrganizationId: unreachable<ProjectApi["getOrganizationId"]>(),
+      findInternal: unreachable<ProjectApi["findInternal"]>(),
     },
     organizations: {
       ensurePersonalWorkspace: unreachable<OrganizationService["ensurePersonalWorkspace"]>(),

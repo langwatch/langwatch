@@ -15,7 +15,7 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import { resolveDataPrivacy } from "@langwatch/data-privacy-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { composeApiTraceReadStack } from "../../../app/api-trace-read-stack.composition.ts";
@@ -57,7 +57,7 @@ function readStackWith(granted: boolean) {
     } as unknown as AuthzService,
     projects: {
       tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "organization-1" } }),
-    } as unknown as ProjectService,
+    } as unknown as ProjectApi,
     dataPrivacy: testDataPrivacyApi(
       resolveDataPrivacy({
         rows: [],

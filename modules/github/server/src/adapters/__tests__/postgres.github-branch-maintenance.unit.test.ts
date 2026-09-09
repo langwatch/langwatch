@@ -2,7 +2,7 @@
  * Whether a process that holds nothing but a database can run the sweep.
  *
  * The sweep used to be reachable only through `PostgresGithubAdapter`, which
- * takes an `OrganizationService` and a `ProjectService` — so a worker could not
+ * takes an `OrganizationService` and a `ProjectApi` — so a worker could not
  * compose it without composing the application those two live in, even though
  * the sweep calls neither. The test that matters is therefore not "does it
  * construct": it is that a branch which is due maps all the way to a stored

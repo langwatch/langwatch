@@ -39,7 +39,7 @@ import {
 import type { LLMConfig, WorkflowService } from "@langwatch/workflow-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import { composeApiAuthoringModelResolver } from "../../app/api-authoring-model.composition.ts";
 import type { ApiTrpcPortsContext } from "../../app-trpc/app-trpc.context.ts";
@@ -163,7 +163,7 @@ import type { ComposedWorkflowFeature } from "./workflow.composition.types.ts";
  */
 export function composeWorkflowCommitMessages(options: {
   modelProviders: ModelProviderService | undefined;
-  projects: ProjectService | undefined;
+  projects: ProjectApi | undefined;
   nlpServiceUrl: string | undefined;
 }): WorkflowCommitMessageService | undefined {
   const resolveModel = composeApiAuthoringModelResolver(options);

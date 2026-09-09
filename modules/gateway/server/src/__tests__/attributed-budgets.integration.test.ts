@@ -31,7 +31,7 @@ import {
   testClickHouseUrl,
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
-import { TestProjectService } from "./support/test-project-service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 /**
  * A month cycle phased to the 17th at 09:00 UTC: far enough in the past
@@ -165,7 +165,7 @@ describe.skipIf(!databaseUrl || !chUrl)("attributed budgets and resets (real PG 
     chRepo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
     service = PrismaGatewayAdapter.create({
       database: prisma,
-      projects: new TestProjectService(),
+      projects: new TestProjectApi(),
       evaluators: {} as never,
       monitors: {} as never,
       changes: {} as never,

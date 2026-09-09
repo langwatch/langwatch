@@ -57,7 +57,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   PersonalUsageDashboardService,
   type PersonalUsageRollup,
@@ -219,7 +219,7 @@ export interface GovernanceAppDependencies {
    * and the organization's hidden governance project, which is the tenant an
    * ingestion source's usage rows land in.
    */
-  projects: Pick<ProjectService, "getOrganizationId" | "tryFindInternal">;
+  projects: Pick<ProjectApi, "getOrganizationId" | "findInternal">;
   /**
    * The member's personal workspace: created on demand when they mint their
    * first key, read as it stands when they open their own dashboard.

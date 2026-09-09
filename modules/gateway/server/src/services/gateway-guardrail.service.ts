@@ -14,7 +14,7 @@ import {
   serializeRowForAudit,
 } from "@langwatch/gateway-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { GatewayAuditPort } from "../ports/gateway-audit.port.ts";
 import { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository.ts";
 
@@ -24,7 +24,7 @@ export class GatewayGuardrailService {
     repository: GatewayGuardrailRepository;
     evaluators: EvaluatorService;
     monitors: MonitorApi;
-    projects: ProjectService;
+    projects: ProjectApi;
     audit: GatewayAuditPort;
   }): GatewayGuardrailService {
     return new GatewayGuardrailService(
@@ -40,7 +40,7 @@ export class GatewayGuardrailService {
     private readonly repository: GatewayGuardrailRepository,
     private readonly evaluators: EvaluatorService,
     private readonly monitors: MonitorApi,
-    private readonly projects: ProjectService,
+    private readonly projects: ProjectApi,
     private readonly audit: GatewayAuditPort,
   ) {}
 

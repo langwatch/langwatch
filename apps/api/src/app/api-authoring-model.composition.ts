@@ -4,7 +4,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 
 /**
@@ -20,7 +20,7 @@ export type ApiAuthoringModelResolver = (input: {
  */
 export function composeApiAuthoringModelResolver(options: {
   modelProviders: ModelProviderService | undefined;
-  projects: ProjectService | undefined;
+  projects: ProjectApi | undefined;
   nlpServiceUrl: string | undefined;
 }): ApiAuthoringModelResolver | undefined {
   const { modelProviders, projects, nlpServiceUrl } = options;

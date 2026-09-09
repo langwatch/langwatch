@@ -7,7 +7,7 @@ import {
   type RecordWorkspaceViewInput,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   AdminWorkspaceViewOcsfPort,
   GovernanceDiagnosticsPort,
@@ -26,7 +26,7 @@ export type { AdminWorkspaceKind, RecordWorkspaceViewInput };
 
 export interface AdminWorkspaceViewAuditDeps {
   prisma: object;
-  projects: ProjectService;
+  projects: ProjectApi;
   ocsfRepository?: AppGovernanceOcsfEventsAdapter;
 }
 

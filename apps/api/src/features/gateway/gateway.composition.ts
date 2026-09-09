@@ -8,7 +8,7 @@ import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-server";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
@@ -34,7 +34,7 @@ class ApiCapabilityUnavailableError extends HandledError {
 /** The other features' services the gateway reaches, named one by one. */
 export type GatewayPeers = Readonly<{
   /** The project directory a virtual key's scope is resolved against. */
-  projects: ProjectService;
+  projects: ProjectApi;
   /** The evaluators a guardrail rule runs, as the decision store reads them. */
   evaluators: EvaluatorService;
   /** The monitors a guardrail attachment names. */

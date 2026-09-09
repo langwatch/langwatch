@@ -35,7 +35,7 @@ import type {
   OrganizationRestInviteService,
   OrganizationRestService,
 } from "@langwatch/organization-server";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 
 import type { DashboardApi } from "@langwatch/dashboard-contract";
@@ -134,7 +134,7 @@ export type ApiRestServices = Readonly<{
         permissions: () => AuthzService;
         plans: () => PlanProvider;
         shares: () => ShareApi;
-        projects: () => ProjectService;
+        projects: () => ProjectApi;
         audit: AppRestManagementAuditPort;
         /**
          * The invitation half, where the process composed one. Absent, the

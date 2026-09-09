@@ -5,7 +5,7 @@ import type {
   Trigger,
 } from "@langwatch/automation-contract";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   GRAPH_TRIGGER_MAX_RESULT_ROWS,
   type GraphTriggerEvaluationDeps,
@@ -265,7 +265,7 @@ function makeHarness({
     customGraphs: { tryFindById: loadCustomGraph } as never,
     projects: {
       tryGetById: async () => project,
-    } as unknown as ProjectService,
+    } as unknown as ProjectApi,
     analytics: {
       getTimeseries,
     } as unknown as AnalyticsService,

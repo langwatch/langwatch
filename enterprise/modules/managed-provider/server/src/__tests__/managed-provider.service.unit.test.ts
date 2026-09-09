@@ -7,119 +7,20 @@ import {
   type ManagedProviderCredentials,
   ManagedProviderConfigurationReporter,
 } from "../index.ts";
-import { ProjectService } from "@langwatch/project-contract";
+import { TestProjectApi } from "./test-project-api.ts";
 
 class SilentReporter extends ManagedProviderConfigurationReporter {
   info(): void {}
   warn(): void {}
 }
 
-class Projects extends ProjectService {
-  tryFindInternal(): never {
-    throw new Error("Not used by this test");
-  }
-
-  ensureInternal(): never {
-    throw new Error("Not used by this test");
-  }
-
-  isPresenceEnabled(): never {
-    throw new Error("Not used by this test");
-  }
-
-  getById(): never {
-    throw new Error("Not used by this test");
-  }
-
-  getOrganizationId(): never {
-    throw new Error("Not used by this test");
-  }
-
-  async tryGetOrganizationId(): Promise<string> {
+class Projects extends TestProjectApi {
+  override async tryGetOrganizationId(): Promise<string> {
     return "org_1";
   }
 
-  async listPaths(): Promise<never[]> {
+  override async listPaths(): Promise<never[]> {
     return [];
-  }
-
-  updateSettings(): never {
-    throw new Error("Not used by this test");
-  }
-
-  regenerateLegacyProjectKey(): never {
-    throw new Error("Not used by this test");
-  }
-
-  requestTopicClustering(): never {
-    throw new Error("Not used by this test");
-  }
-
-  tryGetIdentity(): never {
-    throw new Error("Not used by this test");
-  }
-  tryGetById(): never {
-    throw new Error("Not used by this test");
-  }
-  tryGetSummaryById(): never {
-    throw new Error("Not used by this test");
-  }
-  getWithTeam(): never {
-    throw new Error("Not used by this test");
-  }
-  tryGetWithTeam(): never {
-    throw new Error("Not used by this test");
-  }
-  create(): never {
-    throw new Error("Not used by this test");
-  }
-  update(): never {
-    throw new Error("Not used by this test");
-  }
-  archive(): never {
-    throw new Error("Not used by this test");
-  }
-  listByOrganization(): never {
-    throw new Error("Not used by this test");
-  }
-  listByTeam(): never {
-    throw new Error("Not used by this test");
-  }
-  listNamesByIds(): never {
-    throw new Error("Not used by this test");
-  }
-  listIdsByOrganization(): never {
-    throw new Error("Not used by this test");
-  }
-  listActiveByScopes(): never {
-    throw new Error("Not used by this test");
-  }
-  updateMetadata(): never {
-    throw new Error("Not used by this test");
-  }
-  touchCodingAgentSessionSeen(): never {
-    throw new Error("Not used by this test");
-  }
-  touchCodingAgentPullRequestSeen(): never {
-    throw new Error("Not used by this test");
-  }
-  searchByQuery(): never {
-    throw new Error("Not used by this test");
-  }
-  tryGetTraceSharingConfig(): never {
-    throw new Error("Not used by this test");
-  }
-  resolveOrgAdmin(): never {
-    throw new Error("Not used by this test");
-  }
-  resolveTraceDestination(): never {
-    throw new Error("Not used by this test");
-  }
-  tryGetTraceDestination(): never {
-    throw new Error("Not used by this test");
-  }
-  listTraceDestinations(): never {
-    throw new Error("Not used by this test");
   }
 }
 

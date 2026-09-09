@@ -58,6 +58,7 @@ export {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   passkeySignUpRegistration,
+  type PasskeySignUpDirectory,
   type SignUpVerificationPort,
 } from "./transport/better-auth/passkey-sign-up.api.ts";
 export {

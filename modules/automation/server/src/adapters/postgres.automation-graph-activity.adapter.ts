@@ -63,7 +63,7 @@ export type AutomationGraphActivityDatabase = Pick<
  *
  * What a process supplies is what a process owns — a Prisma client, a clock,
  * the two capability services this feature reads through
- * (`ProjectService`/`AnalyticsService`), the outbound transports, and the
+ * (`ProjectApi`/`AnalyticsService`), the outbound transports, and the
  * cipher its stored credentials were written under. Nothing here reads an
  * environment, opens a connection or chooses a gateway, which is what lets a
  * test compose the whole vertical against fakes.

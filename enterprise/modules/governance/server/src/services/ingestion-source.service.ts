@@ -11,7 +11,7 @@ import {
   type GovernanceIngestionSource,
   type UpdateGovernanceIngestionSourceCommand,
 } from "@langwatch/enterprise-governance-contract";
-import { PROJECT_KIND, type ProjectService } from "@langwatch/project-contract";
+import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
 import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
 import type {
   IngestionSourceEntitlementsPort,
@@ -30,7 +30,7 @@ const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 export class IngestionSourceService {
   private constructor(
     private readonly repository: IngestionSourceRepository,
-    private readonly projects: ProjectService,
+    private readonly projects: ProjectApi,
     private readonly entitlements: IngestionSourceEntitlementsPort,
     private readonly lifecycle: IngestionSourceLifecyclePort,
     private readonly credentials: IngestionCredentialsService,
@@ -43,7 +43,7 @@ export class IngestionSourceService {
 
   static create(options: {
     repository: IngestionSourceRepository;
-    projects: ProjectService;
+    projects: ProjectApi;
     entitlements: IngestionSourceEntitlementsPort;
     lifecycle: IngestionSourceLifecyclePort;
     credentials: IngestionCredentialsService;

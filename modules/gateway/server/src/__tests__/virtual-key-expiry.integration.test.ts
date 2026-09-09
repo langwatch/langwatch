@@ -17,16 +17,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter.ts";
-import type { ProjectService } from "@langwatch/project-contract";
-import { TestProjectService } from "./support/test-project-service.ts";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "./support/test-project-api.ts";
 
 import { PostgresVirtualKeyAdapter } from "../testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
 const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
 /** A trace destination lookup that answers no archived projects, for keys created without one. */
-class NoTraceDestinationsProjectService extends TestProjectService {
-  listTraceDestinations(): ReturnType<ProjectService["listTraceDestinations"]> {
+class NoTraceDestinationsProjectService extends TestProjectApi {
+  listTraceDestinations(): ReturnType<ProjectApi["listTraceDestinations"]> {
     return Promise.resolve([]);
   }
 }
@@ -63,7 +63,7 @@ function codeOf(error: unknown): string | null {
 }
 
 describe.skipIf(!databaseUrl)("virtual key expiration dates (real PG)", () => {
-  const service = createVirtualKeyServiceForTest(prisma, new TestProjectService());
+  const service = createVirtualKeyServiceForTest(prisma, new TestProjectApi());
 
   beforeAll(async () => {
     await prisma.organization.create({
