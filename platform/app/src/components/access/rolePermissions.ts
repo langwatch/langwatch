@@ -185,6 +185,12 @@ const RESOURCE_COPY = {
     blurb: "The policies your organization holds its use of models to.",
     area: "Governance",
   },
+  governanceCost: {
+    label: "Governance cost",
+    blurb:
+      "Your organization's spend, as the provider billed it and as the gateway measured it.",
+    area: "Governance",
+  },
   ingestionSources: {
     label: "Ingestion sources",
     blurb: "Where governance data is collected from.",
