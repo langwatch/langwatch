@@ -155,7 +155,7 @@ provider/deployer record-keeping (Art. 18) map onto:
 - **Art. 12(2)(a) period of operation**: Apache 2.0 (trace timestamps in event_log)
 - **Art. 12(2)(b) reference DB used**: Apache 2.0 (`gen_ai.system` + `gen_ai.request.model` attrs on each span)
 - **Art. 12(2)(c) input data check**: Apache 2.0 (prompt + tool-call payloads on traces, redacted via Presidio)
-- **Art. 12(2)(d) human oversight**: **Enterprise** anomaly-rule webhook dispatch (it delivers the flagged event to a URL you control; the human review of what arrives there is your receiving process, not something LangWatch performs or records), with OCSF/SIEM forwarding of governance events alongside it. The two are separate paths: anomaly alerts arrive over the webhook, never as a record in the OCSF export
+- **Art. 12(2)(d) human oversight**: **Enterprise** anomaly-rule webhook dispatch (it delivers the flagged event to a URL you control; the human review of what arrives there is your receiving process, not something LangWatch performs or records today), with OCSF/SIEM forwarding of governance events alongside it. The two are separate paths: anomaly alerts arrive over the webhook, never as a record in the OCSF export
 - **Art. 18(1) record-keeping ≥10y**: Enterprise extended retention policies, with windows set in years to match the record-keeping clause your assessment requires.
 
 Most enterprise-deploying-an-LLM-agent uses fall under Art. 12 (1-3
