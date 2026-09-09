@@ -916,9 +916,11 @@ function InventoryTabLabel({
 /**
  * The inventory's tab shell.
  *
- * Counts sit on a tab only where the pane's own list is already loaded, which
- * is Catalog and Sources — both read the source list the page holds anyway.
- * Environments is derived from that same list, so it counts too.
+ * Counts sit on a tab only where that pane's own list has actually answered.
+ * Environments is derived from the source list rather than read separately, so
+ * it counts exactly when Sources counts and goes blank whenever Sources does —
+ * one silence cannot be reported as a number on one tab and as nothing on the
+ * tab beside it.
  */
 function InventoryTabs({
   inventoryTab,
@@ -1311,17 +1313,22 @@ function InventorySummaryStrip({
   environments: readonly EnvironmentRow[];
   sources: readonly Source[] | undefined;
 }) {
+  // Environments are derived from the source list, so an unanswered source
+  // read leaves them unmeasured rather than empty. Without this the strip said
+  // "0 environments" beside a dashed source count, off the same silence.
+  const environmentsMeasured = sources !== undefined;
   return (
     <GovernanceSummaryBar
       testId="inventory-summary"
       items={inventorySummaryItems({
         cards,
-        environmentCount: environments.length,
+        environmentCount: environmentsMeasured ? environments.length : null,
         // Sample environments are wholly invented, so none of them was typed
         // in by this reader and all of them count as discovered.
-        discoveredEnvironmentCount:
-          environments.length -
-          (page.sample.active ? 0 : page.addedEnvironments.length),
+        discoveredEnvironmentCount: environmentsMeasured
+          ? environments.length -
+            (page.sample.active ? 0 : page.addedEnvironments.length)
+          : null,
         sourceCount: sources?.length ?? null,
         activeSourceCount:
           sources?.filter((source) => source.status === "active").length ??
@@ -1383,7 +1390,9 @@ function InventoryPage() {
           inventoryTab={inventoryTab}
           selectInventoryTab={selectInventoryTab}
           catalogCount={cards?.length}
-          environmentCount={environments.length}
+          // Derived from the source list, so it goes uncounted on the same
+          // silence that leaves the Sources tab uncounted beside it.
+          environmentCount={sources === undefined ? undefined : environments.length}
           sourceCount={sources?.length}
           catalog={<InventoryCatalogPane page={page} />}
           environments={

@@ -50,9 +50,18 @@ export function inventorySummaryItems({
 }: {
   /** The catalog's cards, or null when the reader cannot see the registry. */
   cards: readonly ToolCard[] | null;
-  environmentCount: number;
+  /**
+   * Null while the source list is loading or failed.
+   *
+   * Environments are DERIVED from that same list, so they inherit its
+   * unreadability. An unanswered read makes the derivation return an empty
+   * array, and counting that would have put "0 environments" next to a dashed
+   * source count — the same read, answered two different ways, with the
+   * environments half stating a measurement it does not have.
+   */
+  environmentCount: number | null;
   /** Environments derived from a source, as opposed to typed in by hand. */
-  discoveredEnvironmentCount: number;
+  discoveredEnvironmentCount: number | null;
   /** Null while the source list is loading or failed. */
   sourceCount: number | null;
   activeSourceCount: number | null;
@@ -68,7 +77,10 @@ export function inventorySummaryItems({
       key: "environments",
       value: environmentCount,
       label: environmentCount === 1 ? "environment" : "environments",
-      hint: `${discoveredEnvironmentCount} discovered from your sources`,
+      hint:
+        discoveredEnvironmentCount === null
+          ? undefined
+          : `${discoveredEnvironmentCount} discovered from your sources`,
     },
     {
       key: "sources",

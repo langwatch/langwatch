@@ -97,4 +97,44 @@ describe("given an admin on the Inventory page", () => {
       );
     });
   });
+
+  describe("when the source read has not answered yet", () => {
+    // The third way to a false zero, and the one that survived the first two
+    // fixes: environments are not read, they are DERIVED from the source list.
+    // An unanswered source read makes that derivation return an empty array,
+    // so the strip said "0 environments" immediately beside the dash it had
+    // correctly drawn for sources — one silence, reported two ways.
+    /** @scenario "A figure the page cannot measure is a dash, never a zero" */
+    it("draws a dash for environments whenever it draws one for sources", () => {
+      harness.sources = { data: undefined, isLoading: true, error: null };
+      renderScreen();
+
+      const strip = screen.getByTestId("inventory-summary");
+      expect(within(strip).queryByText(/^0 discovered/)).toBeNull();
+      expect(strip.textContent).not.toMatch(/0environments/);
+      // Both halves of the derivation say the same thing.
+      expect(within(strip).getAllByText("—").length).toBeGreaterThanOrEqual(2);
+      // And the tab badge agrees with the tab beside it.
+      expect(
+        screen.getByRole("tab", { name: /^Environments/ }).textContent,
+      ).toBe("Environments");
+      expect(screen.getByRole("tab", { name: /^Sources/ }).textContent).toBe(
+        "Sources",
+      );
+    });
+
+    /** @scenario "A figure the page cannot measure is a dash, never a zero" */
+    it("draws a dash for environments when the source read failed", () => {
+      harness.sources = {
+        data: undefined,
+        isLoading: false,
+        error: new Error("source list unavailable"),
+      };
+      renderScreen();
+
+      const strip = screen.getByTestId("inventory-summary");
+      expect(strip.textContent).not.toMatch(/0environments/);
+      expect(within(strip).queryByText(/^0 discovered/)).toBeNull();
+    });
+  });
 });
