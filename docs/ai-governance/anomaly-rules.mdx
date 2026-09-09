@@ -149,7 +149,9 @@ A destination that never succeeds is logged and recorded on the alert. It does n
 
 Requests go out through the same server-side-request-forgery guard the ingestion pullers use: the destination is resolved and its address pinned.
 
-A URL resolving to a private or link-local address is refused and recorded as a failed delivery when `BLOCK_LOCAL_HTTP_CALLS` is on, which it is on LangWatch Cloud. Self-hosted, that refusal only applies if you set the flag, and a host listed in `ALLOWED_PROXY_HOSTS` is allowed either way. Cloud metadata addresses are the exception: they are refused regardless of either setting and cannot be allow-listed.
+A URL resolving to a private or link-local address is refused and recorded as a failed delivery when `BLOCK_LOCAL_HTTP_CALLS` is on, which it is on LangWatch Cloud. Self-hosted, that refusal only applies if you set the flag, and a host listed in `ALLOWED_PROXY_HOSTS` is allowed either way.
+
+The cloud metadata hostnames and addresses themselves are refused regardless of either setting and cannot be allow-listed. An allow-listed name is trusted as written, without a lookup of where it resolves, so only allow-list names you control.
 
 ## Where an existing rule's alerts go
 
