@@ -16,9 +16,13 @@
  * was refused, which is a detail about our integration rather than about their
  * data, and there is nothing they do differently for a 403 than for a 401.
  * `ee/governance/__tests__/listingOutcomePrivacy.guard.unit.test.ts` holds that
- * line by scanning the customer trees for the column name; this file is on the
- * other side of that boundary, which is exactly why the branching belongs here
- * rather than in the page.
+ * line two ways, and THIS FILE IS INSIDE BOTH of them rather than exempt from
+ * either. It scans the whole application for the column name, so widening
+ * {@link AgentsListingSummary} by one column fails it here; and it drives the
+ * read behind this function against a row carrying a sentinel status, so
+ * carrying that status out under some other name fails it too. The branching
+ * belongs here rather than in the page because this is where the vocabulary
+ * narrows, not because this side of the line is unwatched.
  *
  * THERE IS NO `empty` OUTCOME, here or in the log. A provider that answered
  * with an empty list LISTED, with a count of zero, and that is a real answer

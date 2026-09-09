@@ -41,10 +41,17 @@ Feature: Governance samples respect the connected source's data
     Then both measurements remain visible as zero
 
   @unit @regression
+  Scenario: The scan reaches the whole application
+    Given the operator-only columns are searched for across the product
+    When the application is scanned for the operator-only columns
+    Then thousands of authored files are searched before any verdict is given
+    And both source roots are represented among them
+
+  @unit @regression
   Scenario: An operator-only HTTP status never reaches a customer
     Given a listing outcome recorded with the provider's raw HTTP status
-    When a customer-facing surface is built
-    Then no customer-facing file names the status columns
+    When the application is scanned for the operator-only columns
+    Then the status columns are named only where they are produced
     And the customer is shown the outcome and a sentence they can act on
 
   @unit @regression
@@ -55,9 +62,16 @@ Feature: Governance samples respect the connected source's data
     And no mirror field carries one of them under another name
 
   @unit @regression
+  Scenario: The read that feeds the agents screen stays two columns wide
+    Given a stored run status carrying the provider's raw HTTP status
+    When a customer-facing surface is built
+    Then the agents listing read selects only the outcome and the reason
+    And nothing it returns carries the status under any name
+
+  @unit @regression
   Scenario: The erasure count never rides a span
-    Given every command that exports a telemetry span
+    Given every ingestion pull command that exports a telemetry span
     When its span attributes are collected
-    Then the attribute keys are exactly those declared for that command
-    And the withheld person count is not among them
+    Then the attribute names and values are exactly those declared for that command
+    And no exported figure moves with the withheld person count
 
