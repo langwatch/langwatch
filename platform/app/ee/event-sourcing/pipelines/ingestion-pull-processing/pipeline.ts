@@ -48,7 +48,10 @@ import {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusFoldProjection,
 } from "./projections/ingestionPullRunStatus.foldProjection";
-import { INGESTION_PULL_EVENT_TYPES } from "./schemas/constants";
+import {
+  INGESTION_PULL_EVENT_TYPES,
+  INGESTION_PULL_PROCESSING_PIPELINE_NAME,
+} from "./schemas/constants";
 import type { IngestionPullProcessingEvent } from "./schemas/events";
 
 /** Only the executor dependencies are injected — the process-manager
@@ -141,7 +144,7 @@ export function createIngestionPullProcessingPipeline(
   deps: IngestionPullProcessingPipelineDeps,
 ) {
   return definePipeline<IngestionPullProcessingEvent>()
-    .withName("ingestion_pull_processing")
+    .withName(INGESTION_PULL_PROCESSING_PIPELINE_NAME)
     .withAggregateType("ingestion_pull")
     .withProjection(
       "ingestionPullRunStatus",

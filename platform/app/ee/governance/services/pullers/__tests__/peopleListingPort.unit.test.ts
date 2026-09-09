@@ -54,15 +54,45 @@ describe("createPeopleListingPort", () => {
     });
   });
 
-  it("reports the recorded count on the listed arm", async () => {
-    syncFromSource.mockResolvedValue({ outcome: "listed", recorded: 42 });
+  it("reports what the provider named and what was withheld", async () => {
+    syncFromSource.mockResolvedValue({
+      outcome: "listed",
+      recorded: 42,
+      named: 42,
+      withheld: 0,
+    });
     const port = createPeopleListingPort({
       prisma: prismaWith({ organizationId: "org-1" }),
     });
 
     await expect(port.list({ sourceId: "src-1" })).resolves.toEqual({
       outcome: "listed",
-      personCount: 42,
+      directoryPersonCount: 42,
+      withheldPersonCount: 0,
+    });
+  });
+
+  /**
+   * The lossy case, pinned at the seam that used to lose it: the provider named
+   * five hundred and this deployment stored one. The port must pass on the five
+   * hundred, because `recorded` is the number that cannot be recovered from and
+   * the one a screen would otherwise report as the provider's answer.
+   */
+  it("passes on the provider's count when suppression withheld most of it", async () => {
+    syncFromSource.mockResolvedValue({
+      outcome: "listed",
+      recorded: 1,
+      named: 500,
+      withheld: 499,
+    });
+    const port = createPeopleListingPort({
+      prisma: prismaWith({ organizationId: "org-1" }),
+    });
+
+    await expect(port.list({ sourceId: "src-1" })).resolves.toEqual({
+      outcome: "listed",
+      directoryPersonCount: 500,
+      withheldPersonCount: 499,
     });
   });
 
@@ -72,11 +102,12 @@ describe("createPeopleListingPort", () => {
       prisma: prismaWith({ organizationId: "org-1" }),
     });
 
-    // A refusal takes the other arm, so a zero here can only mean the provider
-    // answered and named nobody.
+    // A refusal takes the other arm, so zeroes here can only mean the provider
+    // answered and named nobody, with none withheld.
     await expect(port.list({ sourceId: "src-1" })).resolves.toEqual({
       outcome: "listed",
-      personCount: 0,
+      directoryPersonCount: 0,
+      withheldPersonCount: 0,
     });
   });
 

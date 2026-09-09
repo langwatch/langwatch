@@ -73,10 +73,23 @@ export interface AgentListingPort {
  * not have to check which list a `count` belongs to.
  */
 export interface PeopleListingPort {
-  list(params: {
-    sourceId: string;
-  }): Promise<
-    | { outcome: "listed"; personCount: number }
+  list(params: { sourceId: string }): Promise<
+    | {
+        outcome: "listed";
+        /** Everyone the provider's directory named. A fact about the provider. */
+        directoryPersonCount: number;
+        /**
+         * How many of the people named above this deployment does not hold,
+         * because erasure suppression removed them. A fact about our own
+         * obligations, not about the provider.
+         *
+         * A SUBSET of `directoryPersonCount`, never an addition to it. Adding
+         * the two counts the same people twice. Subtracting is the valid
+         * arithmetic. Safe to show as a CURRENT figure, never as a series:
+         * see the field doc on the event schema for why.
+         */
+        withheldPersonCount: number;
+      }
     | { outcome: "refused"; reason: string; status: number | null }
   >;
 }
@@ -117,7 +130,8 @@ export interface IngestionPullOutcomeCommands {
     sourceId: string;
     requestId: string;
     requestedAt: number;
-    personCount: number;
+    directoryPersonCount: number;
+    withheldPersonCount: number;
   }): Promise<void>;
   recordPeopleListingRefused(args: {
     tenantId: string;
@@ -262,8 +276,16 @@ function retryOrGiveUp({
 }
 
 /** What a listing port answered, with the count named the same either way. */
-type ListingOutcome =
-  | { outcome: "listed"; count: number }
+/**
+ * `Counts` is whatever the listed arm of one entity's port reports, passed
+ * through untouched. It is generic because the two entities do not count the
+ * same way: an agent listing has one number, and a people listing has two,
+ * since what the provider named and what this deployment stored differ by the
+ * erasure check. Flattening both to a single `count` is what made the people
+ * event lossy in the first place.
+ */
+type ListingOutcome<Counts> =
+  | { outcome: "listed"; counts: Counts }
   | { outcome: "refused"; reason: string; status: number | null };
 
 interface ListingOutcomeEnvelope {
@@ -289,14 +311,14 @@ interface ListingOutcomeEnvelope {
  * the outcome commands carry deterministic idempotency keys, so a redelivery
  * cannot write a second outcome event for one request.
  */
-function createListingHandler(
+function createListingHandler<Counts>(
   deps: IngestionPullDispatchDeps,
   listing: {
     what: string;
-    list: (sourceId: string) => Promise<ListingOutcome>;
+    list: (sourceId: string) => Promise<ListingOutcome<Counts>>;
     recordListed: (
       commands: IngestionPullOutcomeCommands,
-      args: ListingOutcomeEnvelope & { count: number },
+      args: ListingOutcomeEnvelope & Counts,
     ) => Promise<void>;
     recordRefused: (
       commands: IngestionPullOutcomeCommands,
@@ -322,7 +344,7 @@ function createListingHandler(
       requestedAt: payload.requestedAt,
     };
 
-    let result: ListingOutcome;
+    let result: ListingOutcome<Counts>;
     try {
       result = await listing.list(payload.sourceId);
     } catch (error) {
@@ -360,7 +382,7 @@ function createListingHandler(
     await listing.recordListed(commands, {
       ...outcomeEnvelope,
       occurredAt: clock(),
-      count: result.count,
+      ...result.counts,
     });
   };
 }
@@ -374,16 +396,15 @@ function createListingHandler(
 export function createAgentListingHandler(
   deps: IngestionPullDispatchDeps,
 ): IntentExecutor<IngestionPullListingIntent> {
-  return createListingHandler(deps, {
+  return createListingHandler<{ agentCount: number }>(deps, {
     what: "Agent",
     list: async (sourceId) => {
       const result = await deps.agentListingPort.list({ sourceId });
       return result.outcome === "refused"
         ? result
-        : { outcome: "listed", count: result.agentCount };
+        : { outcome: "listed", counts: { agentCount: result.agentCount } };
     },
-    recordListed: (commands, { count, ...rest }) =>
-      commands.recordAgentsListed({ ...rest, agentCount: count }),
+    recordListed: (commands, args) => commands.recordAgentsListed(args),
     recordRefused: (commands, args) =>
       commands.recordAgentsListingRefused(args),
   });
@@ -392,23 +413,33 @@ export function createAgentListingHandler(
 /**
  * The `listPeople` intent executor.
  *
- * The count it records is what was WRITTEN, not what the provider named: the
- * service drops anyone on the erasure suppression list before recording, and
- * this event must not report people this deployment deliberately did not keep.
+ * Two counts reach the event, not one. What the provider named and what this
+ * deployment stored differ by the erasure suppression the service applies
+ * before writing, and recording only the survivors would destroy the
+ * provider's number at write time: a tenant that erased its whole staff would
+ * be indistinguishable from a provider that named nobody.
  */
 export function createPeopleListingHandler(
   deps: IngestionPullDispatchDeps,
 ): IntentExecutor<IngestionPullListingIntent> {
-  return createListingHandler(deps, {
+  return createListingHandler<{
+    directoryPersonCount: number;
+    withheldPersonCount: number;
+  }>(deps, {
     what: "People",
     list: async (sourceId) => {
       const result = await deps.peopleListingPort.list({ sourceId });
       return result.outcome === "refused"
         ? result
-        : { outcome: "listed", count: result.personCount };
+        : {
+            outcome: "listed",
+            counts: {
+              directoryPersonCount: result.directoryPersonCount,
+              withheldPersonCount: result.withheldPersonCount,
+            },
+          };
     },
-    recordListed: (commands, { count, ...rest }) =>
-      commands.recordPeopleListed({ ...rest, personCount: count }),
+    recordListed: (commands, args) => commands.recordPeopleListed(args),
     recordRefused: (commands, args) =>
       commands.recordPeopleListingRefused(args),
   });

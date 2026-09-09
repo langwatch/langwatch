@@ -215,13 +215,16 @@ export const RecordIngestionPullPeopleListedCommand = defineCommand({
       sourceId: data.sourceId,
       suffix: `${data.requestId}:people_listed`,
     }),
-  // A count, never a name. The people themselves are rows in the identity
+  // Counts, never a name. The people themselves are rows in the identity
   // tables behind the erasure machinery; a span is neither erasable nor
-  // scoped, so nothing about a person may travel on one.
+  // scoped, so nothing about a person may travel on one. Both counts are
+  // carried under names that say which is which, so a trace cannot be read
+  // as the provider having named only the people we kept.
   spanAttributes: (data) => ({
     "payload.source_id": data.sourceId,
     "payload.request_id": data.requestId,
-    "payload.person_count": data.personCount,
+    "payload.directory_person_count": data.directoryPersonCount,
+    "payload.withheld_person_count": data.withheldPersonCount,
   }),
   makeJobId: (data) =>
     identity({

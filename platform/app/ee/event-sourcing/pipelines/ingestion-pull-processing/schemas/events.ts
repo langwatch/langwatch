@@ -165,16 +165,39 @@ export type IngestionPullPeopleListingRequestedEventData = z.infer<
 export const ingestionPullPeopleListedEventDataSchema = listingEnvelope.extend({
   requestedAt: z.number(),
   /**
-   * How many people were recorded from what the provider named. Zero is the
-   * whole of "the provider returned an empty list": a refusal never reaches
-   * this event, so a zero here cannot mean anything else.
+   * Everyone the provider's directory named. A fact about the provider, and
+   * the direct counterpart of `agentCount`.
    *
-   * It counts what was RECORDED, not what was listed, and those differ by the
-   * erasure suppression the sync passes through. A tenant that erased everyone
-   * a provider still lists reads as a listing of zero, which is the honest
-   * number for what this deployment now knows.
+   * Zero is the whole of "the provider returned an empty list": a refusal
+   * never reaches this event, so a zero here cannot mean anything else.
+   *
+   * `withheldPersonCount` is a SUBSET of this number, never an addition to
+   * it. Adding the two counts the same people twice. Subtracting is the valid
+   * arithmetic: what this deployment holds is the directory count minus the
+   * withheld count, which is why that total is derived and not a third field.
    */
-  personCount: z.number().int().nonnegative(),
+  directoryPersonCount: z.number().int().nonnegative(),
+  /**
+   * How many of the people named above this deployment does not hold, because
+   * erasure suppression removed them. A fact about our own obligations, not
+   * about the provider.
+   *
+   * A SUBSET of `directoryPersonCount`, never an addition to it. Adding the
+   * two counts the same people twice. Subtracting is the valid arithmetic.
+   *
+   * Both numbers travel because the surviving total alone is lossy: a tenant
+   * that erased everyone a provider still lists would otherwise read as a
+   * provider naming nobody, which is a false statement about a system working
+   * exactly as intended, and it sends an admin to debug a healthy provider.
+   *
+   * Safe to record because it is a count carrying no identity, and safe to
+   * show as a CURRENT figure. It must never be shown as a series: this number
+   * moving from zero to one at a known moment says an erasure happened then,
+   * which on a small tenant identifies the person as surely as a name would.
+   * So no trend line, no history drawer, no per-run export, and never beside
+   * a per-person list, where a drop from 500 to 499 is the same disclosure.
+   */
+  withheldPersonCount: z.number().int().nonnegative(),
 });
 export type IngestionPullPeopleListedEventData = z.infer<
   typeof ingestionPullPeopleListedEventDataSchema

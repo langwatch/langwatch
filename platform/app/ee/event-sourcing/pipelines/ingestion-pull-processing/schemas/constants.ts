@@ -96,6 +96,23 @@ export const INGESTION_PULL_EVENT_VERSIONS = {
  * RUN_STATUS moved to 2026-08-28 with `LastSuccessAt` (ADR-128): the column
  * is derivable from the existing event log, so replay backfills it and no
  * source has to fail three more times before its health is knowable.
+ *
+ * RUN_STATUS deliberately did NOT move when the listing columns and the
+ * read-through and completeness columns were added, and the reason is the
+ * same test that moved it last time: a bump says replay will produce
+ * different rows. Neither change makes that true. The listing events are new,
+ * so no history holds one to fold; the read-through and completeness fields
+ * are optional additions to run-completed, so events already written do not
+ * carry them. A replay would cost a full pass over the log and change
+ * nothing, while telling whoever ran it that something was recovered.
+ *
+ * Every one of those columns is nullable and null is a meaningful reading of
+ * each: no listing has been recorded for this source, and the completeness of
+ * the last run is unknown. That is the truth for a source whose history
+ * predates the columns, so leaving the rows alone states it correctly.
+ *
+ * Move this the day a listing column becomes derivable from events already in
+ * the log.
  */
 export const INGESTION_PULL_PROJECTION_VERSIONS = {
   RUN_STATUS: "2026-08-28",
@@ -109,6 +126,26 @@ export type IngestionPullRunOutcome =
   (typeof INGESTION_PULL_RUN_OUTCOME)[keyof typeof INGESTION_PULL_RUN_OUTCOME];
 
 /**
+ * What the last listing of one kind did, as stored on the run-status row.
+ *
+ * Kept apart from `INGESTION_PULL_RUN_OUTCOME` rather than sharing its values,
+ * because a listing and a pull are different scopes on the same connection: a
+ * credential that cannot enumerate a directory still pulls cost perfectly. Two
+ * vocabularies make it impossible to write a listing outcome into a pull
+ * column, or to read one as the source having failed to pull.
+ *
+ * There is no `empty` here on purpose. An empty directory is a LISTED outcome
+ * with a count of zero, which is a real answer from a working provider. A
+ * refusal is the outcome that has no count at all.
+ */
+export const INGESTION_PULL_LISTING_OUTCOME = {
+  LISTED: "listed",
+  REFUSED: "refused",
+} as const;
+export type IngestionPullListingOutcome =
+  (typeof INGESTION_PULL_LISTING_OUTCOME)[keyof typeof INGESTION_PULL_LISTING_OUTCOME];
+
+/**
  * The refusal reason for a listing that never reached the provider — our own
  * side gave out, after retries. Kept apart from the provider's own reasons
  * (`ListingRefusalReason`) so a reader can tell "your credential was rejected"
@@ -119,3 +156,20 @@ export type IngestionPullRunOutcome =
  * about whether it was asking for agents or for people.
  */
 export const LISTING_FAILED_REASON = "listing_failed";
+
+/**
+ * The name this pipeline is registered under, and the name a caller has to
+ * dispatch against to reach it.
+ *
+ * It lives here rather than in `pipeline.ts` because a caller outside this
+ * directory needs it, and importing it from `pipeline.ts` would pull the
+ * commands, the projection and the whole process manager into every
+ * request-serving process, including ones where event sourcing is off. This
+ * file imports nothing, so naming the pipeline costs a caller nothing.
+ *
+ * The point of exporting it at all: a copied string literal turns a rename
+ * into a runtime refusal on somebody's first button press, rather than a
+ * compile error here.
+ */
+export const INGESTION_PULL_PROCESSING_PIPELINE_NAME =
+  "ingestion_pull_processing";

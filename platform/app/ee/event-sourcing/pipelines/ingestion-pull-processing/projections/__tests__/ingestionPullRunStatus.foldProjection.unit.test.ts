@@ -553,4 +553,370 @@ describe("IngestionPullRunStatusFoldProjection", () => {
       });
     });
   });
+  describe("given a source whose pull is working", () => {
+    const configured = projection.apply(
+      projection.init(),
+      event("lw.obs.ingestion_pull.configured", {
+        sourceId: "source-1",
+        cron: "*/15 * * * *",
+        configVersion: "v1",
+        cursor: "cursor-A",
+      }),
+    );
+    /** A row with real pull history, so "the listing left it alone" can fail. */
+    const pulled = projection.apply(
+      configured,
+      event(
+        "lw.obs.ingestion_pull.run_completed",
+        {
+          sourceId: "source-1",
+          runId: "2000",
+          scheduledFor: 2_000,
+          nextCursor: "cursor-B",
+          eventCount: 5,
+        },
+        2_100,
+      ),
+    );
+
+    /**
+     * Everything a health reader or the `IngestionSource` mirror looks at. A
+     * listing is a different scope on the same connection, so none of it may
+     * move when one lands.
+     */
+    const PULL_FIELDS = [
+      "Enabled",
+      "Cron",
+      "Cursor",
+      "LastRunAt",
+      "LastRunOutcome",
+      "LastRunEventCount",
+      "LastRunError",
+      "LastRunErrorCode",
+      "ConsecutiveErrors",
+      "LastSuccessAt",
+      "LastRunScheduledFor",
+    ] as const;
+
+    const pullFields = (state: IngestionPullRunStatusData) =>
+      Object.fromEntries(PULL_FIELDS.map((key) => [key, state[key]]));
+
+    const AGENTS_FIELDS = [
+      "LastAgentsListingAt",
+      "LastAgentsListingOutcome",
+      "LastAgentsListingCount",
+      "LastAgentsListingReason",
+      "LastAgentsListingStatus",
+    ] as const;
+
+    const agentsFields = (state: IngestionPullRunStatusData) =>
+      Object.fromEntries(AGENTS_FIELDS.map((key) => [key, state[key]]));
+
+    const PEOPLE_FIELDS = [
+      "LastPeopleListingAt",
+      "LastPeopleListingOutcome",
+      "LastPeopleDirectoryCount",
+      "LastPeopleWithheldCount",
+      "LastPeopleListingReason",
+      "LastPeopleListingStatus",
+    ] as const;
+
+    const peopleFields = (state: IngestionPullRunStatusData) =>
+      Object.fromEntries(PEOPLE_FIELDS.map((key) => [key, state[key]]));
+
+    const listAgents = ({
+      state,
+      agentCount,
+      occurredAt = 3_000,
+    }: {
+      state: IngestionPullRunStatusData;
+      agentCount: number;
+      occurredAt?: number;
+    }) =>
+      projection.apply(
+        state,
+        event(
+          "lw.obs.ingestion_pull.agents_listed",
+          {
+            sourceId: "source-1",
+            requestId: `req-${occurredAt}`,
+            requestedAt: occurredAt - 100,
+            agentCount,
+          },
+          occurredAt,
+        ),
+      );
+
+    const refuseAgents = ({
+      state,
+      reason = "insufficient_scope",
+      status = 403,
+      occurredAt = 3_000,
+    }: {
+      state: IngestionPullRunStatusData;
+      reason?: string;
+      status?: number | null;
+      occurredAt?: number;
+    }) =>
+      projection.apply(
+        state,
+        event(
+          "lw.obs.ingestion_pull.agents_listing_refused",
+          {
+            sourceId: "source-1",
+            requestId: `req-${occurredAt}`,
+            requestedAt: occurredAt - 100,
+            reason,
+            status,
+          },
+          occurredAt,
+        ),
+      );
+
+    const listPeople = ({
+      state,
+      directoryPersonCount,
+      withheldPersonCount = 0,
+      occurredAt = 4_000,
+    }: {
+      state: IngestionPullRunStatusData;
+      directoryPersonCount: number;
+      withheldPersonCount?: number;
+      occurredAt?: number;
+    }) =>
+      projection.apply(
+        state,
+        event(
+          "lw.obs.ingestion_pull.people_listed",
+          {
+            sourceId: "source-1",
+            requestId: `req-${occurredAt}`,
+            requestedAt: occurredAt - 100,
+            directoryPersonCount,
+            withheldPersonCount,
+          },
+          occurredAt,
+        ),
+      );
+
+    const refusePeople = ({
+      state,
+      reason = "insufficient_scope",
+      status = 403,
+      occurredAt = 4_000,
+    }: {
+      state: IngestionPullRunStatusData;
+      reason?: string;
+      status?: number | null;
+      occurredAt?: number;
+    }) =>
+      projection.apply(
+        state,
+        event(
+          "lw.obs.ingestion_pull.people_listing_refused",
+          {
+            sourceId: "source-1",
+            requestId: `req-${occurredAt}`,
+            requestedAt: occurredAt - 100,
+            reason,
+            status,
+          },
+          occurredAt,
+        ),
+      );
+
+    describe("when nothing has ever been listed", () => {
+      it("says so with null rather than with a count of zero", () => {
+        // Zero would claim the provider named nobody. Never having asked and
+        // having asked and been told nobody are different facts, and only one
+        // of them means somebody should go look at the connection.
+        expect(pulled.LastAgentsListingOutcome).toBeNull();
+        expect(pulled.LastAgentsListingCount).toBeNull();
+        expect(pulled.LastPeopleListingOutcome).toBeNull();
+        expect(pulled.LastPeopleDirectoryCount).toBeNull();
+        expect(pulled.LastPeopleWithheldCount).toBeNull();
+      });
+    });
+
+    describe("when an agents listing is refused", () => {
+      it("leaves the pull unchanged, because the credential still pulls cost", () => {
+        // The fixture has to carry real pull history or this proves nothing.
+        expect(pulled.Cursor).toBe("cursor-B");
+        expect(pulled.LastRunScheduledFor).toBe(2_000);
+        expect(pulled.LastSuccessAt).toBe(2_100);
+
+        const refused = refuseAgents({ state: pulled });
+
+        expect(pullFields(refused)).toEqual(pullFields(pulled));
+        expect(buildIngestionSourceMirror({ state: refused })).toEqual(
+          buildIngestionSourceMirror({ state: pulled }),
+        );
+        expect(
+          deriveSourceHealth({
+            consecutiveFailures: refused.ConsecutiveErrors,
+          }),
+        ).toBe("healthy");
+      });
+
+      it("stamps no scheduled-for, so it cannot supersede a later run", () => {
+        // LastRunScheduledFor is the fence isSuperseded reads. A listing
+        // carries no run, so writing one would freeze Cursor at the listing
+        // and every later run outcome would be discarded as stale.
+        const refused = refuseAgents({ state: pulled, occurredAt: 9_999 });
+        expect(refused.LastRunScheduledFor).toBe(2_000);
+
+        const laterRun = projection.apply(
+          refused,
+          event(
+            "lw.obs.ingestion_pull.run_completed",
+            {
+              sourceId: "source-1",
+              runId: "3000",
+              scheduledFor: 3_000,
+              nextCursor: "cursor-C",
+              eventCount: 2,
+            },
+            10_000,
+          ),
+        );
+
+        expect(laterRun.Cursor).toBe("cursor-C");
+      });
+
+      it("records the reason with no count, so it cannot read as an empty tenant", () => {
+        const listed = listAgents({ state: pulled, agentCount: 12 });
+        const refused = refuseAgents({
+          state: listed,
+          reason: "insufficient_scope",
+          status: 403,
+          occurredAt: 5_000,
+        });
+
+        expect(refused.LastAgentsListingOutcome).toBe("refused");
+        expect(refused.LastAgentsListingReason).toBe("insufficient_scope");
+        expect(refused.LastAgentsListingStatus).toBe(403);
+        // The earlier 12 must not survive beside a refusal: a stale count next
+        // to "refused" reads as a refusal that also returned twelve agents.
+        expect(refused.LastAgentsListingCount).toBeNull();
+      });
+    });
+
+    describe("when an agents listing succeeds and finds nobody", () => {
+      it("records zero, which is a real answer from a working provider", () => {
+        const empty = listAgents({ state: pulled, agentCount: 0 });
+
+        expect(empty.LastAgentsListingOutcome).toBe("listed");
+        expect(empty.LastAgentsListingCount).toBe(0);
+        // Cleared, so no reason from an earlier refusal is left standing.
+        expect(empty.LastAgentsListingReason).toBeNull();
+        expect(empty.LastAgentsListingStatus).toBeNull();
+      });
+
+      it("clears a previous refusal rather than leaving both readings", () => {
+        const recovered = listAgents({
+          state: refuseAgents({ state: pulled }),
+          agentCount: 4,
+          occurredAt: 5_000,
+        });
+
+        expect(recovered.LastAgentsListingOutcome).toBe("listed");
+        expect(recovered.LastAgentsListingCount).toBe(4);
+        expect(recovered.LastAgentsListingReason).toBeNull();
+        expect(recovered.LastAgentsListingStatus).toBeNull();
+      });
+    });
+
+    describe("when one kind is listed after the other was refused", () => {
+      it("keeps the refusal, because a different sync working does not fix it", () => {
+        // One shared column set would erase this, and the source would read as
+        // fine on the strength of a sync that has nothing to do with it.
+        const agentsRefused = refuseAgents({ state: pulled });
+        const thenPeopleListed = listPeople({
+          state: agentsRefused,
+          directoryPersonCount: 30,
+        });
+
+        expect(agentsFields(thenPeopleListed)).toEqual(
+          agentsFields(agentsRefused),
+        );
+        expect(thenPeopleListed.LastAgentsListingOutcome).toBe("refused");
+      });
+
+      it("keeps it in the other direction too", () => {
+        const peopleRefused = refusePeople({ state: pulled });
+        const thenAgentsListed = listAgents({
+          state: peopleRefused,
+          agentCount: 7,
+        });
+
+        expect(peopleFields(thenAgentsListed)).toEqual(
+          peopleFields(peopleRefused),
+        );
+        expect(thenAgentsListed.LastPeopleListingOutcome).toBe("refused");
+      });
+    });
+
+    describe("when a people listing succeeds", () => {
+      it("keeps both counts, because the surviving total alone is lossy", () => {
+        // Withheld is a SUBSET of the directory count, never an addition: a
+        // tenant that erased everyone the provider still lists would otherwise
+        // read as a provider naming nobody, sending an admin to debug a
+        // healthy connection.
+        const listed = listPeople({
+          state: pulled,
+          directoryPersonCount: 30,
+          withheldPersonCount: 4,
+        });
+
+        expect(listed.LastPeopleListingOutcome).toBe("listed");
+        expect(listed.LastPeopleDirectoryCount).toBe(30);
+        expect(listed.LastPeopleWithheldCount).toBe(4);
+        expect(
+          (listed.LastPeopleDirectoryCount ?? 0) -
+            (listed.LastPeopleWithheldCount ?? 0),
+        ).toBe(26);
+        expect(listed.LastPeopleListingReason).toBeNull();
+      });
+
+      it("leaves the pull unchanged", () => {
+        const listed = listPeople({ state: pulled, directoryPersonCount: 30 });
+
+        expect(pullFields(listed)).toEqual(pullFields(pulled));
+        expect(buildIngestionSourceMirror({ state: listed })).toEqual(
+          buildIngestionSourceMirror({ state: pulled }),
+        );
+      });
+    });
+
+    describe("when a people listing is refused", () => {
+      it("drops both counts, so no erasure figure is shown for a listing that never ran", () => {
+        const listed = listPeople({
+          state: pulled,
+          directoryPersonCount: 30,
+          withheldPersonCount: 4,
+        });
+        const refused = refusePeople({
+          state: listed,
+          reason: "listing_failed",
+          status: null,
+          occurredAt: 5_000,
+        });
+
+        expect(refused.LastPeopleListingOutcome).toBe("refused");
+        expect(refused.LastPeopleListingReason).toBe("listing_failed");
+        // Null, not zero: our own side gave out before reaching the provider,
+        // so there is no status to report.
+        expect(refused.LastPeopleListingStatus).toBeNull();
+        expect(refused.LastPeopleDirectoryCount).toBeNull();
+        expect(refused.LastPeopleWithheldCount).toBeNull();
+      });
+
+      it("leaves the pull unchanged, and stamps no scheduled-for", () => {
+        const refused = refusePeople({ state: pulled });
+
+        expect(pullFields(refused)).toEqual(pullFields(pulled));
+        expect(refused.LastRunScheduledFor).toBe(2_000);
+      });
+    });
+  });
 });

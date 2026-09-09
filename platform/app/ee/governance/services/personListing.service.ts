@@ -72,9 +72,28 @@ import {
 
 const logger = createLogger("langwatch:governance:person-listing");
 
-/** What one sync did, in the three shapes the listing itself comes in. */
+/**
+ * What one sync did, in the three shapes the listing itself comes in.
+ *
+ * The listed arm reports both sides of the erasure check rather than only what
+ * survived it. `recorded` alone cannot answer "did the provider name anyone",
+ * because a tenant that erased its whole staff drives it to zero while the
+ * provider named hundreds, and a caller that stores only that number can never
+ * recover the difference.
+ *
+ * `named` is everyone the provider's directory named. `withheld` is how many of
+ * those this deployment does not hold, because erasure suppression removed
+ * them: a SUBSET of `named`, never an addition to it. Adding the two counts the
+ * same people twice. Subtracting is the valid arithmetic, and `recorded` is
+ * exactly that subtraction, carried here only because this is the layer that
+ * did the writing and knows it first hand.
+ *
+ * `withheld` is safe to show as a CURRENT figure and never as a series: it
+ * moving from zero to one at a known moment says an erasure happened then,
+ * which on a small tenant identifies the person as surely as a name would.
+ */
 export type PeopleSyncResult =
-  | { outcome: "listed"; recorded: number }
+  | { outcome: "listed"; recorded: number; named: number; withheld: number }
   | { outcome: "empty" }
   | { outcome: "refused"; refusal: PeopleListingRefusal };
 
@@ -210,10 +229,22 @@ export class PersonListingService {
       events: kept,
     });
 
-    // `listed` with a count of zero is possible and is not the same as `empty`:
-    // it means the provider named people and every one of them is erased. The
-    // tenant has staff; this deployment is right not to hold their names.
-    return { outcome: "listed", recorded: discovered };
+    // A `recorded` of zero is possible here and is not the same as `empty`: it
+    // means the provider named people and every one of them is erased. The
+    // tenant has staff; this deployment is right not to hold their names, and
+    // `named` is what keeps that distinguishable from an empty directory.
+    //
+    // `named` counts the events built from the listing rather than
+    // `listing.items`, so the two numbers add up: `personListingEvents` drops
+    // records with a blank actor, and one of those is a person no erasure check
+    // could have suppressed. Counting it as named would leave a shortfall that
+    // reads as withheld.
+    return {
+      outcome: "listed",
+      recorded: discovered,
+      named: events.length,
+      withheld: suppressedCount,
+    };
   }
 }
 
