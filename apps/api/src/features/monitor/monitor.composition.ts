@@ -10,7 +10,7 @@ import {
   type EvaluationClickHouseResolver,
 } from "@langwatch/evaluation-server";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import { EvaluatorReplicationApi } from "@langwatch/evaluator-server";
+import { EvaluatorReplicationService } from "@langwatch/evaluator-server";
 import { HandledError } from "@langwatch/handled-error";
 import {
   monitorServer,
@@ -124,13 +124,16 @@ class ProcessMonitorReplication extends MonitorReplicationPort {
     targetProjectId: string;
     actor: { id: string };
   }) {
-    const copied = await EvaluatorReplicationApi.create({
+    const copied = await EvaluatorReplicationService.create({
       replicateEvaluatorWorkflow: (replication) =>
         this.workflows.replicateEvaluatorWorkflow({ ...replication, actor: input.actor }),
       deleteReplicatedWorkflow: (replication) =>
         this.workflows.deleteReplicatedWorkflow(replication),
     }).copyToProject({
-      evaluators: this.evaluators,
+      evaluators: {
+        findById: async (lookup) => (await this.evaluators.tryGetById(lookup)) ?? undefined,
+        create: (created) => this.evaluators.create(created),
+      },
       evaluatorId: input.evaluatorId,
       sourceProjectId: input.sourceProjectId,
       targetProjectId: input.targetProjectId,

@@ -241,7 +241,7 @@ export {
 export { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
 export { createGatewaySpendRestApp, type GatewaySpendRestPorts } from "@langwatch/gateway-server";
 export { createGovernanceRestApp } from "@langwatch/enterprise-api";
-export { type AgentPlatformUrlBuilder, createAgentLegacyRestApp } from "@langwatch/agent-server";
+export { type AgentPlatformUrlBuilder } from "@langwatch/agent-server";
 export { createTriggerRestApp } from "@langwatch/automation-server";
 export {
   type CodingAgentCallerScope,

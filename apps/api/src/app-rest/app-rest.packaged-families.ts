@@ -10,7 +10,6 @@ import type {
   ConnectedAgentRuntime,
   LongPollTransportService,
 } from "@langwatch/agent-server";
-import { createAgentLegacyRestApp, createAgentV1RestApp } from "@langwatch/agent-server";
 import type { ApiKeyService } from "@langwatch/api-key-contract";
 import type {
   AppRestBroadcast,
@@ -339,35 +338,14 @@ export function mountApiPackagedRestFamilies(options: {
     agentCache ? () => createAgentCacheRestApp({ security, agentCache }).mountable : null,
   );
 
-  const agents = services.agents;
-  mount(
-    "agents",
-    agents
-      ? () =>
-          createAgentLegacyRestApp({
-            security,
-            agents,
-            agentPlatformUrl: ports.agentPlatformUrl,
-          })
-      : null,
-  );
+  // The agent REST families are unconverted: mounted nothing until their
+  // flat declarations exist (plan section 4).
+  mount("agents", null);
 
   // `/api/v1/agents`: the same application as the deprecated family above,
   // plus ADR-128's connected-agent routes when this process composed that
   // transport (`agentsV1`, absent leaves `/connect/*` and `/:id/call` off).
-  const agentsV1 = services.agentsV1;
-  mount(
-    "agents-v1",
-    agents
-      ? () =>
-          createAgentV1RestApp({
-            security,
-            agents,
-            agentPlatformUrl: ports.agentPlatformUrl,
-            ...(agentsV1 ? agentsV1() : {}),
-          })
-      : null,
-  );
+  mount("agents-v1", null);
 
   const codingAgents = services.codingAgents;
   const codingAgentAudit = services.codingAgentAudit;
