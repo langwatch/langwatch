@@ -2,17 +2,15 @@
  * Characterisation of the three discovery locations, through the real Hono app the API
  * process serves.
  */
-import { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import type { AppRestSecurity } from "@langwatch/api/rest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  ApiApplication,
-  MissingAgentService,
-  NoApiTrpcFeatures,
-} from "../../../api.application.ts";
+import { ApiApplication, NoApiTrpcFeatures } from "../../../api.application.ts";
 import { ApiHttpListener } from "../../../api-http.listener.ts";
 import { ApiRestSecurity } from "../../../api-rest.security.ts";
 import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
@@ -84,12 +82,16 @@ describe("given the API process's discovery locations", () => {
     });
 
     /** @scenario "A discovery location answers only GET" */
-    it("refuses a POST to a document location", async () => {
+    // The declared runtime answers a wrong method with 405 and an `Allow`,
+    // where the deleted builder registered nothing and let the 404 stand.
+    // `/llms.txt` rejoins this list when root-discovery converts.
+    it("refuses a POST to a document location, saying what the location does answer", async () => {
       const api = await startApi();
 
-      for (const path of ["/.well-known/openapi", "/api/openapi.json", "/llms.txt"]) {
+      for (const path of ["/api/gateway/v1/openapi.json", "/api/openapi.json"]) {
         const res = await api.fetch(path, { method: "POST" });
-        expect(res.status).toBe(404);
+        expect(res.status).toBe(405);
+        expect(res.headers.get("allow")).toBe("GET, HEAD");
       }
     });
 
@@ -227,7 +229,7 @@ function unreachablePort(what: string): never & (() => never) {
 
 async function startApi() {
   const security: AppRestSecurity = ApiRestSecurity.create({
-    apiKeys: new Proxy(ApiKeyService.prototype, {}),
+    apiKeys: new Proxy({} as ApiKeyApi, {}),
     authz: new Proxy(AuthzService.prototype, {}),
     organizations: new Proxy(OrganizationService.prototype, {}),
     observability: ApiRestObservabilityComposition.create(),
@@ -245,7 +247,7 @@ async function startApi() {
 
   const application = ApiApplication.create({
     features: new NoApiTrpcFeatures(),
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     rest,
     http: {
       createContext: async () => ({

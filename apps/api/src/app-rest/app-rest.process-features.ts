@@ -55,6 +55,13 @@ import type { ApiExperimentV3RestCollaborators } from "../features/experiment/ex
 import type { ApiExperimentInitRestCollaborators } from "../features/experiment/experiment-init-rest.mount.ts";
 import type { ApiWorkflowRunRestCollaborators } from "../features/workflow/workflow-run-rest.mount.ts";
 import { mountAnnotationRest } from "../features/annotation/annotation-rest.mount.ts";
+import { mountApiDiscoveryRest } from "../features/discovery/api-discovery-rest.mount.ts";
+import { mountGatewayOpenApiRest } from "../features/discovery/gateway-openapi-rest.mount.ts";
+import {
+  mountImageProxyRest,
+  type ImageProxyRestPorts,
+} from "../features/image-proxy/image-proxy-rest.mount.ts";
+import { mountRumRest } from "../features/rum/rum-rest.mount.ts";
 import { mountStoredObjectRest } from "../features/stored-object/stored-object-rest.mount.ts";
 import {
   mountHealthProbeRest,
@@ -335,9 +342,7 @@ export type ApiProcessRestPorts = Readonly<{
   /**
    * The public image relay's egress policy, or none.
    */
-  imageProxy?:
-    | Readonly<{ blockLocalHttpCalls: boolean; allowedHosts: readonly string[] }>
-    | undefined;
+  imageProxy?: ImageProxyRestPorts | undefined;
 }>;
 
 /**
@@ -352,7 +357,6 @@ export abstract class ApiProcessRestAbsenceReport {
 export type ApiProcessRestFamilyName =
   | "admin"
   | "analytics"
-  | "api-discovery"
   | "api-keys"
   | "auth"
   | "auth-cli-device-flow"
@@ -366,13 +370,11 @@ export type ApiProcessRestFamilyName =
   | "experiment-init"
   | "experiment-workbench"
   | "gateway-internal"
-  | "gateway-openapi"
   | "gateway-platform"
   | "gateway-spend"
   | "github"
   | "governance-cli"
   | "governance-ingest"
-  | "image-proxy"
   | "langwatch-ql"
   | "langy"
   | "mcp-authorize"
@@ -383,7 +385,6 @@ export type ApiProcessRestFamilyName =
   | "prompts"
   | "query"
   | "root-discovery"
-  | "rum"
   | "scenario-generate"
   | "scenario-run-export"
   | "scim"
@@ -426,13 +427,16 @@ export function createApiProcessRestFeatures(options: {
     features.push(...(Array.isArray(built) ? built : [built]));
   };
 
-  // The discovery doors and the browser's own telemetry intake. Each is built
-  // by a transport still written against the deleted REST builders, so none is
-  // mounted and each is named once at boot.
-  mount("gateway-openapi", null);
-  mount("api-discovery", null);
+  // The two locations the API description is published at. The gateway one is
+  // FIRST so a later parameterised sibling under `/api/gateway/v1` cannot
+  // shadow it.
+  features.push(mountGatewayOpenApiRest());
+  features.push(mountApiDiscoveryRest());
+  // The root-level locations. Their transport is still written against the
+  // deleted REST builders, so the family is not mounted and is named at boot.
   mount("root-discovery", null);
-  mount("rum", null);
+  // The browser's own telemetry intake, over the process's ONE counter.
+  features.push(mountRumRest({ rateLimit: ports.rateLimit }));
 
   // The subsystem probes. `/api/health` is claimed by the process's lifecycle
   // surface at exactly that path and by nothing deeper, so the five
@@ -509,7 +513,9 @@ export function createApiProcessRestFeatures(options: {
   mount("ops-clickhouse-explain", null);
   mount("dspy-steps", null);
   mount("mcp-authorize", null);
-  mount("image-proxy", null);
+  // The public image relay, where this deployment declared an egress policy.
+  const imageProxy = ports.imageProxy;
+  if (imageProxy) features.push(mountImageProxyRest(imageProxy));
   mount("collector", null);
   // The OTLP receiver and the two aliases that forward into it. They travel
   // together: an alias mounted without the receiver would answer a path that

@@ -10,9 +10,21 @@
  * See packages/api/specs/api-discovery.feature.
  */
 
-import type { Context } from "hono";
+import { featureApi } from "@langwatch/runtime-composition";
 
 import { apiDocumentBytes, apiDocumentETag } from "./openapi-document.ts";
+
+/** The one operation the three discovery locations answer with. */
+export interface ApiDocumentApi {
+  /** The document, or a 304 for a caller that already holds exactly these bytes. */
+  readDocument(input: { ifNoneMatch: string | null }): Response;
+}
+
+/**
+ * The description is nobody's product feature, so it is filed under the
+ * deployment's own operational surface rather than given a module of its own.
+ */
+export const ApiDocumentApi = featureApi<ApiDocumentApi>("ops");
 
 /**
  * Public and immutable for the life of a deploy, but not immutable across
@@ -31,7 +43,7 @@ const CACHE_CONTROL = "public, max-age=60, must-revalidate";
  * like a working one, which is why it is worth handling rather than assuming
  * clients send the simple form.
  */
-function alreadyHasIt(ifNoneMatch: string | undefined): boolean {
+function alreadyHasIt(ifNoneMatch: string | null): boolean {
   if (!ifNoneMatch) return false;
   if (ifNoneMatch.trim() === "*") return true;
 
@@ -89,16 +101,19 @@ export function jsonBytesResponse({
 }
 
 /** Answers a request for the OpenAPI document, 200 with bytes or 304 without. */
-export function respondWithApiDocument(c: Context): Response {
+export function respondWithApiDocument({ ifNoneMatch }: { ifNoneMatch: string | null }): Response {
   const headers = {
     ETag: apiDocumentETag,
     "Cache-Control": CACHE_CONTROL,
   };
 
-  if (alreadyHasIt(c.req.header("if-none-match"))) {
+  if (alreadyHasIt(ifNoneMatch)) {
     // 304 carries no body and no Content-Length by definition.
     return new Response(null, { status: 304, headers });
   }
 
   return jsonBytesResponse({ bytes: apiDocumentBytes, headers });
 }
+
+/** The document server every discovery location in this process answers from. */
+export const apiDocument: ApiDocumentApi = { readDocument: respondWithApiDocument };

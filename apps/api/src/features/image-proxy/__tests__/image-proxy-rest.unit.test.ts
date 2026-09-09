@@ -3,13 +3,9 @@
  * egress at all. The bytes are an attacker's to choose — the URL is the caller's, and the
  * door needs no credential — and they come back on the product's own origin.
  */
-import { ApiKeyService } from "@langwatch/api-key-contract";
-import { AuthzService } from "@langwatch/authz-contract";
-import { OrganizationService } from "@langwatch/organization-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiRestSecurity } from "../../../api-rest.security.ts";
-import { ApiRestObservabilityComposition } from "../../../app/api-rest-observability.composition.ts";
-import { createImageProxyRestApp } from "../image-proxy-rest.ts";
+
+import { mountImageProxyRest } from "../image-proxy-rest.mount.ts";
 
 const egress = vi.hoisted(() => ({ fetchValidatedDestination: vi.fn() }));
 
@@ -18,32 +14,8 @@ vi.mock("@langwatch/egress", () => ({
   fetchValidatedDestination: egress.fetchValidatedDestination,
 }));
 
-/** A security whose credential services are never reached: the door is public. */
-function proxySecurity() {
-  const unreachable = <T extends object>(prototype: T): T =>
-    new Proxy(prototype, {
-      get: (target, property, receiver) =>
-        property in target
-          ? () => {
-              throw new Error(`${String(property)} was reached on the image proxy`);
-            }
-          : Reflect.get(target, property, receiver),
-    });
-
-  return ApiRestSecurity.create({
-    apiKeys: unreachable(ApiKeyService.prototype),
-    authz: unreachable(AuthzService.prototype),
-    organizations: unreachable(OrganizationService.prototype),
-    observability: ApiRestObservabilityComposition.create(),
-  });
-}
-
 function proxy() {
-  return createImageProxyRestApp({
-    security: proxySecurity(),
-    blockLocalHttpCalls: true,
-    allowedHosts: [],
-  });
+  return mountImageProxyRest({ blockLocalHttpCalls: true, allowedHosts: [] });
 }
 
 /** An upstream that answers with the given media type and body. */
@@ -98,6 +70,19 @@ describe("the image proxy", () => {
       expect(response.headers.get("Content-Type")).toBe("image/png");
       expect(response.headers.get("Cache-Control")).toBe("public, max-age=31536000");
     });
+
+    describe("when the caller reaches the /api/v1 twin instead", () => {
+      it("answers the same bytes at the address the pages have always linked", async () => {
+        upstreamAnswers("image/png");
+
+        const response = await proxy().request(
+          "/api/v1/image-proxy?url=https%3A%2F%2Fhost.example%2Flogo.png",
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get("Content-Type")).toBe("image/png");
+      });
+    });
   });
 
   describe("given an upstream that answers with something that is not an image", () => {
@@ -110,6 +95,30 @@ describe("the image proxy", () => {
       );
 
       expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: "URL does not point to an image" });
+    });
+  });
+
+  describe("given a request that names no image at all", () => {
+    it("refuses before any fetch is attempted", async () => {
+      const response = await proxy().request("/api/image-proxy");
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: "Missing url" });
+      expect(egress.fetchValidatedDestination).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a fence that refuses the destination", () => {
+    it("answers one opaque failure rather than reporting the deployment's own network", async () => {
+      egress.fetchValidatedDestination.mockRejectedValue(new Error("blocked: 127.0.0.1"));
+
+      const response = await proxy().request(
+        "/api/image-proxy?url=http%3A%2F%2F127.0.0.1%2Fsecret.png",
+      );
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({ error: "Failed to fetch image" });
     });
   });
 });

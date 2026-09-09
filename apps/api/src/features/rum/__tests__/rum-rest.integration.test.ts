@@ -1,12 +1,13 @@
 /**
- * Characterisation of `POST /api/rum/v1/traces` through the real Hono app.
+ * Characterisation of `POST /api/rum/v1/traces` through the real Hono app the
+ * API process mounts.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { RUM_SESSION_HEADER } from "@langwatch/react-rum/constants";
-import { Hono, type ErrorHandler } from "hono";
+import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createRumRestApp, rateLimitKey } from "../rum-rest.ts";
+import { mountRumRest } from "../rum-rest.mount.ts";
+import { rumCallerKey } from "../rum.rest.ts";
 import type { RumRateLimiter } from "../rum-ingest.service.ts";
 
 const oneSpan = JSON.stringify({
@@ -77,7 +78,8 @@ describe("given a caller to be named for the rate-limit bucket", () => {
   describe("when the browser sends a session header", () => {
     it("names the session, capped at 64 characters", () => {
       const long = "s".repeat(200);
-      expect(rateLimitKey(contextWith({ [RUM_SESSION_HEADER]: long }))).toBe(
+
+      expect(rumCallerKey({ session: long, forwardedFor: null })).toBe(
         `session:${"s".repeat(64)}`,
       );
     });
@@ -85,54 +87,38 @@ describe("given a caller to be named for the rate-limit bucket", () => {
 
   describe("when it does not", () => {
     it("names the hop NEAREST us, not the client-supplied first one", () => {
-      expect(rateLimitKey(contextWith({ "x-forwarded-for": "1.2.3.4, 9.9.9.9, 10.0.0.1" }))).toBe(
-        "ip:10.0.0.1",
-      );
-      expect(rateLimitKey(contextWith({}))).toBe("ip:unknown");
+      expect(
+        rumCallerKey({ session: null, forwardedFor: "1.2.3.4, 9.9.9.9, 10.0.0.1" }),
+      ).toBe("ip:10.0.0.1");
+      expect(rumCallerKey({ session: null, forwardedFor: null })).toBe("ip:unknown");
+    });
+  });
+
+  describe("when the browser sends both", () => {
+    it("reads the session the door bound from the header the browser writes", async () => {
+      const keys: string[] = [];
+      const api = mount(async ({ key }) => {
+        keys.push(key);
+
+        return { allowed: true };
+      });
+
+      await api.fetch("/api/rum/v1/traces", {
+        method: "POST",
+        body: oneSpan,
+        headers: { [RUM_SESSION_HEADER]: "session-1", "x-forwarded-for": "10.0.0.1" },
+      });
+
+      expect(keys).toContain("rum:caller:session:session-1");
     });
   });
 });
 
-function contextWith(headers: Record<string, string>) {
-  return { req: { header: (name: string) => headers[name] } } as never;
-}
+function mount(rateLimit: RumRateLimiter = async () => ({ allowed: true })) {
+  const hono = new Hono().route("/", mountRumRest({ rateLimit }));
 
-function mount() {
-  const rateLimit: RumRateLimiter = async () => ({ allowed: true });
-  const hono = new Hono().route(
-    "/",
-    createRumRestApp({ security: passThroughSecurity(), rateLimit }),
-  );
   return {
     fetch: (path: string, init?: RequestInit) =>
       hono.fetch(new Request(`http://api.test${path}`, init)),
   };
-}
-
-/** A failure here must be legible rather than swallowed into a generic 500. */
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("A public endpoint must not reach the framework auth chain.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
 }
