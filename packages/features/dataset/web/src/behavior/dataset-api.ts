@@ -73,9 +73,8 @@ export type DatasetApiMap = ContractApiMap<typeof datasetTrpc> &
   BorrowedProcedures;
 
 /**
- * The Datasets family's typed tRPC hooks, on the same transport and React
- * Query cache as the application's `api` proxy. INTERNAL by convention:
- * hooks here call it, and screens call the hooks; exported from `./datasets`
- * only so the process shell can mount `datasetApi.Provider`.
+ * The Datasets family's typed tRPC hooks, on the application's transport and
+ * React Query cache. Internal by convention; exported from `./datasets` only
+ * so the process shell can mount `datasetApi.Provider`.
  */
 export const datasetApi = createFeatureApi<DatasetApiMap>();
