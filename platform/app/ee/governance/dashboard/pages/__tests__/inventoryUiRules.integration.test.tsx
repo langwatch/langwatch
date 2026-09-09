@@ -251,7 +251,14 @@ describe("given an admin on the Inventory page", () => {
       // Proof this half is actually empty, so a future change to the default
       // sample choice cannot quietly turn it back into a second full sweep
       // while every assertion above still passes.
-      expect(screen.getByTestId("tool-catalog-empty")).toBeInTheDocument();
+      //
+      // Awaited, not queried outright: `openTab` returns once the tab reports
+      // itself selected, which is earlier than the pane it reveals finishing
+      // its own render. The synchronous form passed on a warm local machine
+      // and failed on a loaded CI worker.
+      expect(
+        await screen.findByTestId("tool-catalog-empty"),
+      ).toBeInTheDocument();
       unmount();
 
       connectTools();
@@ -267,6 +274,14 @@ describe("given an admin on the Inventory page", () => {
       // And the matching proof for this half: connected tools really did put
       // cards on the catalog. Without it a sweep over two empty pages would
       // satisfy every assertion above and still test nothing.
+      //
+      // The card is awaited FIRST and the empty state checked second, because
+      // the absence on its own proves nothing — a pane that has not rendered
+      // yet is also missing its empty state, and the pair would pass on a
+      // catalog that never arrived.
+      expect(
+        await screen.findByTestId("tool-card-src-genie"),
+      ).toBeInTheDocument();
       expect(screen.queryByTestId("tool-catalog-empty")).toBeNull();
     });
 
