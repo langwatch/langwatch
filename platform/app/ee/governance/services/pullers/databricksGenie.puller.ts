@@ -69,12 +69,20 @@ import {
   warehouseCostPieces,
   warehouseCostRowSchema,
 } from "./databricksWarehouseCost";
+import {
+  GENIE_SPACES_PATH,
+  GenieHttpError,
+  type GenieSpace,
+  genieGet,
+  walkGenieSpaces,
+} from "./genieSpaces";
 import { PULLED_USAGE_HINT_KEY } from "./pulledUsageRecord";
-import type {
-  NormalizedPullEvent,
-  PullerAdapter,
-  PullResult,
-  PullRunOptions,
+import {
+  type NormalizedPullEvent,
+  ProviderSignInError,
+  type PullerAdapter,
+  type PullResult,
+  type PullRunOptions,
 } from "./pullerAdapter";
 
 const logger = createLogger("langwatch:governance:databricks-genie-puller");
@@ -237,7 +245,7 @@ const tokenResponseSchema = z.object({
  * across several spaces, and a token per request would multiply one sign-in by
  * the whole walk for no benefit, since the token outlives any single run.
  */
-async function resolveWorkspaceToken(params: {
+export async function resolveWorkspaceToken(params: {
   credentials: Record<string, string> | undefined;
   workspaceUrl: string;
   signal?: AbortSignal;
@@ -250,9 +258,10 @@ async function resolveWorkspaceToken(params: {
   const clientId = credentials?.clientId;
   const clientSecret = credentials?.clientSecret;
   if (!clientId || !clientSecret) {
-    throw new Error(
+    throw new ProviderSignInError(
       "databricks genie puller needs either a workspace token in credentials.token, " +
         "or a service principal's credentials.clientId and credentials.clientSecret",
+      { reason: "not_configured" },
     );
   }
 
@@ -281,9 +290,10 @@ async function resolveWorkspaceToken(params: {
   if (!response.ok) {
     // The status alone, never the body: a token endpoint may echo the request
     // back, and this reason is logged and shown on the source.
-    throw new Error(
+    throw new ProviderSignInError(
       `databricks genie puller could not sign in: the workspace refused the ` +
         `service principal's credentials (HTTP ${response.status})`,
+      { reason: "refused", status: response.status },
     );
   }
 
@@ -292,9 +302,10 @@ async function resolveWorkspaceToken(params: {
     // A proxy or captive portal answering 200 with something that is not a
     // token must not be carried forward as one — it would fail later as an
     // unauthorised Genie call and read as a permissions problem.
-    throw new Error(
+    throw new ProviderSignInError(
       "databricks genie puller could not sign in: the workspace answered the " +
         "sign-in without an access token",
+      { reason: "malformed_response" },
     );
   }
 
@@ -1283,18 +1294,6 @@ function defaultSinceMs(): number {
   return Date.now() - 30 * 24 * 60 * 60 * 1000;
 }
 
-const spaceSchema = z
-  .object({
-    space_id: z.string(),
-    title: z.string().nullable().default(null),
-  })
-  .passthrough();
-
-const spacesPageSchema = z.object({
-  spaces: z.array(spaceSchema).default([]),
-  next_page_token: z.string().nullable().default(null),
-});
-
 const conversationSchema = z
   .object({
     conversation_id: z.string(),
@@ -1518,11 +1517,11 @@ function spaceWalkPlan({
   resumeSpaceId,
   resumeFingerprint,
 }: {
-  spaces: PagedRead<z.infer<typeof spaceSchema>>;
+  spaces: PagedRead<GenieSpace>;
   resumeSpaceId: string | null;
   resumeFingerprint: string | null;
 }): {
-  ordered: Array<z.infer<typeof spaceSchema>>;
+  ordered: Array<GenieSpace>;
   startAt: number;
   resumable: boolean;
   fingerprint: string;
@@ -1611,7 +1610,7 @@ function sweptUpTo({
   spacePlan,
 }: {
   events: NormalizedPullEvent[];
-  space: z.infer<typeof spaceSchema>;
+  space: GenieSpace;
   at: string | null;
   hadGap: boolean;
   oldestPendingMs: number | null;
@@ -1687,24 +1686,6 @@ interface SpaceRead {
  * caller has to branch on it: a 404 from SCIM is a permanent answer worth
  * caching, and every other code is a transient one that must not be.
  */
-class GenieHttpError extends Error {
-  readonly status: number;
-
-  constructor({
-    status,
-    statusText,
-    path,
-  }: {
-    status: number;
-    statusText: string;
-    path: string;
-  }) {
-    super(`HTTP ${status} ${statusText} (databricks genie ${path})`);
-    this.name = "GenieHttpError";
-    this.status = status;
-  }
-}
-
 export class DatabricksGeniePuller
   implements PullerAdapter<DatabricksGeniePullConfig>
 {
@@ -1982,7 +1963,7 @@ export class DatabricksGeniePuller
     token: string;
     options: PullRunOptions;
     budget: RunBudget;
-    space: z.infer<typeof spaceSchema>;
+    space: GenieSpace;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
     resumeConversationId: string | null;
@@ -2053,7 +2034,7 @@ export class DatabricksGeniePuller
     token: string;
     options: PullRunOptions;
     budget: RunBudget;
-    space: z.infer<typeof spaceSchema>;
+    space: GenieSpace;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
     conversationPlan: ReturnType<typeof conversationWalkPlan>;
@@ -2145,7 +2126,7 @@ export class DatabricksGeniePuller
     token: string;
     options: PullRunOptions;
     budget: RunBudget;
-    space: z.infer<typeof spaceSchema>;
+    space: GenieSpace;
     conversation: z.infer<typeof conversationSchema>;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
@@ -2203,7 +2184,7 @@ export class DatabricksGeniePuller
     token: string;
     options: PullRunOptions;
     budget: RunBudget;
-    space: z.infer<typeof spaceSchema>;
+    space: GenieSpace;
   }): Promise<PagedRead<z.infer<typeof conversationSchema>> | null> {
     return await this.isolate({
       what: "conversations",
@@ -2238,7 +2219,7 @@ export class DatabricksGeniePuller
     token: string;
     options: PullRunOptions;
     budget: RunBudget;
-  }): Promise<PagedRead<z.infer<typeof spaceSchema>>> {
+  }): Promise<PagedRead<GenieSpace>> {
     if (config.spaceIds.length > 0) {
       // A pinned list still gets titles where they can be had. The title is
       // what a human reads on the governance screen — "ACME Revenue Analyst"
@@ -2281,18 +2262,25 @@ export class DatabricksGeniePuller
     token: string;
     options: PullRunOptions;
     budget: RunBudget;
-  }): Promise<PagedRead<z.infer<typeof spaceSchema>>> {
-    return await this.paginate({
-      config,
-      token,
-      options,
-      budget,
-      path: "/api/2.0/genie/spaces",
-      parse: (body) => {
-        const page = spacesPageSchema.parse(body);
-        return { items: page.spaces, next: page.next_page_token };
-      },
+  }): Promise<PagedRead<GenieSpace>> {
+    // Through `walkGenieSpaces` rather than the local `paginate`, so the
+    // on-demand agent listing and this sweep enumerate spaces the same way:
+    // one endpoint, one schema, one cycle check. What stays here is the
+    // stopping rule, which is the only part the two callers disagree on.
+    const walk = await walkGenieSpaces({
+      readPage: (query) =>
+        this.get({
+          config,
+          token,
+          options,
+          budget,
+          path: GENIE_SPACES_PATH,
+          query,
+        }),
+      stop: () => budget.exhausted(),
+      pageSize: PAGE_SIZE,
     });
+    return { items: walk.spaces, complete: walk.complete };
   }
 
   /** Every new message in one conversation, mapped to events. */
@@ -2310,7 +2298,7 @@ export class DatabricksGeniePuller
     token: string;
     options: PullRunOptions;
     budget: RunBudget;
-    space: z.infer<typeof spaceSchema>;
+    space: GenieSpace;
     conversation: z.infer<typeof conversationSchema>;
     sinceMs: number;
     identities: Map<number, GenieIdentity>;
@@ -2555,7 +2543,7 @@ export class DatabricksGeniePuller
     identity,
   }: {
     message: z.infer<typeof messageSchema>;
-    space: z.infer<typeof spaceSchema>;
+    space: GenieSpace;
     conversation: z.infer<typeof conversationSchema>;
     createdMs: number;
     identity: GenieIdentity;
@@ -3110,36 +3098,17 @@ export class DatabricksGeniePuller
     path: string;
     query?: Record<string, string>;
   }): Promise<unknown> {
-    const url = new URL(path, config.workspaceUrl);
-    for (const [key, value] of Object.entries(query ?? {})) {
-      url.searchParams.set(key, value);
-    }
-
-    const signal = options.signal
-      ? AbortSignal.any([
-          options.signal,
-          AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        ])
-      : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-
+    // Spending the budget is this wrapper's whole job. The request itself is
+    // shared with the on-demand agent listing, which has no budget to spend.
     budget.spend();
-    const response = await ssrfSafeFetch(url.toString(), {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-      signal,
-      // The workspace host is pinned on the write path, but a redirect from a
-      // real workspace would still carry this token onward, and the helper
-      // follows up to ten by default.
-      followRedirects: false,
+    return await genieGet({
+      workspaceUrl: config.workspaceUrl,
+      token,
+      path,
+      query,
+      signal: options.signal,
+      timeoutMs: REQUEST_TIMEOUT_MS,
     });
-    if (!response.ok) {
-      throw new GenieHttpError({
-        status: response.status,
-        statusText: response.statusText,
-        path,
-      });
-    }
-    return await response.json();
   }
 }
 

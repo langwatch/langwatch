@@ -477,6 +477,161 @@ export class DiscoveredPersonRepository {
   }
 }
 
+/**
+ * Provider-side agents the source listed: Genie spaces, Copilot bots and kin.
+ *
+ * Deliberately NOT a method on `DiscoveredPersonRepository`. The two tables
+ * share a shape and share nothing else: an agent has no `kind` to classify, no
+ * account it could be matched to, and no erasure state, because a Genie space
+ * is not a person and cannot ask to be forgotten. Folding them together would
+ * put the identity table's guards on rows that do not need them and, worse,
+ * invite the next author to reach for a person's guard here and find it
+ * missing.
+ */
+export class DiscoveredAgentRepository {
+  /** The agents screen's read: an organization's agents, newest-seen first. */
+  listByOrganization(client: Client, params: { organizationId: string }) {
+    return client.discoveredAgent.findMany({
+      where: { organizationId: params.organizationId },
+      orderBy: { lastSeenAt: "desc" },
+    });
+  }
+
+  /**
+   * Records that a provider listed this agent at `seenAt` — creating it on
+   * first sight, and widening the seen range every time after.
+   *
+   * It DOES move both dates, unlike `recordDirectorySighting`, and the reason
+   * is what the two lists mean. A directory lists everyone the tenant ever
+   * hired, so "listed today" says nothing about activity and the dates there
+   * are reserved for spend. A provider's agent list is the set of agents that
+   * exist right now: an agent that was deleted stops appearing, so a listing
+   * IS a presence fact and `lastSeenAt` is the only place it can be recorded.
+   * Widening rather than stamping, so a replayed listing is a no-op WHERE
+   * rather than a rewrite.
+   *
+   * `metadata` and `displayText` MERGE and never blank, following the
+   * directory precedent at `recordDirectorySighting`: a field this listing did
+   * not carry is a field the provider did not report, which is not the same
+   * claim as a field the customer cleared, and there is no way to tell those
+   * apart from here. Between losing a fact we hold and being one listing slow
+   * to notice a deletion, the screen is better served by the fact. Callers
+   * therefore OMIT a key they have no value for rather than sending "" or null.
+   *
+   * No `erasedAt` guard, and that absence is deliberate rather than an
+   * oversight: `DiscoveredAgent` carries no erasure state at all. An agent is
+   * not a person, so a subject-access request never reaches this table. Add
+   * one the day that stops being true, and not before, because a guard on a
+   * column that does not exist is a guard nobody can check.
+   */
+  async recordAgentSighting(
+    client: Client,
+    params: {
+      organizationId: string;
+      provider: string;
+      rawAgentId: string;
+      displayText: string;
+      /** Provider-native descriptive fields. Only keys this listing carried. */
+      metadata: Record<string, string>;
+      seenAt: Date;
+    },
+  ): Promise<void> {
+    const key = {
+      organizationId: params.organizationId,
+      provider: params.provider,
+      rawAgentId: params.rawAgentId,
+    };
+    // `skipDuplicates` rather than a caught P2002, for the same reason
+    // `recordActivitySighting` uses it: after the first listing every agent
+    // already has a row, so the collision is the common case — and Prisma logs
+    // a caught unique violation as `prisma:error` before the catch sees it,
+    // one stack trace per known agent per listing.
+    const created = await client.discoveredAgent.createMany({
+      data: [
+        {
+          ...key,
+          displayText: params.displayText,
+          metadata: params.metadata,
+          firstSeenAt: params.seenAt,
+          lastSeenAt: params.seenAt,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    if (created.count > 0) return;
+
+    await client.discoveredAgent.updateMany({
+      where: { ...key, lastSeenAt: { lt: params.seenAt } },
+      data: { lastSeenAt: params.seenAt },
+    });
+    await client.discoveredAgent.updateMany({
+      where: { ...key, firstSeenAt: { gt: params.seenAt } },
+      data: { firstSeenAt: params.seenAt },
+    });
+
+    // Read-then-write, because the merge is a value operation Postgres cannot
+    // be asked for through `updateMany`: `metadata` is one JSON column and a
+    // partial update of it has to know what is already in there.
+    //
+    // Not in a transaction, and the interleaving is genuinely benign: two
+    // listings of the same agent write the same fields from the same provider
+    // reply, so a lost update loses a value identical to the one that won. The
+    // day a caller writes agent metadata that is NOT derived from the
+    // provider's own listing, this needs revisiting.
+    const existing = await client.discoveredAgent.findFirst({
+      where: key,
+      select: { displayText: true, metadata: true },
+    });
+    if (!existing) return;
+
+    const merged = mergeAgentMetadata(existing.metadata, params.metadata);
+    const data: { displayText?: string; metadata?: Prisma.InputJsonValue } = {};
+    // Only what actually changed. A listing runs over the whole tenant and is
+    // idempotent, so the overwhelmingly common pass must write no rows at all.
+    if (
+      params.displayText !== "" &&
+      params.displayText !== existing.displayText
+    ) {
+      data.displayText = params.displayText;
+    }
+    if (merged !== null) data.metadata = merged;
+    if (Object.keys(data).length === 0) return;
+
+    await client.discoveredAgent.updateMany({ where: key, data });
+  }
+}
+
+/**
+ * The stored metadata with this listing's fields laid over it, or null when
+ * that would change nothing.
+ *
+ * Null rather than the unchanged object, so the caller can skip the write
+ * instead of re-serialising a JSON column on every listing.
+ *
+ * A stored value that is not an object is replaced outright. Only this
+ * repository writes the column and it only ever writes objects, so anything
+ * else is a hand-edited row, and merging INTO it would be guessing.
+ */
+function mergeAgentMetadata(
+  stored: unknown,
+  incoming: Record<string, string>,
+): Prisma.InputJsonValue | null {
+  const base =
+    stored !== null && typeof stored === "object" && !Array.isArray(stored)
+      ? (stored as Record<string, unknown>)
+      : null;
+  if (base === null) return incoming;
+
+  const unchanged = Object.entries(incoming).every(
+    ([field, value]) => base[field] === value,
+  );
+  if (unchanged) return null;
+  // The cast is the one place a hand-edited column's contents are trusted: a
+  // stored `undefined` cannot exist through JSON, and every value this
+  // repository ever wrote came from a `Record<string, string>`.
+  return { ...base, ...incoming } as Prisma.InputJsonValue;
+}
+
 /** The dated links between provider-side people and platform users. */
 export class IdentityMatchRepository {
   findAllByDiscoveredPerson(

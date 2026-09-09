@@ -53,9 +53,18 @@ import {
   nextAzureCostCursor,
   readAzureCostRows,
 } from "./azureCostManagement";
+import {
+  type BotRecord,
+  botKey,
+  odataPageSchema,
+  readBotRows,
+  readCopilotBots,
+} from "./copilotBots";
 import { COPILOT_CONVERSATION_ACTION } from "./copilotStudioTraceMapper";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
+  DATAVERSE_API_VERSION,
+  dataverseHeaders,
   isDataverseEnvironmentOrigin,
   isSameDataverseEnvironment,
 } from "./dataverseEnvironment";
@@ -76,11 +85,12 @@ import {
   seatsReadIsDue,
   seatsReportDay,
 } from "./microsoftGraphSeats";
-import type {
-  NormalizedPullEvent,
-  PullerAdapter,
-  PullResult,
-  PullRunOptions,
+import {
+  type NormalizedPullEvent,
+  ProviderSignInError,
+  type PullerAdapter,
+  type PullResult,
+  type PullRunOptions,
 } from "./pullerAdapter";
 
 const logger = createLogger("langwatch:puller:copilot_studio_dataverse");
@@ -118,17 +128,6 @@ const TRANSCRIPT_ORDER_BY = "createdon asc,conversationtranscriptid asc";
  * with neither is unbounded. The sibling adapters carry the same cap.
  */
 const MAX_PAGES_PER_RUN = 50;
-
-/**
- * How many agents one run will name. A tenant holds tens of them, not
- * thousands, so this is a ceiling rather than a page size and the run does not
- * follow a second page of them — it says so in the log instead, because the
- * cost of going over is conversations with no agent name, not a failed run.
- */
-const MAX_BOTS = 500;
-
-/** Web API version this adapter's query shape is written against. */
-const API_VERSION = "v9.2";
 
 /**
  * Microsoft deletes transcripts on a schedule roughly a month out, so a first
@@ -283,30 +282,6 @@ const transcriptRowSchema = cursorRowSchema
     _bot_conversationtranscriptid_value: z.string().nullable().optional(),
   })
   .passthrough();
-
-/**
- * One row of the `bot` table, read once per run to put a name on each
- * conversation.
- */
-const botRowSchema = z
-  .object({
-    botid: z.string(),
-    name: z.string().nullable().optional(),
-    modifiedon: z.string().nullable().optional(),
-  })
-  .passthrough();
-
-/** The envelope every OData collection read comes back in. */
-const odataPageSchema = z.object({
-  value: z.array(z.unknown()).default([]),
-  "@odata.nextLink": z.string().optional(),
-});
-
-/** What the run knows about one agent, keyed by its lookup id. */
-interface BotRecord {
-  botName?: string;
-  botModifiedOn?: string;
-}
 
 /**
  * The cursor. `createdon` alone is not enough — rows written in the same
@@ -623,7 +598,7 @@ function environmentScope(environmentUrl: string): string {
  */
 export const AZURE_MANAGEMENT_SCOPE = `https://${AZURE_MANAGEMENT_HOST}/.default`;
 
-async function resolveEnvironmentToken(params: {
+export async function resolveEnvironmentToken(params: {
   credentials: Record<string, string> | undefined;
   environmentUrl: string;
   /** Which audience to mint for. Defaults to the environment itself. */
@@ -637,9 +612,10 @@ async function resolveEnvironmentToken(params: {
   const clientSecret = credentials?.clientSecret;
 
   if (!tenantId || !clientId || !clientSecret) {
-    throw new Error(
+    throw new ProviderSignInError(
       "copilot studio dataverse puller needs credentials.tenantId, " +
         "credentials.clientId and credentials.clientSecret from the app registration",
+      { reason: "not_configured" },
     );
   }
 
@@ -668,9 +644,10 @@ async function resolveEnvironmentToken(params: {
   if (!response.ok) {
     // The status alone, never the body: a token endpoint may echo the request
     // back, and this reason is logged and shown on the source.
-    throw new Error(
+    throw new ProviderSignInError(
       "copilot studio dataverse puller could not sign in: Microsoft refused " +
         `the application's credentials (HTTP ${response.status})`,
+      { reason: "refused", status: response.status },
     );
   }
 
@@ -679,9 +656,10 @@ async function resolveEnvironmentToken(params: {
     // A proxy or captive portal answering 200 with something that is not a
     // token must not be carried forward as one — it would fail later as an
     // unauthorised Dataverse call and read as a permissions problem.
-    throw new Error(
+    throw new ProviderSignInError(
       "copilot studio dataverse puller could not sign in: Microsoft answered " +
         "the sign-in without an access token",
+      { reason: "malformed_response" },
     );
   }
   return parsed.data.access_token;
@@ -717,7 +695,7 @@ function buildFirstPageUrl(params: {
   now: number;
 }): string {
   const { environmentUrl, config, cursor, now } = params;
-  const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/conversationtranscripts`;
+  const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${DATAVERSE_API_VERSION}/conversationtranscripts`;
 
   const filters = cursor
     ? continuationFilters(cursor)
@@ -758,31 +736,6 @@ function buildFirstPageUrl(params: {
   return `${base}?${query
     .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
     .join("&")}`;
-}
-
-/**
- * Dataverse writes lookup ids in one case and there is no promise both sides of
- * a join agree on it, so the key is folded before it is stored or read. A miss
- * here is silent — a conversation with no agent name — which is exactly the
- * kind of fault that survives a review.
- */
-function botKey(id: string): string {
-  return id.toLowerCase();
-}
-
-/** The agents on one page of the `bot` table, keyed by folded lookup id. */
-function readBotRows(rows: unknown[]): Map<string, BotRecord> {
-  const bots = new Map<string, BotRecord>();
-  for (const raw of rows) {
-    const parsed = botRowSchema.safeParse(raw);
-    if (!parsed.success) continue;
-    const row = parsed.data;
-    bots.set(botKey(row.botid), {
-      botName: row.name ?? undefined,
-      botModifiedOn: row.modifiedon ?? undefined,
-    });
-  }
-  return bots;
 }
 
 /**
@@ -1012,16 +965,6 @@ function refusesNextLink(params: {
     "copilot studio dataverse: refusing a next-page link that is not the configured environment",
   );
   return true;
-}
-
-/** The headers every read of this environment carries. */
-function dataverseHeaders(token: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/json",
-    "OData-MaxVersion": "4.0",
-    "OData-Version": "4.0",
-  };
 }
 
 /** A URL's host for logging, never throwing on one that will not parse. */
@@ -1765,61 +1708,29 @@ export class CopilotStudioDataversePuller
     token: string;
     signal?: AbortSignal;
   }): Promise<Map<string, BotRecord>> {
-    const { environmentUrl, token, signal } = params;
+    const read = await readCopilotBots(params);
 
-    try {
-      const page = await this.fetchBotsPage({ environmentUrl, token, signal });
-      if (!page) return new Map();
-
-      const bots = readBotRows(page.value);
-      warnAboutIncompleteBotList({
-        botCount: bots.size,
-        hasMorePages: Boolean(page["@odata.nextLink"]),
-      });
-      return bots;
-    } catch (error) {
+    // The refusal is discarded ON PURPOSE, and only here. `readCopilotBots`
+    // reports which of the three things happened so the on-demand agent
+    // listing can show an admin the difference between a tenant with no agents
+    // and a credential that may not enumerate them. This caller genuinely
+    // cannot use that: an empty Map is the only thing the walk below can
+    // proceed with, and anything louder would fail a transcript pull over a
+    // missing label.
+    if (!read.ok) {
       logger.warn(
-        { error: error instanceof Error ? error.message : String(error) },
+        { reason: read.refusal.reason, status: read.refusal.status },
         "copilot studio dataverse: could not read the agent list; conversations keep their agent id but get no name",
       );
       return new Map();
     }
-  }
 
-  /**
-   * The one read of the `bot` table, or null when the environment refused it.
-   *
-   * A refusal is null rather than a throw because it is the ordinary case
-   * here: the caller treats "no list" and "an unreadable list" the same way,
-   * and neither is worth an error count.
-   */
-  private async fetchBotsPage(params: {
-    environmentUrl: string;
-    token: string;
-    signal?: AbortSignal;
-  }): Promise<z.infer<typeof odataPageSchema> | null> {
-    const { environmentUrl, token, signal } = params;
-    const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/bots`;
-    const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
-    const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-
-    const response = await ssrfSafeFetch(`${base}?${query}`, {
-      method: "GET",
-      headers: dataverseHeaders(token),
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      // Same reasoning as the transcript read: this request carries the
-      // token, and a redirect would hand it to whoever answers.
-      followRedirects: false,
+    const bots = readBotRows(read.rows);
+    warnAboutIncompleteBotList({
+      botCount: bots.size,
+      hasMorePages: read.hasMorePages,
     });
-
-    if (!response.ok) {
-      logger.warn(
-        { status: response.status },
-        "copilot studio dataverse: could not read the agent list; conversations keep their agent id but get no name",
-      );
-      return null;
-    }
-    return odataPageSchema.parse(await response.json());
+    return bots;
   }
 
   private async fetchPage(params: {
