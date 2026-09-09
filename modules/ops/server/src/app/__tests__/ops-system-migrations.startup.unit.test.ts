@@ -8,9 +8,9 @@ import { PrismaOrganizationTenantSourceRepository } from "../../repositories/pri
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { RedisMigrationLeaseRepository } from "../../repositories/redis/redis.migration-lease.repository.ts";
 import {
-  PostgresSystemMigrationsAdapter,
+  OpsSystemMigrations,
   UserStartupMigrationsUnsupportedError,
-} from "../postgres.system-migrations.adapter.ts";
+} from "../ops-system-migrations.ts";
 
 const clients: PrismaClient[] = [];
 
@@ -79,7 +79,7 @@ function harness({
   vi.spyOn(RedisMigrationLeaseRepository.prototype, "renew").mockResolvedValue(true);
   vi.spyOn(RedisMigrationLeaseRepository.prototype, "release").mockResolvedValue();
 
-  const adapter = PostgresSystemMigrationsAdapter.create({
+  const adapter = OpsSystemMigrations.create({
     database,
     redis: null,
     isSaaS: () => true,
@@ -95,7 +95,7 @@ afterEach(async () => {
   await Promise.all(clients.splice(0).map((client) => client.$disconnect()));
 });
 
-describe("PostgresSystemMigrationsAdapter.runStartup", () => {
+describe("OpsSystemMigrations.runStartup", () => {
   it("runs startup migrations for enrolled tenants and excludes background migrations and tenants", async () => {
     const startup = migrationOf("stored-object-startup", "startup", false);
     const background = migrationOf("background", "background");
@@ -105,7 +105,7 @@ describe("PostgresSystemMigrationsAdapter.runStartup", () => {
       tenants: ["org_acme", "org_globex"],
       enrollments: new Map([[startup.name, new Set(["org_acme"])]]),
     });
-    const adapter = PostgresSystemMigrationsAdapter.create({
+    const adapter = OpsSystemMigrations.create({
       database,
       redis: null,
       isSaaS: () => true,
@@ -127,7 +127,7 @@ describe("PostgresSystemMigrationsAdapter.runStartup", () => {
       report: {},
     }));
     const pendingHarness = harness({ tenants: ["org_acme"] });
-    const pendingAdapter = PostgresSystemMigrationsAdapter.create({
+    const pendingAdapter = OpsSystemMigrations.create({
       database: pendingHarness.database,
       redis: null,
       isSaaS: () => true,
@@ -141,7 +141,7 @@ describe("PostgresSystemMigrationsAdapter.runStartup", () => {
 
     const finalizedHarness = harness({ tenants: ["org_acme"] });
     const finalized = migrationOf("stored-object-startup");
-    const finalizedAdapter = PostgresSystemMigrationsAdapter.create({
+    const finalizedAdapter = OpsSystemMigrations.create({
       database: finalizedHarness.database,
       redis: null,
       isSaaS: () => true,
@@ -157,7 +157,7 @@ describe("PostgresSystemMigrationsAdapter.runStartup", () => {
   it("refuses startup-mode user migrations before starting an organization pass", async () => {
     const userMigration = migrationOf("user-startup");
     const { database } = harness({ tenants: ["org_acme"] });
-    const adapter = PostgresSystemMigrationsAdapter.create({
+    const adapter = OpsSystemMigrations.create({
       database,
       redis: null,
       isSaaS: () => true,

@@ -1,22 +1,19 @@
-import {
-  OpsService,
-  type OpsBlockedSummary,
-  type OpsParkedTenantsPage,
-  type OpsQueueReconcileResult,
-  type QueueInfo,
+import type {
+  OpsBlockedSummary,
+  OpsParkedTenantsPage,
+  OpsQueueReconcileResult,
+  QueueInfo,
 } from "@langwatch/ops-contract";
 
 /** Complete in-memory Ops service used only by the app metrics collector tests. */
-export class OpsMetricsTestAdapter extends OpsService {
+export class OpsMetricsTestAdapter {
   private queueNames: string[] = [];
   private queues: QueueInfo[] = [];
   private pendingReconciliations: Array<OpsQueueReconcileResult | null> = [];
   private pendingDrift = 0;
   private scanCalls = 0;
 
-  private constructor() {
-    super();
-  }
+  private constructor() {}
 
   static create(): OpsMetricsTestAdapter {
     return new OpsMetricsTestAdapter();
@@ -43,7 +40,7 @@ export class OpsMetricsTestAdapter extends OpsService {
   }
 
   private unavailable(): never {
-    throw new Error("This OpsService capability is not used by metrics collector tests");
+    throw new Error("This operations capability is not used by metrics collector tests");
   }
 
   isAdmin(): boolean {

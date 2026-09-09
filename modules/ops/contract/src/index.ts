@@ -4,7 +4,6 @@ export * from "./admin.errors.ts";
 export * from "./admin.queries.ts";
 export * from "./blob-store.ts";
 export * from "./ops.responses.ts";
-export * from "./ops.service.ts";
 export { OpsApi } from "./ops.api.ts";
 export * from "./ops-dashboard.ts";
 export * from "./ops-queue.ts";

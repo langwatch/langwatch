@@ -11,11 +11,11 @@ import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   NoopSchedulerWakeService,
-  PostgresOpsAdapter,
+  OpsOperations,
   QueuePayloadDecoderPort,
   type SchedulerOpsRepository,
 } from "@langwatch/ops-server";
-import type { OpsService } from "@langwatch/ops-contract";
+import type { OpsService } from "../services/ops.service.ts";
 import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -84,7 +84,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
   beforeAll(async () => {
     if (!redisUrl) return;
     redis = new Redis(redisUrl);
-    ops = PostgresOpsAdapter.create({
+    ops = OpsOperations.create({
       database: {
         user: { findUnique: async () => null },
         session: { update: async () => ({}) },

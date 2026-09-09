@@ -479,19 +479,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "ops|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "ops|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "ops|persistence-adapter",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "ops|refusing-composition",
       "measured": "2026-09-08"
     },
     {

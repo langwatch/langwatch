@@ -11,7 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { describe, expect, it } from "vitest";
-import { PostgresOpsAdapter } from "../../adapters/postgres.ops.adapter.ts";
+import { OpsOperations } from "../../app/ops-operations.ts";
 import { AuditStub, AuthStub, organizationEdit } from "./support/backoffice-doubles.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
@@ -34,7 +34,7 @@ const refuseEveryQuery = new Proxy(
 );
 
 function backoffice() {
-  return PostgresOpsAdapter.create({
+  return OpsOperations.create({
     database: refuseEveryQuery as never,
     audit: new AuditStub(),
     auditLog: createApiFixture<AuditLogApi>(),

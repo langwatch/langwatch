@@ -360,11 +360,7 @@ import {
 import { composeLangyFeature, refusingLangyFeature } from "../features/langy/langy.composition.ts";
 import { ApiLangyNavigateResourceAdapter } from "../features/langy/langy-navigate-resource.adapter.ts";
 import { installApiDataPrivacy } from "../features/data-privacy/data-privacy.composition.ts";
-import {
-  composeOpsFeature,
-  LoggedApiOpsAbsence,
-  refusingOpsFeature,
-} from "../features/ops/ops.composition.ts";
+import { installApiOps, LoggedApiOpsAbsence } from "../features/ops/ops.composition.ts";
 import { composeApiAuthCliDeviceFlow } from "../features/auth/auth-cli-device-flow-rest.mount.ts";
 import { composeApiAuthRest } from "../features/auth/auth-rest.mount.ts";
 import { composeApiGovernanceCliRest } from "../features/enterprise/governance-cli-rest.mount.ts";
@@ -3982,9 +3978,13 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     tenancy: ApiTenancyComposition | undefined,
   ): Promise<ComposedOpsFeature> {
     const auth = this.composedAuth?.compose();
-    if (!infrastructure || !auth || !tenancy) return refusingOpsFeature();
+    if (!infrastructure || !auth || !tenancy) {
+      throw new Error(
+        "api ops composition needs infrastructure, auth and tenancy: this process installed none",
+      );
+    }
 
-    return await composeOpsFeature({
+    return await installApiOps({
       infrastructure,
       peers: {
         users: auth.users,

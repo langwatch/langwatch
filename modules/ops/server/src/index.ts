@@ -23,10 +23,7 @@ export { PrismaBugReportRepository } from "./repositories/prisma/prisma.bug-repo
 export { BugReportInboxService } from "./services/bug-report-inbox.service.ts";
 export type { BugReportRepository } from "./repositories/bug-report.repository.ts";
 export type { OpsRepositories } from "./repositories/ops.repositories.ts";
-export {
-  PostgresOpsAdapter,
-  type PostgresOpsAdapterOptions,
-} from "./adapters/postgres.ops.adapter.ts";
+export { OpsOperations, type OpsOperationsOptions } from "./app/ops-operations.ts";
 export {
   RedisOpsSnapshotAdapter,
   type RedisOpsSnapshotAdapterOptions,
@@ -154,10 +151,10 @@ export {
   organizationMigrates,
 } from "./rules/ops-system-migration-cohort.rules.ts";
 export {
-  PostgresSystemMigrationsAdapter,
+  OpsSystemMigrations,
   UserStartupMigrationsUnsupportedError,
-  type PostgresSystemMigrationsAdapterOptions,
-} from "./adapters/postgres.system-migrations.adapter.ts";
+  type OpsSystemMigrationsOptions,
+} from "./app/ops-system-migrations.ts";
 // The state rows on their own, for a reader that is not the runner: the
 // identity write gate decides a user's fork from the backfill's record.
 export { PrismaSystemMigrationStateRepository } from "./repositories/prisma/prisma.system-migration-state.repository.ts";
@@ -178,7 +175,7 @@ export {
   type ProcessManagerPurgeOptions,
   type ProcessManagerPurgeReport,
 } from "./tasks/process-manager-purge.task.ts";
-export { PostgresProcessManagerPurgeAdapter } from "./adapters/postgres.process-manager-purge.adapter.ts";
+export { PrismaProcessManagerPurgeRepository } from "./repositories/prisma/prisma.process-manager-purge.repository.ts";
 export type {
   ProcessManagerPurgeRepository,
   ProcessManagerPurgeTarget,

@@ -17,7 +17,7 @@ import {
   ManagerExplorerService,
   NoopSchedulerWakeService,
   OpsApp,
-  PostgresOpsAdapter,
+  OpsOperations,
   ProcessAuditRepository,
   OpsSnapshotRedisPort,
   ProcessOpsPrismaRepository,
@@ -117,8 +117,8 @@ const OPS_CONSEQUENCE = {
     "API process composed no Redis: the operator dashboard, its badge counts and its live stream have no snapshot to read, so they answer empty rather than showing what the worker computed.",
 } as const;
 
-/** Composes the operator surface over this process's own graph. */
-export async function composeOpsFeature(options: {
+/** Installs the operator module on this process's own graph. */
+export async function installApiOps(options: {
   infrastructure: ApiTrpcInfrastructure;
   peers: OpsPeers;
   adminEmails: readonly string[];
@@ -174,28 +174,6 @@ export type ApiOpsExplainCollaborators = Readonly<{
   isProduction: boolean;
 }>;
 
-/**
- * The operator surface on a process that composed no graph to run it over. The
- * staff check still runs, so `ctx.app.ops` is never undefined and no other
- * surface has to branch on it.
- */
-export function refusingOpsFeature(): ComposedOpsFeature {
-  return { app: refusingOps<OpsApp>() };
-}
-
-/** One operator application, refused by name on every member. */
-function refusingOps<T>(): T {
-  return new Proxy(
-    {},
-    {
-      get: () => (): never => {
-        throw new ApiOpsUnavailableError("The operator back office");
-      },
-      has: () => true,
-    },
-  ) as T;
-}
-
 // ---------------------------------------------------------------------------
 // The operator back office
 // ---------------------------------------------------------------------------
@@ -226,7 +204,7 @@ async function composeOps(
     .withPersistence("postgres", { prisma: options.prisma })
     .withInfrastructure({
       createCapability: (peers): OpsCapability => {
-        const operations = PostgresOpsAdapter.create({
+        const operations = OpsOperations.create({
           adminEmails: options.adminEmails,
           // Once the connection projection decides sign-in, editing the legacy
           // `ssoDomain`/`ssoProvider` strings changes nothing a person experiences,

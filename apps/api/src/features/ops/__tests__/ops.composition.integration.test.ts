@@ -18,7 +18,7 @@ import {
   stub,
   stubInfrastructureEntitlements,
 } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
-import { composeOpsFeature } from "../ops.composition.ts";
+import { installApiOps } from "../ops.composition.ts";
 
 const SESSION_USER = {
   id: "user-1",
@@ -96,7 +96,7 @@ async function composeOperatorApp(
     audit: undefined,
   };
 
-  const ops = await composeOpsFeature({
+  const ops = await installApiOps({
     infrastructure,
     peers: {
       users: stub<UserApi>("users"),

@@ -38,6 +38,7 @@ import type {
 } from "@langwatch/feature-flag-contract";
 import { listFeatureFlags } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import type { OpsService } from "../services/ops.service.ts";
 import type {
   AdminIdentity,
   AggregateDiscovery,
@@ -50,7 +51,6 @@ import type {
   DeadLetterCount,
   GroupInfo,
   DeadOutboxMessageView,
-  OpsService,
   OpsSnapshotService,
   OutboxAttemptView,
   ProcessAuditEntryView,
@@ -599,7 +599,7 @@ export class OpsApp implements OpsApi {
    * Whether this identity is on the deployment's operator allow-list.
    *
    * Synchronous, and keyed on the identity's email rather than a user id —
-   * `OpsService.isAdmin(identity: AdminIdentity)` is the contract, and the
+   * `OpsApi.isAdmin(identity: AdminIdentity)` is the contract, and the
    * allow-list is a list of addresses. Lifted onto the application because a
    * door outside this feature asks it: the SSO connection surface gates on the
    * staff list rather than on `ops:*`, and it reaches this answer through the

@@ -1,8 +1,4 @@
-import type {
-  BackofficeUserRow,
-  OpsService as OpsServiceContract,
-  UserWithBackofficeIncludes,
-} from "@langwatch/ops-contract";
+import type { BackofficeUserRow, UserWithBackofficeIncludes } from "@langwatch/ops-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { Cluster, Redis as IORedis } from "ioredis";
@@ -32,7 +28,7 @@ import type { SchedulerWakePort } from "../ports/scheduler-wake.port.ts";
 import { SchedulerOpsService } from "../services/scheduler-ops.service.ts";
 import { RedisAnomalyStateRepository } from "../repositories/redis/redis.anomaly-state.repository.ts";
 import { QueueRedisRepository } from "../repositories/redis/queue.repository.ts";
-import { QueueAuditAdapter } from "./audit-log.queue-audit.adapter.ts";
+import { QueueAuditAdapter } from "../adapters/audit-log.queue-audit.adapter.ts";
 import { NullQueueRepository } from "../repositories/queue.repository.ts";
 import { QueueService } from "../services/queue.service.ts";
 import type { QueuePayloadDecoderPort } from "../ports/queue-payload-decoder.port.ts";
@@ -42,7 +38,7 @@ import {
 } from "../repositories/prisma/prisma.scheduler-audit.repository.ts";
 import type { Instant } from "@langwatch/time";
 
-export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
+export interface OpsOperationsOptions extends AdminAccessServiceOptions {
   database: AdminDatabase & SchedulerAuditDatabase;
   audit: AdminAuditSink;
   /** The shared audit log every operator act is recorded on. */
@@ -62,11 +58,16 @@ export interface PostgresOpsAdapterOptions extends AdminAccessServiceOptions {
   };
 }
 
-export class PostgresOpsAdapter {
-  private constructor(private readonly options: PostgresOpsAdapterOptions) {}
+/**
+ * The operations half of the application, built from the repositories and the
+ * connections the process hands it. Not a persistence adapter: the backend
+ * choice is the registry's, and this is where the services are composed.
+ */
+export class OpsOperations {
+  private constructor(private readonly options: OpsOperationsOptions) {}
 
-  static create(options: PostgresOpsAdapterOptions): PostgresOpsAdapter {
-    return new PostgresOpsAdapter(options);
+  static create(options: OpsOperationsOptions): OpsOperations {
+    return new OpsOperations(options);
   }
 
   static readonly userBackofficeInclude = PrismaAdminUserMapper.USER_BACKOFFICE_INCLUDE;
@@ -77,7 +78,7 @@ export class PostgresOpsAdapter {
     return PrismaAdminUserMapper.map(user);
   }
 
-  build(): OpsServiceContract {
+  build(): OpsService {
     const access =
       this.options.access ?? AdminAccessService.create({ adminEmails: this.options.adminEmails });
     const queues = this.options.redis

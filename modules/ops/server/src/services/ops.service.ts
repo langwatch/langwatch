@@ -1,5 +1,4 @@
 import {
-  OpsService as OpsServiceContract,
   type AdminIdentity,
   type DeleteBlobInput,
   type DeleteBlobResult,
@@ -44,7 +43,8 @@ import type { SchedulerOpsService } from "./scheduler-ops.service.ts";
 import type { AnomalyStatePort } from "../ports/anomaly-state.port.ts";
 import type { QueueService } from "./queue.service.ts";
 
-export class OpsService extends OpsServiceContract {
+/** The operations half of `OpsApi`, over the repositories and services this process composed. */
+export class OpsService {
   private constructor(
     private readonly access: AdminAccess,
     private readonly impersonation: ImpersonationService,
@@ -53,9 +53,7 @@ export class OpsService extends OpsServiceContract {
     private readonly scheduler: SchedulerOpsService,
     private readonly anomalyState: AnomalyStatePort | null,
     private readonly queues: QueueService,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(options: {
     access: AdminAccess;

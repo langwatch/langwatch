@@ -15,7 +15,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ApiOpsAbsenceReport, composeOpsFeature } from "../ops.composition.ts";
+import { ApiOpsAbsenceReport, installApiOps } from "../ops.composition.ts";
 
 /** The two fleet reads, in the order the repository issues them. */
 function fleetPrisma(rows: { instances: unknown[]; outbox: unknown[] }) {
@@ -57,7 +57,7 @@ class RecordingAbsence extends ApiOpsAbsenceReport {
 
 async function compose(options: { prisma: PrismaClient; redis?: RedisConnection | null }) {
   const report = new RecordingAbsence();
-  const feature = await composeOpsFeature({
+  const feature = await installApiOps({
     infrastructure: {
       prisma: options.prisma,
       authz: {} as never,

@@ -37,6 +37,7 @@ import {
   stubDataRetentionFeature,
   stubEntitlementFeature,
   stubFeatureFlagFeature,
+  stubOpsFeature,
   stubPresenceFeature,
   stubSecretFeature,
   stubShareFeature,
@@ -60,7 +61,6 @@ import { refusingProjectFeature } from "../../project/project.composition.ts";
 import { refusingCodingAgentFeature } from "../../coding-agent/coding-agent.composition.ts";
 import { refusingAutomationFeature } from "../../automation/automation.composition.ts";
 import { refusingEnterpriseFeature } from "../../enterprise/enterprise.composition.ts";
-import { refusingOpsFeature } from "../../ops/ops.composition.ts";
 import { refusingHomeFeature } from "../../project/home.composition.ts";
 import {
   stub,
@@ -210,7 +210,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       presence: stubPresenceFeature(),
       apiKey: stubApiKeyFeature(),
       langy: refusingLangyFeature(),
-      ops: refusingOpsFeature(),
+      ops: stubOpsFeature(),
       scenario: refusingScenarioFeature(),
       analytics: refusingAnalyticsFeature(),
       featureFlag: stubFeatureFlagFeature(),

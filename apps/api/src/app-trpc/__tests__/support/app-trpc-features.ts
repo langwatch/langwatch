@@ -32,6 +32,7 @@ import {
   stubEntitlementFeature,
   stubFeatureFlagFeature,
   stubApiKeyFeature,
+  stubOpsFeature,
   stubPresenceFeature,
   stubSecretFeature,
   stubShareFeature,
@@ -55,7 +56,6 @@ import { refusingProjectFeature } from "../../../features/project/project.compos
 import { refusingCodingAgentFeature } from "../../../features/coding-agent/coding-agent.composition.ts";
 import { refusingAutomationFeature } from "../../../features/automation/automation.composition.ts";
 import { refusingEnterpriseFeature } from "../../../features/enterprise/enterprise.composition.ts";
-import { refusingOpsFeature } from "../../../features/ops/ops.composition.ts";
 import { createAppTrpcFeatures } from "../../app-trpc.features.ts";
 
 /** Every member refuses, so reaching one while BUILDING a surface is a failure. */
@@ -177,7 +177,7 @@ export function buildAppTrpcFeatures(
       presence: stubPresenceFeature(),
       apiKey: stubApiKeyFeature(),
       langy: refusingLangyFeature(),
-      ops: refusingOpsFeature(),
+      ops: stubOpsFeature(),
       scenario: refusingScenarioFeature(),
       analytics: refusingAnalyticsFeature(),
       featureFlag: stubFeatureFlagFeature(),

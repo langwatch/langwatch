@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { RedisMigrationLeaseRepository } from "../../repositories/redis/redis.migration-lease.repository.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
-import { PostgresSystemMigrationsAdapter } from "../postgres.system-migrations.adapter.ts";
+import { OpsSystemMigrations } from "../ops-system-migrations.ts";
 
 const IDENTIFIER_BACKFILL = "identity-d01-identifier-backfill";
 
@@ -75,7 +75,7 @@ function stubDatabase({
 function adapterOn(database: PrismaClient, newbornSweep = vi.fn(async () => undefined)) {
   return {
     newbornSweep,
-    adapter: PostgresSystemMigrationsAdapter.create({
+    adapter: OpsSystemMigrations.create({
       database,
       redis: null,
       isSaaS: () => true,
@@ -86,7 +86,7 @@ function adapterOn(database: PrismaClient, newbornSweep = vi.fn(async () => unde
   };
 }
 
-describe("PostgresSystemMigrationsAdapter", () => {
+describe("OpsSystemMigrations", () => {
   describe("when one organization is enrolled in the identifier backfill and another is not", () => {
     /** @scenario "Organization enrollment is what puts a user in the backfill's cohort" */
     it("admits exactly the enrolled organizations' members; org-less users stay out", async () => {
@@ -238,7 +238,7 @@ describe("project-rooted migration composition", () => {
       .spyOn(PrismaSystemMigrationStateRepository.prototype, "upsertRecordUnlessRolledBack")
       .mockResolvedValue(true);
     const migration = migrationOf({ name });
-    const adapter = PostgresSystemMigrationsAdapter.create({
+    const adapter = OpsSystemMigrations.create({
       database,
       redis: null,
       isSaaS: () => true,
@@ -267,7 +267,7 @@ describe("project-rooted migration composition", () => {
 
   it("checks project-scoped startup completion instead of enumerating organizations", async () => {
     const { database, projectFindMany } = stubDatabase({ enrollments: [], memberships: {} });
-    const adapter = PostgresSystemMigrationsAdapter.create({
+    const adapter = OpsSystemMigrations.create({
       database,
       redis: null,
       isSaaS: () => true,

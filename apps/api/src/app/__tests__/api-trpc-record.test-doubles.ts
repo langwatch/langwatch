@@ -12,7 +12,7 @@ import type { ApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators
 import type { ApiTrpcFeatureApplicationSlices } from "../api-trpc-features.composition.ts";
 import { createGatewayTrpcRouters } from "../../features/gateway/gateway-trpc.mount.ts";
 import { refusingLangyFeature } from "../../features/langy/langy.composition.ts";
-import { refusingOpsFeature } from "../../features/ops/ops.composition.ts";
+import type { ComposedOpsFeature } from "../../features/ops/ops.composition.types.ts";
 import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../features/dataset/dataset.composition.ts";
 import { createEvaluatorTrpcRouter } from "../../features/evaluator/evaluator-trpc.mount.ts";
@@ -352,6 +352,15 @@ export function stubCollaborators(
  * supplies them: the namespaces build on the real parsers and every call
  * refuses.
  */
+/**
+ * The operator slice a suite that drives no back office supplies. The API
+ * process either installs the module or fails boot by name, so the absence is
+ * a test's own, not a deployment shape.
+ */
+export function stubOpsFeature(): ComposedOpsFeature {
+  return { app: stub("app.ops") };
+}
+
 export function stubComposedFeatures(): ComposedApiFeatures {
   return {
     gateway: {
@@ -364,7 +373,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
         }),
     },
     langy: refusingLangyFeature(),
-    ops: refusingOpsFeature(),
+    ops: stubOpsFeature(),
     scenario: refusingScenarioFeature(),
     analytics: refusingAnalyticsFeature(),
     featureFlag: stubFeatureFlagFeature(),

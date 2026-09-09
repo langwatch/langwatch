@@ -12,7 +12,7 @@ import {
   migrationRunsOnThisInstallation,
   userMigrates,
 } from "../rules/ops-system-migration-cohort.rules.ts";
-import { NullOrganizationDataplaneAdapter } from "./null.organization-dataplane.adapter.ts";
+import { NullOrganizationDataplaneAdapter } from "../adapters/null.organization-dataplane.adapter.ts";
 import type { OrganizationDataplanePort } from "../ports/organization-dataplane.port.ts";
 import { SystemMigrationCohortService } from "../services/system-migration-cohort.service.ts";
 import { PrismaMigrationMembershipRepository } from "../repositories/prisma/prisma.migration-membership.repository.ts";
@@ -53,7 +53,7 @@ function mergeSummaries(a: MigrationPassSummary, b: MigrationPassSummary): Migra
   };
 }
 
-export type PostgresSystemMigrationsAdapterOptions = Readonly<{
+export type OpsSystemMigrationsOptions = Readonly<{
   database: PrismaClient;
   redis: Redis | Cluster | null;
   /** Cloud pacing is per-organization enrollment; self-hosted admits everyone. */
@@ -70,12 +70,12 @@ export type PostgresSystemMigrationsAdapterOptions = Readonly<{
   /**
    * The abandoned-newborn sweep (ADR-116 §3), on the pass's own cadence. A LEG
    * rather than a registered migration, because what it hunts is a claim with
-   * no user row behind it — a tenant no source enumerates.
+   * no user row behind it - a tenant no source enumerates.
    */
   newbornSweep: () => Promise<unknown>;
   /**
-   * Where each organization's data lives. Not a filter — a private data plane
-   * never holds an organization back — but a pass that admits one says which
+   * Where each organization's data lives. Not a filter - a private data plane
+   * never holds an organization back - but a pass that admits one says which
    * instance it landed on. Omitted, every organization reads as shared.
    */
   dataplane?: OrganizationDataplanePort;
@@ -86,12 +86,12 @@ export type PostgresSystemMigrationsAdapterOptions = Readonly<{
  * tenant-source repositories and its Redis lease. Was main's
  * `app-layer/system-migrations/runtime.ts`, minus the migration registry.
  */
-export class PostgresSystemMigrationsAdapter {
-  static create(options: PostgresSystemMigrationsAdapterOptions): PostgresSystemMigrationsAdapter {
-    return new PostgresSystemMigrationsAdapter(options);
+export class OpsSystemMigrations {
+  static create(options: OpsSystemMigrationsOptions): OpsSystemMigrations {
+    return new OpsSystemMigrations(options);
   }
 
-  private constructor(private readonly options: PostgresSystemMigrationsAdapterOptions) {}
+  private constructor(private readonly options: OpsSystemMigrationsOptions) {}
 
   async runStartup({
     signal,
@@ -279,7 +279,7 @@ export class PostgresSystemMigrationsAdapter {
   /**
    * Read once, fresh, at the start of the run rather than per tenant: one
    * query instead of one per tenant per migration. Self-hosted never reads
-   * enrollment at all — there is nothing to pace.
+   * enrollment at all - there is nothing to pace.
    */
   private async cohort({
     isSaaS,
