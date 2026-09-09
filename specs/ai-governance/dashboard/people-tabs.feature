@@ -410,9 +410,13 @@ Feature: The People page is two tabs, People and Departments
     Given the organization created a department no connected directory names
     When sam opens the Departments tab
     Then its headcount reads as an em dash rather than zero
+    And the column says the figure counts the people a source named
     # The headcount counts the people the directories filed under the name, not
     # the members an administrator assigned. A zero would report a department
-    # empty when it may hold half the company.
+    # empty when it may hold half the company. The column label is load-bearing
+    # for the same reason: an em dash means "not measured" only to a reader who
+    # is told what was being measured, and to anyone else a dash beside a
+    # department they know has people in it reads as a defect.
 
   @integration
   Scenario: The Departments tab offers no controls to a viewer without the manage grant

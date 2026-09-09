@@ -1366,12 +1366,26 @@ function DepartmentListPanel({
         letterSpacing="wider"
         justifyContent="space-between"
       >
-        <Text>Departments</Text>
-        {!isLoading && (
-          <Text fontWeight="normal" textTransform="none" letterSpacing="normal">
-            {rows.length}
-          </Text>
-        )}
+        <HStack gap={2} minWidth={0}>
+          <Text>Departments</Text>
+          {!isLoading && (
+            <Text
+              fontWeight="normal"
+              textTransform="none"
+              letterSpacing="normal"
+            >
+              {rows.length}
+            </Text>
+          )}
+        </HStack>
+        {/* The figure on each row counts the people a connected source filed
+            under that name. That is not the department's membership: an
+            administrator can assign people no source ever named, and
+            `directoryHeadcount` never counts those. Saying so is what lets the
+            em dash read as "no source named anyone here" instead of as an empty
+            department — the panel this table replaced carried that fact in its
+            heading, and deleting the panel would otherwise have deleted it. */}
+        <Text flexShrink={0}>People named by a source</Text>
       </HStack>
       {isLoading ? (
         <Box padding={4}>

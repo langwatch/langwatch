@@ -245,6 +245,11 @@ describe("given people the providers named", () => {
       const row = screen.getByTestId("department-row-Finance");
       expect(within(row).getByText("—")).toBeVisible();
       expect(within(row).queryByText("0 people")).not.toBeInTheDocument();
+
+      // The dash only reads as "not measured" if the column says what it
+      // measured. Without the label a reader who knows Finance has people in
+      // it reads the dash as a defect in the page.
+      expect(screen.getByText("People named by a source")).toBeVisible();
     });
 
     it("says the table is empty when nobody created one either", () => {
