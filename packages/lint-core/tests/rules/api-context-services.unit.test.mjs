@@ -60,3 +60,9 @@ describe("given a strict feature API module", () => {
     });
   });
 });
+
+it("rejects app construction inside a feature API", () => {
+  const found = report("export class AgentApi { run() { return new AgentApp(); } }");
+  expect(found.map((entry) => entry.messageId)).toEqual(["construction"]);
+  expect(found[0].data.name).toBe("AgentApp");
+});

@@ -17,6 +17,7 @@ function serviceOwnerRoot(filename, cwd) {
 }
 
 function repositoryTarget(specifier, filename) {
+  if (specifier.startsWith("#repositories/")) return filename;
   if (specifier.startsWith(".")) return resolve(dirname(filename), specifier);
   // `~/` was the deleted platform application's alias root. It resolves to
   // nothing now; returning undefined is what makes an import that still uses it
@@ -107,7 +108,8 @@ export const serviceDependenciesRule = defineRule({
         }
         if (!importsRepository(node)) return;
         const target = repositoryTarget(node.source.value, absoluteFilename);
-        if (!target || escapesRoot(ownerRoot, target)) {
+        const foreignRepository = !target || escapesRoot(ownerRoot, target);
+        if (foreignRepository) {
           context.report({
             node: node.source,
             messageId: "foreignRepository",

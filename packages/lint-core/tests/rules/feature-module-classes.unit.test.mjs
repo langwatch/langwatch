@@ -3,7 +3,7 @@ import { featureModuleClassesRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { server: {} } } },
+  features: { agent: { layoutVersion: 0, roles: { server: {}, contract: {} } } },
 });
 
 afterAll(() => workspace.cleanup());
@@ -14,6 +14,9 @@ function report(code, filename) {
 
 const PORT = "packages/features/agent/server/src/ports/agent.port.ts";
 const ADAPTER = "packages/features/agent/server/src/adapters/agent.adapter.ts";
+const REPOSITORY = "packages/features/agent/server/src/repositories/agent.repository.ts";
+const PRISMA_REPOSITORY =
+  "packages/features/agent/server/src/repositories/prisma/prisma.agent.repository.ts";
 
 describe("given a strict feature port module", () => {
   describe("when it exports a concrete class named *Port", () => {
@@ -65,5 +68,43 @@ describe("given a strict feature adapter module", () => {
         ),
       ).toEqual([]);
     });
+  });
+});
+
+describe("given strict feature repositories", () => {
+  it("accepts an interface as a repository port", () => {
+    expect(report("export interface AgentRepository {}", REPOSITORY)).toEqual([]);
+  });
+
+  it("accepts the inherited Prisma repository factory", () => {
+    expect(
+      report(
+        "export class PrismaAgentRepository { static readonly create = this.factory(() => new PrismaAgentRepository()); }",
+        PRISMA_REPOSITORY,
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe("feature apps", () => {
+  it("requires the public app contract to be abstract", () => {
+    const file = "packages/features/agent/contract/src/agent.app.ts";
+    expect(report("export abstract class AgentApp {}", file)).toEqual([]);
+    expect(report("export class AgentApp {}", file).map((entry) => entry.messageId)).toEqual([
+      "abstract",
+    ]);
+  });
+
+  it("requires a concrete app factory", () => {
+    const file = "packages/features/agent/server/src/app/agent.app.ts";
+    expect(
+      report("export class ComposedAgentApp {}", file).map((entry) => entry.messageId),
+    ).toEqual(["create"]);
+    expect(
+      report(
+        "export class ComposedAgentApp { static create() { return new ComposedAgentApp(); } }",
+        file,
+      ),
+    ).toEqual([]);
   });
 });

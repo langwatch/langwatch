@@ -33,6 +33,7 @@ function strictPortBaseline(cwd) {
 
 function declaredClasses(program) {
   const classes = [];
+  const interfaces = [];
   const functions = [];
   for (const statement of program.body) {
     let declaration = statement;
@@ -46,6 +47,9 @@ function declaredClasses(program) {
     }
     if (exported && declaration.type === "ClassDeclaration") {
       classes.push(declaration);
+    }
+    if (exported && declaration.type === "TSInterfaceDeclaration") {
+      interfaces.push(declaration);
     }
     if (exported && declaration.type === "FunctionDeclaration") {
       functions.push(declaration);
@@ -61,7 +65,19 @@ function declaredClasses(program) {
       }
     }
   }
-  return { classes, functions };
+  return { classes, interfaces, functions };
+}
+
+function isStaticCreateFactory(member) {
+  if (member.type !== "PropertyDefinition") return false;
+  if (!member.static) return false;
+  if (member.key.type !== "Identifier" || member.key.name !== "create") return false;
+  if (member.value?.type !== "CallExpression") return false;
+
+  const factory = member.value.callee;
+  if (factory.type !== "MemberExpression") return false;
+  if (factory.object.type !== "ThisExpression") return false;
+  return factory.property.type === "Identifier" && factory.property.name === "factory";
 }
 
 function hasInvalidExportedPort(program) {
@@ -82,6 +98,11 @@ function hasInvalidExportedPort(program) {
 }
 
 function featureModuleKind(normalized) {
+  if (
+    /^packages\/(?:enterprise\/)?features\/[^/]+\/contract\/src\/[^/]+\.app\.ts$/.test(normalized)
+  ) {
+    return { suffix: "App", abstract: true, concrete: false };
+  }
   const contract = normalized.match(
     /^packages\/(?:enterprise\/)?features\/[^/]+\/contract\/src\/.+\.service\.ts$/,
   );
@@ -92,6 +113,9 @@ function featureModuleKind(normalized) {
   );
   if (!server) return undefined;
   const path = server[1];
+  if (/^app\/[^/]+\.app\.ts$/.test(path)) {
+    return { suffix: "App", abstract: false, concrete: true };
+  }
   if (/^api\/[^/]+\/.+\.api\.ts$/.test(path)) {
     return { suffix: "Api", abstract: false, concrete: true };
   }
@@ -170,12 +194,15 @@ export const featureModuleClassesRule = defineRule({
             data: { path: normalized, suffix: kind.suffix },
           });
         }
-        const matching = declarations.classes.filter((candidate) =>
+        const matchingClasses = declarations.classes.filter((candidate) =>
           candidate.id?.name.endsWith(kind.suffix),
         );
-        const valid = matching.filter((candidate) =>
-          kind.abstract ? candidate.abstract : !candidate.abstract,
+        const matchingInterfaces = declarations.interfaces.filter((candidate) =>
+          candidate.id?.name.endsWith(kind.suffix),
         );
+        const valid = kind.abstract
+          ? matchingClasses.filter((candidate) => candidate.abstract).concat(matchingInterfaces)
+          : matchingClasses.filter((candidate) => !candidate.abstract);
         if (valid.length === 0) {
           context.report({
             node,
@@ -188,10 +215,11 @@ export const featureModuleClassesRule = defineRule({
         for (const candidate of valid) {
           const hasStaticCreate = candidate.body.body.some(
             (member) =>
-              member.type === "MethodDefinition" &&
-              member.static &&
-              member.key.type === "Identifier" &&
-              member.key.name === "create",
+              (member.type === "MethodDefinition" &&
+                member.static &&
+                member.key.type === "Identifier" &&
+                member.key.name === "create") ||
+              isStaticCreateFactory(member),
           );
           if (!hasStaticCreate) {
             context.report({ node: candidate, messageId: "create" });

@@ -1,14 +1,13 @@
 import { defineRule } from "../define-rule.mjs";
 
-/**
- * A door in a strict feature package: `src/transport/<surface>/<name>.api.ts`.
- * `src/api/<surface>/` is the name that directory used to have, and four packages still publish
- * a family from it, so both are matched.
- */
+// Strict feature doors are nested `<surface>/<name>.api.ts` or direct
+// `<feature>.<rest|trpc>.ts`; legacy `src/api/<surface>/` families remain valid.
 function isFeatureApi(file) {
   return (
     file.role === "server" &&
-    /^src\/(?:transport|api)\/[^/]+\/.+\.api\.ts$/.test(file.relative ?? "")
+    /^(?:src\/(?:transport|api)\/[^/]+\/.+\.api|src\/transport\/[a-z0-9-]+\.(?:rest|trpc))\.ts$/.test(
+      file.relative ?? "",
+    )
   );
 }
 
@@ -72,7 +71,7 @@ export const apiContextServicesRule = defineRule({
       },
       NewExpression(node) {
         const name = identifierName(node.callee);
-        if (name && /(Service|Repository|Store|Adapter)$/.test(name)) {
+        if (name && /(App|Service|Repository|Store|Adapter)$/.test(name)) {
           context.report({ node, messageId: "construction", data: { name } });
         }
       },

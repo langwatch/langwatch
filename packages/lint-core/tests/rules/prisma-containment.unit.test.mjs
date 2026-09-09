@@ -13,6 +13,61 @@ function report(filename, code) {
 }
 
 describe("given a feature package file", () => {
+  it("allows native model client types only inside a Prisma repository", () => {
+    const code = 'import type { PrismaModelClient } from "@langwatch/prisma-client";';
+
+    expect(
+      report("packages/features/agent/server/src/repositories/prisma/agent.repository.ts", code),
+    ).toEqual([]);
+    expect(
+      report("packages/features/agent/server/src/services/agent.service.ts", code).map(
+        (issue) => issue.messageId,
+      ),
+    ).toEqual(["featurePrismaClient"]);
+  });
+
+  it("rejects connection imports mixed into a repository type import", () => {
+    expect(
+      report(
+        "packages/features/agent/server/src/repositories/prisma/agent.repository.ts",
+        'import { type PrismaModelClient, PrismaConnectionService } from "@langwatch/prisma-client";',
+      ).map((issue) => issue.messageId),
+    ).toEqual(["featurePrismaClient"]);
+  });
+
+  it("rejects ownership type leakage through the ownership subpath", () => {
+    expect(
+      report(
+        "packages/features/agent/server/src/services/agent.service.ts",
+        'import type { ScopedPrismaClient } from "@langwatch/prisma-client/ownership";',
+      ).map((issue) => issue.messageId),
+    ).toEqual(["featurePrismaClient"]);
+  });
+
+  it("allows repository runtime helpers only at repository and registry seams", () => {
+    expect(
+      report(
+        "packages/features/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
+        'import { PrismaRepository } from "@langwatch/prisma-client";',
+      ),
+    ).toEqual([]);
+    expect(
+      report(
+        "packages/features/agent/server/src/repositories/agent-repositories.registry.ts",
+        'import { prismaRepositories } from "@langwatch/prisma-client";',
+      ),
+    ).toEqual([]);
+  });
+
+  it("rejects repository runtime helpers outside their seams", () => {
+    expect(
+      report(
+        "packages/features/agent/server/src/services/agent.service.ts",
+        'import { PrismaRepository, prismaRepositories } from "@langwatch/prisma-client";',
+      ).map((issue) => issue.messageId),
+    ).toEqual(["featurePrismaClient"]);
+  });
+
   describe("when it imports generated Prisma outside the repository seam", () => {
     /** @scenario "Generated Prisma imported outside the seam is reported" */
     it("reports generatedPrisma", () => {

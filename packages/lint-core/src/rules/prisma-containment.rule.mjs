@@ -2,6 +2,12 @@ import { defineRule } from "../define-rule.mjs";
 
 const PRISMA_ROOT = "@langwatch/prisma-client";
 const PRISMA_GENERATED = "@langwatch/prisma-client/generated";
+const REPOSITORY_CLIENT_TYPES = new Set([
+  "PrismaModelClient",
+  "ScopedPrismaClient",
+  "PrismaRelationException",
+]);
+const REPOSITORY_RUNTIME_HELPERS = new Set(["PrismaRepository", "prismaRepositories"]);
 const APPLICATION_ROOTS = new Set(["ui", "api", "worker", "server"]);
 
 /**
@@ -55,6 +61,22 @@ function isStrictPrismaAdapter(pkg) {
   return /^adapters\/postgres\.[^/]+\.adapter\.ts$/.test(pkg.relative);
 }
 
+function isPrismaRepositoryRegistry(pkg) {
+  return (
+    pkg.kind === "server" &&
+    /^repositories\/[a-z0-9-]+(?:-repositories)?\.registry\.ts$/.test(pkg.relative)
+  );
+}
+
+function allowedRepositoryImport(binding, importKind, adapter, registry) {
+  if (binding.type !== "ImportSpecifier") return false;
+
+  const typeOnly = importKind === "type" || binding.importKind === "type";
+  if (typeOnly && adapter && REPOSITORY_CLIENT_TYPES.has(binding.imported.name)) return true;
+
+  return (adapter || registry) && REPOSITORY_RUNTIME_HELPERS.has(binding.imported.name);
+}
+
 function importedSpecifier(node) {
   if (node.type === "ImportExpression") {
     return node.source?.type === "Literal" ? node.source.value : undefined;
@@ -88,7 +110,20 @@ export const prismaContainmentRule = defineRule({
       if (generated && !adapter) {
         context.report({ node, messageId: "generatedPrisma" });
       }
-      if (pkg.feature && specifier === PRISMA_ROOT) {
+      const repositoryImportOnly =
+        node.type === "ImportDeclaration" &&
+        node.specifiers.length > 0 &&
+        node.specifiers.every((binding) =>
+          allowedRepositoryImport(
+            binding,
+            node.importKind,
+            adapter,
+            isPrismaRepositoryRegistry(pkg),
+          ),
+        );
+      const featurePrismaImport =
+        pkg.feature && (specifier === PRISMA_ROOT || specifier === `${PRISMA_ROOT}/ownership`);
+      if (featurePrismaImport && !repositoryImportOnly) {
         context.report({ node, messageId: "featurePrismaClient" });
       }
     };

@@ -9,6 +9,7 @@ const NAME_RE = new RegExp(`^${NAME}$`);
 
 export const CANONICAL_ARTIFACTS = new Set([
   "adapter",
+  "app",
   "api",
   "commands",
   "errors",
@@ -55,36 +56,44 @@ export function isFeatureApiContract(sourcePath, feature) {
 }
 
 export const CONTRACT_ARTIFACT = new RegExp(
-  `^${NAME}\\.(?:commands|errors|events|queries|service)\\.ts$`,
+  `^${NAME}\\.(?:app|commands|errors|events|queries|service)\\.ts$`,
 );
 export const SERVER_ONLY_CONTRACT_ARTIFACT =
   /\.(?:adapter|api|mapper|migration|port|projection|repository|store)\.ts$/;
-export const CONTRACT_ARTIFACT_SUFFIX = /\.(?:commands|errors|events|queries|service)\.ts$/;
+export const CONTRACT_ARTIFACT_SUFFIX = /\.(?:app|commands|errors|events|queries|service)\.ts$/;
 
 export const SERVER_PATTERNS = [
   /^index\.ts$/,
+  // Legacy (feature-shape inventories it): a server package has no test-only entrypoint.
   /^testing\.ts$/,
-  // The feature's application: one class, composed from its own services and
-  // ports, that both transports call, so a REST handler and a tRPC procedure
-  // cannot answer differently.
+  new RegExp(`^${NAME}\\.server\\.ts$`),
+  // A feature app groups its public services; transport adapters stay outside it.
   new RegExp(`^app/${NAME}\\.app\\.ts$`),
+  // Legacy (feature-shape inventories it): builders now live in app/__tests__/<name>.fixture.ts.
   new RegExp(`^fixtures/${NAME}\\.fixture\\.ts$`),
   new RegExp(`^services/${NAME}\\.service\\.ts$`),
   new RegExp(`^ports/${NAME}\\.port\\.ts$`),
   new RegExp(`^repositories/${NAME}(?:\\.${NAME})?\\.repository\\.ts$`),
-  new RegExp(`^repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:mapper|repository)\\.ts$`),
+  // A feature can select a repository bundle by persistence backend.
+  new RegExp(`^repositories/${NAME}(?:-repositories)?\\.registry\\.ts$`),
+  new RegExp(`^repositories/${NAME}(?:\\.${NAME})?\\.repositories\\.ts$`),
+  new RegExp(
+    `^repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:database|mapper|repository|repositories|store)\\.ts$`,
+  ),
   new RegExp(`^stores/${NAME}(?:\\.${NAME})?\\.store\\.ts$`),
   new RegExp(`^stores/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.store\\.ts$`),
   new RegExp(`^projections/${NAME}\\.projection\\.ts$`),
   new RegExp(`^subscribers/${NAME}\\.subscriber\\.ts$`),
   new RegExp(`^processes/${NAME}\\.process\\.ts$`),
   new RegExp(`^intents/${NAME}\\.intent\\.ts$`),
+  // A persistence adapter (postgres.*, prisma.*) is legacy; repositories select their backend.
   new RegExp(`^adapters/${NAME}(?:\\.${NAME})?\\.adapter\\.ts$`),
   // One-shot programs run from the task launcher, composed by apps/tasks.
   new RegExp(`^tasks/${NAME}\\.task\\.ts$`),
-  // A transport lives under `transport/<surface>/`, where the surface names
-  // the door: `api-rest`, `api-trpc`.
+  // Legacy (feature-shape inventories it): a feature declares one flat file per protocol.
   new RegExp(`^transport/${NAME}/${NAME}\\.api\\.ts$`),
+  // Flat API declarations and explicit WebSocket protocol integrations.
+  new RegExp(`^transport/${NAME}\\.(?:rest|trpc|ws)\\.ts$`),
   new RegExp(`^migrations/${NAME}-import\\.${NAME}\\.migration\\.ts$`),
 ];
 
@@ -161,6 +170,7 @@ export function isStrictServerFilename(name) {
 }
 
 export const ARTIFACT_PARTS = new Set([
+  "app",
   "adapter",
   "api",
   "commands",
@@ -189,7 +199,7 @@ export const QUALIFIED_ARTIFACTS = new Set([
 ]);
 
 export const SUBJECT_ARTIFACT =
-  /\.(?:adapter|commands|errors|events|intent|process|projection|queries|repository|service|store|subscriber)\.tsx?$/;
+  /\.(?:adapter|app|commands|errors|events|intent|process|projection|queries|repository|service|store|subscriber)\.tsx?$/;
 
 export function claimsSubject(candidate, feature, subject) {
   if (candidate === subject) return true;

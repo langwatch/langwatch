@@ -12,8 +12,32 @@ import {
 import { defineRule } from "../define-rule.mjs";
 
 const SERVER_HOMES =
-  "services/, ports/, repositories/, stores/, adapters/, projections/, subscribers/, " +
-  "processes/, intents/, rules/, tasks/, transport/<surface>/, migrations/, app/, fixtures/";
+  "services/, ports/, repository bundles and registries, stores/, adapters/, projections/, subscribers/, " +
+  "processes/, intents/, rules/, tasks/, transport/<surface>/ or transport/<feature>.<rest|trpc|ws>.ts, migrations/, app/, fixtures/, <feature>.server.ts";
+
+function definitionOf(context, identifier) {
+  let scope = context.sourceCode.getScope(identifier);
+  while (scope && !scope.set.has(identifier.name)) scope = scope.upper;
+  return scope?.set.get(identifier.name)?.defs[0];
+}
+
+function isPureThrownError(context, node) {
+  if (node.parent?.type !== "ThrowStatement" || node.parent.argument !== node) return false;
+  if (node.callee.type !== "Identifier") return false;
+
+  const definition = definitionOf(context, node.callee);
+  if (node.callee.name === "Error" && !definition) return true;
+  if (definition?.type !== "ImportBinding") return false;
+
+  const declaration = definition.parent;
+  const imported = definition.node;
+  if (declaration.importKind === "type" || imported.importKind === "type") return false;
+  if (imported.type !== "ImportSpecifier") return false;
+  const name = imported.imported.name ?? imported.imported.value;
+  return (
+    /Error$/.test(name) && /^@langwatch\/[^/]+-contract(?:\/|$)/.test(declaration.source.value)
+  );
+}
 
 function contractVisitors(context, source) {
   const { name, sourcePath } = source;
@@ -23,7 +47,7 @@ function contractVisitors(context, source) {
       context.report({ node, messageId, data: { name, ...data } });
     },
   });
-  if (/^(?:commands|errors|events|queries|service)\.ts$/.test(name)) {
+  if (/^(?:app|commands|errors|events|queries|service)\.ts$/.test(name)) {
     return report("contractMissingSubject", { artifact: name.replace(/\.ts$/, "") });
   }
   if (SERVER_ONLY_CONTRACT_ARTIFACT.test(name)) return report("contractServerArtifact");
@@ -107,8 +131,10 @@ export const featureSourceLayoutRule = defineRule({
         },
         NewExpression(node) {
           const pureValue =
-            node.callee?.type === "Identifier" && PURE_VALUE_CONSTRUCTORS.has(node.callee.name);
-          if (pureValue) {
+            node.callee?.type === "Identifier" &&
+            PURE_VALUE_CONSTRUCTORS.has(node.callee.name) &&
+            !definitionOf(context, node.callee);
+          if (pureValue || isPureThrownError(context, node)) {
             return;
           }
           report(node, "a `new` expression");

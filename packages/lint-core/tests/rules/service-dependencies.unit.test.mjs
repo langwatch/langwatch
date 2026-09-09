@@ -47,6 +47,12 @@ describe("given a strict feature service module", () => {
         [],
       );
     });
+
+    it("allows the feature-local repository alias", () => {
+      expect(
+        report('import type { AgentRepository } from "#repositories/agent.repository";'),
+      ).toEqual([]);
+    });
   });
 
   describe("when it recovers the global application graph", () => {

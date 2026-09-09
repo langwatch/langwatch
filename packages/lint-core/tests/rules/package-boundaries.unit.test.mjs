@@ -16,6 +16,74 @@ function report(filename, code) {
 }
 
 describe("given package-boundaries", () => {
+  it("allows an exact catalogue-declared cross-feature web dependency", () => {
+    const fixture = createFixtureWorkspace({
+      features: {
+        annotation: { layoutVersion: 0, roles: { web: {} } },
+        organization: {
+          layoutVersion: 0,
+          roles: { web: { exports: ["./personal-workspace-features"] } },
+        },
+      },
+    });
+    fixture.write(
+      "apps/ui/src/features/catalogue.json",
+      JSON.stringify({
+        version: 0,
+        features: [
+          {
+            id: "annotations",
+            root: "annotation",
+            uses: {
+              screens: [],
+              surfaces: ["@langwatch/organization-web/personal-workspace-features"],
+            },
+          },
+        ],
+      }),
+    );
+
+    try {
+      expect(
+        runRule(boundaryRule, {
+          cwd: fixture.cwd,
+          filename: "packages/features/annotation/web/src/behavior/gate.ts",
+          code: 'import { client } from "@langwatch/organization-web/personal-workspace-features";',
+        }),
+      ).toEqual([]);
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  it("rejects an undeclared cross-feature web dependency", () => {
+    const fixture = createFixtureWorkspace({
+      features: {
+        annotation: { layoutVersion: 0, roles: { web: {} } },
+        organization: {
+          layoutVersion: 0,
+          roles: { web: { exports: ["./personal-workspace-features"] } },
+        },
+      },
+    });
+    fixture.write(
+      "apps/ui/src/features/catalogue.json",
+      JSON.stringify({ version: 0, features: [] }),
+    );
+
+    try {
+      expect(
+        runRule(boundaryRule, {
+          cwd: fixture.cwd,
+          filename: "packages/features/annotation/web/src/behavior/gate.ts",
+          code: 'import { client } from "@langwatch/organization-web/personal-workspace-features";',
+        }).map((entry) => entry.messageId),
+      ).toContain("crossFeature");
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
   describe("when a web package imports a different feature's server package", () => {
     /** @scenario "A web package importing another feature's server is reported as webImportsServer" */
     it("reports webImportsServer", () => {
