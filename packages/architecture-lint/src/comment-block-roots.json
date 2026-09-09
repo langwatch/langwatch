@@ -51,76 +51,10 @@
       "count": 15
     },
     {
-      "key": "mcp",
-      "measured": "2026-09-08",
-      "expires": "2026-10-15",
-      "count": 69
-    },
-    {
-      "key": "packages/actor",
-      "measured": "2026-09-08",
-      "expires": "2026-10-15",
-      "count": 2
-    },
-    {
-      "key": "packages/api",
-      "measured": "2026-09-08",
-      "expires": "2026-10-15",
-      "count": 291
-    },
-    {
-      "key": "packages/architecture-lint",
-      "measured": "2026-09-08",
-      "expires": "2026-10-15",
-      "count": 115
-    },
-    {
-      "key": "packages/aws-client",
-      "measured": "2026-09-08",
-      "expires": "2026-10-15",
-      "count": 6
-    },
-    {
-      "key": "packages/clickhouse-client",
-      "measured": "2026-09-08",
-      "expires": "2026-10-15",
-      "count": 101
-    },
-    {
-      "key": "packages/config",
-      "measured": "2026-09-08",
-      "expires": "2026-10-15",
-      "count": 33
-    },
-    {
-      "key": "packages/design-system",
-      "measured": "2026-09-08",
-      "expires": "2026-10-15",
-      "count": 51
-    },
-    {
-      "key": "packages/egress",
-      "measured": "2026-09-08",
-      "expires": "2026-10-15",
-      "count": 51
-    },
-    {
       "key": "enterprise",
       "measured": "2026-09-08",
       "expires": "2026-10-15",
       "count": 11
-    },
-    {
-      "key": "enterprise/packages/composition/api",
-      "measured": "2026-09-08",
-      "expires": "2026-10-15",
-      "count": 10
-    },
-    {
-      "key": "enterprise/packages/composition/worker",
-      "measured": "2026-09-08",
-      "expires": "2026-10-15",
-      "count": 5
     },
     {
       "key": "enterprise/modules/audit-log/server",
@@ -201,10 +135,22 @@
       "count": 9
     },
     {
-      "key": "packages/eventing",
+      "key": "enterprise/packages/composition/api",
       "measured": "2026-09-08",
       "expires": "2026-10-15",
-      "count": 467
+      "count": 10
+    },
+    {
+      "key": "enterprise/packages/composition/worker",
+      "measured": "2026-09-08",
+      "expires": "2026-10-15",
+      "count": 5
+    },
+    {
+      "key": "mcp",
+      "measured": "2026-09-08",
+      "expires": "2026-10-15",
+      "count": 69
     },
     {
       "key": "modules/agent/contract",
@@ -907,6 +853,60 @@
       "measured": "2026-09-08",
       "expires": "2026-10-01",
       "count": 206
+    },
+    {
+      "key": "packages/actor",
+      "measured": "2026-09-08",
+      "expires": "2026-10-15",
+      "count": 2
+    },
+    {
+      "key": "packages/api",
+      "measured": "2026-09-08",
+      "expires": "2026-10-15",
+      "count": 291
+    },
+    {
+      "key": "packages/architecture-lint",
+      "measured": "2026-09-08",
+      "expires": "2026-10-15",
+      "count": 115
+    },
+    {
+      "key": "packages/aws-client",
+      "measured": "2026-09-08",
+      "expires": "2026-10-15",
+      "count": 6
+    },
+    {
+      "key": "packages/clickhouse-client",
+      "measured": "2026-09-08",
+      "expires": "2026-10-15",
+      "count": 101
+    },
+    {
+      "key": "packages/config",
+      "measured": "2026-09-08",
+      "expires": "2026-10-15",
+      "count": 33
+    },
+    {
+      "key": "packages/design-system",
+      "measured": "2026-09-08",
+      "expires": "2026-10-15",
+      "count": 51
+    },
+    {
+      "key": "packages/egress",
+      "measured": "2026-09-08",
+      "expires": "2026-10-15",
+      "count": 51
+    },
+    {
+      "key": "packages/eventing",
+      "measured": "2026-09-08",
+      "expires": "2026-10-15",
+      "count": 467
     },
     {
       "key": "packages/group-queue",

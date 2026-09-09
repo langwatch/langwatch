@@ -31,30 +31,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/clickhouse-client/src",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|packages/config/src",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|packages/design-system/src",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|packages/design-system/src/components",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|packages/design-system/src/components/icons",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|enterprise/packages/composition/api/src/governance",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "crowded-folder|enterprise/modules/billing/contract/src",
       "measured": "2026-09-08"
     },
@@ -103,11 +79,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/eventing/src/projections",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|packages/eventing/src/replay",
+      "key": "crowded-folder|enterprise/packages/composition/api/src/governance",
       "measured": "2026-09-08"
     },
     {
@@ -703,6 +675,34 @@
       "measured": "2026-09-08"
     },
     {
+      "key": "crowded-folder|packages/clickhouse-client/src",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "crowded-folder|packages/config/src",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "crowded-folder|packages/design-system/src",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "crowded-folder|packages/design-system/src/components",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "crowded-folder|packages/design-system/src/components/icons",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "crowded-folder|packages/eventing/src/projections",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "crowded-folder|packages/eventing/src/replay",
+      "measured": "2026-09-08"
+    },
+    {
       "key": "crowded-folder|packages/group-queue/src",
       "measured": "2026-09-08"
     },
@@ -736,98 +736,6 @@
     },
     {
       "key": "fragment-file|apps/worker/src/app/worker-github-redis.composition.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/clickhouse-client/src/observability.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/clickhouse-client/src/shutdown.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/config/src/clickhouse.config.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/config/src/logger.config.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/config/src/postgres.config.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/config/src/redis.config.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/config/src/trusted-proxy.config.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/close-button.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/delayed.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/icons/anthropic-icon.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/icons/custom-icon.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/icons/databricks-icon.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/icons/equals-icon.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/icons/github-icon.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/icons/llm-icon.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/icons/microsoft-icon.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/icons/openai-icon.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/icons/opentelemetry-icon.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/icons/weaviate-icon.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/icons/workato-icon.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/messages/remove-message-button.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/components/small-label.tsx",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/design-system/src/system/create-system.ts",
       "measured": "2026-09-08"
     },
     {
@@ -1356,6 +1264,98 @@
     },
     {
       "key": "fragment-file|modules/workflow/web/src/model/sse/errors.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/clickhouse-client/src/observability.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/clickhouse-client/src/shutdown.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/config/src/clickhouse.config.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/config/src/logger.config.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/config/src/postgres.config.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/config/src/redis.config.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/config/src/trusted-proxy.config.ts",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/close-button.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/delayed.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/icons/anthropic-icon.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/icons/custom-icon.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/icons/databricks-icon.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/icons/equals-icon.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/icons/github-icon.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/icons/llm-icon.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/icons/microsoft-icon.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/icons/openai-icon.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/icons/opentelemetry-icon.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/icons/weaviate-icon.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/icons/workato-icon.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/messages/remove-message-button.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/components/small-label.tsx",
+      "measured": "2026-09-08"
+    },
+    {
+      "key": "fragment-file|packages/design-system/src/system/create-system.ts",
       "measured": "2026-09-08"
     },
     {

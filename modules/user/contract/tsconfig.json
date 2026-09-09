@@ -9,7 +9,7 @@
     "lib": ["es2022"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "types": ["vitest/globals"],
+    "types": ["node", "vitest/globals"],
 
     "rewriteRelativeImportExtensions": false
   },
