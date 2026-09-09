@@ -64,9 +64,7 @@ describe("given the Add source menu", () => {
         "Anthropic Claude (Cowork)",
         "Workato",
         "Microsoft Copilot Studio",
-        "OpenAI Enterprise Compliance",
         "OpenAI Admin",
-        "Anthropic Claude Enterprise Compliance",
         "Anthropic Admin API (usage & cost)",
         "Databricks AI/BI Genie",
         "Custom S3 audit log",
@@ -80,6 +78,18 @@ describe("given the Add source menu", () => {
       expect(
         screen.queryByText("Microsoft Copilot Studio (Purview)"),
       ).toBeNull();
+
+      // The two Enterprise Compliance types are defined but never offered:
+      // neither has a finished data path, so picking one buys a source that
+      // stays silent. The loop above is what proves this menu renders its
+      // items at all, so their absence here reads as filtering rather than
+      // an empty menu.
+      for (const withheld of [
+        "OpenAI Enterprise Compliance",
+        "Anthropic Claude Enterprise Compliance",
+      ]) {
+        expect(screen.queryByText(withheld)).toBeNull();
+      }
     });
 
     /** @scenario "Add source menu lists every type by vendor, grouped in plain language" */

@@ -243,6 +243,7 @@ describe("Feature: directory departments land on the entities we already have", 
 
       const outcome = await service().applyDirectoryEvents({
         organizationId,
+        provider: PROVIDER,
         events: [
           directoryEvent({
             actor: JONAS_OID,
