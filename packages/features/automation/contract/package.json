@@ -20,14 +20,15 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/config": "workspace:*",
-    "@langwatch/time": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "croner": "^10.0.1",
     "liquidjs": "^10.27.1",
     "marked": "^18.0.5",
-    "sanitize-html": "^2.17.5",
+    "sanitize-html": "^2.17.7",
     "zod": "4.4.3"
   },
   "devDependencies": {

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 
 const planMock = vi.hoisted(() => ({
-  getActivePlan: vi.fn(),
+  getActivePlan: vi.fn<EntitlementApi["getActivePlan"]>(),
   resolveOrganizationId: vi.fn(),
 }));
 // No Redis is injected here, so these exercise the in-memory fallback. The
@@ -33,6 +34,7 @@ function plan(overrides: Record<string, unknown>) {
   planMock.resolveOrganizationId.mockResolvedValue("org-1");
   planMock.getActivePlan.mockResolvedValue({
     planSource: "subscription",
+    type: "PAID",
     name: "Plan",
     free: false,
     maxMembers: 1,

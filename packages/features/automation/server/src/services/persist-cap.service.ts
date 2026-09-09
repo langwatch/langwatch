@@ -5,7 +5,8 @@ import type {
   AutomationPlan,
   AutomationPlanProvider,
 } from "@langwatch/automation-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automations:persist-cap");
@@ -25,8 +26,8 @@ const FREE_PLAN_TYPES = new Set<string>(["FREE", "LAUNCH"]);
 export type PersistCapConfig = AutomationPersistCapConfig;
 
 export interface PersistCapDependencies {
-  projects: ProjectService;
-  planProvider: AutomationPlanProvider;
+  projects: ProjectApi;
+  planProvider: EntitlementApi;
   config: PersistCapConfig;
 }
 
