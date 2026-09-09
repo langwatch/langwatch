@@ -181,6 +181,84 @@ Feature: The AI Governance Agents page
     And that empty state offers a way to register one
     And the banner is gone
 
+  # ===========================================================================
+  # The sync control
+  # ===========================================================================
+  #
+  # ASKING IS ASYNCHRONOUS, and every rule in this block follows from it. The
+  # press dispatches a request on the `ingestion_pull` aggregate and returns.
+  # The pipeline's outbox leases it, an effect handler calls the provider, and
+  # an outcome event lands later. There is no completion to await, so the
+  # control can only ever report what it STARTED. A press that resolved into
+  # "found four agents" would be inventing the half that has not happened.
+  #
+  # A SECOND PRESS WHILE ONE IS RUNNING IS DROPPED, deliberately, not queued:
+  # an admin pressing twice means "did that work", not "ask twice". The drop
+  # happens inside the process manager where the page cannot see it, so the
+  # page has to carry it in words. A live control that silently does nothing
+  # reads as broken, so it goes quiet and says why.
+  #
+  # ONE ASK PER SOURCE, because the aggregate IS the source. Two sources are
+  # two streams, two leases and two provider calls, and one refusing must be
+  # recordable without losing the other's answer. Sources whose provider has
+  # no agent listing at all are skipped before the ask rather than asked and
+  # refused, since that refusal was knowable without spending a lease on it.
+  #
+  # EVERY UNPRESSABLE STATE CARRIES ITS OWN SENTENCE. Disabled with a reason
+  # beats a press that does nothing, and it also beats an absent control: a
+  # reader who cannot sync is the one least able to work out why the page will
+  # not refresh. That is where this control departs from the people page's
+  # `Run match pass`, which hides itself from a reader without the grant.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: The sync control asks every provider that can list agents
+    Given an organization with a Databricks source, a Copilot source and a
+      source whose provider cannot list agents
+    When a sync is requested
+    Then a listing is requested from the Databricks and the Copilot source
+    And the source whose provider cannot list agents is not asked at all
+    And both asks are filed under the organization's governance project
+    And both carry the same request id, because they are one press
+
+  @unit
+  Scenario: The sync control reports what it started, not what it found
+    Given an organization with two providers that can list agents
+    When a sync is requested
+    Then the result says how many providers were asked
+    And it names them
+    And it carries no count of agents found, because none has answered yet
+
+  @unit
+  Scenario: A sync that cannot be recorded says so instead of appearing to start
+    Given an organization with a provider that can list agents
+    And no governance project for the request to be filed under
+    When a sync is requested
+    Then the request is refused by name
+    And nothing is dispatched
+
+  @integration
+  Scenario: A second press while a sync is in flight says so rather than doing nothing
+    Given an administrator on the Agents page with a provider connected
+    When they press the sync control
+    Then the control goes quiet
+    And it says a request was already made and reloading is how the result is seen
+    And a second press dispatches nothing
+
+  @integration
+  Scenario: An organization with no listing provider is told so
+    Given an organization with no provider that can list agents
+    When an administrator opens the Agents page
+    Then the sync control is not pressable
+    And it says no connected provider can list agents
+
+  @integration
+  Scenario: A reader who cannot sync is told why rather than shown nothing
+    Given a reader without the governance manage grant
+    When they open the Agents page
+    Then the sync control is drawn and not pressable
+    And it says only an administrator can ask a provider to list its agents
+
   # ---------------------------------------------------------------------------
   # Empty states. One shared shape (~/components/governance/empty), two
   # different sets of words, because a page that has nothing to show still has
@@ -192,7 +270,26 @@ Feature: The AI Governance Agents page
   # them to go register an agent is the page failing to read its own state. The
   # shared component cannot enforce this, because it cannot see WHY the list is
   # empty. Only the page knows, so the page decides.
+  #
+  # THERE IS A NOTHING THIS PAGE CANNOT YET NAME, and the copy is written to
+  # stay out of its way. A provider answering "this tenant has no agents" and a
+  # provider refusing to answer are different facts, one about the tenant and
+  # one about the credential, and the listing keeps them apart in the log. No
+  # read surfaces them: the outcome events exist and no projection folds them.
+  # So an empty table with a provider connected says only what is known — these
+  # providers are connected, nothing has been listed from them — and offers the
+  # ask. It must not claim the tenant is empty, because on a refusal that would
+  # be the exact collapse the three-outcome listing was built to prevent.
   # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: An empty table with a provider connected says which and offers the ask
+    Given an organization with providers that can list agents and no agents
+    When an administrator opens the Agents page
+    Then the empty state names the connected providers
+    And it says nothing has been listed from them yet
+    And it does not claim the organization has no agents
+    And the way out is asking them, not registering one from code
 
   @integration
   Scenario: Every empty state on the page carries a way out
