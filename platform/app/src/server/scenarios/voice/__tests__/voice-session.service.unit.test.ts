@@ -894,9 +894,11 @@ describe("finishVoiceSession", () => {
     describe("when a fresh call is finished", () => {
       /** @scenario "A finished browser call writes one trace per exchange and every message links to its exchange's trace" */
       it("records the call traces before writing the run and passes the ids through", async () => {
-        const recordCallTraces = vi.fn<VoiceSessionPorts["recordCallTraces"]>(async () => ({
-          turnTraceIds: ["trace_x"],
-        }));
+        const recordCallTraces = vi.fn<VoiceSessionPorts["recordCallTraces"]>(
+          async () => ({
+            turnTraceIds: ["trace_x"],
+          }),
+        );
         const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
           async () => {},
         );
@@ -932,7 +934,9 @@ describe("finishVoiceSession", () => {
     describe("when the finish short-circuits on a terminal run", () => {
       /** @scenario "A retried hang-up leaves a terminal run untouched" */
       it("records no traces and writes no run", async () => {
-        const recordCallTraces = vi.fn<VoiceSessionPorts["recordCallTraces"]>(async () => ({ turnTraceIds: [] }));
+        const recordCallTraces = vi.fn<VoiceSessionPorts["recordCallTraces"]>(
+          async () => ({ turnTraceIds: [] }),
+        );
         const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
           async () => {},
         );
