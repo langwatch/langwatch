@@ -177,7 +177,7 @@ when its row reads 0.
 | Feature | State | Landed | Open kinds | Blocked on / note |
 | --- | --- | --- | --- | --- |
 | annotation | DONE (reference) | 09-07 | `refusing-composition` (Kimi's api-key twin, leaves with api-key) | |
-| api-key | Kimi's lane | — | 8 | Kimi; not touched by these lanes |
+| api-key | 7 of 8 | `cac2ac82ec`, `d1da1efff0` | `persistence-adapter` (the sandbox reap adapter, worker-held) | claims `ApiKey` only; the legacy project key and personal-workspace reads moved to `ProjectApi` |
 | audit-log (ent) | DONE behind a port | `008a5cd882` | `memory-twin-untested` | contract test |
 | dashboard | DONE | `56b01cb75d` | 0 | 35-operation door: DECISION D-f |
 | data-privacy | DONE | `77f4346117` | 0 | nullable redaction in the API: DECISION D-c |
@@ -191,7 +191,7 @@ when its row reads 0.
 | presence | DONE | `d7d5ea94c0` | `memory-twin-untested` | contract test; actor identity cache: DECISION D-j |
 | role | DONE bar REST mount | `84ae292008` + `cccfe396b0` | `memory-twin-untested` | mount waits on the door port (section 6) |
 | secret | DONE | `9d279eef12` | 0 | |
-| share | DONE | `403a40bd2a` | 0 | `PinnedToActiveShareError` still raw |
+| share | DONE | `403a40bd2a`, `d1da1efff0` | 0 | claims `ShareLink` only; trace-sharing config read off the project peer; `PinnedToActiveShareError` still raw |
 | sso (ent) | DONE | `c1363cbb99` | 0 | ledger is a port until identity has an API token |
 | suite | DONE | `814620f1bf` + `cba1e5bd02` | 0 | web package governed |
 | topic | DONE | `a8508cf3c7` | 0 | |
@@ -411,11 +411,15 @@ guarding things outside the package, 29 failing, 17 policies untested).
 | `publicEnv` procedure gone; `authProvider` ships in the HTML shell; ops-sidebar boolean deleted | `tmp/PUBLIC-ENV-SHELL-BRIEF.md` | DONE (in `3eb6c56657`, close-out `b296291289`). Follow-up QUEUED: public config as per-module config objects handed to each web module at install (Alex 22:2x) |
 | Structured logs: Prisma events through the process logger; dev backend lane sets observability up once | `tmp/STRUCTURED-LOGS-BRIEF.md` | DONE `e28c2e6cb2` |
 | Generated project references + drift lint; 179 typecheck scripts path-free; Prisma client un-committed | `tmp/TSCONFIG-REFERENCES-BRIEF.md` | DONE `6edf217226`, `5f9cf03ae9`, `a054de0589` |
-| pnpm catalogs: one version per dependency, named catalog for the SDK toolchain, enforcement test | `tmp/CATALOGS-BRIEF.md` | RUNNING (Sonnet) |
-| Persistence wave, Tier B (§4a): api-key, project, user first; then auth, evaluator, model-provider; then ops, github, coding-agent, automation, workflow, analytics, authz, identity, billing, licensing, scim, managed-provider | `tmp/PERSISTENCE-WAVE-BRIEF.md` + `tmp/wiring/<m>.md` | RUNNING (three Opus lanes, one module each) |
+| pnpm catalogs: one version per dependency, named catalog for the SDK toolchain, enforcement test | `tmp/CATALOGS-BRIEF.md` | DONE `6e705d40af` |
+| Persistence wave, Tier B (§4a): api-key, project, user, github, model-provider, share DONE `d1da1efff0` (rows 210 to 194; api and worker boot on the developer stack); next auth, evaluator, coding-agent, ops; then automation, workflow, analytics, authz, identity, billing, licensing, scim, managed-provider | `tmp/PERSISTENCE-WAVE-BRIEF.md` + `tmp/TIER-B-PARALLEL-ADDENDUM.md` + `tmp/wiring/<m>.md` | RUNNING in pairs; the production composition is the root session's file, lanes hand it the install line |
 | Web maps derived from converted contracts (Haiku, one file each) | `tmp/WEB-MAP-BRIEF.md` | github `de84c467f0`, scim `29a7141c47`, licensing `81ca1564af` DONE; ops, workflow RUNNING; 13 wait on their contracts |
 | Wiring 3b as install lines for converted-but-unmounted families (scim, model-provider, analytics, automation, workflow, evaluation), which apidiff names as the routes main serves and this branch 404s | `tmp/wiring/*.md`, `tmp/apidiff/out/haiku-report.md` | QUEUED behind the three persistence lanes (same composition file) |
-| apidiff: `-env-file`, psql search path, `ensure:built`; first full run at `e28c2e6cb2`: 604 union operations, 280 probed, 79 equal, 39 routes main serves that this branch 404s (all unmounted families), 300 skipped for unmintable path ids | `tools/apidiff`, `tmp/run-apidiff.sh` | DONE tooling; QUEUED: per-family fixtures so the harness can mint ids (Sonnet) |
+| apidiff: first full run at `e28c2e6cb2` (604 union, 280 probed, 79 equal, 39 routes main serves that this branch 404s); path parameters resolve from their own placeholder `6ddc5dad0f`; instances boot as haven stacks under their own slugs with `haven destroy` `7855b8fa38` | `tools/apidiff`, `tmp/run-apidiff-haven.sh`, `specs/tooling/apidiff-on-haven.feature` | DONE tooling; QUEUED: the next full run on the haven path |
+| Lint records and class A deletions: ADR-135 to 143 and specs for every registered rule with a drift guard `6dc2735f2f`; two ast-grep duplicates and the dead runtime-undefined rule deleted, nested-ternary becomes the built-in with its baseline re-keyed, no-undefined measured at 11,567 and not adopted `44f5974f8e` | `tmp/LINT-ADR-SPEC-BRIEF.md`, `tmp/lint-investigation-report.md` | DONE |
+| haven: colima and image pulls under lane columns, viewer wide lines `1c99086757`; tab model (session, logs by application, errors, traces, metrics, profiles, stores, jobs; wide rows cut with expand on demand) | `specs/setup/haven-up-viewer-tabs.feature`, `tmp/VIEWER-TABS-BRIEF.md` | RUNNING (Opus) |
+| haven gate hook: no decision on ungated commands, `haven up` registers the worktree-local hook, `HAVEN_TEST_WORKERS` machine-wide unit worker cap | `specs/setup/haven-agent-hooks.feature` | RUNNING (Sonnet); NOT global, a hook in the user's home would fire in every repository |
+| visualdiff allocates its Redis databases at run time (was pinned to 12 and 13, on top of the running stack) | `tools/visualdiff` | DONE `3473f8b8a8` |
 | Tier A conversions (§4a): governance, trace, scenario, langy, gateway, organization, agent, experiment, prompt, webhook | convert.md + wiring notes | QUEUED, one Opus lane per module beside Tier B, largest last |
 | Main fold: 52 real commits, 2,116 paths, 1,088 conflicts at `8303615a73` (251 delete/modify in the deleted monolith) | `tmp/main-delta.txt`, `tmp/merge-status.txt` | QUEUED as a porting wave after the rename; not a merge |
 
