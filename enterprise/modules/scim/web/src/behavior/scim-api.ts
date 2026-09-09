@@ -1,26 +1,13 @@
 /**
- * The procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as every other feature
- * family's map says of itself.
- *
- * THE SEGMENT NAME IS LOAD-BEARING. `scimToken` is a mount point on the root
- * router and tRPC hashes that path into the React Query cache key.
- *
- * THE TOKEN IS RETURNED ONCE. `generate` is the only place the plaintext bearer
- * ever exists on this side of the wire; `list` answers metadata and never a
- * secret, which is why the row type below has no token field at all and why the
- * screen keeps the minted one in local state until the dialog closes.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/api/web`, and the
- * import below is the only one in the package.
+ * The procedures this package calls, derived from the contract. The `scimToken`
+ * segment is load-bearing: tRPC hashes it into the React Query cache key. The
+ * plaintext bearer crosses the wire once, from `generate`; `list` answers
+ * metadata only. This module is the package's one governed-closure exception to
+ * ADR-004: its `@langwatch/api/web` import is the only one in the package.
  */
 
-import { type ModuleApi, createModuleApi } from "@langwatch/api/web";
-
-/** The organization every SCIM procedure is scoped to. */
-type OrganizationScope = { organizationId: string };
+import type { scimTokenTrpc } from "@langwatch/enterprise-scim-contract";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 
 /** One bearer token, as the table renders it: metadata, never the secret. */
 export type ScimTokenRow = {
@@ -30,26 +17,10 @@ export type ScimTokenRow = {
   lastUsedAt: Date | null;
 };
 
-export type ScimApiMap = {
-  scimToken: {
-    list: { query: { input: OrganizationScope; output: ScimTokenRow[] } };
-
-    /** The one and only time the plaintext bearer crosses the wire. */
-    generate: {
-      mutation: {
-        input: OrganizationScope & { description?: string };
-        output: { token: string };
-      };
-    };
-
-    revoke: {
-      mutation: { input: OrganizationScope & { tokenId: string }; output: unknown };
-    };
-  };
-};
+export type ScimApiMap = ContractApiMap<typeof scimTokenTrpc>;
 
 /**
  * The SCIM family's typed tRPC hooks. Same machinery, same transport and same
  * React Query cache as the application's `api` proxy.
  */
-export const scimApi: ModuleApi<ScimApiMap> = createModuleApi<ScimApiMap>();
+export const scimApi = createModuleApi<ScimApiMap>();
