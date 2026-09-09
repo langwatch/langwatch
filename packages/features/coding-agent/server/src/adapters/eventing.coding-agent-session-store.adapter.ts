@@ -161,7 +161,7 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
   }
 
   /** State only; delegates to `getWithApplied` so the two paths cannot diverge. */
-  async tryGet(
+  async find(
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<CodingAgentSessionState | null> {
