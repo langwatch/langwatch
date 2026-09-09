@@ -6,6 +6,7 @@ export * from "./evaluator.api.ts";
 export * from "./evaluator.errors.ts";
 export * from "./evaluator.schemas.ts";
 export * from "./evaluator.trpc.ts";
+export * from "./evaluators.native.ts";
 export * from "./evaluators.ts";
 export {
   batchEvaluationResultSchema,
