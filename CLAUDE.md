@@ -40,6 +40,16 @@ well as the shell, so these travel with the worktree; an exported variable still
 wins for a single run. Postgres and Redis stay haven-managed either way: it
 starts them through brew, not a container.
 
+One thing you give up with `LANGWATCH_HAVEN_CH=0`: the managed container is
+capped twice — a 1.5 GiB cgroup and a 1.35 GiB `<max_server_memory_usage>` — and
+your own ClickHouse is capped by whatever its config says. A stock
+clickhouse-server sets no `<max_server_memory_usage>` at all, which is not
+"unlimited" but *90% of the machine*, and on a laptop that ends in swap
+exhaustion and a kernel watchdog panic rather than a failed query. `haven up`
+now reads that server's effective ceiling and warns when it exceeds a third of
+your RAM; it will not cap a server it does not manage, so put a
+`<max_server_memory_usage>` in its own `config.d` and reload it.
+
 Tests follow the same rule. `pnpm test:unit` never needed a container, and
 `pnpm test:integration` runs against native services when
 `LANGWATCH_TEST_CLICKHOUSE_URL`, `LANGWATCH_TEST_REDIS_URL` and

@@ -21,6 +21,7 @@ import (
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/claudesettings"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhousedocker"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhouseprobe"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/colima"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dockerjanitor"
@@ -226,7 +227,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 
 	orch := app.New(app.Deps{
 		Cfg: cfg, Proxy: proxy, Store: store, Sup: sup, Sys: sys,
-		CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
+		CH: ch, CHProbe: clickhouseprobe.New(), PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
 		Container: rt, Janitor: dockerjanitor.New(rt),
 		ProcTel: procmetrics.New(observabilityEndpoints().OTLPHTTPPort),
 		Claude:  claudesettings.New(), Log: logger,

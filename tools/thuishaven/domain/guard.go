@@ -20,6 +20,46 @@ func IsProtectedDatabase(db string) bool {
 	return db == MainDatabase
 }
 
+// IsLoopbackHost reports whether host names this machine. `.localhost` counts:
+// it resolves to loopback natively, and it is how every haven-routed service is
+// addressed. Callers pass an already-lowercased hostname.
+//
+// Shared by the destructive-operation guard below and by the ClickHouse ceiling
+// check, which must judge a server against this machine's memory only when the
+// server actually runs on this machine.
+func IsLoopbackHost(host string) bool {
+	return host == "localhost" || host == "127.0.0.1" || host == "::1" || strings.HasSuffix(host, ".localhost")
+}
+
+// IsLoopbackURL reports whether rawURL addresses this machine. An empty or
+// unparseable URL is not local: a check that cannot tell says nothing.
+func IsLoopbackURL(rawURL string) bool {
+	if rawURL == "" {
+		return false
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	return IsLoopbackHost(strings.ToLower(u.Hostname()))
+}
+
+// SafeDisplayURL reduces a URL to scheme://host[:port] — enough to tell one
+// server from another, with no room for the credentials a CLICKHOUSE_URL or a
+// DATABASE_URL routinely carries. Use it anywhere a URL is printed, logged or
+// put in an error.
+func SafeDisplayURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Host == "" {
+		return "the configured server"
+	}
+	scheme := u.Scheme
+	if scheme == "" {
+		scheme = "http"
+	}
+	return scheme + "://" + u.Host
+}
+
 // GuardLocalDatabaseURL rejects a database URL that a destructive local-dev
 // operation (seed, reset, drop) must never touch: anything not on loopback,
 // not authenticated as the expected local dev user, or that smells like
@@ -37,7 +77,7 @@ func GuardLocalDatabaseURL(rawURL, wantUser string) error {
 	}
 
 	host := strings.ToLower(u.Hostname())
-	if host != "localhost" && host != "127.0.0.1" && host != "::1" && !strings.HasSuffix(host, ".localhost") {
+	if !IsLoopbackHost(host) {
 		return fmt.Errorf("database host %q is not local — refusing a destructive operation against it", host)
 	}
 

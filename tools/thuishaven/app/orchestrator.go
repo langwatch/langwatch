@@ -26,11 +26,14 @@ type Orchestrator struct {
 	sup   Supervisor
 	sys   System
 	ch    ClickHouse
-	pg    Postgres
-	rds   Redis
-	obs   Observability
-	hyg   Hygiene
-	sem   Semaphore
+	// chProbe reads the ceiling of a ClickHouse haven does not manage. Nil
+	// where nothing wired it, and the ceiling check is then skipped.
+	chProbe ClickHouseCeilingProbe
+	pg      Postgres
+	rds     Redis
+	obs     Observability
+	hyg     Hygiene
+	sem     Semaphore
 	// container is the colima VM the langyagent worker runs on in its container
 	// tiers (see domain.LangyTier). May be nil in tests that never launch it.
 	container ContainerRuntime
@@ -65,6 +68,7 @@ type Deps struct {
 	Sup       Supervisor
 	Sys       System
 	CH        ClickHouse
+	CHProbe   ClickHouseCeilingProbe
 	PG        Postgres
 	RDS       Redis
 	Obs       Observability
@@ -88,7 +92,7 @@ func New(d Deps) *Orchestrator {
 	}
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
-		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
+		ch: d.CH, chProbe: d.CHProbe, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
 		container: d.Container, janitor: d.Janitor, procTel: d.ProcTel, claude: d.Claude, log: d.Log,
 	}
 }
@@ -234,6 +238,10 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		o.ensurePostgres(ctx, &st)
 		o.ensureRedis(ctx, &st)
 	}
+	// Outside the block on purpose: the ClickHouse haven does not manage is
+	// exactly the one no ensure above touches, and it is the one that can take
+	// the machine down.
+	o.warnUnmanagedClickHouseCeiling(ctx, p.LwDir)
 	o.linkObservability(ctx, &st)
 	st.UpdatedAt = o.sys.Now()
 	if err := o.store.WriteOverlay(p.LwDir, st); err != nil {
@@ -753,6 +761,40 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	o.store.RemoveStack(slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
 	return nil
+}
+
+// warnUnmanagedClickHouseCeiling says something about the ClickHouse haven is
+// pointed at but does not manage (LANGWATCH_HAVEN_CH=0, the documented
+// no-container route). haven caps the container it owns two ways and used to
+// cap this one no ways at all, without saying so — and a brew clickhouse-server
+// with no max_server_memory_usage takes 90% of the machine, which on
+// 2026-09-09 exhausted an 18 GiB laptop's swap and got it killed by the kernel
+// watchdog.
+//
+// Every reason to stay quiet is honored: a managed server (already capped), no
+// wired probe, a URL that is not this machine's (its memory is not ours to
+// judge), a server that will not answer, or a machine whose RAM is unreadable.
+// The check is advisory — `up` never fails on it, because a developer who
+// deliberately runs a big local ClickHouse is not doing anything wrong.
+func (o *Orchestrator) warnUnmanagedClickHouseCeiling(ctx context.Context, lwDir string) {
+	if o.cfg.ShouldManageClickHouse || o.chProbe == nil || lwDir == "" {
+		return
+	}
+	rawURL := domain.LoadDotenv(lwDir)["CLICKHOUSE_URL"]
+	if !domain.IsLoopbackURL(rawURL) {
+		return
+	}
+	ceiling, err := o.chProbe.Ceiling(ctx, rawURL)
+	if err != nil {
+		o.log.Debug("could not read the unmanaged clickhouse memory ceiling", zap.Error(err))
+		return
+	}
+	verdict := domain.AssessClickHouseCeiling(ceiling, o.sys.TotalMemory())
+	// domain.SafeDisplayURL, not rawURL: a CLICKHOUSE_URL carries a password
+	// and this string is printed.
+	if msg := verdict.Warning("the ClickHouse at " + domain.SafeDisplayURL(rawURL)); msg != "" {
+		o.log.Warn(msg)
+	}
 }
 
 // ensureClickHouse starts the shared managed clickhouse-server (if not already

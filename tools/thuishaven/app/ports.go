@@ -252,6 +252,19 @@ type ClickHouse interface {
 	Stop()
 }
 
+// ClickHouseCeilingProbe reads how much memory a ClickHouse server will let
+// itself take, from a server addressed only by URL. It exists for the server
+// haven does NOT manage: with LANGWATCH_HAVEN_CH=0 there is no container, no
+// cgroup and no haven-written config, so the one thing haven can still do is
+// look at what is there and say whether it is safe. Nil when unwired, and the
+// check is skipped.
+type ClickHouseCeilingProbe interface {
+	// Ceiling reads the server's effective memory ceiling. An error means the
+	// server could not be asked (down, unreachable, credentials refused), which
+	// is never itself a complaint — haven stays quiet rather than guessing.
+	Ceiling(ctx context.Context, rawURL string) (domain.ClickHouseCeiling, error)
+}
+
 // Postgres manages one shared, brew-services Postgres and the per-slug
 // databases on it — the same one-server-many-databases pattern as ClickHouse.
 // Unlike ClickHouse, haven does not own the server's full lifecycle: a

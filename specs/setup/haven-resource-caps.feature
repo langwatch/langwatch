@@ -69,6 +69,19 @@ Feature: Resource caps — shared services can't take the machine
     When haven checks that server against the machine it runs on
     Then the check passes
 
+  # Bound by adapters/clickhouseprobe/probe_test.go (`// @scenario` on
+  # TestProbeCeiling). Reading is where the hazard hides: a stock server
+  # reports its absent ceiling as the number 0, which reads as "no limit
+  # configured" and behaves as most of the machine.
+  @unit
+  Scenario: An absent memory ceiling is read as absent, not as zero
+    Given a ClickHouse server that sets no memory ceiling of its own
+    When haven reads that server's ceiling
+    Then the reading says the server set no ceiling
+    And it keeps the fallback share the server would use instead
+    And haven only reads — it changes nothing on the server
+    And the server's password never appears in what haven reports
+
   # The managed container and an unmanaged server reach the same verdict from
   # the same policy: the tier a server runs in changes who applies the ceiling,
   # never what counts as a safe one.
