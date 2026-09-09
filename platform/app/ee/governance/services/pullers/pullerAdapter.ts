@@ -116,6 +116,38 @@ export const normalizedPullEventSchema = z.object({
 export type NormalizedPullEvent = z.infer<typeof normalizedPullEventSchema>;
 
 /**
+ * An adapter could not obtain the bearer its provider calls need.
+ *
+ * A subclass rather than a plain `Error` because two callers now read the same
+ * failure and want different things from it. The run path wants the message,
+ * unchanged, in the log and on the source. A caller listing entities on demand
+ * wants to tell an admin WHICH failure it was, and the three cases below are
+ * three different next actions: fill the credential in, fix the one that is
+ * there, or try again later.
+ *
+ * `message` stays customer-safe. It names the status at most, never the
+ * provider's reply body, which may echo the request back with the secret in it.
+ */
+export class ProviderSignInError extends Error {
+  readonly reason: "not_configured" | "refused" | "malformed_response";
+  /** The sign-in endpoint's status, when the failure had one. */
+  readonly status: number | null;
+
+  constructor(
+    message: string,
+    params: {
+      reason: "not_configured" | "refused" | "malformed_response";
+      status?: number;
+    },
+  ) {
+    super(message);
+    this.name = "ProviderSignInError";
+    this.reason = params.reason;
+    this.status = params.status ?? null;
+  }
+}
+
+/**
  * Result of a single `runOnce` invocation. Drained when `cursor === null`.
  *
  * `cursor` and `errorCount` are ONE contract, not two independent fields: the
