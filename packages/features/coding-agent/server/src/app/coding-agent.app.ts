@@ -26,9 +26,20 @@ import { GithubApi } from "@langwatch/github-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
+import type {
+  CodingAgentPullRequestUsageRead,
+  CodingAgentViewer,
+} from "@langwatch/coding-agent-contract";
 import type { CodingAgentScopeCaller } from "#ports/coding-agent-caller-scope.port";
 import type { CodingAgentClickHousePort } from "#ports/coding-agent-clickhouse.port";
 import type { CodingAgentBillingPolicyPort } from "#ports/coding-agent-billing.port";
+import type { CodingAgentAuditPort } from "#ports/coding-agent-audit.port";
+import type { CodingAgentViewerVisibilityPort } from "#ports/coding-agent-viewer-visibility.port";
+import {
+  gatePullRequestSessionTitles,
+  gateSessionListCost,
+  gateSessionListTitles,
+} from "../rules/coding-agent-gates.rules.ts";
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
 import {
   CodingAgentProjectionPersistenceAdapter,
@@ -93,6 +104,10 @@ export type CodingAgentInfrastructure = Readonly<{
   billing: CodingAgentBillingPolicyPort;
   scopeDirectory: CodingAgentCallerScopeDirectoryPort;
   scopePermissions: CodingAgentScopePermissionsPort;
+  /** What one viewer may read of one project's captured content and spend. */
+  visibility: CodingAgentViewerVisibilityPort;
+  /** Where a read that names people is written down. */
+  audit: CodingAgentAuditPort;
   /** Test-only service seam; production composition leaves this absent. */
   service?: CodingAgentService;
 }>;
@@ -134,21 +149,26 @@ export class CodingAgentApp implements CodingAgentApi {
       },
       resolveCallerProjectScope: (input) => scopeService.resolve(input),
     };
-    return new CodingAgentApp(service, dependencies.github, scope);
+    return new CodingAgentApp(service, dependencies.github, scope, infrastructure);
   }
 
   readonly #codingAgents: CodingAgentService;
   readonly #github: GithubApi;
   readonly #scope: CodingAgentScopePorts;
+  readonly #visibility: CodingAgentViewerVisibilityPort;
+  readonly #audit: CodingAgentAuditPort;
 
   private constructor(
     codingAgents: CodingAgentService,
     github: GithubApi,
     scope: CodingAgentScopePorts,
+    infrastructure: CodingAgentInfrastructure,
   ) {
     this.#codingAgents = codingAgents;
     this.#github = github;
     this.#scope = scope;
+    this.#visibility = infrastructure.visibility;
+    this.#audit = infrastructure.audit;
   }
 
   logContentKeys(eventName: string) {
@@ -212,9 +232,48 @@ export class CodingAgentApp implements CodingAgentApi {
     return this.#codingAgents.backfillPullRequestMappings(input);
   }
 
-  /** The Sessions screen's display projection for one project. */
-  listForProject(input: CodingAgentSessionsListInput): Promise<CodingAgentSessionListRow[]> {
-    return this.#codingAgents.listForProject(input);
+  /**
+   * The Sessions screen's rows for one project, cut to what this viewer may
+   * see: the title is the one conversation-derived value on the row, so it
+   * follows content visibility, and the cost follows `cost:view`.
+   */
+  async listForProject(
+    input: CodingAgentSessionsListInput,
+    by: CodingAgentViewer,
+  ): Promise<CodingAgentSessionListRow[]> {
+    const visibility = await this.#visibility.readVisibility({
+      userId: by.id,
+      projectId: input.projectId,
+    });
+    const rows = await this.#codingAgents.listForProject(input);
+
+    return gateSessionListCost({
+      rows: gateSessionListTitles({
+        rows,
+        canReadCapturedContent: visibility.canReadCapturedContent,
+      }),
+      canSeeCosts: visibility.canSeeCosts,
+    });
+  }
+
+  /**
+   * Records who read an answer that names people. Awaited by its callers before
+   * the answer leaves, so a read is never served unrecorded.
+   */
+  async recordPullRequestUsageRead(read: CodingAgentPullRequestUsageRead): Promise<void> {
+    await this.#audit.auditLog({
+      userId: read.readerUserId,
+      organizationId: read.organizationId,
+      action: "codingAgents.pullRequestUsage",
+      targetKind: "pullRequest",
+      targetId: `${read.repositoryHost}/${read.repositoryFullName}#${read.prNumber}`,
+      args: {
+        repository: read.repositoryFullName,
+        host: read.repositoryHost,
+        pullRequest: read.prNumber,
+        contributingProjectCount: read.contributingProjectCount,
+      },
+    });
   }
 
   /** The GitHub web origin this instance is bound to. */
@@ -270,7 +329,12 @@ export class CodingAgentApp implements CodingAgentApi {
     });
   }
 
-  /** One pull request in full: totals, contributors, models and sessions. */
+  /**
+   * One pull request in full: totals, contributors, models and sessions. Each
+   * session's title is resolved against the project it ran in, because the
+   * detail spans an organization and a reader can be trusted with one
+   * project's conversations and not another's.
+   */
   async getPullRequestDetail(
     pullRequest: CodingAgentPullRequestRef,
     by: CodingAgentCaller,
@@ -280,13 +344,24 @@ export class CodingAgentApp implements CodingAgentApi {
       caller: { kind: "user", userId: by.id },
       organizationId,
     });
-    return this.#codingAgents.getPullRequestDetail({
+    const detail = await this.#codingAgents.getPullRequestDetail({
       organizationId,
       repositoryHost: pullRequest.repositoryHost,
       repositoryFullName: pullRequest.repositoryFullName,
       prNumber: pullRequest.prNumber,
       ...scope,
     });
+
+    return {
+      ...detail,
+      sessions: gatePullRequestSessionTitles({
+        sessions: detail.sessions,
+        contentProjectIds: await this.contentProjectIdsFor({
+          userId: by.id,
+          projectIds: detail.sessions.map((session) => session.projectId),
+        }),
+      }),
+    };
   }
 
   /** Reads personal pull-request usage and GitHub connection state. */
@@ -325,6 +400,33 @@ export class CodingAgentApp implements CodingAgentApi {
         ? `/api/github/install?organizationId=${encodeURIComponent(organizationId)}`
         : null,
     };
+  }
+
+  /**
+   * Which of these projects the reader may read the captured content of, once
+   * per distinct project and only for those that contributed a session. One
+   * whose visibility cannot be resolved is absent, which hides its titles.
+   */
+  private async contentProjectIdsFor({
+    userId,
+    projectIds,
+  }: {
+    userId: string;
+    projectIds: readonly string[];
+  }): Promise<ReadonlySet<string>> {
+    const distinct = [...new Set(projectIds)];
+    const visible = await Promise.all(
+      distinct.map(async (projectId) => {
+        try {
+          const visibility = await this.#visibility.readVisibility({ userId, projectId });
+          return visibility.canReadCapturedContent ? projectId : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    return new Set(visible.filter((projectId) => projectId !== null));
   }
 
   /** Resolves a pull-request project's organization or preserves the old error. */

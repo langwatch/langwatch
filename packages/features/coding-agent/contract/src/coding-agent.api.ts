@@ -28,6 +28,24 @@ export type CodingAgentCallerScope =
   | { readonly kind: "user"; readonly userId: string }
   | { readonly kind: "apiKey"; readonly apiKeyId: string; readonly userId: string | null };
 
+/** Who a viewer-scoped read is answered for. */
+export type CodingAgentViewer = { readonly id: string };
+
+/**
+ * One read of a pull request's usage rollup, as it is written down. Never the
+ * contributors themselves: how many projects fed it says how wide the read
+ * reached without copying the names into a second store that outlives it.
+ */
+export type CodingAgentPullRequestUsageRead = Readonly<{
+  /** Who read it, as the door that answered resolved them. */
+  readerUserId: string;
+  organizationId: string;
+  repositoryHost: string;
+  repositoryFullName: string;
+  prNumber: number;
+  contributingProjectCount: number;
+}>;
+
 export interface CodingAgentApi {
   logContentKeys(eventName: string): readonly LogContentKey[];
   contentAttrKeys(eventName: string): readonly string[];
@@ -55,7 +73,17 @@ export interface CodingAgentApi {
   getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
   listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
   backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void>;
-  listForProject(input: CodingAgentSessionsListInput): Promise<CodingAgentSessionListRow[]>;
+  /**
+   * The Sessions screen's rows, cut to what this viewer may see: the generated
+   * title follows the project's content visibility, the cost follows
+   * `cost:view`.
+   */
+  listForProject(
+    input: CodingAgentSessionsListInput,
+    by: CodingAgentViewer,
+  ): Promise<CodingAgentSessionListRow[]>;
+  /** Records who read an answer that names people. */
+  recordPullRequestUsageRead(read: CodingAgentPullRequestUsageRead): Promise<void>;
   githubWebBase(): string;
   tryResolveOrganizationForProject(projectId: string): Promise<string | undefined>;
   getPullRequestUsage(
