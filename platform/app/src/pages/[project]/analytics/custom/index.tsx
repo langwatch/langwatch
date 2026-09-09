@@ -574,6 +574,9 @@ export const customGraphFormToCustomGraphInput = (
 ): CustomGraphInput | undefined => {
   for (const series of formData.series) {
     const metric = getMetric(series.metric);
+    if (!metric) {
+      return undefined;
+    }
     if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
       return undefined;
     }
@@ -621,6 +624,9 @@ const customAPIinput = (
 ): CustomAPICallData | undefined => {
   for (const series of formData.series) {
     const metric = getMetric(series.metric);
+    if (!metric) {
+      return undefined;
+    }
     if (metric.requiresKey && !metric.requiresKey.optional && !series.key) {
       return undefined;
     }
