@@ -1,37 +1,17 @@
 /**
- * The procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as every other feature
- * family's map says of itself: the procedures are mounted by the process out of
- * `@langwatch/enterprise-licensing-server`, which a web package may not import
- * even for a type.
- *
- * THE SEGMENT NAME IS LOAD-BEARING. `license` is a mount point on the root
- * router and tRPC hashes that path into the React Query cache key; spell it
- * differently and these hooks stop sharing a cache with the `api.license.*`
- * call sites that have not moved — the Usage page's self-hosted branch among
- * them.
- *
- * `LicenseStatus` IS THE PRODUCER'S OWN TYPE, declared in
- * `@langwatch/enterprise-licensing-contract` and returned by
- * `LicensingApp.getLicenseStatus`, so widening what a license reports is a
- * compile error at the producer rather than a blank card here.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/api/web`, and the
- * import below is the only one in the package.
+ * The procedures this package calls, derived from the contract. The segment
+ * name is load-bearing (tRPC cache key). ADR-004: this is the one governed-closure
+ * exception, importing from `@langwatch/api/web`.
  */
 
-import type { LicenseStatus } from "@langwatch/enterprise-licensing-contract";
-import { createModuleApi } from "@langwatch/api/web";
+import type { licenseTrpc } from "@langwatch/enterprise-licensing-contract";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { TimeInput } from "@langwatch/time";
 import type { PlanType } from "../model/plan-form-defaults.ts";
 
-/** The organization every license procedure is scoped to. */
-type OrganizationScope = { organizationId: string };
-
 /** The plan template a minted key carries, as the generator form fills it in. */
-export type LicenseMintInput = OrganizationScope & {
+export type LicenseMintInput = {
+  organizationId: string;
   privateKey: string;
   organizationName: string;
   email: string;
@@ -40,32 +20,11 @@ export type LicenseMintInput = OrganizationScope & {
   plan: Record<string, unknown>;
 };
 
-export type LicensingApiMap = {
-  license: {
-    getStatus: {
-      query: { input: OrganizationScope; output: LicenseStatus };
-    };
-
-    upload: {
-      mutation: {
-        input: OrganizationScope & { licenseKey: string };
-        output: { success: boolean };
-      };
-    };
-
-    remove: {
-      mutation: { input: OrganizationScope; output: { success: boolean; removed: boolean } };
-    };
-
-    /** Mints and signs a key from a private key the operator supplies. */
-    generate: {
-      mutation: { input: LicenseMintInput; output: { licenseKey: string } };
-    };
-  };
-};
+/** Everything this family calls: the derived namespace. */
+export type LicensingApiMap = ContractApiMap<typeof licenseTrpc>;
 
 /**
- * The licensing family's typed tRPC hooks. Same machinery, same transport and
- * same React Query cache as the application's `api` proxy.
+ * The licensing family's typed tRPC hooks. INTERNAL to this package: screens
+ * call it, and the process shell mounts `licensingApi.Provider`.
  */
 export const licensingApi = createModuleApi<LicensingApiMap>();
