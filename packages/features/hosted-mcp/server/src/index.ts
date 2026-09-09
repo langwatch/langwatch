@@ -17,11 +17,18 @@ export {
   type McpToolServer,
 } from "./ports/hosted-mcp.port.ts";
 export {
-  createMcpAuthorizeRestApp,
+  McpAuthorizationService,
   MCP_AUTHORIZE_PERMISSION,
+  type McpApprovalOutcome,
+  type McpApprovalRequest,
+  type McpApprover,
+  type McpAuthorizationCollaborators,
   type McpAuthorizeProject,
-  type McpAuthorizeRestPorts,
-  type McpAuthorizeSession,
-} from "./transport/api-rest/mcp-authorize.api.ts";
+} from "./services/mcp-authorization.service.ts";
+export {
+  McpAuthorizeApi,
+  mcpAuthorizeApprover,
+  mcpAuthorizeRest,
+} from "./transport/mcp-authorize.rest.ts";
 export { hostedMcpServer } from "./hosted-mcp.server.ts";
 export type { HostedMcpConfig, HostedMcpInfrastructure } from "./hosted-mcp.server.ts";

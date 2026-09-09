@@ -1,48 +1,24 @@
 /**
  * @vitest-environment node
+ *
+ * `POST /api/mcp/authorize` over the real declaration and approval service.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import { beforeEach, describe, expect, it } from "vitest";
+
+import type { HostedMcpRedis } from "../../ports/hosted-mcp.port.ts";
 import {
-  createMcpAuthorizeRestApp,
+  McpAuthorizationService,
   MCP_AUTHORIZE_PERMISSION,
-  type McpAuthorizeRestPorts,
-} from "../mcp-authorize.api.ts";
-import type { HostedMcpRedis } from "../../../ports/hosted-mcp.port.ts";
+  type McpApprover,
+} from "../../services/mcp-authorization.service.ts";
+import { mcpAuthorizeApprover, mcpAuthorizeRest } from "../mcp-authorize.rest.ts";
 
 const PROJECT_ID = "project-1";
 const CLIENT_ID = "mcp_client_1";
 const REDIRECT_URI = "http://127.0.0.1:9999/cb";
 
-const renderUnexpected = (
-  error: unknown,
-  c: { json: (body: unknown, status: number) => Response },
-) => c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("This family resolves its own credential.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
-}
+const APPROVER: McpApprover = { user: { id: "user-1" } };
 
 /** The Redis this flow reaches: the client registry, and where a code lands. */
 function fakeRedis() {
@@ -51,6 +27,7 @@ function fakeRedis() {
     `mcp:oauth:client:${CLIENT_ID}`,
     JSON.stringify({ redirectUris: [REDIRECT_URI], clientName: "test" }),
   );
+
   return {
     stored,
     redis: {
@@ -63,33 +40,47 @@ function fakeRedis() {
   };
 }
 
-function ports(options: { held: readonly string[] }): {
-  ports: McpAuthorizeRestPorts;
-  probed: string[];
-  stored: Map<string, string>;
-} {
+/** The family, its approval service, and the two things a test reads back. */
+function harnessFor(options: { held: readonly string[]; approver?: McpApprover | null }) {
   const { redis, stored } = fakeRedis();
   const probed: string[] = [];
-  return {
-    probed,
-    stored,
-    ports: {
-      resolveSession: () => Promise.resolve({ user: { id: "user-1" } }),
-      tryGetProject: () =>
+  const approver = options.approver === undefined ? APPROVER : options.approver;
+
+  const authorization = McpAuthorizationService.create({
+    collaborators: {
+      findProject: () =>
         Promise.resolve({ id: PROJECT_ID, apiKey: "lw_project_key", archivedAt: null }),
-      probeProjectPermission: (input) => {
+      mayApprove: (input) => {
         probed.push(input.permission);
+
         return Promise.resolve(options.held.includes(input.permission));
       },
       isDemoProject: () => false,
       encrypt: (value: string) => `encrypted:${value}`,
       redis,
     },
-  };
+  });
+
+  const runtime = createRestRuntime({
+    identity: {
+      authenticate: () => {
+        throw new Error("This family resolves its own credential.");
+      },
+    },
+  });
+
+  const app = runtime.mount(mcpAuthorizeRest.router(), {
+    app: () => ({ approve: (request) => authorization.approve(request) }),
+    credential: "public",
+    onError: (error, context) => context.json({ error: String(error) }, 500),
+    facts: [bindRestMiddleware(mcpAuthorizeApprover, () => approver)],
+  });
+
+  return { app, probed, stored };
 }
 
 async function approve(
-  app: ReturnType<typeof createMcpAuthorizeRestApp>,
+  app: ReturnType<typeof harnessFor>["app"],
   overrides: Record<string, unknown> = {},
 ) {
   const body: Record<string, unknown> = {
@@ -104,6 +95,7 @@ async function approve(
   for (const [key, value] of Object.entries(body)) {
     if (value === undefined) delete body[key];
   }
+
   return await app.request("/api/mcp/authorize", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -117,15 +109,16 @@ function mintedCodes(stored: Map<string, string>): string[] {
 }
 
 describe("given the hosted MCP approval step", () => {
-  let harness: ReturnType<typeof ports>;
+  let harness: ReturnType<typeof harnessFor>;
 
   const mount = (held: readonly string[]) => {
-    harness = ports({ held });
-    return createMcpAuthorizeRestApp({ security: passThroughSecurity(), ports: harness.ports });
+    harness = harnessFor({ held });
+
+    return harness.app;
   };
 
   beforeEach(() => {
-    harness = ports({ held: [] });
+    harness = harnessFor({ held: [] });
   });
 
   describe("when the approving person may only view the project", () => {
@@ -176,6 +169,34 @@ describe("given the hosted MCP approval step", () => {
       });
     });
   });
+
+  describe("when nobody is signed in", () => {
+    it("refuses before any registration is looked up", async () => {
+      const harnessed = harnessFor({ held: ["project:update"], approver: null });
+
+      const response = await approve(harnessed.app);
+
+      expect(response.status).toBe(401);
+      expect(((await response.json()) as { error: string }).error).toBe("Not authenticated");
+      expect(mintedCodes(harnessed.stored)).toEqual([]);
+    });
+  });
+
+  describe("when the posted body is not JSON", () => {
+    it("refuses it as an invalid body", async () => {
+      const harnessed = harnessFor({ held: ["project:update"] });
+
+      const response = await harnessed.app.request("/api/mcp/authorize", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "not json",
+      });
+
+      expect(response.status).toBe(400);
+      expect(((await response.json()) as { error: string }).error).toBe("Invalid body");
+      expect(mintedCodes(harnessed.stored)).toEqual([]);
+    });
+  });
 });
 
 /**
@@ -185,15 +206,14 @@ describe("given the hosted MCP approval step", () => {
  * does not defend against it: the same attacker authored the challenge.
  */
 describe("given an authorization request naming a client and a redirect URI", () => {
-  const mount = (harness: ReturnType<typeof ports>) =>
-    createMcpAuthorizeRestApp({ security: passThroughSecurity(), ports: harness.ports });
-
   describe("when the redirect URI is exactly one the client registered", () => {
-    /** @scenario "Authorization succeeds when redirect_uri exactly matches the registered client" */
+    /**
+     * @scenario Authorization succeeds when redirect_uri exactly matches the registered client
+     */
     it("issues an authorization code", async () => {
-      const harness = ports({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:update"] });
 
-      const response = await approve(mount(harness));
+      const response = await approve(harness.app);
 
       expect(response.status).toBe(200);
       expect(((await response.json()) as { redirect: string }).redirect).toContain("code=");
@@ -201,11 +221,13 @@ describe("given an authorization request naming a client and a redirect URI", ()
   });
 
   describe("when the redirect URI is not one the client registered", () => {
-    /** @scenario "Authorization is rejected when redirect_uri does not match the registered client" */
+    /**
+     * @scenario Authorization is rejected when redirect_uri does not match the registered client
+     */
     it("refuses it and never mints a code", async () => {
-      const harness = ports({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:update"] });
 
-      const response = await approve(mount(harness), {
+      const response = await approve(harness.app, {
         redirect_uri: "https://attacker.invalid/callback",
       });
 
@@ -226,11 +248,13 @@ describe("given an authorization request naming a client and a redirect URI", ()
     "blob:https://app.langwatch.ai/00000000-0000-4000-8000-000000000000",
     "filesystem:https://app.langwatch.ai/temporary/x",
   ])("when the redirect URI is %s", (redirect_uri) => {
-    /** @scenario "Authorization is rejected when redirect_uri uses a scheme the browser executes" */
+    /**
+     * @scenario Authorization is rejected when redirect_uri uses a scheme the browser executes
+     */
     it("refuses it before the client registry is consulted", async () => {
-      const harness = ports({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:update"] });
 
-      const response = await approve(mount(harness), { redirect_uri });
+      const response = await approve(harness.app, { redirect_uri });
 
       expect(response.status).toBe(400);
       const body = (await response.json()) as { error: string; redirect?: string };
@@ -243,9 +267,9 @@ describe("given an authorization request naming a client and a redirect URI", ()
   describe("when the client was never registered", () => {
     /** @scenario "Authorization is rejected for an unregistered client_id" */
     it("refuses it and never mints a code", async () => {
-      const harness = ports({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:update"] });
 
-      const response = await approve(mount(harness), { client_id: "mcp_never_registered" });
+      const response = await approve(harness.app, { client_id: "mcp_never_registered" });
 
       expect(response.status).toBe(400);
       expect(((await response.json()) as { error: string }).error).toBe(
@@ -258,9 +282,9 @@ describe("given an authorization request naming a client and a redirect URI", ()
   describe("when the request names no client at all", () => {
     /** @scenario "Authorization is rejected when client_id is missing" */
     it("refuses it before any registration is looked up", async () => {
-      const harness = ports({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:update"] });
 
-      const response = await approve(mount(harness), { client_id: undefined });
+      const response = await approve(harness.app, { client_id: undefined });
 
       expect(response.status).toBe(400);
       expect(((await response.json()) as { error: string }).error).toContain("client_id");
@@ -276,15 +300,12 @@ describe("given an authorization request naming a client and a redirect URI", ()
  * popup waiting forever with nothing to report.
  */
 describe("given a verified client whose approval then fails", () => {
-  const mount = (harness: ReturnType<typeof ports>) =>
-    createMcpAuthorizeRestApp({ security: passThroughSecurity(), ports: harness.ports });
-
   describe("when the request carries no code challenge", () => {
     /** @scenario "A consent failure a client can be told about is redirected back to the client" */
     it("sends the browser back to the registered redirect URI with the OAuth error", async () => {
-      const harness = ports({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:update"] });
 
-      const response = await approve(mount(harness), { code_challenge: undefined });
+      const response = await approve(harness.app, { code_challenge: undefined });
 
       expect(response.status).toBe(400);
       const body = (await response.json()) as { error: string; redirect: string };
@@ -304,11 +325,13 @@ describe("given a verified client whose approval then fails", () => {
      * The token endpoint verifies every code as S256 whatever was requested, so accepting
      * another method here would mint a code that can never be redeemed.
      */
-    /** @scenario "A code challenge method other than S256 is refused at the authorization request" */
+    /**
+     * @scenario A code challenge method other than S256 is refused at the authorization request
+     */
     it("refuses it now rather than at the exchange", async () => {
-      const harness = ports({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:update"] });
 
-      const response = await approve(mount(harness), { code_challenge_method: "plain" });
+      const response = await approve(harness.app, { code_challenge_method: "plain" });
 
       expect(response.status).toBe(400);
       const body = (await response.json()) as { error: string; redirect: string };
@@ -323,9 +346,9 @@ describe("given a verified client whose approval then fails", () => {
   describe("when the approving person cannot reach the project", () => {
     /** @scenario "A project the user cannot reach is reported to the client as access denied" */
     it("answers access_denied and carries it back to the client", async () => {
-      const harness = ports({ held: [] });
+      const harness = harnessFor({ held: [] });
 
-      const response = await approve(mount(harness));
+      const response = await approve(harness.app);
 
       expect(response.status).toBe(403);
       const body = (await response.json()) as { error: string; redirect: string };
@@ -338,16 +361,16 @@ describe("given a verified client whose approval then fails", () => {
 
 describe("given a failure the client cannot be told about", () => {
   describe("when the redirect URI was never verified against a registration", () => {
-    /** @scenario "A consent failure that cannot be attributed to a client stays on the LangWatch page" */
+    /**
+     * @scenario A consent failure that cannot be attributed to a client stays on the LangWatch page
+     */
     it("carries no redirect for the browser to follow", async () => {
-      const harness = ports({ held: ["project:update"] });
-      const app = createMcpAuthorizeRestApp({
-        security: passThroughSecurity(),
-        ports: harness.ports,
-      });
+      const harness = harnessFor({ held: ["project:update"] });
 
-      const unregisteredClient = await approve(app, { client_id: "mcp_never_registered" });
-      const foreignRedirect = await approve(app, {
+      const unregisteredClient = await approve(harness.app, {
+        client_id: "mcp_never_registered",
+      });
+      const foreignRedirect = await approve(harness.app, {
         redirect_uri: "https://attacker.invalid/callback",
       });
 

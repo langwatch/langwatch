@@ -2146,7 +2146,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       authoringSession && mcpCipher && projects
         ? {
             resolveSession: (request: Request) => authoringSession.resolve(request),
-            tryGetProject: async (projectId: string) => {
+            findProject: async (projectId: string) => {
               const project = await projects.tryGetById(projectId);
               return project
                 ? {

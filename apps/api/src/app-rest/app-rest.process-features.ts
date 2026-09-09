@@ -81,7 +81,10 @@ import type {
 } from "../features/trace/trace-rest.mount.ts";
 import type { OpsClickHouseExplainRestPorts } from "@langwatch/ops-server";
 import type { DspyStepsRestPorts } from "@langwatch/experiment-server";
-import type { McpAuthorizeRestPorts } from "@langwatch/hosted-mcp-server";
+import {
+  mountMcpAuthorizeRest,
+  type McpAuthorizeRestPorts,
+} from "../features/mcp/mcp-authorize-rest.mount.ts";
 import {
   mountApiPackagedRestFamilies,
   type ApiPackagedRestAbsenceReport,
@@ -378,7 +381,6 @@ export type ApiProcessRestFamilyName =
   | "governance-ingest"
   | "langwatch-ql"
   | "langy"
-  | "mcp-authorize"
   | "ops-clickhouse-explain"
   | "organization-management"
   | "otlp-ingest"
@@ -511,7 +513,11 @@ export function createApiProcessRestFeatures(options: {
 
   mount("ops-clickhouse-explain", null);
   mount("dspy-steps", null);
-  mount("mcp-authorize", null);
+  // The hosted MCP OAuth approval step, where this process composed a browser
+  // session to authenticate the approving person and a cipher to write the
+  // credential the code embeds.
+  const mcpAuthorize = ports.mcpAuthorize;
+  if (mcpAuthorize) features.push(mountMcpAuthorizeRest(mcpAuthorize));
   // The public image relay, where this deployment declared an egress policy.
   const imageProxy = ports.imageProxy;
   if (imageProxy) features.push(mountImageProxyRest(imageProxy));

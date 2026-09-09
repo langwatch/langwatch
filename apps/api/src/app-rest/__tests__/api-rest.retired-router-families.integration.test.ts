@@ -356,7 +356,7 @@ function dspyStep() {
 function mcpPorts(redis: ReturnType<typeof fakeRedis>) {
   return {
     resolveSession: async () => ({ user: { id: "user-1" } }),
-    tryGetProject: async (projectId: string) => ({
+    findProject: async (projectId: string) => ({
       id: projectId,
       apiKey: "project-key",
       archivedAt: null,
