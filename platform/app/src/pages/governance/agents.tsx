@@ -281,7 +281,7 @@ function useAgentsScreen() {
  * hook reports what was started and never what was found, and the toast says
  * reloading is how the reader sees a result.
  *
- * `asked` is remembered for the life of the mounted page rather than timed
+ * `hasAsked` is remembered for the life of the mounted page rather than timed
  * out. A second request arriving while one is in flight is DROPPED by the
  * process manager, not queued, and this page still has no way to learn when
  * the first one settled.
@@ -307,7 +307,7 @@ function useAgentSync({
   orgId: string;
   canManage: boolean;
 }) {
-  const [asked, setAsked] = useState(false);
+  const [hasAsked, setAsked] = useState(false);
   const sources = api.governanceAgents.syncSources.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
@@ -332,10 +332,10 @@ function useAgentSync({
   const connected = sources.data ?? [];
   const status = governanceSyncStatus({
     canManage,
-    sourcesLoading: sources.isLoading,
+    isLoadingSources: sources.isLoading,
     sourceCount: connected.length,
     isAsking: mutation.isPending,
-    asked,
+    hasAsked,
   });
 
   return {
