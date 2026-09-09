@@ -612,14 +612,23 @@ export class GovernanceCostService {
         errorCount: source.errorCount,
         lastSuccessAt: source.lastSuccessAt,
       });
-      // The notice has two shapes. Only the one naming a last SUCCESS is
-      // carried onto this screen. The other shape names how far a page-capped
-      // run read, and that point is not a last success -- feeding it into a
-      // field called "oldest last success" would date an outage from a run
-      // that never failed. The sources screen already shows the read-through
-      // point in its own words; whether the cost screen should say something
-      // separate about a half-read source is an open question, and nothing in
-      // the scenarios asks for it yet.
+      // The notice has two shapes, and this guard is a FENCE FOR LATER rather
+      // than a filter doing work today: the call above passes neither
+      // `completeness` nor `readThroughAt`, so the read-through shape is
+      // currently unreachable from here and every non-null notice names a last
+      // success.
+      //
+      // It stays because the day someone selects those two columns and passes
+      // them through -- which is a one-line change and an obvious one to make
+      // -- the read-through point would otherwise land in a field called
+      // "oldest last success" and date an outage from a run that never failed.
+      // A page-capped run did not fail. That is a wrong answer wearing the
+      // shape of a right one, which survives review far better than a crash.
+      //
+      // The sources screen already reports the read-through point in its own
+      // words. Whether this screen should say anything separate about a
+      // half-read source is deliberately unanswered: no scenario asks for it,
+      // and inventing the sentence would commit us to a meaning nobody agreed.
       if (notice === null || !("lastSuccessIso" in notice)) return [];
       return [{ name: source.name, lastSuccessIso: notice.lastSuccessIso }];
     });
