@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"runtime"
@@ -202,7 +203,7 @@ func (o *Orchestrator) rewrap(r rewrapRequest) hookReply {
 	input := map[string]any{
 		"command": domain.WrapCommand(o.havenPath(), r.command, opts),
 	}
-	systemMessage := "haven: " + r.decision.String()
+	systemMessage := admissionMessage(r, opts.Workers)
 
 	if r.decision == domain.Background {
 		input["run_in_background"] = true
@@ -228,6 +229,41 @@ func (o *Orchestrator) rewrap(r rewrapRequest) hookReply {
 			UpdatedInput:             input,
 		},
 	}
+}
+
+// admissionMessage is what the gate says about a decision, and it says nothing
+// at all about the ordinary one. "haven: admitted" was printed above every
+// gated command a session ran - forty-one of them in one turn on 2026-09-09 -
+// and it carries no information: the command ran, which the caller can see. A
+// line worth printing names something the caller did not already know and could
+// act on, which is only true when the run was changed.
+func admissionMessage(r rewrapRequest, workers int) string {
+	switch r.decision {
+	case domain.Narrow:
+		return fmt.Sprintf("haven: narrowed to %d test workers - the machine is busy, so this runs at a width that fits", workers)
+	case domain.Queue:
+		return "haven: " + queueNote(r.queueDepth)
+	case domain.Background:
+		return "haven: backgrounded, " + queueNote(r.queueDepth) + " - the result arrives as a notification"
+	case domain.Refuse:
+		return "haven: refused"
+	case domain.Admit:
+		return ""
+	}
+	return ""
+}
+
+// queueNote spells the wait a caller is about to have, in runs rather than in
+// seconds: how long each one takes is the one thing nobody can predict, and a
+// count is a number the reader can check against their own machine.
+func queueNote(depth int) string {
+	switch {
+	case depth <= 0:
+		return "queued for the machine-wide slot"
+	case depth == 1:
+		return "queued behind 1 run"
+	}
+	return fmt.Sprintf("queued behind %d runs", depth)
 }
 
 // havenPath is haven's own absolute path, because `make haven install` is
