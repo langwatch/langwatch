@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/ops-contract";
 
 /**
- * The queue reads the metrics writer makes, and nothing else — narrower than `OpsApi`, which
+ * The queue reads the metrics writer makes, and nothing else - narrower than `OpsApi`, which
  * a process holding only Redis cannot compose. The operations service satisfies it as it stands.
  */
 export abstract class OpsQueueMetricsSourcePort {
