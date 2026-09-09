@@ -18,6 +18,7 @@
 import { internalSecret } from "@langwatch/api";
 import {
   type AppRestSecurity,
+  HttpError,
   MANAGEMENT_API_VERSION,
   type EndpointVariables,
   type MountableRestApp,
@@ -25,13 +26,9 @@ import {
 } from "@langwatch/api/rest";
 
 import { ScimWebhookApi } from "./scim-webhook.api.ts";
-import {
-  SCIM_WEBHOOK_SIGNATURE_HEADER,
-  SCIM_WEBHOOK_TOLERANCE_SECONDS,
-  verifyScimWebhookSignature,
-} from "../../rules/scim-webhook-signature.rules.ts";
 import type { ScimService } from "@langwatch/enterprise-scim-contract";
-import { nowInstant, type Instant } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
+import { scimWebhookAuth } from "./scim-webhook.middleware.ts";
 
 /** Everything the intake reaches that the SCIM boundary does not own. */
 export type ScimWebhookRestPorts = Readonly<{
@@ -49,35 +46,6 @@ export type ScimWebhookRestPorts = Readonly<{
   now?: () => Instant;
 }>;
 
-/**
- * The nonces already spent inside the tolerance window.
- *
- * Per process, which is what an in-memory window can promise: it blunts the
- * replay a captured delivery makes cheap, while the timestamp tolerance is the
- * bound that holds across every replica.
- */
-class ScimWebhookReplayWindow {
-  private readonly seen = new Map<string, number>();
-
-  /** True when this nonce is new, and remembers it; false when it repeats. */
-  claim(nonce: string, nowSeconds: number): boolean {
-    for (const [key, at] of this.seen) {
-      if (nowSeconds - at > SCIM_WEBHOOK_TOLERANCE_SECONDS) this.seen.delete(key);
-    }
-    if (this.seen.has(nonce)) return false;
-    this.seen.set(nonce, nowSeconds);
-    return true;
-  }
-}
-
-function bearerToken(header: string | undefined): string | null {
-  if (!header) return null;
-  const [scheme, ...rest] = header.split(" ");
-  if (scheme?.toLowerCase() !== "bearer") return null;
-  const token = rest.join(" ").trim();
-  return token.length > 0 ? token : null;
-}
-
 /** Builds the `/api/webhooks/auth0-scim` family over one process's ports. */
 export function createScimWebhookRestApp(options: {
   security: AppRestSecurity;
@@ -92,44 +60,19 @@ export function createScimWebhookRestApp(options: {
     // negotiate.
     staticGeneration: "v1",
     errorEnvelope: "legacy",
+    errorHandler: () => (error, context) => {
+      if (error instanceof HttpError) {
+        return context.json({ error: error.error }, error.status);
+      }
+      throw error;
+    },
   });
   const scimWebhookApi = ScimWebhookApi.create();
-  const replays = new ScimWebhookReplayWindow();
-  const clock = ports.now ?? nowInstant;
-
-  const intakeHandler = async (c: ServiceContext<EndpointVariables>, input: { body: string }) => {
-    const secret = ports.webhookSecret();
-    if (!secret) return c.json({ error: "Webhook not configured" }, { status: 404 });
-
-    const raw = input.body;
-    const nowSeconds = Math.floor(clock().epochMilliseconds / 1000);
-    const signature = verifyScimWebhookSignature({
-      secret,
-      body: raw,
-      header: c.req.header(SCIM_WEBHOOK_SIGNATURE_HEADER),
-      nowSeconds,
-    });
-    if (!signature.verified) return c.json({ error: "Unauthorized" }, { status: 401 });
-    if (!replays.claim(signature.nonce, nowSeconds))
-      return c.json({ error: "Unauthorized" }, { status: 401 });
-
-    const token = bearerToken(c.req.header("authorization"));
-    if (!token) return c.json({ error: "Unauthorized" }, { status: 401 });
-    const entitlement = await ports.scim().verifyToken({ token });
-    if (entitlement.status === "invalid_token")
-      return c.json({ error: "Unauthorized" }, { status: 401 });
-    if (entitlement.status !== "ok") return c.json({ error: "Forbidden" }, { status: 403 });
-
-    let body: unknown;
-    try {
-      body = JSON.parse(raw);
-    } catch {
-      return c.json({ error: "Invalid JSON" }, { status: 400 });
-    }
+  const intakeHandler = async (c: ServiceContext<EndpointVariables>) => {
     await scimWebhookApi.handle({
       service: ports.scim(),
-      organizationId: entitlement.organizationId,
-      events: Array.isArray(body) ? body : [body],
+      organizationId: c.get("scimWebhookOrganizationId"),
+      events: c.get("scimWebhookEvents"),
     });
     return c.json({ received: true });
   };
@@ -141,6 +84,7 @@ export function createScimWebhookRestApp(options: {
           "auth0 SCIM webhook: signed with the deployment secret, tenanted by the presented SCIM token",
         ),
       )(b)
+        .withMiddleware(scimWebhookAuth(ports))
         // The HMAC is computed over these exact characters.
         .withRawBody("text")
         .withRawResponse(

@@ -29,8 +29,6 @@ import {
   scimPatchRequestSchema,
   scimReplaceGroupRequestSchema,
 } from "@langwatch/enterprise-scim-contract";
-import type { Context, MiddlewareHandler } from "hono";
-import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
 import { internalSecret, publicEndpoint } from "@langwatch/api";
 import {
   type AppRestSecurity,
@@ -40,6 +38,8 @@ import {
 } from "@langwatch/api/rest";
 import { z } from "zod";
 import type { ScimService } from "@langwatch/enterprise-scim-contract";
+import type { Context } from "hono";
+import { scimBearerAuth } from "./scim-auth.middleware.ts";
 
 const operations = {
   createGroup: CREATE_GROUP,
@@ -77,23 +77,6 @@ function scimJson(_c: Context, data: unknown, status = 200) {
   });
 }
 
-const scimAuth =
-  (scim: () => ScimService): MiddlewareHandler<{ Variables: { scimOrganizationId: string } }> =>
-  async (c, next) => {
-    const header = c.req.header("authorization");
-    if (!header?.startsWith("Bearer ")) return scimError(c, 401, "Bearer token is required");
-
-    const result = await scim().verifyToken({ token: header.slice(7) });
-    if (result.status === "invalid_token") return scimError(c, 401, "Bearer token is not valid");
-    if (result.status === "plan_not_entitled") {
-      return scimError(c, 403, ENTERPRISE_FEATURE_ERRORS.SCIM);
-    }
-
-    c.set("scimOrganizationId", result.organizationId);
-    await next();
-    return;
-  };
-
 /**
  * Builds the SCIM 2.0 protocol family over one process's Enterprise SCIM
  * application.
@@ -119,7 +102,7 @@ export function createScimProtocolRestApp(options: {
     name: "scim",
     basePath: "/api/scim/v2",
     staticGeneration: "v2",
-    verifySecret: scimAuth(scim),
+    verifySecret: scimBearerAuth(scim),
     credentialClass: "scim_token",
     // The family's own refusals, unchanged: a SCIM error is the protocol's own
     // document, and everything else leaves this family exactly as it did

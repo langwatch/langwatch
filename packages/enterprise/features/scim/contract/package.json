@@ -23,8 +23,8 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
-    "@langwatch/time": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
