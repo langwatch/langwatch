@@ -14,9 +14,12 @@
  *
  * The page issues no query — there is no organization-wide agent read — so
  * everything here is driven from the address and from session storage, which
- * is where the reader's sample choice lives. `RenderCode` is mocked to a plain
- * block: the snippet under test is the string the dialog passes it, and
- * highlighting it through Shiki in jsdom buys nothing.
+ * is where the reader's sample choice lives.
+ *
+ * REGISTERING IS A DRAWER NOW, and a drawer is mounted by `CurrentDrawer` at
+ * the app root rather than by this page. So the register tests here assert
+ * the request — which drawer the page asks for, and what it leaves in the
+ * address — and never the snippet, which belongs to the drawer's own test.
  *
  * Spec: specs/ai-governance/dashboard/agents-page.feature
  */
@@ -33,6 +36,10 @@ import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const harness = vi.hoisted(() => ({
+  openedDrawers: [] as Array<{ drawer: string; props?: unknown }>,
+}));
 
 import {
   AGENT_TABLE_COLUMNS,
@@ -71,8 +78,18 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
-vi.mock("~/components/code/RenderCode", () => ({
-  RenderCode: ({ code }: { code: string }) => <pre>{code}</pre>,
+// The register drawer is a URL-routed singleton mounted by `CurrentDrawer`
+// outside this page, so the honest thing to assert here is the navigation the
+// page asks for. What the drawer then draws is
+// `src/components/governance/agents/__tests__/registerAgentDrawer.integration.test.tsx`.
+// See dev/docs/best_practices/drawers.md, "Testing".
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({
+    openDrawer: (drawer: string, props?: unknown) =>
+      harness.openedDrawers.push({ drawer, props }),
+    closeDrawer: vi.fn(),
+    goBack: vi.fn(),
+  }),
 }));
 
 vi.mock("~/utils/api", () => {
@@ -222,6 +239,7 @@ const rowNames = () =>
 beforeEach(() => {
   window.sessionStorage.clear();
   window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
+  harness.openedDrawers.length = 0;
 });
 afterEach(() => {
   cleanup();
@@ -407,45 +425,54 @@ describe("the agents page sample rows", () => {
 
 describe("registering an agent", () => {
   describe("when the reader chooses Register agent", () => {
-    /** @scenario "Register agent opens the connect-from-code flow" */
-    it("explains that the agent registers itself and shows both snippets", async () => {
+    /** @scenario "Register agent opens the connect-from-code drawer" */
+    it("asks for the drawer instead of mounting one itself", async () => {
       const user = userEvent.setup();
       renderAgentsAt();
 
       await user.click(screen.getByRole("button", { name: /Register agent/ }));
 
-      expect(
-        await screen.findByText(/An agent registers itself from the process/),
-      ).toBeVisible();
-      expect(screen.getByText(/@langwatch.connect_agent/)).toBeVisible();
-      expect(screen.getByText(/connectAgent\(/)).toBeVisible();
-      // Instructions, not a form: nothing here could be persisted, so nothing
-      // is collected.
-      expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+      expect(harness.openedDrawers.map((entry) => entry.drawer)).toEqual([
+        "addAgent",
+      ]);
+      // Nothing is mounted from here: the page hands the drawer to the shell
+      // and the shell owns the mount. This is the assertion that would have
+      // caught the modal it replaced, which the page mounted itself.
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
   });
 
-  describe("when the address asks for the register dialog", () => {
-    /** @scenario "An address asking for the register dialog opens it on arrival" */
-    it("opens it without a click", async () => {
+  describe("when the address asks for the register drawer", () => {
+    /** @scenario "An address asking for the register drawer opens it on arrival" */
+    it("asks for it without a click", async () => {
       renderAgentsAt(["/governance/agents?add=1"]);
 
-      expect(
-        await screen.findByText(/An agent registers itself from the process/),
-      ).toBeVisible();
+      await waitFor(() =>
+        expect(harness.openedDrawers.map((entry) => entry.drawer)).toEqual([
+          "addAgent",
+        ]),
+      );
     });
 
-    /** @scenario "Closing the register dialog takes the request out of the address" */
-    it("takes add out of the address when the reader closes it", async () => {
-      const user = userEvent.setup();
-      const { router } = renderAgentsAt(["/governance/agents?add=1"]);
-      await screen.findByText(/An agent registers itself from the process/);
-
-      await user.click(screen.getByRole("button", { name: /close/i }));
+    /**
+     * The state one navigation later, with the drawer already named in the
+     * address. Written as its own entry rather than as a second act of the
+     * test above, because the drawer navigation is mocked here: the real
+     * `openDrawer` is what puts `drawer.open` in the address, so the only
+     * honest way to reach this state in this file is to start in it.
+     */
+    /** @scenario "The request to register an agent leaves the address once the drawer has it" */
+    it("clears the request and leaves the drawer in place", async () => {
+      const { router } = renderAgentsAt([
+        "/governance/agents?add=1&drawer.open=addAgent",
+      ]);
 
       await waitFor(() =>
-        expect(router.state.location.search).not.toContain("add"),
+        expect(router.state.location.search).not.toContain("add=1"),
       );
+      expect(router.state.location.search).toContain("drawer.open=addAgent");
+      // Already open: asking again would push a second entry onto the stack.
+      expect(harness.openedDrawers).toEqual([]);
     });
   });
 });
@@ -453,10 +480,11 @@ describe("registering an agent", () => {
 describe("the whole agents page", () => {
   describe("when it renders with its agents and again with none", () => {
     /**
-     * The subject is `document.body`, not the render container: the register
-     * dialog and every chip menu portal out of the container, and those are
-     * exactly the places a native select would hide. Each pass opens one of
-     * them and asserts while it is on screen.
+     * The subject is `document.body`, not the render container: every chip
+     * menu portals out of the container, and that is exactly where a native
+     * select would hide. Each pass opens one and asserts while it is on
+     * screen. The register drawer is not among them — it is mounted by the
+     * shell, so its own test makes this assertion about it.
      */
     /** @scenario "No governance page renders a native select" */
     it("contains no native select element, sample or empty", async () => {
@@ -477,14 +505,6 @@ describe("the whole agents page", () => {
       );
       expect(
         await screen.findByRole("menuitem", { name: "Databricks" }),
-      ).toBeVisible();
-      expect(findNativeSelects(document.body)).toHaveLength(0);
-      cleanup();
-
-      renderAgentsAt();
-      await user.click(screen.getByRole("button", { name: /Register agent/ }));
-      expect(
-        await screen.findByText(/An agent registers itself from the process/),
       ).toBeVisible();
       expect(findNativeSelects(document.body)).toHaveLength(0);
       cleanup();
@@ -869,13 +889,15 @@ describe("the agents filter chips", () => {
         .parentElement as HTMLElement;
       expect(doors.some((b) => headerRow.contains(b))).toBe(true);
 
-      // And it is one FLOW, not merely one label: the pane's copy opens the
-      // same dialog the header does.
+      // And it is one FLOW, not merely one label: the pane's copy asks for
+      // the same drawer the header does.
       const inPane = doors.find((b) => !headerRow.contains(b));
       await user.click(inPane as HTMLButtonElement);
-      expect(
-        await screen.findByRole("dialog", { name: /Register an agent/ }),
-      ).toBeVisible();
+      await waitFor(() =>
+        expect(harness.openedDrawers.map((entry) => entry.drawer)).toEqual([
+          "addAgent",
+        ]),
+      );
     });
   });
 

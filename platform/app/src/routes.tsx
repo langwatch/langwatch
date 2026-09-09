@@ -241,8 +241,8 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/people")),
       },
       {
-        // Agents and Applications detected across the organization, as two
-        // tabs (?tab=agents|applications).
+        // The agents detected across the organization, as one list. `?view`
+        // picks the layout and `?add=1` asks for the register drawer.
         path: "/governance/agents",
         ...page(() => import("./pages/governance/agents")),
       },

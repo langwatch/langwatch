@@ -40,6 +40,14 @@ Feature: The AI Governance Agents page
   # the connect-from-code flow rather than a name-and-environment form; a form
   # here would collect fields nothing could persist.
   #
+  # AND IT IS A DRAWER, NOT A MODAL. It was a modal; the section's one create
+  # surface is the right-side drawer, so it is now registered as `addAgent` and
+  # mounted by `CurrentDrawer` like every other. That buys the address: the
+  # drawer reopens from a paste and browser back closes it. `?add=1` is kept as
+  # the short href another screen can hold — the page honours it once, asks for
+  # the drawer, and drops the parameter, exactly as the people page does with
+  # its own `add=1`.
+  #
   # Rulebook: specs/ai-governance/dashboard/governance-ui-controls.feature
   # ADR: dev/docs/adr/128-connected-agents.md
   # ---------------------------------------------------------------------------
@@ -110,22 +118,30 @@ Feature: The AI Governance Agents page
   # ===========================================================================
 
   @integration
-  Scenario: Register agent opens the connect-from-code flow
+  Scenario: Register agent opens the connect-from-code drawer
     When the reader chooses Register agent
-    Then a dialog explains that an agent registers itself from the process that runs it
+    Then the page asks for the register drawer rather than mounting one itself
+    And the drawer explains that an agent registers itself from the process that runs it
     And it shows the Python and the TypeScript snippet that does it
-    And it collects no fields, because nothing could persist them
 
   @integration
-  Scenario: An address asking for the register dialog opens it on arrival
+  Scenario: Registering an agent collects nothing, because nothing could be saved
+    Given the register drawer is open
+    Then it offers no field to fill in
+    And it carries no submit, only the way out
+
+  @integration
+  Scenario: An address asking for the register drawer opens it on arrival
     When a governance viewer opens the Agents page with "add=1" in the address
-    Then the register dialog is open
+    Then the page asks for the register drawer
+    And closing it is a navigation, not local state
 
   @integration
-  Scenario: Closing the register dialog takes the request out of the address
-    Given the register dialog was opened from the address
-    When the reader closes it
+  Scenario: The request to register an agent leaves the address once the drawer has it
+    Given the address carries both "add=1" and the open register drawer
     Then the address no longer carries "add"
+    And the drawer stays named in the address
+    And the drawer is not asked for a second time
 
   # ===========================================================================
   # Filters and sort

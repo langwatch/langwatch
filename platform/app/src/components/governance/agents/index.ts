@@ -66,4 +66,7 @@ export {
   type GovernanceEmptyStateCopy,
   NO_MATCHING_AGENTS_COPY,
 } from "./emptyStates";
-export { RegisterAgentDialog } from "./RegisterAgentDialog";
+// `RegisterAgentDrawer` is deliberately absent. It is a registry drawer, and
+// `drawerRegistry` imports it lazily by path so its chunk stays out of the
+// initial bundle; re-exporting it here would pull it back in for every
+// importer of this barrel.

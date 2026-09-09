@@ -1,5 +1,6 @@
 import { Heading, HStack, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router";
 
 import {
@@ -16,7 +17,6 @@ import {
   type GovernanceEmptyStateCopy,
   isAgentsLayout,
   NO_MATCHING_AGENTS_COPY,
-  RegisterAgentDialog,
   SAMPLE_AGENT_ROWS,
   sourcesPresentIn,
   summarizeAgentFleet,
@@ -35,6 +35,7 @@ import {
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useDrawer } from "~/hooks/useDrawer";
 
 /**
  * The Agents page: what runs against the organization, as one list.
@@ -110,29 +111,59 @@ function useAgentsLayout() {
   return { layout, selectLayout };
 }
 
+/** The address that opens the register-agent drawer on arrival. */
+const ADD_AGENT_PARAM = "add";
+
 /**
- * Whether the register dialog is open, as part of the address.
+ * The deep link that arrives asking to register an agent:
+ * `/governance/agents?add=1`, which is how the governance home page's "Add
+ * agent" pill sends a reader here. A pill that dropped the reader on the page
+ * and left them to find the button again would be a worse version of no pill
+ * at all.
  *
- * The governance home page offers an "Add agent" pill that lands here, and a
- * pill that dropped the reader on the page and left them to find the button
- * again would be a worse version of no pill at all. `?add=1` is the whole
- * contract: present means open, and closing takes it back out so a refresh or
- * a shared link does not reopen a dialog the reader already dismissed.
+ * The parameter is a request, not state. It is honoured once, and then cleared
+ * from the address on the render after the drawer has landed in it — reading
+ * `drawer.open` rather than latching a flag, so the clear cannot run before the
+ * open it is waiting for. Same contract, same parameter name and the same
+ * shape as the people page's `useAddDepartmentDeepLink`, because it is the
+ * same problem: a short href another screen can hold, translated into the
+ * drawer address the registry actually routes on.
+ *
+ * Unlike that one this has no permission gate. The department deep link checks
+ * `governance:manage` because the mutation behind its drawer would refuse the
+ * reader anyway; there is no mutation behind this one. It shows the snippet a
+ * reader runs in their own process, so anyone who can see this page can read
+ * it.
  */
-function useRegisterDialog() {
+function useAddAgentDeepLink() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const open = searchParams.get("add") === "1";
-  const setOpen = (nowOpen: boolean) =>
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        if (nowOpen) next.set("add", "1");
-        else next.delete("add");
-        return next;
-      },
-      { replace: true },
-    );
-  return { open, setOpen };
+  const { openDrawer } = useDrawer();
+
+  const requested = searchParams.get(ADD_AGENT_PARAM) === "1";
+  const drawerOpen = searchParams.get("drawer.open");
+  const opened = useRef(false);
+
+  useEffect(() => {
+    if (!requested) {
+      opened.current = false;
+      return;
+    }
+
+    if (drawerOpen === "addAgent") {
+      setSearchParams(
+        (previous) => {
+          const params = new URLSearchParams(previous);
+          params.delete(ADD_AGENT_PARAM);
+          return params;
+        },
+        { replace: true },
+      );
+      return;
+    }
+    if (opened.current) return;
+    opened.current = true;
+    openDrawer("addAgent");
+  }, [requested, drawerOpen, openDrawer, setSearchParams]);
 }
 
 /**
@@ -221,7 +252,9 @@ function AgentsPane({
 
 function AgentsPage() {
   const { layout, selectLayout } = useAgentsLayout();
-  const { open: registerOpen, setOpen: setRegisterOpen } = useRegisterDialog();
+  const { openDrawer } = useDrawer();
+  const openRegister = () => openDrawer("addAgent");
+  useAddAgentDeepLink();
   const sample = useSampleMode();
   const { filters, setFilter, clearFilters } = useAgentFilters();
   const rows = sample.active ? SAMPLE_AGENT_ROWS : [];
@@ -258,7 +291,7 @@ function AgentsPage() {
                 now marks only the sample affordances, which is the one thing
                 on the screen it needs to distinguish.
                 Rule: specs/ai-governance/dashboard/governance-ui-controls.feature */}
-            <PageLayout.HeaderButton onClick={() => setRegisterOpen(true)}>
+            <PageLayout.HeaderButton onClick={openRegister}>
               <Plus size={14} />
               Register agent
             </PageLayout.HeaderButton>
@@ -294,14 +327,13 @@ function AgentsPage() {
           filters={filters}
           layout={layout}
           sample={sample.active}
-          onRegister={() => setRegisterOpen(true)}
+          onRegister={openRegister}
           onClearFilters={clearFilters}
         />
       </VStack>
-      <RegisterAgentDialog
-        open={registerOpen}
-        onClose={() => setRegisterOpen(false)}
-      />
+      {/* No drawer is mounted here. `CurrentDrawer` at the app root owns the
+          mount and the address owns which one is open, so this page only ever
+          asks. */}
     </GovernanceLayout>
   );
 }
