@@ -7,6 +7,7 @@
  * handshake, the two customer-facing failure strings — is sealed in here.
  */
 
+import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import * as ScenarioRunner from "@langwatch/scenario";
 import type { CallRecord, CallTurn } from "../call-record";
@@ -15,6 +16,8 @@ import type {
   VoiceTransportCredential,
   VoiceTransportRunner,
 } from "../voice-transport.registry";
+
+const logger = createLogger("langwatch:scenarios:voice:elevenlabs");
 
 /**
  * How long to wait for the socket to open before failing the run. ElevenLabs
@@ -284,7 +287,13 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     // live transcript, so anything else reads as not-ready: return null and let
     // the caller keep the browser transcript. A missing status keeps today's
     // behaviour for older payloads (#8019).
-    if (typeof body.status === "string" && body.status !== "done") return null;
+    if (typeof body.status === "string" && body.status !== "done") {
+      logger.info(
+        { conversationId, status: body.status },
+        "provider record not ready; browser transcript will be used",
+      );
+      return null;
+    }
     const startedAt = body.metadata?.start_time_unix_secs
       ? body.metadata.start_time_unix_secs * 1000
       : Date.now();

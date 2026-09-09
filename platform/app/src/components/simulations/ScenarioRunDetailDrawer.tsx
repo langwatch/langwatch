@@ -25,11 +25,11 @@ import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { Drawer } from "../ui/drawer";
 import { CopyIdChip } from "./CopyIdChip";
+import { CutAtLimitBadge, isCutAtLimitOf } from "./CutAtLimitBadge";
 import { RunCriteriaChip } from "./RunCriteriaChip";
 import { RunDetailSection } from "./RunDetailSection";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
-import { CutAtLimitBadge } from "./ScenarioRunHeader";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
 import { hasNoResults } from "./scenario-run-status.utils";
 import { SimulationConsole } from "./simulation-console/SimulationConsole";
@@ -319,7 +319,7 @@ function ClassicScenarioRunDetailDrawer({
                     <Heading size="md" truncate title={displayTitle}>
                       {displayTitle}
                     </Heading>
-                    {scenarioState.metadata?.langwatch?.isCutAtLimit ? (
+                    {isCutAtLimitOf(scenarioState.metadata) ? (
                       <CutAtLimitBadge />
                     ) : null}
                   </HStack>

@@ -241,6 +241,7 @@ describe("finishVoiceSession", () => {
                 status: ScenarioRunStatus.SUCCESS,
                 source: "provider" as const,
                 audioUrl: null,
+                scenarioId: null,
                 scenarioSetId: null,
               }
             : null,
@@ -288,6 +289,7 @@ describe("finishVoiceSession", () => {
               status: ScenarioRunStatus.SUCCESS,
               source: "provider" as const,
               audioUrl: null,
+              scenarioId: null,
               scenarioSetId: null,
             })),
           },
@@ -318,6 +320,7 @@ describe("finishVoiceSession", () => {
               source: "browser" as const,
               // Same-origin proxy URL the transport wrote, read back verbatim.
               audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+              scenarioId: null,
               scenarioSetId: "set_terminal",
             })),
           },
@@ -358,6 +361,7 @@ describe("finishVoiceSession", () => {
               status: ScenarioRunStatus.SUCCESS,
               source: "provider" as const,
               audioUrl: null,
+              scenarioId: null,
               scenarioSetId: null,
             })),
           },
@@ -391,6 +395,7 @@ describe("finishVoiceSession", () => {
               status: ScenarioRunStatus.IN_PROGRESS,
               source: "provider" as const,
               audioUrl: null,
+              scenarioId: null,
               scenarioSetId: null,
             })),
           },
@@ -405,6 +410,115 @@ describe("finishVoiceSession", () => {
         expect(writeCallRun).toHaveBeenCalledTimes(1);
         expect(writeCallRun.mock.calls[0]?.[0].scenarioRunId).toBe(
           result.runId,
+        );
+      });
+
+      /** @scenario "A retried hang-up completes a half-written run" */
+      it("reuses the half-written run's agent when the token carries none", async () => {
+        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+          async () => {},
+        );
+        const createVoiceAgent = vi.fn(async () => ({ id: "agent_new" }));
+        const ports = fakePorts({
+          runner: fakeRunner(),
+          over: {
+            writeCallRun,
+            createVoiceAgent,
+            findExistingRun: vi.fn(async () => ({
+              agentId: "agent_existing",
+              status: ScenarioRunStatus.IN_PROGRESS,
+              source: null,
+              audioUrl: null,
+              scenarioId: null,
+              scenarioSetId: null,
+            })),
+          },
+        });
+
+        // Token names no agent and the request has no name, so a fresh finish
+        // would throw VoiceNameRequiredError; the re-drive reuses the id the
+        // half-written run already attached instead (#7973).
+        const result = await finishVoiceSession({
+          ports,
+          ...FINISH_BASE,
+          token: { ...TOKEN, agentId: null },
+        });
+
+        expect(createVoiceAgent).not.toHaveBeenCalled();
+        expect(result.agentId).toBe("agent_existing");
+      });
+
+      /** @scenario "A retried hang-up completes a half-written run" */
+      it("re-drives when the run was cancelled rather than dropping the transcript", async () => {
+        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+          async () => {},
+        );
+        const ports = fakePorts({
+          runner: fakeRunner(),
+          over: {
+            writeCallRun,
+            findExistingRun: vi.fn(async () => ({
+              agentId: "agent_row",
+              status: ScenarioRunStatus.CANCELLED,
+              source: null,
+              audioUrl: null,
+              scenarioId: null,
+              scenarioSetId: null,
+            })),
+          },
+        });
+
+        const result = await finishVoiceSession({
+          ports,
+          ...FINISH_BASE,
+          token: { ...TOKEN, agentId: "agent_row" },
+        });
+
+        expect(writeCallRun).toHaveBeenCalledTimes(1);
+        expect(writeCallRun.mock.calls[0]?.[0].scenarioRunId).toBe(
+          result.runId,
+        );
+      });
+
+      /** @scenario "A retried hang-up completes a half-written run" */
+      it("reuses the persisted scenario rather than re-resolving an archived one", async () => {
+        const writeCallRun = vi.fn<VoiceSessionPorts["writeCallRun"]>(
+          async () => {},
+        );
+        // Were it resolved now, the archived scenario would return null and the
+        // run could never complete (#7973 AC1): the persisted set is reused.
+        const resolveScenarioSet = vi.fn(async () => null);
+        const ports = fakePorts({
+          runner: fakeRunner(),
+          over: {
+            writeCallRun,
+            resolveScenarioSet,
+            findExistingRun: vi.fn(async () => ({
+              agentId: "agent_row",
+              status: ScenarioRunStatus.IN_PROGRESS,
+              source: null,
+              audioUrl: null,
+              scenarioId: "scenario_archived",
+              scenarioSetId: "set_a",
+            })),
+          },
+        });
+
+        await finishVoiceSession({
+          ports,
+          ...FINISH_BASE,
+          token: { ...TOKEN, agentId: "agent_row" },
+          scenarioId: "scenario_archived",
+        });
+
+        expect(resolveScenarioSet).not.toHaveBeenCalled();
+        expect(writeCallRun).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scenario: {
+              scenarioId: "scenario_archived",
+              scenarioSetId: "set_a",
+            },
+          }),
         );
       });
     });

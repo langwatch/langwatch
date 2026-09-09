@@ -13,10 +13,7 @@ import { HandledError } from "@langwatch/handled-error";
 
 import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
 import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
-import {
-  isTerminalStatus,
-  type ScenarioRunStatus,
-} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import {
   type BrowserTranscriptTurn,
   browserTranscriptToCallRecord,
@@ -191,8 +188,9 @@ export interface VoiceSessionPorts {
   }): Promise<{ id: string; agentExternalId: string } | null>;
   /** The run already written for this id, or null. Returns the agent id it
    *  attached so a duplicate finish can answer with it, and the run status so a
-   *  finish short-circuits on a terminal run but re-drives a half-written,
-   *  non-terminal one (#7973). */
+   *  finish short-circuits on a written run but re-drives a half-written one
+   *  (#7973). Also returns the persisted scenario and set so a re-drive reuses
+   *  them rather than re-resolving a scenario that may since be archived. */
   findExistingRun(input: {
     projectId: string;
     scenarioRunId: string;
@@ -201,6 +199,10 @@ export interface VoiceSessionPorts {
     status: ScenarioRunStatus;
     source: CallRecord["source"] | null;
     audioUrl: string | null;
+    /** The scenario the run was written under, reused on a re-drive so a
+     *  scenario archived between attempts cannot break the retry (#7973 AC1).
+     *  Null when the run carries none (a drawer call). */
+    scenarioId: string | null;
     /** The set the run landed in, so a terminal retry deep-links it (AC14).
      *  Null when the run carries none (a drawer call). */
     scenarioSetId: string | null;
@@ -452,11 +454,15 @@ type ExistingRun = NonNullable<
  * and the deep link to the set (AC14) — the scenario is deliberately not
  * re-resolved, so an archived scenario cannot break the retry (#7973 AC1).
  */
-function terminalRunResult(
-  scenarioRunId: string,
-  token: VoiceSessionTokenPayload,
-  existing: ExistingRun,
-): FinishResult {
+function terminalRunResult({
+  scenarioRunId,
+  token,
+  existing,
+}: {
+  scenarioRunId: string;
+  token: VoiceSessionTokenPayload;
+  existing: ExistingRun;
+}): FinishResult {
   return {
     runId: scenarioRunId,
     agentId: token.agentId ?? existing.agentId ?? "",
@@ -511,34 +517,50 @@ function selectCallRecord({
   endedAt: number;
   isCutAtLimit: boolean;
 }): CallRecord {
-  const hasProviderTurns =
-    providerRecord !== null && providerRecord.turns.length > 0;
-  const shouldUseBrowserTranscript =
-    (!providerRecord || !hasProviderTurns) && transcript.length > 0;
-  if (providerRecord && !shouldUseBrowserTranscript) {
+  // The provider's record when it actually holds turns.
+  if (providerRecord && providerRecord.turns.length > 0) {
     return { ...providerRecord, isCutAtLimit };
   }
-  return {
-    ...browserTranscriptToCallRecord({
-      conversationId,
-      transport,
-      transcript,
-      startedAt,
-      endedAt,
-      isCutAtLimit,
-    }),
-    // The turns come from the browser, but a recording the provider already
-    // returned is still this call's audio.
-    ...(providerRecord?.audioUrl ? { audioUrl: providerRecord.audioUrl } : {}),
-  };
+  const browserRecord = browserTranscriptToCallRecord({
+    conversationId,
+    transport,
+    transcript,
+    startedAt,
+    endedAt,
+    isCutAtLimit,
+  });
+  // No provider turns, but the browser captured the conversation: keep it
+  // rather than write an empty run the reader sees as "no response" (#8019).
+  // The turns come from the browser, but a recording the provider already
+  // returned is still this call's audio.
+  if (transcript.length > 0) {
+    return {
+      ...browserRecord,
+      ...(providerRecord?.audioUrl
+        ? { audioUrl: providerRecord.audioUrl }
+        : {}),
+    };
+  }
+  // Neither side has turns: keep the (empty) provider record when one came
+  // back, else the empty browser record.
+  return providerRecord ? { ...providerRecord, isCutAtLimit } : browserRecord;
 }
+
+/** Statuses that mean the finish write already completed: only these are
+ *  returned untouched on a retry (#7973 AC1). */
+const WRITTEN_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([
+  ScenarioRunStatus.SUCCESS,
+  ScenarioRunStatus.FAILED,
+]);
 
 /**
  * Ingest a finished call as a run, exactly once per conversation.
  *
  * Idempotent on the conversation id: a second hang-up, a mid-call reload or a
- * late webhook all resolve to the same run id, and an existing run is returned
- * untouched (AC14). Creates the agent row when the drawer had none; falls back
+ * late webhook all resolve to the same run id. A fully written run
+ * (SUCCESS/FAILED) is returned untouched (AC14, #7973 AC1); a half-written or
+ * cancelled run is re-driven through `writeCallRun` (#7973 AC2). Creates the
+ * agent row when the drawer had none; falls back
  * to the live transcript when the provider record is not ready or the fetch
  * fails, marking the latter so the panel can say so (AC15).
  */
@@ -576,14 +598,29 @@ export async function finishVoiceSession(input: {
     projectId: input.projectId,
     scenarioRunId,
   });
-  if (existing && isTerminalStatus(existing.status)) {
-    return terminalRunResult(scenarioRunId, token, existing);
+  // The question is "did the finish write already complete?", not "is the run
+  // terminal?": ERROR, CANCELLED and STALLED are terminal too, and answering a
+  // retry after one of those with the empty terminal result would drop the
+  // caller's transcript — the loss #7973 exists to close. Only a written run is
+  // returned untouched; anything else re-drives writeCallRun (#7973 AC2).
+  if (existing && WRITTEN_STATUSES.has(existing.status)) {
+    return terminalRunResult({ scenarioRunId, token, existing });
   }
 
-  const scenarioContext = await resolveScenarioContext(ports, {
-    projectId: input.projectId,
-    scenarioId: input.scenarioId,
-  });
+  // A re-drive reuses the scenario the half-written run already landed under,
+  // rather than re-resolving it: a scenario archived between the two attempts
+  // would now throw scenario_not_found and the run could never complete (#7973
+  // AC1). Only a fresh finish (no existing run) resolves the scenario set.
+  const scenarioContext =
+    existing && existing.scenarioId !== null && existing.scenarioSetId !== null
+      ? {
+          scenarioId: existing.scenarioId,
+          scenarioSetId: existing.scenarioSetId,
+        }
+      : await resolveScenarioContext(ports, {
+          projectId: input.projectId,
+          scenarioId: input.scenarioId,
+        });
 
   // Prefer the provider's record; fall back to the live transcript when it is
   // not ready or the fetch fails. Fetched BEFORE the agent row is created so a

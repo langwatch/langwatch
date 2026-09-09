@@ -91,13 +91,12 @@ describe("voiceCallTargetOf", () => {
 
   describe("given the scope is a plan of many scenarios", () => {
     /** @scenario "Call it myself is offered only when one scenario is in scope" */
-    it("names no scenario, so Call it myself is not offered for a plan", () => {
+    it("resolves no target, so Call it myself is not offered for a plan", () => {
       const result = voiceCallTargetOf({
         form: form({ target: { type: "voice", id: "agent_voice" } }),
         subject: PLAN_SUBJECT,
       });
-      expect(result).not.toBeNull();
-      expect(result?.scenarioId).toBeUndefined();
+      expect(result).toBeNull();
     });
   });
 
@@ -114,24 +113,23 @@ describe("voiceCallTargetOf", () => {
 
   describe("given the run dialog runs a suite that holds several scenarios", () => {
     /** @scenario "Call it myself is offered only when one scenario is in scope" */
-    it("names no scenario, so Call it myself is not offered", () => {
+    it("resolves no target, so Call it myself is not offered", () => {
       const result = voiceCallTargetOf({
         form: form({ target: { type: "voice", id: "agent_voice" } }),
         subject: suiteSubject(["scenario_a", "scenario_b"]),
       });
-      expect(result).not.toBeNull();
-      expect(result?.scenarioId).toBeUndefined();
+      expect(result).toBeNull();
     });
   });
 
   describe("given the run dialog runs a suite that holds no scenarios", () => {
     /** @scenario "Call it myself is offered only when one scenario is in scope" */
-    it("names no scenario, so Call it myself is not offered", () => {
+    it("resolves no target, so Call it myself is not offered", () => {
       const result = voiceCallTargetOf({
         form: form({ target: { type: "voice", id: "agent_voice" } }),
         subject: suiteSubject([]),
       });
-      expect(result?.scenarioId).toBeUndefined();
+      expect(result).toBeNull();
     });
   });
 

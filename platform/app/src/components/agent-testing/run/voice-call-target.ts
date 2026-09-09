@@ -8,9 +8,9 @@
  *
  * A voice call is offered only when exactly one scenario is in scope: a single
  * case, or a suite holding exactly one scenario. A `plan` subject (many
- * scenarios) has no single scenario to score the call under, so the resolved
- * target carries no `scenarioId` and the dialog gates the action off (#8019
- * AC9) — it is not an unscored voice-call target.
+ * scenarios) or an empty scope has no single scenario to score the call under,
+ * so no target is resolved (null) and the dialog gates the action off (#8019
+ * AC9) — a resolved target always names the scenario it is scored under.
  *
  * @see specs/features/agents/voice-agents-v1.feature
  */
@@ -29,8 +29,9 @@ export type VoiceCallTarget = {
   agentId: string;
   /** The saved agent row id. */
   agentRowId: string;
-  /** The scenario the call is scored under, when the dialog runs one scenario. */
-  scenarioId?: string;
+  /** The scenario the call is scored under; a target is resolved only when
+   *  exactly one scenario is in scope, so this is always present. */
+  scenarioId: string;
 };
 
 /**
@@ -56,13 +57,15 @@ export function voiceCallTargetOf({
   if (!parsed.success) return null;
   // A call is scored against a scenario only when exactly one scenario is in
   // scope: a single case, or a suite that holds exactly one scenario. Every
-  // other scope has no single scenario to write the run under.
+  // other scope has no single scenario to write the run under, so no target is
+  // offered (#8019 AC9).
   const scenarioId = scenarioIdInScope(subject);
+  if (!scenarioId) return null;
   return {
     transport: parsed.data.transport,
     agentId: parsed.data.agentId,
     agentRowId: agent.id,
-    ...(scenarioId ? { scenarioId } : {}),
+    scenarioId,
   };
 }
 

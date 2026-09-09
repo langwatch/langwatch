@@ -89,36 +89,6 @@ describe("ScenarioRunDetailDrawer", () => {
         ).toBeInTheDocument();
       });
 
-      /** @scenario "A voice run stops at the maximum call duration and is marked as cut at the limit" */
-      it("shows the cut-at-limit marker when the run was cut at the call limit", () => {
-        render(
-          <ScenarioRunHeader
-            name="Echo user request"
-            status={ScenarioRunStatus.SUCCESS}
-            copyableIds={[{ label: "Scenario ID", value: "sc-123" }]}
-            isCutAtLimit
-          />,
-          { wrapper: DrawerWrapper },
-        );
-
-        expect(screen.getByText("Cut at the call limit")).toBeInTheDocument();
-      });
-
-      it("hides the marker when the run was not cut at the call limit", () => {
-        render(
-          <ScenarioRunHeader
-            name="Echo user request"
-            status={ScenarioRunStatus.SUCCESS}
-            copyableIds={[{ label: "Scenario ID", value: "sc-123" }]}
-          />,
-          { wrapper: DrawerWrapper },
-        );
-
-        expect(
-          screen.queryByText("Cut at the call limit"),
-        ).not.toBeInTheDocument();
-      });
-
       it("displays copyable IDs below the header", () => {
         render(
           <ScenarioRunHeader

@@ -113,11 +113,15 @@ async function authenticateVoiceRequest({
  * verify its token between the two — the token says whether an agent will be
  * created, and so which permissions this request needs (#8021 AC2).
  */
-async function requirePermissions(
-  witness: VoiceAuthWitness,
-  projectId: string,
-  permissions: readonly VoicePermission[],
-): Promise<void> {
+async function requirePermissions({
+  witness,
+  projectId,
+  permissions,
+}: {
+  witness: VoiceAuthWitness;
+  projectId: string;
+  permissions: readonly VoicePermission[];
+}): Promise<void> {
   for (const permission of permissions) {
     const allowed = await probeProjectPermission(
       { session: witness.session },
@@ -142,7 +146,7 @@ async function requireProject({
   permissions: readonly VoicePermission[];
 }): Promise<void> {
   const witness = await authenticateVoiceRequest({ req, projectId });
-  await requirePermissions(witness, projectId, permissions);
+  await requirePermissions({ witness, projectId, permissions });
 }
 
 // POST /api/voice/session — mint a signed-URL session from the form values.
@@ -252,11 +256,16 @@ secured
       // token names no saved agent will create one on the way in, so it needs
       // agent-management rights up front; a finish against a saved agent does
       // not (#8021 AC2).
-      await requirePermissions(
+      //
+      // On a re-drive the service can reuse an existing run's agentId and create
+      // nothing, so this asks for evaluations:manage though nothing is created;
+      // accepted as a deliberate, conservative over-ask (the same user already
+      // cleared it on the first attempt).
+      await requirePermissions({
         witness,
-        body.projectId,
-        voicePermissionsFor({ createsAgent: !token.agentId }),
-      );
+        projectId: body.projectId,
+        permissions: voicePermissionsFor({ createsAgent: !token.agentId }),
+      });
 
       const result = await finishVoiceSession({
         ports,

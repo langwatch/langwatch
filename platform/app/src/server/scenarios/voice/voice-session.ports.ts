@@ -112,15 +112,16 @@ export function createVoiceSessionPortsFromServices({
         scenarioRunId,
       });
       if (!run) return null;
-      // The status decides whether a retried finish short-circuits (terminal)
-      // or re-drives a half-written run (non-terminal, #7973). The persisted
-      // source, recording and set let a terminal retry report the original
-      // run's transcript origin, Play control and deep link (AC14).
+      // The status decides whether a retried finish short-circuits (written)
+      // or re-drives a half-written run (#7973). The persisted source,
+      // recording and set let a terminal retry report the original run's
+      // transcript origin, Play control and deep link (AC14).
       return {
         ...narrowPersistedRunFields(run.metadata),
         status: run.status,
-        // The set the run landed in, so a terminal retry deep-links it without
-        // re-resolving the (possibly archived) scenario (#7973 AC1).
+        // The scenario and set the run landed under, reused on a re-drive so a
+        // scenario archived between attempts cannot break the retry (#7973 AC1).
+        scenarioId: typeof run.scenarioId === "string" ? run.scenarioId : null,
         scenarioSetId:
           typeof run.scenarioSetId === "string" ? run.scenarioSetId : null,
       };

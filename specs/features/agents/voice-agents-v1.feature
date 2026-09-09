@@ -642,6 +642,14 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When the browser retries the finish
     Then the run completes with no duplicate messages
 
+  # 7973 AC6
+  @unit @regression
+  Scenario: A re-driven finish keeps the first attempt's metadata
+    Given a run for the session was started twice with different metadata
+    When a snapshot and the finish are folded onto it
+    Then the run keeps the first attempt's metadata
+    And it reaches the finished status with the snapshot's messages
+
   # ---------------------------------------------------------------------------
   # Talk to it authorization and the cutoff marker (#8021)
   # ---------------------------------------------------------------------------

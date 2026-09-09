@@ -232,9 +232,7 @@ function RunDialogCallBody({
           transport={voiceCall.transport}
           agentId={voiceCall.agentId}
           agentRowId={voiceCall.agentRowId}
-          {...(voiceCall.scenarioId
-            ? { scenarioId: voiceCall.scenarioId }
-            : {})}
+          scenarioId={voiceCall.scenarioId}
         />
       </VStack>
     </Dialog.Body>
@@ -310,7 +308,7 @@ function RunDialogContent({
               blockedReason={runBlockedReason({ subject, form, controller })}
               warning={offender ? RUN_MISSING_MAPPINGS_TOOLTIP : null}
               onRun={onRun}
-              {...(voiceCall?.scenarioId
+              {...(voiceCall
                 ? { onCallItMyself: () => setIsCalling(true) }
                 : {})}
               caseCount={form.caseCount}

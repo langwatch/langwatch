@@ -10,9 +10,12 @@ import { Button, Heading, HStack, Icon, VStack } from "@chakra-ui/react";
 import { Edit2, Square } from "lucide-react";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { CopyIdChip } from "~/components/simulations/CopyIdChip";
+import {
+  CutAtLimitBadge,
+  isCutAtLimitOf,
+} from "~/components/simulations/CutAtLimitBadge";
 import { RunCriteriaChip } from "~/components/simulations/RunCriteriaChip";
 import { ScenarioRunActions } from "~/components/simulations/ScenarioRunActions";
-import { CutAtLimitBadge } from "~/components/simulations/ScenarioRunHeader";
 import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
 import { hasNoResults } from "~/components/simulations/scenario-run-status.utils";
 import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
@@ -58,7 +61,7 @@ function HeadingRow({
       <Heading size="md" truncate title={displayTitle}>
         {displayTitle}
       </Heading>
-      {scenarioState.metadata?.langwatch?.isCutAtLimit && <CutAtLimitBadge />}
+      {isCutAtLimitOf(scenarioState.metadata) && <CutAtLimitBadge />}
       {scenarioVersion != null && (
         <HStack data-testid="run-drawer-version">
           <CaseVersionChip version={scenarioVersion} />

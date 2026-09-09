@@ -231,6 +231,7 @@ describe("Feature: voice-session ports composition", () => {
       it("maps agent id, source, recording and scenario set through", async () => {
         getScenarioRunData.mockResolvedValueOnce({
           status: ScenarioRunStatus.SUCCESS,
+          scenarioId: "scenario_1",
           scenarioSetId: "set_1",
           metadata: {
             agentId: "agent_row",
@@ -249,6 +250,7 @@ describe("Feature: voice-session ports composition", () => {
           status: ScenarioRunStatus.SUCCESS,
           source: "provider",
           audioUrl: "/api/voice/session/conv_1/audio?projectId=p1",
+          scenarioId: "scenario_1",
           scenarioSetId: "set_1",
         });
       });
@@ -258,6 +260,7 @@ describe("Feature: voice-session ports composition", () => {
       it("narrows a non-source and a non-string recording to null", async () => {
         getScenarioRunData.mockResolvedValueOnce({
           status: ScenarioRunStatus.SUCCESS,
+          scenarioId: undefined,
           scenarioSetId: undefined,
           metadata: { agentId: 7, source: 42, audioUrl: {} },
         });
@@ -272,6 +275,7 @@ describe("Feature: voice-session ports composition", () => {
           status: ScenarioRunStatus.SUCCESS,
           source: null,
           audioUrl: null,
+          scenarioId: null,
           scenarioSetId: null,
         });
       });
