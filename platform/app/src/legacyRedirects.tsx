@@ -80,6 +80,30 @@ export const legacyRedirectRoutes: RouteObject[] = [
     ),
   },
   {
+    // Anomaly rules became a tab inside the inventory. Pinned, because the
+    // inventory default tab is Catalog and the old address meant rules.
+    path: "/governance/anomaly-rules",
+    element: (
+      <LegacyPrefixRedirect
+        from="/governance/anomaly-rules"
+        to="/governance/inventory"
+        pinParams={{ tab: "anomaly-rules" }}
+      />
+    ),
+  },
+  {
+    // The bare users listing became the People tab of the people page.
+    // Exact match only: /governance/users/:id keeps its own detail route.
+    path: "/governance/users",
+    element: (
+      <LegacyPrefixRedirect
+        from="/governance/users"
+        to="/governance/people"
+        pinParams={{ tab: "people" }}
+      />
+    ),
+  },
+  {
     path: "/settings/gateway/*",
     element: <LegacyPrefixRedirect from="/settings/gateway" to="/gateway" />,
   },

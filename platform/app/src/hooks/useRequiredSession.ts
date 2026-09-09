@@ -53,6 +53,10 @@ export const noOrgBouncerRoutes = [
   "/governance/people",
   "/governance/costs",
   "/governance/billed",
+  "/governance/insights",
+  "/governance/analytics",
+  "/governance/signals",
+  "/governance/agents",
   // The retired addresses stay exempt so each redirect route renders
   // before the bouncer fires (cost-centers precedent below).
   "/governance/catalog",

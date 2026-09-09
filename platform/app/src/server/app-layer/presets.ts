@@ -1,11 +1,34 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { BillableEventsClickHouseRepository } from "@ee/billing/services/billableEvents.clickhouse.repository";
 import { createNoopEnterprisePipelineCommands } from "@ee/event-sourcing/pipelineSet";
+import { GovernanceCostRollupStore } from "@ee/governance/projections/governanceCostRollup.store";
+import {
+  DiscoveredPersonRepository,
+  ErasedIdentifierSuppressionRepository,
+  GovernanceTenantHistoryRepository,
+  IdentityMatchRepository,
+  IdentityMatchSuggestionRepository,
+} from "@ee/governance/repositories/governanceIdentity.repository";
 import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
+import {
+  COST_ROLLUP_COMPARATOR_TARGET_TYPE,
+  CostRollupComparatorService,
+} from "@ee/governance/services/costRollupComparator.service";
+import {
+  costSourceFromTargetId,
+  reconcileCostRollupComparatorSchedules,
+} from "@ee/governance/services/costRollupComparatorSchedule";
+import { installGovernanceSuppressionSnapshot } from "@ee/governance/services/erasureSuppression.service";
+import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
+import { GovernanceRollupErasureClickHouseRepository } from "@ee/governance/services/governanceRollupErasure.clickhouse.repository";
+import { createGovernanceRollupReplayPort } from "@ee/governance/services/governanceRollupReplay.port";
 import { GovernanceTraceActivityClickHouseRepository } from "@ee/governance/services/governanceTraceActivity.clickhouse.repository";
+import { IdentityErasureService } from "@ee/governance/services/identityErasure.service";
+import { IdentityMatchService } from "@ee/governance/services/identityMatch.service";
+import { IdentityMatchSuggestionService } from "@ee/governance/services/identityMatchSuggestion.service";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
@@ -1027,6 +1050,79 @@ export function initializeDefaultApp(options?: {
     ? { governanceKpisRepository }
     : undefined;
 
+  // ADR-128's daily cost rollup. One instance for the whole App: the fold
+  // writes through it on BOTH pipelines (gateway spend and pulled usage), the
+  // comparator reads through it, and `app.governance.costRollup` hands out the
+  // same reference — so the watchdog can never be reading a different table
+  // from the one the product shows.
+  const governanceCostRollupRepository = clickhouseEnabled
+    ? new GovernanceCostRollupClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+  const governanceCostRollupStore = governanceCostRollupRepository
+    ? new GovernanceCostRollupStore(governanceCostRollupRepository)
+    : undefined;
+
+  // ADR-128 §9 step 5. The fold substitutes a pseudonym for an erased
+  // identifier on its way past, and it reads the erasure list through a
+  // process-wide snapshot because its dimension tuple is computed
+  // synchronously. Installing that snapshot is what makes the substitution
+  // happen at all: without this line the fold finds nothing installed and
+  // writes every identifier verbatim, so an erasure's own replay puts the
+  // erased address straight back into the money table.
+  //
+  // Unconditional, and on every role. Nothing is read until a money event asks
+  // a question, and the fold runs on both the web and the worker side.
+  installGovernanceSuppressionSnapshot(prisma);
+
+  // The erasure itself (ADR-128 §9). Its ClickHouse side deletes the money rows
+  // carrying an identifier and reads back which days they were on — a mutation
+  // rather than a query, hence its own repository rather than a method on the
+  // rollup's.
+  const governanceRollupErasureRepository = clickhouseEnabled
+    ? new GovernanceRollupErasureClickHouseRepository(resolveClickHouseClient)
+    : undefined;
+  const governanceIdentityErasure = governanceRollupErasureRepository
+    ? new IdentityErasureService({
+        prisma,
+        tenantHistory: new GovernanceTenantHistoryRepository(),
+        suppression: new ErasedIdentifierSuppressionRepository(),
+        discoveredPeople: new DiscoveredPersonRepository(),
+        identityMatches: new IdentityMatchRepository(),
+        matchSuggestions: new IdentityMatchSuggestionRepository(),
+        rollupErasure: governanceRollupErasureRepository,
+        // Resolved at call time: the ops group is composed further down, and
+        // an erasure happens long after boot. Refusing rather than skipping the
+        // rebuild — the money rows are already deleted by then, so a silent
+        // no-op here is a day's totals quietly missing an amount.
+        replay: createGovernanceRollupReplayPort(() => {
+          const ops = getApp().ops;
+          if (!ops) {
+            throw new Error(
+              "Governance erasure needs the ops replay service to rebuild the daily cost rows, and this process composed no ops group",
+            );
+          }
+          return ops.replay;
+        }),
+        // ADR-022 makes the event log's retention the ceiling on what can be
+        // rebuilt. Stated as null until PR-D wires the configured retention
+        // through: every affected day is then attempted rather than being
+        // pre-emptively written off, and a day that genuinely cannot be
+        // replayed surfaces as a rebuild that changed nothing.
+        replayHorizon: () => null,
+      })
+    : undefined;
+
+  // ADR-128 §12's match engine, and the review surface that reads it. Pure
+  // Postgres — the evidence is confirmed addresses and directory identifiers,
+  // and the links it writes are admin-curated rows — so unlike the erasure next
+  // door it does not ride the ClickHouse gate: an instance with no ClickHouse
+  // still has people to match.
+  //
+  // NOT the suggestion half. That one scores names, and it is composed only
+  // behind the worker-role gate in `enterprisePipelines.identityMatch` below,
+  // so no request path can reach the scorer through this bag.
+  const governanceIdentityMatch = new IdentityMatchService({ prisma });
+
   // Governance's OCSF SIEM-export sink. One instance for the whole App: the
   // subscriber sync writes through it, the puller worker and the workspace-view
   // audit trail write through it, and the SIEM export procedure reads
@@ -1130,6 +1226,72 @@ export function initializeDefaultApp(options?: {
   const systemMigrations = roleRunsWorkers(config.processRole)
     ? startSystemMigrations({ redis })
     : undefined;
+
+  // ADR-128: the cost rollup's comparator, on the same calendar scheduler the
+  // reports use. The fire is a tiny trigger — the lane read back out of
+  // `targetId`, the day derived from the slot — so the handler re-derives
+  // everything at fire time rather than acting on a payload minted when the
+  // schedule was written.
+  //
+  // It samples YESTERDAY, not today: a day still being written to is expected
+  // to disagree with its own summary, and a watchdog that fires on that is a
+  // watchdog nobody reads.
+  if (roleRunsWorkers(config.processRole) && governanceCostRollupRepository) {
+    const comparator = new CostRollupComparatorService(
+      governanceCostRollupRepository,
+    );
+    const comparatorLogger = createLogger(
+      "langwatch:governance:cost-rollup:comparator-schedule",
+    );
+    schedulerRegistry.register({
+      targetType: COST_ROLLUP_COMPARATOR_TARGET_TYPE,
+      handler: async (fire) => {
+        const costSource = costSourceFromTargetId(fire.targetId);
+        if (!costSource) {
+          // A row naming a lane we do not have. Comparing the wrong lane would
+          // report drift between two things never meant to match, so say so
+          // and do nothing.
+          comparatorLogger.warn(
+            { targetId: fire.targetId, tenantId: fire.projectId },
+            "Cost rollup comparator fired for an unknown cost source; skipping",
+          );
+          return;
+        }
+        const sampled = new Date(fire.slot.getTime() - 86_400_000)
+          .toISOString()
+          .slice(0, 10);
+        await comparator.compareDay({
+          tenantId: fire.projectId,
+          day: sampled,
+          costSource,
+        });
+      },
+    });
+
+    // Registering the handler is only half of it: without calendar entries
+    // carrying this targetType the loop never fires it. Boot reconciliation,
+    // fire-and-forget, the same shape as the report schedules below.
+    void reconcileCostRollupComparatorSchedules({
+      prisma,
+      scheduledJobs: new PrismaScheduledJobRepository(prisma),
+      targetType: COST_ROLLUP_COMPARATOR_TARGET_TYPE,
+      logger: comparatorLogger,
+    })
+      .then(({ created, deactivated }) => {
+        if (created > 0 || deactivated > 0) {
+          comparatorLogger.info(
+            { created, deactivated },
+            "Reconciled cost rollup comparator schedules at boot",
+          );
+        }
+      })
+      .catch((error: unknown) => {
+        comparatorLogger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Cost rollup comparator schedule reconciliation failed at boot (will retry next boot)",
+        );
+      });
+  }
 
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
@@ -1328,6 +1490,26 @@ export function initializeDefaultApp(options?: {
             ),
           }
         : undefined,
+      governanceCostRollupStore,
+      // ADR-128 §12: the suggestion half's ONLY runtime composition, and the
+      // engine's only trigger — the feed that discovers people, a call site
+      // rather than a calendar entry. Worker role only (the name scorer
+      // measured 2.9 seconds of blocked event loop at the ADR's example size)
+      // and proof before guesses, the order the engine spec fixes. This import
+      // is what the scorer's import-graph guard names as the one allowed
+      // caller.
+      identityMatch: roleRunsWorkers(config.processRole)
+        ? {
+            runFor: async ({ organizationId }) => {
+              await IdentityMatchService.create(prisma).linkProvenMatches({
+                organizationId,
+              });
+              await IdentityMatchSuggestionService.create(prisma).recompute({
+                organizationId,
+              });
+            },
+          }
+        : undefined,
     },
     projects,
     monitors,
@@ -1342,6 +1524,7 @@ export function initializeDefaultApp(options?: {
     gatewaySpend,
     webhookDelivery,
     gatewayDebits,
+    governanceCostRollupStore,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
     // can reconstitute oversized commands (fetch from transient S3 spool) and
     // best-effort delete the spool after event_log INSERT succeeds.
@@ -1864,6 +2047,9 @@ export function initializeDefaultApp(options?: {
       kpis: governanceKpisRepository,
       personalUsage: personalUsageRepository,
       activityMonitor: activityMonitorRepository,
+      costRollup: governanceCostRollupRepository,
+      identityErasure: governanceIdentityErasure,
+      identityMatch: governanceIdentityMatch,
     },
     billableEvents: billableEventsRepository,
     codingAgents: {
@@ -2234,6 +2420,12 @@ export function createTestApp(overrides?: TestAppOverrides): App {
       kpis: undefined,
       personalUsage: undefined,
       activityMonitor: undefined,
+      costRollup: undefined,
+      identityErasure: undefined,
+      // Real rather than a double: it is Postgres-only, and a test that drives
+      // the review surface wants the actual evidence rules, not a stub that
+      // agrees with whatever the test expects.
+      identityMatch: new IdentityMatchService({ prisma: testPrisma }),
     },
     billableEvents: undefined,
     codingAgents: {

@@ -141,6 +141,18 @@ describe("guardOrganizationId — bare queries throw", () => {
       ).rejects.toThrow(/organizationId/);
     });
   });
+
+  describe("when running findMany on DepartmentMembershipHistory without a tenancy key", () => {
+    it("THROWS — a userId filter alone would read another tenant's history", async () => {
+      await expect(
+        runGuard({
+          model: "DepartmentMembershipHistory",
+          action: "findMany",
+          args: { where: { userId: "user_1", validTo: null } },
+        }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
 });
 
 describe("guardOrganizationId — single-organization invariant", () => {
@@ -225,6 +237,40 @@ describe("guardOrganizationId — audited real query shapes pass", () => {
           model: "RoleBinding",
           action: "deleteMany",
           args: { where: { apiKeyId: "ak_1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when reading DepartmentMembershipHistory links open on a day", () => {
+    it("does NOT throw — the department-on-day read names its organization", async () => {
+      await expect(
+        runGuard({
+          model: "DepartmentMembershipHistory",
+          action: "findMany",
+          args: {
+            where: {
+              organizationId: "org_1",
+              userId: { in: ["user_1", "user_2"] },
+              validFrom: { lte: new Date() },
+              OR: [{ validTo: null }, { validTo: { gt: new Date() } }],
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("when closing an open DepartmentMembershipHistory link by row id", () => {
+    it("does NOT throw — id is the tenancy proof for a single-row update", async () => {
+      await expect(
+        runGuard({
+          model: "DepartmentMembershipHistory",
+          action: "update",
+          args: {
+            where: { id: "dmh_1" },
+            data: { validTo: new Date() },
+          },
         }),
       ).resolves.toBe("ok");
     });

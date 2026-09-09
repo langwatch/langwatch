@@ -68,6 +68,9 @@ describe("DepartmentService", () => {
   }, 60_000);
 
   afterAll(async () => {
+    await prisma.departmentMembershipHistory.deleteMany({
+      where: { organizationId: { in: [ORG_ID, OTHER_ORG_ID] } },
+    });
     await prisma.department.deleteMany({
       where: { organizationId: { in: [ORG_ID, OTHER_ORG_ID] } },
     });
@@ -140,6 +143,162 @@ describe("DepartmentService", () => {
         },
       });
       expect(membership.departmentId).toBe(sales.id);
+    });
+  });
+
+  describe("given assignments that change over time (ADR-128 §13, #7882)", () => {
+    const MORGAN = `usr-morgan-${ns}`;
+
+    beforeAll(async () => {
+      await prisma.user.create({
+        data: { id: MORGAN, email: `${MORGAN}@example.com`, name: MORGAN },
+      });
+      await prisma.organizationUser.create({
+        data: {
+          organizationId: ORG_ID,
+          userId: MORGAN,
+          role: OrganizationUserRole.MEMBER,
+        },
+      });
+    });
+
+    /** @scenario A reorg closes the old dated link and opens a new one */
+    it("dates every assignment: open on assign, closed on reassign, closed-only on clear", async () => {
+      const support = await service().create({
+        organizationId: ORG_ID,
+        name: "Support",
+      });
+      const legal = await service().create({
+        organizationId: ORG_ID,
+        name: "Legal",
+      });
+
+      await service().assignUser({
+        organizationId: ORG_ID,
+        userId: MORGAN,
+        departmentId: support.id,
+      });
+      // Re-asserting the standing assignment — what the daily directory read
+      // does — must not close and reopen the link: a sync day is not a reorg.
+      await service().assignUser({
+        organizationId: ORG_ID,
+        userId: MORGAN,
+        departmentId: support.id,
+      });
+      let links = await prisma.departmentMembershipHistory.findMany({
+        where: { organizationId: ORG_ID, userId: MORGAN },
+        orderBy: { validFrom: "asc" },
+      });
+      expect(links).toHaveLength(1);
+      expect(links[0]?.departmentId).toBe(support.id);
+      expect(links[0]?.validTo).toBeNull();
+
+      await service().assignUser({
+        organizationId: ORG_ID,
+        userId: MORGAN,
+        departmentId: legal.id,
+      });
+      links = await prisma.departmentMembershipHistory.findMany({
+        where: { organizationId: ORG_ID, userId: MORGAN },
+        orderBy: { validFrom: "asc" },
+      });
+      expect(links).toHaveLength(2);
+      expect(links[0]?.validTo).not.toBeNull();
+      expect(links[1]?.departmentId).toBe(legal.id);
+      expect(links[1]?.validTo).toBeNull();
+
+      // Clearing closes the link and opens nothing: "unassigned" is the
+      // absence of a link, not a link to an absence.
+      await service().assignUser({
+        organizationId: ORG_ID,
+        userId: MORGAN,
+        departmentId: null,
+      });
+      links = await prisma.departmentMembershipHistory.findMany({
+        where: { organizationId: ORG_ID, userId: MORGAN, validTo: null },
+      });
+      expect(links).toHaveLength(0);
+    });
+
+    /** @scenario "A past day resolves to the department whose link covered it" */
+    it("resolves a past day against the link that was open then, not today's pointer", async () => {
+      const jan = await service().create({
+        organizationId: ORG_ID,
+        name: "January Dept",
+      });
+      const feb = await service().create({
+        organizationId: ORG_ID,
+        name: "February Dept",
+      });
+      // Seeded directly: the service can only write links starting "now", and
+      // this test is about reading history that already happened.
+      await prisma.departmentMembershipHistory.createMany({
+        data: [
+          {
+            id: `dmh-a-${ns}`,
+            organizationId: ORG_ID,
+            userId: ROBIN,
+            departmentId: jan.id,
+            validFrom: new Date("2026-01-01T00:00:00.000Z"),
+            validTo: new Date("2026-02-01T00:00:00.000Z"),
+          },
+          {
+            id: `dmh-b-${ns}`,
+            organizationId: ORG_ID,
+            userId: ROBIN,
+            departmentId: feb.id,
+            validFrom: new Date("2026-02-01T00:00:00.000Z"),
+            validTo: new Date("2026-03-01T00:00:00.000Z"),
+          },
+        ],
+      });
+
+      const january = await service().departmentsOnDay({
+        organizationId: ORG_ID,
+        userIds: [ROBIN],
+        dayUtc: "2026-01-15",
+      });
+      expect(january.get(ROBIN)).toBe(jan.id);
+
+      const february = await service().departmentsOnDay({
+        organizationId: ORG_ID,
+        userIds: [ROBIN],
+        dayUtc: "2026-02-15",
+      });
+      expect(february.get(ROBIN)).toBe(feb.id);
+
+      // Before any link: unassigned, said by absence, never an error.
+      const before = await service().departmentsOnDay({
+        organizationId: ORG_ID,
+        userIds: [ROBIN],
+        dayUtc: "2025-12-15",
+      });
+      expect(before.has(ROBIN)).toBe(false);
+    });
+
+    it("rejects a second open link at the database, not by discipline", async () => {
+      const dept = await service().create({
+        organizationId: ORG_ID,
+        name: "Guard Dept",
+      });
+      await service().assignUser({
+        organizationId: ORG_ID,
+        userId: MORGAN,
+        departmentId: dept.id,
+      });
+
+      // The one-open-link partial unique index (SQLSTATE 23505) — the reason
+      // `departmentsOnDay` can promise at most one department per member.
+      await expect(
+        prisma.departmentMembershipHistory.create({
+          data: {
+            organizationId: ORG_ID,
+            userId: MORGAN,
+            departmentId: dept.id,
+            validFrom: new Date(),
+          },
+        }),
+      ).rejects.toThrow();
     });
   });
 

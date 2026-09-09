@@ -368,6 +368,21 @@ Feature: Databricks AI/BI Genie puller
       # spend the moment it lands, because a re-read that already answered
       # cannot answer again.
 
+    @integration
+    Scenario: A question held for its missing bill is priced when the bill lands
+      Given a question whose hour has no billing row yet
+      When the puller runs
+      Then the watermark stays behind that hour rather than moving to the clock
+      And the question is recorded without a cost for now
+      When the bill lands and the puller runs again from where it stopped
+      Then that same question carries its real share
+      # The scenario above is the allocator's half: the question is owed. This
+      # is what the owing has to be FOR. Without the watermark holding behind
+      # the unbilled hour, the sweep moves past a question it has seen, the
+      # fixed settling re-read never reaches back that far, and the zero it was
+      # recorded at becomes permanent. Holding is only worth its cost if the
+      # resumed run actually prices what it went back for.
+
     @unit
     Scenario: A statement that priced on any line is not held for an unbilled one
       Given a statement with one billed line and one line not yet billed
@@ -427,6 +442,19 @@ Feature: Databricks AI/BI Genie puller
       Then the question is sent to the workspace address on the source
       # Same secret, same reasoning as every other call this adapter makes: the
       # address on the source decides where the token goes.
+
+    @integration
+    Scenario: A question is priced by the warehouse that answered it, not the one the connector signs in to
+      Given a Genie source that names a warehouse
+      When the puller asks for billing
+      Then every question it sends runs on the named warehouse
+      But the answer is not narrowed to work that warehouse did
+      # The named warehouse says where the billing query EXECUTES. It does not
+      # say which warehouse answered the question being priced: a Genie space
+      # answers on whichever warehouse it was built against, routinely not the
+      # one the connector holds CAN USE on. Filtering the answer by the
+      # executor would return nothing and record that as a cost of zero, which
+      # reads on the page as a tool nobody is paying for.
 
     @unit
     Scenario: A question is still priced after the provider renames its client label

@@ -2,8 +2,10 @@ import { createIngestionPullProcessingPipeline } from "@ee/event-sourcing/pipeli
 import type { IngestionPullOutcomeCommands } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/process-manager/ingestionPullEffects";
 import { createPulledUsageProcessingPipeline } from "@ee/event-sourcing/pipelines/pulled-usage-processing";
 import type { PulledUsageLedgerProcessDeps } from "@ee/governance/process-manager/pulledUsageLedger.process";
+import type { GovernanceCostRollupState } from "@ee/governance/projections/governanceCostRollup.foldProjection";
 import { reconcileIngestionPullProcesses } from "@ee/governance/services/pullers/ingestionPullLifecycle";
 import {
+  type DiscoveredPeopleMatcher,
   type PulledUsageDispatcher,
   runIngestionPull,
 } from "@ee/governance/services/pullers/pullerWorker";
@@ -12,6 +14,7 @@ import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import type { EventSourcing } from "~/server/event-sourcing/eventSourcing";
 import { mapCommands } from "~/server/event-sourcing/mapCommands";
+import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 
 const logger = createLogger("langwatch:enterprise:event-sourcing");
 
@@ -24,6 +27,20 @@ export interface EnterprisePipelineSetConfig {
    * still records every observation, only the ledger row is skipped.
    */
   pulledUsageLedger?: PulledUsageLedgerProcessDeps;
+  /**
+   * ADR-128's daily cost rollup store. Absent without ClickHouse — the
+   * pipeline still records every observation, only the summary is skipped.
+   */
+  governanceCostRollupStore?: FoldProjectionStore<GovernanceCostRollupState>;
+  /**
+   * ADR-128 §12's identity-match engine, composed by the root on the worker
+   * role only. A type, never an import: this module is statically reachable
+   * from request routers, and the scorer behind the engine is gated off every
+   * request path by the engine's import-graph guard. Absent on request-serving
+   * roles — discovery still records people, the review queue just waits for a
+   * process that composes the engine.
+   */
+  identityMatch?: DiscoveredPeopleMatcher;
 }
 
 type EnterprisePipelineRuntimeDeps = EnterprisePipelineSetConfig & {
@@ -47,7 +64,11 @@ function registerIngestionPullPipeline(
       dispatch: {
         runPort: {
           run: (params) =>
-            runIngestionPull({ ...params, pulledUsage: deps.pulledUsage }),
+            runIngestionPull({
+              ...params,
+              pulledUsage: deps.pulledUsage,
+              identityMatch: deps.identityMatch,
+            }),
         },
         commands: () => {
           if (!outcomeCommands) {
@@ -102,7 +123,10 @@ function registerIngestionPullPipeline(
  */
 function registerPulledUsagePipeline(deps: EnterprisePipelineRuntimeDeps) {
   const pipeline = deps.eventSourcing.register(
-    createPulledUsageProcessingPipeline({ ledger: deps.pulledUsageLedger }),
+    createPulledUsageProcessingPipeline({
+      ledger: deps.pulledUsageLedger,
+      costRollupStore: deps.governanceCostRollupStore,
+    }),
   );
   return { commands: mapCommands(pipeline.commands) };
 }

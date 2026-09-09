@@ -23,6 +23,7 @@ import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/
 import { pricePulledUsage } from "@ee/event-sourcing/pipelines/pulled-usage-processing/services/pulled-usage-pricing.service";
 import { z } from "zod";
 
+import { actorForPulledDay } from "../logic/pulledActorNaming";
 import type { NormalizedPullEvent } from "./pullerAdapter";
 
 /** The key an adapter attaches its usage hint under, inside `extra`. */
@@ -64,6 +65,34 @@ const pulledUsageHintSchema = z
      * us a string should have every one of them survive to the ledger.
      */
     costUsd: z.string().optional(),
+    /**
+     * Which currency `costUsd` is in, ISO 4217. Absent means dollars, which is
+     * what every adapter written before this reported.
+     *
+     * Deliberately NOT a dimension. `dimensions` is the restatement identity,
+     * and a provider that re-denominated a period would mint a fresh key and
+     * add its correction on top of the figure it corrects rather than
+     * replacing it. Currency belongs with the money, not with the coordinates.
+     */
+    currency: z.string().length(3).optional(),
+    /**
+     * The BILLER's own conversion of `costUsd` into dollars, as the exact
+     * decimal string it published. Azure returns this beside the native
+     * amount at its own invoice-grade rate.
+     *
+     * Only ever the biller's number. Absent stays absent — nothing downstream
+     * fills it from a rate of our own. Also not a dimension, for the same
+     * reason as `currency`.
+     */
+    costUsdBiller: z.string().optional(),
+    /**
+     * The agent/application within the source, when the provider names one —
+     * a Genie space, a Copilot bot. Deliberately NOT a dimension: for every
+     * adapter that has one it is derivable from a coordinate that is already
+     * in `dimensions` (Genie's `spaceId`), so putting it there again would
+     * change every restatement key for nothing.
+     */
+    agentId: z.string().optional(),
     /** Falls back to the event's `target`, which is where models already sit. */
     model: z.string().optional(),
     tokensCacheRead: z.number().int().nonnegative().default(0),
@@ -93,6 +122,11 @@ export interface PulledUsageSourceAttribution {
   organizationId: string;
   /** Null when the source is org-wide. Never substituted with anything. */
   teamId: string | null;
+  /**
+   * When the source was connected — the input to ADR-129's named-or-blank
+   * line, not attribution. See `actorForPulledDay`.
+   */
+  createdAt: Date;
 }
 
 /**
@@ -141,10 +175,17 @@ function restatementKeyFor({
 export function buildPulledUsageRecord({
   event,
   source,
+  governanceProjectId,
   observedAt,
 }: {
   event: NormalizedPullEvent;
   source: PulledUsageSourceAttribution;
+  /**
+   * The org's hidden governance project — where the row is STORED, not who
+   * the money belongs to. Separate from `source` because attribution is what
+   * the source knows and the home is what the org has.
+   */
+  governanceProjectId: string;
   observedAt: Date;
 }): PulledUsageObservedEventData | null {
   const raw = event.extra?.[PULLED_USAGE_HINT_KEY];
@@ -174,6 +215,8 @@ export function buildPulledUsageRecord({
           // The string when the adapter kept one, so no digit is lost to the
           // float `cost_usd` had to be to fit the canonical event shape.
           costUsd: hint.costUsd ?? event.cost_usd,
+          currencyCode: hint.currency,
+          costUsdBiller: hint.costUsdBiller,
           // Present by the schema's own refinement on this branch.
           costStatus: hint.costStatus!,
         })
@@ -195,17 +238,43 @@ export function buildPulledUsageRecord({
     ingestionSourceId: source.ingestionSourceId,
     organizationId: source.organizationId,
     teamId: source.teamId,
-    // Deferred: `IngestionSource` carries no project yet (ADR-088 Decision 4).
-    // Null says unattributed. The hidden governance project every other pull
-    // writer uses is not an option here — it is invisible to the customer, so
-    // filing their money there would be worse than saying we do not know.
-    projectId: null,
+    // The row's home: the org's hidden governance project, the same partition
+    // the OCSF audit rows and the ledger's TenantId already use. Nothing
+    // pulled arrives homeless. This says where the row is STORED and not who
+    // owns the money — that stays on organizationId/teamId above, which
+    // `pulledUsageScopeId` reads to pick the ledger's Scope. Members never see
+    // the home: every listing surface excludes kind="internal_governance".
+    // Decision: ADR-128.
+    projectId: governanceProjectId,
     model,
     ...quantities,
+    costNanoMinor: priced.costNanoMinor,
+    currencyCode: priced.currencyCode,
     costNanoUsd: priced.costNanoUsd,
     rateVersion: priced.rateVersion,
     costBasis: priced.costBasis,
     costStatus: priced.costStatus,
+    // The spender, threaded from the adapter's own `actor` field through the
+    // one shared named-or-blank rule (ADR-129). This is what keeps the paused
+    // providers paused without a registry here: Anthropic and Azure emit
+    // `actor: ""` on their money events, so they stay blank structurally, and
+    // an adapter starts naming its spend the day it starts saying who spent.
+    // NOT hashed into `restatementKey` above — identity can change between
+    // pulls, and an actor in the key would mint a second record (ADR-129
+    // Decision 4, on `databricksGenie.puller.ts`'s own precedent).
+    rawActorId: actorForPulledDay({
+      sourceCreatedAt: source.createdAt,
+      dayUtc: new Date(occurredAtMs).toISOString().slice(0, 10),
+      reportedActor: event.actor ?? "",
+    }),
+    // The agent, from the hint, through the SAME line: the rollup cell is
+    // keyed by this field too, so ADR-129 Decision 2's twice-guard applies to
+    // it verbatim — a day recorded agent-less must stay agent-less.
+    agentId: actorForPulledDay({
+      sourceCreatedAt: source.createdAt,
+      dayUtc: new Date(occurredAtMs).toISOString().slice(0, 10),
+      reportedActor: hint.agentId ?? "",
+    }),
     occurredAtMs,
     observedAtMs: observedAt.getTime(),
   };

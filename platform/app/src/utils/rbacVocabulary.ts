@@ -142,6 +142,16 @@ export const Resources = {
   // EXTERNAL get nothing, because a cache entry is agent-written state a
   // reader has no call to see.
   AGENT_CACHE: "agentCache",
+  // The organization's cost screen (ADR-128): the provider-billed lane, the
+  // gateway-metered lane and the seat lane, each labeled for what it is.
+  //
+  // Its own resource rather than a grain of `governance`, because reading
+  // what the organization spends is a strictly different capability from
+  // administering ingestion and anomaly rules — a finance reviewer needs the
+  // figures and nothing else, and `governance:view` today carries the whole
+  // admin surface with it. Read-only: `governanceCost:view` is the only
+  // grain, since nothing on the screen is editable.
+  GOVERNANCE_COST: "governanceCost",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
