@@ -20,7 +20,7 @@ import {
 import { InviteExpiredError, InviteNotFoundError } from "@langwatch/organization-contract";
 import { resolveInviteDisplayStatus } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 
 import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
 
@@ -53,6 +53,10 @@ export type ApiPersonDeploymentFacts = Readonly<{
   adminEmails?: string | readonly string[] | undefined;
 }>;
 
+import {
+  createFrontDoorTrpcRouter,
+  createPublicEnvTrpcProcedure,
+} from "./auth-trpc.mount.ts";
 import type { ComposedAuthFeature } from "./auth.composition.types.ts";
 
 /**
@@ -79,7 +83,7 @@ export function composeAuthFeature(options: {
    * Taken rather than built: a second directory is a second answer to "who is
    * this person".
    */
-  peers: Readonly<{ users: UserService }>;
+  peers: Readonly<{ users: UserApi }>;
   /** The shared counter the front door's throttle meters through. */
   rateLimit(
     input: Readonly<{ key: string; windowSeconds: number; max: number }>,
@@ -245,7 +249,14 @@ export function composeAuthFeature(options: {
     resolveAuthProvider,
   });
 
-  return { app, resolveAuthProvider };
+  return {
+    app,
+    resolveAuthProvider,
+    routers: (mount) => ({
+      frontDoor: createFrontDoorTrpcRouter(mount.runtime, () => app),
+      publicEnv: createPublicEnvTrpcProcedure(mount.runtime, () => app),
+    }),
+  };
 }
 
 /**
@@ -258,7 +269,14 @@ export function refusingAuthFeature(processName: string): ComposedAuthFeature {
   };
   const app = new Proxy({}, { get: () => refuse, has: () => true }) as AuthApp;
 
-  return { app, resolveAuthProvider: () => Promise.resolve("email") };
+  return {
+    app,
+    resolveAuthProvider: () => Promise.resolve("email"),
+    routers: (mount) => ({
+      frontDoor: createFrontDoorTrpcRouter(mount.runtime, () => app),
+      publicEnv: createPublicEnvTrpcProcedure(mount.runtime, () => app),
+    }),
+  };
 }
 
 /**

@@ -3,15 +3,21 @@
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthService } from "@langwatch/auth-contract";
-import { PostgresAuthDirectoryAdapter, type AuthRestPorts } from "@langwatch/auth-server";
+import {
+  authRest,
+  PostgresAuthDirectoryAdapter,
+  type AuthDoorApi,
+} from "@langwatch/auth-server";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { BetterAuthIdentityBirthAdapter } from "@langwatch/identity-server/adapters/better-auth-identity-birth";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { MountableRestApp, RestErrorHandler } from "@langwatch/api/rest";
 
 import type {
   ApiBrowserSessionTransportPort,
   ApiComposedBetterAuth,
 } from "../../app/api-auth.composition.ts";
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
 
 export type ApiAuthRestOptions = Readonly<{
   /** The instance this process composed, or none where a host supplied one. */
@@ -28,8 +34,20 @@ export type ApiAuthRestOptions = Readonly<{
   featureFlags: FeatureFlagApi | undefined;
 }>;
 
+/**
+ * Mounts `/api/auth` on the public door. The catch-all is what Better Auth
+ * manages its own session behind, so the family answers its refusals in this
+ * process's legacy envelope, exactly as it always has.
+ */
+export function mountAuthRest(
+  runtime: ApiRestRuntime,
+  options: Readonly<{ door: () => AuthDoorApi; errors: RestErrorHandler }>,
+): MountableRestApp {
+  return runtime.mount(authRest.router(), options.door, { onError: options.errors });
+}
+
 /** Composes the `/api/auth` family's ports, or none. */
-export function composeApiAuthRest(options: ApiAuthRestOptions): AuthRestPorts | undefined {
+export function composeApiAuthRest(options: ApiAuthRestOptions): AuthDoorApi | undefined {
   const { betterAuth, sessions, auth, apiKeys, prisma, featureFlags } = options;
   if (!betterAuth || !sessions || !auth || !apiKeys || !prisma || !featureFlags) {
     return undefined;
@@ -42,7 +60,7 @@ export function composeApiAuthRest(options: ApiAuthRestOptions): AuthRestPorts |
       const verified = await sessions.tryResolveVerifiedSession(request);
       return auth.tryResolveBrowserSession({ verified });
     },
-    tryFindProjectSlugByToken: async ({ token }) => {
+    findProjectSlugByToken: async ({ token }) => {
       const resolved = await apiKeys.findResolvedToken({ token });
       return resolved?.project.slug ?? null;
     },

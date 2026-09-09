@@ -14,7 +14,7 @@ import type { AdminRestPorts, BugReportRestPorts } from "@langwatch/ops-server";
 import type { UnsubscribeRestPorts } from "@langwatch/automation-server";
 import type { GithubInstallApi } from "@langwatch/github-server";
 import type { BillingStripeWebhookApi } from "@langwatch/enterprise-billing-server";
-import type { AuthCliDeviceFlowRestPorts, AuthRestPorts } from "@langwatch/auth-server";
+import type { AuthCliDeviceFlowApi, AuthDoorApi } from "@langwatch/auth-server";
 import type {
   GovernanceCliRestPorts,
   GovernanceIngestRestPorts,
@@ -280,11 +280,11 @@ export type ApiRestPorts = Readonly<{
   /**
    * The RFC 8628 CLI device grant's collaborators, or none.
    */
-  authCliDeviceFlow?: AuthCliDeviceFlowRestPorts | undefined;
+  authCliDeviceFlow?: AuthCliDeviceFlowApi | undefined;
   /**
    * The `/api/auth` family's collaborators, or none.
    */
-  auth?: AuthRestPorts | undefined;
+  auth?: AuthDoorApi | undefined;
   /**
    * The CLI governance plane's collaborators, or none.
    */

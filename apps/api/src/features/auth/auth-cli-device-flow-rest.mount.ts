@@ -29,19 +29,36 @@
  * beats a door that answers 500 to every `langwatch login`.
  */
 import {
+  authCliDeviceFlowRest,
   CliDeviceSessionService,
   CliDeviceSessionStorePort,
   PostgresAuthDirectoryAdapter,
-  type AuthCliDeviceFlowRestPorts,
-  type CliBrowserSessionPort,
+  type AuthCliDeviceFlowApi,
+  type CliBrowserSession,
   type CliPersonalWorkspace,
 } from "@langwatch/auth-server";
+import type { MountableRestApp, RestErrorHandler } from "@langwatch/api/rest";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OrganizationApp } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
+
+import type { ApiRestRuntime } from "../../app-rest/api-rest.runtime.ts";
+
+/**
+ * Mounts `/api/auth/cli` on the public door, BEFORE `/api/auth`: the sign-in
+ * door is a catch-all and would otherwise swallow all seven of these paths.
+ */
+export function mountAuthCliDeviceFlowRest(
+  runtime: ApiRestRuntime,
+  options: Readonly<{ door: () => AuthCliDeviceFlowApi; errors: RestErrorHandler }>,
+): MountableRestApp {
+  return runtime.mount(authCliDeviceFlowRest.router(), options.door, {
+    onError: options.errors,
+  });
+}
 
 /** The one Redis this process opened, behind the grant's five operations. */
 export class ApiCliDeviceSessionStore extends CliDeviceSessionStorePort {
@@ -125,13 +142,13 @@ export type ApiAuthCliDeviceFlowOptions = Readonly<{
  */
 export function composeApiAuthCliDeviceFlow(
   options: ApiAuthCliDeviceFlowOptions,
-): AuthCliDeviceFlowRestPorts | undefined {
+): AuthCliDeviceFlowApi | undefined {
   const { redis, prisma, session, apiKeys, organizations, authz, featureFlags } = options;
   if (!redis || !prisma || !session || !apiKeys || !organizations || !authz || !featureFlags) {
     return undefined;
   }
 
-  const resolveSession: CliBrowserSessionPort = async (request) => {
+  const resolveSession = async (request: Request): Promise<CliBrowserSession | null> => {
     const actor = await session(request);
     if (!actor) return null;
     const person = await prisma.user.findUnique({

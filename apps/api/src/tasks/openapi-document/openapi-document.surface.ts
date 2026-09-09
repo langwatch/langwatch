@@ -4,7 +4,7 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 
-import type { AuthRestPorts } from "@langwatch/auth-server";
+import type { AuthDoorApi } from "@langwatch/auth-server";
 import type { GovernanceIngestRestPorts } from "@langwatch/enterprise-governance-server";
 
 
@@ -96,7 +96,7 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
         reportError: refuse<undefined>("The tracked-event error sink"),
         describeValidationError: refuse<string>("Tracked-event validation prose"),
       }),
-      userAvatarObjects: refuse("Avatar object reads"),
+      users: refuse("The signed-in person"),
       webhooks: refuse("Webhooks"),
       workflows: refuse("Workflows"),
     },
@@ -230,9 +230,9 @@ function processPorts(): ApiRestPorts {
       betterAuth: refuse("The Better Auth instance"),
       revokeBrowserSession: refuse<Promise<void>>("Browser session revocation"),
       resolveSession: refuse("Browser session resolution") as never,
-      tryFindProjectSlugByToken: refuse<Promise<string | null>>("Legacy token project lookup"),
+      findProjectSlugByToken: refuse<Promise<string | null>>("Legacy token project lookup"),
       featureFlags: refuse("The feature-flag store"),
-      directory: refuse("The member directory") as AuthRestPorts["directory"],
+      directory: refuse("The member directory") as AuthDoorApi["directory"],
       baseUrl: PUBLIC_BASE_URL,
       federatedLogout: refuse<Promise<string | null>>("Federated logout"),
       runWithIdentityBirth: (run) => run(),

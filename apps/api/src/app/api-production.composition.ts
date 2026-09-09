@@ -93,7 +93,7 @@ import {
   resolvePersonDeploymentFacts,
   type ApiPersonDeploymentFacts,
 } from "../features/auth/auth.composition.ts";
-import { composeUserFeature, refusingUserFeature } from "../features/user/user.composition.ts";
+import { installApiUser, refusingUserFeature } from "../features/user/user.composition.ts";
 import { installApiPresence } from "../features/presence/presence.composition.ts";
 import { BroadcastAdapter } from "@langwatch/presence-server";
 import {
@@ -301,7 +301,9 @@ import {
   ApiBrowserSessionTransportPort,
   AuthSessionApiAuthenticationAdapter,
 } from "./api-auth.composition.ts";
+import { createApiUserAvatarObjectReader } from "../features/user/user-avatar-objects.adapter.ts";
 import { ApiUserAvatarStorageAdapter } from "../features/user/user-avatar-storage.adapter.ts";
+import { createApiUserDirectory } from "../features/user/user-directory.adapter.ts";
 import { ApiInstanceAdminKeyAdapter } from "./api-instance-admin-key.adapter.ts";
 import { ApiRestObservabilityComposition } from "./api-rest-observability.composition.ts";
 import {
@@ -386,7 +388,7 @@ import {
   composeApiEnterpriseApplication,
   LoggedApiEnterpriseApplicationAbsence,
 } from "./api-enterprise-application.composition.ts";
-import type { AuthCliDeviceFlowRestPorts, AuthRestPorts } from "@langwatch/auth-server";
+import type { AuthCliDeviceFlowApi, AuthDoorApi } from "@langwatch/auth-server";
 import type {
   GovernanceCliRestPorts,
   GovernanceIngestRestPorts,
@@ -636,6 +638,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedPrompt!: ComposedPromptFeature;
   private composedAuthFeature!: ComposedAuthFeature;
   private composedUser!: ComposedUserFeature;
+  /** The ONE install, memoised: both callers reach the same user graph. */
+  private composedUserInstall: Promise<ComposedUserFeature> | undefined;
   private composedPresence!: ComposedPresenceFeature;
   /**
    * The process's ONE tenant fan-out. Created here rather than inside the
@@ -922,7 +926,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       config: options.config,
       resources: options.resources,
     });
-    const auth = tenancy ? this.resolveAuth(options, tenancy, queueInfrastructure) : undefined;
+    const auth = tenancy
+      ? await this.resolveAuth(options, tenancy, queueInfrastructure)
+      : undefined;
 
     if (!authz || !tenancy || !auth) {
       return Promise.resolve(
@@ -1042,7 +1048,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // sign-up and presence. Composed over the SAME user directory the browser-session boundary
     // resolves through and the SAME organization service the REST doors serve from — a second
     // of either would be a second answer to who somebody is.
-    await this.composePersonFeatures(options, auth, tenancy);
+    await this.composePersonFeatures(options, tenancy);
     // The product half: a reviewer's annotations, the support inbox, the project's privacy
     // rules and its setup checklist. It composes FIRST because it is the one half that cannot
     // be missing on a process holding a database, which is what makes it the seed the other
@@ -2166,6 +2172,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       codingAgent: this.composedCodingAgent,
       enterprise: this.composedEnterprise,
       scim: this.composedScim,
+      // The SAME application both user namespaces answer from: `/api/me` and
+      // `/api/user-avatar` read one answer to who somebody is.
+      users: this.composedUser.app,
       ...(this.composedDataset ? { dataset: this.composedDataset } : {}),
       ...(this.composedEvaluator ? { evaluator: this.composedEvaluator } : {}),
       ...(this.composedMonitor ? { monitor: this.composedMonitor } : {}),
@@ -2386,15 +2395,28 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * The Auth graph this process authenticates browser callers with, and where it came from.
    * Precedence, and the reason for it: 1. An injected composition wins.
    */
-  private resolveAuth(
+  private async resolveAuth(
     options: ApiRuntimeCompositionOptions,
     tenancy: ApiResolvedTenancy,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
-  ): ApiAuthSessionCompositionPort | undefined {
+  ): Promise<ApiAuthSessionCompositionPort | undefined> {
     if (this.options.auth) return this.options.auth;
+    if (!this.composedDatabase) return undefined;
 
     const logger = createLogger(options.config.serviceName);
+    // The person graph FIRST: Auth resolves a signed-in person through the
+    // user application, and the user application ends their sessions through
+    // Auth. The runtime resolves that cycle, so this line is what makes the
+    // browser-session boundary a reader of the one graph rather than a second.
+    const user = await this.installUser(options, tenancy);
     this.composedAuth = ApiAuthComposition.tryCompose({
+      auth: user.auth,
+      // The SAME graph, in the shape Better Auth's passkey ceremony, SCIM and
+      // the back office still name it.
+      directory: createApiUserDirectory({
+        users: user.app,
+        processName: options.config.serviceName,
+      }),
       database: this.composedDatabase?.connection,
       // The organization service this process actually serves from, injected
       // or composed. A second one here would resolve a person's workspaces
@@ -2426,19 +2448,72 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // the stock Prisma engine and three no-ops. The SAME registration every other
       // identity write on this process stages through.
       identityEventing: this.composedIdentityEventing,
-      // Where an uploaded avatar's bytes land: the content-addressed store the stored-object
-      // feature opens, read at the UPLOAD rather than here. That feature composes further down
-      // — it stands on services that stand on the session this graph verifies — so a store read
-      // at this line would always be absent and every upload would refuse on a process that can
+      processName: options.config.serviceName,
+      report: LoggedApiAuthAbsence.create(logger),
+    });
+    return this.composedAuth;
+  }
+
+  /**
+   * The signed-in person's graph, installed ONCE. Both the browser-session
+   * boundary and the person-shaped features reach it, and a second install
+   * would be a second answer to who somebody is.
+   */
+  private installUser(
+    options: ApiRuntimeCompositionOptions,
+    tenancy: ApiResolvedTenancy,
+  ): Promise<ComposedUserFeature> {
+    const personMail = this.resolvePersonMail();
+    // The project directory this process resolved its tenancy through. Read
+    // rather than referenced: `/api/me/project` names the project a calling
+    // key belongs to, and a second directory would name a different one.
+    const projects = this.composedTenancy?.projects;
+    if (!projects) {
+      throw new Error("The user graph was installed before this process resolved a tenancy");
+    }
+
+    this.composedUserInstall ??= installApiUser({
+      prisma: this.requireDatabase().connection.client,
+      peers: {
+        organizations: tenancy.organizations,
+        projects,
+        // ADR-027's mode, resolved once by the feature that owns the
+        // signed-out doors: the account screens must report the mode the door
+        // the person came through offered.
+        resolveAuthProvider: () => this.composedAuthFeature.resolveAuthProvider(),
+      },
+      // The ONE registration this process made, taken rather than repeated:
+      // the identifier ledger stages every command through it.
+      eventing: this.composedIdentityEventing,
+      // The SAME Redis Better Auth's own session cache lives in, so revoking a
+      // session through this process clears the entry the other tier reads.
+      redis: this.composedQueueRedis ?? null,
+      // The SAME counter the public REST surface meters through, so a budget
+      // cannot be spent twice by asking on two paths.
+      rateLimit: (request) => this.rateLimiter.consume(request),
+      deployment: this.personDeployment(options),
+      // Where an uploaded avatar's bytes land: the content-addressed store the
+      // stored-object feature opens, read at the UPLOAD rather than here. That
+      // feature composes further down, so a store read at this line would
+      // always be absent and every upload would refuse on a process that can
       // serve it.
       avatarStorage: ApiUserAvatarStorageAdapter.create({
         storedObjects: () => this.composedStoredObject?.bytes,
         processName: options.config.serviceName,
       }),
+      // The SAME application `/api/files` reads through, in the shape the
+      // avatar family takes. Its row carries the owner kind, which is what
+      // makes the family's refusal of every non-avatar object a real check.
+      avatarObjects: createApiUserAvatarObjectReader(() => this.composedStoredObject.app),
+      // The spend rollup behind `/api/me/usage`. Enterprise governance owns the
+      // ledger, so a deployment without it refuses by name rather than
+      // reporting a zero somebody would read as "you spent nothing".
+      personalUsage: () => this.resolveEnterprise()?.governance,
+      ...(personMail ? { mail: personMail } : {}),
       processName: options.config.serviceName,
-      report: LoggedApiAuthAbsence.create(logger),
     });
-    return this.composedAuth;
+
+    return this.composedUserInstall;
   }
 
   /**
@@ -2690,7 +2765,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     authz: AuthzService,
     tenancy: ApiResolvedTenancy,
     publicBaseUrl: string | undefined,
-  ): AuthCliDeviceFlowRestPorts | undefined {
+  ): AuthCliDeviceFlowApi | undefined {
     const auth = this.composedAuth?.compose();
     return composeApiAuthCliDeviceFlow({
       redis: this.composedQueueRedis,
@@ -2714,7 +2789,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   /**
    * The `/api/auth` family's collaborators, or none.
    */
-  private composeAuthRest(tenancy: ApiResolvedTenancy): AuthRestPorts | undefined {
+  private composeAuthRest(tenancy: ApiResolvedTenancy): AuthDoorApi | undefined {
     const auth = this.composedAuth?.compose();
     return composeApiAuthRest({
       betterAuth: this.composedAuth?.betterAuth,
@@ -2733,7 +2808,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private composeGovernanceCliRest(
     authz: AuthzService,
-    deviceFlow: AuthCliDeviceFlowRestPorts | undefined,
+    deviceFlow: AuthCliDeviceFlowApi | undefined,
     publicBaseUrl: string | undefined,
   ): GovernanceCliRestPorts | undefined {
     const sessions = deviceFlow?.sessions;
@@ -3010,7 +3085,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private async composePersonFeatures(
     options: ApiRuntimeCompositionOptions,
-    auth: ApiAuthSessionCompositionPort,
     tenancy: ApiResolvedTenancy,
   ): Promise<void> {
     const database = this.composedDatabase?.connection;
@@ -3028,37 +3102,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       return;
     }
 
-    const session = auth.compose();
-    // The ONE registration this process made, taken rather than repeated. Every ledger
-    // write below stages through it — the thirteen identifier and two-step commands, the
-    // five a join request has, the fourteen a connection has and the five a directory's
-    // push states — and a second adapter would resolve senders out of a second registry.
-    const identityEventing = this.composedIdentityEventing;
+    // The signed-in person's own graph, installed here or already installed by
+    // the browser-session boundary: `installUser` memoises, so both callers
+    // reach ONE user application and one browser-session service.
+    this.composedUser = await this.installUser(options, tenancy);
 
     this.composedAuthFeature = composeAuthFeature({
       prisma: database.client,
-      // The SAME user directory the browser-session boundary composed: a second
-      // directory is a second answer to who somebody is.
-      peers: { users: session.users },
+      // The SAME user application the browser-session boundary reads through:
+      // a second directory is a second answer to who somebody is.
+      peers: { users: this.composedUser.app },
       // The SAME counter the public REST surface meters through, so a budget
       // cannot be spent twice by asking on two paths.
-      rateLimit: (request) => this.rateLimiter.consume(request),
-      deployment: this.personDeployment(options),
-      ...(personMail ? { mail: personMail } : {}),
-      processName,
-    });
-
-    this.composedUser = await composeUserFeature({
-      prisma: database.client,
-      peers: {
-        auth: session.auth,
-        organizations: tenancy.organizations,
-        // ADR-027's mode, resolved once by the feature that owns the
-        // signed-out doors: the account screens must report the mode the door
-        // the person came through offered.
-        resolveAuthProvider: () => this.composedAuthFeature.resolveAuthProvider(),
-      },
-      eventing: identityEventing,
       rateLimit: (request) => this.rateLimiter.consume(request),
       deployment: this.personDeployment(options),
       ...(personMail ? { mail: personMail } : {}),

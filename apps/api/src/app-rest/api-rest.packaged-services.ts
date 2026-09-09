@@ -42,7 +42,7 @@ import type {
   StoredObjectApp,
 } from "@langwatch/stored-object-server";
 import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
-import type { UserAvatarObjectReader } from "@langwatch/user-server";
+import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { WorkflowEvaluationTrigger } from "@langwatch/workflow-server";
 import type { Context, MiddlewareHandler } from "hono";
@@ -101,9 +101,10 @@ export type ApiPackagedRestServices = Readonly<{
   simulations?: (() => SimulationService) | undefined;
   storedObjects?: (() => StoredObjectApp) | undefined;
   /**
-   * One avatar object's metadata and bytes, for `/api/user-avatar`.
+   * The signed-in person, for `/api/me` and `/api/user-avatar`. The SAME
+   * application the two tRPC namespaces answer from.
    */
-  userAvatarObjects?: (() => UserAvatarObjectReader) | undefined;
+  users?: (() => UserApi) | undefined;
   /**
    * Recording a customer's feedback event as the one span that carries it, plus the
    * second validation pass, the id, the error sink and the rendered rejection the

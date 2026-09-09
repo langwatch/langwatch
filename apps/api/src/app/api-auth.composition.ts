@@ -1,18 +1,12 @@
 import type { AuthService, VerifiedBrowserSession } from "@langwatch/auth-contract";
-import { PostgresAuthAdapter, type SignUpVerificationPort } from "@langwatch/auth-server";
+import type { SignUpVerificationPort } from "@langwatch/auth-server";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import {
-  BetterAuthAccountQueriesAdapter,
-  PostgresIdentityEmailAdapter,
-} from "@langwatch/identity-server";
 import type { IdentityEventingPort } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { PostgresUserAdapter, type UserAvatarStoragePort } from "@langwatch/user-server";
 import type { UserService } from "@langwatch/user-contract";
-import { ApiUserAvatarStorageAdapter } from "../features/user/user-avatar-storage.adapter.ts";
 import type { ApiBrowserSessionConfig } from "../platform/config/api.config.ts";
 import { ApiAuthenticationPort } from "../api-request.policy.ts";
 import type { ApiTrpcSession } from "../app-trpc/app-trpc.context.ts";
@@ -98,7 +92,8 @@ export type ApiAuthSessionDependencies = Readonly<{
   auth: AuthService;
   sessions: ApiBrowserSessionTransportPort;
   /**
-   * The user directory the Auth service already resolves a signed-in person through.
+   * The user directory the Auth service already resolves a signed-in person
+   * through, in the shape SCIM and the back office still name it.
    */
   users: UserService;
 }>;
@@ -117,6 +112,17 @@ export abstract class ApiAuthAbsenceReportPort {
 
 export type ApiAuthCompositionOptions = {
   database: PrismaConnection;
+  /**
+   * The browser-session service the user runtime composed. Taken rather than
+   * built: it is one half of the cycle the runtime already resolved, and a
+   * second adapter here would revoke sessions the other half never saw.
+   */
+  auth: AuthService;
+  /**
+   * The same user graph in the shape Better Auth's passkey ceremony, SCIM and
+   * the back office still name it. One directory behind all three.
+   */
+  directory: UserService;
   /**
    * The organization service the user service resolves a person's workspaces
    * through — the same instance the rest of this process serves from, never a
@@ -154,10 +160,6 @@ export type ApiAuthCompositionOptions = {
    * its own key prefix, so revoking a session has to clear that cache as well as the row.
    */
   redis?: RedisConnection | null;
-  /**
-   * Where an uploaded avatar's bytes are written.
-   */
-  avatarStorage?: UserAvatarStoragePort | undefined;
   /** Names this process in the refusal an avatar upload produces. */
   processName: string;
 };
@@ -201,25 +203,8 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
     // own terms, and every repository underneath takes the same typed client.
     // No assertion sits at this seam, and none should.
     const database = options.database.client;
-    const users = PostgresUserAdapter.create({
-      database,
-      // The issuer a credential account row is stored under is a persisted
-      // format, so it is minted by the package that owns the format rather
-      // than restated here — a root that spelled the prefix out would write
-      // rows the other tier's queries do not find.
-      credentialIssuer: BetterAuthAccountQueriesAdapter.issuerForProviderId("credential"),
-      organizations: options.organizations,
-      avatarStorage:
-        options.avatarStorage ??
-        ApiUserAvatarStorageAdapter.absent({ processName: options.processName }),
-    }).build();
-
-    const auth = PostgresAuthAdapter.create({
-      database,
-      redis: options.redis ?? null,
-      identityEmails: PostgresIdentityEmailAdapter.create({ database }).build(),
-      users,
-    }).build();
+    const users = options.directory;
+    const auth = options.auth;
 
     const supplied = options.browserSessions;
     if (supplied) {

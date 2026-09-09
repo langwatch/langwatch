@@ -174,14 +174,8 @@ export {
   AuthzApiAuthorizationAdapter,
 } from "./api-request.policy.ts";
 export { TopicApiFeature } from "./features/topic/topic-api.feature.ts";
+
 export {
-  createDatasetRestApp,
-  type DatasetDirectUploadAuthorization,
-  type DatasetDirectUploadAuthorizer,
-} from "@langwatch/dataset-server";
-export {
-  createEvaluatorsRestApp,
-  type EvaluatorAppVariables,
   apiResponseEvaluatorSchema,
   createEvaluatorInputSchema,
   updateEvaluatorInputSchema,
@@ -239,8 +233,8 @@ export {
   type GatewaySpendRestPorts,
 } from "@langwatch/gateway-server/api-rest/gateway-spend";
 export { createGovernanceRestApp } from "@langwatch/enterprise-api";
-export { type AgentPlatformUrlBuilder } from "@langwatch/agent-server";
-export { createTriggerRestApp } from "@langwatch/automation-server";
+
+
 export { type CodingAgentCallerScope } from "@langwatch/coding-agent-server";
 export { createWebhookRestApp } from "@langwatch/enterprise-api";
 export {
@@ -254,9 +248,8 @@ export {
   type TraceExportRestPorts,
 } from "@langwatch/trace-server/api-rest/trace-export";
 export { createGroupRestApp } from "@langwatch/organization-server";
-export { createModelDefaultsRestApp } from "@langwatch/model-provider-server";
-export { createModelProvidersRestApp } from "@langwatch/model-provider-server";
-export { createMeRestApp } from "@langwatch/user-server";
+
+
 export {
   createOrganizationsRestApp,
   ORGANIZATIONS_SPEC_OPTIONS,
@@ -265,22 +258,13 @@ export {
 } from "@langwatch/organization-server";
 export { createTeamsRestApp } from "@langwatch/organization-server";
 export {
-  createUserAvatarRestApp,
-  type UserAvatarDualAuthVariables,
-  type UserAvatarObjectReader,
-  type UserAvatarStoredObjectRead,
-} from "@langwatch/user-server";
-export {
   archiveScenarioSetRuns,
   createScenarioEventsRestApp,
 } from "@langwatch/scenario-server/api-rest/scenario-event";
 export { createScenariosRestApp } from "@langwatch/scenario-server/api-rest/scenario";
 export { createSimulationRunsRestApp } from "@langwatch/scenario-server/api-rest/simulation-run";
 export {
-  createWorkflowsRestApp,
-  type WorkflowEvaluationOutcome,
   type WorkflowEvaluationTrigger,
-  type WorkflowRestPorts,
 } from "@langwatch/workflow-server";
 export {
   apiConfigDefinition,

@@ -31,7 +31,7 @@ import { composeApiIdentityPipelines } from "../../../app/api-identity-pipelines
 import { ApiAuditPort } from "../../../api-request.policy.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import type { ApiTrpcInfrastructure } from "../../../platform/infrastructure/api-trpc.infrastructure.ts";
-import { composeUserFeature } from "../../user/user.composition.ts";
+import { installApiUser } from "../../user/user.composition.ts";
 import { composeOrganizationFeature } from "../organization.composition.ts";
 import {
   stubCollaborators,
@@ -145,18 +145,20 @@ async function composePersonFeatures(
   eventing: IdentityEventingPort = new SilentEventing(),
   plans: ApiTrpcInfrastructure["plans"] = roomyPlan(),
 ) {
-  const user = await composeUserFeature({
+  const user = await installApiUser({
     prisma,
     peers: {
-      auth: {} as unknown as AuthService,
       organizations: {
         getSettings: async () => ({ supportContact: null }),
       } as unknown as OrganizationService,
+      projects: { tryGetIdentity: async () => null },
       resolveAuthProvider: async () => "email",
     },
     eventing,
     rateLimit,
     deployment: { baseUrl: "https://app.acme.test", adminEmails: "staff@langwatch.ai" },
+    avatarStorage: { store: async () => ({ id: "avatar" }) },
+    avatarObjects: { findById: async () => null },
     processName: "langwatch-api",
   });
 

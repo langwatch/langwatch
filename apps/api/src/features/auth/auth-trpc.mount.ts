@@ -1,75 +1,60 @@
 /**
- * App-process transport mounts for the signed-out surfaces: the unauthenticated
- * front door, and the one deployment fact the sign-in page reads.
- *
- * Behaviour is package-owned (`@langwatch/auth-server`); this supplies the
- * process's root, its public and authenticated procedures, the policy chain,
- * and the composed `AuthApp` both surfaces answer from.
+ * Binds the two signed-out surfaces to this process's execution path. The
+ * caller's address, their own address and the operator allow-list are the
+ * PROCESS's, so each arrives as a fact rather than off a context.
  */
+import { bindTrpcFact, callerAddressFact, type TrpcRuntime } from "@langwatch/api/trpc";
 import {
-  FrontDoorTrpcApi,
-  PublicEnvTrpcApi,
-  type AuthApp,
-  type FrontDoorTrpcContext,
-  type PublicEnvTrpcContext,
+  callerEmailFact,
+  frontDoorTrpcTransport,
+  operatorAllowListFact,
+  publicEnvTrpcTransport,
+  viewerEmailFact,
+  type FrontDoorApi,
+  type PublicEnvApi,
 } from "@langwatch/auth-server";
-import {
-  createTrpcApiService,
-  declaredPolicy,
-  type AppTrpcPolicyMiddlewares,
-  type TrpcApiMount,
-  type TrpcApiPorts,
-  type TrpcApiPublicMount,
-} from "@langwatch/api/trpc";
-import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
-/**
- * Mounts `frontDoor.*` on the app process's tRPC root.
- *
- * `sendMyAddressConfirmation` is the one procedure that needs a session; every
- * other one runs before the caller has an account.
- */
-export function createFrontDoorTrpcRouter<
-  TContext extends FrontDoorTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> &
-    TrpcApiPublicMount<TContext, TOptions, TRoot> &
-    TrpcApiPorts<AuthApp>,
-) {
-  return FrontDoorTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
+/** The slice of the process context these two surfaces read. */
+export interface AuthHostContext {
+  app: Readonly<{
+    config: Readonly<{ opsSidebarEmails?: readonly string[] | undefined }>;
+  }>;
+  clientIp?: () => string;
+  session?: Readonly<{ user: Readonly<{ email?: string | null }> }> | null;
 }
 
-type PublicEnvMount<
-  TContext extends PublicEnvTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
-> = Readonly<{
-  /** No session: the sign-in page asks this before anyone has one. */
-  publicProcedure: TRPCRootObject<TContext, object, TOptions, TRoot>["procedure"];
-  middlewares: AppTrpcPolicyMiddlewares;
-  ports: AuthApp;
-}>;
+/** Mounts `frontDoor.*` under its own key at the root. */
+export function createFrontDoorTrpcRouter<TContext extends AuthHostContext>(
+  runtime: TrpcRuntime<TContext>,
+  app: () => FrontDoorApi,
+) {
+  return runtime.mount(frontDoorTrpcTransport, app, {
+    facts: [
+      bindTrpcFact(callerAddressFact, (ctx) => ctx.clientIp?.() ?? null),
+      bindTrpcFact(callerEmailFact, (ctx) => ctx.session?.user.email ?? null),
+    ],
+  });
+}
 
 /**
- * Mounts `publicEnv` on the app process's tRPC root.
- *
- * A procedure rather than a router, because that is what the surface is: the
- * client calls `publicEnv({})` at the root, and giving it a namespace would
- * rename it. That is also why this one keeps its own mount type — there is no
- * root and no authenticated procedure for `createTrpcApiService` to compose.
+ * Mounts `publicEnv` and answers the PROCEDURE rather than the router around
+ * it. A single query at the ROOT rather than a namespace: the client calls
+ * `publicEnv({})`, and a key of its own would rename it.
  */
-export function createPublicEnvTrpcProcedure<
-  TContext extends PublicEnvTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: PublicEnvMount<TContext, TOptions, TRoot>) {
-  return PublicEnvTrpcApi.create(
-    {
-      public: mount.publicProcedure,
-      policy: declaredPolicy(mount.middlewares),
-    },
-    mount.ports,
-  );
+export function createPublicEnvTrpcProcedure<TContext extends AuthHostContext>(
+  runtime: TrpcRuntime<TContext>,
+  app: () => PublicEnvApi,
+) {
+  const mounted = runtime.mount(publicEnvTrpcTransport, app, {
+    facts: [
+      bindTrpcFact(viewerEmailFact, (ctx) => ctx.session?.user.email ?? null),
+      bindTrpcFact(operatorAllowListFact, (ctx) => {
+        const allowList = ctx.app.config.opsSidebarEmails;
+
+        return allowList ? [...allowList] : null;
+      }),
+    ],
+  });
+
+  return mounted.publicEnv;
 }

@@ -13,6 +13,8 @@ import type { Logger } from "@langwatch/observability";
 import { secretRest, secretsAliasRest } from "@langwatch/secret-server";
 
 import { mountAnnotationRest } from "../features/annotation/annotation-rest.mount.ts";
+import { mountAuthCliDeviceFlowRest } from "../features/auth/auth-cli-device-flow-rest.mount.ts";
+import { mountAuthRest } from "../features/auth/auth-rest.mount.ts";
 import { mountApiKeyRest } from "../features/api-key/api-key-rest.mount.ts";
 import {
   mountCodingAgentRest,
@@ -39,6 +41,8 @@ import {
 import { mountStoredObjectFileRest } from "../features/stored-object/stored-object-file-rest.mount.ts";
 import { mountStoredObjectRest } from "../features/stored-object/stored-object-rest.mount.ts";
 import { mountSuiteRest } from "../features/suite/suite-rest.mount.ts";
+import { mountMeRest } from "../features/user/me-rest.mount.ts";
+import { mountUserAvatarRest } from "../features/user/user-avatar-rest.mount.ts";
 import type { ApiPackagedRestCollaborators } from "./api-rest.packaged-services.ts";
 import type { ApiRestRuntime } from "./api-rest.runtime.ts";
 import type { ApiRestPorts, ApiRestServices } from "./api-rest.services.ts";
@@ -200,9 +204,35 @@ export const API_REST_DOORS = [
     owner: "process",
     paths: ["/api/langy/conversations", "/api/langy/ui", "/api/internal/langy/*"],
   },
-  { family: "auth-cli-device-flow", owner: "process", paths: ["/api/auth/cli/*"] },
+  {
+    family: "auth-cli-device-flow",
+    owner: "module",
+    // Ordered BEFORE `/api/auth`: that family is Better Auth's catch-all and
+    // would otherwise swallow all seven of these paths.
+    paths: ["/api/auth/cli/*", "/api/v1/auth/cli/*"],
+    mount: ({ runtime, ports }: ApiRestDoorContext) => {
+      const door = ports.authCliDeviceFlow;
+      if (!door) return null;
+
+      return [mountAuthCliDeviceFlowRest(runtime, { door: () => door, errors: ports.errors })];
+    },
+    absent:
+      "API process serves no /api/auth/cli: the device grant needs a Redis to hold a device code, a database to re-derive membership from, and a browser session to name who approves. Without all three `langwatch login` cannot complete.",
+  },
   { family: "governance-cli", owner: "process", paths: ["/api/v1/governance/*"] },
-  { family: "auth", owner: "process", paths: ["/api/auth/*"] },
+  {
+    family: "auth",
+    owner: "module",
+    paths: ["/api/auth/*"],
+    mount: ({ runtime, ports }: ApiRestDoorContext) => {
+      const door = ports.auth;
+      if (!door) return null;
+
+      return [mountAuthRest(runtime, { door: () => door, errors: ports.errors })];
+    },
+    absent:
+      "API process serves no /api/auth: it composed no Better Auth instance, no session transport, no credential service or no flag store, and a sign-in door missing any of them would answer every browser as signed out.",
+  },
   { family: "governance-ingest", owner: "process", paths: ["/api/ingest/otel", "/api/ingest/webhook"] },
   {
     family: "scim",
@@ -299,7 +329,13 @@ export const API_REST_DOORS = [
   },
   { family: "governance", owner: "module", paths: ["/api/governance", "/api/v1/governance"] },
   { family: "groups", owner: "module", paths: ["/api/groups", "/api/v1/groups"] },
-  { family: "me", owner: "module", paths: ["/api/me", "/api/v1/me"] },
+  {
+    family: "me",
+    owner: "module",
+    paths: ["/api/me", "/api/v1/me"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) =>
+      packaged?.services.users ? [mountMeRest(runtime, packaged.services.users)] : null,
+  },
   {
     family: "model-providers",
     owner: "module",
@@ -351,7 +387,15 @@ export const API_REST_DOORS = [
   {
     family: "user-avatar",
     owner: "module",
-    paths: ["/api/user-avatar/:projectId/:userId"],
+    paths: ["/api/user-avatar/:projectId/:id"],
+    // The byte door's verifier decides this family, and the runtime installs
+    // it under every session door: absent, the mount would refuse by name.
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const users = packaged?.services.users;
+      if (!users || !packaged?.ports.dualAuth) return null;
+
+      return [mountUserAvatarRest(runtime, users)];
+    },
     absent:
       "API process serves no /api/user-avatar: it composed no stored-object read, or no dual-credential verifier for the browser to load an image with. Every member list, annotation and presence bar falls back to initials rather than the photo a person uploaded.",
   },

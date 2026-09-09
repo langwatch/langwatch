@@ -3,6 +3,7 @@
  */
 import { TraceContentExtractionService } from "@langwatch/trace-server";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type {
   AppRestManagementAuditPort,
   AppRestRbacVocabulary,
@@ -52,7 +53,6 @@ import type { ApiTraceIngestComposition } from "./api-trace-ingest.composition.t
 import { createApiTrackedEventPorts } from "../features/trace/tracked-event-ports.adapter.ts";
 import { createAgentPlatformUrlBuilder } from "../features/agent/agent-platform-url.ts";
 import { createDatasetDirectUploadAuthorizer } from "../features/dataset/dataset-direct-upload-auth.ts";
-import { createApiUserAvatarObjectReader } from "../features/user/user-avatar-objects.adapter.ts";
 import { createScenarioRunPlatformUrlBuilder } from "../features/scenario/scenario-run-platform-url.ts";
 import {
   MemoryAgentCacheEntryStore,
@@ -129,6 +129,8 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
    * command queue.
    */
   traceIngest: ApiTraceIngestComposition | undefined;
+  /** The signed-in person, for `/api/me` and `/api/user-avatar`. */
+  users: UserApi;
   /** The credential pair and the project directory every family resolves through. */
   apiKeys: ApiKeyApi;
   organizations: OrganizationService;
@@ -206,11 +208,9 @@ export function composeApiPackagedRest(
       ...(options.projects ? { projects: () => options.projects! } : {}),
       ...(options.monitor ? { monitors: options.monitor.restServices.monitors } : {}),
       storedObjects: () => options.storedObject.app,
-      // The SAME application `/api/files` reads through, in the shape the
-      // avatar family takes. Its row carries the owner kind, which is what
-      // makes the family's refusal of every non-avatar object a real check
-      // rather than a comparison against a field nobody projected.
-      userAvatarObjects: () => createApiUserAvatarObjectReader(() => options.storedObject.app),
+      // The SAME application both user namespaces answer from: one answer to
+      // who somebody is, whichever door asked.
+      users: () => options.users,
       scenarios: () => options.scenario.scenarioService,
       scenarioTabs: () => options.scenario.scenarioTabs,
       simulations: () => options.scenario.simulations,

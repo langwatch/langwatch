@@ -18,8 +18,11 @@
  *
  * Spec: specs/settings/user-avatar-upload.feature
  */
+import { Readable } from "node:stream";
+
 import type { StoredObjectApp } from "@langwatch/stored-object-server";
-import type { UserAvatarObjectReader, UserAvatarStoredObjectRead } from "@langwatch/user-server";
+import type { UserAvatarObjectRead } from "@langwatch/user-contract";
+import type { UserAvatarObjects } from "@langwatch/user-server";
 
 /**
  * Builds the reader the family takes, resolved per request.
@@ -31,9 +34,9 @@ import type { UserAvatarObjectReader, UserAvatarStoredObjectRead } from "@langwa
  */
 export function createApiUserAvatarObjectReader(
   storedObjects: () => StoredObjectApp,
-): UserAvatarObjectReader {
+): UserAvatarObjects {
   return {
-    async getById(input: { projectId: string; id: string }): Promise<UserAvatarStoredObjectRead> {
+    async findById(input: { projectId: string; id: string }): Promise<UserAvatarObjectRead> {
       const result = await storedObjects().readById(input);
       if (!result) return null;
 
@@ -49,7 +52,13 @@ export function createApiUserAvatarObjectReader(
       // metadata to have been read — the gate runs before the status does.
       if (!("stream" in result)) return { status: "missing", metadata };
 
-      return { status: "available", metadata, stream: result.stream };
+      // The family answers bytes through a `Response`, so the stream crossing
+      // this seam is the web one. Node's own is what the store hands back.
+      return {
+        status: "available",
+        metadata,
+        stream: Readable.toWeb(result.stream) as ReadableStream,
+      };
     },
   };
 }

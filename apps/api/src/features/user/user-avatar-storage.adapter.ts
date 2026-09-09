@@ -31,7 +31,7 @@ import {
   UserAvatarTooLargeError,
   type UserAvatarMediaType,
 } from "@langwatch/user-contract";
-import { UserAvatarStoragePort } from "@langwatch/user-server";
+import type { UserAvatarStorage } from "@langwatch/user-server";
 
 /**
  * The one operation an avatar write performs on the content-addressed store.
@@ -53,7 +53,7 @@ export type ApiUserAvatarObjectWriter = Pick<StoredObjectsService, "storeFromByt
  * store read at composition time would therefore always be absent. It is read
  * at the upload instead, which is the only moment it is needed.
  */
-export class ApiUserAvatarStorageAdapter extends UserAvatarStoragePort {
+export class ApiUserAvatarStorageAdapter implements UserAvatarStorage {
   static create(options: {
     /** The content-addressed store, resolved at the upload rather than at composition. */
     storedObjects: () => ApiUserAvatarObjectWriter | undefined;
@@ -83,9 +83,7 @@ export class ApiUserAvatarStorageAdapter extends UserAvatarStoragePort {
   private constructor(
     private readonly storedObjects: () => ApiUserAvatarObjectWriter | undefined,
     private readonly processName: string,
-  ) {
-    super();
-  }
+  ) {}
 
   async store(input: {
     projectId: string;

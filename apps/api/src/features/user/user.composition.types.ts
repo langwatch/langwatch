@@ -1,23 +1,27 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
+import type { AuthService } from "@langwatch/auth-contract";
 import type { UserApi } from "@langwatch/user-contract";
-import type { IdentityTrpcPorts, UserTrpcPorts } from "@langwatch/user-server";
+import type { ApiTrpcContext, ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
+import type {
+  createIdentityTrpcRouter,
+  createUserTrpcRouter,
+} from "./user-trpc.mount.ts";
 
-/** The slices and the port groups. The two tRPC namespaces are not here: their
- * transports are unconverted. */
+/** The two namespaces, the slices, and the session service composed beside them. */
 export type ComposedUserFeature = Readonly<{
+  routers(mount: ApiTrpcFeatureMount): {
+    user: ReturnType<typeof createUserTrpcRouter<ApiTrpcContext>>;
+    identity: ReturnType<typeof createIdentityTrpcRouter<ApiTrpcContext>>;
+  };
   /** The `ctx.app.users` slice. */
   app: UserApi;
   /**
-   * The operator allow-list this deployment names, in the shape `ctx.app.ops`
-   * carries. Published for the retention gate, so "who may keep data forever"
-   * and "who sees the operator sidebar" are never two answers.
+   * The browser-session service, composed on the SAME runtime: Auth resolves a
+   * signed-in person through the user application and the user application
+   * revokes sessions through Auth, so one graph answers both directions.
    */
-  ops: ApiTrpcFeatureApplication["ops"];
-  /** The `ctx.app.config` slice: the same allow-list, parsed once. */
+  auth: AuthService;
+  /** The `ctx.app.config` slice: the operator allow-list, parsed once. */
   config: ApiTrpcFeatureApplication["config"];
-  /**
-   * The two port groups the namespaces are built on.
-   */
-  ports: Readonly<{ identity: IdentityTrpcPorts; user: UserTrpcPorts }>;
 }>;

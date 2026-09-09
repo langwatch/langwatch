@@ -2,22 +2,17 @@
  * What the user feature's composition reads on its own connection, and how.
  */
 import { compareSync, hashSync } from "bcrypt";
-import type { AuthService } from "@langwatch/auth-contract";
 import { IdentityEventingPort } from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { UserService } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import { composeUserFeature } from "../user.composition.ts";
+import { installApiUser } from "../user.composition.ts";
 
 const USER_ID = "user-1";
 const CREDENTIAL_ACCOUNT_ID = "account-credential";
 const AUTH0_ACCOUNT_ID = "account-auth0";
 const CURRENT_PASSWORD = "the-current-one";
 const NEW_PASSWORD = "the-next-one";
-
-/** The request context these ports take and none of them read. */
-const CTX = {} as never;
 
 /** A stored bcrypt hash, in the deployment's own format. */
 const STORED_HASH = hashSync(CURRENT_PASSWORD, 10);
@@ -107,23 +102,24 @@ class SilentEventing extends IdentityEventingPort {
   }
 }
 
-function composeFeature() {
+async function composeFeature() {
   const prisma = testPrisma();
-  const feature = composeUserFeature({
+  const feature = await installApiUser({
     prisma: prisma.client,
     peers: {
-      users: {} as unknown as UserService,
-      auth: {} as unknown as AuthService,
       organizations: {} as unknown as OrganizationService,
+      projects: { tryGetIdentity: async () => null },
       resolveAuthProvider: async () => "email",
     },
     eventing: new SilentEventing(),
     rateLimit: async () => ({ allowed: true, resetAt: Date.now() + 60_000 }),
     deployment: {},
+    avatarStorage: { store: async () => ({ id: "avatar" }) },
+    avatarObjects: { findById: async () => null },
     processName: "langwatch-api",
   });
 
-  return { ports: feature.ports, prisma };
+  return { app: feature.app, prisma };
 }
 
 describe("given the API process's user feature composed on its own connection", () => {
@@ -134,10 +130,10 @@ describe("given the API process's user feature composed on its own connection", 
      */
     /** @scenario "Credential password hashes never leave the user feature" */
     it("rotates through the feature's own repository, with its own predicate and selection", async () => {
-      const { ports, prisma } = composeFeature();
+      const { app, prisma } = await composeFeature();
 
       await expect(
-        ports.user.rotatePassword(CTX, {
+        app.rotatePassword({
           userId: USER_ID,
           currentPassword: CURRENT_PASSWORD,
           newPassword: NEW_PASSWORD,
@@ -158,14 +154,14 @@ describe("given the API process's user feature composed on its own connection", 
     });
 
     it("answers with a word rather than the stored hash on every outcome", async () => {
-      const { ports } = composeFeature();
+      const { app } = await composeFeature();
 
-      const wrong = await ports.user.rotatePassword(CTX, {
+      const wrong = await app.rotatePassword({
         userId: USER_ID,
         currentPassword: "not-the-current-one",
         newPassword: NEW_PASSWORD,
       });
-      const rotated = await ports.user.rotatePassword(CTX, {
+      const rotated = await app.rotatePassword({
         userId: USER_ID,
         currentPassword: CURRENT_PASSWORD,
         newPassword: NEW_PASSWORD,
@@ -180,11 +176,11 @@ describe("given the API process's user feature composed on its own connection", 
     });
 
     it("reports a passkey-only account as having no password rather than refusing it", async () => {
-      const { ports, prisma } = composeFeature();
+      const { app, prisma } = await composeFeature();
       prisma.account.findFirst.mockResolvedValueOnce(null);
 
       await expect(
-        ports.user.rotatePassword(CTX, {
+        app.rotatePassword({
           userId: USER_ID,
           currentPassword: CURRENT_PASSWORD,
           newPassword: NEW_PASSWORD,
@@ -195,9 +191,9 @@ describe("given the API process's user feature composed on its own connection", 
 
   describe("when the settings page reads the sign-in methods this person holds", () => {
     it("lists them through the feature, carrying no credential column", async () => {
-      const { ports } = composeFeature();
+      const { app } = await composeFeature();
 
-      const linked = await ports.user.listLinkedAccounts(CTX, { userId: USER_ID });
+      const linked = await app.listLinkedAccounts({ userId: USER_ID });
 
       expect(linked).toEqual([
         { id: CREDENTIAL_ACCOUNT_ID, provider: "credential", providerAccountId: USER_ID },
@@ -207,10 +203,10 @@ describe("given the API process's user feature composed on its own connection", 
     });
 
     it("finds the Auth0 database identity through the feature's own subject prefix", async () => {
-      const { ports, prisma } = composeFeature();
+      const { app, prisma } = await composeFeature();
 
       await expect(
-        ports.user.tryFindAuth0DatabaseAccount(CTX, { userId: USER_ID }),
+        app.findAuth0DatabaseAccount({ userId: USER_ID }),
       ).resolves.toEqual({ providerAccountId: "auth0|abc123" });
       expect(prisma.account.findFirst).toHaveBeenCalledWith({
         where: {
@@ -223,10 +219,10 @@ describe("given the API process's user feature composed on its own connection", 
     });
 
     it("removes one method under the serializable transaction the feature owns", async () => {
-      const { ports, prisma } = composeFeature();
+      const { app, prisma } = await composeFeature();
 
       await expect(
-        ports.user.unlinkAccount(CTX, { userId: USER_ID, accountId: AUTH0_ACCOUNT_ID }),
+        app.unlinkAccount({ userId: USER_ID, accountId: AUTH0_ACCOUNT_ID }),
       ).resolves.toBe("unlinked");
 
       expect(prisma.raw.$transaction).toHaveBeenCalledWith(expect.any(Function), {
@@ -238,31 +234,14 @@ describe("given the API process's user feature composed on its own connection", 
     });
 
     it("refuses to remove the last one", async () => {
-      const { ports, prisma } = composeFeature();
+      const { app, prisma } = await composeFeature();
       prisma.account.count.mockResolvedValueOnce(1);
 
       await expect(
-        ports.user.unlinkAccount(CTX, { userId: USER_ID, accountId: AUTH0_ACCOUNT_ID }),
+        app.unlinkAccount({ userId: USER_ID, accountId: AUTH0_ACCOUNT_ID }),
       ).resolves.toBe("last_account");
       expect(prisma.account.delete).not.toHaveBeenCalled();
     });
   });
 
-  describe("when a sign-up asks whether an address is already taken", () => {
-    /**
-     * The contrast that keeps the rule above from being read as "this feature
-     * reads nothing directly". `User` is a different table with no credential
-     * on it, and this read is answered on the connection itself.
-     */
-    it("asks this process's own connection, case-insensitively", async () => {
-      const { ports, prisma } = composeFeature();
-
-      await expect(ports.user.emailIsTaken(CTX, { email: "Somebody@Example.com" })).resolves.toBe(
-        false,
-      );
-      expect(prisma.user.findFirst).toHaveBeenCalledWith({
-        where: { email: { equals: "Somebody@Example.com", mode: "insensitive" } },
-      });
-    });
-  });
 });

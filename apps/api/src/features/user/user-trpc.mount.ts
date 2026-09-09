@@ -1,56 +1,38 @@
 /**
- * App-process transport mounts for the user vertical.
- *
- * Behaviour is package-owned (`@langwatch/user-server`); this supplies the
- * process's root, its authenticated and public procedures, the policy chain,
- * and the application ports the user package does not own.
- *
- * Both surfaces act on the SESSION's own account, which is why neither takes a
- * permission for most of its procedures: `identity.completeVerification`
- * spends the caller's own verification record, and `user.*` reads and writes
- * the caller's own profile, credentials and avatar. The four organization
- * scoped procedures — the avatar upload and the /me dashboard reads — take
- * `organization:view` through the same policy chain as every other feature.
+ * Binds the user vertical's declared procedures to this process's execution
+ * path. Both namespaces act on the SESSION's own account, so both bind the
+ * same `UserApi` and neither takes a narrow door of its own.
  */
-import {
-  createTrpcApiService,
-  type TrpcApiMount,
-  type TrpcApiPorts,
-  type TrpcApiPublicMount,
-} from "@langwatch/api/trpc";
-import {
-  IdentityTrpcApi,
-  UserTrpcApi,
-  type IdentityTrpcContext,
-  type IdentityTrpcPorts,
-  type UserTrpcContext,
-  type UserTrpcPorts,
-} from "@langwatch/user-server";
-import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
+import { bindTrpcFact, browserSessionFact, callerAddressFact, type TrpcRuntime } from "@langwatch/api/trpc";
+import type { UserApi } from "@langwatch/user-contract";
+import { identityTrpcTransport, userTrpcTransport } from "@langwatch/user-server";
 
-/** Mounts `identity.*` on the app process's tRPC root. */
-export function createIdentityTrpcRouter<
-  TContext extends IdentityTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(mount: TrpcApiMount<TContext, TOptions, TRoot> & TrpcApiPorts<IdentityTrpcPorts>) {
-  return IdentityTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
+/** The slice of the process context these two namespaces read. */
+export interface UserHostContext {
+  app: Readonly<{ users: UserApi }>;
+  clientIp?: () => string;
+  session?: Readonly<{ sessionId?: string | undefined }> | null;
 }
 
 /**
- * Mounts `user.*` on the app process's tRPC root.
- *
- * `user.register` runs before an account exists, so this mount takes the
- * process's public procedure as well as its authenticated one.
+ * Mounts `user.*`. The caller's address keys the sign-up throttle and the
+ * browser session is what a credential write keeps alive, and neither is the
+ * feature's to read off a context it cannot see.
  */
-export function createUserTrpcRouter<
-  TContext extends UserTrpcContext,
-  TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
-  TRoot extends AnyTRPCRootTypes,
->(
-  mount: TrpcApiMount<TContext, TOptions, TRoot> &
-    TrpcApiPublicMount<TContext, TOptions, TRoot> &
-    TrpcApiPorts<UserTrpcPorts>,
+export function createUserTrpcRouter<TContext extends UserHostContext>(
+  runtime: TrpcRuntime<TContext>,
 ) {
-  return UserTrpcApi.create(mount.root, createTrpcApiService(mount), mount.ports);
+  return runtime.mount(userTrpcTransport, (ctx) => ctx.app.users, {
+    facts: [
+      bindTrpcFact(callerAddressFact, (ctx) => ctx.clientIp?.() ?? null),
+      bindTrpcFact(browserSessionFact, (ctx) => ctx.session?.sessionId ?? null),
+    ],
+  });
+}
+
+/** Mounts `identity.*`: the ceremony that spends a magic link. */
+export function createIdentityTrpcRouter<TContext extends UserHostContext>(
+  runtime: TrpcRuntime<TContext>,
+) {
+  return runtime.mount(identityTrpcTransport, (ctx) => ctx.app.users);
 }
