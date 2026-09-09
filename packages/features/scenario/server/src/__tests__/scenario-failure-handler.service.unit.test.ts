@@ -5,7 +5,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  AgentService,
+  type AgentApi,
   type AgentWithFields,
   type HttpAgentConfig,
 } from "@langwatch/agent-contract";
@@ -17,16 +17,17 @@ import {
 } from "@langwatch/scenario-contract";
 import { ScenarioFailureHandlerService } from "@langwatch/scenario-server";
 import { decodeScenarioError, ScenarioInfraErrorCode } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);
 
-function testAgentService(
+function testAgentApi(
   lookup: (input: {
     projectId: string;
     agentId: string;
   }) => Promise<Partial<HttpAgentConfig> | null>,
-): AgentService {
-  return Object.assign(Object.create(AgentService.prototype), {
+): AgentApi {
+  return createApiFixture<AgentApi>({
     getById: async ({ id, projectId }: { id: string; projectId: string }) => {
       const foundConfig = await lookup({ projectId, agentId: id });
       if (!foundConfig) throw new Error("Agent not found");
@@ -52,7 +53,7 @@ function testAgentService(
       };
       return agent;
     },
-  }) as AgentService;
+  });
 }
 
 function testSimulationService(): SimulationService {
@@ -68,7 +69,7 @@ function createHandler(
   }) => Promise<Partial<HttpAgentConfig> | null> = vi.fn().mockResolvedValue(null),
 ): ScenarioFailureHandlerService {
   return ScenarioFailureHandlerService.create({
-    agents: testAgentService(lookup),
+    agents: testAgentApi(lookup),
     simulations: testSimulationService(),
   });
 }

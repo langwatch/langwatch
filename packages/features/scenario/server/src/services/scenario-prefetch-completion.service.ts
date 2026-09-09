@@ -2,7 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRunModels } from "@langwatch/scenario-contract";
-import type { TraceService } from "@langwatch/trace-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 
 import type { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
 import type {
@@ -62,7 +62,7 @@ export class ScenarioPrefetchCompletionService {
     config: ScenarioExecutionPrefetchConfig;
     lookups: ScenarioExecutionLookupService;
     modelParameters: ScenarioModelParametersService;
-    traces: TraceService;
+    traces: TraceApi;
   }): ScenarioPrefetchCompletionService {
     return new ScenarioPrefetchCompletionService(options);
   }
@@ -72,7 +72,7 @@ export class ScenarioPrefetchCompletionService {
       config: ScenarioExecutionPrefetchConfig;
       lookups: ScenarioExecutionLookupService;
       modelParameters: ScenarioModelParametersService;
-      traces: TraceService;
+      traces: TraceApi;
     },
   ) {}
 

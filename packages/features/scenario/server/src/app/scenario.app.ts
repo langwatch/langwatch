@@ -3,6 +3,7 @@
  */
 import {
   startScenarioTabPresence,
+  ScenarioApi,
   type CancelScenarioBatchInput,
   type CancelScenarioRunInput,
   type CodeScenario,
@@ -23,7 +24,14 @@ import {
   type ScenarioExecutionService,
   type ScenarioIdInput,
   type ScenarioMoveInput,
+  type ScenarioRunConfig,
   type ScenarioService,
+  type ScenarioTestSuite,
+  type ScenarioTestSuiteCreateInput,
+  type ScenarioTestSuiteIdInput,
+  type ScenarioTestSuiteRenameInput,
+  type ScenarioTestSuiteRunDefinition,
+  type ScenarioTestSuiteUpdateInput,
   type ScenarioTabPresence,
   type ScenarioTabRegistration,
   type ScenarioTabRegistry,
@@ -57,8 +65,10 @@ import {
   withNote,
   withResolvedModels,
 } from "@langwatch/scenario-contract";
-import type { UserFullProfile, UserProfilesInput, UserService } from "@langwatch/user-contract";
+import type { UserApi, UserFullProfile, UserProfilesInput } from "@langwatch/user-contract";
 import type { EventEmitter } from "node:events";
+import type { TestAgentRunInput, TestAgentTurnInput } from "@langwatch/scenario-contract";
+import type { AgentTestService } from "../services/agent-test.service.ts";
 import type {
   RunConfigurationEntry,
   RunConfigurationsService,
@@ -81,11 +91,12 @@ export interface ScenarioCaller {
 
 /** What the process composes this feature's application from. */
 export interface ScenarioAppDependencies {
+  agentTesting: AgentTestService;
   scenarios: ScenarioService;
   simulations: SimulationService;
   scenarioExecution: ScenarioExecutionService;
   scenarioTabs: ScenarioTabRegistry;
-  users: UserService;
+  users: UserApi;
   broadcast: ScenarioBroadcast;
   /** Reads results as atoms and folds them into the Results tab's views. */
   resultAtoms: ResultAtomsService;
@@ -117,12 +128,24 @@ export interface QueueSimulationRunInput {
   resolvedModels?: ResolvedRunModels | null;
 }
 
-export class ScenarioApp {
+export class ScenarioApp implements ScenarioApi {
   static create(dependencies: ScenarioAppDependencies): ScenarioApp {
     return new ScenarioApp(dependencies);
   }
 
-  private constructor(private readonly dependencies: ScenarioAppDependencies) {}
+  #dependencies: ScenarioAppDependencies;
+
+  private constructor(dependencies: ScenarioAppDependencies) {
+    this.#dependencies = dependencies;
+  }
+
+  testAgentTurn(input: TestAgentTurnInput) {
+    return this.#dependencies.agentTesting.sendTurn(input);
+  }
+
+  testAgentRun(input: TestAgentRunInput) {
+    return this.#dependencies.agentTesting.scheduleRun(input);
+  }
 
   /**
    * The author a versioned write is recorded under. One spelling, in one place. Two doors built
@@ -137,22 +160,84 @@ export class ScenarioApp {
 
   /** Every non-archived scenario in the project. */
   list(input: { projectId: string }): Promise<Scenario[]> {
-    return this.dependencies.scenarios.list(input);
+    return this.#dependencies.scenarios.list(input);
+  }
+
+  listTestSuites(input: {
+    projectId: string;
+    includeArchived?: boolean;
+  }): Promise<ScenarioTestSuite[]> {
+    return this.#dependencies.scenarios.listTestSuites(input);
+  }
+
+  getReferenceStates(input: { ids: string[]; projectId: string }) {
+    return this.#dependencies.scenarios.getReferenceStates(input);
+  }
+
+  getRunConfigs(input: { ids: string[]; projectId: string }) {
+    return this.#dependencies.scenarios.getRunConfigs(input);
+  }
+
+  getModelChoices(input: { ids: string[]; projectId: string }) {
+    return this.#dependencies.scenarios.getModelChoices(input);
+  }
+
+  resolveRunParametersForScenarios(input: {
+    scenarios: ScenarioRunConfig[];
+    values?: RunParameterValues;
+  }) {
+    return this.#dependencies.scenarios.resolveRunParametersForScenarios(input);
+  }
+
+  getNamesByIds(input: { ids: string[]; projectId: string }) {
+    return this.#dependencies.scenarios.getNamesByIds(input);
+  }
+
+  tryGetTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite | null> {
+    return this.#dependencies.scenarios.tryGetTestSuite(input);
+  }
+
+  createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
+    return this.#dependencies.scenarios.createTestSuite(input);
+  }
+
+  updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
+    return this.#dependencies.scenarios.updateTestSuite(input);
+  }
+
+  getTestSuiteRunDefinition(
+    input: ScenarioTestSuiteIdInput,
+  ): Promise<ScenarioTestSuiteRunDefinition> {
+    return this.#dependencies.scenarios.getTestSuiteRunDefinition(input);
+  }
+
+  archiveTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite> {
+    return this.#dependencies.scenarios.archiveTestSuite(input);
+  }
+
+  renameTestSuite(input: ScenarioTestSuiteRenameInput): Promise<ScenarioTestSuite> {
+    return this.#dependencies.scenarios.renameTestSuite(input);
+  }
+
+  getInternalSuiteSummaries(
+    input: SimulationProjectDateRangeInput,
+  ): Promise<SimulationExternalSetSummary[]> {
+    return this.#dependencies.simulations.getInternalSuiteSummaries(input);
   }
 
   /** How many scenarios the project holds. */
   count(input: { projectId: string }): Promise<number> {
-    return this.dependencies.scenarios.count(input);
+    return this.#dependencies.scenarios.count(input);
   }
 
   /** One scenario, or null when it does not exist or is archived. */
   tryGetById(input: ScenarioIdInput): Promise<Scenario | null> {
-    return this.dependencies.scenarios.tryGetById(input);
+    return this.#dependencies.scenarios.tryGetById(input);
   }
 
   /** One scenario, archived ones included. */
   tryGetByIdIncludingArchived(input: ScenarioIdInput): Promise<Scenario | null> {
-    return this.dependencies.scenarios.tryGetByIdIncludingArchived(input);
+    return this.#dependencies.scenarios.tryGetByIdIncludingArchived(input);
   }
 
   /**
@@ -164,7 +249,7 @@ export class ScenarioApp {
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
-    return this.dependencies.scenarios.create({ ...input, lastUpdatedById: by.id });
+    return this.#dependencies.scenarios.create({ ...input, lastUpdatedById: by.id });
   }
 
   /**
@@ -176,7 +261,7 @@ export class ScenarioApp {
     input: Omit<ScenarioUpdateInput, "lastUpdatedById" | "actor">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
-    return this.dependencies.scenarios.update({
+    return this.#dependencies.scenarios.update({
       ...input,
       lastUpdatedById: by.id,
       actor: this.authorFor(by),
@@ -185,7 +270,7 @@ export class ScenarioApp {
 
   /** Archives one scenario. */
   archive(input: ScenarioIdInput): Promise<Scenario> {
-    return this.dependencies.scenarios.archive(input);
+    return this.#dependencies.scenarios.archive(input);
   }
 
   /** Archives several scenarios, reporting each failure rather than stopping. */
@@ -193,12 +278,12 @@ export class ScenarioApp {
     ids: string[];
     projectId: string;
   }): Promise<{ archived: string[]; failed: { id: string; error: string }[] }> {
-    return this.dependencies.scenarios.batchArchive(input);
+    return this.#dependencies.scenarios.batchArchive(input);
   }
 
   /** Files one scenario in a test suite, or unfiles it when `testSuiteId` is null. */
   moveToTestSuite(input: ScenarioMoveInput): Promise<Scenario> {
-    return this.dependencies.scenarios.moveToTestSuite(input);
+    return this.#dependencies.scenarios.moveToTestSuite(input);
   }
 
   /** Copies a scenario, attributed to the caller who asked for it. */
@@ -206,7 +291,7 @@ export class ScenarioApp {
     input: Omit<ScenarioDuplicateInput, "lastUpdatedById">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
-    return this.dependencies.scenarios.duplicate({ ...input, lastUpdatedById: by.id });
+    return this.#dependencies.scenarios.duplicate({ ...input, lastUpdatedById: by.id });
   }
 
   // -- version history -------------------------------------------------------
@@ -216,12 +301,12 @@ export class ScenarioApp {
     versions: ScenarioVersionSummary[];
     nextCursor: number | null;
   }> {
-    return this.dependencies.scenarios.listVersions(input);
+    return this.#dependencies.scenarios.listVersions(input);
   }
 
   /** One saved version in full. */
   getVersion(input: ScenarioVersionInput): Promise<ScenarioVersionDetail> {
-    return this.dependencies.scenarios.getVersion(input);
+    return this.#dependencies.scenarios.getVersion(input);
   }
 
   /** Makes a saved version current again, attributed to its caller. */
@@ -229,7 +314,7 @@ export class ScenarioApp {
     input: Omit<ScenarioVersionRestoreInput, "actor">,
     by: ScenarioCaller,
   ): Promise<Scenario> {
-    return this.dependencies.scenarios.restoreVersion({
+    return this.#dependencies.scenarios.restoreVersion({
       ...input,
       actor: this.authorFor(by),
     });
@@ -240,7 +325,7 @@ export class ScenarioApp {
    * saved each version; the name a person reads is resolved from it.
    */
   getUserProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
-    return this.dependencies.users.getProfiles(input);
+    return this.#dependencies.users.getProfiles(input);
   }
 
   // -- running a scenario ----------------------------------------------------
@@ -253,14 +338,14 @@ export class ScenarioApp {
   resolveRunParameters(
     input: ResolveScenarioRunParametersInput,
   ): Promise<ResolvedScenarioRunParameters> {
-    return this.dependencies.scenarios.resolveRunParameters(input);
+    return this.#dependencies.scenarios.resolveRunParameters(input);
   }
 
   /** Validates a run against its target before anything is queued. */
   prefetchExecution(
     input: ScenarioExecutionPrefetchInput,
   ): Promise<ScenarioExecutionPrefetchResult> {
-    return this.dependencies.scenarioExecution.prefetch(input);
+    return this.#dependencies.scenarioExecution.prefetch(input);
   }
 
   /**
@@ -286,7 +371,7 @@ export class ScenarioApp {
       ...(secretParameterNames.length > 0 ? { secretParameterNames } : {}),
     };
 
-    return this.dependencies.simulations.queueRun({
+    return this.#dependencies.simulations.queueRun({
       tenantId: input.projectId,
       scenarioRunId: input.scenarioRunId,
       scenarioId: input.scenarioId,
@@ -302,14 +387,14 @@ export class ScenarioApp {
 
   /** Cancels one queued or running job. */
   cancelJob(input: CancelScenarioRunInput): Promise<{ cancelled: boolean }> {
-    return this.dependencies.scenarios.cancelJob(input);
+    return this.#dependencies.scenarios.cancelJob(input);
   }
 
   /** Cancels every job in one batch run. */
   cancelBatchRun(
     input: CancelScenarioBatchInput,
   ): Promise<{ cancelledCount: number; skippedCount: number }> {
-    return this.dependencies.scenarios.cancelBatchRun(input);
+    return this.#dependencies.scenarios.cancelBatchRun(input);
   }
 
   // -- reading what ran ------------------------------------------------------
@@ -332,7 +417,7 @@ export class ScenarioApp {
 
     if (scenarioSetId) {
       // Single suite/set view — no conditional fetch support yet.
-      const data = await this.dependencies.simulations.getRunDataForScenarioSet({
+      const data = await this.#dependencies.simulations.getRunDataForScenarioSet({
         projectId,
         scenarioSetId,
         limit,
@@ -359,7 +444,7 @@ export class ScenarioApp {
     }
 
     // Cross-suite view — supports conditional fetch via sinceTimestamp.
-    return this.dependencies.simulations.getRunDataForAllSuites({
+    return this.#dependencies.simulations.getRunDataForAllSuites({
       projectId,
       limit,
       cursor,
@@ -371,67 +456,67 @@ export class ScenarioApp {
 
   /** The project's suites, summarised. */
   getScenarioSetsData(input: SimulationProjectDateRangeInput): Promise<SimulationSetData[]> {
-    return this.dependencies.simulations.getScenarioSetsData(input);
+    return this.#dependencies.simulations.getScenarioSetsData(input);
   }
 
   /** The latest run result per test case inside the window. */
   getLastResultSummaries(
     input: SimulationLastResultSummariesInput,
   ): Promise<SimulationLastResultSummary[]> {
-    return this.dependencies.simulations.getLastResultSummaries(input);
+    return this.#dependencies.simulations.getLastResultSummaries(input);
   }
 
   /** The latest update across the project's runs — a cheap freshness probe. */
   getLastUpdatedAt(input: SimulationLastUpdatedInput): Promise<number> {
-    return this.dependencies.simulations.getLastUpdatedAt(input);
+    return this.#dependencies.simulations.getLastUpdatedAt(input);
   }
 
   /** One page of one suite's runs. */
   getRunDataForScenarioSet(
     input: SimulationScenarioSetRunsInput,
   ): Promise<{ runs: SimulationRunData[]; nextCursor?: string; hasMore: boolean }> {
-    return this.dependencies.simulations.getRunDataForScenarioSet(input);
+    return this.#dependencies.simulations.getRunDataForScenarioSet(input);
   }
 
   /** One run by its id. No date window, so old runs stay reachable. */
   tryGetScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null> {
-    return this.dependencies.simulations.tryGetScenarioRunData(input);
+    return this.#dependencies.simulations.tryGetScenarioRunData(input);
   }
 
   /** How many batch runs one suite has, for its pagination. */
   getBatchRunCountForScenarioSet(input: SimulationExternalSetCountInput): Promise<number> {
-    return this.dependencies.simulations.getBatchRunCountForScenarioSet(input);
+    return this.#dependencies.simulations.getBatchRunCountForScenarioSet(input);
   }
 
   /** The pre-aggregated batch history one suite's sidebar renders. */
   getBatchHistoryForScenarioSet(
     input: SimulationBatchHistoryInput,
   ): Promise<SimulationBatchHistory> {
-    return this.dependencies.simulations.getBatchHistoryForScenarioSet(input);
+    return this.#dependencies.simulations.getBatchHistoryForScenarioSet(input);
   }
 
   /** One batch run's runs. No date window, so old batches open directly. */
   getRunDataForBatchRun(input: SimulationBatchRunInput): Promise<SimulationBatchRunData> {
-    return this.dependencies.simulations.getRunDataForBatchRun(input);
+    return this.#dependencies.simulations.getRunDataForBatchRun(input);
   }
 
   /** Summaries for the suites the SDK and CI report into. */
   getExternalSetSummaries(
     input: SimulationProjectDateRangeInput,
   ): Promise<SimulationExternalSetSummary[]> {
-    return this.dependencies.simulations.getExternalSetSummaries(input);
+    return this.#dependencies.simulations.getExternalSetSummaries(input);
   }
 
   /** Runs across every suite, one page at a time. */
   getRunDataForAllSuites(input: SimulationAllSuitesInput): Promise<SimulationAllSuitesRunData> {
-    return this.dependencies.simulations.getRunDataForAllSuites(input);
+    return this.#dependencies.simulations.getRunDataForAllSuites(input);
   }
 
   // -- the live stream -------------------------------------------------------
 
   /** The project's fan-out emitter, relaying what another pod published. */
   tenantEmitter(projectId: string): EventEmitter {
-    return this.dependencies.broadcast.getTenantEmitter(projectId);
+    return this.#dependencies.broadcast.getTenantEmitter(projectId);
   }
 
   /**
@@ -440,7 +525,7 @@ export class ScenarioApp {
   startTabPresence(registration: ScenarioTabRegistration): Promise<ScenarioTabPresence> {
     return startScenarioTabPresence({
       registration,
-      registry: this.dependencies.scenarioTabs,
+      registry: this.#dependencies.scenarioTabs,
     });
   }
 
@@ -451,7 +536,7 @@ export class ScenarioApp {
     filter: ResultsFilter;
     groupBy: ResultsGroupBy;
   }): Promise<ResultsOverview> {
-    return this.dependencies.resultAtoms.getOverview(input);
+    return this.#dependencies.resultAtoms.getOverview(input);
   }
 
   /** One page of atoms, newest first. A drill-down, never a total. */
@@ -460,7 +545,7 @@ export class ScenarioApp {
     limit: number;
     cursor?: string;
   }): Promise<{ atoms: ResultAtom[]; nextCursor?: string; hasMore: boolean }> {
-    return this.dependencies.resultAtoms.getAtoms(input);
+    return this.#dependencies.resultAtoms.getAtoms(input);
   }
 
   /** The scenarios that ran from code inside the window, for the scenario filter. */
@@ -469,7 +554,7 @@ export class ScenarioApp {
     startDate: number;
     endDate?: number;
   }): Promise<CodeScenario[]> {
-    return this.dependencies.resultAtoms.getCodeScenarios(input);
+    return this.#dependencies.resultAtoms.getCodeScenarios(input);
   }
 
   /** The targets the window names that the stored agent and prompt lists cannot. */
@@ -478,7 +563,7 @@ export class ScenarioApp {
     startDate: number;
     endDate?: number;
   }): Promise<RunTarget[]> {
-    return this.dependencies.resultAtoms.getRunTargets(input);
+    return this.#dependencies.resultAtoms.getRunTargets(input);
   }
 
   /** Every configuration this project's run plans already ran with, newest first. */
@@ -488,6 +573,6 @@ export class ScenarioApp {
     endDate?: number;
     limit?: number;
   }): Promise<RunConfigurationEntry[]> {
-    return this.dependencies.runConfigurations.getEntries(input);
+    return this.#dependencies.runConfigurations.getEntries(input);
   }
 }

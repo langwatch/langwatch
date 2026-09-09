@@ -1,6 +1,6 @@
 import { ScenarioTargetSelector } from "../scenario-target-selector.tsx";
 import type { TargetValue } from "../../../model/scenario-target.ts";
-import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
+import { agentHasDevTunnel } from "@langwatch/agent-web/agent-client";
 import { useMemo } from "react";
 import { useSession } from "../../../behavior/auth-session.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";

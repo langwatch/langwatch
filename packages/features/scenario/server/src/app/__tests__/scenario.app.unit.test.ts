@@ -12,6 +12,8 @@ import type {
 } from "@langwatch/scenario-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { AgentTestService } from "../../services/agent-test.service.ts";
 
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
@@ -28,6 +30,7 @@ function harness() {
   };
 
   const app = ScenarioApp.create({
+    agentTesting: createApiFixture<AgentTestService>(),
     simulations: simulations as SimulationService,
     // Nothing below is reached: assembling the envelope reads only its
     // argument and the run capability. A reach for any of them throws on the

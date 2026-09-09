@@ -28,6 +28,12 @@ repository or import the adapter.
 
 ## Public surfaces and transports
 
+The server root exposes process composition and services. REST and tRPC
+transports are imported through explicit `@langwatch/scenario-server/api-rest/*`
+and `@langwatch/scenario-server/api-trpc/*` exports, so a worker naming the
+server root does not also load those handlers. The subpaths resolve to the
+same implementation files used by the API process.
+
 This slice owns authored scenario definitions, archive state, names, reference
 classification, input mapping, templating, and the compact configuration read
 required before execution.

@@ -1,7 +1,7 @@
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type {
   RunSecretCiphertext,
@@ -11,8 +11,8 @@ import type {
   ScenarioService,
 } from "@langwatch/scenario-contract";
 import type { SecretService } from "@langwatch/secret-contract";
-import type { SuiteService } from "@langwatch/suite-contract";
-import type { TraceService } from "@langwatch/trace-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
 import { ScenarioExecutionLookupService } from "./scenario-execution-lookup.service.ts";
@@ -44,14 +44,14 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   secretCipher: ScenarioSecretCipherPort;
   config: ScenarioExecutionPrefetchConfig;
   scenarios: ScenarioService;
-  suites: SuiteService;
+  suites: SuiteApi;
   prompts: PromptService;
-  agents: AgentService;
+  agents: AgentApi;
   workflows: WorkflowService;
-  projects: ProjectService;
+  projects: ProjectApi;
   modelProviders: ModelProviderService;
   secrets: SecretService;
-  traces: TraceService;
+  traces: TraceApi;
 };
 
 type DecryptedRunSecrets =

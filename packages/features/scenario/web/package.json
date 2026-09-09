@@ -10,6 +10,11 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./scenario-mappings": {
+      "langwatch-declaration-source": "./src/scenario-mappings.ts",
+      "types": "./dist/scenario-mappings.d.ts",
+      "default": "./src/scenario-mappings.ts"
+    },
     "./surfaces/media-part": {
       "langwatch-declaration-source": "./src/ui/sections/media-part.tsx",
       "types": "./dist/ui/sections/media-part.d.ts",
@@ -48,6 +53,7 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-web": "workspace:*",
     "@langwatch/analytics-web": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
@@ -58,13 +64,11 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/api": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/suite-contract": "workspace:*",
     "@langwatch/suite-web": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
     "@langwatch/ui-host": "workspace:*",

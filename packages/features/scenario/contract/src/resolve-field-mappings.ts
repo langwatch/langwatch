@@ -2,6 +2,21 @@
 
 import type { FieldMapping } from "./field-mapping.ts";
 
+export function hasScenarioInputMapping(mappings: Record<string, FieldMapping>): boolean {
+  return Object.values(mappings).some(
+    (mapping) =>
+      mapping.type === "source" && (mapping.path[0] === "input" || mapping.path[0] === "messages"),
+  );
+}
+
+export function isScenarioMappingValid({
+  mappings,
+}: {
+  mappings: Record<string, FieldMapping>;
+}): boolean {
+  return hasScenarioInputMapping(mappings);
+}
+
 /** The portable part of a scenario runner turn used by input mapping. */
 export type ScenarioInput = {
   messages: ReadonlyArray<{ role: string; content: unknown }>;
@@ -15,23 +30,7 @@ const LEGACY_FIELD_NAMES: Record<string, string> = {
   thread_id: "threadId",
 };
 
-/**
- * Resolves input mappings to the scalar values expected by agent adapters.
- *
- * Source resolution rules:
- * - `sourceId: "scenario"`, `path: ["input"]` — last user message content
- * - `sourceId: "scenario"`, `path: ["messages"]` — full messages array as JSON string
- * - `sourceId: "scenario"`, `path: ["threadId"]` — thread ID, empty string if absent
- * - `sourceId: "scenario"`, `path: ["session"]` — the session the agent last
- *   returned for the thread: a string as it is, any other JSON value as JSON
- *   text, empty string before the first answer
- * - `type: "value"` — the literal value string
- *
- * @param fieldMappings - Map of input identifier → mapping definition
- * @param agentInput - Runtime input provided by the scenario runner
- * @param session - The session held for the thread, when the caller has one
- * @returns Map of input identifier → resolved string value
- */
+/** Resolves scenario turn fields, previous session state and literal values into agent inputs. */
 export function resolveFieldMappings({
   fieldMappings,
   agentInput,

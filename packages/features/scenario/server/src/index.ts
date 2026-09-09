@@ -34,19 +34,8 @@ export * from "./services/scenario-execution.service.ts";
 export * from "./services/scenario-execution-prefetcher.service.ts";
 export {
   AgentTestService,
-  type AgentTestRunResult,
   type AgentTestServiceOptions,
-  type AgentTestTurnResult,
 } from "./services/agent-test.service.ts";
-export {
-  AgentTestOwnershipPort,
-  type AgentTestOwnershipSubject,
-} from "./ports/agent-test-ownership.port.ts";
-export {
-  AgentTestConnectedDispatchPort,
-  type AgentTestConnectedDispatchResult,
-  type AgentTestConnectedInstance,
-} from "./ports/agent-test-connected-dispatch.port.ts";
 export * from "./services/scenario-failure-handler.service.ts";
 export * from "./services/scenario-processor.service.ts";
 export * from "./services/scenario-tab-registry.service.ts";
@@ -136,33 +125,11 @@ export {
   type ResultAtomsClickHouseClient,
 } from "./adapters/result-atoms.clickhouse.adapter.ts";
 export { RunConfigurationsClickHouseAdapter } from "./adapters/run-configurations.clickhouse.adapter.ts";
-export { ScenarioTrpcApi } from "./transport/api-trpc/scenario.api.ts";
-export { filterRunsByTimestamp } from "./transport/api-trpc/scenario-events.api.ts";
-export {
-  simulationTargetSchema,
-  type SimulationTarget,
-} from "./transport/api-trpc/simulation-runner.api.ts";
 export type {
   ScenarioTrpcContext,
   ScenarioTrpcPorts,
   ScenarioTrpcProcedures,
 } from "./rules/scenario-trpc-context.rules.ts";
-export {
-  archiveScenarioSetRuns,
-  createScenarioEventsRestApp,
-  type InlineMediaExtraction,
-} from "./transport/api-rest/scenario-event.api.ts";
-export {
-  createScenarioRunExportRestApp,
-  type ScenarioRunExportPort,
-  type ScenarioRunExportRequestFields,
-  type ScenarioRunExportRestPorts,
-} from "./transport/api-rest/scenario-run-export.api.ts";
-export { createScenariosRestApp } from "./transport/api-rest/scenario.api.ts";
-export {
-  createSimulationRunsRestApp,
-  type ScenarioRunPlatformUrlBuilder,
-} from "./transport/api-rest/simulation-run.api.ts";
 
 // --------------------------------------------------------------------------- The run-history
 // download The keyset sweep behind `POST /api/export/scenario-runs/download`, its two CSV row axes,
@@ -175,13 +142,6 @@ export {
   ScenarioRunExportForbiddenError,
   ScenarioRunExportUnauthenticatedError,
 } from "@langwatch/scenario-contract";
-export {
-  SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
-  SCENARIO_GENERATE_FEATURE_KEY,
-  createScenarioGenerateRestApp,
-  type ScenarioGenerateRestPorts,
-  type ScenarioGenerateRestSession,
-} from "./transport/api-rest/scenario-generate.api.ts";
 export {
   isAbortLikeError,
   nlpgoHandledErrorFrom,

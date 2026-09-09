@@ -11,7 +11,7 @@ import type {
   AuthzService,
   PermissionDecision,
 } from "@langwatch/authz-contract";
-import { AgentNotFoundError, type AgentService } from "@langwatch/agent-contract";
+import { AgentNotFoundError, type AgentApi } from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
@@ -20,13 +20,11 @@ import type { ProjectService } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { TraceService } from "@langwatch/trace-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ApiApplication,
-  MissingAgentService,
-} from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import { createSseSubscriptionApp } from "../../../app-trpc/app-trpc.sse.ts";
 import { sameOriginSseInit } from "../../../app-trpc/__tests__/support/sse-browser-request.ts";
 import { ApiRestSecurity } from "../../../api-rest.security.ts";
@@ -230,7 +228,7 @@ function composeApplication(
     // `getById` answers the feature's own not-found rather than the stub's
     // refusal, because preparing a run against a target that is not there is a
     // real answer the drawer renders.
-    agents: stub<AgentService>("agents", {
+    agents: createApiFixture<AgentApi>({
       getById: async ({ projectId, id }: { projectId: string; id: string }) => {
         throw new AgentNotFoundError(id, projectId);
       },
@@ -282,7 +280,7 @@ function composeApplication(
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({

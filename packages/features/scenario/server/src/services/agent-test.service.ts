@@ -3,10 +3,22 @@
  * agent, through the same live dispatcher a simulation's connected column uses),
  * @see specs/agents/agent-test-run.feature
  */
-import { AgentCallTimeoutError, AgentTestRefusedError } from "@langwatch/agent-contract";
-import type { AgentService, AgentWithFields } from "@langwatch/agent-contract";
+import {
+  AgentCallTimeoutError,
+  AgentTestRefusedError,
+  AgentOwnerOnlyError,
+  connectedAgentSelectability,
+  DEFAULT_CALL_TIMEOUT_MS,
+  MAX_CALL_TIMEOUT_MS,
+} from "@langwatch/agent-contract";
+import type {
+  AgentApi,
+  AgentWithFields,
+  AgentTestRunResult,
+  AgentTestTurnResult,
+} from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import {
@@ -20,13 +32,14 @@ import {
   type RunActor,
   type SimulationService,
   type TargetConfig,
+  type TestAgentRunInput,
+  type TestAgentTurnInput,
 } from "@langwatch/scenario-contract";
 import type { SecretService } from "@langwatch/secret-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 
 import type { AgentAdapterFactoryPort } from "../ports/agent-adapter-factory.port.ts";
-import type { AgentTestConnectedDispatchPort } from "../ports/agent-test-connected-dispatch.port.ts";
-import type { AgentTestOwnershipPort } from "../ports/agent-test-ownership.port.ts";
+import { z } from "zod";
 import {
   AgentTestPrefetchService,
   type AdapterRead,
@@ -37,31 +50,15 @@ import { ScenarioModelParametersService } from "./scenario-model-parameters.serv
 import { ScenarioTargetPrefetchService } from "./scenario-target-prefetch.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 
-/** What one turn answered. */
-export type AgentTestTurnResult = {
-  output: unknown;
-  durationMs: number;
-  instance: { hostname: string; label: string | null } | null;
-};
-
-/** The ids a scheduled test run answers with. */
-export type AgentTestRunResult = {
-  scenarioRunId: string;
-  batchRunId: string;
-  setId: string;
-};
-
 export type AgentTestServiceOptions = {
-  agents: AgentService;
-  projects: ProjectService;
+  agents: AgentApi;
+  projects: ProjectApi;
   workflows: WorkflowService;
   prompts: PromptService;
   secrets: SecretService;
   modelProviders: ModelProviderService;
   simulations: SimulationService;
   config: ScenarioExecutionPrefetchConfig;
-  ownership: AgentTestOwnershipPort;
-  connectedDispatch: AgentTestConnectedDispatchPort;
   /** Builds the adapter that speaks to the agent under test. */
   agentAdapters: AgentAdapterFactoryPort;
   /** The platform's call-budget ceiling every kind of agent answers inside. */
@@ -107,6 +104,11 @@ const NOT_TESTABLE_REASON = "Only HTTP, code, workflow and connected agents can 
 const CONNECTED_RUN_NOT_QUEUEABLE_REASON =
   "Testing a connected agent through a scripted run is not available on this deployment yet";
 
+const connectedCallConfigSchema = z.looseObject({
+  timeoutMs: z.number().int().positive().optional(),
+  sticky: z.boolean().optional(),
+});
+
 /** The targets a test RUN can queue, once a connected one is refused. */
 type QueueableTarget = TargetConfig & { type: "http" | "code" | "workflow" };
 
@@ -143,19 +145,26 @@ export class AgentTestService {
       throw new AgentTestRefusedError({ reason: NOT_TESTABLE_REASON });
     }
 
-    await this.options.ownership.assertRunnable({
-      agents: [
-        {
-          id: input.agent.id,
-          name: input.agent.name,
-          type: input.agent.type,
-          ownerUserId: input.agent.ownerUserId ?? null,
-        },
-      ],
-      actor: input.actor,
-    });
+    const ownerUserId = input.agent.ownerUserId;
+    if (target.type !== "connected" || !ownerUserId) {
+      return target;
+    }
 
-    return target;
+    const { selectable } = connectedAgentSelectability({
+      ownerUserId,
+      viewerUserId: input.actor?.id,
+    });
+    if (selectable) {
+      return target;
+    }
+
+    const owners = await this.options.agents.ownersOf([{ ownerUserId }]);
+    throw new AgentOwnerOnlyError({
+      agentId: input.agent.id,
+      agentName: input.agent.name,
+      ownerUserId,
+      ownerName: owners.get(ownerUserId)?.name ?? null,
+    });
   }
 
   private async readProject(projectId: string): Promise<ProjectRead> {
@@ -187,27 +196,11 @@ export class AgentTestService {
     return result;
   }
 
-  async sendTurn(input: {
-    projectId: string;
-    agent: AgentWithFields;
-    message: string;
-    params?: Record<string, string | number | boolean>;
-    actor: RunActor | undefined;
-  }): Promise<AgentTestTurnResult> {
+  async sendTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {
     const target = await this.resolveTarget(input);
 
     if (target.type === "connected") {
-      const dispatched = await this.options.connectedDispatch.dispatch({
-        projectId: input.projectId,
-        agentId: input.agent.id,
-        agentName: input.agent.name,
-        environment: input.agent.environment ?? null,
-        config: input.agent.config,
-        message: input.message,
-        params: input.params,
-      });
-
-      return dispatched;
+      return this.#sendConnectedTurn(input);
     }
 
     const prefetch = await AgentTestPrefetchService.create().prefetch({
@@ -244,11 +237,37 @@ export class AgentTestService {
     return { output, durationMs: Date.now() - startedAt, instance: null };
   }
 
-  async scheduleRun(input: {
-    projectId: string;
-    agent: AgentWithFields;
-    actor: RunActor | undefined;
-  }): Promise<AgentTestRunResult> {
+  async #sendConnectedTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {
+    const config = connectedCallConfigSchema.parse(input.agent.config ?? {});
+    const messages = [{ role: "user" as const, content: input.message }];
+    const dispatched = await this.options.agents.callConnected({
+      projectId: input.projectId,
+      agent: {
+        id: input.agent.id,
+        name: input.agent.name,
+        environment: input.agent.environment ?? null,
+        timeoutMs: Math.min(config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
+        isSticky: config.sticky ?? false,
+      },
+      call: {
+        threadId: crypto.randomUUID(),
+        messages,
+        newMessages: messages,
+        params: input.params ?? {},
+        session: void 0,
+        traceparent: null,
+        run: {},
+      },
+    });
+
+    return {
+      output: dispatched.output,
+      durationMs: dispatched.durationMs,
+      instance: { hostname: dispatched.instance.hostname, label: dispatched.instance.label },
+    };
+  }
+
+  async scheduleRun(input: TestAgentRunInput): Promise<AgentTestRunResult> {
     const target = await this.resolveTarget(input);
     if (target.type === "connected") {
       throw new AgentTestRefusedError({ reason: CONNECTED_RUN_NOT_QUEUEABLE_REASON });

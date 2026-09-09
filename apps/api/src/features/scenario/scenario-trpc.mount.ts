@@ -6,11 +6,8 @@
  * fire-and-forget process side effects a created scenario triggers.
  */
 import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
-import {
-  ScenarioTrpcApi,
-  type ScenarioTrpcContext,
-  type ScenarioTrpcPorts,
-} from "@langwatch/scenario-server";
+import { ScenarioTrpcApi } from "@langwatch/scenario-server/api-trpc/scenario";
+import { type ScenarioTrpcContext, type ScenarioTrpcPorts } from "@langwatch/scenario-server";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /** Mounts `scenarios.*` on the app process's tRPC root. */

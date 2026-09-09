@@ -1,11 +1,11 @@
-import { AgentNotFoundError, type Agent, type AgentService } from "@langwatch/agent-contract";
+import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import {
   ModelProviderInvalidError,
   ModelProviderNotFoundError,
   type ModelProvider,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
-import { projectSchema, type ProjectService } from "@langwatch/project-contract";
+import { projectSchema, type ProjectApi } from "@langwatch/project-contract";
 import { versionedPromptSchema, type PromptService } from "@langwatch/prompt-contract";
 import {
   type LiteLLMParams,
@@ -13,8 +13,9 @@ import {
   type ScenarioService,
 } from "@langwatch/scenario-contract";
 import type { SecretService } from "@langwatch/secret-contract";
-import { suiteSchema, type SuiteService } from "@langwatch/suite-contract";
-import type { TraceService } from "@langwatch/trace-contract";
+import { suiteSchema, type SuiteApi } from "@langwatch/suite-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   workflowDslSchema,
   workflowSchema,
@@ -185,30 +186,34 @@ function scenarioService(deps: ScenarioPrefetchFixture): ScenarioService {
   });
 }
 
-function suiteService(deps: ScenarioPrefetchFixture): SuiteService {
-  return fakeService<SuiteService>({
-    tryGet: async (input) => {
-      const value = await deps.suiteConfigFetcher.getBySetId(input.id, input.projectId);
-      if (!value) return null;
+function suiteService(deps: ScenarioPrefetchFixture): SuiteApi {
+  return createApiFixture<SuiteApi>({
+    listByIds: async (input) => {
+      const [id] = input.ids;
+      if (!id) return [];
+      const value = await deps.suiteConfigFetcher.getBySetId(id, input.projectId);
+      if (!value) return [];
       const now = new Date(0);
-      return suiteSchema.parse({
-        id: input.id,
-        projectId: input.projectId,
-        name: "Test suite",
-        slug: "test-suite",
-        description: null,
-        scenarioIds: [],
-        targets: value.targets ?? [],
-        repeatCount: 1,
-        labels: [],
-        simulatorModel: value.simulatorModel,
-        judgeModel: value.judgeModel,
-        kind: "run_plan",
-        scope: null,
-        archivedAt: null,
-        createdAt: now,
-        updatedAt: now,
-      });
+      return [
+        suiteSchema.parse({
+          id,
+          projectId: input.projectId,
+          name: "Test suite",
+          slug: "test-suite",
+          description: null,
+          scenarioIds: [],
+          targets: value.targets ?? [],
+          repeatCount: 1,
+          labels: [],
+          simulatorModel: value.simulatorModel,
+          judgeModel: value.judgeModel,
+          kind: "run_plan",
+          scope: null,
+          archivedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      ];
     },
   });
 }
@@ -245,8 +250,8 @@ function promptService(deps: ScenarioPrefetchFixture): PromptService {
   });
 }
 
-function agentService(deps: ScenarioPrefetchFixture): AgentService {
-  return fakeService<AgentService>({
+function agentService(deps: ScenarioPrefetchFixture): AgentApi {
+  return createApiFixture<AgentApi>({
     getById: async (input) => {
       const value = await deps.agentFetcher.findById(input);
       if (!value) throw new AgentNotFoundError(input.id);
@@ -311,8 +316,8 @@ function workflowService(deps: ScenarioPrefetchFixture): WorkflowService {
   });
 }
 
-function projectService(deps: ScenarioPrefetchFixture): ProjectService {
-  return fakeService<ProjectService>({
+function projectService(deps: ScenarioPrefetchFixture): ProjectApi {
+  return createApiFixture<ProjectApi>({
     tryGetById: async (projectId) => {
       const value = await deps.projectFetcher.findUnique(projectId);
       if (!value) return null;
@@ -422,7 +427,7 @@ export function createTestScenarioExecutionPrefetcherService(
     secrets: fakeService<SecretService>({
       getValues: ({ projectId }) => deps.projectSecretsFetcher.getSecrets(projectId),
     }),
-    traces: fakeService<TraceService>({
+    traces: createApiFixture<TraceApi>({
       resolveIngestWaitTimeout: (input) =>
         deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs(input),
     }),

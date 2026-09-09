@@ -5,6 +5,7 @@
  * standalone-adapters.ts and scenario-worker.ts.
  */
 
+import type { LanguageModelV3 } from "@ai-sdk/provider";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { defaultSettingsMiddleware, wrapLanguageModel } from "ai";
 import type { LiteLLMParams } from "@langwatch/scenario-contract";
@@ -157,7 +158,7 @@ export class LitellmModelAdapter {
 
   private constructor() {}
 
-  static createModel(input: CreateModelFromParamsInput) {
+  static createModel(input: CreateModelFromParamsInput): LanguageModelV3 {
     const { litellmParams, nlpServiceUrl } = input;
     const providerKey = litellmParams.model.split("/")[0] || undefined;
     const headers = Object.fromEntries(
@@ -185,7 +186,7 @@ export class LitellmModelAdapter {
    * explicit future JudgeAgent option still wins rather than being silently
    * rewritten.
    */
-  static createJudgeModel(input: CreateModelFromParamsInput) {
+  static createJudgeModel(input: CreateModelFromParamsInput): LanguageModelV3 {
     const model = LitellmModelAdapter.createModel(input);
     if (!JUDGE_MODELS_REQUIRING_DISABLED_REASONING.has(input.litellmParams.model)) {
       return model;

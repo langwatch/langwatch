@@ -10,6 +10,7 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
+    { "path": "../../agent/contract/tsconfig.build.json" },
     {
       "path": "tsconfig.build.json"
     },

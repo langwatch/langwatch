@@ -3,12 +3,8 @@
  * @vitest-environment node
  * @see specs/agents/agent-test-run.feature
  */
-import {
-  AgentOwnerOnlyError,
-  type AgentService,
-  type AgentWithFields,
-} from "@langwatch/agent-contract";
-import type { AgentTestOwnershipPort } from "../ports/agent-test-ownership.port.ts";
+import { type AgentApi, type AgentWithFields } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { AGENT_TEST_SCENARIO_ID } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentTestService } from "../services/agent-test.service.ts";
@@ -58,32 +54,19 @@ function httpAgent(overrides: Partial<AgentWithFields> = {}): AgentWithFields {
   } as AgentWithFields;
 }
 
-function fakeAgents(namesById: Record<string, string> = {}): AgentService {
-  return {
+function fakeAgents(namesById: Record<string, string> = {}): AgentApi {
+  return createApiFixture<AgentApi>({
     getNamesByIds: vi
-      .fn()
+      .fn<AgentApi["getNamesByIds"]>()
       .mockResolvedValue(Object.entries(namesById).map(([id, name]) => ({ id, name }))),
-  } as unknown as AgentService;
-}
-
-function fakeOwnership(namesById: Record<string, string>): AgentTestOwnershipPort {
-  return {
-    assertRunnable: async ({ agents, actor }) => {
-      const foreign = agents.find(
-        (agent) =>
-          agent.type === "connected" &&
-          agent.ownerUserId != null &&
-          agent.ownerUserId !== actor?.id,
-      );
-      if (!foreign?.ownerUserId) return;
-      throw new AgentOwnerOnlyError({
-        agentId: foreign.id,
-        agentName: foreign.name,
-        ownerUserId: foreign.ownerUserId,
-        ownerName: namesById[foreign.ownerUserId] ?? null,
-      });
-    },
-  };
+    ownersOf: async () =>
+      new Map(Object.entries(namesById).map(([userId, name]) => [userId, { userId, name }])),
+    callConnected: vi.fn<AgentApi["callConnected"]>().mockResolvedValue({
+      output: "answer",
+      durationMs: 1,
+      instance: { instanceId: "instance_1", hostname: "host", label: null },
+    }),
+  });
 }
 
 function serviceFor(options: {
@@ -91,22 +74,15 @@ function serviceFor(options: {
   namesById?: Record<string, string>;
 }) {
   const queueRun = options.queueRun ?? vi.fn().mockResolvedValue(undefined);
+  const agents = fakeAgents(options.namesById);
   const service = AgentTestService.create({
-    agents: fakeAgents(options.namesById),
+    agents,
     projects: { tryGetById: vi.fn().mockResolvedValue(null) } as never,
     workflows: {} as never,
     prompts: {} as never,
     secrets: {} as never,
     modelProviders: {} as never,
-    ownership: fakeOwnership(options.namesById ?? {}),
     agentAdapters: { build: (...args: never[]) => buildAdapter(...args) } as never,
-    connectedDispatch: {
-      dispatch: vi.fn().mockResolvedValue({
-        output: {},
-        durationMs: 1,
-        instance: { hostname: "host", label: null },
-      }),
-    } as never,
     simulations: { queueRun } as never,
     config: {
       langwatchEndpoint: "http://app:5560",
@@ -115,7 +91,7 @@ function serviceFor(options: {
     },
     maxCallTimeoutMs: 300_000,
   });
-  return { service, queueRun };
+  return { service, queueRun, agents };
 }
 
 const actor = { id: "user_1", label: "user" as const };
@@ -130,6 +106,31 @@ beforeEach(() => {
 });
 
 describe("AgentTestService.sendTurn", () => {
+  it("dispatches connected tests through the composed Agent API with the capped call budget", async () => {
+    const { service, agents } = serviceFor({});
+    const result = await service.sendTurn({
+      projectId: "proj_1",
+      agent: httpAgent({ type: "connected", config: { timeoutMs: 999_999, sticky: true } }),
+      actor,
+      message: "hello",
+      params: { region: "eu" },
+    });
+
+    expect(agents.callConnected).toHaveBeenCalledWith({
+      projectId: "proj_1",
+      agent: expect.objectContaining({ timeoutMs: 300_000, isSticky: true }),
+      call: expect.objectContaining({
+        messages: [{ role: "user", content: "hello" }],
+        newMessages: [{ role: "user", content: "hello" }],
+        params: { region: "eu" },
+      }),
+    });
+    expect(result).toEqual({
+      output: "answer",
+      durationMs: 1,
+      instance: { hostname: "host", label: null },
+    });
+  });
   describe("given an HTTP agent that never answers", () => {
     /** @scenario "A turn that outlives the call deadline is failed" */
     it("fails with agent_call_timeout at the platform cap", async () => {

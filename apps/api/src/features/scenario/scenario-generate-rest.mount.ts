@@ -6,7 +6,7 @@ import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import {
   SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS,
   createScenarioGenerateRestApp,
-} from "@langwatch/scenario-server";
+} from "@langwatch/scenario-server/api-rest/scenario-generate";
 
 import type { ApiAuthoringModelResolver } from "../../app/api-authoring-model.composition.ts";
 import type {

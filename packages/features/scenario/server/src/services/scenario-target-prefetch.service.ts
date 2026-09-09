@@ -1,4 +1,4 @@
-import { AgentNotFoundError, type Agent, type AgentService } from "@langwatch/agent-contract";
+import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import { FieldMappingSchema } from "@langwatch/scenario-contract";
 import type { SecretService } from "@langwatch/secret-contract";
@@ -28,7 +28,7 @@ type HydrationFailure = {
 export class ScenarioTargetPrefetchService {
   static create(options: {
     prompts: PromptService;
-    agents: AgentService;
+    agents: AgentApi;
     workflows: WorkflowService;
     secrets: SecretService;
     workflowHydrator: ScenarioWorkflowHydratorService;
@@ -40,7 +40,7 @@ export class ScenarioTargetPrefetchService {
   private constructor(
     private readonly options: {
       prompts: PromptService;
-      agents: AgentService;
+      agents: AgentApi;
       workflows: WorkflowService;
       secrets: SecretService;
       workflowHydrator: ScenarioWorkflowHydratorService;

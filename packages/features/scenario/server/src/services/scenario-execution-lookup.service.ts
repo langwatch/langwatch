@@ -1,5 +1,5 @@
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import {
   mergeRunParameters,
   parseScenarioParameterDefinitions,
@@ -9,7 +9,7 @@ import {
   type ScenarioService,
   withoutParameterNames,
 } from "@langwatch/scenario-contract";
-import { tryExtractSuiteId, type Suite, type SuiteService } from "@langwatch/suite-contract";
+import { tryExtractSuiteId, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 
 import type { ScenarioConfig } from "@langwatch/scenario-contract";
 
@@ -20,8 +20,8 @@ type FetchProjectResult =
 export class ScenarioExecutionLookupService {
   static create(options: {
     scenarios: ScenarioService;
-    projects: ProjectService;
-    suites: SuiteService;
+    projects: ProjectApi;
+    suites: SuiteApi;
     modelProviders: ModelProviderService;
   }): ScenarioExecutionLookupService {
     return new ScenarioExecutionLookupService(options);
@@ -30,8 +30,8 @@ export class ScenarioExecutionLookupService {
   private constructor(
     private readonly options: {
       scenarios: ScenarioService;
-      projects: ProjectService;
-      suites: SuiteService;
+      projects: ProjectApi;
+      suites: SuiteApi;
       modelProviders: ModelProviderService;
     },
   ) {}
@@ -129,7 +129,9 @@ export class ScenarioExecutionLookupService {
       return null;
     }
 
-    return this.options.suites.tryGet({ id: suiteId, projectId });
+    const [suite] = await this.options.suites.listByIds({ ids: [suiteId], projectId });
+
+    return suite ?? null;
   }
 
   async resolveModel({

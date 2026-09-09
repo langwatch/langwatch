@@ -1,21 +1,6 @@
-/**
- * What a scenario run is actually going to execute.
- *
- * The run happens in a child process with no database access, so everything
- * the target needs has to be resolved and packed here: the prompt or agent
- * configuration, and every secret its url, headers or code will reference.
- * A gap left here becomes a failure inside the sandbox, where the reason is
- * much harder to see.
- *
- * Two rules carry the most weight. A target that no longer exists answers
- * `null` rather than throwing, so the run reports that its target is gone
- * instead of crashing the prefetch for every other target in the batch. And
- * the run's own secret values win over the project's, because that override
- * is the whole point of passing them.
- */
-
 import { describe, expect, it } from "vitest";
-import { AgentNotFoundError, type Agent, type AgentService } from "@langwatch/agent-contract";
+import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SecretService } from "@langwatch/secret-contract";
 import { WorkflowNotFoundError, type WorkflowService } from "@langwatch/workflow-contract";
@@ -38,7 +23,7 @@ function serviceAnswering(answers: Answers = {}) {
     tryGetPromptByIdOrHandle: async () => answers.prompt ?? null,
   } as unknown as PromptService;
 
-  const agents = {
+  const agents = createApiFixture<AgentApi>({
     getById: async () => {
       if (answers.agent === "down") throw new Error("agent service unreachable");
       if (answers.agent === undefined || answers.agent === "missing") {
@@ -47,7 +32,7 @@ function serviceAnswering(answers: Answers = {}) {
 
       return answers.agent;
     },
-  } as unknown as AgentService;
+  });
 
   const workflows = {
     getById: async () => {

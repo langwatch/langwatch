@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -16,13 +16,13 @@ const logger = createLogger("langwatch:scenarios:failure-handler");
 export class ScenarioFailureHandlerService {
   private constructor(
     private readonly options: {
-      agents: AgentService;
+      agents: AgentApi;
       simulations: SimulationService;
     },
   ) {}
 
   static create(input: {
-    agents: AgentService;
+    agents: AgentApi;
     simulations: SimulationService;
   }): ScenarioFailureHandlerService {
     return new ScenarioFailureHandlerService(input);

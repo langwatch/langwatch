@@ -22,6 +22,8 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@ag-ui/core": "~0.0.57",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

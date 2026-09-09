@@ -6,7 +6,7 @@
 
 import { Box, chakra, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
-import { agentHasDevTunnel } from "@langwatch/agent-web/surfaces/browser-port";
+import { agentHasDevTunnel } from "@langwatch/agent-web/agent-client";
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
 import {
   DIALOG_FIELD_STYLE,

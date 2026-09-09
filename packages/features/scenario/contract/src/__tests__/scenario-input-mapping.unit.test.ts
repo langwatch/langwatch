@@ -3,8 +3,8 @@
  * @see specs/features/scenarios/minimal-input-mapping.feature
  */
 import { describe, expect, it } from "vitest";
-import type { FieldMapping } from "@langwatch/prompt-web/surfaces/variables";
-import { isScenarioMappingValid } from "../scenario-input-mapping-section.tsx";
+import type { FieldMapping } from "../field-mapping.ts";
+import { isScenarioMappingValid } from "../resolve-field-mappings.ts";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 

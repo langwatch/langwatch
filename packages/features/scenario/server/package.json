@@ -45,7 +45,8 @@
       "default": "./src/adapters/simulation-processing-producer.adapter.ts"
     },
     "./composition/stalled-runs-backfill": {
-      "types": "./dist/tasks/stalled-runs-backfill.task.d.ts"
+      "types": "./dist/tasks/stalled-runs-backfill.task.d.ts",
+      "default": "./src/tasks/stalled-runs-backfill.task.ts"
     },
     "./api-trpc/scenario": {
       "types": "./dist/transport/api-trpc/scenario.api.d.ts",
@@ -77,8 +78,7 @@
     },
     "./api-rest/scenario-generate": {
       "types": "./dist/transport/api-rest/scenario-generate.api.d.ts",
-      "default": "./src/transport/api-rest/scenario-generate.api.ts",
-      "default": "./src/tasks/stalled-runs-backfill.task.ts"
+      "default": "./src/transport/api-rest/scenario-generate.api.ts"
     }
   },
   "scripts": {
@@ -89,6 +89,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.55",
+    "@ai-sdk/provider": "^3.0.13",
     "@clickhouse/client": "^1.23.0",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
