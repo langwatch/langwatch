@@ -12,9 +12,13 @@ package, or `pnpm typecheck:all` for the full workspace.
 `typecheck:one` delegates to the package's own script, including declaration
 preparation; package names use pnpm's native filter.
 
-`pnpm install` removes the old automatic compiler and linter shims without
-replacing fresh pnpm launchers. Existing checkouts can run
+Install admission hooks per worktree with
+`haven setup gate-hook codex-gate-hook` for Claude and Codex respectively.
+Codex project hooks require a trusted project and review through `/hooks`.
+`pnpm install` removes old automatic compiler/linter shims without replacing
+fresh pnpm launchers. Existing checkouts can run
 `node dev/scripts/install-check-shims.mjs --remove` immediately.
+Use `haven slot run -- pnpm typecheck` for explicit terminal queueing.
 
 For local iteration, use `pnpm typecheck:fast`, or select applications with
 `pnpm typecheck:fast worker ui`. This checks production entrypoints through
@@ -94,6 +98,20 @@ declaration solution still resolve to source. Adding a
 package requires a passing declaration build and consumer check; setting
 `composite` alone does not establish that boundary. See
 [TypeScript project references](https://www.typescriptlang.org/docs/handbook/project-references).
+
+For large Zod schemas, prefer object-shape spreads over long `.extend()` chains
+when their parsing semantics match. Preserve unknown-key handling, catchalls,
+refinements, defaults, and distinct input/output types. Zod documents the
+[typechecking cost of chained extensions](https://zod.dev/api#extend).
+The `langwatch/zod-object-composition` rule reports `.extend()` and `.merge()`
+on statically resolved Zod objects, including local aliases and workspace
+imports. Use `.safeExtend()` when refinements or assignability checks must be
+retained. The rule offers no automatic fix because object strictness and
+catchalls must be preserved. Opaque factories are outside its static analysis.
+Compiling a runtime validator does not simplify its inferred TypeScript types.
+Declaration emission can avoid rechecking schema construction in consumers,
+but emitted declarations may still expose large Zod generics; benchmark the
+consumer as well as the declaration build before adopting this boundary.
 
 Capture a cold worker trace with
 `pnpm typecheck worker --incremental false --generateTrace /tmp/langwatch-worker-trace`.

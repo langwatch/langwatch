@@ -642,7 +642,7 @@ this outright: an unhandled cause must degrade to a generic message plus a trace
 | file:line                                                           | surface                                                                                                |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `workflow/.../api-rest/workflow-studio.api.ts:168, 207, 212`        | `/code-completion`, `/post_event` (`:207` also returns `error.cause` verbatim)                         |
-| `annotation/.../api-rest/annotation.api.ts:162,194,219,279,313,396` | every annotation REST route                                                                            |
+| `annotation/.../transport/annotation.rest.ts:162,194,219,279,313,396` | every annotation REST route                                                                            |
 | `evaluation/.../api-rest/evaluations-legacy.api.ts:551`             | `POST /api/evaluations/batch/log_results`                                                              |
 | `experiment/.../api-rest/experiment-dspy-steps.api.ts:218`          | `POST /api/dspy/log_steps`                                                                             |
 | `scenario/.../api-rest/scenario-generate.api.ts:204-208`            | `POST /api/scenario/generate`                                                                          |

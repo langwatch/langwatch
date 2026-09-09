@@ -1123,7 +1123,7 @@ Three have no pagination parameters whatsoever and read tables that grow with us
   `include: { author: true }` returns the entire `User` row per version rather than the `{ id, name }`
   select its sibling repository uses.
 - `GET /api/annotations` —
-  `packages/features/annotation/server/src/transport/api-rest/annotation.api.ts:141, 150-153`;
+  `packages/features/annotation/server/src/transport/annotation.rest.ts:141, 150-153`;
   `prisma.annotation.repository.ts:206-220`, no `take`. The repository input schema _supports_
   `startDate` / `endDate` / `traceIds` and the route passes none of them, so it is the widest possible
   call into a method built to be narrowed.

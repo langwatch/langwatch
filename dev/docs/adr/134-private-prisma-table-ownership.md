@@ -101,6 +101,15 @@ unless an exact, reviewed migration exception permits them. An exception names
 the repository, relation/operation, reason and removal condition. It does not
 make a second owner or permit arbitrary access to the target table.
 
+Historical cross-table repairs are framework `SystemMigration` implementations,
+not ordinary feature capabilities. Their private `*-migration.repository.ts`
+may receive `scopedPrismaClient` with literal model names matching its declared
+tuple. The ownership lint resolves callers and permits construction only into
+the owning feature's imported `SystemMigration` implementation. Repository
+exports, ordinary App callers, factory aliases and computed scopes are rejected.
+The audit identifier repair reads Agent candidates and patches AuditLog through
+this bounded exception; remove it after pre-fix history has been repaired.
+
 Keep coherent child tables together where they belong to the same feature.
 Do not drop relations as part of this initial migration. The schema uses
 Prisma 7's `relationMode = "prisma"`; removing a relation can remove integrity

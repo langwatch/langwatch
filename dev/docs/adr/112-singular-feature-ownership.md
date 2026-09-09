@@ -205,8 +205,10 @@ SaaS deployment selection is distinct from an Enterprise entitlement check,
 but that activation distinction does not relicense the implementation source.
 
 The Enterprise feature catalogue consequently contains only genuinely
-Enterprise-owned domains: `audit-log`, `billing`, `governance`, `licensing`,
-`managed-provider`, `saas`, `scim`, `sso`, and `webhook`. Enterprise
+Enterprise-owned domains: `billing`, `governance`, `licensing`,
+`managed-provider`, `saas`, `scim`, and `sso`. [ADR-134](./134-private-prisma-table-ownership.md)
+moves shared AuditLog persistence and outbound Webhook capability to core;
+Enterprise consumers retain their existing product gates. Enterprise
 composition may consume core contracts and install compatible Enterprise
 extensions, but the portable Enterprise catalogue does not claim `ops`.
 

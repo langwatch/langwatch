@@ -105,7 +105,44 @@ Services that were never started receive no stop call. Allocations made during
 construction therefore use `resources.own(name, close)` separately; those
 allocations are released even if boot fails or the runtime stops before start.
 
+The API bootstrap applies the same lifecycle to services registered by existing
+composition adapters. It seals registrations after composition, awaits service
+readiness before opening the listener, and drains services before telemetry and
+infrastructure close. This bridge preserves startup order while process roots
+move to feature installers; it does not constitute installer adoption.
+
 ### Accepted app factory shape
+
+The app owns public use cases and orchestration across its private entity
+services and peer APIs. Entity services own mapping, repository operations and
+entity errors. User enrichment and workflows involving multiple owners belong
+in the app, including when a feature has only one entity service. Internal
+policy helpers are private app methods, not additional public API operations.
+
+Repository interfaces and implementations remain separate files. A feature may
+register complete backend factories with
+`defineRepositories({ postgres: PostgresRepositories, memory: MemoryRepositories })`
+and select them with `.withRepositories(registry).withApp(App)`. A repository
+factory contains construction only, allowing related memory repositories to
+share one instance of their database. It does not combine their queries into
+one repository. Tests can replace one repository in the returned object.
+
+The process selects a backend once with `.withPersistence(...)`. Boot validates
+the selected factories and their declared infrastructure before construction;
+it never silently falls back to memory. Repository-aware app factories receive
+`repositories`, declared peer dependencies, config and resource ownership,
+without a raw infrastructure property. Services receive repository interfaces.
+Postgres and memory follow the same observable repository behavior and each
+installation receives fresh memory state.
+
+Contracts contain the callable app API, REST/tRPC input and output schemas,
+portable errors and values used by those public surfaces. Persistence records,
+internal commands and intermediate query structures remain server-private.
+Filenames name their actual role: public schema files use `.schemas.ts`, API
+interfaces use `.api.ts`, and concrete repositories use `.repository.ts`.
+App and service operation names use RPC verbs: `get` for a known record,
+`getMany` for known IDs, `list` for queries, and `create`, `update` and `delete`
+for the corresponding mutations. Feature naming remains unchanged.
 
 The portable contract exports a `<Feature>Api` interface from
 `contract/src/<feature>.api.ts`. It contains only callable public use cases;
@@ -233,13 +270,40 @@ and process adapters. Feature declarations cannot construct or replace the
 trusted policy binding. Human, project-key and service identities retain their
 actual principal kind and existing credential ceilings.
 
+Handlers are inline in the fluent endpoint declaration, beside the verb, path,
+permission and input/output schemas. Types are inferred there; detached handler
+factories and repeated signature annotations obscure the boundary. Ordinary
+handlers return a JSON object, a JSON array, or `void` (including `Promise<void>`),
+or throw a concrete error. No-content is `void`, never a `NO_CONTENT` sentinel.
+The framework owns serialization, status, headers and error mapping. A handler
+cannot return `Response`, call response methods through its app, or produce text.
+Text, SSE, downloads and other special protocols require explicit framework
+integrations; they do not widen the ordinary handler interface.
+
+Middleware may declare additional output schemas. The framework parses each
+middleware result and supplies its inferred value as an additional trailing
+handler argument, in declaration order. The first argument remains
+`{ input, app, actor, scope, signal }`; middleware never merges facts into `input`
+or adds hidden properties to it. Header-dependent authentication, SCIM bearer
+credentials and webhook signatures belong in middleware. It supplies validated
+semantic facts, never raw headers, credentials, request/response objects or
+aliases of them. A handler cannot recover these through its input or app.
+Invalid middleware output prevents handler invocation; middleware facts cannot
+silently replace the framework's authenticated principal or authorized target.
+
 Input and output schemas are mandatory, including empty-input and no-content
-operations. Handlers return the input type of the output schema; the framework
-parses and emits its output type, including transforms and removed fields.
-Validation cannot be disabled. Streaming protocols validate each item before
-emitting it; downloads and other non-JSON responses need explicit framework
-contracts. Legacy raw registration paths remain visible migration debt until
-all callers move; they are not alternative authoring APIs.
+operations. Type checking rejects handler returns incompatible with the output
+schema, including values returned to a void declaration. Valid output is parsed
+and emitted with its declared transforms and field removal. If an unexpected
+runtime value fails output validation, the framework logs the validation error
+and endpoint/request metadata, then sends the original value with the declared
+status. Output mismatch alone never becomes a 500 or suppresses the response.
+This applies equally to REST and tRPC. Logs contain safe issue details, never the
+response content, rejected values, raw error messages, or dynamic record keys
+that disclose content. Input parsing, authentication, authorization and explicit
+security redaction remain enforced; output diagnostics are not their substitute.
+Legacy raw registration paths remain visible migration debt until all callers
+move; they are not alternative authoring APIs.
 
 Domain orchestration and collaborators belong behind app services. Conditional
 secondary permission decisions are declared policy results, preserving behavior
@@ -544,7 +608,7 @@ violations.
 | **Inject complete contracts.** No callback bags, service locators, `Pick`/`Omit` service views, mirrored signatures, or foreign repositories. | oxlint (`service-dependencies`) |
 | **Keep boundaries typed.** Zod validates transport, persistence and process inputs. No `any`, double assertions, suppression comments, or assertions standing in for validation. | oxlint (`typed-prisma-seam`, `no-inferable-twin` proposed), focused typechecks |
 | **Keep infrastructure private.** Generated Prisma stays inside repository adapters; roots parse the environment once and inject semantic configuration. | oxlint (`prisma-containment`, `environment-boundaries`), architecture-lint (`typed-prisma-seam`) |
-| **Keep methods predictable.** Return a value or throw a concrete domain error. Absence is `find*` returning `null`. `require*` is forbidden. | oxlint (`fallible-result-naming`) — **the rule still enforces the OLD `try*` convention** (`packages/lint-core/src/rules/fallible-result-naming.rule.mjs:72`). Alex ruled on 2026-09-06 that `try*` is banned and absence is `find*`; the rename is in progress across 678 declarations in the rule's scope, and the rule flips to `find*` when it lands |
+| **Keep methods predictable.** Required operations return a value or throw a concrete domain error. Normal absence belongs to explicitly named `find*` methods returning `null` or `undefined`. `try*` and `require*` are forbidden. | oxlint (`fallible-result-naming`); legacy declarations remain migration work and are not a precedent for new code |
 | **Keep composition declarative.** No SQL, authorization decision, business mapping, transaction, or request handling inside a composition module. | architecture-lint (`no-domain-query-in-composition`, proposed) |
 | **Keep authorization consistent.** Preserve the credential principal, check the target being accessed, share policy between transports. | oxlint (`api-context-services`), architecture-lint (`api-transport-boundaries`), policy-parity test (proposed) |
 | **Keep source readable.** Lower-kebab filenames with dotted roles, small cohesive collaborators, braces, named intermediate values, short comments explaining durable constraints. | oxfmt, oxlint (`feature-source-filename`, `service-member-spacing`, `comment-block-size`), architecture-lint (`service-ceilings`, `comment-blocks`) |

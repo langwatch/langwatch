@@ -38,6 +38,21 @@ There is a related cost the spawn cap prices better than RAM does: a cache entry
 
 A user-level registration would cover every session on the machine in one write, and that is exactly why it is not what ships: the hook changes how a _different_ tool behaves, and haven does not get to assume that for every checkout a developer opens. `haven setup gate-hook` installs it into the worktree's own `.claude/settings.local.json`; `haven up` installs nothing. The cost is that governance is only where it was asked for — a worktree nobody ran `setup` in is ungoverned, and that is the developer's call to make rather than haven's.
 
+`haven setup codex-gate-hook` installs the same admission gate in the worktree's
+gitignored `.codex/hooks.json`. Codex's `Bash` hook also covers `exec_command`.
+The Codex protocol adapter omits neutral decisions and rewrites only `command`,
+preserving Codex's execution settings. Installation merges existing hooks and
+leaves feature flags unchanged. Hooks are enabled by default, but project-local
+hooks need a trusted project and review through `/hooks` before they run, per
+[the official Codex hooks documentation](https://learn.chatgpt.com/docs/hooks).
+
+Every admitted heavy command, including one finding the machine idle, runs
+through `haven run`. It uses the `checks` flock semaphore and capacity resolver
+shared with `haven slot run` and `haven typecheck`; the heavy-run ledger is
+telemetry, not a second queue. Admission samples pressure once, preserves the
+caller wait ceiling and cancellation, and applies no new compiler resource cap.
+Existing Haven queue commands are not wrapped again.
+
 **It reaches past `PreToolUse`, and the Decision names where.** `PreToolUse` is what ships and all `haven setup gate-hook` installs: admission and the command-shaped cost checks. The rest is the phase-2 surface, named here so each check has an event that could observe it rather than being specced against nothing — settings and instruction changes that arrive without a tool call (`ConfigChange`, `InstructionsLoaded`), turn-shaped observations (`PostToolBatch`, `Stop`) and sub-agent accounting (`SubagentStart`, `SubagentStop`). Every scenario needing one of those is parked `@unimplemented` in `specs/claude/llm-cost-safety.feature`, and they arrive with the telemetry that tells us which of the checks are worth building.
 
 **It classifies narrowly and defers by default** — vitest, tsgo, biome, `next build`, `go build`, `docker build` are heavy; everything else returns `defer` after reading one cached file.

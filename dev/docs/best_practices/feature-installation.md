@@ -1,5 +1,19 @@
 # Installing a feature into an app
 
+## Feature app contract
+
+New `serverFeature` installers follow [ADR-133](../adr/133-composition-spec.md):
+setup returns the feature's public app and `.provides(FeatureApp)` publishes that
+same object. The abstract contract app has readonly service members; it owns no
+behaviour. Services are not also registered individually. Keep transport-only
+assembly in named adapters outside the app, so workers and tasks need no API
+collaborators. Cross-feature dependencies name the owning app contract as each
+feature migrates. Existing service tokens supplied by process roots are the
+explicit bridge for features still composed manually.
+
+The transport mounting mechanisms below remain in use during that cutover.
+They must preserve route discovery without constructing live services.
+
 A feature package owns its behaviour — services, repositories, adapters,
 transports (see `service-repository-adapter-port.md`). This doc covers the
 other half: how a process comes to SERVE that feature. The rule is one
