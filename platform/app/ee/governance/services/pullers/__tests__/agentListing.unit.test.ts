@@ -343,6 +343,34 @@ describe("listGenieAgents", () => {
     });
   });
 
+  describe("given the workspace holds more spaces than the walk could read", () => {
+    it("refuses rather than present the pages it managed as the inventory", async () => {
+      // Every page hands back a fresh token, so the walk is cut short by its
+      // own page bound rather than by reaching the end.
+      let token = 0;
+      fetchMock.mockImplementation(() => {
+        token += 1;
+        return Promise.resolve(
+          reply({
+            ok: true,
+            status: 200,
+            body: {
+              spaces: [{ space_id: `space-${token}`, title: `Space ${token}` }],
+              next_page_token: `tok-${token}`,
+            },
+          }),
+        );
+      });
+
+      const listing = await listGenieAgents({ workspaceUrl, token: "t" });
+
+      expect(listing).toEqual({
+        outcome: "refused",
+        refusal: { reason: "unavailable", status: null },
+      });
+    });
+  });
+
   describe("given the workspace enumerates no spaces", () => {
     it("reports an empty workspace", async () => {
       fetchMock.mockResolvedValueOnce(
