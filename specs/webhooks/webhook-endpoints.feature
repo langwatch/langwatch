@@ -1,10 +1,12 @@
 Feature: Webhook endpoints, signed outbound event delivery
   Stripe-shaped webhook platform: an organization registers endpoints with
   per-endpoint event subscriptions, and the platform delivers signed,
-  batched, versioned envelopes with a multi-day retry ladder, a visible
+  batched, versioned envelopes with a day-long retry ladder, a visible
   per-attempt delivery log carrying the receiver's own status codes, and
   automatic disabling of endpoints that fail for three days straight.
-  Delivery is push over a persisted event log, never the only copy of it.
+  Delivery is push over a persisted event log, never the only copy of it,
+  and a batch that exhausts its retries is parked for the operator, never
+  deleted.
 
   Background:
     Given an organization on an enterprise plan with webhook endpoints
@@ -306,11 +308,24 @@ Feature: Webhook endpoints, signed outbound event delivery
 
   Rule: Retries follow the Stripe ladder and respect the receiver
 
+    # A day, not three: retrying is only worth what a receiver's outage costs
+    # to ride out, and past that the batch is better parked where an operator
+    # can see it and push it through. Parked is not dropped — the batch stays
+    # until it delivers or an operator discards it.
     @unit
-    Scenario: The retry ladder holds its last attempt inside seventy two hours
+    Scenario: The retry ladder holds its last attempt inside one day
       Given the ladder delays and the send attempt budget
-      Then the cumulative schedule stays within seventy two hours of the first failure
-      And the cadence settles at twelve hours
+      Then the cumulative schedule stays within one day of the first failure
+      And the cadence settles at four hours
+
+    # Everything that failed together would otherwise retry together, and a
+    # cohort that collided once re-collides at every rung.
+    @unit
+    Scenario: Retry delays spread so a failed cohort comes apart
+      Given a ladder step
+      When many retries are scheduled from it
+      Then their delays spread around the step instead of landing on one instant
+      And every delay stays within a fifth of the step either side
 
     @unit
     Scenario: A permanent receiver error retires the batch immediately
@@ -339,12 +354,30 @@ Feature: Webhook endpoints, signed outbound event delivery
       When a delivery attempt succeeds
       Then the streak is cleared
 
+    # Disabled and deleted are different promises. Deleted means the customer
+    # asked us to stop, so the queue drains without posting. Disabled means
+    # the receiver is expected back, so nothing the customer queued is lost
+    # to the pause: batches wait on the ladder, park when it runs out, and
+    # re-enabling revives them.
     @integration
-    Scenario: A disabled endpoint drains its queue without posting
+    Scenario: A disabled endpoint keeps its queued batches unsent
       Given a disabled endpoint with a pending batch
       When the batch dispatches
       Then nothing is sent to the receiver
+      And the batch stays queued for a later attempt
+
+    @integration
+    Scenario: A deleted endpoint discards its queued batches
+      Given a deleted endpoint with a pending batch
+      When the batch dispatches
+      Then nothing is sent to the receiver
       And the batch completes so the queue drains
+
+    @integration
+    Scenario: Re-enabling an endpoint revives its parked batches
+      Given a disabled endpoint whose batch exhausted its retries
+      When the endpoint is re-enabled
+      Then the parked batch is pending again with a fresh attempt budget
 
     @integration
     Scenario: Dead lettered batches can be requeued
@@ -365,6 +398,17 @@ Feature: Webhook endpoints, signed outbound event delivery
       Given the endpoint drawer is open
       Then the batch size, batch delay, and in-flight controls show their defaults
       And saving sends the edited values
+
+    # Appends have no order to preserve — two envelopes arriving together are
+    # equally valid in either sequence — so a racing append must never fail
+    # for having raced. Losing that race once cost the envelope a full
+    # delivery attempt and, eleven collisions later, the envelope itself.
+    @integration
+    Scenario: Concurrent envelopes for one endpoint all land
+      Given many spend events arriving together for one endpoint
+      When their appends race on the endpoint's stream
+      Then every envelope lands exactly once
+      And none of them fails for having raced
 
     @integration
     Scenario: Envelopes coalesce into one signed batch up to the endpoint's size

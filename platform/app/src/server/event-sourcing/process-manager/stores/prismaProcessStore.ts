@@ -21,7 +21,10 @@ import type {
   PersistedProcessInstance,
   ProcessCommit,
   ProcessStore,
+  ProcessTransaction,
+  TransactResult,
 } from "./processStore.types";
+import { safeDiagnosticError } from "../failureDiagnostic";
 
 class DuplicateInboxRollback extends Error {}
 
@@ -35,6 +38,21 @@ function refWhere(ref: ProcessRef) {
 
 function refLockKey(ref: ProcessRef): string {
   return JSON.stringify([ref.processName, ref.projectId, ref.processKey]);
+}
+
+function toPersisted<State>(
+  ref: ProcessRef,
+  row: ProcessManagerInstance,
+): PersistedProcessInstance<State> {
+  return {
+    ref,
+    tenantId: row.tenantId,
+    ...(row.userId === null ? {} : { userId: row.userId }),
+    state: row.state as State,
+    revision: row.revision,
+    nextWakeAt: row.nextWakeAt?.getTime() ?? null,
+    updatedAt: row.updatedAt.getTime(),
+  };
 }
 
 function asDate(epochMs: number): Date {
@@ -121,20 +139,83 @@ export class PrismaProcessStore implements ProcessStore {
       },
     });
     if (!row) return null;
-    return {
-      ref: params.ref,
-      tenantId: row.tenantId,
-      ...(row.userId === null ? {} : { userId: row.userId }),
-      state: row.state as State,
-      revision: row.revision,
-      nextWakeAt: row.nextWakeAt?.getTime() ?? null,
-      updatedAt: row.updatedAt.getTime(),
-    };
+    return toPersisted<State>(params.ref, row);
   }
 
   async commit<State = unknown>(
     commit: ProcessCommit<State>,
   ): Promise<CommitResult> {
+    return await this.writeUnderLock<State>({
+      ref: commit.ref,
+      tenantId: commit.tenantId,
+      ...(commit.userId === undefined ? {} : { userId: commit.userId }),
+      sourceEventId: commit.sourceEventId,
+      now: commit.now,
+      decide: (existing) => {
+        const actualRevision = existing?.revision ?? 0;
+        if (actualRevision !== commit.expectedRevision) {
+          return { outcome: "revisionConflict" as const, actualRevision };
+        }
+        return {
+          outcome: "write" as const,
+          state: commit.state,
+          nextWakeAt: commit.nextWakeAt,
+          messages: commit.messages,
+        };
+      },
+    });
+  }
+
+  async transact<State = unknown>(
+    transaction: ProcessTransaction<State>,
+  ): Promise<TransactResult> {
+    const result = await this.writeUnderLock<State>({
+      ref: transaction.ref,
+      tenantId: transaction.tenantId,
+      ...(transaction.userId === undefined ? {} : { userId: transaction.userId }),
+      sourceEventId: transaction.sourceEventId,
+      now: transaction.now,
+      decide: (existing) => ({
+        outcome: "write" as const,
+        ...transaction.apply(existing),
+      }),
+    });
+    if (result.outcome === "revisionConflict") {
+      // Unreachable: `decide` above never returns a conflict, and the write
+      // derives its expected revision from the read this lock is holding. If
+      // it ever fires, the lock stopped covering the read.
+      throw safeDiagnosticError(
+        `process transact reported a revision conflict on ${transaction.ref.processName}/${transaction.ref.processKey}`,
+      );
+    }
+    return result;
+  }
+
+  /**
+   * The one write body, shared by {@link commit} and {@link transact}: take the
+   * process-ref lock, consume the inbox marker, read the instance, let the
+   * caller decide from what it read, and persist state, wake and messages.
+   *
+   * The read sits INSIDE the lock. That is what lets `transact` promise no
+   * conflict, and it is why `decide` receives the instance rather than a
+   * revision the caller guessed at beforehand.
+   */
+  private async writeUnderLock<State = unknown>(params: {
+    ref: ProcessRef;
+    tenantId: string;
+    userId?: string;
+    sourceEventId: string | null;
+    now: number;
+    decide: (existing: PersistedProcessInstance<State> | null) =>
+      | { outcome: "revisionConflict"; actualRevision: number }
+      | {
+          outcome: "write";
+          state: State;
+          nextWakeAt: number | null;
+          messages: NewOutboxMessage[];
+        };
+  }): Promise<CommitResult> {
+    const commit = params;
     try {
       return await this.prisma.$transaction(async (tx) => {
         // This lock only serializes commits for the same process reference.
@@ -165,29 +246,26 @@ export class PrismaProcessStore implements ProcessStore {
           if (duplicate) return { outcome: "duplicateEvent" as const };
         }
 
-        const existing = await tx.processManagerInstance.findUnique({
+        const row = await tx.processManagerInstance.findUnique({
           where: {
             projectId: commit.ref.projectId,
             processName_projectId_processKey: refWhere(commit.ref),
           },
-          select: { revision: true },
         });
+        const existing = row === null ? null : toPersisted<State>(commit.ref, row);
         const actualRevision = existing?.revision ?? 0;
-        if (actualRevision !== commit.expectedRevision) {
-          return {
-            outcome: "revisionConflict" as const,
-            actualRevision,
-          };
-        }
+
+        const decided = commit.decide(existing);
+        if (decided.outcome === "revisionConflict") return decided;
 
         const revision = actualRevision + 1;
         const instanceData = {
           tenantId: commit.tenantId,
           userId: commit.userId ?? null,
-          state: toJsonInput(commit.state as JsonValue),
+          state: toJsonInput(decided.state as JsonValue),
           revision,
           nextWakeAt:
-            commit.nextWakeAt === null ? null : asDate(commit.nextWakeAt),
+            decided.nextWakeAt === null ? null : asDate(decided.nextWakeAt),
           updatedAt: asDate(commit.now),
         };
 
@@ -221,7 +299,7 @@ export class PrismaProcessStore implements ProcessStore {
           const updated = await tx.processManagerInstance.updateMany({
             where: {
               ...refWhere(commit.ref),
-              revision: commit.expectedRevision,
+              revision: actualRevision,
             },
             data: instanceData,
           });
@@ -261,7 +339,7 @@ export class PrismaProcessStore implements ProcessStore {
 
         const insertedMessageKeys: string[] = [];
         const duplicateMessageKeys: string[] = [];
-        for (const message of commit.messages) {
+        for (const message of decided.messages) {
           const inserted = await tx.processManagerOutbox.createMany({
             data: [
               {
@@ -388,6 +466,25 @@ export class PrismaProcessStore implements ProcessStore {
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
     return rows.map(toMessage);
+  }
+
+  async countPendingMessages(params: {
+    ref: ProcessRef;
+    intentType: string;
+  }): Promise<{ count: number; nextAttemptAt: number | null }> {
+    const aggregate = await this.prisma.processManagerOutbox.aggregate({
+      where: {
+        ...refWhere(params.ref),
+        intentType: params.intentType,
+        status: "pending",
+      },
+      _count: { _all: true },
+      _min: { nextAttemptAt: true },
+    });
+    return {
+      count: aggregate._count._all,
+      nextAttemptAt: aggregate._min.nextAttemptAt?.getTime() ?? null,
+    };
   }
 
   async leaseDueMessages(params: {
@@ -659,25 +756,30 @@ export class PrismaProcessStore implements ProcessStore {
     // No new index: `dead` is a rare status, so the existing
     // (status, nextAttemptAt, leasedUntil) index already makes this selective.
     //
-    // `discarded` is reaped on the same window and by the same sweep. It is
-    // the terminal state an operator writes rather than one the dispatcher
-    // writes, but it means the same thing to retention — a record of work
-    // that will never run, kept for as long as the operator might ask about
-    // it. Leaving it out is what would make it immortal: no other family's
-    // predicate matches it, and this is the highest-volume table in the
-    // system (specs/ops/dead-letter-recovery.feature).
+    // Only `discarded` is reaped, and the distinction is the whole point.
+    //
+    // `discarded` is the terminal state an OPERATOR writes: someone looked at
+    // the message and said never send this. Deleting it after the window is
+    // housekeeping on a decision that was already taken, and leaving it out
+    // would make it immortal — no other family's predicate matches it, on the
+    // highest-volume table in the system.
+    //
+    // `dead` is the state the DISPATCHER writes when a message ran out of
+    // attempts, and nobody agreed to lose it. Sweeping it turned "this one
+    // stopped retrying" into "this one no longer exists" thirty days later,
+    // silently and with no record of what was in it. A message that never
+    // delivered is retained until it delivers or an operator discards it,
+    // which is the only way `retire` can mean parked rather than dropped
+    // (specs/ops/dead-letter-recovery.feature).
     return await this.prisma.$executeRaw`
       DELETE FROM "ProcessManagerOutbox"
       WHERE "id" IN (
         SELECT "id" FROM "ProcessManagerOutbox"
-        WHERE "status" IN (
-            'dead'::"ProcessManagerOutboxStatus",
-            'discarded'::"ProcessManagerOutboxStatus"
-          )
+        WHERE "status" = 'discarded'::"ProcessManagerOutboxStatus"
           AND "updatedAt" < ${asDate(params.before)}
         LIMIT ${params.limit}
       )
-      -- @tenancy: process-manager retention sweep, dead outbox (system-owned maintenance)
+      -- @tenancy: process-manager retention sweep, discarded outbox (system-owned maintenance)
     `;
   }
 

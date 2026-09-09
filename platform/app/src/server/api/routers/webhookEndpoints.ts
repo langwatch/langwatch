@@ -71,7 +71,10 @@ const requireWebhooksPlan = async ({
 };
 
 function service(prisma: PrismaClient) {
-  return new WebhookEndpointService({ prisma });
+  return new WebhookEndpointService({
+    prisma,
+    processStore: new PrismaProcessStore(prisma),
+  });
 }
 
 /** Map service errors onto tRPC codes so the UI gets actionable messages. */

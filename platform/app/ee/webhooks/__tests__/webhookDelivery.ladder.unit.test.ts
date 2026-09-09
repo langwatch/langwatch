@@ -9,31 +9,58 @@ import {
 const HOUR = 60 * 60 * 1000;
 
 describe("webhook retry ladder", () => {
-  /** @scenario The retry ladder holds its last attempt inside seventy two hours */
-  it("keeps the cumulative schedule within 72h and settles at 12h", () => {
+  /** @scenario The retry ladder holds its last attempt inside one day */
+  it("keeps the cumulative schedule within a day and settles at 4h", () => {
+    // Jitter pinned to its midpoint: the schedule under test is the ladder's.
+    const midpoint = () => 0.5;
     let elapsed = 0;
     const delays: number[] = [];
     for (let attempt = 1; attempt < WEBHOOK_SEND_MAX_ATTEMPTS; attempt++) {
-      const delay = webhookRetryDelayMs({ attempt });
+      const delay = webhookRetryDelayMs({ attempt, random: midpoint });
       delays.push(delay);
       elapsed += delay;
     }
-    // The final retry fires inside 72 hours of the first failure.
-    expect(elapsed).toBeLessThanOrEqual(72 * HOUR);
-    // And the ladder is not trivially short: it spans multiple days.
-    expect(elapsed).toBeGreaterThan(48 * HOUR);
-    // Cadence settles at 12h once the explicit rungs are exhausted.
-    expect(delays.at(-1)).toBe(12 * HOUR);
-    expect(webhookRetryDelayMs({ attempt: 99 })).toBe(12 * HOUR);
+    // The final retry fires inside one day of the first failure.
+    expect(elapsed).toBeLessThanOrEqual(24 * HOUR);
+    // And the ladder is not trivially short: it rides out a working day.
+    expect(elapsed).toBeGreaterThan(12 * HOUR);
+    // Cadence settles at 4h once the explicit rungs are exhausted.
+    expect(delays.at(-1)).toBe(4 * HOUR);
+    expect(webhookRetryDelayMs({ attempt: 99, random: midpoint })).toBe(
+      4 * HOUR,
+    );
     // The explicit rungs are exactly the documented schedule.
     expect(WEBHOOK_RETRY_LADDER_MS).toEqual([
       60_000,
       5 * 60_000,
+      15 * 60_000,
       30 * 60_000,
+      HOUR,
       2 * HOUR,
-      6 * HOUR,
-      12 * HOUR,
+      4 * HOUR,
     ]);
+  });
+
+  /** @scenario Retry delays spread so a failed cohort comes apart */
+  it("spreads delays a fifth of the step either side, never on one instant", () => {
+    const step = WEBHOOK_RETRY_LADDER_MS[0]!;
+    expect(webhookRetryDelayMs({ attempt: 1, random: () => 0 })).toBe(
+      step - step / 5,
+    );
+    expect(webhookRetryDelayMs({ attempt: 1, random: () => 1 })).toBe(
+      step + step / 5,
+    );
+    // Distinct draws land on distinct instants — the cohort comes apart.
+    const draws = new Set(
+      [0.1, 0.35, 0.62, 0.87].map((value) =>
+        webhookRetryDelayMs({ attempt: 1, random: () => value }),
+      ),
+    );
+    expect(draws.size).toBe(4);
+    for (const delay of draws) {
+      expect(delay).toBeGreaterThanOrEqual(step - step / 5);
+      expect(delay).toBeLessThanOrEqual(step + step / 5);
+    }
   });
 });
 
