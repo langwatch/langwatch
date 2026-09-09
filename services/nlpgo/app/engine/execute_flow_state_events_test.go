@@ -93,9 +93,14 @@ func TestExecuteStream_EmitsErrorWorkflowEventOnNodeFailure(t *testing.T) {
 			{ID: "entry", Type: dsl.ComponentEntry},
 			// code node with no Code executor wired — deterministic failure
 			{ID: "code-1", Type: dsl.ComponentCode},
+			// End node required by the missing-End planner guard (#3198);
+			// code-1 errors before End runs, so the error-path assertions
+			// below are unaffected.
+			{ID: "end", Type: dsl.ComponentEnd},
 		},
 		Edges: []dsl.Edge{
 			{Source: "entry", SourceHandle: "outputs.input", Target: "code-1", TargetHandle: "inputs.input"},
+			{Source: "code-1", Target: "end"},
 		},
 	}
 

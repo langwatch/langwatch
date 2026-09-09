@@ -64,9 +64,14 @@ func TestEngineExecute_ErrorPathStampsInputNotOutput(t *testing.T) {
 			// "code executor not configured" branch in dispatch — a
 			// deterministic failure path that doesn't need Python.
 			{ID: "code-1", Type: dsl.ComponentCode},
+			// End node required by the missing-End planner guard (#3198);
+			// code-1 errors before End runs, so the error-path assertions
+			// below are unaffected.
+			{ID: "end", Type: dsl.ComponentEnd},
 		},
 		Edges: []dsl.Edge{
 			{Source: "entry", SourceHandle: "outputs.input", Target: "code-1", TargetHandle: "inputs.input"},
+			{Source: "code-1", Target: "end"},
 		},
 	}
 

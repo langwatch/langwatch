@@ -370,10 +370,13 @@ func autoparseIfElseBody(amountValue string) string {
 	            {"identifier":"true","type":"bool"},
 	            {"identifier":"false","type":"bool"}
 	          ]
-	        }}
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[{"identifier":"result","type":"bool"}]}}
 	      ],
 	      "edges":[
-	        {"id":"e1","source":"entry","sourceHandle":"outputs.amount","target":"gate","targetHandle":"inputs.amount","type":"default"}
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.amount","target":"gate","targetHandle":"inputs.amount","type":"default"},
+	        {"id":"e2","source":"gate","sourceHandle":"outputs.true","target":"end","targetHandle":"inputs.result","type":"default"},
+	        {"id":"e3","source":"gate","sourceHandle":"outputs.false","target":"end","targetHandle":"inputs.result","type":"default"}
 	      ],
 	      "state":{}
 	    },
@@ -437,10 +440,13 @@ func autoparseLiquidIfElseBody(amountValue string) string {
 	            {"identifier":"true","type":"bool"},
 	            {"identifier":"false","type":"bool"}
 	          ]
-	        }}
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[{"identifier":"result","type":"bool"}]}}
 	      ],
 	      "edges":[
-	        {"id":"e1","source":"entry","sourceHandle":"outputs.amount","target":"gate","targetHandle":"inputs.amount","type":"default"}
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.amount","target":"gate","targetHandle":"inputs.amount","type":"default"},
+	        {"id":"e2","source":"gate","sourceHandle":"outputs.true","target":"end","targetHandle":"inputs.result","type":"default"},
+	        {"id":"e3","source":"gate","sourceHandle":"outputs.false","target":"end","targetHandle":"inputs.result","type":"default"}
 	      ],
 	      "state":{}
 	    },
