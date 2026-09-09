@@ -5,7 +5,11 @@ import {
   startOtlpMetricsExport,
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import {
+  ResourceScope,
+  RuntimeLifecycle,
+  cleanupAfterFailure,
+} from "@langwatch/runtime-composition";
 import {
   SecretEnvironmentService,
   secretLogRedactPaths,
@@ -113,7 +117,13 @@ export class ApiRuntimeBootstrap {
         observability,
         resources,
       });
-      const main = new ApiRuntimeBootstrap(config, process, createLogger(config.serviceName));
+      graph.seal();
+      const main = new ApiRuntimeBootstrap(
+        config,
+        process,
+        createLogger(config.serviceName),
+        graph,
+      );
       if (options.signals !== false) {
         main.disposeSignals = installApiSignalHandlers({
           ...options.signals,
@@ -130,16 +140,45 @@ export class ApiRuntimeBootstrap {
   }
 
   private closing: Promise<void> | undefined;
+  private starting: Promise<ApiListenerAddress | undefined> | undefined;
+  private cleanup: Promise<void> | undefined;
   private disposeSignals: (() => void) | undefined;
 
   private constructor(
     readonly config: ApiConfig,
     readonly process: ApiRuntimeProcessPort,
     private readonly logger: Pick<Logger, "error" | "info">,
+    private readonly graph: ScopedApiProcessGraph,
   ) {}
 
   start(): Promise<ApiListenerAddress | undefined> {
-    return this.process.start();
+    if (this.closing) return Promise.reject(new Error("Cannot start a closed API runtime."));
+
+    this.starting ??= this.startProcess();
+    return this.starting;
+  }
+
+  private async startProcess(): Promise<ApiListenerAddress | undefined> {
+    try {
+      await this.graph.start();
+      return await this.process.start();
+    } catch (error) {
+      return cleanupAfterFailure(error, () => this.cleanupProcess());
+    }
+  }
+
+  private cleanupProcess(): Promise<void> {
+    this.cleanup ??= Promise.resolve().then(async () => {
+      const cleanup = new ResourceScope();
+      cleanup.own("API graph", () => this.graph.close());
+      cleanup.own("API process", () => this.process.close());
+      try {
+        await cleanup.close();
+      } finally {
+        this.disposeSignals?.();
+      }
+    });
+    return this.cleanup;
   }
 
   close(): Promise<void> {
@@ -148,11 +187,8 @@ export class ApiRuntimeBootstrap {
   }
 
   private async closeMain(): Promise<void> {
-    try {
-      await this.process.close();
-    } finally {
-      this.disposeSignals?.();
-    }
+    await this.starting?.catch(() => void 0);
+    await this.cleanupProcess();
   }
 }
 
@@ -172,6 +208,9 @@ async function closeGraphAfterCompositionFailure(
 }
 
 class ScopedApiProcessGraph extends ApiProcessGraphPort {
+  private lifecycle: RuntimeLifecycle | undefined;
+  private closing: Promise<void> | undefined;
+
   static create(resources: ResourceScope): ScopedApiProcessGraph {
     return new ScopedApiProcessGraph(resources);
   }
@@ -180,7 +219,30 @@ class ScopedApiProcessGraph extends ApiProcessGraphPort {
     super();
   }
 
+  private runtime(): RuntimeLifecycle {
+    this.lifecycle ??= new RuntimeLifecycle(this.resources.sealServices(), new ResourceScope());
+    return this.lifecycle;
+  }
+
+  seal(): void {
+    this.runtime();
+  }
+
+  start(): Promise<void> {
+    return this.runtime().start();
+  }
+
+  override drain(): Promise<void> {
+    return this.runtime().stop();
+  }
+
   close(): Promise<void> {
-    return this.resources.close();
+    this.closing ??= Promise.resolve().then(async () => {
+      const cleanup = new ResourceScope();
+      cleanup.own("API infrastructure", () => this.resources.close());
+      cleanup.own("API feature services", () => this.drain());
+      await cleanup.close();
+    });
+    return this.closing;
   }
 }

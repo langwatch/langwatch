@@ -1,8 +1,8 @@
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   ApiKeyBindingIdAdapter,
   ApiKeyDiagnosticsAdapter,
-  PostgresApiKeyAdapter,
+  ApiKeyApp,
 } from "@langwatch/api-key-server";
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import { EventingAuthzGrantAdapter } from "@langwatch/authz-server";
@@ -115,29 +115,35 @@ export class ApiTenancyComposition {
       diagnostics: LoggedApiProjectDiagnostics.create(),
     }).build();
 
-    const apiKeys = PostgresApiKeyAdapter.create({
-      database,
-      pepper: options.pepper,
-      authz: options.authz.permissions,
-      grants: options.authz.grants,
-      organizations,
-      projects,
-      bindingIds: ApiKeyBindingIdAdapter.create(),
-      // The import-shaped identity: a compatibility grant minted for a
-      // credential that predates the ledger has to derive the same id every
-      // time it is re-minted, or a re-run writes a second fact for one access.
-      deriveBindingId: EventingAuthzGrantAdapter.deriveGrantId,
-      diagnostics: ApiKeyDiagnosticsAdapter.create(createLogger("langwatch:api-key")),
-    }).build();
+    const apiKeyApp = ApiKeyApp.create({
+      dependencies: {
+        authorization: options.authz.permissions,
+        organizations,
+        projects,
+      },
+      infrastructure: {
+        database,
+        pepper: options.pepper,
+        bindingIds: ApiKeyBindingIdAdapter.create(),
+        deriveBindingId: EventingAuthzGrantAdapter.deriveGrantId,
+        diagnostics: ApiKeyDiagnosticsAdapter.create(createLogger("langwatch:api-key")),
+      },
+      config: undefined,
+      resources: { own: () => undefined },
+    });
 
-    return new ApiTenancyComposition(organizations, projects, apiKeys);
+    return new ApiTenancyComposition(organizations, projects, apiKeyApp);
   }
 
   private constructor(
     readonly organizations: OrganizationService,
     readonly projects: ProjectService,
-    readonly apiKeys: ApiKeyService,
+    readonly apiKeyApp: ApiKeyApp,
   ) {}
+
+  get apiKeys(): ApiKeyApi {
+    return this.apiKeyApp;
+  }
 }
 
 /**

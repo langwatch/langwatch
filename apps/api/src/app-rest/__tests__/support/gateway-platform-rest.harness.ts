@@ -5,7 +5,7 @@
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { PostgresAuthzAdapter } from "@langwatch/authz-server";
-import { createGatewayPlatformRestApp } from "@langwatch/gateway-server";
+import { createGatewayPlatformRestApp } from "@langwatch/gateway-server/api-rest/gateway-platform";
 import {
   PrismaConfigService,
   PrismaConnectionService,

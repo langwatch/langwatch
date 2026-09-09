@@ -15,7 +15,8 @@
  *
  * @see ./langwatch-ql-rest.mount.ts — the saved-chart half of the same graph
  */
-import { createQueryRestApp, type LangWatchQLRestPorts } from "@langwatch/analytics-server";
+import { createQueryRestApp } from "@langwatch/analytics-server/api-rest/query";
+import type { LangWatchQLRestPorts } from "@langwatch/analytics-server/api-rest/langwatch-ql";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 
 /**

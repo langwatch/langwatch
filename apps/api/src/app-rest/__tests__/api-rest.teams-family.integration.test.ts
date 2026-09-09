@@ -3,7 +3,7 @@
  * driven through this process's OWN security spine.
  * @see specs/teams/teams-rest-api.feature
  */
-import { type ApiKeyService } from "@langwatch/api-key-contract";
+import { type ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzAccessBinding, AuthzService } from "@langwatch/authz-contract";
 import {
   PERSONAL_TEAM_ARCHIVE_REFUSAL,
@@ -737,7 +737,7 @@ function mountTeams(): { api: MountedRestFamily; directory: TeamDirectory } {
     "authorization",
   );
 
-  const apiKeys: ApiKeyService = namedAbsences(
+  const apiKeys: ApiKeyApi = namedAbsences(
     {
       resolveOrganizationToken: async (input: { token: string }) => {
         const apiKeyId =

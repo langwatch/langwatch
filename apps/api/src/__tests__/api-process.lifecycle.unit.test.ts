@@ -1,6 +1,8 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application.ts";
+import { ApiApplication, NoApiTrpcFeatures } from "../api.application.ts";
 import {
   ApiMetricsPort,
   ApiProcessLifecycleRoutes,
@@ -42,7 +44,7 @@ describe("ApiApplication HTTP failures", () => {
     });
     const application = ApiApplication.create({
       features: new NoApiTrpcFeatures(),
-      agents: new MissingAgentService(),
+      agents: createApiFixture<AgentApi>(),
       rest,
       http: {
         createContext: async () => ({
@@ -73,7 +75,7 @@ describe("ApiApplication HTTP failures", () => {
     });
     const application = ApiApplication.create({
       features: new NoApiTrpcFeatures(),
-      agents: new MissingAgentService(),
+      agents: createApiFixture<AgentApi>(),
       rest,
       http: {
         createContext: async () => ({

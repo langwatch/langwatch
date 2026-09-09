@@ -5,7 +5,7 @@
 import {
   createLangWatchQLRestApp,
   type LangWatchQLRestPorts,
-} from "@langwatch/analytics-server";
+} from "@langwatch/analytics-server/api-rest/langwatch-ql";
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 

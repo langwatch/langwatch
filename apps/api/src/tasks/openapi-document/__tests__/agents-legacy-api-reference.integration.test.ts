@@ -41,6 +41,15 @@ beforeAll(async () => {
 
 describe("given the Agents REST compatibility interface is mounted", () => {
   describe("when the OpenAPI document is generated", () => {
+    it.each([
+      ["post", "/api/v1/agents/connect/register"],
+      ["get", "/api/v1/agents/connect/poll"],
+      ["post", "/api/v1/agents/connect/frames"],
+      ["post", "/api/v1/agents/{id}/call"],
+    ])("describes %s %s without constructing AgentApp", (method, path) => {
+      expect(generated.operations).toContain(`${method.toUpperCase()} ${path}`);
+    });
+
     /** @scenario "Legacy REST is documented as deprecated" */
     it.each(LEGACY_OPERATIONS)("marks %s %s deprecated and names its successor", (method, path) => {
       const { deprecated, description } = operation(method, path);

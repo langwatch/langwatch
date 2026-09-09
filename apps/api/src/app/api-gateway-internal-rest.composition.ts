@@ -2,9 +2,13 @@
  * The Go data plane's control-plane calls, filled from this process.
  */
 import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
+import { createElevenLabsWebhookRestApp } from "@langwatch/gateway-server/api-rest/elevenlabs-webhook";
 import {
-  createElevenLabsWebhookRestApp,
   createGatewayInternalRestApp,
+  type GatewayInternalRestPorts,
+  type GatewaySpendCommandSender,
+} from "@langwatch/gateway-server/api-rest/gateway-internal";
+import {
   GatewayConfigAssemblyAdapter,
   GatewayConfigMaterialiserService,
   GatewayGuardrailEvaluationService,
@@ -12,9 +16,7 @@ import {
   GatewayModelProviderCredentialsPort,
   ModelCatalogGatewaySpendRatingAdapter,
   PrismaGatewayInternalStoreAdapter,
-  type GatewayInternalRestPorts,
   type GatewayRealtimeSessionCollaborators,
-  type GatewaySpendCommandSender,
   type GatewaySpendConfirmationPort,
   type GatewaySpendRatingPort,
 } from "@langwatch/gateway-server";

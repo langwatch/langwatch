@@ -1,10 +1,10 @@
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
-import { ApiOtlpCredentialPolicyAdapter } from "./api-otlp-credential-policy.adapter.ts";
 /**
  * The OTLP receiver, composed from this process's own graph. Ingestion is the one path
  * where this process is a WRITER rather than a reader, and everything below follows from
  * that.
  */
+import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import { ApiOtlpCredentialPolicyAdapter } from "./api-otlp-credential-policy.adapter.ts";
 import { TraceProcessingProducerAdapter } from "@langwatch/trace-server";
 import {
   CodingAgentService,
@@ -24,16 +24,20 @@ import {
   TraceSpanCollectionService,
   TraceSpanDedupPort,
   TrackedEventSpanService,
-  type CollectorCredential,
-  type CollectorCredentialPort,
-  type CollectorSpanIngestPort,
-  type CollectorUsageLimitPort,
-  type OtlpIngestCredential,
-  type OtlpIngestRestPorts,
   type EdgeMediaExtractionDeps,
   type SpanDedupRef,
   type TraceIngressPayloadPort,
 } from "@langwatch/trace-server";
+import type {
+  CollectorCredential,
+  CollectorCredentialPort,
+  CollectorSpanIngestPort,
+  CollectorUsageLimitPort,
+} from "@langwatch/trace-server/api-rest/collector";
+import type {
+  OtlpIngestCredential,
+  OtlpIngestRestPorts,
+} from "@langwatch/trace-server/api-rest/otlp-ingest";
 
 import type { ApiHandlerManagedCredentials } from "./api-handler-managed-credential.ts";
 

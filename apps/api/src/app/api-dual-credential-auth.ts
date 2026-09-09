@@ -1,7 +1,7 @@
 /**
  * The two credential kinds a browser-served BYTE endpoint accepts, arbitrated.
  */
-import { getTokenType, type ApiKeyService } from "@langwatch/api-key-contract";
+import { getTokenType, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { arbitrateClaims, type AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { MiddlewareHandler } from "hono";
@@ -58,7 +58,7 @@ type ByteEndpointClaim = { kind: "api-key" } | { kind: "session"; userId: string
 
 /** Builds the byte endpoints' verifier for one process's credential graph. */
 export function createApiDualCredentialAuth(options: {
-  apiKeys: ApiKeyService;
+  apiKeys: ApiKeyApi;
   session: ApiHandlerManagedSessionPort;
   /** The SAME ceiling the framework chain enforces, for the API-key branch. */
   credentials: Pick<ApiHandlerManagedCredentials, "enforceCeiling">;
@@ -96,7 +96,7 @@ export function createApiDualCredentialAuth(options: {
     // The claimed credential's failure is the request's failure; there is
     // nothing to fall back to.
     const resolved = credentials
-      ? await apiKeys.tryResolveToken({
+      ? await apiKeys.findResolvedToken({
           token: credentials.token,
           ...(credentials.projectId ? { projectId: credentials.projectId } : {}),
         })

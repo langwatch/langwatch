@@ -3,6 +3,7 @@
  * handed to every `compose<Feature>()` the router literal names, rather than a group half
  * folding ten features' collaborators into one record first.
  */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -37,4 +38,10 @@ export type ApiTrpcInfrastructure = Readonly<{
   saasBilling: boolean;
   /** Where a command is recorded, on a process that composed a trail. */
   audit: ApiAuditPort | undefined;
+  /**
+   * The one audit log this process records operator and management acts on.
+   * Always present: a process installs either the audit-log feature or the
+   * null one under the same token, never neither and never both.
+   */
+  auditLog: AuditLogApi;
 }>;

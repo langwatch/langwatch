@@ -7,8 +7,8 @@ import {
   GatewaySpendConfirmationPort,
   GatewaySpendProducerAdapter,
   type ConfirmSpendCommandData,
-  type GatewaySpendCommandSender,
 } from "@langwatch/gateway-server";
+import type { GatewaySpendCommandSender } from "@langwatch/gateway-server/api-rest/gateway-internal";
 
 const spendProducer = GatewaySpendProducerAdapter.create();
 /** Reports the composition decision an absent queue would otherwise hide. */

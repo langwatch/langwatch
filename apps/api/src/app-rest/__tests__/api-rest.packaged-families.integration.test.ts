@@ -4,6 +4,8 @@
  * these through ONE all-or-nothing call over thirty-two product services.
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
+import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import {
   TraceIngressCommandPort,
@@ -14,6 +16,7 @@ import {
 import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
 import type { UserAvatarObjectReader } from "@langwatch/user-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
+import { generateSpecs } from "hono-openapi";
 import { HTTPException } from "hono/http-exception";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
@@ -109,13 +112,27 @@ describe("given a process that composed none of the packaged services", () => {
 });
 
 describe("given the deprecated agents family", () => {
+  it("documents connected Agent routes without resolving the AgentApp provider", async () => {
+    const agents = vi.fn(() => {
+      throw new Error("OpenAPI must not resolve AgentApp");
+    });
+    const api = mount(collaboratorsWith({ agents, agentsV1: () => ({ connect: {}, call: {} }) }));
+    const document = await api.specs();
+
+    expect(agents).not.toHaveBeenCalled();
+    expect(document.paths?.["/api/v1/agents/connect/register"]?.post).toBeDefined();
+    expect(document.paths?.["/api/v1/agents/connect/poll"]?.get).toBeDefined();
+    expect(document.paths?.["/api/v1/agents/connect/frames"]?.post).toBeDefined();
+    expect(document.paths?.["/api/v1/agents/{id}/call"]?.post).toBeDefined();
+  });
+
   describe("when a project credential lists them", () => {
     it("answers from the application this process composed, for the credential's project", async () => {
       const list = vi.fn(async () => ({
         data: [],
         pagination: { page: 1, limit: 20, total: 0, totalPages: 0 },
       }));
-      const api = mount(collaboratorsWith({ agents: () => ({ list }) as never }));
+      const api = mount(collaboratorsWith({ agents: () => createApiFixture<AgentApi>({ list }) }));
 
       const response = await api.fetch("/api/agents");
 
@@ -196,7 +213,10 @@ describe("given the byte-serving file family", () => {
  */
 describe("given the avatar family over a reader that carries the owner kind", () => {
   describe("when a signed-in caller loads an avatar", () => {
-    /** @scenario "The avatar route serves an object whose purpose and owner kind are the avatar ones" */
+    /**
+     * @scenario "The avatar route serves an object whose purpose and owner kind
+     * are the avatar ones"
+     */
     it("streams the bytes with the stored media type", async () => {
       const api = mount(withAvatarObject(avatarRead()));
 
@@ -266,7 +286,9 @@ describe("given the avatar family over a reader that carries the owner kind", ()
   });
 
   describe("when this process composed no dual-credential verifier", () => {
-    /** @scenario "The avatar route is left off a process that cannot authenticate an image request" */
+    /**
+     * @scenario "The avatar route is left off a process that cannot authenticate an image request"
+     */
     it("leaves the family off rather than 401ing every member list", () => {
       const api = mount(
         collaboratorsWith(
@@ -411,6 +433,7 @@ function mount(collaborators: ApiPackagedRestCollaborators, report?: MountReport
   }
 
   return {
+    specs: () => generateSpecs(hono, { excludeStaticFile: false }),
     fetch: (path: string, init?: RequestInit) =>
       hono.fetch(new Request(`http://api.test${path}`, init)),
     /**
@@ -582,7 +605,7 @@ function withRealDualAuth(objects: UserAvatarObjectReader): ApiPackagedRestColla
     ports: {
       ...fullPorts(),
       dualAuth: createApiDualCredentialAuth({
-        apiKeys: { tryResolveToken: async () => null } as never,
+        apiKeys: { findResolvedToken: async () => null } as never,
         session: {
           resolve: async () => null,
           permitted: async () => false,
@@ -649,6 +672,15 @@ function passThroughSecurity(): AppRestSecurity {
   };
   const asProject: MiddlewareHandler = async (c, next) => {
     c.set("project", project);
+    c.set("resolvedToken", {
+      type: "apiKey",
+      apiKeyId: "key_test",
+      userId: "user_test",
+      organizationId: "organization_test",
+      project,
+    });
+    c.set("apiKeyId", "key_test");
+    c.set("apiKeyUserId", "user_test");
     await next();
   };
   const asOrganization: MiddlewareHandler = async (c, next) => {

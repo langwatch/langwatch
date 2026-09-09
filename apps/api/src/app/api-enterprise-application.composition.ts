@@ -34,7 +34,7 @@ import {
   WebhookAccessService,
   WebhookApp,
   WebhookHealthService,
-} from "@langwatch/enterprise-api/webhooks";
+} from "@langwatch/webhook-server";
 import { PostgresSessionPolicyAdapter } from "@langwatch/enterprise-governance-server";
 import type { EventSourcing } from "@langwatch/eventing";
 import { PrismaProcessStore } from "@langwatch/eventing/server";

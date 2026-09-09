@@ -14,12 +14,14 @@
 import type { AnalyticsReadInput, AnalyticsTimeseriesInput } from "@langwatch/analytics-contract";
 import {
   AnalyticsTrpcApi,
-  LangWatchQLTrpcApi,
   type AnalyticsTrpcContext,
   type AnalyticsTrpcPorts,
+} from "@langwatch/analytics-server/api-trpc/analytics";
+import {
+  LangWatchQLTrpcApi,
   type LangWatchQLTrpcContext,
   type LangWatchQLTrpcPorts,
-} from "@langwatch/analytics-server";
+} from "@langwatch/analytics-server/api-trpc/langwatch-ql";
 import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@langwatch/api/trpc";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 

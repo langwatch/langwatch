@@ -2,10 +2,12 @@
  * The packaged tRPC record itself, served by the API process.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { EventEmitter } from "node:events";
 import { describe, expect, it } from "vitest";
-import { ApiApplication, MissingAgentService } from "../../api.application.ts";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { ApiApplication } from "../../api.application.ts";
 import { ApiAuditPort } from "../../api-request.policy.ts";
 import { ApiRestSecurity } from "../../api-rest.security.ts";
 import { createSseSubscriptionApp } from "../../app-trpc/app-trpc.sse.ts";
@@ -162,7 +164,7 @@ function composeApplication() {
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({

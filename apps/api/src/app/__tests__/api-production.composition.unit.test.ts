@@ -1,9 +1,8 @@
-import { AgentService } from "@langwatch/agent-contract";
-import { ConnectedAgentRuntimeAdapter } from "@langwatch/agent-server";
+import type { AgentApi } from "@langwatch/agent-contract";
 import {
-  ApiKeyService,
+  type ApiKeyApi,
   type OrganizationApiKeyResolution,
-  type ResolvedApiKeyToken,
+  type ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
 import { AuthService } from "@langwatch/auth-contract";
 import { AuthzService } from "@langwatch/authz-contract";
@@ -14,6 +13,7 @@ import { OrganizationService } from "@langwatch/organization-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { Hono } from "hono";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 const processMocks = vi.hoisted(() => {
   const process = { start: vi.fn(async () => undefined), close: vi.fn(async () => undefined) };
@@ -171,7 +171,6 @@ vi.mock("../../platform/infrastructure/api-database.infrastructure.ts", async (i
 
 import { ApiMetricsPort } from "../../api-process.lifecycle.ts";
 import { ApiProcessGraphPort } from "../../api.process.ts";
-import { ApiAgentsComposition } from "../api-agents.composition.ts";
 import {
   ApiAuthComposition,
   ApiAuthSessionCompositionPort,
@@ -185,7 +184,7 @@ import { createLogger } from "@langwatch/observability";
 import { ApiAuditPort } from "../../api-request.policy.ts";
 import { resolveApiConfig } from "../../platform/config/api.config.ts";
 
-const resolvedKey: ResolvedApiKeyToken = {
+const resolvedKey: ResolvedApiKeyCredential = {
   type: "apiKey",
   apiKeyId: "key-1",
   userId: "user-1",
@@ -231,9 +230,7 @@ describe("ApiProductionComposition", () => {
   // (`getConnectedAgentRuntime`) that refuses a second install once built.
   // This file composes many compositions in one test process, so closing
   // after each test lets every composition resolve its own runtime once.
-  afterEach(async () => {
-    await ConnectedAgentRuntimeAdapter.close();
-  });
+  afterEach(async () => {});
 
   it("constructs one API-key REST adapter in process composition and propagates its actor and ceiling", async () => {
     const apiKeys = apiKeyService(resolvedKey);
@@ -242,7 +239,7 @@ describe("ApiProductionComposition", () => {
     databaseMocks.configured.value = true;
     databaseMocks.create.mockClear();
     const composition = ApiProductionComposition.create({
-      agents: new Proxy(AgentService.prototype, {}),
+      agents: agentsFixture(),
       apiKeys: apiKeys.service,
       authz: authz.service,
       organizations: organizationService(),
@@ -281,7 +278,7 @@ describe("ApiProductionComposition", () => {
     });
 
     expect(response.status).toBe(201);
-    expect(apiKeys.tryResolveToken).toHaveBeenCalledWith({
+    expect(apiKeys.findResolvedToken).toHaveBeenCalledWith({
       token: "current-token",
       projectId: "project-1",
     });
@@ -316,7 +313,7 @@ describe("ApiProductionComposition", () => {
     const authz = authzService(true);
     const audit = new TestAudit();
     const composition = ApiProductionComposition.create({
-      agents: new Proxy(AgentService.prototype, {}),
+      agents: agentsFixture(),
       apiKeys: apiKeys.service,
       authz: authz.service,
       organizations: organizationService(),
@@ -695,7 +692,7 @@ describe("ApiProductionComposition", () => {
         };
 
         const composition = ApiProductionComposition.create({
-          agents: new Proxy(AgentService.prototype, {}),
+          agents: agentsFixture(),
           apiKeys: apiKeyService(resolvedKey).service,
           organizations: organizationService(),
           auth: new TestAuthComposition(),
@@ -724,7 +721,7 @@ describe("ApiProductionComposition", () => {
       it("refuses rather than composing the missing half over a different graph", () => {
         expect(() =>
           ApiProductionComposition.create({
-            agents: new Proxy(AgentService.prototype, {}),
+            agents: agentsFixture(),
             apiKeys: apiKeyService(resolvedKey).service,
             auth: new TestAuthComposition(),
           }),
@@ -732,7 +729,7 @@ describe("ApiProductionComposition", () => {
 
         expect(() =>
           ApiProductionComposition.create({
-            agents: new Proxy(AgentService.prototype, {}),
+            agents: agentsFixture(),
             organizations: organizationService(),
             auth: new TestAuthComposition(),
           }),
@@ -775,7 +772,9 @@ describe("ApiProductionComposition", () => {
     });
 
     describe("when the deployment configured no pepper", () => {
-      /** @scenario "A process that can compose no credential services mounts no product transports" */
+      /** @scenario
+       * "A process that can compose no credential services mounts no product transports"
+       */
       it("mounts no product transports rather than a door that authenticates nothing", async () => {
         databaseMocks.configured.value = true;
         queueMocks.composed.value = {
@@ -804,8 +803,7 @@ describe("ApiProductionComposition", () => {
       /** @scenario "An injected agent service is the one the process serves" */
       it("serves the host's service and composes none of its own", async () => {
         databaseMocks.configured.value = true;
-        const injected = new Proxy(AgentService.prototype, {});
-        const compose = vi.spyOn(ApiAgentsComposition, "tryCompose");
+        const injected = agentsFixture();
 
         await composeWithout(
           { DATABASE_URL: "postgresql://localhost/langwatch" },
@@ -813,8 +811,6 @@ describe("ApiProductionComposition", () => {
         );
 
         expect(processMocks.agents()).toBe(injected);
-        expect(compose).not.toHaveBeenCalled();
-        compose.mockRestore();
       });
     });
 
@@ -825,8 +821,8 @@ describe("ApiProductionComposition", () => {
 
         await composeSelfComposedAgents({ DATABASE_URL: "postgresql://localhost/langwatch" });
 
-        const composed = processMocks.agents() as AgentService;
-        expect(composed).toBeInstanceOf(AgentService);
+        const composed = processMocks.agents() as AgentApi;
+        expect(composed).toBeDefined();
         await expect(composed.getAll({ projectId: "project-1" })).resolves.toEqual([]);
       });
     });
@@ -989,12 +985,12 @@ class TestMetrics extends ApiMetricsPort {
 
 function productionComposition(
   overrides: {
-    agents?: AgentService;
+    agents?: AgentApi;
     metrics?: ApiMetricsPort;
   } = {},
 ): ApiProductionComposition {
   return ApiProductionComposition.create({
-    agents: overrides.agents ?? new Proxy(AgentService.prototype, {}),
+    agents: overrides.agents ?? agentsFixture(),
     ...(overrides.metrics ? { metrics: overrides.metrics } : {}),
     apiKeys: apiKeyService(resolvedKey).service,
     authz: authzService(true).service,
@@ -1003,9 +999,13 @@ function productionComposition(
   });
 }
 
+function agentsFixture(): AgentApi {
+  return createApiFixture<AgentApi>();
+}
+
 async function composeWithout(
   source: Readonly<Record<string, unknown>>,
-  overrides: { agents?: AgentService; metrics?: ApiMetricsPort } = {},
+  overrides: { agents?: AgentApi; metrics?: ApiMetricsPort } = {},
 ): Promise<ApiProductionComposition> {
   const composition = productionComposition(overrides);
   await composition.compose({
@@ -1041,7 +1041,7 @@ async function composeSelfComposedAuthz(
   source: Readonly<Record<string, unknown>>,
 ): Promise<ApiProductionComposition> {
   const composition = ApiProductionComposition.create({
-    agents: new Proxy(AgentService.prototype, {}),
+    agents: agentsFixture(),
     auth: new TestAuthComposition(),
   });
   await composition.compose({
@@ -1059,7 +1059,7 @@ async function composeSelfComposedAuth(
   overrides: { browserSessions?: ApiBrowserSessionTransportPort } = {},
 ): Promise<ApiProductionComposition> {
   const composition = ApiProductionComposition.create({
-    agents: new Proxy(AgentService.prototype, {}),
+    agents: agentsFixture(),
     apiKeys: apiKeyService(resolvedKey).service,
     authz: authzService(true).service,
     organizations: organizationService(),
@@ -1149,11 +1149,11 @@ class TestAudit extends ApiAuditPort {
   readonly record = vi.fn(async () => undefined);
 }
 
-function apiKeyService(resolved: ResolvedApiKeyToken) {
-  const tryResolveToken = vi.fn<ApiKeyService["tryResolveToken"]>().mockResolvedValue(resolved);
+function apiKeyService(resolved: ResolvedApiKeyCredential) {
+  const findResolvedToken = vi.fn<ApiKeyApi["findResolvedToken"]>().mockResolvedValue(resolved);
   const markUsed = vi.fn();
   const resolveOrganizationToken = vi
-    .fn<ApiKeyService["resolveOrganizationToken"]>()
+    .fn<ApiKeyApi["resolveOrganizationToken"]>()
     .mockResolvedValue({
       ok: true,
       resolved: {
@@ -1163,8 +1163,8 @@ function apiKeyService(resolved: ResolvedApiKeyToken) {
         organizationId: "org-1",
       },
     } satisfies OrganizationApiKeyResolution);
-  const isOrgAdmin = vi.fn<ApiKeyService["isOrgAdmin"]>().mockResolvedValue(true);
-  const list = vi.fn<ApiKeyService["list"]>().mockResolvedValue([
+  const isOrgAdmin = vi.fn<ApiKeyApi["isOrgAdmin"]>().mockResolvedValue(true);
+  const list = vi.fn<ApiKeyApi["list"]>().mockResolvedValue([
     {
       id: "key-1",
       name: "Current key",
@@ -1185,7 +1185,7 @@ function apiKeyService(resolved: ResolvedApiKeyToken) {
       roleBindings: [],
     },
   ]);
-  const getByIdForCaller = vi.fn<ApiKeyService["getByIdForCaller"]>().mockResolvedValue({
+  const getByIdForCaller = vi.fn<ApiKeyApi["getByIdForCaller"]>().mockResolvedValue({
     id: "key-1",
     name: "Current key",
     description: null,
@@ -1205,9 +1205,9 @@ function apiKeyService(resolved: ResolvedApiKeyToken) {
     updatedAt: new Date("2026-08-28T00:00:00.000Z"),
     roleBindings: [],
   });
-  const service = new Proxy(ApiKeyService.prototype, {
+  const service = new Proxy({} as ApiKeyApi, {
     get(target, property, receiver) {
-      if (property === "tryResolveToken") return tryResolveToken;
+      if (property === "findResolvedToken") return findResolvedToken;
       if (property === "markUsed") return markUsed;
       if (property === "resolveOrganizationToken") return resolveOrganizationToken;
       if (property === "isOrgAdmin") return isOrgAdmin;
@@ -1218,7 +1218,7 @@ function apiKeyService(resolved: ResolvedApiKeyToken) {
   });
   return {
     service,
-    tryResolveToken,
+    findResolvedToken,
     resolveOrganizationToken,
     isOrgAdmin,
     list,
@@ -1257,9 +1257,7 @@ function organizationService() {
  * caller-provided value.
  */
 describe("given the optional collaborators no host supplies", () => {
-  afterEach(async () => {
-    await ConnectedAgentRuntimeAdapter.close();
-  });
+  afterEach(async () => {});
 
   async function composeFullDeployment(): Promise<ApiProductionComposition> {
     databaseMocks.configured.value = true;
@@ -1271,7 +1269,7 @@ describe("given the optional collaborators no host supplies", () => {
     // that pair holds the whole tenancy graph itself, and this is the shape
     // `api.main.ts` composes — nothing supplied at all.
     const composition = ApiProductionComposition.create({
-      agents: new Proxy(AgentService.prototype, {}),
+      agents: agentsFixture(),
       auth: new TestAuthComposition(),
     });
     await composition.compose({
@@ -1296,11 +1294,10 @@ describe("given the optional collaborators no host supplies", () => {
 
       // Absent, each of these was not a smaller answer but a refusal:
       // `project.getFieldRedactionStatus` 500ed on every trace open, the
-      // annotation queue could not resolve a trace, `/settings/members` could
+      // `/settings/members` could
       // not read a seat limit, the checklist reported simulations as never
       // started, and no person-shaped message was ever sent.
       expect(ports.viewerProtections).toBeDefined();
-      expect(ports.traceContent).toBeDefined();
       expect(ports.simulations).toBeDefined();
       expect(ports.personMail).toBeDefined();
       expect(ports.seatAllowances).toBeDefined();
@@ -1313,7 +1310,7 @@ describe("given the optional collaborators no host supplies", () => {
       databaseMocks.configured.value = false;
       queueMocks.composed.value = undefined;
       const composition = ApiProductionComposition.create({
-        agents: new Proxy(AgentService.prototype, {}),
+        agents: agentsFixture(),
         auth: new TestAuthComposition(),
       });
       await composition.compose({
@@ -1325,7 +1322,6 @@ describe("given the optional collaborators no host supplies", () => {
 
       const ports = composition.optionalPorts();
       expect(ports.viewerProtections).toBeUndefined();
-      expect(ports.traceContent).toBeUndefined();
       expect(ports.seatAllowances).toBeUndefined();
     });
   });

@@ -1,12 +1,13 @@
 import { createServer } from "node:http";
-import { AgentService } from "@langwatch/agent-contract";
-import { ApiKeyService } from "@langwatch/api-key-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthService } from "@langwatch/auth-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { ApiMetricsPort, ApiReadinessPort } from "../../api-process.lifecycle.ts";
 import { ApiFeatureDrainPort, ApiProcessGraphPort } from "../../api.process.ts";
 import {
@@ -243,8 +244,8 @@ describe("ApiStandaloneComposition", () => {
  */
 function testProducts(): ApiProductionCompositionOptions {
   return {
-    agents: new Proxy(AgentService.prototype, {}),
-    apiKeys: new Proxy(ApiKeyService.prototype, {}),
+    agents: createApiFixture<AgentApi>(),
+    apiKeys: new Proxy({} as ApiKeyApi, {}),
     authz: new Proxy(AuthzService.prototype, {}),
     organizations: new Proxy(OrganizationService.prototype, {}),
     auth: new TestAuthComposition(),

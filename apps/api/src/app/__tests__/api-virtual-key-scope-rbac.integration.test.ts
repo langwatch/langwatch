@@ -10,7 +10,10 @@ import {
   PostgresAuthzAdapter,
 } from "@langwatch/authz-server";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
-import { VirtualKeyTrpcApi, type VirtualKeyTrpcContext } from "@langwatch/gateway-server";
+import {
+  VirtualKeyTrpcApi,
+  type VirtualKeyTrpcContext,
+} from "@langwatch/gateway-server/api-trpc/virtual-key";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import {

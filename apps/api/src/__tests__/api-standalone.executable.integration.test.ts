@@ -1,12 +1,13 @@
 import { createServer } from "node:http";
-import { AgentService } from "@langwatch/agent-contract";
-import { ApiKeyService } from "@langwatch/api-key-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthService } from "@langwatch/auth-contract";
 import type { UserService } from "@langwatch/user-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { configureLogger, createLogger } from "@langwatch/observability";
 import { OrganizationService } from "@langwatch/organization-contract";
 import { afterEach, describe, expect, it, vi, type MockInstance } from "vitest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   ApiAuthSessionCompositionPort,
   ApiBrowserSessionTransportPort,
@@ -19,19 +20,6 @@ import {
 } from "../app/api-standalone.executable.ts";
 import { apiLoggerConfiguration, resolveApiConfig } from "../platform/config/api.config.ts";
 
-/**
- * The executable's boot proof.
- *
- * It drives the REAL entry path — `startStandaloneApi` over an injected host —
- * rather than a composition constructed by hand, because the two things this
- * file exists to pin are properties of the wiring between them: which
- * composition the entry reaches for, and what happens before a socket opens.
- *
- * No datastore is required and none is used. The process composes a Prisma
- * client from a connection string without dialling it (Prisma connects on its
- * first query), so a boot with `DATABASE_URL` set is exactly the shape a
- * deployment has and exactly as deterministic as one without.
- */
 describe("the standalone API executable", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -45,9 +33,6 @@ describe("the standalone API executable", () => {
 
       const started = await startStandaloneApi({ host: new RecordingHost(environment) });
 
-      // Both lines come from collaborators only the production composition
-      // resolves. The process surface this executable used to boot composed a
-      // database and a queue and stopped, so neither could ever be reported.
       expect(logged(log.info)).toContainEqual(
         expect.stringContaining("API composed without a Group Queue"),
       );
@@ -71,7 +56,9 @@ describe("the standalone API executable", () => {
       await expect(fetch(`http://127.0.0.1:${environment.API_PORT}/api/health`)).rejects.toThrow();
     });
 
-    /** @scenario "A collaborator the process goes on to compose itself is not announced as absent" */
+    /** @scenario
+     * "A collaborator the process goes on to compose itself is not announced as absent"
+     */
     /** @scenario "A process that composes its own browser sessions announces no absence" */
     it("announces no adapter as one no package implements, and serves anyway", async () => {
       const environment = deployment();
@@ -79,9 +66,6 @@ describe("the standalone API executable", () => {
 
       const started = await startStandaloneApi({ host: new RecordingHost(environment) });
 
-      // The executable used to say this on every boot and then compose Better
-      // Auth for itself a few lines later. Whatever it cannot build is
-      // reported by the composition that ran into it, naming the reason.
       expect(logged(log.warn)).not.toContainEqual(
         expect.stringContaining("without an adapter no package implements"),
       );
@@ -268,8 +252,8 @@ function logged(spy: MockInstance): string[] {
  */
 function hostProducts(): ApiProductionCompositionOptions {
   return {
-    agents: new Proxy(AgentService.prototype, {}),
-    apiKeys: new Proxy(ApiKeyService.prototype, {}),
+    agents: createApiFixture<AgentApi>(),
+    apiKeys: new Proxy({} as ApiKeyApi, {}),
     authz: new Proxy(AuthzService.prototype, {}),
     organizations: new Proxy(OrganizationService.prototype, {}),
     auth: new HostAuthComposition(),

@@ -13,14 +13,14 @@
 import { createErrorHandler } from "@langwatch/api";
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
-import { ConnectedAgentStateAdapter } from "@langwatch/agent-server";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import {
   LangyLocalControlRuntimeAdapter,
   LocalControlLongPoll,
   LocalControlSessionCoreService,
   type LocalControlRuntime,
 } from "@langwatch/langy-server";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { nanoid } from "nanoid";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -39,7 +39,7 @@ let api: ReturnType<typeof mount>;
 beforeEach(() => {
   actingUserId = OWNER;
   runtime = LangyLocalControlRuntimeAdapter.create({
-    store: ConnectedAgentStateAdapter.memory(),
+    store: SessionStateStoreFactory.memory(),
     projects: { tryReadOrganizationId: async () => "organization-1" },
     mintSessionKey: async () => ({
       token: `sk-lw-${nanoid(48)}`,
@@ -174,7 +174,7 @@ async function refusalOf(response: Response): Promise<{ code: string; message: s
 function mount() {
   const hono = new Hono();
   const core = LocalControlSessionCoreService.create({
-    apiKeys: { tryResolveToken: async () => null } as unknown as ApiKeyService,
+    apiKeys: { findResolvedToken: async () => null } as unknown as ApiKeyApi,
     readCredential: () => null,
     actors: { tryFindById: async () => null } as never,
     baseHost: "https://app.langwatch.test",

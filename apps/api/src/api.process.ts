@@ -3,12 +3,10 @@ import {
   type ProcessObservability,
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
-import type { AgentService } from "@langwatch/agent-contract";
-import type { AgentAppDependencies, AgentTestPort } from "@langwatch/agent-server";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { TRPCCreateRouterOptions } from "@trpc/server";
 import {
   ApiApplication,
-  MissingAgentService,
   NoApiTrpcFeatures,
   type ApiHttpOptions,
   type ApiSubscriptionMount,
@@ -43,12 +41,7 @@ export abstract class ApiProcessGraphPort {
  */
 export class ApiProcess {
   static create(options: {
-    /** Absent for a process that composed no agent service; ApiApplication gets the null object. */
-    agents?: AgentService;
-    /** Absent for a process that composed no Scenario application; see ApiApplication. */
-    agentTesting?: AgentTestPort;
-    /** Absent for a process that composed no connected-agent transport; see ApiApplication. */
-    connectedAgents?: AgentAppDependencies["connected"];
+    agents: AgentApi;
     http?: Omit<ApiHttpOptions, "logger">;
     requestPolicy?: ApiRequestPolicy;
     rest?: Hono;
@@ -85,12 +78,7 @@ export class ApiProcess {
     }
     const observability = createProcessObservability(options.observability);
     const application = ApiApplication.create({
-      // ApiApplication requires both: a process that composed neither passes
-      // the null objects, so `agents.*`/`secrets.*` still mount and refuse by
-      // name instead of leaving the router off the wire.
-      agents: options.agents ?? new MissingAgentService(),
-      agentTesting: options.agentTesting,
-      ...(options.connectedAgents ? { connectedAgents: options.connectedAgents } : {}),
+      agents: options.agents,
       features: options.features ?? new NoApiTrpcFeatures(),
       validateOutput: options.validateOutput ?? false,
       http: {

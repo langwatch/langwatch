@@ -1,8 +1,8 @@
 /**
  * The workbench run loop, composed for real and driven end to end.
  */
-import type { AgentService, Agent as TypedAgent } from "@langwatch/agent-contract";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { AgentApi, Agent as TypedAgent } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AbsentPayloadStagingAdapter } from "@langwatch/stored-object-server";
 import type {
   AuthzGetDecisionInput,
@@ -22,8 +22,9 @@ import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { ApiAuditPort } from "../../api-request.policy.ts";
-import { ApiApplication, MissingAgentService } from "../../api.application.ts";
+import { ApiApplication } from "../../api.application.ts";
 import { composeDatasetService } from "../../features/dataset/dataset.composition.ts";
 import { composeEvaluatorService } from "../../features/evaluator/evaluator.composition.ts";
 import { composeMonitorService } from "../../features/monitor/monitor.composition.ts";
@@ -175,14 +176,14 @@ function testRedis() {
 }
 
 /** The one credential a run mints for the code it executes. */
-function testApiKeys(): { service: ApiKeyService; created: unknown[] } {
+function testApiKeys(): { service: ApiKeyApi; created: unknown[] } {
   const created: unknown[] = [];
   const service = {
     create: async (input: unknown) => {
       created.push(input);
       return { token: "sk-lw-sandbox" };
     },
-  } as unknown as ApiKeyService;
+  } as unknown as ApiKeyApi;
   return { service, created };
 }
 
@@ -332,7 +333,7 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
       datasets,
       monitors,
       evaluators,
-      agents: stub<AgentService>("agents"),
+      agents: createApiFixture<AgentApi>(),
       modelProviders,
       reportEvaluation: evaluation.reportEvaluation,
     },
@@ -357,7 +358,7 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({

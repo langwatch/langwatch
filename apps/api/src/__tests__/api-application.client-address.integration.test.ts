@@ -2,7 +2,8 @@
  * The caller's address on the tRPC surface.
  * @regression
  */
-import { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TRPCCreateRouterOptions } from "@trpc/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -10,7 +11,6 @@ import {
   ApiApplication,
   ApiTrpcFeaturesPort,
   type ApiTrpcFeatureMount,
-  MissingAgentService,
   NoApiTrpcFeatures,
 } from "../api.application.ts";
 import { ApiHttpListener } from "../api-http.listener.ts";
@@ -41,7 +41,7 @@ afterEach(() => {
 async function probeAddress(headers: Record<string, string>): Promise<string> {
   const application = ApiApplication.create({
     features: new AddressProbeFeatures(),
-    agents: new MissingAgentService() as AgentService,
+    agents: createApiFixture<AgentApi>(),
     http: {
       createContext: async () => ({
         actor: () => ({ id: "user-1" }),
@@ -76,8 +76,8 @@ describe("the tRPC surface's per-caller rate-limit key", () => {
     it("names the unresolved bucket rather than a resolved caller's key", async () => {
       const application = ApiApplication.create({
         features: new AddressProbeFeatures(),
-        agents: new MissingAgentService() as AgentService,
-        http: {
+        agents: createApiFixture<AgentApi>(),
+            http: {
           createContext: async () => ({
             actor: () => ({ id: "user-1" }),
             authorize: async () => undefined,

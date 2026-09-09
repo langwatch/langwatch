@@ -2,17 +2,17 @@
  * The subscription lane, mounted on the process rather than merely built. Two properties,
  * and the mount is where both are decidable.
  */
-import { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { OrganizationService } from "@langwatch/organization-contract";
 import type { Secret, SecretApi } from "@langwatch/secret-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TRPCCreateRouterOptions } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiApplication,
   ApiTrpcFeaturesPort,
-  MissingAgentService,
   NoApiTrpcFeatures,
   type ApiTrpcFeatureMount,
 } from "../api.application.ts";
@@ -91,7 +91,7 @@ function subscriptionSecurity() {
     });
 
   return ApiRestSecurity.create({
-    apiKeys: unreachable(ApiKeyService.prototype),
+    apiKeys: unreachable({} as ApiKeyApi),
     authz: unreachable(AuthzService.prototype),
     organizations: unreachable(OrganizationService.prototype),
     observability: ApiRestObservabilityComposition.create(),
@@ -102,7 +102,7 @@ function subscriptionSecurity() {
 function processWithLane() {
   const application = ApiApplication.create({
     features: new LiveUpdateFeatures(),
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     http: {
       createContext: async () => ({
         actor: () => ({ id: "user-1" }),
@@ -217,7 +217,7 @@ describe("ApiApplication's subscription lane", () => {
     it("serves no /api/sse route at all", async () => {
       const application = ApiApplication.create({
         features: new NoApiTrpcFeatures(),
-        agents: new MissingAgentService(),
+        agents: createApiFixture<AgentApi>(),
         http: {
           createContext: async () => ({
             actor: () => ({ id: "user-1" }),

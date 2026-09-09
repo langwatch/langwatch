@@ -4,7 +4,7 @@
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
-import { SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS } from "@langwatch/scenario-server";
+import { SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS } from "@langwatch/scenario-server/api-rest/scenario-generate";
 import type { WorkflowApp } from "@langwatch/workflow-server";
 import { Hono, type ErrorHandler, type MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";

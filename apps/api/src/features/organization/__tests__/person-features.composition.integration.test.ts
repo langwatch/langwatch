@@ -2,6 +2,7 @@
  * The person-shaped features of the packaged tRPC record, served by the API process.
  */
 import type { AuthService } from "@langwatch/auth-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type {
   AuthzGetDecisionInput,
   AuthzGrantsService,
@@ -21,12 +22,10 @@ import {
 } from "@langwatch/identity-server";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi, ProjectService } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ApiApplication,
-  MissingAgentService,
-} from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import { ApiEventingIdentityAdapter } from "../../../app/api-identity-eventing.adapter.ts";
 import { composeApiIdentityPipelines } from "../../../app/api-identity-pipelines.composition.ts";
 import { ApiAuditPort } from "../../../api-request.policy.ts";
@@ -176,6 +175,7 @@ async function composePersonFeatures(
           getSettings: async () => ({ supportContact: null }),
         } as unknown as OrganizationService,
         projects: { create: async () => ({ slug: "acme-1" }) } as unknown as ProjectService,
+        projectApi: {} as unknown as ProjectApi,
         grants,
         auth: {} as unknown as AuthService,
         users: user.app,
@@ -222,7 +222,7 @@ async function composeApplication(
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({

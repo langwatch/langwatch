@@ -15,7 +15,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AgentService, AgentWithFields } from "@langwatch/agent-contract";
+import type { AgentApi, AgentWithFields } from "@langwatch/agent-contract";
 import { AgentNotFoundError } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
@@ -37,8 +37,8 @@ class AllowTestQueries extends PrismaQueryGuard {
   }
 }
 
-/** In-memory `AgentService` — only `getById`/`create` are exercised here. */
-class FakeAgentService implements Pick<AgentService, "getById" | "create"> {
+/** In-memory AgentApi used to resolve the agents seeded by this suite. */
+class FakeAgentApi implements Pick<AgentApi, "getById" | "create"> {
   private readonly byId = new Map<string, AgentWithFields>();
 
   async create(input: {
@@ -174,7 +174,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
   const services = () => ({
     datasets: {} as DatasetService,
     prompts: createPromptService(),
-    agents: new FakeAgentService() as unknown as AgentService,
+    agents: new FakeAgentApi(),
     workflows: createWorkflowDslPort(prisma!),
     evaluators: new FakeEvaluatorService() as unknown as EvaluatorService,
   });
@@ -234,7 +234,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         "fast resolution agent workflow",
       );
 
-      const agentService = new FakeAgentService();
+      const agentService = new FakeAgentApi();
       const agent = await agentService.create({
         id: `test_agent_${nanoid(8)}`,
         projectId: PROJECT_ID,
@@ -254,7 +254,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         },
         [{ type: "agent", dbAgentId: agent.id }],
         [],
-        { ...services(), agents: agentService as unknown as AgentService },
+        { ...services(), agents: agentService },
       );
 
       if ("error" in result) {
@@ -288,7 +288,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
       });
       cleanupWorkflowIds.push(workflowId);
 
-      const agentService = new FakeAgentService();
+      const agentService = new FakeAgentApi();
       const agent = await agentService.create({
         id: `test_agent_${nanoid(8)}`,
         projectId: PROJECT_ID,
@@ -308,7 +308,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         },
         [{ type: "agent", dbAgentId: agent.id }],
         [],
-        { ...services(), agents: agentService as unknown as AgentService },
+        { ...services(), agents: agentService },
       );
 
       expect("error" in result).toBe(true);

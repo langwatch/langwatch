@@ -2,12 +2,10 @@
  * Builds the request body from the package's own `timeseriesInputSchema`
  * (ADR-128), never the browser metric registry.
  */
-import type { AnalyticsApp } from "@langwatch/analytics-server";
-import {
-  createAnalyticsLegacyRestApp,
-  createAnalyticsRestApp,
-  timeseriesInputSchema,
-} from "@langwatch/analytics-server";
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import { createAnalyticsLegacyRestApp } from "@langwatch/analytics-server/api-rest/analytics-legacy";
+import { createAnalyticsRestApp } from "@langwatch/analytics-server/api-rest/analytics";
+import { timeseriesInputSchema } from "@langwatch/analytics-server";
 import {
   flexibleDateSchema,
   type AppRestSecurity,
@@ -20,7 +18,7 @@ import {
  */
 export function mountAnalyticsRest(options: {
   security: AppRestSecurity;
-  analytics: () => AnalyticsApp;
+  analytics: () => AnalyticsApi;
 }): MountableRestApp[] {
   const requestSchema = timeseriesInputSchema.omit({ projectId: true }).extend({
     startDate: flexibleDateSchema,

@@ -3,7 +3,7 @@
  * The billing reconciliation REST surface'''s BOUNDARY: canonical error envelope, plan gate, cursor validation and replay cap — the ledger itself is a double since none of these depend on it.
  * Spec: specs/ai-gateway/gateway-spend-rest.feature, specs/ai-gateway/public-rest-api.feature, specs/ai-gateway/billing-spend-events.feature
  */
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { apiErrorSchema, requestTraceIds } from "@langwatch/api/rest";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
@@ -11,10 +11,12 @@ import {
   GatewaySpendCursorAdapter,
   GatewaySpendEventsPort,
   GatewaySpendEventsService,
+} from "@langwatch/gateway-server";
+import {
   createGatewaySpendRestApp,
   type GatewaySpendEnvelope,
   type GatewaySpendWebhookEndpoint,
-} from "@langwatch/gateway-server";
+} from "@langwatch/gateway-server/api-rest/gateway-spend";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
@@ -161,7 +163,7 @@ function buildApp(options?: {
       return { ok: false as const, reason: "unusable_credential" as const };
     },
     markUsed,
-  } as unknown as ApiKeyService;
+  } as unknown as ApiKeyApi;
 
   const security = ApiRestSecurity.create({
     apiKeys,

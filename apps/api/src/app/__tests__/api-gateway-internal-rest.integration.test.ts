@@ -3,11 +3,14 @@
  * @see apps/api/src/app/api-gateway-internal-rest.composition.ts
  * @see packages/features/gateway/server/src/transport/api-rest/gateway-internal.api.ts
  */
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { AppRestSecurity } from "@langwatch/api/rest";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import { buildGatewayCanonicalString, computeGatewaySignature } from "@langwatch/gateway-server";
+import {
+  buildGatewayCanonicalString,
+  computeGatewaySignature,
+} from "@langwatch/gateway-server/api-rest/gateway-internal";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -90,7 +93,7 @@ function composeFamily(options: {
   } as unknown as PrismaClient;
 
   const security: AppRestSecurity = ApiRestSecurity.create({
-    apiKeys: {} as unknown as ApiKeyService,
+    apiKeys: {} as unknown as ApiKeyApi,
     authz: {} as unknown as AuthzService,
     organizations: {} as unknown as OrganizationService,
     observability: ApiRestObservabilityComposition.create(),
@@ -455,7 +458,7 @@ describe("the gateway internal control plane", () => {
       expect(
         composeApiGatewayInternalRest({
           security: ApiRestSecurity.create({
-            apiKeys: {} as unknown as ApiKeyService,
+            apiKeys: {} as unknown as ApiKeyApi,
             authz: {} as unknown as AuthzService,
             organizations: {} as unknown as OrganizationService,
             observability: ApiRestObservabilityComposition.create(),

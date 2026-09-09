@@ -215,21 +215,21 @@ export function organizationWorld(options: OrganizationWorldOptions = {}): Organ
       return { members: rows, totalCount: rows.length };
     },
     getMember: async ({ userId }) => found(userId),
-    changeMemberRole: async ({ userId, role }) => {
+    changeMemberRole: async ({ userId, role }, _by) => {
       found(userId).role = role;
       return { teamsLeftWithoutAdmin: [] };
     },
-    setMemberDisabled: async ({ userId, disabled, actingUser }) => {
+    setMemberDisabled: async ({ userId, disabled }, by) => {
       const member = found(userId);
-      if (disabled && actingUser?.id === userId) throw new CannotDisableSelfError();
+      if (disabled && by?.id === userId) throw new CannotDisableSelfError();
       if (!disabled && member.disabledAt !== null && seatsLeft() <= 0) {
         seatOverflow(activeCount(), options.seats ?? 0);
       }
       member.disabledAt = disabled ? EPOCH : null;
     },
-    deleteMember: async ({ userId, actingUserId }) => {
+    deleteMember: async ({ userId }, by) => {
       const member = found(userId);
-      if (actingUserId === userId) throw new CannotRemoveSelfError();
+      if (by?.id === userId) throw new CannotRemoveSelfError();
       const admins = activeAdmins();
       if (member.role === "ADMIN" && member.disabledAt === null && admins.length <= 1) {
         throw new CannotRemoveLastAdminError();

@@ -30,6 +30,9 @@ const PERSONAL_PROJECT: RestAuthProject = {
 /** The `personal_project.api_key` the device-login exchange delivered. */
 const DELIVERED_KEY = "sk-lw-personal-alpha";
 
+/** A key minted for a job rather than for a person, on the same workspace. */
+const SERVICE_KEY = "sk-lw-personal-alpha-service";
+
 const USAGE = {
   summary: {
     spentUsd: 1.25,
@@ -79,6 +82,26 @@ describe("given the personal project key device login delivered", () => {
   });
 });
 
+describe("given a service key on that same personal workspace", () => {
+  describe("when it reads the personal usage", () => {
+    /** @scenario "An ownerless service key is refused rather than answered as the owner" */
+    it("refuses by name rather than answering as the workspace's owner", async () => {
+      const personalUsage = vi.fn(async () => USAGE);
+      const api = mountMe(personalUsage);
+
+      const response = await api.get("/api/me/usage", {
+        authorization: `Bearer ${SERVICE_KEY}`,
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "personal_usage_service_key_unsupported",
+      });
+      expect(personalUsage).not.toHaveBeenCalled();
+    });
+  });
+});
+
 function mountMe(personalUsage: () => Promise<typeof USAGE>): MountedRestFamily {
   const world = RestAuthWorld.create({
     projects: [PERSONAL_PROJECT],
@@ -88,6 +111,13 @@ function mountMe(personalUsage: () => Promise<typeof USAGE>): MountedRestFamily 
         projectId: PERSONAL_PROJECT.id,
         userId: REST_AUTH_USER,
         apiKeyId: "api-key-personal",
+        grants: ["project:view"],
+      },
+      {
+        token: SERVICE_KEY,
+        projectId: PERSONAL_PROJECT.id,
+        userId: null,
+        apiKeyId: "api-key-service",
         grants: ["project:view"],
       },
     ],

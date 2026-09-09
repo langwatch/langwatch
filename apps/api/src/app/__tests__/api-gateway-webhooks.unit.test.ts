@@ -60,8 +60,8 @@ describe("the API's Enterprise webhook platform", () => {
         resolveClickHouseClient: testClickHouse,
       });
 
-      expect(webhooks?.endpoints.tryGetDeliverable).toBeTypeOf("function");
-      expect(webhooks?.events?.getEmittedEvents).toBeTypeOf("function");
+      expect(webhooks?.webhooks.tryGetDeliverable).toBeTypeOf("function");
+      expect(webhooks?.webhooks.getEmittedEvents).toBeTypeOf("function");
       expect(webhooks?.delivery?.appendReplayToEndpointStream).toBeTypeOf("function");
     });
   });
@@ -74,9 +74,9 @@ describe("the API's Enterprise webhook platform", () => {
         resolveClickHouseClient: null,
       });
 
-      expect(webhooks?.endpoints.tryGetDeliverable).toBeTypeOf("function");
+      expect(webhooks?.webhooks.tryGetDeliverable).toBeTypeOf("function");
       expect(webhooks?.delivery?.appendReplayToEndpointStream).toBeTypeOf("function");
-      expect(webhooks?.events).toBeUndefined();
+      expect(webhooks?.eventsAvailable).toBe(false);
     });
   });
 
@@ -109,8 +109,8 @@ describe("the API's Enterprise webhook platform", () => {
         webhooks,
       });
 
-      expect(ports.webhookEndpoints).toBe(webhooks.endpoints);
-      expect(ports.webhookEvents).toBe(webhooks.events);
+      expect(ports.webhookEndpoints).toBe(webhooks.webhooks);
+      expect(ports.webhookEvents).toBe(webhooks.webhooks);
       expect(ports.webhookDelivery).toBe(webhooks.delivery);
     });
 

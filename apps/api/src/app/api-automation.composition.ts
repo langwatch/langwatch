@@ -38,7 +38,6 @@
  *                           and this process never runs one.
  */
 import {
-  AutomationPersistCapService,
   AutomationApp,
   AutomationClockPort,
   AutomationGraphNotifierPort,
@@ -50,17 +49,12 @@ import {
   AutomationSlackBotTokenDecryptorPort,
   AutomationTestFirePort,
   HmacUnsubscribeTokenAdapter,
-  PostgresAutomationAdapter,
   SchedulerWakePort,
-  type AutomationPersistCapRedisPort,
   type ClaimLease,
 } from "@langwatch/automation-server";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type {
-  AutomationPersistCapConfig,
-  AutomationPlanProvider,
-  SlackActionParams,
-} from "@langwatch/automation-contract";
+import type { AutomationPlanProvider, SlackActionParams } from "@langwatch/automation-contract";
+import { automationServerConfigSchema } from "@langwatch/automation-contract";
 import { PrismaScheduledJobStore, SchedulerService } from "@langwatch/eventing/server";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -69,16 +63,8 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { ResourceScope } from "@langwatch/runtime-composition";
 import { nowInstant, toDate } from "@langwatch/time";
-
-/**
- * The platform application's persist ceilings, stated here.
- *
- * Stated rather than read from configuration because they are the DEPLOYMENT
- * defaults every install has run on, and reading them from an unset variable
- * would silently give every free project the paid ceiling.
- */
-const PERSIST_CAP: AutomationPersistCapConfig = { free: 50, paid: 500, enterprise: 5_000 };
 
 /** A capability the API process deliberately does not run, refused by name. */
 class ApiAutomationUnavailableError extends HandledError {
@@ -120,44 +106,38 @@ export type ApiAutomationCompositionOptions = Readonly<{
 export function composeApiAutomationApp(options: ApiAutomationCompositionOptions): AutomationApp {
   const logger = createLogger(`${options.processName}:automation`);
   const clock = new ApiAutomationClock();
-
-  const automation = PostgresAutomationAdapter.create({
-    database: options.prisma,
-    verifier: HmacUnsubscribeTokenAdapter.create({ secret: options.unsubscribeSecret }),
-    // The report calendar, on the SAME `ScheduledJob` store the worker's loop
-    // claims a due row through — Eventing's own, not a second narrowing of it,
-    // so the row this process writes on save is the row that process reads.
-    // Storing a schedule is one guarded Postgres write and needs no loop; the
-    // loop stays where the fires are.
-    jobs: new PrismaScheduledJobStore(options.prisma),
-    clock,
-    wake: new ApiSchedulerWake(options.redis, logger),
-    projects: options.projects,
-    // Nothing here evaluates a graph automation — the worker does — so the
-    // charted reads a graph trigger would be measured against refuse by name
-    // rather than being composed a second time on this process.
-    analytics: unevaluatedGraphAnalytics(),
-    notifier: new UndeliveredApiGraphAlerts(),
-    baseHost: options.baseHost,
-    logger: new ApiAutomationLogger(logger),
-    slackTokens: new ApiAutomationSlackTokens(options.providers),
-    dispatchErrors: new ApiAutomationDispatchErrors(),
-    heartbeat: new UnmeasuredApiAutomationHeartbeat(),
-    runaway: new UncontainedApiAutomationRunaway(logger),
-    testFire: new UndeliverableApiTestFire(),
-    persistCaps: AutomationPersistCapService.create({
-      projects: options.projects,
-      planProvider: options.plans,
-      config: PERSIST_CAP,
-      redis: options.redis as AutomationPersistCapRedisPort | null,
-    }),
-  }).build();
+  const config = { ...automationServerConfigSchema.parse({}), baseHost: options.baseHost };
 
   return AutomationApp.create({
-    automation,
-    monitors: options.monitors,
-    projects: options.projects,
-    featureFlags: options.featureFlags,
+    dependencies: {
+      analytics: unevaluatedGraphAnalytics(),
+      monitors: options.monitors,
+      featureFlags: options.featureFlags,
+      entitlement: options.plans,
+      projects: options.projects,
+    },
+    infrastructure: {
+      database: options.prisma,
+      verifier: HmacUnsubscribeTokenAdapter.create({ secret: options.unsubscribeSecret }),
+      // The report calendar, on the SAME `ScheduledJob` store the worker's loop
+      // claims a due row through — Eventing's own, not a second narrowing of it,
+      // so the row this process writes on save is the row that process reads.
+      // Storing a schedule is one guarded Postgres write and needs no loop; the
+      // loop stays where the fires are.
+      jobs: new PrismaScheduledJobStore(options.prisma),
+      clock,
+      wake: new ApiSchedulerWake(options.redis, logger),
+      notifier: new UndeliveredApiGraphAlerts(),
+      logger: new ApiAutomationLogger(logger),
+      slackTokens: new ApiAutomationSlackTokens(options.providers),
+      dispatchErrors: new ApiAutomationDispatchErrors(),
+      heartbeat: new UnmeasuredApiAutomationHeartbeat(),
+      runaway: new UncontainedApiAutomationRunaway(logger),
+      testFire: new UndeliverableApiTestFire(),
+      redis: options.redis,
+    },
+    config,
+    resources: new ResourceScope(),
   });
 }
 

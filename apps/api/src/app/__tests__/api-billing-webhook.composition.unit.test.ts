@@ -10,7 +10,7 @@
  * @see packages/enterprise/features/billing/specs/stripe-webhook.feature
  */
 // @vitest-environment node
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
   BillingSubscriptionService,
@@ -36,7 +36,7 @@ const STRIPE_CONFIG: ApiBillingConfig = {
 
 function security() {
   return ApiRestSecurity.create({
-    apiKeys: {} as ApiKeyService,
+    apiKeys: {} as ApiKeyApi,
     authz: {} as AuthzService,
     organizations: {} as OrganizationService,
     observability: ApiRestObservabilityComposition.create(),

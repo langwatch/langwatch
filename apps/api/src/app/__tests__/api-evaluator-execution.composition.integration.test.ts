@@ -3,12 +3,15 @@
  * @see apps/api/src/app/api-evaluator-execution.composition.ts
  * @see specs/ai-gateway/guardrail-check-endpoint.feature
  */
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { ExperimentService } from "@langwatch/experiment-contract";
-import { buildGatewayCanonicalString, computeGatewaySignature } from "@langwatch/gateway-server";
+import {
+  buildGatewayCanonicalString,
+  computeGatewaySignature,
+} from "@langwatch/gateway-server/api-rest/gateway-internal";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -271,7 +274,7 @@ function gatewayInternalWithGuardrails() {
   const runtime = evaluatorExecution();
   const app = composeApiGatewayInternalRest({
     security: ApiRestSecurity.create({
-      apiKeys: {} as unknown as ApiKeyService,
+      apiKeys: {} as unknown as ApiKeyApi,
       authz: {} as unknown as AuthzService,
       organizations: {} as unknown as OrganizationService,
       observability: ApiRestObservabilityComposition.create(),
@@ -351,6 +354,10 @@ function mountProcessRest() {
         Promise.resolve({
           ok: true as const,
           project: { id: "project-1" },
+          resolved: {
+            type: "legacyProjectKey" as const,
+            project: { id: "project-1" } as never,
+          },
           markUsed: () => void 0,
         }),
       rateLimit: async () => ({ allowed: true }),

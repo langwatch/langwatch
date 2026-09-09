@@ -6,9 +6,9 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import { createApiKeysRestApp } from "@langwatch/api-key-server";
-import type { ConnectedAgentRuntime, LongPollTransportService } from "@langwatch/agent-server";
 import type { AuthRestPorts } from "@langwatch/auth-server";
-import { createGatewayPlatformRestApp, createGatewaySpendRestApp } from "@langwatch/gateway-server";
+import { createGatewayPlatformRestApp } from "@langwatch/gateway-server/api-rest/gateway-platform";
+import { createGatewaySpendRestApp } from "@langwatch/gateway-server/api-rest/gateway-spend";
 import type { GovernanceIngestRestPorts } from "@langwatch/enterprise-governance-server";
 
 
@@ -105,20 +105,7 @@ function packagedCollaborators(): ApiPackagedRestCollaborators {
     services: {
       agentCache: refuse("The agent cache"),
       agents: refuse("Agents"),
-      // Layers `/api/v1/agents/connect/*` and `/:id/call` onto the family
-      // above (ADR-128). Production supplies it whenever connected agents
-      // composed (`api-packaged-rest.composition.ts:171-173`); a stand-in
-      // that omitted it would silently drop four documented operations.
-      agentsV1: () => ({
-        connectedRuntime: refuse<ConnectedAgentRuntime>("The connected-agent runtime"),
-        connect: {
-          transport: refuse<LongPollTransportService>("The long-poll transport"),
-        },
-        call: {
-          runtime: refuse<ConnectedAgentRuntime>("The connected-agent runtime"),
-          assertRunnable: refuse<Promise<void>>("Connected-agent runnability checks"),
-        },
-      }),
+      agentsV1: () => ({ connect: {}, call: {} }),
       apiKeys: refuse("API keys"),
       automation: refuse("Automations"),
       broadcast: refuse("Broadcast"),

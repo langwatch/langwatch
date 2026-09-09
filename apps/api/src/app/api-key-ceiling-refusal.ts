@@ -4,7 +4,7 @@
 import {
   ApiKeyPermissionDeniedError,
   ApiKeyPermissionNotDelegableError,
-  type ResolvedApiKeyToken,
+  type ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -12,7 +12,7 @@ import { classifyForLangy } from "@langwatch/langy-contract";
 import type { Logger } from "@langwatch/observability";
 
 export function apiKeyCeilingRefusal(
-  resolved: Extract<ResolvedApiKeyToken, { type: "apiKey" }>,
+  resolved: Extract<ResolvedApiKeyCredential, { type: "apiKey" }>,
   permission: AuthzPermission,
   logger: Pick<Logger, "error">,
 ): HandledError {

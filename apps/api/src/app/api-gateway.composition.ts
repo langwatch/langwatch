@@ -30,6 +30,7 @@ import {
   type VirtualKeyActor,
   virtualKeyBudgetInputSchema,
   GatewayScopeResolutionService,
+  type GatewayAppDependencies,
 } from "@langwatch/gateway-server";
 import { PrismaGatewayAuditRepository } from "@langwatch/gateway-server/composition/gateway-audit";
 import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
@@ -47,6 +48,7 @@ import { PrismaVirtualKeyAuthorizationRepository } from "@langwatch/gateway-serv
 import { PrismaVirtualKeyDirectBudgetRepository } from "@langwatch/gateway-server/composition/gateway-virtual-key-direct-budgets";
 import { PrismaGatewayScopeResolutionRepository } from "@langwatch/gateway-server/composition/gateway-scope-resolution";
 import { PrismaGatewayTransactionAdapter } from "@langwatch/gateway-server/composition/gateway-transactions";
+import { ResourceScope } from "@langwatch/runtime-composition";
 
 const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
 /** A capability this deployment did not compose, refused by name. */
@@ -253,7 +255,7 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
   // named by `@langwatch/gateway-contract` (`GatewayApplicableBudget`,
   // `GatewayVirtualKeyDirectBudget`), so the application declares them itself
   // instead of taking them as parameters a router could not propagate.
-  const app = GatewayApp.create({
+  const infrastructure: GatewayAppDependencies = {
     virtualKeys,
     budgetDecisions,
     budgetSpend,
@@ -442,6 +444,13 @@ export function composeApiGateway(options: ApiGatewayCompositionOptions): ApiGat
         virtualKeyIds: [...virtualKeyIds],
         window,
       }),
+  };
+
+  const app = GatewayApp.create({
+    dependencies: {},
+    infrastructure,
+    config: undefined,
+    resources: new ResourceScope(),
   });
 
   return { app, virtualKeys, budgetSpend, virtualKeySpend, spendEvents, budgetDecisions };

@@ -1,20 +1,10 @@
-import { AgentService } from "@langwatch/agent-contract";
-import {
-  AgentApp,
-  AgentTrpcApi,
-  type AgentAppDependencies,
-  type AgentTestPort,
-  type AgentTrpcContext,
-} from "@langwatch/agent-server";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { runWithContext } from "@langwatch/observability/context";
-import {
-  TRPCError,
-  type AnyTRPCRouter,
-  type TRPCCreateRouterOptions,
-  type TRPCDefaultErrorShape,
+import type {
+  AnyTRPCRouter,
+  TRPCCreateRouterOptions,
+  TRPCDefaultErrorShape,
 } from "@trpc/server";
 import {
   allRegisteredRoutes,
@@ -25,6 +15,7 @@ import {
 import {
   TrpcRootDefinition,
   type AppTrpcPolicyMiddlewares,
+  type TrpcRuntime,
   type TrpcAuthorizationDecisions,
   type TrpcAuthorizationDenialPort,
   type TrpcCauseTranslationPort,
@@ -32,7 +23,6 @@ import {
   type TrpcRequestLike,
 } from "@langwatch/api/trpc";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
-import { trace } from "@opentelemetry/api";
 import { Hono, type Context } from "hono";
 import type { AppTrpcFeatureRecord } from "./app-trpc/app-trpc.features.ts";
 import type { TopicApiFeature } from "./features/topic/topic-api.feature.ts";
@@ -41,6 +31,7 @@ import type { SseSubscriptionPorts } from "./app-trpc/app-trpc.sse.ts";
 import { apiClientAddress, apiSocketAddress } from "./app/api-client-address.ts";
 import { appTrpcErrorFormatter } from "./app-trpc/app-trpc.error-formatter.ts";
 import { createApiTrpcPolicy } from "./app-trpc/app-trpc.policy.ts";
+import { createAgentTrpcRouter, type AgentTrpcContext } from "./features/agent/agent-trpc.mount.ts";
 import type { SecretHostContext } from "./features/secret/secret-trpc.mount.ts";
 import type {
   ApiTrpcEnterpriseRequest,
@@ -56,7 +47,7 @@ export type ApiActor = Readonly<{ id: string }>;
  * unplaceable client cannot spend the whole deployment's signed-out budget.
  */
 const UNRESOLVED_CLIENT_ADDRESS = "unresolved";
-export type ApiServices = Readonly<{ agents: AgentApp }>;
+export type ApiServices = Readonly<{ agents: AgentApi }>;
 
 /** The HTTP host authenticates a request then supplies these policy operations. */
 export type ApiRequestContext = Readonly<{
@@ -114,7 +105,7 @@ export type ApiHttpOptions = Readonly<{
  * The context every procedure on this process resolves against. Three groups, and they
  * are not interchangeable. The first is the request policy the host supplied.
  */
-type ApiTrpcContext = Omit<ApiRequestContext, "can"> & {
+export type ApiTrpcContext = Omit<ApiRequestContext, "can"> & {
   can(permission: AuthzPermission, target: Readonly<{ projectId: string }>): Promise<boolean>;
   /**
    * The caller's address, as the trusted-proxy resolver answers it, and the key every
@@ -163,6 +154,11 @@ export type ApiTrpcFeatureMount = Readonly<{
   publicProcedure: ApiTrpcRoot["procedure"];
   middlewares: AppTrpcPolicyMiddlewares;
   /**
+   * The declared path: a feature that states its procedures in a contract is
+   * mounted through this rather than through the middlewares above.
+   */
+  runtime: TrpcRuntime<ApiTrpcContext>;
+  /**
    * Whether every mounted procedure's answer is checked against its declared
    * output schema. On the mount rather than per feature, so a deployment
    * cannot validate half its surfaces.
@@ -189,111 +185,6 @@ export abstract class ApiTrpcFeaturesPort<
   abstract readonly application: ApiTrpcFeatureApplication;
   /** Builds the namespace record on this process's mount. */
   abstract build(mount: ApiTrpcFeatureMount): TRecord;
-}
-
-export class MissingAgentService extends AgentService {
-  private unavailable(): never {
-    throw new Error("Agent service is not configured for this API application.");
-  }
-
-  getById() {
-    return this.unavailable();
-  }
-
-  getAll() {
-    return this.unavailable();
-  }
-
-  getReferenceStates() {
-    return this.unavailable();
-  }
-
-  getNamesByIds() {
-    return this.unavailable();
-  }
-
-  exists() {
-    return this.unavailable();
-  }
-
-  list() {
-    return this.unavailable();
-  }
-
-  create() {
-    return this.unavailable();
-  }
-
-  update() {
-    return this.unavailable();
-  }
-
-  archive() {
-    return this.unavailable();
-  }
-
-  relatedEntities() {
-    return this.unavailable();
-  }
-
-  cascadeArchive() {
-    return this.unavailable();
-  }
-
-  getCopies() {
-    return this.unavailable();
-  }
-
-  getSourceOfCopy() {
-    return this.unavailable();
-  }
-
-  copy() {
-    return this.unavailable();
-  }
-
-  pushToCopies() {
-    return this.unavailable();
-  }
-
-  syncFromSource() {
-    return this.unavailable();
-  }
-
-  getHistory() {
-    return this.unavailable();
-  }
-
-  registerConnected() {
-    return this.unavailable();
-  }
-
-  ownersOf() {
-    return this.unavailable();
-  }
-
-  getConnectedByNameAndEnvironment() {
-    return this.unavailable();
-  }
-
-  getConnectedByName() {
-    return this.unavailable();
-  }
-}
-
-function handledErrorCode(error: HandledError): TRPCError["code"] {
-  const codes: Partial<Record<number, TRPCError["code"]>> = {
-    400: "BAD_REQUEST",
-    401: "UNAUTHORIZED",
-    403: "FORBIDDEN",
-    404: "NOT_FOUND",
-    409: "CONFLICT",
-    412: "PRECONDITION_FAILED",
-    413: "PAYLOAD_TOO_LARGE",
-    422: "UNPROCESSABLE_CONTENT",
-    429: "TOO_MANY_REQUESTS",
-  };
-  return codes[error.httpStatus] ?? "INTERNAL_SERVER_ERROR";
 }
 
 /**
@@ -364,20 +255,7 @@ export function createTrpcRoot(errorFormatter: ApiErrorFormatter = defaultErrorF
  */
 export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFeatureRecord> {
   static create<TRecord extends TRPCCreateRouterOptions>(options: {
-    /**
-     * Required — a process that composes no real agent service passes
-     * {@link MissingAgentService}, which mounts the router and refuses every
-     * call by name instead of leaving `agents.*` off the wire.
-     */
-    agents: AgentService;
-    /**
-     * Runs "Test agent" over the Scenario application.
-     */
-    agentTesting?: AgentTestPort;
-    /**
-     * Reads presence off the connected-agent runtime (ADR-128).
-     */
-    connectedAgents?: AgentAppDependencies["connected"];
+    agents: AgentApi;
     topic?: TopicApiFeature;
     http?: ApiHttpOptions;
     rest?: Hono;
@@ -392,13 +270,7 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
   }): ApiApplication<TRecord> {
     options.topic?.install();
     return new ApiApplication<TRecord>(
-      {
-        agents: AgentApp.create({
-          agents: options.agents,
-          testing: options.agentTesting,
-          ...(options.connectedAgents ? { connected: options.connectedAgents } : {}),
-        }),
-      },
+      { agents: options.agents },
       options.http,
       options.rest,
       options.topic,
@@ -421,14 +293,21 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
     private readonly validateOutput = false,
   ) {
     this.root = createTrpcRoot(http?.errorFormatter ?? defaultErrorFormatter);
-    const protectedProcedure = this.createProtectedProcedure();
-    const agents = AgentTrpcApi.create(this.root, { protected: protectedProcedure });
+    const policy = this.createFeaturePolicy();
+    const agents = createAgentTrpcRouter(policy.declaredRuntime);
     this.trpc = this.root.router({
       agents,
       // Spread rather than nested: every packaged surface is keyed by the wire
       // namespace it has always answered on, and nesting them under one key
       // would rename all twenty-two of them at once.
-      ...this.buildFeatureRouters(),
+      ...this.features.build({
+        root: this.root,
+        protectedProcedure: policy.protectedProcedure,
+        publicProcedure: this.root.procedure,
+        middlewares: policy.middlewares,
+        runtime: policy.declaredRuntime,
+        validateOutput: this.validateOutput,
+      }),
     });
     this.hono = http ? this.createHono(http, rest) : undefined;
   }
@@ -436,10 +315,10 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
   /**
    * The packaged namespaces, built on this process's own mount.
    */
-  private buildFeatureRouters(): TRecord {
+  private createFeaturePolicy() {
     const features = this.features;
 
-    const policy = createApiTrpcPolicy<ApiTrpcContext, ApiTrpcContext>(this.root, {
+    return createApiTrpcPolicy<ApiTrpcContext, ApiTrpcContext>(this.root, {
       authz: features.authorization,
       denials: features.denials,
       causes: features.causes,
@@ -474,17 +353,6 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
           });
         },
       },
-    });
-
-    return features.build({
-      root: this.root,
-      protectedProcedure: policy.protectedProcedure,
-      // The signed-out doors — the front door and `publicEnv` beside it — are
-      // built on the root's bare procedure. They are the two surfaces a person
-      // reaches before they have a session at all.
-      publicProcedure: this.root.procedure,
-      middlewares: policy.middlewares,
-      validateOutput: this.validateOutput,
     });
   }
 
@@ -538,56 +406,6 @@ export class ApiApplication<TRecord extends TRPCCreateRouterOptions = AppTrpcFea
         ...(this.features?.application ?? unavailableFeatureApplication),
       },
     };
-  }
-
-  private createProtectedProcedure() {
-    const logger = this.http?.logger ?? createLogger("langwatch:api");
-    const audit = this.http?.audit;
-    const tracer = trace.getTracer("langwatch:api");
-
-    return this.root.procedure.use(async ({ ctx, input, next, path, type }) => {
-      return tracer.startActiveSpan(`trpc ${path}`, async (span) => {
-        let actor: ApiActor | undefined;
-        let failure: unknown;
-        try {
-          actor = ctx.actor();
-          return await runWithContext({ userId: actor.id }, async () => {
-            const result = await next();
-            if (!result.ok) {
-              const cause = result.error.cause;
-              failure = result.error;
-              if (HandledError.isHandled(cause)) {
-                throw new TRPCError({
-                  code: handledErrorCode(cause),
-                  message: cause.message,
-                  cause,
-                });
-              }
-              if (isZodLikeError(cause)) {
-                const validation = ValidationError.fromZodError(cause);
-                throw new TRPCError({
-                  code: handledErrorCode(validation),
-                  message: validation.code,
-                  cause: validation,
-                });
-              }
-              logger.error({ path, type, error: result.error }, "tRPC call failed");
-            } else {
-              logger.info({ path, type }, "tRPC call");
-            }
-            return result;
-          });
-        } catch (error) {
-          failure = error;
-          throw error;
-        } finally {
-          if (type === "mutation" && audit && actor) {
-            await audit({ actorId: actor.id, path, input, error: failure });
-          }
-          span.end();
-        }
-      });
-    });
   }
 
   private createHono(http: ApiHttpOptions, rest: Hono | undefined): Hono {

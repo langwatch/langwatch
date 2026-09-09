@@ -5,11 +5,8 @@
 import type { AppRestBroadcast, AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { sharedFiltersInputSchema } from "@langwatch/analytics-server";
-import {
-  createExportTracesRestApp,
-  TraceExportService,
-  traceExportRequestShape,
-} from "@langwatch/trace-server";
+import { createExportTracesRestApp } from "@langwatch/trace-server/api-rest/trace-export";
+import { TraceExportService, traceExportRequestShape } from "@langwatch/trace-server";
 import { z } from "zod";
 
 import type { ApiHandlerManagedSessionPort } from "../../app/api-handler-managed-session.ts";

@@ -17,7 +17,7 @@
  * @see specs/ai-gateway/realtime-sessions.feature
  */
 // @vitest-environment node
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
   ELEVENLABS_WEBHOOK_SECRET_KEY,
@@ -120,7 +120,7 @@ describe("given a process that registered no spend pipeline", () => {
 
 function restSecurity() {
   return ApiRestSecurity.create({
-    apiKeys: {} as unknown as ApiKeyService,
+    apiKeys: {} as unknown as ApiKeyApi,
     authz: {} as unknown as AuthzService,
     organizations: {} as unknown as OrganizationService,
     observability: ApiRestObservabilityComposition.create(),

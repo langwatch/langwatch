@@ -3,8 +3,9 @@
  * `stub()` proxy every one of those tests already used to fake a namespace's build-time
  * surface.
  */
-import { EventEmitter } from "node:events";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { EventEmitter } from "node:events";
 import { z } from "zod";
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiTrpcCollaborators } from "../../app-trpc/app-trpc.collaborators.ts";
@@ -26,7 +27,7 @@ import { createRoleBindingTrpcRouter, createRoleTrpcRouter } from "../../feature
 import { refusingScenarioFeature } from "../../features/scenario/scenario.composition.ts";
 import { createStoredObjectTrpcRouter } from "../../features/stored-object/stored-object-trpc.mount.ts";
 import { refusingBugReportFeature } from "../../features/bug-report/bug-report.composition.ts";
-import { refusingAnnotationFeature } from "../../features/annotation/annotation.composition.ts";
+import { refusingAnnotationFeature } from "../../features/annotation/annotation-absence.ts";
 import {
   createDashboardTrpcRouter,
   createGraphTrpcRouter,
@@ -100,9 +101,13 @@ export function stub<T>(group: string, buildTime: Record<string, unknown> = {}):
  */
 export function stubInfrastructureEntitlements(): Pick<
   ApiTrpcInfrastructure,
-  "plans" | "featureFlags" | "saasBilling"
+  "plans" | "featureFlags" | "saasBilling" | "auditLog"
 > {
   return {
+    auditLog: createApiFixture<AuditLogApi>({
+      record: async () => void 0,
+      listEntityHistory: async () => [],
+    }),
     plans: { getActivePlan: async () => ({ type: "FREE" }) as never },
     featureFlags: stub("featureFlags", { isEnabled: async () => true }),
     // Self-hosted, so the two Enterprise billing namespaces mount as the empty
@@ -143,7 +148,7 @@ export function stubApplicationSlices(
     workflows: stub("app.workflows"),
     experiments: stub("app.experiments"),
     evaluations: stub("app.evaluations"),
-    annotations: stub("app.annotations"),
+    annotation: stub("app.annotation"),
     authzApp: stub("app.authzApp"),
     permissions: stub("app.permissions"),
     roles: stub("app.roles"),
@@ -151,6 +156,11 @@ export function stubApplicationSlices(
     dataset: stub("app.dataset"),
     evaluatorApp: stub("app.evaluatorApp"),
     featureFlags: stub("app.featureFlags", { isEnabled: async () => true }),
+    featureFlag: createApiFixture<ApiTrpcFeatureApplicationSlices["featureFlag"]>(
+      { isEnabled: async () => false },
+      "app.featureFlag",
+    ),
+    secrets: stub("app.secrets"),
     langy: stub("app.langy"),
     monitors: stub("app.monitors"),
     scenarios: stub("app.scenarios"),
@@ -167,11 +177,6 @@ export function stubApplicationSlices(
     ops: stub("app.ops", { isAdmin: () => true }),
     prompts: stub("app.prompts"),
     governance: stub("app.governance"),
-    featureFlag: createApiFixture<ApiTrpcFeatureApplicationSlices["featureFlag"]>(
-      { isEnabled: async () => false },
-      "app.featureFlag",
-    ),
-    secrets: stub("app.secrets"),
     governanceApp: stub("app.governanceApp"),
     sessionPolicy: stub("app.sessionPolicy"),
     webhooks: stub("app.webhooks"),
@@ -401,10 +406,27 @@ export function stubMount(): never {
       Object.assign({}, ...routers) as Record<string, unknown>,
     procedure: chain,
   };
+  // The declared path, structurally: building through it is what a
+  // declaration-mounted feature (annotation, apiKey) does — one `procedure`
+  // call per member, then the record collected through `router`.
+  const runtime = {
+    procedure: () => chain,
+    router: (routes: Record<string, unknown>) => root.router(routes),
+  };
+  const declaredRuntime = {
+    ...runtime,
+    mount: (
+      declaration: {
+        router: (factory: typeof runtime, app: (ctx: never) => unknown) => unknown;
+      },
+      app: (ctx: never) => unknown,
+    ) => declaration.router(runtime, app),
+  };
   return {
     root,
     protectedProcedure: chain,
     publicProcedure: chain,
+    runtime: declaredRuntime,
     // Every middleware answers a callable that yields a middleware object. The
     // chain above swallows whatever `.use()` is handed, so what a middleware IS
     // does not matter here — only that naming one never throws.

@@ -519,7 +519,7 @@ export type ApiMailConfig = Readonly<{
  * The studio's per-project Lambda deployment: the account, the image and the
  * network every per-project function is created in. The Lambda cleanup cron
  * reads only its three credential fields; the studio's execution half (see
- * `composeApiStudioHost`) reads the whole shape.
+ * `composeApiWorkflowStudioDispatch`) reads the whole shape.
  */
 export type ApiNlpLambdaFleetConfig = StudioLambdaConfig;
 

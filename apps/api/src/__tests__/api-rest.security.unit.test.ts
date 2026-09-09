@@ -1,8 +1,8 @@
 import { requires } from "@langwatch/api";
 import {
   ApiKeyPermissionDeniedError,
-  ApiKeyService,
-  type ResolvedApiKeyToken,
+  type ApiKeyApi,
+  type ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
 import { AuthzService, type AuthzPermission } from "@langwatch/authz-contract";
 import type { Logger } from "@langwatch/observability";
@@ -18,7 +18,7 @@ import { ApiAuditPort } from "../api-request.policy.ts";
 import { ApiHandlerManagedCredentials } from "../app/api-handler-managed-credential.ts";
 import { ApiRestObservabilityComposition } from "../app/api-rest-observability.composition.ts";
 
-const currentKey: ResolvedApiKeyToken = {
+const currentKey: ResolvedApiKeyCredential = {
   type: "apiKey",
   apiKeyId: "key-1",
   userId: "user-1",
@@ -40,7 +40,7 @@ describe("ApiRestSecurity", () => {
   describe("when a project route authenticates", () => {
     it("passes the exact X-Project-Id target to canonical current-key resolution", async () => {
       const apiKeys = apiKeyService();
-      apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+      apiKeys.findResolvedToken.mockResolvedValue(currentKey);
       const app = projectApp(policyOver({ apiKeys }));
 
       const response = await app.request("/api/secret", {
@@ -49,7 +49,7 @@ describe("ApiRestSecurity", () => {
 
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({ projectId: "project-1" });
-      expect(apiKeys.tryResolveToken).toHaveBeenCalledWith({
+      expect(apiKeys.findResolvedToken).toHaveBeenCalledWith({
         token: "sk-lw-token",
         projectId: "project-1",
       });
@@ -57,7 +57,7 @@ describe("ApiRestSecurity", () => {
 
     it("keeps Basic's encoded project target and falls back to X-Auth-Token for malformed Basic", async () => {
       const apiKeys = apiKeyService();
-      apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+      apiKeys.findResolvedToken.mockResolvedValue(currentKey);
       const app = projectApp(policyOver({ apiKeys }));
 
       await app.request("/api/secret", {
@@ -69,11 +69,11 @@ describe("ApiRestSecurity", () => {
         headers: { authorization: "Basic malformed", "X-Auth-Token": "fallback-token" },
       });
 
-      expect(apiKeys.tryResolveToken).toHaveBeenNthCalledWith(1, {
+      expect(apiKeys.findResolvedToken).toHaveBeenNthCalledWith(1, {
         token: "basic-token",
         projectId: "project-1",
       });
-      expect(apiKeys.tryResolveToken).toHaveBeenNthCalledWith(2, {
+      expect(apiKeys.findResolvedToken).toHaveBeenNthCalledWith(2, {
         token: "fallback-token",
         projectId: null,
       });
@@ -81,7 +81,7 @@ describe("ApiRestSecurity", () => {
 
     it("distinguishes missing credentials, which never reach resolution, from invalid ones", async () => {
       const apiKeys = apiKeyService();
-      apiKeys.tryResolveToken.mockResolvedValue(null);
+      apiKeys.findResolvedToken.mockResolvedValue(null);
       const app = projectApp(policyOver({ apiKeys }));
 
       const missing = await app.request("/api/secret");
@@ -91,7 +91,7 @@ describe("ApiRestSecurity", () => {
 
       expect(missing.status).toBe(401);
       expect(invalid.status).toBe(401);
-      expect(apiKeys.tryResolveToken).toHaveBeenCalledExactlyOnceWith({
+      expect(apiKeys.findResolvedToken).toHaveBeenCalledExactlyOnceWith({
         token: "bad-token",
         projectId: null,
       });
@@ -127,7 +127,7 @@ describe("ApiRestSecurity", () => {
   describe("when a project route authorizes", () => {
     it("keeps legacy project keys actorless and outside the permission ceiling", async () => {
       const apiKeys = apiKeyService();
-      apiKeys.tryResolveToken.mockResolvedValue({
+      apiKeys.findResolvedToken.mockResolvedValue({
         type: "legacyProjectKey",
         project: currentKey.project,
       });
@@ -149,7 +149,7 @@ describe("ApiRestSecurity", () => {
 
     it("delegates current key ceilings to canonical AuthZ with resolved project lineage", async () => {
       const apiKeys = apiKeyService();
-      apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+      apiKeys.findResolvedToken.mockResolvedValue(currentKey);
       const authz = authzService();
       authz.hasApiKeyPermission.mockResolvedValue(false);
       const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
@@ -174,7 +174,7 @@ describe("ApiRestSecurity", () => {
     /** @scenario "A permission Langy is never delegated says so" */
     it("keeps Langy's never-delegable ceiling refusal distinct", async () => {
       const apiKeys = apiKeyService();
-      apiKeys.tryResolveToken.mockResolvedValue({ ...currentKey, isLangySessionKey: true });
+      apiKeys.findResolvedToken.mockResolvedValue({ ...currentKey, isLangySessionKey: true });
       const authz = authzService();
       authz.hasApiKeyPermission.mockResolvedValue(false);
       // Never delegable: secrets have no safe read. The original incident
@@ -198,7 +198,7 @@ describe("ApiRestSecurity", () => {
       /** @scenario "A denial answered by the security middleware carries the same channel" */
       it("ships the tips and documentation link for re-scoping the key", async () => {
         const apiKeys = apiKeyService();
-        apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+        apiKeys.findResolvedToken.mockResolvedValue(currentKey);
         const authz = authzService();
         authz.hasApiKeyPermission.mockResolvedValue(false);
         const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
@@ -219,7 +219,7 @@ describe("ApiRestSecurity", () => {
       /** @scenario "A denial answered by the security middleware carries the same channel" */
       it("says who can act on it", async () => {
         const apiKeys = apiKeyService();
-        apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+        apiKeys.findResolvedToken.mockResolvedValue(currentKey);
         const authz = authzService();
         authz.hasApiKeyPermission.mockResolvedValue(false);
         const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
@@ -237,7 +237,7 @@ describe("ApiRestSecurity", () => {
       /** @scenario "One refusal renders one body whichever half answers it" */
       it("produces a body identical to the middleware's", async () => {
         const apiKeys = apiKeyService();
-        apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+        apiKeys.findResolvedToken.mockResolvedValue(currentKey);
         const authz = authzService();
         authz.hasApiKeyPermission.mockResolvedValue(false);
         const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
@@ -261,7 +261,7 @@ describe("ApiRestSecurity", () => {
       /** @scenario "One refusal renders one body whichever half answers it" */
       it("carries the same denial and no identifiers from the handler-managed-credential door", async () => {
         const apiKeys = apiKeyService();
-        apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+        apiKeys.findResolvedToken.mockResolvedValue(currentKey);
         const authz = authzService();
         authz.hasApiKeyPermission.mockResolvedValue(false);
         const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
@@ -300,7 +300,7 @@ describe("ApiRestSecurity", () => {
       /** @scenario "An API-key ceiling denial carries no identifier fields" */
       it("carries no apiKeyId, userId or projectId in the body", async () => {
         const apiKeys = apiKeyService();
-        apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+        apiKeys.findResolvedToken.mockResolvedValue(currentKey);
         const authz = authzService();
         authz.hasApiKeyPermission.mockResolvedValue(false);
         const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
@@ -320,7 +320,7 @@ describe("ApiRestSecurity", () => {
   describe("when a project request completes", () => {
     it("marks a current key as used and audits a successful attributed mutation", async () => {
       const apiKeys = apiKeyService();
-      apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+      apiKeys.findResolvedToken.mockResolvedValue(currentKey);
       const audit = new TestAudit();
       const app = projectApp(policyOver({ apiKeys, audit }));
 
@@ -341,7 +341,7 @@ describe("ApiRestSecurity", () => {
 
     it("does not mark or audit a legacy project key after a successful response", async () => {
       const apiKeys = apiKeyService();
-      apiKeys.tryResolveToken.mockResolvedValue({
+      apiKeys.findResolvedToken.mockResolvedValue({
         type: "legacyProjectKey",
         project: currentKey.project,
       });
@@ -360,7 +360,7 @@ describe("ApiRestSecurity", () => {
 
     it("does not move the key's last-used clock for a refused request", async () => {
       const apiKeys = apiKeyService();
-      apiKeys.tryResolveToken.mockResolvedValue(currentKey);
+      apiKeys.findResolvedToken.mockResolvedValue(currentKey);
       const authz = authzService();
       authz.hasApiKeyPermission.mockResolvedValue(false);
       const app = projectApp(policyOver({ apiKeys, authz }), { permission: "secrets:manage" });
@@ -693,18 +693,18 @@ function testLogger() {
 }
 
 function apiKeyService() {
-  const tryResolveToken = vi.fn<ApiKeyService["tryResolveToken"]>();
-  const resolveOrganizationToken = vi.fn<ApiKeyService["resolveOrganizationToken"]>();
+  const findResolvedToken = vi.fn<ApiKeyApi["findResolvedToken"]>();
+  const resolveOrganizationToken = vi.fn<ApiKeyApi["resolveOrganizationToken"]>();
   const markUsed = vi.fn();
-  const service = new Proxy(ApiKeyService.prototype, {
+  const service = new Proxy({} as ApiKeyApi, {
     get(target, property, receiver) {
-      if (property === "tryResolveToken") return tryResolveToken;
+      if (property === "findResolvedToken") return findResolvedToken;
       if (property === "resolveOrganizationToken") return resolveOrganizationToken;
       if (property === "markUsed") return markUsed;
       return Reflect.get(target, property, receiver);
     },
   });
-  return { service, tryResolveToken, resolveOrganizationToken, markUsed };
+  return { service, findResolvedToken, resolveOrganizationToken, markUsed };
 }
 
 function authzService() {

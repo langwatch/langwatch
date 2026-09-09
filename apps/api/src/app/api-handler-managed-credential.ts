@@ -3,7 +3,7 @@
  * families let the framework authenticate them: the chain resolves the credential, checks
  * the permission, and renders a refusal in whichever envelope the family declared.
  */
-import { type ApiKeyService, type ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import { type ApiKeyApi, type ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -16,8 +16,8 @@ import { extractApiKeyRequestCredentials } from "./api-key-request-credentials.t
 export type HandlerManagedCredential =
   | Readonly<{
       ok: true;
-      project: ResolvedApiKeyToken["project"];
-      resolved: ResolvedApiKeyToken;
+      project: ResolvedApiKeyCredential["project"];
+      resolved: ResolvedApiKeyCredential;
       markUsed: () => void;
     }>
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
@@ -34,7 +34,7 @@ const INVALID_CREDENTIAL_MESSAGE = "Invalid auth token.";
 
 export class ApiHandlerManagedCredentials {
   static create(options: {
-    apiKeys: ApiKeyService;
+    apiKeys: ApiKeyApi;
     authz: AuthzService;
     logger?: Pick<Logger, "error">;
   }): ApiHandlerManagedCredentials {
@@ -46,7 +46,7 @@ export class ApiHandlerManagedCredentials {
   }
 
   private constructor(
-    private readonly apiKeys: ApiKeyService,
+    private readonly apiKeys: ApiKeyApi,
     private readonly authz: AuthzService,
     private readonly logger: Pick<Logger, "error">,
   ) {}
@@ -64,7 +64,7 @@ export class ApiHandlerManagedCredentials {
       return { ok: false, status: 401, body: { message: MISSING_CREDENTIAL_MESSAGE } };
     }
 
-    const resolved = await this.apiKeys.tryResolveToken(credentials);
+    const resolved = await this.apiKeys.findResolvedToken(credentials);
     if (!resolved) {
       return { ok: false, status: 401, body: { message: INVALID_CREDENTIAL_MESSAGE } };
     }
@@ -101,7 +101,7 @@ export class ApiHandlerManagedCredentials {
    * refusal {@link authenticate} would have answered with.
    */
   async enforceCeiling(input: {
-    resolved: ResolvedApiKeyToken;
+    resolved: ResolvedApiKeyCredential;
     permission: AuthzPermission;
   }): Promise<void> {
     // A legacy project key has no per-permission ceiling: project keys predate
@@ -116,7 +116,7 @@ export class ApiHandlerManagedCredentials {
   }
 
   private isWithinCeiling(input: {
-    resolved: Extract<ResolvedApiKeyToken, { type: "apiKey" }>;
+    resolved: Extract<ResolvedApiKeyCredential, { type: "apiKey" }>;
     permission: AuthzPermission;
   }): Promise<boolean> {
     const { resolved, permission } = input;

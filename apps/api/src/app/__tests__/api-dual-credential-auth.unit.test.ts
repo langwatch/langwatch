@@ -3,7 +3,7 @@
  * endpoint accepts (files, avatars): a project API key or a live session, never both,
  * never neither, never a fallback from one to the other.
  */
-import type { ApiKeyService, ResolvedApiKeyToken } from "@langwatch/api-key-contract";
+import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describe, expect, it, vi } from "vitest";
@@ -17,19 +17,19 @@ import type { ApiHandlerManagedSessionPort } from "../api-handler-managed-sessio
 
 const PROJECT_ID = "project-dual";
 
-function resolvedToken(): ResolvedApiKeyToken {
-  return { project: { id: PROJECT_ID } } as ResolvedApiKeyToken;
+function resolvedToken(): ResolvedApiKeyCredential {
+  return { project: { id: PROJECT_ID } } as ResolvedApiKeyCredential;
 }
 
 function harness(options: {
-  tryResolveToken?: ReturnType<typeof vi.fn>;
+  findResolvedToken?: ReturnType<typeof vi.fn>;
   session?: ReturnType<typeof vi.fn>;
 }) {
-  const tryResolveToken = options.tryResolveToken ?? vi.fn().mockResolvedValue(null);
+  const findResolvedToken = options.findResolvedToken ?? vi.fn().mockResolvedValue(null);
   const resolve = options.session ?? vi.fn().mockResolvedValue(null);
   const enforceCeiling = vi.fn().mockResolvedValue(undefined);
   const middleware = createApiDualCredentialAuth({
-    apiKeys: { tryResolveToken } as unknown as ApiKeyService,
+    apiKeys: { findResolvedToken } as unknown as ApiKeyApi,
     session: { resolve } as unknown as ApiHandlerManagedSessionPort,
     credentials: { enforceCeiling },
   });
@@ -48,7 +48,7 @@ function harness(options: {
   );
   app.get("/", handler as never);
 
-  return { app, handler, tryResolveToken, resolve };
+  return { app, handler, findResolvedToken, resolve };
 }
 
 describe("createApiDualCredentialAuth", () => {
@@ -56,7 +56,7 @@ describe("createApiDualCredentialAuth", () => {
     /** @scenario "An API key alone authenticates a byte endpoint" */
     it("authenticates through the key", async () => {
       const { app, resolve } = harness({
-        tryResolveToken: vi.fn().mockResolvedValue(resolvedToken()),
+        findResolvedToken: vi.fn().mockResolvedValue(resolvedToken()),
       });
 
       const res = await app.request("/", { headers: { authorization: "Bearer sk-lw-valid" } });
@@ -70,7 +70,7 @@ describe("createApiDualCredentialAuth", () => {
   describe("given a live session and no API key headers", () => {
     /** @scenario "A session alone authenticates a byte endpoint" */
     it("authenticates as the session's user", async () => {
-      const { app, tryResolveToken } = harness({
+      const { app, findResolvedToken } = harness({
         session: vi.fn().mockResolvedValue({ user: { id: "user-1" } }),
       });
 
@@ -78,14 +78,14 @@ describe("createApiDualCredentialAuth", () => {
 
       expect(res.status).toBe(200);
       await expect(res.json()).resolves.toEqual({ userId: "user-1", apiKeyProjectId: null });
-      expect(tryResolveToken).not.toHaveBeenCalled();
+      expect(findResolvedToken).not.toHaveBeenCalled();
     });
   });
 
   describe("given both an API key and a live session", () => {
     /** @scenario "A request carrying both credential kinds is refused" */
     it("refuses as contested without trying either credential", async () => {
-      const { app, handler, tryResolveToken } = harness({
+      const { app, handler, findResolvedToken } = harness({
         session: vi.fn().mockResolvedValue({ user: { id: "user-1" } }),
       });
 
@@ -96,7 +96,7 @@ describe("createApiDualCredentialAuth", () => {
         error: "contested_credentials",
         meta: { kinds: ["api-key", "session"] },
       });
-      expect(tryResolveToken).not.toHaveBeenCalled();
+      expect(findResolvedToken).not.toHaveBeenCalled();
       expect(handler).not.toHaveBeenCalled();
     });
   });
@@ -104,7 +104,7 @@ describe("createApiDualCredentialAuth", () => {
   describe("given a foreign proxy's Basic header alongside a live session", () => {
     /** @scenario "A non-LangWatch proxy credential abstains so the session decides" */
     it("does not contest — the session authenticates the request", async () => {
-      const { app, tryResolveToken } = harness({
+      const { app, findResolvedToken } = harness({
         session: vi.fn().mockResolvedValue({ user: { id: "user-1" } }),
       });
 
@@ -116,7 +116,7 @@ describe("createApiDualCredentialAuth", () => {
 
       expect(res.status).toBe(200);
       await expect(res.json()).resolves.toEqual({ userId: "user-1", apiKeyProjectId: null });
-      expect(tryResolveToken).not.toHaveBeenCalled();
+      expect(findResolvedToken).not.toHaveBeenCalled();
     });
   });
 
@@ -124,7 +124,7 @@ describe("createApiDualCredentialAuth", () => {
     /** @scenario "A legacy prefix-less project key with no session still authenticates" */
     it("claims the request and lets the stored-key lookup decide", async () => {
       const { app } = harness({
-        tryResolveToken: vi.fn().mockResolvedValue(resolvedToken()),
+        findResolvedToken: vi.fn().mockResolvedValue(resolvedToken()),
       });
 
       const res = await app.request("/", {
@@ -139,7 +139,7 @@ describe("createApiDualCredentialAuth", () => {
   describe("given API key credentials that do not resolve", () => {
     /** @scenario "An invalid API key is refused without falling back to the session" */
     it("answers unauthenticated with no fallback", async () => {
-      const { app, handler } = harness({ tryResolveToken: vi.fn().mockResolvedValue(null) });
+      const { app, handler } = harness({ findResolvedToken: vi.fn().mockResolvedValue(null) });
 
       const res = await app.request("/", { headers: { authorization: "Bearer sk-lw-expired" } });
 

@@ -8,16 +8,15 @@ import type {
   AuthzService,
   PermissionDecision,
 } from "@langwatch/authz-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
-import {
-  ApiApplication,
-  MissingAgentService,
-} from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterprise-governance.composition.ts";
 import { composeGatewayFeature } from "../gateway.composition.ts";
@@ -30,12 +29,12 @@ import {
   stubRoleFeature,
   stubStoredObjectFeature,
   stubDataPrivacyFeature,
-  stubEntitlementFeature,
-  stubPresenceFeature,
-  stubShareFeature,
   stubDataRetentionFeature,
+  stubEntitlementFeature,
   stubFeatureFlagFeature,
+  stubPresenceFeature,
   stubSecretFeature,
+  stubShareFeature,
   stubTopicFeature,
 } from "../../../app/__tests__/api-trpc-record.test-doubles.ts";
 import { refusingApiKeyFeature } from "../../api-key/api-key.composition.ts";
@@ -47,7 +46,7 @@ import { refusingPromptFeature } from "../../prompt/prompt.composition.ts";
 import { refusingScenarioFeature } from "../../scenario/scenario.composition.ts";
 import { refusingBugReportFeature } from "../../bug-report/bug-report.composition.ts";
 import { refusingIntegrationsChecksFeature } from "../../project/integrations-checks.composition.ts";
-import { refusingAnnotationFeature } from "../../annotation/annotation.composition.ts";
+import { refusingAnnotationFeature } from "../../annotation/annotation-absence.ts";
 import { refusingHttpProxyFeature } from "../../agent/http-proxy.composition.ts";
 import { refusingModelProviderFeature } from "../../model-provider/model-provider.composition.ts";
 import { refusingTraceFeature } from "../../trace/trace.composition.ts";
@@ -208,7 +207,6 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       user: refusingUserFeature("langwatch-api"),
       presence: stubPresenceFeature(),
       apiKey: refusingApiKeyFeature(),
-      secret: stubSecretFeature(),
       langy: refusingLangyFeature(),
       ops: refusingOpsFeature(),
       scenario: refusingScenarioFeature(),
@@ -241,6 +239,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       codingAgent: refusingCodingAgentFeature(),
       automation: refusingAutomationFeature(),
       enterprise: refusingEnterpriseFeature(),
+      secret: stubSecretFeature(),
     },
     infrastructure,
     collaborators: stubCollaborators({
@@ -257,7 +256,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({

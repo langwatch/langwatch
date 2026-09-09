@@ -9,9 +9,9 @@
  * organization settings — are the seam, and they are seeded from the world's own tables.
  */
 import type {
-  ApiKeyService,
+  ApiKeyApi,
   OrganizationApiKeyResolution,
-  ResolvedApiKeyToken,
+  ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
 import type { AppRestSecurity, IdempotentRunner } from "@langwatch/api/rest";
 import {
@@ -201,7 +201,7 @@ export class RestAuthWorld {
   }
 
   /** The key directory a family reads directly, the same one the chain resolves through. */
-  apiKeys(): ApiKeyService {
+  apiKeys(): ApiKeyApi {
     return this.apiKeyService();
   }
 
@@ -210,17 +210,17 @@ export class RestAuthWorld {
     return this.authzService();
   }
 
-  private apiKeyService(): ApiKeyService {
+  private apiKeyService(): ApiKeyApi {
     const keys = this.keys;
     const used = this.used;
     return {
-      tryResolveToken: async ({
+      findResolvedToken: async ({
         token,
         projectId,
       }: {
         token: string;
         projectId?: string | null;
-      }): Promise<ResolvedApiKeyToken | null> => {
+      }): Promise<ResolvedApiKeyCredential | null> => {
         const key = keys.get(token);
         if (!key || key.kind === "organization" || !key.projectId) return null;
         // A re-pointing header selects a project only inside the key's own
@@ -286,7 +286,7 @@ export class RestAuthWorld {
       markUsed: ({ id }: { id: string }) => {
         used.push(id);
       },
-    } as unknown as ApiKeyService;
+    } as unknown as ApiKeyApi;
   }
 
   private authzService(): AuthzService {

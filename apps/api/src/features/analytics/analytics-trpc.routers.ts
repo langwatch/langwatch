@@ -8,7 +8,8 @@
  */
 import type { filterFieldsEnum } from "@langwatch/analytics-contract";
 import type { sharedFiltersInputSchema, timeseriesInputSchema } from "@langwatch/analytics-server";
-import type { AnalyticsTrpcPorts, LangWatchQLTrpcPorts } from "@langwatch/analytics-server";
+import type { AnalyticsTrpcPorts } from "@langwatch/analytics-server/api-trpc/analytics";
+import type { LangWatchQLTrpcPorts } from "@langwatch/analytics-server/api-trpc/langwatch-ql";
 import type { z } from "zod";
 import type { ApiTrpcFeatureMount } from "../../api.application.ts";
 import { createAnalyticsTrpcRouter, createLangWatchQLTrpcRouter } from "./analytics-trpc.mount.ts";

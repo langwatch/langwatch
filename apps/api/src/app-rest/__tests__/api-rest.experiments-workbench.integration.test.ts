@@ -3,7 +3,7 @@
  * Every step hands the next one what the previous one produced: slug, version.
  * @see specs/experiments-v3/workbench-versioning.feature
  */
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
@@ -122,7 +122,7 @@ function mount(): MountedRestFamily {
     newId: () => `experiment_${nanoid(8)}`,
     references: {
       prompts: unreached<PromptService>("The prompt service"),
-      agents: unreached<AgentService>("The agent service"),
+      agents: unreached<AgentApi>("The agent API"),
       evaluators: unreached<EvaluatorService>("The evaluator service"),
       workflows: unreached<WorkflowService>("The workflow service"),
       dataset: unreached<DatasetService>("The dataset service"),

@@ -1,4 +1,5 @@
-import { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -32,92 +33,6 @@ vi.mock("../api-http.listener.ts", () => ({
 import { ApiProcess } from "../api.process.ts";
 import { ApiFeatureDrainPort, ApiProcessGraphPort } from "../api.process.ts";
 import { ApiReadinessPort } from "../api-process.lifecycle.ts";
-
-class TestAgentService extends AgentService {
-  getById() {
-    return this.unavailable();
-  }
-
-  getAll() {
-    return this.unavailable();
-  }
-
-  getReferenceStates() {
-    return this.unavailable();
-  }
-
-  getNamesByIds() {
-    return this.unavailable();
-  }
-  registerConnected() {
-    return this.unavailable();
-  }
-  ownersOf() {
-    return this.unavailable();
-  }
-  getConnectedByNameAndEnvironment() {
-    return this.unavailable();
-  }
-  getConnectedByName() {
-    return this.unavailable();
-  }
-
-  exists() {
-    return this.unavailable();
-  }
-
-  list() {
-    return this.unavailable();
-  }
-
-  create() {
-    return this.unavailable();
-  }
-
-  update() {
-    return this.unavailable();
-  }
-
-  archive() {
-    return this.unavailable();
-  }
-
-  relatedEntities() {
-    return this.unavailable();
-  }
-
-  cascadeArchive() {
-    return this.unavailable();
-  }
-
-  getCopies() {
-    return this.unavailable();
-  }
-
-  getSourceOfCopy() {
-    return this.unavailable();
-  }
-
-  copy() {
-    return this.unavailable();
-  }
-
-  pushToCopies() {
-    return this.unavailable();
-  }
-
-  syncFromSource() {
-    return this.unavailable();
-  }
-
-  getHistory() {
-    return this.unavailable();
-  }
-
-  private unavailable(): never {
-    throw new Error("Not used by this test.");
-  }
-}
 
 describe("ApiProcess", () => {
   beforeEach(() => {
@@ -257,7 +172,7 @@ function createProcess(
   featureDrain?: ApiFeatureDrainPort,
 ): ApiProcess {
   return ApiProcess.create({
-    agents: new TestAgentService(),
+    agents: createApiFixture<AgentApi>(),
     http: {
       createContext: async () => ({
         actor: () => ({ id: "user-1" }),

@@ -4,7 +4,7 @@
  * @see specs/organizations/organizations-provisioning-rest-api.feature
  */
 import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
-import type { ApiKey, ApiKeyService, CreateApiKeyInput } from "@langwatch/api-key-contract";
+import type { ApiKey, ApiKeyApi, CreateApiKeyInput } from "@langwatch/api-key-contract";
 import {
   OrganizationSlugTakenError,
   type OrganizationProvisioningPort,
@@ -50,7 +50,7 @@ describe("given a self-hosted deployment with the instance credential configured
       // The chain the family exists for: the token it handed back resolves to
       // the organization it just made, holding ADMIN over it, with no browser
       // step in between.
-      const verified = await keys.tryVerify({ token: body.adminApiKey.token });
+      const verified = await keys.findVerifiedToken({ token: body.adminApiKey.token });
       expect(verified?.organizationId).toBe(body.organization.id);
       expect(verified?.roleBindings).toContainEqual(
         expect.objectContaining({
@@ -338,7 +338,7 @@ function inMemoryApiKeys() {
       stored.set(token, apiKey);
       return { token, apiKey };
     },
-    tryVerify: async ({ token }: { token: string }) => {
+    findVerifiedToken: async ({ token }: { token: string }) => {
       const apiKey = stored.get(token);
       return apiKey ? { ...apiKey, tokenType: "apiKey" as const } : null;
     },
@@ -374,7 +374,7 @@ function mountProvisioning(options: Omit<Parameters<typeof mountRestFamily>[0], 
     ...options,
     packaged: {
       organizationProvisioning: () => directory as never,
-      apiKeys: () => keys as unknown as ApiKeyService,
+      apiKeys: () => keys as unknown as ApiKeyApi,
     },
   });
   return { api, directory, keys };

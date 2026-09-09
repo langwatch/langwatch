@@ -1,7 +1,7 @@
 /**
  * The workbench run loop, composed for this process.
  */
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   AbsentAgentSandboxKeyShareAdapter,
   AgentSandboxKeyMintService,
@@ -9,7 +9,7 @@ import {
   RedisAgentSandboxKeyShareAdapter,
   type AgentSandboxKeyShareRedis,
 } from "@langwatch/api-key-server";
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
@@ -59,7 +59,6 @@ import {
   UnconfiguredWorkflowStudioStreamAdapter,
   WorkflowStudioDispatchService,
 } from "@langwatch/workflow-server";
-import { ConnectedAgentRuntimeAdapter } from "@langwatch/agent-server";
 import { ConnectedTargetService } from "@langwatch/suite-server";
 import type { CallOutcome, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
@@ -203,10 +202,10 @@ export type ApiExperimentRunOptions = Readonly<{
   /** The four contract services a run loads its rows through, already composed. */
   datasets: DatasetService;
   prompts: PromptService;
-  agents: AgentService;
+  agents: AgentApi;
   evaluators: EvaluatorService;
   /** The credential a run lends the code it executes. Absent means it lends none. */
-  apiKeys: ApiKeyService | undefined;
+  apiKeys: ApiKeyApi | undefined;
   /**
    * The 32-byte hex key this deployment seals stored secrets with, which the shared sandbox
    * token is held under too. Absent means the runs of a project share no key.
@@ -354,7 +353,7 @@ export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiEx
       redis: redis,
       storedSecretEncryptionKey: options.storedSecretEncryptionKey,
     }),
-    connectedDispatch: ApiExperimentConnectedDispatchAdapter.create(),
+    connectedDispatch: ApiExperimentConnectedDispatchAdapter.create(options.agents),
     connectedAgentOwnership: ApiExperimentConnectedAgentOwnershipAdapter.create(),
   };
 
@@ -390,14 +389,17 @@ export function composeApiExperimentRun(options: ApiExperimentRunOptions): ApiEx
   };
 }
 
-/**
- * The connected-agent dispatcher a run's turns go through (ADR-128). Composed here
- * because neither feature server package may import the other: the runtime lives in
- * `@langwatch/agent-server` and the run loop in `@langwatch/experiment-server`.
- */
+/** Experiment turns use the same Agent App as the interactive relay. */
 class ApiExperimentConnectedDispatchAdapter extends ExperimentConnectedDispatchPort {
-  static create(): ApiExperimentConnectedDispatchAdapter {
-    return new ApiExperimentConnectedDispatchAdapter();
+  readonly #agents: AgentApi;
+
+  static create(agents: AgentApi): ApiExperimentConnectedDispatchAdapter {
+    return new ApiExperimentConnectedDispatchAdapter(agents);
+  }
+
+  private constructor(agents: AgentApi) {
+    super();
+    this.#agents = agents;
   }
 
   dispatch(input: {
@@ -406,7 +408,7 @@ class ApiExperimentConnectedDispatchAdapter extends ExperimentConnectedDispatchP
     call: DispatchCall;
     signal: AbortSignal;
   }): Promise<CallOutcome> {
-    return ConnectedAgentRuntimeAdapter.get().dispatcher.dispatch(input);
+    return this.#agents.callConnected(input);
   }
 }
 
@@ -571,7 +573,7 @@ class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialP
    */
   static create(options: {
     prisma: PrismaClient;
-    apiKeys: ApiKeyService | undefined;
+    apiKeys: ApiKeyApi | undefined;
     redis: AgentSandboxKeyShareRedis | null;
     storedSecretEncryptionKey: string | undefined;
   }): ApiExperimentSandboxCredentialAdapter {
@@ -607,7 +609,7 @@ class ApiExperimentSandboxCredentialAdapter extends ExperimentSandboxCredentialP
     const organizationId = project?.team?.organizationId;
     if (!organizationId) return undefined;
 
-    return await mint.tryGetOrMint({ projectId: input.projectId, organizationId });
+    return await mint.findOrMint({ projectId: input.projectId, organizationId });
   }
 }
 

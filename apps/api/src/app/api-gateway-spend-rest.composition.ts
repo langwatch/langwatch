@@ -5,16 +5,18 @@ import { ApiRestCapabilityUnavailableError } from "./api-rest-ports.ts";
 import { ClickHouseUnavailableError } from "@langwatch/analytics-server";
 import { ForbiddenError } from "@langwatch/api/rest";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-import { eventMatches, WebhookEnvelopeService } from "@langwatch/enterprise-api/webhooks";
+import { eventMatches, WebhookEnvelopeService } from "@langwatch/webhook-server";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 import {
   FixedGatewaySettlementPolicyAdapter,
   GatewayEndUserCapsAdapter,
   GatewaySpendScopeAdapter,
-  type GatewaySpendRestPorts,
-  type GatewaySpendWebhookDelivery,
-  type GatewaySpendWebhookEndpoints,
-  type GatewaySpendWebhookEvents,
 } from "@langwatch/gateway-server";
+import type {
+  GatewaySpendRestPorts,
+  GatewaySpendWebhookDelivery,
+  GatewaySpendWebhookEndpoints,
+} from "@langwatch/gateway-server/api-rest/gateway-spend";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { MiddlewareHandler } from "hono";
 
@@ -24,8 +26,8 @@ import type { ApiGatewayComposition } from "./api-gateway.composition.ts";
  * The Enterprise webhook platform, as the replay route reads it.
  */
 export type ApiGatewaySpendWebhookPort = Readonly<{
-  endpoints: GatewaySpendWebhookEndpoints;
-  events: GatewaySpendWebhookEvents | undefined;
+  webhooks: WebhookApi;
+  eventsAvailable: boolean;
   delivery: GatewaySpendWebhookDelivery | undefined;
 }>;
 
@@ -72,8 +74,8 @@ export function composeApiGatewaySpendRest(
   const ports: GatewaySpendRestPorts = {
     spendEvents: gateway.spendEvents,
     budgetSpend: gateway.budgetSpend,
-    webhookEndpoints: webhooks?.endpoints ?? webhookPlatformAbsent,
-    webhookEvents: webhooks?.events,
+    webhookEndpoints: webhooks?.webhooks ?? webhookPlatformAbsent,
+    webhookEvents: webhooks?.eventsAvailable ? webhooks.webhooks : undefined,
     webhookDelivery: webhooks?.delivery,
     // The wire format is the webhook platform's, and the pull and the push
     // have to answer the same bytes, so the mapping ARRIVES rather than being

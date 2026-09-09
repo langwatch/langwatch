@@ -49,11 +49,13 @@ import {
   WebhookEndpointAdapter,
   WebhookEventsAdapter,
   WebhookEventsService,
+  WebhookApp,
+  WebhookHealthService,
   WebhookIdPort,
   WebhookSecretPort,
   type WebhookDeliveryProcessDeps,
   type WebhookEndpointRuntime,
-} from "@langwatch/enterprise-api/webhooks";
+} from "@langwatch/webhook-server";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
@@ -100,7 +102,18 @@ export function composeApiGatewayWebhooks(
     ...unrunExecutorCollaborators(),
   });
 
-  return { endpoints, events, delivery };
+  const webhooks = WebhookApp.create({
+    endpoints,
+    events,
+    health: WebhookHealthService.create({
+      endpoints,
+      processStore: PrismaProcessStore.create({ database }),
+    }),
+    assertEndpointsEntitled: () => Promise.resolve(),
+    dispatch: () => Promise.reject(new Error("The API process cannot dispatch webhook delivery.")),
+  });
+
+  return { webhooks, eventsAvailable: events !== undefined, delivery };
 }
 
 /** The endpoint registry and the emitted-envelope log, as ANY door on this process reads them. */

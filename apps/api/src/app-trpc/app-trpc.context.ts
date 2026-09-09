@@ -21,6 +21,7 @@ import type {
   OrganizationSessionPolicyService,
   WebhookApp,
 } from "@langwatch/enterprise-api";
+import type { LicensingApi, LimitType } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayApp } from "@langwatch/gateway-server";
 import type { GithubService } from "@langwatch/github-contract";
 import type { AuthzApi, AuthzService } from "@langwatch/authz-contract";
@@ -107,6 +108,28 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * mints and the routing policies their traffic follows.
    */
   governanceApp: GovernanceApp;
+  /**
+   * What this instance is licensed for, and the seat ceilings that licence
+   * sets. One application for `license.*` and `licenseEnforcement.*`, because
+   * the licence that sets a ceiling and the ceiling a create button asks about
+   * cannot be allowed to disagree.
+   */
+  licensing: LicensingApi;
+  /**
+   * Where a reached ceiling is reported. Still on the slice although no
+   * transport reads it: the licence application is COMPOSED over it, so the
+   * deployment that answered the check is the one that raises the alert.
+   */
+  usageLimits: Readonly<{
+    notifyResourceLimitReached(
+      input: Readonly<{
+        organizationId: string;
+        limitType: LimitType;
+        current: number;
+        max: number;
+      }>,
+    ): Promise<void>;
+  }>;
   /** The rules an organization bounds its members' sessions by. */
   sessionPolicy: OrganizationSessionPolicyService;
   /**

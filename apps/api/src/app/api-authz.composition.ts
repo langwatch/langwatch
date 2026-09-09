@@ -1,6 +1,7 @@
 import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
 import {
   EventingAuthzCommandDispatcherAdapter,
+  AuthzApp,
   KsuidAuthzBindingIdAdapter,
   ObservabilityAuthzMetricsAdapter,
   PostgresAuthzAdapter,
@@ -122,11 +123,16 @@ export class ApiAuthzComposition {
     const registered = options.eventing.eventSourcing.register(built.pipeline);
     dispatcher.connect(EventingAuthzCommandDispatcherAdapter.sendersFrom(registered.commands));
 
-    return new ApiAuthzComposition(built.authz, built.grants);
+    return new ApiAuthzComposition(
+      built.authz,
+      built.grants,
+      AuthzApp.fromServices({ permissions: built.authz, grants: built.grants }),
+    );
   }
 
   private constructor(
     readonly permissions: AuthzService,
     readonly grants: AuthzGrantsService,
+    readonly app: AuthzApp,
   ) {}
 }

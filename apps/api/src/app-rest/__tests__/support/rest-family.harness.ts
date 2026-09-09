@@ -71,8 +71,12 @@ export function createRestFamilySecurity(
     : pass;
 
   const asProject: MiddlewareHandler = async (c, next) => {
-    c.set("project", caller.project ?? TEST_PROJECT);
+    const project = caller.project ?? TEST_PROJECT;
+    c.set("project", project);
     if (caller.userId !== null) c.set("apiKeyUserId", caller.userId ?? TEST_USER_ID);
+    // The whole resolved credential, as the process's own authentication
+    // installs it: handlers read their caller off this, never off loose keys.
+    c.set("resolvedToken", { type: "legacyProjectKey", project });
     await next();
   };
   const asOrganization: MiddlewareHandler = async (c, next) => {

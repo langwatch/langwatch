@@ -19,6 +19,7 @@ import type { ProjectService } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { composeApiTraceReadStack } from "../../../app/api-trace-read-stack.composition.ts";
+import { testDataPrivacyApi } from "./support/test-data-privacy.service.ts";
 import { composeApiPlanProvider } from "../../../app/api-usage.composition.ts";
 
 const SCOPED_KEY: RestCredentialPrincipal = {
@@ -57,19 +58,18 @@ function readStackWith(granted: boolean) {
     projects: {
       tryGetWithTeam: async () => ({ id: "project-1", team: { organizationId: "organization-1" } }),
     } as unknown as ProjectService,
-    dataPrivacy: {
-      getResolvedForProject: async () =>
-        resolveDataPrivacy({
-          rows: [],
-          facts: {
-            organizationId: "organization-1",
-            teamId: "team-1",
-            projectId: "project-1",
-            departmentId: null,
-            isPersonal: false,
-          },
-        }),
-    },
+    dataPrivacy: testDataPrivacyApi(
+      resolveDataPrivacy({
+        rows: [],
+        facts: {
+          organizationId: "organization-1",
+          teamId: "team-1",
+          projectId: "project-1",
+          departmentId: null,
+          isPersonal: false,
+        },
+      }),
+    ),
     plans: composeApiPlanProvider({ isSaas: false }),
     dataRetention: unreachable("dataRetention"),
     topics: unreachable("topics"),

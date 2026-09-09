@@ -5,8 +5,8 @@
  */
 import type { AppRestBroadcast, AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import { generate } from "@langwatch/ksuid";
+import { createScenarioRunExportRestApp } from "@langwatch/scenario-server/api-rest/scenario-run-export";
 import {
-  createScenarioRunExportRestApp,
   ScenarioRunExportForbiddenError,
   ScenarioRunExportService,
   ScenarioRunExportUnauthenticatedError,

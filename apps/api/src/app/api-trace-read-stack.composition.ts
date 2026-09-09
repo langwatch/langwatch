@@ -1,10 +1,9 @@
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections, TraceViewerService } from "@langwatch/trace-contract";
 /**
  * The ClickHouse trace READ stack, composed from this process's own graph.
  */
 import {
   TraceReadRedactionService,
-  ClaudeCodeLogEnrichmentService,
   TraceReadableSpanService,
   TraceEditOverlayRedactionService,
   TraceEditOverlayRestoreService,
@@ -17,20 +16,13 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 import {
   CONTENT_KEY_CATALOG,
-  isContentVisible,
-  isContentVisibleToPublic,
-  describeAudience,
   PRIVACY_DROPPED_MARKER_ATTR,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
-  type ContentCategory,
-  type ResolvedCategory,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
+import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { sharedFiltersInputSchema } from "@langwatch/analytics-server";
-import {
-  ContentDropPolicyService,
-  PrismaDataPrivacyResolutionAdapter,
-} from "@langwatch/data-privacy-server";
+import { ContentDropPolicyService } from "@langwatch/data-privacy-server";
 import { EvaluationPreconditionService } from "@langwatch/evaluation-server";
 import { evaluatorTypesSchema, getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -42,7 +34,7 @@ import { ModelProviderExecutionHandleService } from "@langwatch/model-provider-s
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
-import type { TopicService } from "@langwatch/topic-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
 import {
   buildDisplayInput,
   stringifySpanIO,
@@ -51,6 +43,11 @@ import {
   type Trace,
   type TraceService as TraceTreeService,
 } from "@langwatch/trace-contract";
+import {
+  findPromptReferenceInAncestors,
+  flattenParamsToPromptAttributes,
+  type PromptLookupSpan,
+} from "@langwatch/prompt-contract";
 import {
   TraceBlobStoreService,
   ClickHouseTraceAdapter,
@@ -75,6 +72,7 @@ import {
   TraceListClickHouseRepository,
   TraceListService,
   TraceLegacyReadService,
+  ClickHouseTraceExistenceRepository,
   TraceFullIoPort,
   TracePayloadReaderPort,
   TraceQueryClassificationAdapter,
@@ -83,19 +81,14 @@ import {
   TraceSummaryService,
   traceMetadataUpdateSchema,
   VisibilityWindowService,
-  type ClaudeSpanRef,
   type TraceLegacyFilterConditions,
-  type TracesV2TrpcPorts,
   type TraceAppDependencies,
+  TraceViewerProtectionService,
+  TraceViewerReadService,
 } from "@langwatch/trace-server";
-import type { TracesTrpcPorts } from "@langwatch/trace-server";
-import {
-  findPromptReferenceInAncestors,
-  flattenParamsToPromptAttributes,
-  type PromptLookupSpan,
-  type TraceLegacyFilterInput,
-  type TraceLegacyListInput,
-} from "@langwatch/trace-contract";
+import type { TracesV2TrpcPorts } from "@langwatch/trace-server/api-trpc/traces-v2";
+import type { TracesTrpcPorts } from "@langwatch/trace-server/api-trpc/traces";
+import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.port.ts";
@@ -115,13 +108,13 @@ export type ApiTraceReadStackOptions = Readonly<{
    * `prisma` and `projects` when the process does not hand one in, so a caller cannot compose
    * the stack without a policy resolver and quietly serve unredacted content.
    */
-  dataPrivacy?: ApiTraceDataPrivacyResolver | undefined;
+  dataPrivacy: DataPrivacyApi;
   /** The plan the visibility window comes from. */
   plans: PlanProvider;
   /** The retention cascade the span read's floor is widened to. */
   dataRetention: DataRetentionApi;
   /** The topic tree the grid labels its rows with. */
-  topics: TopicService;
+  topics: TopicApi;
   /** The gateway the AI composer resolves its model through. */
   modelProviders: ModelProviderService | undefined;
   /** Where a resolved model executes: nlpgo's OpenAI-compatible proxy. */
@@ -271,10 +264,6 @@ function preconditionTraceData(
 }
 
 /** The project's resolved data-privacy policy, as this stack reads it. */
-export type ApiTraceDataPrivacyResolver = Readonly<{
-  getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy>;
-}>;
-
 /** Composes the trace read stack over this process's own connection. */
 export function composeApiTraceReadStack(options: ApiTraceReadStackOptions): ApiTraceReadStackPort {
   return ApiComposedTraceReadStack.create(options);
@@ -287,30 +276,38 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
 
   private readonly logger: Logger;
   private readonly canonicalisation = TraceCanonicalisationService.create();
-  private readonly protections: ApiTraceProtections;
+  private readonly protections: TraceViewerProtectionService;
   private readonly composed: TraceAppDependencies["traces"];
+  private readonly viewerService: TraceViewerService;
   private readonly dropPolicy = ContentDropPolicyService.create();
   private readonly preconditions = EvaluationPreconditionService.create();
-  private readonly dataPrivacy: ApiTraceDataPrivacyResolver;
+  private readonly dataPrivacy: DataPrivacyApi;
 
   private constructor(private readonly options: ApiTraceReadStackOptions) {
     super();
     this.logger = createLogger(`${options.processName}:traces`);
-    this.dataPrivacy =
-      options.dataPrivacy ??
-      PrismaDataPrivacyResolutionAdapter.create({
-        prisma: options.prisma,
-        projects: options.projects,
-      });
-    this.protections = ApiTraceProtections.create({
-      ...options,
+    this.dataPrivacy = options.dataPrivacy;
+    this.protections = TraceViewerProtectionService.create({
+      authz: options.authz,
+      projects: options.projects,
+      plans: options.plans,
       dataPrivacy: this.dataPrivacy,
+      fallbackVisibilityDays: FREE_VISIBILITY_DAYS,
+      processName: options.processName,
     });
     this.composed = this.composeReaders();
+    this.viewerService = TraceViewerReadService.create({
+      read: this.composed.read,
+      protections: this.protections,
+    });
   }
 
   readers(): TraceAppDependencies["traces"] {
     return this.composed;
+  }
+
+  viewer(): TraceViewerService {
+    return this.viewerService;
   }
 
   getViewerProtections(ctx: unknown, input: Readonly<{ projectId: string }>): Promise<Protections> {
@@ -373,7 +370,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
 
   readPorts(): Pick<
     TracesV2TrpcPorts,
-    "tryGetVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes" | "codingAgentEnrichment"
+    "tryGetVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes"
   > {
     return {
       tryGetVisibilityCutoffMs: (projectId) => this.protections.visibilityCutoffMs(projectId),
@@ -402,17 +399,6 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
           getResolvedPolicyForProject: (input) => this.dataPrivacy.getResolvedForProject(input),
         },
       },
-      codingAgentEnrichment: {
-        isCodingAgentShapedSpan: ClaudeCodeLogEnrichmentService.isCodingAgentShapedSpan,
-        enrichSpansFromLogs: (input) =>
-          ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs(input),
-        enrichSingleSpanWithLogContent: (input) =>
-          ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent({
-            ...input,
-            modelCallRefs: input.modelCallRefs as ClaudeSpanRef[],
-          }),
-        mapSummaryRowsToRefs: ClaudeCodeLogEnrichmentService.mapSummaryRowsToClaudeRefs,
-      },
     };
   }
 
@@ -422,7 +408,6 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     | "tryGetVisibilityCutoffMs"
     | "mappers"
     | "derivedAttrPrefixes"
-    | "codingAgentEnrichment"
     | "queryTranslation"
   > {
     return {
@@ -460,7 +445,6 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       | "tryGetVisibilityCutoffMs"
       | "mappers"
       | "derivedAttrPrefixes"
-      | "codingAgentEnrichment"
       | "queryTranslation"
     >;
   }
@@ -571,6 +555,13 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     });
 
     return {
+      existence: resolve
+        ? new ClickHouseTraceExistenceRepository(resolve as never)
+        : {
+            // An API process without trace storage has no ids to queue. This
+            // preserves the legacy empty-set answer for annotation workflows.
+            findExistingTraceIds: async () => [],
+          },
       read: read as unknown as TraceAppDependencies["traces"]["read"],
       list: TraceListService.create({
         repository: enabled
@@ -749,6 +740,18 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
   }
 }
 
+class ApiTraceCapabilityUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(processName: string, capability: string) {
+    super("service_unavailable", `${processName} has no ${capability}.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ApiTraceCapabilityUnavailableError";
+  }
+}
+
 /** An offloaded payload, on a process that resolves none. */
 class UnresolvedTracePayloadReader extends TracePayloadReaderPort {
   static create(): UnresolvedTracePayloadReader {
@@ -798,187 +801,6 @@ function tryActorId(ctx: unknown): string | undefined {
 /**
  * What one caller may read of one project's captured content. Three independent sources, and
  * they are independent on purpose. Spend follows the caller's own PERMISSION — `cost:view`, the
- * same question the declared check on a cost-oriented read asks.
- */
-type ApiTraceProtectionsOptions = ApiTraceReadStackOptions &
-  Readonly<{ dataPrivacy: ApiTraceDataPrivacyResolver }>;
-
-class ApiTraceProtections {
-  static create(options: ApiTraceProtectionsOptions): ApiTraceProtections {
-    return new ApiTraceProtections(options);
-  }
-
-  private readonly logger: Logger;
-  private readonly window: VisibilityWindowService;
-
-  private constructor(private readonly options: ApiTraceProtectionsOptions) {
-    this.logger = createLogger(`${options.processName}:trace-protections`);
-    this.window = VisibilityWindowService.create(options.plans);
-  }
-
-  /**
-   * The plan's cutoff for one project, failing CLOSED. A leak is irreversible and over-blurring
-   * is a refresh away, so an unresolvable organization and a plan-store error both apply the
-   * free-tier window rather than answering "unbounded".
-   */
-  async visibilityCutoffMs(projectId: string): Promise<number | null> {
-    const dayMs = 24 * 60 * 60 * 1000;
-    try {
-      const project = await this.options.projects.tryGetWithTeam(projectId);
-      const organizationId = project?.team?.organizationId;
-      if (!organizationId) {
-        this.logger.error(
-          { projectId },
-          "visibility window failing closed: project resolves to no organization",
-        );
-        return Date.now() - FREE_VISIBILITY_DAYS * dayMs;
-      }
-      return await this.window.tryGetVisibilityCutoffMs({ organizationId });
-    } catch (error) {
-      this.logger.error(
-        { projectId, error },
-        "visibility window failing closed: plan resolution failed",
-      );
-      return Date.now() - FREE_VISIBILITY_DAYS * dayMs;
-    }
-  }
-
-  async resolve(input: {
-    projectId: string;
-    userId: string | undefined;
-    publiclyShared: boolean;
-  }): Promise<Protections> {
-    const [canSeeCosts, isMember, isAdmin, visibilityCutoffMs] = await Promise.all([
-      this.permitted(input, "cost:view"),
-      this.permitted(input, "traces:view"),
-      this.permitted(input, "project:update"),
-      this.visibilityCutoffMs(input.projectId),
-    ]);
-
-    let policy: ResolvedDataPrivacy;
-    try {
-      policy = await this.options.dataPrivacy.getResolvedForProject({
-        projectId: input.projectId,
-      });
-    } catch (error) {
-      this.logger.error(
-        { error, projectId: input.projectId },
-        "data-privacy policy resolution failed; hiding captured content (fail-closed)",
-      );
-      return {
-        canSeeCosts,
-        canSeeCapturedInput: false,
-        canSeeCapturedOutput: false,
-        capturedInputVisibleTo: null,
-        capturedOutputVisibleTo: null,
-        contentCategories: uniformContentCategories(false),
-        hiddenAttributes: [{ pattern: "*", visibleTo: "members of this project" }],
-        visibilityCutoffMs,
-      };
-    }
-
-    const restricted = policy.customAttributes.filter((rule) => rule.disposition === "restrict");
-
-    const anonymous = input.publiclyShared || input.userId === undefined;
-    const categories = Object.fromEntries(
-      CONTENT_CATEGORIES.map((category) => {
-        const resolved = policy.categories[category];
-        return [
-          category,
-          {
-            canSee: anonymous
-              ? isContentVisibleToPublic(resolved)
-              : isContentVisible(resolved, {
-                  isAdmin,
-                  isMember,
-                  isMemberRole: isMember,
-                  isViewer: isMember && !isAdmin,
-                  // Neither is resolvable from this process's graph, and both
-                  // widen rather than narrow, so both stay false.
-                  isProjectOwner: false,
-                  groupIds: [],
-                }),
-            restrictVisibleTo: restrictLabelFor(resolved),
-          },
-        ];
-      }),
-    ) as Protections["contentCategories"];
-
-    const visibleTo = "members of this project";
-    return {
-      canSeeCosts,
-      canSeeCapturedInput: categories?.input.canSee ?? false,
-      canSeeCapturedOutput: categories?.output.canSee ?? false,
-      capturedInputVisibleTo: categories?.input.restrictVisibleTo ?? null,
-      capturedOutputVisibleTo: categories?.output.restrictVisibleTo ?? null,
-      contentCategories: categories,
-      // Every `restrict` rule is hidden from this reader: resolving whether a
-      // named group contains them needs a membership read this process does
-      // not compose, and "I do not know" reads as no.
-      hiddenAttributes: restricted.map((rule) => ({ pattern: rule.pattern, visibleTo })),
-      restrictedAttributes: restricted.map((rule) => ({
-        pattern: rule.pattern,
-        visibleTo,
-        canSee: false,
-      })),
-      visibilityCutoffMs,
-    };
-  }
-
-  /**
-   * The same, for a share viewer — null when the project is gone, which the
-   * read turns into the same generic not-found a bad token gets.
-   */
-  async tryResolveForShare(input: {
-    projectId: string;
-    userId: string | undefined;
-  }): Promise<Protections | null> {
-    const project = await this.options.projects.tryGetWithTeam(input.projectId);
-    if (!project) return null;
-    return this.resolve({ ...input, publiclyShared: true });
-  }
-
-  private async permitted(
-    input: { projectId: string; userId: string | undefined },
-    permission: "cost:view" | "traces:view" | "project:update",
-  ): Promise<boolean> {
-    if (input.userId === undefined) return false;
-    return this.options.authz.hasPermission({
-      userId: input.userId,
-      permission,
-      projectId: input.projectId,
-    });
-  }
-}
-
-const CONTENT_CATEGORIES = ["input", "output", "system", "tools"] as const;
-
-/** A per-category map where every category shares one decision. */
-function uniformContentCategories(canSee: boolean): Protections["contentCategories"] {
-  return Object.fromEntries(
-    CONTENT_CATEGORIES.map((category: ContentCategory) => [
-      category,
-      { canSee, restrictVisibleTo: null },
-    ]),
-  ) as Protections["contentCategories"];
-}
-
-/**
- * The audience label for a `restrict` category, whether or not the viewer can
- * see it: it names the audience on a hidden placeholder AND tells an
- * in-audience viewer the content is restricted rather than ordinary.
- */
-function restrictLabelFor(category: ResolvedCategory): string | null {
-  return category.disposition === "restrict"
-    ? describeAudience(category.audience, { groups: {} })
-    : null;
-}
-
-/** A capability this process did not compose, refused by name at the call. */
-class ApiTraceCapabilityUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(processName: string, capability: string) {
     super("service_unavailable", "This part of the product is not available on this deployment", {
       httpStatus: 503,
       fault: "platform",

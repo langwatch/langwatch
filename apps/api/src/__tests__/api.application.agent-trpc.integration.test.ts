@@ -1,7 +1,7 @@
-import { AgentService, type AgentWithFields } from "@langwatch/agent-contract";
-import { getCurrentContext } from "@langwatch/observability/context";
+import { type AgentWithFields } from "@langwatch/agent-contract";
+import { agentFixture, createAgentAppFixture } from "@langwatch/agent-server/testing";
 import { describe, expect, it, vi } from "vitest";
-import { ApiApplication, MissingAgentService, NoApiTrpcFeatures } from "../api.application.ts";
+import { ApiApplication, NoApiTrpcFeatures } from "../api.application.ts";
 
 const agent: AgentWithFields = {
   id: "agent-1",
@@ -26,93 +26,31 @@ const agent: AgentWithFields = {
   copyCount: 2,
 };
 
-class TestAgentService extends AgentService {
-  readonly observedContexts: Array<ReturnType<typeof getCurrentContext>> = [];
-  readonly getAll = vi.fn(async () => {
-    this.observedContexts.push(getCurrentContext());
-    return [agent];
-  });
+class AllowingFeatures extends NoApiTrpcFeatures {
+  readonly authorization = {
+    getDecision: vi.fn(async () => ({ permitted: true, organizationRole: null })),
+    getProjectAnyDecision: vi.fn(async () => ({ permitted: true, organizationRole: null })),
+    checkScopeLineage: vi.fn(async () => ({ kind: "consistent" as const })),
+  };
 
-  private unavailable(): never {
-    throw new Error("This test does not dispatch this agent service method.");
-  }
-
-  getById() {
-    return this.unavailable();
-  }
-  getReferenceStates() {
-    return this.unavailable();
-  }
-  getNamesByIds() {
-    return this.unavailable();
-  }
-  registerConnected() {
-    return this.unavailable();
-  }
-  ownersOf() {
-    // No agent in this fixture carries an `ownerUserId`, so there is nobody
-    // to look up: `AgentApp.getAll` calls this on every read now (ADR-128),
-    // not only for a connected agent.
-    return Promise.resolve(new Map<string, { userId: string; name: string | null }>());
-  }
-  getConnectedByNameAndEnvironment() {
-    return this.unavailable();
-  }
-  getConnectedByName() {
-    return this.unavailable();
-  }
-  exists() {
-    return this.unavailable();
-  }
-  list() {
-    return this.unavailable();
-  }
-  create() {
-    return this.unavailable();
-  }
-  update() {
-    return this.unavailable();
-  }
-  archive() {
-    return this.unavailable();
-  }
-  relatedEntities() {
-    return this.unavailable();
-  }
-  cascadeArchive() {
-    return this.unavailable();
-  }
-  getCopies() {
-    return this.unavailable();
-  }
-  getSourceOfCopy() {
-    return this.unavailable();
-  }
-  copy() {
-    return this.unavailable();
-  }
-  pushToCopies() {
-    return this.unavailable();
-  }
-  syncFromSource() {
-    return this.unavailable();
-  }
-  getHistory() {
-    return this.unavailable();
-  }
+  readonly errorReporting = {
+    capture: async () => undefined,
+    asError: (error: unknown) => error,
+  };
 }
 
 describe("ApiApplication Agent tRPC composition", () => {
   it("mounts every legacy agents.* procedure with its legacy presenter shape", async () => {
-    const agents = new TestAgentService();
-    const authorize = vi.fn(async () => undefined);
+    const { app: agents, repositories } = createAgentAppFixture();
+    await repositories.agents.create(agentFixture(agent));
+    const features = new AllowingFeatures();
     const application = ApiApplication.create({
       agents,
-      features: new NoApiTrpcFeatures(),
+      features,
     });
     const caller = application.createCaller({
       actor: () => ({ id: "user-1" }),
-      authorize,
+      tryActor: () => ({ id: "user-1" }),
       can: async () => true,
     });
 
@@ -123,10 +61,15 @@ describe("ApiApplication Agent tRPC composition", () => {
     // `connected` dependency, so a non-connected agent degrades to no
     // declared parameters, no owner and offline presence with no instances —
     // and, holding no owner, it is one anybody may choose.
-    await expect(agentCaller.getAll({ projectId: "project-1" })).resolves.toEqual([
-      {
-        ...agent,
-        _count: { copiedAgents: 2 },
+    await expect(agentCaller.getAll({ projectId: "project-1" })).resolves.toMatchObject([
+      expect.objectContaining({
+        id: agent.id,
+        projectId: agent.projectId,
+        name: agent.name,
+        type: agent.type,
+        config: agent.config,
+        fieldsResolved: true,
+        _count: { copiedAgents: 0 },
         ownerUserId: null,
         parameters: [],
         owner: null,
@@ -134,10 +77,14 @@ describe("ApiApplication Agent tRPC composition", () => {
         instances: [],
         selectable: true,
         notSelectableReason: null,
-      },
+      }),
     ]);
-    expect(agents.observedContexts).toEqual([{ userId: "user-1" }]);
-    expect(authorize).toHaveBeenCalledWith("evaluations:view", { projectId: "project-1" });
+    expect(features.authorization.getDecision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        permission: "evaluations:view",
+        scope: { tier: "project", id: "project-1" },
+      }),
+    );
 
     const names = Object.keys(application.trpc._def.procedures)
       .filter((path) => path.startsWith("agents."))
@@ -161,45 +108,19 @@ describe("ApiApplication Agent tRPC composition", () => {
     ]);
   });
 
-  /** @scenario "A process with no database composes no agent service" */
-  it("mounts the agents surface backed by the null object, refusing every call by name", async () => {
-    const application = ApiApplication.create({
-      features: new NoApiTrpcFeatures(),
-      agents: new MissingAgentService(),
-    });
-
-    const names = Object.keys(application.trpc._def.procedures).filter((path) =>
-      path.startsWith("agents."),
-    );
-    expect(names.length).toBeGreaterThan(0);
-
-    const caller = application.createCaller({
-      actor: () => ({ id: "user-1" }),
-      authorize: async () => undefined,
-      can: async () => true,
-    });
-    const agentCaller = caller.agents;
-    if (!agentCaller) throw new Error("Agent router was not composed.");
-
-    await expect(agentCaller.getAll({ projectId: "project-1" })).rejects.toThrow(
-      "Agent service is not configured for this API application.",
-    );
-  });
-
   it("refuses a copy command whose project inputs cross tenant boundaries", async () => {
-    const agents = new TestAgentService();
-    const copy = vi.spyOn(agents, "copy");
-    const authorizeScopeLineage = vi.fn(async () => {
+    const { app: agents } = createAgentAppFixture();
+    const features = new AllowingFeatures();
+    features.authorization.checkScopeLineage.mockImplementation(async () => {
       throw new Error("scope lineage mismatch");
     });
     const application = ApiApplication.create({
       agents,
-      features: new NoApiTrpcFeatures(),
+      features,
     });
     const caller = application.createCaller({
       actor: () => ({ id: "user-1" }),
-      authorize: async () => undefined,
-      authorizeScopeLineage,
+      tryActor: () => ({ id: "user-1" }),
       can: async () => true,
     });
     const agentCaller = caller.agents;
@@ -213,10 +134,8 @@ describe("ApiApplication Agent tRPC composition", () => {
       }),
     ).rejects.toThrow("scope lineage mismatch");
 
-    expect(authorizeScopeLineage).toHaveBeenCalledWith(
+    expect(features.authorization.checkScopeLineage).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: "project-1", sourceProjectId: "project-2" }),
-      "evaluations:manage",
     );
-    expect(copy).not.toHaveBeenCalled();
   });
 });

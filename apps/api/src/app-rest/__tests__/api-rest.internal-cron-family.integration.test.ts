@@ -95,7 +95,12 @@ describe("given a deployment that composed no cron collaborators", () => {
       security: passThroughSecurity(),
       services: {},
       ports: {
-        handlerManagedCredential: async () => ({ ok: true, project, markUsed: () => {} }),
+        handlerManagedCredential: async () => ({
+          ok: true as const,
+          project,
+          resolved: { type: "legacyProjectKey" as const, project: project as never },
+          markUsed: () => {},
+        }),
         rateLimit: async () => ({ allowed: true }),
       } as ApiProcessRestPorts,
     })) {
@@ -114,7 +119,12 @@ function mount(options: { cleanupOldLambdas: () => Promise<void>; secret?: strin
     security: passThroughSecurity(),
     services: {},
     ports: {
-      handlerManagedCredential: async () => ({ ok: true, project, markUsed: () => {} }),
+      handlerManagedCredential: async () => ({
+        ok: true as const,
+        project,
+        resolved: { type: "legacyProjectKey" as const, project: project as never },
+        markUsed: () => {},
+      }),
       rateLimit: async () => ({ allowed: true }),
       cron: {
         internalSecret: () => ("secret" in options ? options.secret : SECRET),

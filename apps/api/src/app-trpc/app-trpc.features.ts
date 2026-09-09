@@ -12,6 +12,10 @@ import { createPersonalWorkspaceFeaturesTrpcRouter } from "../features/organizat
 import { createPromptTagTrpcRouter } from "../features/prompt/prompt-trpc.mount.ts";
 import { createSsoConnectionTrpcRouter } from "../features/sso/sso-trpc.mount.ts";
 import { composeGithubTrpcRouter } from "../features/github/github.composition.ts";
+import {
+  createLicenseEnforcementTrpcRouter,
+  createLicenseTrpcRouter,
+} from "../features/enterprise/licensing-trpc.mount.ts";
 import { createEnterpriseBillingTrpcRouters } from "../features/enterprise/enterprise-billing-trpc.mount.ts";
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount.ts";
 import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition.ts";
@@ -103,8 +107,12 @@ export function createAppTrpcFeatures(options: {
     // a namespace mounted outside the list would serve traffic from outside
     // every audit that reads it.
     emailSuppression: automationRouters.emailSuppression,
-    license: enterprise.license,
-    licenseEnforcement: enterprise.licenseEnforcement,
+    // What this instance is licensed for, and the ceilings that licence sets.
+    // Mounted by the process rather than forwarded from the Enterprise
+    // composition: the procedures are declared in the feature's own contract,
+    // and `ctx.app.licensing` is the one application that answers both.
+    license: createLicenseTrpcRouter(mount.runtime),
+    licenseEnforcement: createLicenseEnforcementTrpcRouter(mount.runtime),
     organization: composed.organization.router(mount),
     project: composed.project.router(mount),
     scimToken: enterprise.scimToken,

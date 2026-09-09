@@ -3,6 +3,7 @@
  * the real `/api/trpc` handler.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { AgentApi } from "@langwatch/agent-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   type DataPrivacyApi,
@@ -16,16 +17,13 @@ import type {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { ResourceScope } from "@langwatch/runtime-composition";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { ApiAuditPort } from "../../../api-request.policy.ts";
-import {
-  ApiApplication,
-  MissingAgentService,
-} from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import { LWQL_FLAG } from "@langwatch/analytics-server";
 import { composeAnalyticsFeature } from "../analytics.composition.ts";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import {
   stub,
@@ -165,7 +163,7 @@ function composeApplication(options: { clickhouse?: boolean; workbenchEnabled?: 
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({

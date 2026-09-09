@@ -120,7 +120,12 @@ function mount(overrides: {
     security: passThroughSecurity(),
     services: {},
     ports: {
-      handlerManagedCredential: async () => ({ ok: true, project, markUsed: () => {} }),
+      handlerManagedCredential: async () => ({
+        ok: true as const,
+        project,
+        resolved: { type: "legacyProjectKey" as const, project: project as never },
+        markUsed: () => {},
+      }),
       rateLimit: async () => ({ allowed: true }),
       admin: {
         ops: () =>
