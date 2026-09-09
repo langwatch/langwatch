@@ -1,0 +1,132 @@
+{{- if .Values.voice.enabled }}
+{{- if not .Values.voice.publicBaseUrl }}
+{{- fail "voice.publicBaseUrl is required when voice.enabled is true — Twilio Media Streams connects inbound to this URL, and the worker refuses to start without it. Set it to the public https:// origin fronting the voice Service/Ingress." }}
+{{- end }}
+{{- if not .Values.voice.twilio.existingSecret }}
+{{- fail "voice.twilio.existingSecret is required when voice.enabled is true — the voice worker reads TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN/TWILIO_FROM_NUMBER from it. Create a Secret with those keys (see voice.twilio.keys) and set this to its name." }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-voice
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-voice
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: voice
+    {{- include "langwatch.labels" . | nindent 4 }}
+  {{- with .Values.voice.podAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  # Fixed at 1, not a value: the Twilio Media Streams WebSocket routes an
+  # in-flight call by nonce inside one process, so a second replica would
+  # split a call's frames across two processes with no shared state.
+  replicas: 1
+  # Recreate, not RollingUpdate: two replicas would each answer half a call's
+  # frames, so the old pod must fully terminate before the new one starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-voice
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-voice
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: voice
+        {{- with (include "langwatch.cloudIdentityPodLabels" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- with (coalesce .Values.voice.podAnnotations .Values.global.podAnnotations) }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with (include "langwatch.serviceAccountName" .) }}
+      serviceAccountName: {{ . }}
+      {{- end }}
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
+      terminationGracePeriodSeconds: {{ include "langwatch.terminationGracePeriod" (dict "component" .Values.workers "name" "workers") }}
+      securityContext:
+        {{- include "langwatch.podSecurityContext" (dict "ctx" . "component" .Values.voice) | nindent 8 }}
+
+      {{- with (coalesce .Values.voice.nodeSelector .Values.global.scheduling.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.voice.tolerations .Values.global.scheduling.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.voice.affinity .Values.global.scheduling.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with (coalesce .Values.voice.priorityClassName .Values.global.scheduling.priorityClassName) }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+
+      containers:
+        - name: {{ .Release.Name }}-voice
+          securityContext:
+            {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.voice) | nindent 12 }}
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
+          workingDir: /app/platform/app
+          command: ['pnpm']
+          args: ['run', 'start:workers']
+          ports:
+            - name: voice-ws
+              containerPort: {{ .Values.voice.wsPort }}
+              protocol: TCP
+          env:
+            {{- include "langwatch.sharedEnv" . | nindent 12 }}
+            {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers "name" "workers") | nindent 12 }}
+
+            - name: OTEL_SERVICE_NAME
+              value: "langwatch-voice"
+
+            # See the workers Deployment — the voice worker consumes the app's
+            # queues too, so it needs the same callback path back to the app.
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.workers.upstreams.langwatch.scheme | default "http" }}://{{ .Values.workers.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.workers.upstreams.langwatch.port | default 5560 }}
+
+            # Env contract: langwatch/langwatch#8014 (voice-env-contract comment).
+            - name: VOICE_WORKER_ONLY
+              value: "true"
+            - name: VOICE_WS_PORT
+              value: {{ .Values.voice.wsPort | quote }}
+            - name: VOICE_PUBLIC_BASE_URL
+              value: {{ .Values.voice.publicBaseUrl | quote }}
+
+            - name: TWILIO_ACCOUNT_SID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.voice.twilio.existingSecret }}
+                  key: {{ .Values.voice.twilio.keys.accountSid }}
+            - name: TWILIO_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.voice.twilio.existingSecret }}
+                  key: {{ .Values.voice.twilio.keys.authToken }}
+            - name: TWILIO_FROM_NUMBER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.voice.twilio.existingSecret }}
+                  key: {{ .Values.voice.twilio.keys.fromNumber }}
+
+          resources:
+            {{- toYaml .Values.voice.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp-dir
+              mountPath: /tmp
+      volumes:
+        - name: tmp-dir
+          emptyDir: {}
+{{- end }}

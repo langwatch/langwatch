@@ -1,0 +1,47 @@
+{{- if and .Values.voice.enabled .Values.voice.ingress.enabled }}
+{{- if not .Values.voice.ingress.host }}
+{{- fail "voice.ingress.host is required when voice.ingress.enabled is true — it must match the hostname in voice.publicBaseUrl." }}
+{{- end }}
+# Fronts the voice worker's WebSocket port. Twilio Media Streams needs a
+# WebSocket-capable path: add any upgrade/timeout annotations your ingress
+# controller requires under voice.ingress.annotations (TLS termination is left
+# to your edge, same as the main ingress).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-voice
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-voice
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: voice
+    {{- include "langwatch.labels" . | nindent 4 }}
+  {{- with .Values.voice.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.voice.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.voice.ingress.tls }}
+  tls:
+    {{- range . }}
+    - secretName: {{ .secretName }}
+      hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+    {{- end }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.voice.ingress.host | quote }}
+      http:
+        paths:
+          - path: /twilio
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-voice
+                port:
+                  number: {{ .Values.voice.service.port }}
+{{- end }}

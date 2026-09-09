@@ -1073,6 +1073,105 @@ workers:
 
 
 # =============================================================================
+# Voice Worker Configuration (opt-in)
+# =============================================================================
+# A dedicated single-replica worker that terminates Twilio Media Streams calls.
+# Off by default — the default install renders no voice resources at all.
+#
+# Twilio Media Streams connects INBOUND to this worker: without a
+# publicly-reachable voice.publicBaseUrl, there are no phone targets, no
+# matter how the rest of this block is set. Terminate TLS at your own edge
+# (ingress or a cloud load balancer) and point voice.publicBaseUrl at that
+# public origin.
+#
+# Env contract (langwatch/langwatch#8014): the worker reads VOICE_WORKER_ONLY,
+# VOICE_WS_PORT, VOICE_PUBLIC_BASE_URL and the three TWILIO_* variables below.
+# Replicas are fixed at 1, not a value — the Twilio Media Streams WebSocket
+# routes an in-flight call by nonce inside one process, so a second replica
+# would split a call's frames across two processes with no shared state.
+## @section Voice worker (opt-in)
+voice:
+  ## @param voice.enabled [default: false] Deploy the voice worker Deployment, Service (and Ingress if voice.ingress.enabled). Off by default.
+  enabled: false
+
+  # Public https:// origin Twilio dials back to; the worker derives
+  # wss://<host>/twilio/<nonce> from it. Required whenever voice.enabled is
+  # true — the chart refuses to render without it.
+  ## @param voice.publicBaseUrl [string] Public https:// origin Twilio connects to (e.g. https://voice.example.com). Required when voice.enabled is true.
+  publicBaseUrl: ""
+
+  # TCP port of the Twilio Media Streams WebSocket listener inside the pod.
+  ## @param voice.wsPort [default: 3300] Container port of the Twilio Media Streams WebSocket listener.
+  wsPort: 3300
+
+  # Twilio REST credentials. Bring your own Twilio account; the chart never
+  # carries phone numbers or call-routing config (see langwatch/langwatch#8014
+  # — allowed_callees and the call-duration cap are project configuration,
+  # not environment).
+  ## @extra voice.twilio Twilio credentials, read from an existing Secret you manage.
+  ## @param voice.twilio.existingSecret [string] Name of an existing Secret carrying the Twilio credential keys below. Required when voice.enabled is true.
+  ## @param voice.twilio.keys.accountSid [default: TWILIO_ACCOUNT_SID] Key in the existing Secret for the Twilio Account SID.
+  ## @param voice.twilio.keys.authToken [default: TWILIO_AUTH_TOKEN] Key in the existing Secret for the Twilio auth token.
+  ## @param voice.twilio.keys.fromNumber [default: TWILIO_FROM_NUMBER] Key in the existing Secret for the outbound caller id (E.164).
+  twilio:
+    existingSecret: ""
+    keys:
+      accountSid: TWILIO_ACCOUNT_SID
+      authToken: TWILIO_AUTH_TOKEN
+      fromNumber: TWILIO_FROM_NUMBER
+
+  # Resource requirements for the voice worker pod.
+  # See: https://kubespec.dev/v1/Pod#spec.containers.resources
+  ## @extra voice.resources Resource requests and limits for the voice worker.
+  ## @param voice.resources.requests.cpu [string, default: 100m] Requested CPU.
+  ## @param voice.resources.requests.memory [string, default: 512Mi] Requested memory.
+  ## @param voice.resources.limits.cpu [string, default: 500m] CPU limit.
+  ## @param voice.resources.limits.memory [string, default: 1Gi] Memory limit.
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits: { cpu: 500m, memory: 1Gi }
+
+  # Node selector
+  # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
+  ## @param voice.nodeSelector [object] Node selector overrides.
+  nodeSelector: {}
+  # Tolerations
+  # See: https://kubespec.dev/v1/Pod#spec.tolerations
+  ## @param voice.tolerations [array] Tolerations overrides.
+  tolerations: []
+  # Affinity
+  # See: https://kubespec.dev/v1/Pod#spec.affinity
+  ## @param voice.affinity [object] Affinity overrides.
+  affinity: {}
+  ## @param voice.podAnnotations [object] Additional pod annotations for the voice worker.
+  podAnnotations: {}
+
+  # Service exposing the Twilio Media Streams WebSocket port in-cluster.
+  ## @extra voice.service Service configuration for the voice worker.
+  ## @param voice.service.type [default: ClusterIP] Service type.
+  ## @param voice.service.port [default: 3300] Service port (target is voice.wsPort).
+  service:
+    type: ClusterIP
+    port: 3300
+
+  # Optional Ingress fronting the WebSocket port. TLS termination and any
+  # WebSocket-upgrade timeout annotations your controller needs are left to
+  # you — add them under voice.ingress.annotations.
+  ## @extra voice.ingress Ingress configuration for the voice worker.
+  ## @param voice.ingress.enabled [default: false] Create an Ingress for the voice worker.
+  ## @param voice.ingress.className [string] IngressClassName for the voice Ingress.
+  ## @param voice.ingress.annotations [object] Additional annotations (e.g. controller-specific WebSocket upgrade/timeout settings).
+  ## @param voice.ingress.host [string] Hostname the voice Ingress routes, matching voice.publicBaseUrl. Required when voice.ingress.enabled is true.
+  ## @param voice.ingress.tls [array] TLS configuration, same shape as ingress.tls ([{secretName, hosts}]).
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: ""
+    tls: []
+
+
+# =============================================================================
 # LangWatch NLP Service Configuration
 # =============================================================================
 # Configuration for the NLP service (nlpgo).

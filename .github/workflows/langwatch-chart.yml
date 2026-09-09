@@ -194,6 +194,14 @@ jobs:
         if: "!cancelled()"
         run: ./tests/stored-objects-upgrade-ordering.sh
 
+      # The voice worker is opt-in (langwatch/langwatch#8015): the default
+      # install must render none of it, and enabling it must refuse to render
+      # without the two values it cannot work without (publicBaseUrl, the
+      # Twilio secret) — only visible in the rendered output.
+      - name: "assert the opt-in voice worker renders correctly"
+        if: "!cancelled()"
+        run: ./tests/voice-worker.sh
+
       # Design C rests on one Secret name resolving identically on both sides:
       # the app reads the langwatch_lwql password from exactly the Secret the
       # ClickHouse pod mounts to create that identity. The two names come from
