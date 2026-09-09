@@ -1392,7 +1392,9 @@ function InventoryPage() {
           catalogCount={cards?.length}
           // Derived from the source list, so it goes uncounted on the same
           // silence that leaves the Sources tab uncounted beside it.
-          environmentCount={sources === undefined ? undefined : environments.length}
+          environmentCount={
+            sources === undefined ? undefined : environments.length
+          }
           sourceCount={sources?.length}
           catalog={<InventoryCatalogPane page={page} />}
           environments={
