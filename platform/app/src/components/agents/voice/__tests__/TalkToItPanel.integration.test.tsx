@@ -131,6 +131,9 @@ describe("TalkToItPanel", () => {
 
       const player = await screen.findByTestId("talk-play");
       expect(player.querySelector("audio")).toHaveAttribute("src", audioUrl);
+      // A drawer call is not a run (#8020): the panel offers no run link, only
+      // the transcript and the Play control.
+      expect(screen.queryByTestId("talk-run-link")).toBeNull();
     });
   });
 

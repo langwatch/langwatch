@@ -29,11 +29,17 @@ function fakeAgentService(over: {
     projectId: string;
   }) => Promise<AgentWithFields | null>;
   create?: (input: unknown) => Promise<AgentWithFields>;
+  createVoiceAgent?: (input: unknown) => Promise<{ id: string }>;
 }) {
   return {
     getById: over.getById ?? vi.fn(async () => null),
     create:
       over.create ??
+      vi.fn(async () => {
+        throw new Error("not stubbed");
+      }),
+    createVoiceAgent:
+      over.createVoiceAgent ??
       vi.fn(async () => {
         throw new Error("not stubbed");
       }),
@@ -134,10 +140,12 @@ describe("Feature: voice-session ports composition", () => {
 
   describe("given createVoiceAgent", () => {
     describe("when a new voice agent is created", () => {
-      it("creates a voice-typed agent row through the service", async () => {
-        const create = vi.fn(async () => voiceAgentRow({ id: "agent_new" }));
+      it("creates the voice agent through the identity-key-deduped service method", async () => {
+        // The port delegates to AgentService.createVoiceAgent, which folds the
+        // row on its identity key so a retried finish reuses one row (#8020).
+        const createVoiceAgent = vi.fn(async () => ({ id: "agent_new" }));
         const ports = createVoiceSessionPortsFromServices({
-          agentService: fakeAgentService({ create }),
+          agentService: fakeAgentService({ createVoiceAgent }),
           scenarioService: fakeScenarioService({}),
         });
 
@@ -149,12 +157,12 @@ describe("Feature: voice-session ports composition", () => {
         });
 
         expect(created).toEqual({ id: "agent_new" });
-        expect(create).toHaveBeenCalledWith(
+        expect(createVoiceAgent).toHaveBeenCalledWith(
           expect.objectContaining({
             projectId: "project_1",
             name: "New agent",
-            type: "voice",
-            config: { transport: "elevenlabs_convai", agentId: "el_agent_1" },
+            transport: "elevenlabs_convai",
+            agentId: "el_agent_1",
           }),
         );
       });

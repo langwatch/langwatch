@@ -5,6 +5,10 @@ import type {
   ConnectedComponentConfig,
   Workflow,
 } from "~/optimization_studio/types/dsl";
+import {
+  type VoiceTransport,
+  voiceAgentIdentityKey,
+} from "~/server/agents/voice/voice-agent.config";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import type { RunActor } from "~/server/scenarios/run-actor";
 import {
@@ -219,6 +223,53 @@ export class AgentService {
       projectId: input.projectId,
     });
     return enriched!;
+  }
+
+  /**
+   * Creates the voice agent row a "Talk to it" call is saved under on first
+   * hang-up, deduped by its natural identity key so a retried finish for a
+   * not-yet-saved agent — or two browser tabs racing the same one — reuses the
+   * one row rather than creating a second (#8020, decision 1). This replaces the
+   * old run-based guard, which stopped covering the drawer path once a drawer
+   * call no longer writes a run.
+   *
+   * Race-safe the same way {@link registerConnected} is: look up the identity
+   * key, create, and on the unique-constraint race re-read and reuse the winner.
+   */
+  async createVoiceAgent(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    transport: VoiceTransport;
+    agentId: string;
+  }): Promise<TypedAgent> {
+    const identityKey = voiceAgentIdentityKey({
+      transport: input.transport,
+      agentExternalId: input.agentId,
+    });
+    const existing = await this.repository.findByIdentityKey({
+      projectId: input.projectId,
+      identityKey,
+    });
+    if (existing) return existing;
+    try {
+      return await this.repository.create({
+        id: input.id,
+        projectId: input.projectId,
+        name: input.name,
+        type: "voice",
+        config: { transport: input.transport, agentId: input.agentId },
+        identityKey,
+      });
+    } catch (error) {
+      if (!isUniqueConstraintViolation(error)) throw error;
+      const raced = await this.repository.findByIdentityKey({
+        projectId: input.projectId,
+        identityKey,
+      });
+      if (!raced) throw error;
+      return raced;
+    }
   }
 
   /**

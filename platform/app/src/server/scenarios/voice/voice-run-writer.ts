@@ -3,16 +3,14 @@
  * render: one message per turn (caller → user, agent → assistant), the caller
  * marked human.
  *
- * Two shapes, one writer:
- *  - A drawer call ("Talk to it") lands in the voice-call set under a synthetic
- *    per-agent scenario id, and carries no verdict — it is not judged against a
- *    scenario (AC13).
- *  - A "Call it myself" scenario call (AC23) lands under the real scenario id
- *    and its set, beside the scenario's simulated runs, tagged
- *    `metadata.langwatch.callerKind = "human"`. Finishing it emits a
- *    RunFinished that names the scenario, which is what the scenario-evaluations
- *    subscriber keys on to grade the human transcript against the scenario's
- *    attached evaluators — the same grading a simulated run gets.
+ * Only a "Call it myself" scenario call is written here (#8020): it lands under
+ * the real scenario id and its set, beside the scenario's simulated runs,
+ * tagged `metadata.langwatch.callerKind = "human"`. Finishing it emits a
+ * RunFinished that names the scenario, which is what the scenario-evaluations
+ * subscriber keys on to grade the human transcript against the scenario's
+ * attached evaluators — the same grading a simulated run gets. A drawer "Talk
+ * to it" call has no scenario, so it is never written as a run at all; it
+ * leaves only its per-exchange traces (3a).
  *
  * Kept apart from the session service so the service stays a pure orchestrator
  * over injected ports.
@@ -21,7 +19,6 @@
 import { HandledError } from "@langwatch/handled-error";
 
 import { AgentRepository } from "~/server/agents/agent.repository";
-import { VOICE_CALL_SCENARIO_SET_ID } from "~/server/agents/voice/voice-agent.config";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import type { SimulationMessage } from "~/server/event-sourcing/pipelines/simulation-processing/schemas/shared";
@@ -69,7 +66,8 @@ function toMessages(
 
 /**
  * The scenario a "Call it myself" run is written under, and the set it shares
- * with that scenario's simulated runs. Absent for a drawer call.
+ * with that scenario's simulated runs. Always present: only a scenario call is
+ * ever written as a run (#8020).
  */
 export interface VoiceRunScenario {
   scenarioId: string;
@@ -90,7 +88,7 @@ export async function writeVoiceCallRun({
   agentRowId: string;
   agentDisplayName: string;
   record: CallRecord;
-  scenario?: VoiceRunScenario;
+  scenario: VoiceRunScenario;
   /** The trace id each turn links to, one per `record.turns[i]` in order, from
    *  {@link recordVoiceCallTraces}. Set on the message and the run's trace list
    *  so the drawer probes the exchange's trace. */
@@ -104,10 +102,10 @@ export async function writeVoiceCallRun({
   });
   if (!agent) throw new VoiceAgentNotFoundError();
 
-  // A scenario call lands under the real scenario and its set; a drawer call
-  // lands in the voice-call set under a synthetic per-agent id.
-  const scenarioId = scenario?.scenarioId ?? `voiceagent_${agentRowId}`;
-  const scenarioSetId = scenario?.scenarioSetId ?? VOICE_CALL_SCENARIO_SET_ID;
+  // The call lands under the real scenario and its set, beside that scenario's
+  // simulated runs.
+  const scenarioId = scenario.scenarioId;
+  const scenarioSetId = scenario.scenarioSetId;
 
   const metadata = {
     name: agentDisplayName,
@@ -150,22 +148,17 @@ export async function writeVoiceCallRun({
     occurredAt: record.endedAt,
   });
 
-  // No results envelope: the verdict is not decided here. A drawer call carries
-  // no verdict at all (AC13). A scenario call is finished SUCCESS with the
-  // scenario id named on the event, so the scenario-evaluations subscriber
-  // grades the transcript against the scenario's attached evaluators (AC23) —
-  // exactly the path a simulated run's finish takes.
+  // No results envelope: the verdict is not decided here. The run is finished
+  // SUCCESS with the scenario id named on the event, so the scenario-evaluations
+  // subscriber grades the transcript against the scenario's attached evaluators
+  // (AC23) — exactly the path a simulated run's finish takes.
   await getApp().simulations.finishRun({
     tenantId: projectId,
     scenarioRunId,
     status: "SUCCESS",
-    ...(scenario
-      ? {
-          scenarioId: scenario.scenarioId,
-          scenarioSetId: scenario.scenarioSetId,
-          batchRunId: scenarioRunId,
-        }
-      : {}),
+    scenarioId: scenario.scenarioId,
+    scenarioSetId: scenario.scenarioSetId,
+    batchRunId: scenarioRunId,
     occurredAt: record.endedAt,
   });
 }

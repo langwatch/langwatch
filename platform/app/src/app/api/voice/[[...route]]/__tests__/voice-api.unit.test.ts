@@ -411,6 +411,41 @@ describe("Feature: Voice session HTTP door", () => {
     });
   });
 
+  describe("given a drawer finish that names no scenario", () => {
+    describe("when the finish is handled", () => {
+      /** @scenario "A drawer Talk to it call writes no run" */
+      it("succeeds with no run id, since a drawer call writes no run", async () => {
+        const token = signVoiceSessionToken({
+          payload: {
+            sessionId: "sess_1",
+            projectId: PROJECT_ID,
+            agentId: "agent_row",
+            agentExternalId: "el_agent",
+            transport: "elevenlabs_convai",
+            exp: Date.now() + 60_000,
+          },
+        });
+        fetchCallRecord.mockResolvedValue(null);
+
+        const res = await post("/api/voice/session/conv_1/finish", {
+          projectId: PROJECT_ID,
+          sessionToken: token,
+          conversationId: "conv_1",
+          transcript: [{ role: "caller", text: "hi" }],
+          startedAt: 1,
+          endedAt: 2,
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        // A drawer call is not persisted as a run (#8020): the response carries
+        // no run id and no scenario set id.
+        expect(body.runId).toBe("");
+        expect(body.scenarioSetId).toBeUndefined();
+      });
+    });
+  });
+
   describe("given a finish with a bad session token", () => {
     describe("when the finish request is sent", () => {
       /** @scenario "A finish with an invalid or expired session token is refused" */

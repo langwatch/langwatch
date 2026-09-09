@@ -25,7 +25,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When I save the agent
     Then "Support line" appears in the agents list with the mic icon
     When I press "Talk to it", allow the microphone, say "I want to cancel my order" and hang up after the agent answers
-    Then the panel shows the transcript, a Play control and a link to a run with caller "You"
+    Then the panel shows the transcript and a Play control, and no run exists for that conversation id
     When I open New scenario, write the situation, the persona and the criteria for "Angry cancellation"
     And under Agent I pick "Support line", keep the project default caller voice and save
     And I press "Run"
@@ -40,8 +40,8 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then the panel shows Connecting, then a running timer and a live two-speaker transcript
     When I say "I want to cancel my order" and the agent answers
     And I press "Hang up"
-    Then the panel shows the transcript, a Play control and a link to the run
-    And that run has caller "You", per-turn audio and the transcript
+    Then the panel shows the transcript and a Play control, and no run exists for that conversation id
+    And a trace exists for that conversation id with per-turn audio and the transcript
 
   # AC19, AC24
   @e2e @unimplemented
@@ -148,11 +148,19 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And the panel shows "Recording could not be fetched from ElevenLabs" instead of a generic error
 
   # AC14
-  @integration
+  @unit @regression
   Scenario: Hanging up twice produces exactly one run
-    Given a live call against "Support line" with a known conversation id
+    Given a live "Call it myself" call against a scenario with a known conversation id
     When Hang up is pressed twice for that conversation id
     Then exactly one run exists for that conversation id
+
+  # #8020 AC1
+  @unit @regression
+  Scenario: Hanging up twice on a drawer call records traces and writes no run
+    Given a live drawer "Talk to it" call with a known conversation id and no scenario in scope
+    When Hang up is pressed twice for that conversation id
+    Then no run is ever written for that conversation id
+    And the call's traces are recorded, deduped by their deterministic ids
 
   # AC27
   @integration
@@ -733,3 +741,55 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Given a half-written run is re-driven for the same conversation
     When the call is finished again
     Then the recomputed trace ids are identical to the first attempt
+
+  # ---------------------------------------------------------------------------
+  # A drawer call is not persisted as a run (#8020)
+  # ---------------------------------------------------------------------------
+
+  # #8020 AC1
+  @unit @regression
+  Scenario: A drawer Talk to it call writes no run
+    Given a finish with no scenario id
+    When the call is finished
+    Then writeCallRun is never called
+    And findExistingRun is never called
+    And the call's traces are still recorded
+    And the finish result carries no run id and no scenario set id
+
+  # #8020 AC2
+  @unit @regression
+  Scenario: Call it myself still writes and judges a run after 8020
+    Given a "Call it myself" finish naming a resolvable scenario id
+    When the call is finished
+    Then writeCallRun is called with that scenario and its set
+    And the finish event names the scenario, so the run is judged
+
+  # #8020 AC3
+  @unit @regression
+  Scenario: A drawer finish never mints a synthetic scenario id
+    Given a finish with no scenario id
+    When the call is finished
+    Then writeCallRun is never called
+    And no scenarioId of the form "voiceagent_<agentId>" is ever produced
+
+  # #8020 decision 1
+  @unit @regression
+  Scenario: A retried drawer finish for an unsaved agent reuses the one agent row
+    Given two drawer finishes for the same never-saved voice agent
+    When each finish creates the voice agent row
+    Then the identity key folds them onto the same row rather than creating a second
+
+  # #8020 decision 2
+  @unit @regression
+  Scenario: The legacy voice-calls set is excluded from run listings
+    Given a run-listing query is built
+    When its set exclusion is applied
+    Then the "voice-calls" set is excluded alongside the agent-test set
+    And a run is still read by its own id
+
+  # #8020 decision 5
+  @unit @regression
+  Scenario: A human caller's turns render as You, not User Simulator
+    Given a scenario run whose caller kind is "human"
+    When the conversation body renders a caller turn
+    Then it reads "You" with a person icon, not "User Simulator" with a flask
