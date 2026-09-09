@@ -29,7 +29,13 @@ export function buildSecurityHeaders({
 
   const cspHeader = [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
+    // blob: in script-src, not only worker-src: AudioWorklet.addModule() is a
+    // script fetch, and the ElevenLabs browser client (1.23.x) registers its
+    // rawAudioProcessor / audioConcatProcessor worklets from a blob: URL. Without
+    // it the voice panel fails in production with "Failed to load the
+    // rawAudioProcessor worklet module" while working in dev, where no CSP is
+    // enforced (#7947).
+    `script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
     `style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev https://fonts.googleapis.com https://unpkg.com${cdn}`,
     `img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://*.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
     `font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat https://www.google.com https://*.reo.dev https://fonts.gstatic.com${cdn}`,
@@ -55,7 +61,12 @@ export function buildSecurityHeaders({
     // without ever prompting, which reads as a user denial (#7947).
     "Permissions-Policy":
       "geolocation=(), microphone=(self), camera=(), payment=(), usb=()",
-    ...(!dev ? { "Content-Security-Policy": cspHeader } : {}),
+    // Dev enforces nothing but reports the same policy, so a directive that
+    // would break production shows up as a console violation on the first
+    // local run instead of after deploy (#7947).
+    ...(dev
+      ? { "Content-Security-Policy-Report-Only": cspHeader }
+      : { "Content-Security-Policy": cspHeader }),
     ...(!dev
       ? {
           "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
