@@ -40,7 +40,26 @@ export const VOICE_TRANSPORT_PROVIDER: Record<VoiceTransport, "elevenlabs"> = {
 export const parseVoiceAgentConfig = (config: unknown): VoiceAgentConfig =>
   voiceAgentConfigSchema.parse(config);
 
-/** The scenario set every drawer "Talk to it" call is written into, so those
- *  runs group apart from scenario runs. Client-safe (the panel builds the run
- *  link from it; the run writer writes into it). */
+/**
+ * The legacy scenario set drawer "Talk to it" calls used to be written into,
+ * before #8020 stopped persisting a drawer call as a run. Nothing is written
+ * here any more (a drawer call now leaves only its per-exchange traces), but
+ * pre-#8020 `voicecall_` runs still carry this set id in ClickHouse, so run
+ * listings exclude it (see `AGENT_TEST_SET_EXCLUSION`). A run someone has a
+ * direct link to still opens by its own id.
+ */
 export const VOICE_CALL_SCENARIO_SET_ID = "voice-calls";
+
+/**
+ * The natural key that folds every "Talk to it" against the same vendor agent
+ * onto one row, so a first hang-up before the agent is saved cannot create a
+ * second agent row on a retry (or from two browser tabs racing). Shares the
+ * `(projectId, identityKey)` unique constraint the connected agents use.
+ */
+export const voiceAgentIdentityKey = ({
+  transport,
+  agentExternalId,
+}: {
+  transport: VoiceTransport;
+  agentExternalId: string;
+}): string => `voice:${transport}:${agentExternalId}`;

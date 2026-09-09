@@ -18,6 +18,7 @@ import type { AgentWithFields } from "~/server/agents/agent-fields";
 import {
   parseVoiceAgentConfig,
   VOICE_TRANSPORT_PROVIDER,
+  type VoiceTransport,
 } from "~/server/agents/voice/voice-agent.config";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
@@ -46,6 +47,15 @@ export interface VoiceSessionServices {
       projectId: string;
     }): Promise<AgentWithFields | null>;
     create(input: CreateAgentInput): Promise<AgentWithFields>;
+    /** Creates the voice agent row deduped by its identity key, so a retried
+     *  finish for a not-yet-saved agent reuses the one row (#8020). */
+    createVoiceAgent(input: {
+      id: string;
+      projectId: string;
+      name: string;
+      transport: VoiceTransport;
+      agentId: string;
+    }): Promise<{ id: string }>;
   };
   scenarioService: {
     getById(input: { id: string; projectId: string }): Promise<Scenario | null>;
@@ -129,12 +139,14 @@ export function createVoiceSessionPortsFromServices({
     },
 
     async createVoiceAgent({ projectId, name, transport, agentId }) {
-      const created = await agentService.create({
+      // Deduped by identity key inside the service, so a retried finish for a
+      // not-yet-saved agent reuses the one row (#8020, decision 1).
+      const created = await agentService.createVoiceAgent({
         id: `agent_${nanoid()}`,
         projectId,
         name,
-        type: "voice",
-        config: { transport, agentId },
+        transport,
+        agentId,
       });
       return { id: created.id };
     },

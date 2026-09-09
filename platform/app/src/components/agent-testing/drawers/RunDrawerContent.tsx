@@ -162,6 +162,12 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
     status: scenarioState.status,
   });
 
+  // A voice "Call it myself" run's caller is a real person, so their turns read
+  // as "You", not the LLM "User Simulator" (#8020). Same metadata field the
+  // results-table caller badge reads (caller-display.ts).
+  const isHumanCaller =
+    scenarioState.metadata?.langwatch?.callerKind === "human";
+
   if (!detail.hasConversation) {
     return (
       <ConversationBox>
@@ -185,6 +191,7 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
           variant="drawer"
           projectId={project?.id ?? ""}
           typingRole={typingRole}
+          isHumanCaller={isHumanCaller}
         />
       </ConversationExpandContext.Provider>
     </ConversationBox>

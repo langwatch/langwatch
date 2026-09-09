@@ -20,7 +20,7 @@ A **Voice** agent type in **Agents** points at an ElevenLabs Conversational AI a
 | **Run a scenario** | Normal scenario run | A simulated caller, speaking the scenario with a caller voice |
 
 <Note>
-  **Talk to it** works before the agent is saved, as soon as the agent id and the ElevenLabs key exist. The agent is saved on hang-up, and the call is stored as a run in the **voice-calls** set with caller `human`, a transcript and a link to the recording.
+  **Talk to it** works before the agent is saved, as soon as the agent id and the ElevenLabs key exist. The agent is saved on hang-up. The panel then shows the transcript and, when the recording is ready, a Play control. The call is not stored as a run; instead each exchange is recorded as a trace, so the conversation stays queryable in the Trace Explorer without a run. To score a call against a scenario, use **Call it myself**, which does write a judged run.
 </Note>
 
 **Call it myself** opens the same panel from the Run dialog of a scenario, in scenario mode. The run is named after the scenario.
