@@ -16,7 +16,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { ApiKeyListEntry } from "@langwatch/api-key-contract";
+import type { ApiKeyListEntry, ApiKeyTrpcRoleBinding } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -260,7 +260,7 @@ export default function ApiKeysScreen() {
     description?: string | null;
     permissionMode?: "all" | "readonly" | "restricted";
     permissions?: string[];
-    bindings?: Array<{ role: string; scopeType: string; scopeId: string }>;
+    bindings?: ApiKeyTrpcRoleBinding[];
   }) => {
     updateMutation.mutate(
       {

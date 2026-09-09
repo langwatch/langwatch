@@ -9,7 +9,7 @@ import {
   apiKeyRestRevokedSchema,
   refineRestrictedPermissions,
   type ApiKeyDetail,
-  type ApiKeyService,
+  type ApiKeyApi,
 } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { Context } from "hono";
@@ -166,7 +166,7 @@ const resolveCallerIsAdmin = async ({
   callerUserId,
   apiKeyId,
 }: {
-  service: ApiKeyService;
+  service: ApiKeyApi;
   organizationId: string;
   callerUserId: string | null;
   apiKeyId: string;
@@ -191,7 +191,7 @@ const resolveCallerCanReadAnyKey = async ({
   callerUserId,
 }: {
   apiKeyId: string;
-  service: ApiKeyService;
+  service: ApiKeyApi;
   permissions: AuthzService;
   organizationId: string;
   callerUserId: string | null;
@@ -308,7 +308,7 @@ const refuseNonAdminPrivilegedMint = async ({
   assignedToUserId,
 }: {
   apiKeyId: string;
-  service: ApiKeyService;
+  service: ApiKeyApi;
   organizationId: string;
   callerUserId: string | null;
   isService: boolean;
@@ -341,7 +341,7 @@ export function createApiKeysRestApp(options: {
    * mounting a family must not force its services to be constructed, which is
    * what lets the OpenAPI spec generator build this app with none.
    */
-  apiKeys: () => ApiKeyService;
+  apiKeys: () => ApiKeyApi;
   permissions: () => AuthzService;
   audit: AppRestManagementAuditPort;
 }): MountableRestApp {

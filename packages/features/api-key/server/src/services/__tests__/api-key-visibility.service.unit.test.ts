@@ -1,14 +1,7 @@
 /**
- * Which projects a credential can see.
- *
- * This answers a question about someone else's data, so its refusals matter
- * more than its answers: a key belonging to another organization resolves to
- * nothing, and a project the key cannot actually view is filtered out even
- * though a role binding brought it into the candidate set.
- *
- * The bounded scan is the other thing worth pinning. Past the candidate limit
- * it THROWS rather than returning what it has — truncating would hand back a
- * shorter list that looks like a complete answer.
+ * Which projects a credential can see. Refusals matter more than answers: a
+ * key of another organization resolves to nothing, and past the candidate
+ * limit it THROWS rather than truncating into a complete-looking list.
  */
 
 import { describe, expect, it } from "vitest";
@@ -27,8 +20,8 @@ function serviceWith(options: {
   const asked: Array<Record<string, unknown>> = [];
   const service = ApiKeyVisibilityService.create({
     repository: {
-      tryFindByIdInOrganization: async (input: Record<string, unknown>) => {
-        asked.push({ method: "tryFindByIdInOrganization", ...input });
+      findByIdInOrganization: async (input: Record<string, unknown>) => {
+        asked.push({ method: "findByIdInOrganization", ...input });
         return options.key === undefined
           ? { id: "key-1", roleBindings: [] as Binding[] }
           : options.key;

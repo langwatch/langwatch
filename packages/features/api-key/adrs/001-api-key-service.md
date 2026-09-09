@@ -19,11 +19,12 @@ replacement, ingestion-key discovery, CLI device-key lifecycle, enrichment,
 and revocation. Transports delegate to it rather than reimplementing those
 rules.
 
-Authentication is an attempted lookup and is named `tryVerify`; other nullable
-reads are likewise explicitly named `try*`. Mutations either complete or
-throw. A newly minted key is born revoked, its private role and grants are
-attached first, and it is activated last. A replacement attaches the new grant
-set before revoking the old set.
+Authentication is an attempted lookup and is named `findVerifiedToken`:
+invalid credentials answer `null`. Other nullable reads are likewise named
+`find*`. Mutations and required reads either complete or throw a concrete
+API-key domain error. A newly minted key is born revoked, its private role and
+grants are attached first, and it is activated last. A replacement attaches
+the new grant set before revoking the old set.
 
 ### Target selection compatibility
 
@@ -38,8 +39,9 @@ compatibility decision rather than a migration-side behaviour change.
 ### Public surfaces and transports
 
 The contract exports portable Zod 4 values, API-key errors, and the one
-abstract `ApiKeyService`. Existing REST, tRPC, CLI, OTLP, and internal callers
-remain compatibility transports and delegate to the service on App context.
+callable `ApiKeyApi` interface with its `featureApi` token. Existing REST,
+tRPC, CLI, OTLP, and internal callers remain compatibility transports and
+delegate to the feature app on the process context.
 
 ### Dependencies
 
@@ -69,7 +71,7 @@ the credential pepper when it constructs the PostgreSQL adapter.
 ### Errors
 
 Mutations and required reads throw API-key contract errors. Authentication and
-genuinely optional reads return `null` only through methods named `try*`.
+genuinely optional reads return `null` only through methods named `find*`.
 
 ### Contracts and validation
 

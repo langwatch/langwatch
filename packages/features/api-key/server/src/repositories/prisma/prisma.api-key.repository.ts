@@ -37,7 +37,7 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
       include: { roleBindings: true },
     });
   }
-  tryFindByLookupId(input: { lookupId: string }): Promise<StoredApiKey | null> {
+  findByLookupId(input: { lookupId: string }): Promise<StoredApiKey | null> {
     return this.database.apiKey.findFirst({
       where: {
         lookupId: input.lookupId,
@@ -46,13 +46,13 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
       include: { roleBindings: true },
     });
   }
-  tryFindById(input: { id: string }): Promise<StoredApiKey | null> {
+  findById(input: { id: string }): Promise<StoredApiKey | null> {
     return this.database.apiKey.findFirst({
       where: { id: input.id },
       include: { roleBindings: true },
     });
   }
-  tryFindByIdInOrganization(input: {
+  findByIdInOrganization(input: {
     id: string;
     organizationId: string;
   }): Promise<StoredApiKey | null> {
@@ -115,7 +115,7 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
   async upgradeHash(input: { id: string; hashedSecret: string }): Promise<void> {
     await this.update({ id: input.id, hashedSecret: input.hashedSecret });
   }
-  tryFindIngestKey(input: {
+  findIngestKey(input: {
     organizationId: string;
     projectId: string;
     sourceType: string;
@@ -146,7 +146,7 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
       orderBy: { createdAt: "desc" },
     });
   }
-  async tryFindLegacyProjectId(input: { token: string }): Promise<string | null> {
+  async findLegacyProjectId(input: { token: string }): Promise<string | null> {
     const row = await this.database.project.findUnique({
       where: { apiKey: input.token, archivedAt: null },
       select: { id: true },
@@ -180,7 +180,7 @@ export class PrismaApiKeyRepository extends ApiKeyRepository {
     });
     return count;
   }
-  async tryFindPersonalWorkspaceOwner(input: {
+  async findPersonalWorkspaceOwner(input: {
     organizationId: string;
     scopeId: string;
   }): Promise<{ ownerUserId: string | null } | null> {

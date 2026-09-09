@@ -11,7 +11,7 @@ import {
   LANGY_SESSION_API_KEY_NAME,
   type ApiKey,
   type ApiKeyDetail,
-  type ApiKeyService,
+  type ApiKeyApi,
 } from "@langwatch/api-key-contract";
 import {
   createRestApiService,
@@ -164,7 +164,7 @@ function buildApi(
     granted?: readonly string[];
   } = {},
 ) {
-  const apiKeys: ApiKeyService = Object.assign(new TestApiKeyService(), options.apiKeys);
+  const apiKeys: ApiKeyApi = Object.assign(new TestApiKeyService(), options.apiKeys);
   const permissions: AuthzService = Object.assign(new TestAuthzService(), options.permissions);
   const audited: AuditEntry[] = [];
   const audit: AppRestManagementAuditPort = (entry) => {

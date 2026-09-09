@@ -1,37 +1,35 @@
 /**
- * The process policy this mount wraps around the package-owned API-key
- * transport. The proof it carries is that mounting changed nothing a caller
- * can observe: the same nine procedure names, the same declared access
- * decision with the same written reason on each one, and — the load-bearing
- * one — that every middleware in the chain sees the VALIDATED input.
- *
- * That last assertion is the whole hazard of this shape. tRPC appends the
- * input parser where `.input()` is called, so a policy composed ahead of it
- * hands the lineage guard, the declared check and the audit row
- * `input === undefined` — and all three then pass while reporting green.
- *
- * The second thing pinned here is credential handling: a minted token reaches
- * the caller and appears in NO audit entry.
+ * The process mount wrapped around the package-owned API-key transport: the
+ * nine names, their written no-permission declarations, and the audit rows.
  */
-import type { ApiKey } from "@langwatch/api-key-contract";
-import type { ApiKeyApp } from "@langwatch/api-key-server";
+
+// What is pinned here:
+//   - every procedure still carries its no-permission declaration with the
+//     organization id explicitly allowed;
+//   - the automatic mutation row records the VALIDATED input (a default the
+//     caller omitted proves the parser ran first);
+//   - the mount adds the curated audit entry, because the automatic row's
+//     generic redaction masks `apiKeyId` and `revoke`'s answer carries no id;
+//   - the minted token reaches the caller while appearing in NO audit entry.
+
 import {
-  authzDeclarationOf,
-  declareAuthzMiddleware,
-  type AuthzDeclaration,
-} from "@langwatch/authz-contract";
-import { initTRPC, TRPCError } from "@trpc/server";
+  ApiKeyAlreadyRevokedError,
+  type ApiKey,
+  type ApiKeyApi,
+} from "@langwatch/api-key-contract";
+import type { TrpcRuntimeAuditEntry, TrpcRuntimePorts } from "@langwatch/api/trpc";
+import { createTrpcRuntime, redactAuditArgs } from "@langwatch/api/trpc";
+import { authzDeclarationOf, type AuthzDeclaration } from "@langwatch/authz-contract";
+import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
-import type { AppTrpcPolicyMiddlewares } from "@langwatch/api/trpc";
+
 import { createApiKeyTrpcRouter } from "../api-key-trpc.mount.ts";
 
 const ORG_ID = "org_api_key_mount";
 const USER_ID = "user_api_key_mount";
 
 type TestContext = {
-  app: { apiKeys: ApiKeyApp };
-  actor(): { id: string };
-  session: { user: { id: string } } | null;
+  app: { apiKeys: ApiKeyApi };
 };
 
 function storedKey(overrides: Partial<ApiKey> = {}): ApiKey {
@@ -73,62 +71,54 @@ function declarationsOf(router: unknown): Record<string, AuthzDeclaration | null
   );
 }
 
-function harness({ apiKeys = {} }: { apiKeys?: Partial<ApiKeyApp> } = {}) {
-  const trpc = initTRPC.context<TestContext>().create();
+function harness({
+  apiKeys = {},
+  anonymous = false,
+}: { apiKeys?: Partial<ApiKeyApi>; anonymous?: boolean } = {}) {
+  const root = initTRPC.context<TestContext>().create();
   const recordAudit = vi.fn();
-  /** What each middleware in the chain saw, in the order they ran. */
-  const seen: { name: string; declaration?: AuthzDeclaration; input: unknown }[] = [];
+  const audit = { entries: [] as TrpcRuntimeAuditEntry[] };
 
-  /**
-   * Stands in for one of the app's middlewares. Recording the `input` each one
-   * receives is what makes the ordering rule observable: composed ahead of the
-   * feature's `.input()` these would every one record `undefined`.
-   */
-  const record =
-    (name: string, declaration?: AuthzDeclaration) =>
-    ({ input, next }: { input: unknown; next: () => Promise<unknown> }) => {
-      seen.push({ name, declaration, input });
-      return next();
-    };
-
-  const middlewares: AppTrpcPolicyMiddlewares = {
-    tracer: record("tracer"),
-    logger: record("logger"),
-    handledError: record("handledError"),
-    scopeLineageGuard: (declaration) => record("scopeLineageGuard", declaration),
-    // The real one attaches the declaration to the middleware it builds; this
-    // stands in for that, so `declarationsOf` reads the same shape the router
-    // sweep does.
-    declaredCheck: (declaration) =>
-      declareAuthzMiddleware(
-        declaration,
-        record("declaredCheck", declaration) as unknown as (params: never) => Promise<unknown>,
-      ),
-    enforceCheck: record("enforceCheck"),
-    auditMutations: record("auditMutations"),
+  const ports: TrpcRuntimePorts<TestContext> = {
+    identity: {
+      caller: () => ({ actor: anonymous ? null : { type: "user", id: USER_ID } }),
+    },
+    authorization: {
+      forRequest: () => ({
+        getDecision: async () => ({ permitted: true, organizationRole: null }),
+        getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
+        checkScopeLineage: async () => ({ kind: "consistent" }),
+      }),
+    },
+    denials: {
+      membershipDisabled: () => new Error("membership disabled"),
+      liteMemberRestricted: () => new Error("lite member"),
+    },
+    audit: {
+      record: async (entry) => {
+        audit.entries.push(entry);
+      },
+      // The REAL redaction, so what this test asserts is what the trail keeps.
+      redact: ({ procedure, args }) => redactAuditArgs({ input: args, action: procedure }),
+      exempt: () => false,
+    },
+    errors: {
+      report: () => {},
+      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
+      translate: () => undefined,
+    },
   };
 
-  const app = { ...apiKeys } as unknown as ApiKeyApp;
-
-  const router = createApiKeyTrpcRouter({
-    root: trpc,
-    protectedProcedure: trpc.procedure.use(({ ctx, next }) => {
-      if (!ctx.session) throw new TRPCError({ code: "UNAUTHORIZED" });
-      return next({ ctx: { session: { user: ctx.session.user } } });
-    }),
-    middlewares,
-    recordAudit,
-  });
+  const runtime = createTrpcRuntime<TestContext>({ root, procedure: root.procedure, ports });
+  const router = createApiKeyTrpcRouter({ runtime, recordAudit });
 
   return {
     router,
     recordAudit,
-    seen,
-    caller: router.createCaller({
-      app: { apiKeys: app },
-      actor: () => ({ id: USER_ID }),
-      session: { user: { id: USER_ID } },
-    }),
+    audit,
+    caller: root.router({ apiKey: router }).createCaller({
+      app: { apiKeys: apiKeys as ApiKeyApi },
+    }).apiKey,
   };
 }
 
@@ -217,41 +207,17 @@ describe("API-key transport mount", () => {
     });
   });
 
-  describe("when a member reads their own bindings", () => {
-    /** @scenario "The declared check reads the validated input" */
-    it("hands every middleware the organization the validated input named", async () => {
-      const { caller, seen } = harness({ apiKeys: { listCallerBindings: async () => [] } });
-
-      await caller.myBindings({ organizationId: ORG_ID });
-
-      expect(seen.map((entry) => entry.name)).toEqual([
-        "tracer",
-        "logger",
-        "handledError",
-        "scopeLineageGuard",
-        "declaredCheck",
-        "enforceCheck",
-        "auditMutations",
-      ]);
-      // Every one of them, not just the first: the policy is applied AFTER the
-      // feature's own `.input()`, so none of them can see `undefined`.
-      for (const entry of seen) {
-        expect(entry.input).toEqual({ organizationId: ORG_ID });
-      }
-    });
-  });
-
   describe("when a member mints a key", () => {
-    it("returns the token to the caller and keeps it out of the audit entry", async () => {
-      const { caller, recordAudit } = harness({
-        apiKeys: {
-          createKey: async () => ({
-            token: "sk-lw-plaintext-shown-once",
-            apiKey: storedKey(),
-            assignedToUserId: USER_ID,
-          }),
-        },
-      });
+    const minting = {
+      createKey: async () => ({
+        token: "sk-lw-plaintext-shown-once",
+        apiKey: storedKey(),
+        assignedToUserId: USER_ID,
+      }),
+    };
+
+    it("returns the token to the caller and keeps it out of every audit entry", async () => {
+      const { caller, recordAudit, audit } = harness({ apiKeys: minting });
 
       const result = await caller.create({
         organizationId: ORG_ID,
@@ -260,6 +226,19 @@ describe("API-key transport mount", () => {
       });
 
       expect(result.token).toBe("sk-lw-plaintext-shown-once");
+      expect(JSON.stringify(recordAudit.mock.calls)).not.toContain("sk-lw-plaintext-shown-once");
+      expect(JSON.stringify(audit.entries)).not.toContain("sk-lw-plaintext-shown-once");
+    });
+
+    it("records the curated entry the mint has always written", async () => {
+      const { caller, recordAudit } = harness({ apiKeys: minting });
+
+      await caller.create({
+        organizationId: ORG_ID,
+        name: "Mount Key",
+        bindings: [],
+      });
+
       expect(recordAudit).toHaveBeenCalledWith({
         userId: USER_ID,
         organizationId: ORG_ID,
@@ -272,19 +251,72 @@ describe("API-key transport mount", () => {
           assignedToUserId: USER_ID,
         },
       });
-      expect(JSON.stringify(recordAudit.mock.calls)).not.toContain("sk-lw-plaintext-shown-once");
+    });
+
+    it("records the automatic row over the VALIDATED input, defaults applied", async () => {
+      const { caller, audit } = harness({ apiKeys: minting });
+
+      // No keyType on the wire: the default reaching the audit row is the
+      // proof the parser ran before the audit middleware read the input.
+      await caller.create({ organizationId: ORG_ID, name: "Mount Key", bindings: [] });
+
+      expect(audit.entries).toHaveLength(1);
+      expect(audit.entries[0]).toMatchObject({
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        action: "apiKey.create",
+        error: undefined,
+      });
+      expect(audit.entries[0]?.args).toMatchObject({ keyType: "personal", permissionMode: "all" });
+    });
+  });
+
+  describe("when a member revokes a key", () => {
+    it("records the curated entry naming the key the automatic row cannot", async () => {
+      const { caller, recordAudit, audit } = harness({ apiKeys: { revokeKey: async () => {} } });
+
+      const result = await caller.revoke({ organizationId: ORG_ID, apiKeyId: "ak_1" });
+
+      expect(result).toEqual({ success: true });
+      expect(recordAudit).toHaveBeenCalledWith({
+        userId: USER_ID,
+        organizationId: ORG_ID,
+        action: "apiKey.revoke",
+        args: { apiKeyId: "ak_1" },
+      });
+      // The automatic row beside it: the generic redaction masks `apiKeyId`,
+      // and `{ success: true }` yields no target id — which is exactly the gap
+      // the curated entry above fills.
+      expect(audit.entries[0]).toMatchObject({
+        action: "apiKey.revoke",
+        args: { organizationId: ORG_ID, apiKeyId: "[redacted]" },
+        targetId: undefined,
+      });
+    });
+
+    it("records no curated entry for a refusal, and the automatic row carries the failure", async () => {
+      const { caller, recordAudit, audit } = harness({
+        apiKeys: {
+          revokeKey: async () => {
+            throw new ApiKeyAlreadyRevokedError("ak_1");
+          },
+        },
+      });
+
+      await expect(
+        caller.revoke({ organizationId: ORG_ID, apiKeyId: "ak_1" }),
+      ).rejects.toMatchObject({ code: "CONFLICT" });
+
+      expect(recordAudit).not.toHaveBeenCalled();
+      expect(audit.entries[0]?.action).toBe("apiKey.revoke");
+      expect(audit.entries[0]?.error).toBeDefined();
     });
   });
 
   describe("when the caller has no session", () => {
     it("refuses before the API-key application runs", async () => {
       const listKeys = vi.fn();
-      const { router } = harness({ apiKeys: { listKeys } });
-      const caller = router.createCaller({
-        app: { apiKeys: { listKeys } as unknown as ApiKeyApp },
-        actor: () => ({ id: USER_ID }),
-        session: null,
-      });
+      const { caller } = harness({ apiKeys: { listKeys }, anonymous: true });
 
       await expect(caller.list({ organizationId: ORG_ID })).rejects.toMatchObject({
         code: "UNAUTHORIZED",

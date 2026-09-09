@@ -113,7 +113,7 @@ describe("LegacyApiKeyGrantService", () => {
     expect(attachBindings).toHaveBeenCalledTimes(2);
   });
 
-  /** @scenario "A key born during a parked genesis import still mints once the organization migrates" */
+  // @scenario A key born during a parked genesis import still mints once the organization migrates
   it("retries after the organization reaches finalized cutover", async () => {
     const { service, tryGetEngineCutoverAt, attachBindings } = harness({
       cutoverAt: null,
@@ -179,7 +179,7 @@ describe("legacy API-key grant facts", () => {
 
   it("derives a stable identity from the fact", () => {
     const derive = vi.fn(() => "grant-derived");
-    expect(LegacyApiKeyGrantService.tryLegacyGrantForApiKey(apiKey(), derive)?.bindingId).toBe(
+    expect(LegacyApiKeyGrantService.findLegacyGrantForApiKey(apiKey(), derive)?.bindingId).toBe(
       "grant-derived",
     );
     expect(derive).toHaveBeenCalledWith({

@@ -33,9 +33,9 @@ export type ApiKeyUpdateRecord = {
 export abstract class ApiKeyRepository {
   abstract create(input: ApiKeyCreateRecord): Promise<StoredApiKey>;
   abstract activate(input: { id: string }): Promise<StoredApiKey>;
-  abstract tryFindByLookupId(input: { lookupId: string }): Promise<StoredApiKey | null>;
-  abstract tryFindById(input: { id: string }): Promise<StoredApiKey | null>;
-  abstract tryFindByIdInOrganization(input: {
+  abstract findByLookupId(input: { lookupId: string }): Promise<StoredApiKey | null>;
+  abstract findById(input: { id: string }): Promise<StoredApiKey | null>;
+  abstract findByIdInOrganization(input: {
     id: string;
     organizationId: string;
   }): Promise<StoredApiKey | null>;
@@ -52,7 +52,7 @@ export abstract class ApiKeyRepository {
   abstract revoke(input: { id: string; cause: ApiKeyRevocationCause }): Promise<StoredApiKey>;
   abstract updateLastUsedAt(input: { id: string }): Promise<void>;
   abstract upgradeHash(input: { id: string; hashedSecret: string }): Promise<void>;
-  abstract tryFindIngestKey(input: {
+  abstract findIngestKey(input: {
     organizationId: string;
     projectId: string;
     sourceType: string;
@@ -61,7 +61,7 @@ export abstract class ApiKeyRepository {
     organizationId: string;
     projectId: string;
   }): Promise<StoredApiKey[]>;
-  abstract tryFindLegacyProjectId(input: { token: string }): Promise<string | null>;
+  abstract findLegacyProjectId(input: { token: string }): Promise<string | null>;
   abstract rotateLegacyProjectKey(input: { projectId: string; token: string }): Promise<boolean>;
   /**
    * Revokes every unrevoked key of one reserved name whose expiry has elapsed.
@@ -72,8 +72,8 @@ export abstract class ApiKeyRepository {
    * and policy belongs above persistence.
    */
   abstract revokeExpiredByName(input: { name: string; now: Instant }): Promise<number>;
-  /** Resolves personal team/project ownership without leaking foreign persistence to the service. */
-  abstract tryFindPersonalWorkspaceOwner(input: {
+  /** Resolves personal team/project ownership without leaking foreign persistence upward. */
+  abstract findPersonalWorkspaceOwner(input: {
     organizationId: string;
     scopeId: string;
   }): Promise<{ ownerUserId: string | null } | null>;

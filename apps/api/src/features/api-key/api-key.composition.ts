@@ -3,7 +3,6 @@
  * other door reads one through, and the one thing the surface reaches that the feature
  * does not own: the trail a mint, a rotation and a revocation are recorded on.
  */
-import type { ApiKeyService } from "@langwatch/api-key-contract";
 import { ApiKeyApp } from "@langwatch/api-key-server";
 import { HandledError } from "@langwatch/handled-error";
 
@@ -22,12 +21,15 @@ export function composeApiKeyFeature(options: {
    */
   audit: ApiAuditPort | undefined;
   /** The SAME credential service every REST door authenticates a caller through. */
-  peers: Readonly<{ apiKeys: ApiKeyService }>;
+  app: ApiKeyApp;
 }): ComposedApiKeyFeature {
   return {
-    app: ApiKeyApp.create({ apiKeys: options.peers.apiKeys }),
+    app: options.app,
     router: (mount) =>
-      createApiKeyTrpcRouter({ ...mount, recordAudit: recordApiKeyAudit(options.audit) }),
+      createApiKeyTrpcRouter({
+        runtime: mount.runtime,
+        recordAudit: recordApiKeyAudit(options.audit),
+      }),
   };
 }
 
@@ -43,7 +45,8 @@ export function refusingApiKeyFeature(): ComposedApiKeyFeature {
 
   return {
     app: new Proxy({}, { get: () => refuse, has: () => true }) as ApiKeyApp,
-    router: (mount) => createApiKeyTrpcRouter({ ...mount, recordAudit: () => undefined }),
+    router: (mount) =>
+      createApiKeyTrpcRouter({ runtime: mount.runtime, recordAudit: () => undefined }),
   };
 }
 

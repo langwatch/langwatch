@@ -34,7 +34,7 @@ export class ApiKeyTokenAdapter extends ApiKeyTokenPort {
     return ApiKeyTokenAdapter.hashApiKeySecret(secret, this.pepper);
   }
 
-  trySplit(token: string) {
+  findTokenParts(token: string) {
     return splitApiKeyToken(token);
   }
 

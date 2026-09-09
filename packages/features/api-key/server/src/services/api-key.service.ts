@@ -1,5 +1,4 @@
 import {
-  ApiKeyService as ApiKeyCapability,
   type ApiKey,
   type ApiKeyBinding,
   type ApiKeyBindingNames,
@@ -16,7 +15,7 @@ import {
   type CliKeySelection,
   type CreateApiKeyInput,
   type OrganizationApiKeyResolution,
-  type ResolvedApiKeyToken,
+  type ResolvedApiKeyCredential,
   type RevokeApiKeyInput,
   type UpdateApiKeyInput,
 } from "@langwatch/api-key-contract";
@@ -46,8 +45,8 @@ export type ApiKeyDependencies = {
   tokens: ApiKeyTokenPort;
 };
 
-/** The only public capability for API credentials. */
-export class ApiKeyService extends ApiKeyCapability {
+/** The only public capability for API credentials; ApiKeyApp adapts it to the contract API. */
+export class ApiKeyService {
   private readonly policy: ApiKeyGrantPolicyService;
   private readonly catalog: ApiKeyCatalogService;
   private readonly lifecycle: ApiKeyLifecycleService;
@@ -64,7 +63,6 @@ export class ApiKeyService extends ApiKeyCapability {
     private readonly repository: ApiKeyRepository,
     options: ApiKeyDependencies,
   ) {
-    super();
     const dependencies = { repository, ...options };
     this.policy = ApiKeyGrantPolicyService.create(dependencies);
     this.catalog = ApiKeyCatalogService.create(dependencies);
@@ -83,15 +81,15 @@ export class ApiKeyService extends ApiKeyCapability {
     return this.lifecycle.update(input);
   }
 
-  async tryVerify(input: { token: string }): Promise<ApiKeyVerification | null> {
-    return this.tokens.tryVerify(input);
+  async findVerifiedToken(input: { token: string }): Promise<ApiKeyVerification | null> {
+    return this.tokens.findVerifiedToken(input);
   }
 
-  async tryResolveToken(input: {
+  async findResolvedToken(input: {
     token: string;
     projectId?: string | null;
-  }): Promise<ResolvedApiKeyToken | null> {
-    return this.tokens.tryResolveToken(input);
+  }): Promise<ResolvedApiKeyCredential | null> {
+    return this.tokens.findResolvedToken(input);
   }
 
   async regenerateLegacyProjectKey(input: { projectId: string }): Promise<string> {
@@ -146,8 +144,8 @@ export class ApiKeyService extends ApiKeyCapability {
     return this.policy.isOrgAdminApiKey(input);
   }
 
-  async tryGetById(input: { id: string }): Promise<ApiKey | null> {
-    return this.catalog.tryGetById(input);
+  async findById(input: { id: string }): Promise<ApiKey | null> {
+    return this.catalog.findById(input);
   }
 
   async getByIdForCaller(input: {
@@ -159,11 +157,11 @@ export class ApiKeyService extends ApiKeyCapability {
     return this.catalog.getByIdForCaller(input);
   }
 
-  async tryGetNameByIdInOrg(input: {
+  async findNameByIdInOrg(input: {
     id: string;
     organizationId: string;
   }): Promise<ApiKeyName | null> {
-    return this.catalog.tryGetNameByIdInOrg(input);
+    return this.catalog.findNameByIdInOrg(input);
   }
 
   async getUserBindings(input: {
@@ -185,12 +183,12 @@ export class ApiKeyService extends ApiKeyCapability {
     return this.catalog.getOrgMembers(input);
   }
 
-  async tryGetIngestionKey(input: {
+  async findIngestionKey(input: {
     organizationId: string;
     projectId: string;
     sourceType: string;
   }): Promise<ApiKey | null> {
-    return this.catalog.tryGetIngestionKey(input);
+    return this.catalog.findIngestionKey(input);
   }
 
   async listIngestionKeysForProject(input: {
@@ -200,8 +198,8 @@ export class ApiKeyService extends ApiKeyCapability {
     return this.catalog.listIngestionKeysForProject(input);
   }
 
-  async tryGetByLookupId(input: { lookupId: string }): Promise<ApiKey | null> {
-    return this.catalog.tryGetByLookupId(input);
+  async findByLookupId(input: { lookupId: string }): Promise<ApiKey | null> {
+    return this.catalog.findByLookupId(input);
   }
 
   async validateCliSelection(input: {
@@ -212,11 +210,11 @@ export class ApiKeyService extends ApiKeyCapability {
     return this.cli.validateCliSelection(input);
   }
 
-  async tryResolveDefaultCliSelection(input: {
+  async findDefaultCliSelection(input: {
     userId: string;
     organizationId: string;
   }): Promise<CliKeySelection | null> {
-    return this.cli.tryResolveDefaultCliSelection(input);
+    return this.cli.findDefaultCliSelection(input);
   }
 
   async mintCliLoginKey(input: {

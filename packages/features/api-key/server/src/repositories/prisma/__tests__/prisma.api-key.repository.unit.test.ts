@@ -2,12 +2,7 @@
  * @vitest-environment node
  *
  * `HIDDEN_SYSTEM_KEY_NAMES` is a tenant-isolation boundary, not a UI filter:
- * `@langwatch/api-key-contract` says membership grants a cross-tenant query
- * bound in `guardOrganizationId`. This repository kept a private copy of the
- * list holding only "Langy session", so a sandbox key was listed to every
- * member of the organization while the service layer refused to let anyone
- * revoke it. These cases pin both listings to the contract's list rather than
- * to today's two names, so a third system name is covered the day it is added.
+ * these cases pin both listings to the contract's list, not to today's names.
  */
 import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -123,7 +118,7 @@ describe("PrismaApiKeyRepository", () => {
       const database = { apiKey: { findFirst } } as unknown as PrismaApiKeyDatabase;
       const repository = PrismaApiKeyRepository.create(database);
 
-      await repository.tryFindIngestKey({
+      await repository.findIngestKey({
         organizationId: "org-1",
         projectId: "project-1",
         sourceType: "claude_code",

@@ -1,7 +1,7 @@
 /**
  * The credential a code agent's sandbox authenticates with.
  */
-import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyService } from "@langwatch/api-key-contract";
+import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 
 import type { AgentSandboxKeySharePort } from "../ports/agent-sandbox-key-share.port.ts";
@@ -26,17 +26,17 @@ export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = ["agentCache:manage"
 
 export class AgentSandboxKeyMintService {
   static create(options: {
-    apiKeys: ApiKeyService;
+    apiKeys: ApiKeyApi;
     /** Resolves whose credential a personal workspace's key has to be. */
-    repository: Pick<ApiKeyRepository, "tryFindPersonalWorkspaceOwner">;
+    repository: Pick<ApiKeyRepository, "findPersonalWorkspaceOwner">;
     share: AgentSandboxKeySharePort;
   }): AgentSandboxKeyMintService {
     return new AgentSandboxKeyMintService(options.apiKeys, options.repository, options.share);
   }
 
   private constructor(
-    private readonly apiKeys: ApiKeyService,
-    private readonly repository: Pick<ApiKeyRepository, "tryFindPersonalWorkspaceOwner">,
+    private readonly apiKeys: ApiKeyApi,
+    private readonly repository: Pick<ApiKeyRepository, "findPersonalWorkspaceOwner">,
     private readonly share: AgentSandboxKeySharePort,
   ) {}
 
@@ -80,7 +80,7 @@ export class AgentSandboxKeyMintService {
    * share may both mint; both keys are valid and the later one is shared from then on.
    */
   async getOrMint(input: { projectId: string; organizationId: string }): Promise<string> {
-    const held = await this.share.tryGet({ projectId: input.projectId });
+    const held = await this.share.findSharedKey({ projectId: input.projectId });
     if (held !== undefined) {
       return held;
     }
@@ -96,7 +96,7 @@ export class AgentSandboxKeyMintService {
    * must still run: its rows each do their own work and the cache simply never answers. So a
    * failure here is a warning and an `undefined`, never a thrown error that would stop the run.
    */
-  async tryGetOrMint(input: {
+  async findOrMint(input: {
     projectId: string;
     organizationId: string;
   }): Promise<string | undefined> {
@@ -125,7 +125,7 @@ export class AgentSandboxKeyMintService {
     projectId: string;
     organizationId: string;
   }): Promise<string | null> {
-    const personal = await this.repository.tryFindPersonalWorkspaceOwner({
+    const personal = await this.repository.findPersonalWorkspaceOwner({
       organizationId: input.organizationId,
       scopeId: input.projectId,
     });

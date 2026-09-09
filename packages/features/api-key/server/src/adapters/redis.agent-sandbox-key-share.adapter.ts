@@ -59,7 +59,7 @@ export class RedisAgentSandboxKeyShareAdapter extends AgentSandboxKeySharePort {
     super();
   }
 
-  async tryGet(input: { projectId: string }): Promise<string | undefined> {
+  async findSharedKey(input: { projectId: string }): Promise<string | undefined> {
     const sealed = (await this.readSealed(input.projectId)) ?? this.readMemory(input.projectId);
     if (sealed === undefined) return undefined;
 

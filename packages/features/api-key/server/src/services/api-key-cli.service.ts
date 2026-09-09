@@ -78,7 +78,7 @@ export class ApiKeyCliService {
     return { bindings, permissions: permissions.sort() };
   }
 
-  async tryResolveDefaultCliSelection(input: {
+  async findDefaultCliSelection(input: {
     userId: string;
     organizationId: string;
   }): Promise<CliKeySelection | null> {
@@ -103,7 +103,7 @@ export class ApiKeyCliService {
     ];
     const heldByTeam = new Map<string, string[]>();
     for (const teamId of teamIds) {
-      const personal = await this.repository.tryFindPersonalWorkspaceOwner({
+      const personal = await this.repository.findPersonalWorkspaceOwner({
         organizationId: input.organizationId,
         scopeId: teamId,
       });

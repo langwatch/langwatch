@@ -48,16 +48,16 @@ function serviceWith(fakes: Fakes = {}) {
   const calls: string[] = [];
   const service = ApiKeyTokenResolutionService.create({
     repository: {
-      tryFindByLookupId: async () => (fakes.row === undefined ? storedKey() : fakes.row),
+      findByLookupId: async () => (fakes.row === undefined ? storedKey() : fakes.row),
       upgradeHash: async () => {
         calls.push("upgradeHash");
         if (fakes.upgradeFails) throw new Error("write failed");
       },
-      tryFindLegacyProjectId: async () => fakes.legacyProjectId ?? null,
+      findLegacyProjectId: async () => fakes.legacyProjectId ?? null,
       rotateLegacyProjectKey: async () => "rotated",
     },
     tokens: {
-      trySplit: (token: string) =>
+      findTokenParts: (token: string) =>
         token.startsWith("sk-lw-") ? { lookupId: "lookup", secret: "secret" } : null,
       verify: () => fakes.verify ?? "match",
       hash: () => "rehashed",
@@ -73,12 +73,12 @@ function serviceWith(fakes: Fakes = {}) {
 }
 
 describe("ApiKeyTokenResolutionService", () => {
-  describe("tryVerify", () => {
+  describe("findVerifiedToken", () => {
     describe("given a revoked key", () => {
       it("refuses it", async () => {
         const { service } = serviceWith({ row: storedKey({ revokedAt: new Date() }) });
 
-        await expect(service.tryVerify({ token: CURRENT_TOKEN })).resolves.toBeNull();
+        await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
       });
     });
 
@@ -88,7 +88,7 @@ describe("ApiKeyTokenResolutionService", () => {
           row: storedKey({ expiresAt: new Date(Date.now() - 1000) }),
         });
 
-        await expect(service.tryVerify({ token: CURRENT_TOKEN })).resolves.toBeNull();
+        await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
       });
     });
 
@@ -98,7 +98,7 @@ describe("ApiKeyTokenResolutionService", () => {
           row: storedKey({ expiresAt: new Date(Date.now() + 60_000) }),
         });
 
-        await expect(service.tryVerify({ token: CURRENT_TOKEN })).resolves.toMatchObject({
+        await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
           id: "key-1",
         });
       });
@@ -108,7 +108,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("refuses it", async () => {
         const { service } = serviceWith({ verify: "no_match" });
 
-        await expect(service.tryVerify({ token: CURRENT_TOKEN })).resolves.toBeNull();
+        await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
       });
     });
 
@@ -116,7 +116,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("refuses it without reaching storage", async () => {
         const { service } = serviceWith({});
 
-        await expect(service.tryVerify({ token: "not-a-token" })).resolves.toBeNull();
+        await expect(service.findVerifiedToken({ token: "not-a-token" })).resolves.toBeNull();
       });
     });
 
@@ -124,7 +124,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("refuses it", async () => {
         const { service } = serviceWith({ row: null });
 
-        await expect(service.tryVerify({ token: CURRENT_TOKEN })).resolves.toBeNull();
+        await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
       });
     });
 
@@ -132,7 +132,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("never hands back the stored secret", async () => {
         const { service } = serviceWith({});
 
-        const verified = await service.tryVerify({ token: CURRENT_TOKEN });
+        const verified = await service.findVerifiedToken({ token: CURRENT_TOKEN });
 
         expect(verified).not.toBeNull();
         expect(verified).not.toHaveProperty("hashedSecret");
@@ -143,7 +143,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("re-hashes it while still letting the caller in", async () => {
         const { service, calls } = serviceWith({ verify: "match_legacy" });
 
-        await expect(service.tryVerify({ token: CURRENT_TOKEN })).resolves.toMatchObject({
+        await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
           id: "key-1",
         });
         expect(calls).toContain("upgradeHash");
@@ -154,14 +154,14 @@ describe("ApiKeyTokenResolutionService", () => {
         // time, not a locked-out customer.
         const { service } = serviceWith({ verify: "match_legacy", upgradeFails: true });
 
-        await expect(service.tryVerify({ token: CURRENT_TOKEN })).resolves.toMatchObject({
+        await expect(service.findVerifiedToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
           id: "key-1",
         });
       });
     });
   });
 
-  describe("tryResolveToken", () => {
+  describe("findResolvedToken", () => {
     describe("given a key whose organization does not own the named project", () => {
       it("refuses it, rather than resolving across the tenant boundary", async () => {
         const { service } = serviceWith({
@@ -169,7 +169,7 @@ describe("ApiKeyTokenResolutionService", () => {
         });
 
         await expect(
-          service.tryResolveToken({ token: CURRENT_TOKEN, projectId: "project-1" }),
+          service.findResolvedToken({ token: CURRENT_TOKEN, projectId: "project-1" }),
         ).resolves.toBeNull();
       });
     });
@@ -182,7 +182,7 @@ describe("ApiKeyTokenResolutionService", () => {
         });
 
         await expect(
-          service.tryResolveToken({ token: CURRENT_TOKEN, projectId: "project-2" }),
+          service.findResolvedToken({ token: CURRENT_TOKEN, projectId: "project-2" }),
         ).resolves.toBeNull();
       });
     });
@@ -198,7 +198,7 @@ describe("ApiKeyTokenResolutionService", () => {
         });
 
         await expect(
-          service.tryResolveToken({ token: CURRENT_TOKEN, projectId: "project-2" }),
+          service.findResolvedToken({ token: CURRENT_TOKEN, projectId: "project-2" }),
         ).resolves.toMatchObject({ type: "apiKey", project: { id: "project-2" } });
       });
     });
@@ -212,7 +212,7 @@ describe("ApiKeyTokenResolutionService", () => {
         });
 
         await expect(
-          service.tryResolveToken({ token: CURRENT_TOKEN, projectId: "project-2" }),
+          service.findResolvedToken({ token: CURRENT_TOKEN, projectId: "project-2" }),
         ).resolves.toMatchObject({ type: "apiKey", project: { id: "project-2" } });
       });
     });
@@ -221,7 +221,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("resolves that project", async () => {
         const { service } = serviceWith({});
 
-        await expect(service.tryResolveToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
+        await expect(service.findResolvedToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
           type: "apiKey",
           apiKeyId: "key-1",
           project: { id: "project-1" },
@@ -240,7 +240,7 @@ describe("ApiKeyTokenResolutionService", () => {
           }),
         });
 
-        await expect(service.tryResolveToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
+        await expect(service.findResolvedToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
       });
     });
 
@@ -252,7 +252,7 @@ describe("ApiKeyTokenResolutionService", () => {
           }),
         });
 
-        await expect(service.tryResolveToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
+        await expect(service.findResolvedToken({ token: CURRENT_TOKEN })).resolves.toBeNull();
       });
     });
 
@@ -262,7 +262,7 @@ describe("ApiKeyTokenResolutionService", () => {
           row: storedKey({ name: LANGY_SESSION_API_KEY_NAME }),
         });
 
-        await expect(service.tryResolveToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
+        await expect(service.findResolvedToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
           isLangySessionKey: true,
         });
       });
@@ -270,7 +270,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("leaves an ordinary key unmarked", async () => {
         const { service } = serviceWith({ row: storedKey({ name: "a key" }) });
 
-        await expect(service.tryResolveToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
+        await expect(service.findResolvedToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
           isLangySessionKey: false,
         });
       });
@@ -280,7 +280,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("resolves it to its project", async () => {
         const { service } = serviceWith({ legacyProjectId: "project-1" });
 
-        await expect(service.tryResolveToken({ token: LEGACY_TOKEN })).resolves.toMatchObject({
+        await expect(service.findResolvedToken({ token: LEGACY_TOKEN })).resolves.toMatchObject({
           type: "legacyProjectKey",
           project: { id: "project-1" },
         });
@@ -289,7 +289,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("refuses one whose project no longer exists", async () => {
         const { service } = serviceWith({ legacyProjectId: "project-1", identity: null });
 
-        await expect(service.tryResolveToken({ token: LEGACY_TOKEN })).resolves.toBeNull();
+        await expect(service.findResolvedToken({ token: LEGACY_TOKEN })).resolves.toBeNull();
       });
     });
 
@@ -297,7 +297,7 @@ describe("ApiKeyTokenResolutionService", () => {
       it("falls back to reading it as a legacy project key", async () => {
         const { service } = serviceWith({ verify: "no_match", legacyProjectId: "project-1" });
 
-        await expect(service.tryResolveToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
+        await expect(service.findResolvedToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
           type: "legacyProjectKey",
         });
       });
@@ -383,7 +383,7 @@ describe("ApiKeyTokenResolutionService", () => {
 
         const service = ApiKeyTokenResolutionService.create({
           repository: {
-            tryFindLegacyProjectId: async ({ token }: { token: string }) =>
+            findLegacyProjectId: async ({ token }: { token: string }) =>
               token === storedToken ? projectId : null,
             rotateLegacyProjectKey: async (input: { projectId: string; token: string }) => {
               if (input.projectId !== projectId) return null;
@@ -395,7 +395,7 @@ describe("ApiKeyTokenResolutionService", () => {
           projects: { tryGetIdentity: async () => project() },
         } as never);
 
-        await expect(service.tryResolveToken({ token: LEGACY_TOKEN })).resolves.toMatchObject({
+        await expect(service.findResolvedToken({ token: LEGACY_TOKEN })).resolves.toMatchObject({
           type: "legacyProjectKey",
           project: { id: projectId },
         });
@@ -403,8 +403,8 @@ describe("ApiKeyTokenResolutionService", () => {
         const newToken = await service.regenerateLegacyProjectKey({ projectId });
         expect(newToken).toBe("sk-lw-rotated-project-key");
 
-        await expect(service.tryResolveToken({ token: LEGACY_TOKEN })).resolves.toBeNull();
-        await expect(service.tryResolveToken({ token: newToken })).resolves.toMatchObject({
+        await expect(service.findResolvedToken({ token: LEGACY_TOKEN })).resolves.toBeNull();
+        await expect(service.findResolvedToken({ token: newToken })).resolves.toMatchObject({
           type: "legacyProjectKey",
           project: { id: projectId },
         });

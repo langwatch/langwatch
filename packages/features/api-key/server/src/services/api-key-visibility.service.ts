@@ -24,7 +24,7 @@ export class ApiKeyVisibilityService {
     organizationId: string;
   }): Promise<ApiKeyVisibleProjects> {
     const parsed = apiKeyVisibleProjectsInputSchema.parse(input);
-    const key = await this.repository.tryFindByIdInOrganization({
+    const key = await this.repository.findByIdInOrganization({
       id: parsed.apiKeyId,
       organizationId: parsed.organizationId,
     });

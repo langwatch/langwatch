@@ -1,26 +1,10 @@
 /**
- * One API key row, as the Settings > API Keys table reads it.
+ * One API key row, as the Settings > API Keys table reads it. See ADR-001
+ * (../adrs/001-api-key-service.md) for why the shape lives in the contract.
  *
- * This is the answer of `apiKey.list`, written down here as the schema the
- * transport validates against and the type inferred from it. Before
- * the family moved out of `platform/app`, the page typed its rows as
- * `RouterOutputs["apiKey"]["list"][number]` — the whole shape derived from an
- * `AppRouter` a browser package may not name. The producer is PACKAGED
- * (`@langwatch/api-key-server`'s `ApiKeyApp.listKeys`), so the ruling on
- * contract moves allows the real fix rather than a restatement: the app method
- * is ANNOTATED with this type, and both halves are now checked against one
- * declaration — the same one the tRPC output schema enforces at runtime.
- *
- * ## NO KEY MATERIAL IS ON THIS SHAPE, and that is the point of writing it down
- *
- * `lookupIdPrefix` is five characters of the key's LOOKUP id — the public half
- * that identifies which row a presented credential belongs to. It is not a
- * prefix of the secret. The plaintext token exists in exactly one answer in this
- * feature, `apiKey.create`, at the moment of minting; every read hands back this
- * row and nothing more. Widening this type with a token, a hash, or the full
- * lookup id would turn a list request into a credential disclosure, which is why
- * the rule is stated here rather than left to the projection that happens to
- * satisfy it today.
+ * NO KEY MATERIAL is on this shape: `lookupIdPrefix` is five characters of the
+ * key's public lookup id, never part of the secret. The plaintext token leaves
+ * the server exactly once, in `apiKey.create` at the moment of minting.
  */
 
 import { z } from "zod";
@@ -28,16 +12,12 @@ import { apiKeyBindingSchema, type ApiKeyBinding } from "./api-key.ts";
 
 /**
  * One of the CALLER's own bindings, with the scope named rather than only
- * identified. The answer of `apiKey.myBindings`, which both drawers and the CLI
+ * identified. The answer of `apiKey.myBindings`, which the drawers and the CLI
  * authorize screen read to work out the ceiling a new key may be given.
- *
- * Declared here rather than in `@langwatch/api-key-server` — where it lived,
- * with no consumer outside that package's own barrel — because a browser
- * package may not import a server one, and this is a DTO rather than anything
- * the server owns.
  */
-export const namedApiKeyBindingSchema = apiKeyBindingSchema
-  .extend({
+export const namedApiKeyBindingSchema = z
+  .object({
+    ...apiKeyBindingSchema.shape,
     customRoleId: z.string().nullable(),
     scopeName: z.string().nullable(),
     customRoleName: z.string().nullable(),

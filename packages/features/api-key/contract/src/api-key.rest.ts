@@ -1,11 +1,8 @@
 /**
- * The wire shapes the `/api/api-keys` REST family publishes.
- *
- * Narrower than the stored key on purpose: neither the hashed secret nor the
- * lookup id ever leaves this door, and the listing carries no permission mode
- * at all. `roleBindings` is what a list row publishes; `bindings` is the same
- * set in the shape a write accepts, so reading a key back after a write is a
- * comparison rather than a translation.
+ * The wire shapes the `/api/api-keys` REST family publishes. Narrower than the
+ * stored key on purpose: neither the hashed secret nor the lookup id ever
+ * leaves this door. `bindings` is the write shape of what `roleBindings`
+ * reads back, so a write followed by a read is a comparison, not a translation.
  */
 import { z } from "zod";
 
@@ -34,7 +31,8 @@ export type ApiKeyRestListItem = z.infer<typeof apiKeyRestListItemSchema>;
 
 export const apiKeyRestListSchema = z.object({ data: z.array(apiKeyRestListItemSchema) });
 
-export const apiKeyRestDetailSchema = apiKeyRestListItemSchema.extend({
+export const apiKeyRestDetailSchema = z.object({
+  ...apiKeyRestListItemSchema.shape,
   keyType: z.enum(["personal", "service"]),
   assignedToUserId: z.string().nullable(),
   createdByUserId: z.string().nullable(),

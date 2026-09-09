@@ -9,7 +9,6 @@ import {
   type ApiKeyListEntry,
   type ApiKeyName,
   type ApiKeyProject,
-  type ApiKeyService,
   type ApiKeyTeam,
   type ApiKeyUser,
   type CreateApiKeyInput,
@@ -24,7 +23,7 @@ import {
   type ApiKeyVisibleProjectsInput,
   type OrganizationApiKeyResolution,
   type OrganizationApiKeyResolutionInput,
-  type ResolvedApiKeyToken,
+  type ResolvedApiKeyCredential,
   type ApiKeyTokenResolutionInput,
   type CliKeySelection,
   type ApiKeySelectionInput,
@@ -32,11 +31,15 @@ import {
   type ApiKeyCallerReadInput,
 } from "@langwatch/api-key-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 import {
   PostgresApiKeyAdapter,
   type PostgresApiKeyAdapterOptions,
 } from "../adapters/postgres.api-key.adapter.ts";
+import type { ApiKeyService } from "../services/api-key.service.ts";
 
 /** Who an operation is performed by, and whose membership is proved. */
 export interface ApiKeyCaller {
@@ -44,8 +47,16 @@ export interface ApiKeyCaller {
 }
 
 /** What the process composes this feature's application from. */
-export type ApiKeyInfrastructure = PostgresApiKeyAdapterOptions;
-export type ApiKeySetup = FeatureSetup<Record<never, never>, ApiKeyInfrastructure, undefined>;
+export type ApiKeyInfrastructure = Omit<
+  PostgresApiKeyAdapterOptions,
+  "authz" | "grants" | "organizations" | "projects"
+>;
+type ApiKeyDependencies = Readonly<{
+  authorization: typeof AuthzApi;
+  organizations: typeof OrganizationApi;
+  projects: typeof ProjectApi;
+}>;
+export type ApiKeySetup = FeatureSetup<ApiKeyDependencies, ApiKeyInfrastructure, undefined>;
 
 /** What a key may create: the caller's own personal key, or an admin's key. */
 export type CreateApiKeyRequest = Readonly<{
@@ -72,10 +83,22 @@ export type UpdateApiKeyRequest = Readonly<{
 
 export class ApiKeyApp implements ApiKeyApi {
   static readonly contract = ApiKeyApi;
-  static readonly dependencies = {} as const;
+  static readonly dependencies: ApiKeyDependencies = {
+    authorization: AuthzApi,
+    organizations: OrganizationApi,
+    projects: ProjectApi,
+  };
 
   static create(setup: ApiKeySetup): ApiKeyApp {
-    return new ApiKeyApp(PostgresApiKeyAdapter.create(setup.infrastructure).build());
+    return new ApiKeyApp(
+      PostgresApiKeyAdapter.create({
+        ...setup.infrastructure,
+        authz: setup.dependencies.authorization,
+        grants: setup.dependencies.authorization,
+        organizations: setup.dependencies.organizations,
+        projects: setup.dependencies.projects,
+      }).build(),
+    );
   }
 
   private constructor(service: ApiKeyService) {
@@ -95,11 +118,13 @@ export class ApiKeyApp implements ApiKeyApi {
   async update(input: UpdateApiKeyInput) {
     return this.#service.update(input);
   }
-  async tryVerify(input: { token: string }): Promise<ApiKeyVerification | null> {
-    return this.#service.tryVerify(input);
+  async findVerifiedToken(input: { token: string }): Promise<ApiKeyVerification | null> {
+    return this.#service.findVerifiedToken(input);
   }
-  async tryResolveToken(input: ApiKeyTokenResolutionInput): Promise<ResolvedApiKeyToken | null> {
-    return this.#service.tryResolveToken(input);
+  async findResolvedToken(
+    input: ApiKeyTokenResolutionInput,
+  ): Promise<ResolvedApiKeyCredential | null> {
+    return this.#service.findResolvedToken(input);
   }
   async regenerateLegacyProjectKey(input: { projectId: string }): Promise<string> {
     return this.#service.regenerateLegacyProjectKey(input);
@@ -136,14 +161,14 @@ export class ApiKeyApp implements ApiKeyApi {
   async isOrgAdminApiKey(input: { apiKeyId: string; organizationId: string }): Promise<boolean> {
     return this.#service.isOrgAdminApiKey(input);
   }
-  async tryGetById(input: { id: string }) {
-    return this.#service.tryGetById(input);
+  async findById(input: { id: string }) {
+    return this.#service.findById(input);
   }
   async getByIdForCaller(input: ApiKeyCallerReadInput): Promise<ApiKeyDetail> {
     return this.#service.getByIdForCaller(input);
   }
-  async tryGetNameByIdInOrg(input: { id: string; organizationId: string }) {
-    return this.#service.tryGetNameByIdInOrg(input);
+  async findNameByIdInOrg(input: { id: string; organizationId: string }) {
+    return this.#service.findNameByIdInOrg(input);
   }
   async getUserBindings(input: { userId: string; organizationId: string }) {
     return this.#service.getUserBindings(input);
@@ -157,18 +182,14 @@ export class ApiKeyApp implements ApiKeyApi {
   async getOrgMembers(input: { organizationId: string }) {
     return this.#service.getOrgMembers(input);
   }
-  async tryGetIngestionKey(input: {
-    organizationId: string;
-    projectId: string;
-    sourceType: string;
-  }) {
-    return this.#service.tryGetIngestionKey(input);
+  async findIngestionKey(input: { organizationId: string; projectId: string; sourceType: string }) {
+    return this.#service.findIngestionKey(input);
   }
   async listIngestionKeysForProject(input: { organizationId: string; projectId: string }) {
     return this.#service.listIngestionKeysForProject(input);
   }
-  async tryGetByLookupId(input: { lookupId: string }) {
-    return this.#service.tryGetByLookupId(input);
+  async findByLookupId(input: { lookupId: string }) {
+    return this.#service.findByLookupId(input);
   }
   async validateCliSelection(input: {
     userId: string;
@@ -177,8 +198,8 @@ export class ApiKeyApp implements ApiKeyApi {
   }) {
     return this.#service.validateCliSelection(input);
   }
-  async tryResolveDefaultCliSelection(input: { userId: string; organizationId: string }) {
-    return this.#service.tryResolveDefaultCliSelection(input);
+  async findDefaultCliSelection(input: { userId: string; organizationId: string }) {
+    return this.#service.findDefaultCliSelection(input);
   }
   async mintCliLoginKey(input: {
     userId: string;
@@ -223,7 +244,7 @@ export class ApiKeyApp implements ApiKeyApi {
     input: Readonly<{ organizationId: string }>,
     by: ApiKeyCaller,
   ): Promise<NamedApiKeyBinding[]> {
-    await this.ensureMember(input.organizationId, by);
+    await this.#ensureMember(input.organizationId, by);
     const bindings = await this.#service.getUserBindings({
       userId: by.id,
       organizationId: input.organizationId,
@@ -251,12 +272,12 @@ export class ApiKeyApp implements ApiKeyApi {
    * identically for an id that does not exist and one that belongs to another organization, so
    * it cannot be used to enumerate.
    */
-  async getKeyName(
+  async findKeyName(
     input: Readonly<{ organizationId: string; apiKeyId: string }>,
     by: ApiKeyCaller,
   ): Promise<ApiKeyName | null> {
-    await this.ensureMember(input.organizationId, by);
-    return this.#service.tryGetNameByIdInOrg({
+    await this.#ensureMember(input.organizationId, by);
+    return this.#service.findNameByIdInOrg({
       id: input.apiKeyId,
       organizationId: input.organizationId,
     });
@@ -271,8 +292,8 @@ export class ApiKeyApp implements ApiKeyApi {
     input: Readonly<{ organizationId: string }>,
     by: ApiKeyCaller,
   ): Promise<ApiKeyListEntry[]> {
-    await this.ensureMember(input.organizationId, by);
-    const callerIsAdmin = await this.isOrganizationAdmin(input.organizationId, by);
+    await this.#ensureMember(input.organizationId, by);
+    const callerIsAdmin = await this.#isOrganizationAdmin(input.organizationId, by);
 
     const apiKeys = callerIsAdmin
       ? await this.#service.listAll({ organizationId: input.organizationId })
@@ -357,13 +378,12 @@ export class ApiKeyApp implements ApiKeyApi {
     input: CreateApiKeyRequest,
     by: ApiKeyCaller,
   ): Promise<{ token: string; apiKey: ApiKey; assignedToUserId: string | null }> {
-    await this.ensureMember(input.organizationId, by);
+    await this.#ensureMember(input.organizationId, by);
     const isService = input.keyType === "service";
+    const assignedToAnother = Boolean(input.assignedToUserId) && input.assignedToUserId !== by.id;
+    const privilegedMint = isService || assignedToAnother;
 
-    if (
-      (isService || (input.assignedToUserId && input.assignedToUserId !== by.id)) &&
-      !(await this.isOrganizationAdmin(input.organizationId, by))
-    ) {
+    if (privilegedMint && !(await this.#isOrganizationAdmin(input.organizationId, by))) {
       throw new ApiKeyAdminRequiredError(
         isService ? "create-service-key" : "assign-to-another-user",
       );
@@ -387,8 +407,8 @@ export class ApiKeyApp implements ApiKeyApi {
 
   /** Rewrites a key's name, description, permissions and bindings. */
   async updateKey(input: UpdateApiKeyRequest, by: ApiKeyCaller): Promise<ApiKey> {
-    await this.ensureMember(input.organizationId, by);
-    const callerIsAdmin = await this.isOrganizationAdmin(input.organizationId, by);
+    await this.#ensureMember(input.organizationId, by);
+    const callerIsAdmin = await this.#isOrganizationAdmin(input.organizationId, by);
 
     return this.#service.update({
       id: input.apiKeyId,
@@ -408,8 +428,8 @@ export class ApiKeyApp implements ApiKeyApi {
     input: Readonly<{ organizationId: string; apiKeyId: string }>,
     by: ApiKeyCaller,
   ): Promise<void> {
-    await this.ensureMember(input.organizationId, by);
-    const callerIsAdmin = await this.isOrganizationAdmin(input.organizationId, by);
+    await this.#ensureMember(input.organizationId, by);
+    const callerIsAdmin = await this.#isOrganizationAdmin(input.organizationId, by);
 
     await this.#service.revoke({
       id: input.apiKeyId,
@@ -424,7 +444,7 @@ export class ApiKeyApp implements ApiKeyApi {
     input: Readonly<{ organizationId: string }>,
     by: ApiKeyCaller,
   ): Promise<ApiKeyProject[]> {
-    await this.ensureMember(input.organizationId, by);
+    await this.#ensureMember(input.organizationId, by);
     return this.#service.getOrgProjects({ organizationId: input.organizationId });
   }
 
@@ -433,7 +453,7 @@ export class ApiKeyApp implements ApiKeyApi {
     input: Readonly<{ organizationId: string }>,
     by: ApiKeyCaller,
   ): Promise<ApiKeyTeam[]> {
-    await this.ensureMember(input.organizationId, by);
+    await this.#ensureMember(input.organizationId, by);
     return this.#service.getOrgTeams({ organizationId: input.organizationId });
   }
 
@@ -446,19 +466,19 @@ export class ApiKeyApp implements ApiKeyApi {
     input: Readonly<{ organizationId: string }>,
     by: ApiKeyCaller,
   ): Promise<ApiKeyUser[]> {
-    await this.ensureMember(input.organizationId, by);
-    if (!(await this.isOrganizationAdmin(input.organizationId, by))) return [];
+    await this.#ensureMember(input.organizationId, by);
+    if (!(await this.#isOrganizationAdmin(input.organizationId, by))) return [];
     return this.#service.getOrgMembers({ organizationId: input.organizationId });
   }
 
-  private ensureMember(organizationId: string, by: ApiKeyCaller): Promise<void> {
+  #ensureMember(organizationId: string, by: ApiKeyCaller): Promise<void> {
     return this.#service.ensureCallerIsOrgMember({
       userId: by.id,
       organizationId,
     });
   }
 
-  private isOrganizationAdmin(organizationId: string, by: ApiKeyCaller): Promise<boolean> {
+  #isOrganizationAdmin(organizationId: string, by: ApiKeyCaller): Promise<boolean> {
     return this.#service.isOrgAdmin({ userId: by.id, organizationId });
   }
 }

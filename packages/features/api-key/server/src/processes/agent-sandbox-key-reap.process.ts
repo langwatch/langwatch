@@ -4,10 +4,10 @@ import { z } from "zod";
 export const AGENT_SANDBOX_KEY_REAP_PROCESS_NAME = "agentSandboxKeyReap";
 
 /**
- * Hourly. A sandbox key carries its own `expiresAt` and `ApiKeyService.verify`
- * already refuses an elapsed one, so a reaped key was inert before this ran.
- * The sweep is about not leaving a long tail of live-looking rows behind, not
- * about closing an authentication hole.
+ * Hourly. A sandbox key carries its own `expiresAt` and verification
+ * (`ApiKeyApi.findVerifiedToken`) already refuses an elapsed one, so a reaped
+ * key was inert before this ran. The sweep is about not leaving a long tail of
+ * live-looking rows behind, not about closing an authentication hole.
  */
 export const AGENT_SANDBOX_KEY_REAP_INTERVAL_MS = 60 * 60 * 1000;
 

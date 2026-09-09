@@ -22,9 +22,10 @@ import {
   PERMISSION_CATEGORIES,
   selectionsFromPermissions,
   type ApiKeyListEntry,
+  type ApiKeyTrpcRoleBinding,
   type NamedApiKeyBinding,
 } from "@langwatch/api-key-contract";
-import { ScopeChipPicker, type ScopeChipPickerEntry } from "../elements/scope-picker.tsx";
+import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -97,16 +98,12 @@ export function EditApiKeyDrawer({
     scopeType?: string;
     scopeId?: string;
     permissions?: string[];
-    bindings?: Array<{
-      role: string;
-      scopeType: string;
-      scopeId: string;
-    }>;
+    bindings?: ApiKeyTrpcRoleBinding[];
   }) => void;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedScopes, setSelectedScopes] = useState<ScopeChipPickerEntry[]>([]);
+  const [selectedScopes, setSelectedScopes] = useState<ScopeTriadEntry[]>([]);
   const [permissionMode, setPermissionMode] = useState<"all" | "restricted">("all");
   const [categorySelections, setCategorySelections] = useState<Record<string, PermissionSelection>>(
     {},

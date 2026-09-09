@@ -1,7 +1,6 @@
 export * from "./api-key.ts";
 export * from "./api-key.errors.ts";
 export * from "./api-key.list.ts";
-export * from "./api-key.service.ts";
 export * from "./api-key.api.ts";
 export * from "./api-key.tokens.ts";
 export * from "./api-key.visibility.ts";
@@ -10,5 +9,7 @@ export * from "./api-key.responses.ts";
 export * from "./api-key.revocation-cause.ts";
 export * from "./api-key.permissions.ts";
 export * from "./api-key.rest.ts";
+export * from "./api-key.trpc.ts";
+export * from "./api-key-trpc.schemas.ts";
 export { apiKeyPermissionSchema as apiKeyPermissionFormatSchema } from "./api-key.ts";
 export * from "./api-key.config.ts";

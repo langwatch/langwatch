@@ -49,8 +49,8 @@ export class ApiKeyCatalogService {
     private readonly options: ApiKeyDependencies,
   ) {}
 
-  async tryGetById({ id }: { id: string }): Promise<ApiKey | null> {
-    const row = await this.repository.tryFindById({ id });
+  async findById({ id }: { id: string }): Promise<ApiKey | null> {
+    const row = await this.repository.findById({ id });
 
     return row ? publicApiKey(row) : null;
   }
@@ -75,11 +75,11 @@ export class ApiKeyCatalogService {
     };
   }
 
-  async tryGetNameByIdInOrg(input: {
+  async findNameByIdInOrg(input: {
     id: string;
     organizationId: string;
   }): Promise<ApiKeyName | null> {
-    const row = await this.repository.tryFindByIdInOrganization(input);
+    const row = await this.repository.findByIdInOrganization(input);
 
     return row ? { name: row.name, revoked: row.revokedAt !== null } : null;
   }
@@ -152,18 +152,18 @@ export class ApiKeyCatalogService {
     return rows.map(publicApiKey);
   }
 
-  async tryGetIngestionKey(input: {
+  async findIngestionKey(input: {
     organizationId: string;
     projectId: string;
     sourceType: string;
   }): Promise<ApiKey | null> {
-    const row = await this.repository.tryFindIngestKey(input);
+    const row = await this.repository.findIngestKey(input);
 
     return row ? publicApiKey(row) : null;
   }
 
-  async tryGetByLookupId(input: { lookupId: string }): Promise<ApiKey | null> {
-    const row = await this.repository.tryFindByLookupId(input);
+  async findByLookupId(input: { lookupId: string }): Promise<ApiKey | null> {
+    const row = await this.repository.findByLookupId(input);
 
     return row ? publicApiKey(row) : null;
   }
@@ -188,7 +188,7 @@ export class ApiKeyCatalogService {
   }
 
   private async getInOrganization(id: string, organizationId: string): Promise<StoredApiKey> {
-    const row = await this.repository.tryFindByIdInOrganization({
+    const row = await this.repository.findByIdInOrganization({
       id,
       organizationId,
     });

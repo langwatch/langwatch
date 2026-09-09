@@ -1,11 +1,6 @@
 /**
- * What the `apiKey.*` surface answers, as schemas.
- *
- * The rule `api-key.list.ts` writes down holds here too: NO KEY MATERIAL is
- * on any read.
- * The plaintext token appears in exactly one shape below — the answer of
- * `apiKey.create`, at the moment of minting — and every other schema carries
- * the five-character public `lookupIdPrefix` and nothing more.
+ * What the `apiKey.*` surface answers, as schemas. No key material on any read:
+ * the plaintext token appears only in `apiKeyMintedSchema`, at minting time.
  */
 import { z } from "zod";
 

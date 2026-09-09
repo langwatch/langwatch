@@ -70,13 +70,13 @@ class MemoryApiKeys extends ApiKeyRepository {
     for (const row of matched) row.revokedAt = toDate(now);
     return Promise.resolve(matched.length);
   }
-  tryFindByLookupId({ lookupId }: { lookupId: string }): Promise<StoredApiKey | null> {
+  findByLookupId({ lookupId }: { lookupId: string }): Promise<StoredApiKey | null> {
     return Promise.resolve(this.rows.find((row) => row.lookupId === lookupId) ?? null);
   }
-  tryFindById({ id }: { id: string }): Promise<StoredApiKey | null> {
+  findById({ id }: { id: string }): Promise<StoredApiKey | null> {
     return Promise.resolve(this.rows.find((row) => row.id === id) ?? null);
   }
-  tryFindByIdInOrganization({
+  findByIdInOrganization({
     id,
     organizationId,
   }: {
@@ -137,20 +137,20 @@ class MemoryApiKeys extends ApiKeyRepository {
   get(id: string): StoredApiKey | undefined {
     return this.rows.find((row) => row.id === id);
   }
-  tryFindIngestKey(): Promise<StoredApiKey | null> {
+  findIngestKey(): Promise<StoredApiKey | null> {
     return Promise.resolve(null);
   }
   findIngestKeysForProject(): Promise<StoredApiKey[]> {
     return Promise.resolve([]);
   }
-  tryFindLegacyProjectId(): Promise<string | null> {
+  findLegacyProjectId(): Promise<string | null> {
     return Promise.resolve(this.legacyProjectId);
   }
   rotateLegacyProjectKey(input: { projectId: string; token: string }): Promise<boolean> {
     this.regeneratedLegacyProject = input;
     return Promise.resolve(this.legacyProjectRotationSucceeds);
   }
-  tryFindPersonalWorkspaceOwner(): Promise<{ ownerUserId: string | null } | null> {
+  findPersonalWorkspaceOwner(): Promise<{ ownerUserId: string | null } | null> {
     return Promise.resolve(null);
   }
 }
@@ -268,7 +268,7 @@ describe("API-key service", () => {
       bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org-1" }],
     });
     expect(created.token).toMatch(/^sk-lw-[^_]+_[^_]+$/);
-    const verified = await service.tryVerify({ token: created.token });
+    const verified = await service.findVerifiedToken({ token: created.token });
     expect(verified?.id).toBe(created.apiKey.id);
     expect(verified).not.toHaveProperty("hashedSecret");
   });
@@ -287,7 +287,7 @@ describe("API-key service", () => {
       callerUserId: null,
       callerIsAdmin: true,
     });
-    expect(await service.tryVerify({ token: created.token })).toBeNull();
+    expect(await service.findVerifiedToken({ token: created.token })).toBeNull();
   });
 
   it("resolves a current key through its single project binding", async () => {
@@ -299,7 +299,7 @@ describe("API-key service", () => {
       bindings: [{ scopeType: "PROJECT", scopeId: "project-1", role: "VIEWER" }],
     });
 
-    await expect(service.tryResolveToken({ token: created.token })).resolves.toMatchObject({
+    await expect(service.findResolvedToken({ token: created.token })).resolves.toMatchObject({
       type: "apiKey",
       apiKeyId: created.apiKey.id,
       organizationId: "org-1",
@@ -316,7 +316,7 @@ describe("API-key service", () => {
     const service = createService(repository, dependencies({ projects }));
     const token = `sk-lw-${"a".repeat(16)}_${"b".repeat(48)}`;
 
-    await expect(service.tryResolveToken({ token })).resolves.toMatchObject({
+    await expect(service.findResolvedToken({ token })).resolves.toMatchObject({
       type: "legacyProjectKey",
       project: { id: "project-1" },
     });
@@ -329,7 +329,7 @@ describe("API-key service", () => {
     const service = createService(repository);
 
     await expect(
-      service.tryResolveToken({ token: "sk-lw-legacy-token", projectId: "other-project" }),
+      service.findResolvedToken({ token: "sk-lw-legacy-token", projectId: "other-project" }),
     ).resolves.toMatchObject({
       type: "legacyProjectKey",
       project: { id: resolvedProject.id },
@@ -351,22 +351,15 @@ describe("API-key service", () => {
     });
 
     await expect(
-      service.tryResolveToken({ token: created.token, projectId: targetProject.id }),
+      service.findResolvedToken({ token: created.token, projectId: targetProject.id }),
     ).resolves.toMatchObject({ type: "apiKey", project: { id: targetProject.id } });
     expect(tryGetIdentity).toHaveBeenCalledWith(targetProject.id);
   });
 
   /**
-   * The self-scoping half of token resolution, which every other case here
-   * skips by passing a projectId.
-   *
-   * An ingestion key authenticates with the bearer token alone — the OTLP
-   * exporter inside a wrapped `langwatch <tool>` child sends no projectId
-   * header and no basic auth — so the resolver has to derive the bound project
-   * from the key's own PROJECT-scoped binding. When it did not, the receiver
-   * answered "Invalid auth token" to every real ingest. Found by dogfooding,
-   * because it bites at the receiver and nowhere a typecheck or a
-   * management-only test looks.
+   * The self-scoping half of token resolution: an ingestion key presents the
+   * bearer token alone, so the bound project comes from the key's own
+   * PROJECT-scoped binding.
    */
   it("derives the project from a key bound to exactly one, with no projectId supplied", async () => {
     const deps = dependencies();
@@ -378,7 +371,7 @@ describe("API-key service", () => {
       bindings: [{ scopeType: "PROJECT", scopeId: resolvedIdentity.id, role: "ADMIN" }],
     });
 
-    await expect(service.tryResolveToken({ token: created.token })).resolves.toMatchObject({
+    await expect(service.findResolvedToken({ token: created.token })).resolves.toMatchObject({
       type: "apiKey",
       project: { id: resolvedIdentity.id },
     });
@@ -402,7 +395,7 @@ describe("API-key service", () => {
       ],
     });
 
-    await expect(service.tryResolveToken({ token: created.token })).resolves.toBeNull();
+    await expect(service.findResolvedToken({ token: created.token })).resolves.toBeNull();
   });
 
   it("upgrades a legacy SHA-256 hash after successful verification", async () => {
@@ -419,7 +412,7 @@ describe("API-key service", () => {
       .update(secret)
       .digest("hex");
 
-    await expect(service.tryVerify({ token: created.token })).resolves.toMatchObject({
+    await expect(service.findVerifiedToken({ token: created.token })).resolves.toMatchObject({
       id: created.apiKey.id,
     });
     await new Promise((resolve) => setImmediate(resolve));
@@ -560,8 +553,8 @@ describe("API-key service", () => {
   it("refuses a personal scope for a different owner or an unowned key", async () => {
     const repository = new MemoryApiKeys();
     (
-      repository as unknown as { tryFindPersonalWorkspaceOwner: ReturnType<typeof vi.fn> }
-    ).tryFindPersonalWorkspaceOwner = vi.fn().mockResolvedValue({ ownerUserId: "owner-1" });
+      repository as unknown as { findPersonalWorkspaceOwner: ReturnType<typeof vi.fn> }
+    ).findPersonalWorkspaceOwner = vi.fn().mockResolvedValue({ ownerUserId: "owner-1" });
     const service = createService(repository);
     await expect(
       service.create({
@@ -585,7 +578,7 @@ describe("API-key service", () => {
    */
   it("allows a personal scope for the owner the workspace belongs to", async () => {
     class OwnedPersonalWorkspace extends MemoryApiKeys {
-      override tryFindPersonalWorkspaceOwner(): Promise<{
+      override findPersonalWorkspaceOwner(): Promise<{
         ownerUserId: string | null;
       } | null> {
         return Promise.resolve({ ownerUserId: "owner-1" });
@@ -716,7 +709,7 @@ describe("API key verification", () => {
         bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org-1" }],
       });
 
-      const verified = await service.tryVerify({ token: created.token });
+      const verified = await service.findVerifiedToken({ token: created.token });
 
       expect(verified?.id).toBe(created.apiKey.id);
       expect(legacyGrants.mint).toHaveBeenCalledWith(
@@ -730,7 +723,7 @@ describe("API key verification", () => {
       const legacyGrants = { mint: vi.fn() } as unknown as ApiKeyDependencies["legacyGrants"];
       const service = createService(new MemoryApiKeys(), dependencies({ legacyGrants }));
 
-      expect(await service.tryVerify({ token: "sk-lw-x_y" })).toBeNull();
+      expect(await service.findVerifiedToken({ token: "sk-lw-x_y" })).toBeNull();
       expect(legacyGrants.mint).not.toHaveBeenCalled();
     });
   });
@@ -752,7 +745,7 @@ describe("API key verification", () => {
         callerIsAdmin: true,
       });
 
-      expect(await service.tryVerify({ token: created.token })).toBeNull();
+      expect(await service.findVerifiedToken({ token: created.token })).toBeNull();
       expect(legacyGrants.mint).not.toHaveBeenCalled();
     });
   });

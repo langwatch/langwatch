@@ -57,7 +57,7 @@ export class ApiKeyLifecycleService {
     }
 
     const bindings = parsed.bindings;
-    const permissions = this.grants.tryValidatePermissionSelection({
+    const permissions = this.grants.findValidatedPermissions({
       bindings,
       permissionMode: parsed.permissionMode ?? "all",
       permissions: parsed.permissions,
@@ -139,7 +139,7 @@ export class ApiKeyLifecycleService {
     const hasPermissionUpdate =
       input.bindings !== void 0 || input.permissionMode !== void 0 || input.permissions !== void 0;
     const permissions = hasPermissionUpdate
-      ? this.grants.tryValidatePermissionSelection({
+      ? this.grants.findValidatedPermissions({
           bindings: input.bindings ?? [],
           permissionMode: input.permissionMode ?? existing.permissionMode,
           permissions: input.permissions,
@@ -233,7 +233,7 @@ export class ApiKeyLifecycleService {
   }
 
   private async getInOrganization(id: string, organizationId: string): Promise<StoredApiKey> {
-    const row = await this.repository.tryFindByIdInOrganization({
+    const row = await this.repository.findByIdInOrganization({
       id,
       organizationId,
     });

@@ -27,7 +27,7 @@ function policyWith(fakes: Fakes = {}) {
   const calls: Array<Record<string, unknown>> = [];
   const service = ApiKeyGrantPolicyService.create({
     repository: {
-      tryFindPersonalWorkspaceOwner: async () =>
+      findPersonalWorkspaceOwner: async () =>
         fakes.personalOwner === undefined ? null : { ownerUserId: fakes.personalOwner },
     },
     authz: {
@@ -320,13 +320,13 @@ describe("ApiKeyGrantPolicyService", () => {
     });
   });
 
-  describe("tryValidatePermissionSelection", () => {
+  describe("findValidatedPermissions", () => {
     describe("given permissions outside restricted mode", () => {
       it("refuses them", () => {
         const { service } = policyWith({});
 
         expect(() =>
-          service.tryValidatePermissionSelection({
+          service.findValidatedPermissions({
             bindings: [scope()],
             permissionMode: "all",
             permissions: ["project:view"],
@@ -340,7 +340,7 @@ describe("ApiKeyGrantPolicyService", () => {
         const { service } = policyWith({});
 
         expect(() =>
-          service.tryValidatePermissionSelection({
+          service.findValidatedPermissions({
             bindings: [scope()],
             permissionMode: "restricted",
             permissions: ["project:view"],
@@ -354,7 +354,7 @@ describe("ApiKeyGrantPolicyService", () => {
         const { service } = policyWith({});
 
         expect(() =>
-          service.tryValidatePermissionSelection({
+          service.findValidatedPermissions({
             bindings: [scope({ role: "CUSTOM" })],
             permissionMode: "restricted",
             permissions: [],
@@ -368,7 +368,7 @@ describe("ApiKeyGrantPolicyService", () => {
         const { service } = policyWith({});
 
         expect(() =>
-          service.tryValidatePermissionSelection({
+          service.findValidatedPermissions({
             bindings: [scope({ role: "CUSTOM" })],
             permissionMode: "restricted",
             permissions: ["wildcard-everything"],
@@ -382,7 +382,7 @@ describe("ApiKeyGrantPolicyService", () => {
         const { service } = policyWith({});
 
         expect(
-          service.tryValidatePermissionSelection({
+          service.findValidatedPermissions({
             bindings: [scope({ role: "CUSTOM" })],
             permissionMode: "restricted",
             permissions: ["project:view", "organization:view"],
@@ -396,7 +396,7 @@ describe("ApiKeyGrantPolicyService", () => {
         const { service } = policyWith({});
 
         expect(
-          service.tryValidatePermissionSelection({ bindings: [scope()], permissionMode: "all" }),
+          service.findValidatedPermissions({ bindings: [scope()], permissionMode: "all" }),
         ).toBeUndefined();
       });
     });

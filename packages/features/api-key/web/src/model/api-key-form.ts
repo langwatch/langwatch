@@ -1,11 +1,7 @@
 /**
- * The choices the create and edit drawers offer, as data.
- *
- * Moved from `platform/app/src/pages/settings/api-keys/utils.ts`. The Chakra
- * `createListCollection` the platform module built beside this list did NOT
- * travel: a collection is a rendering concern, and a `model` module that
- * imports a component library is a layer inversion the drawer can avoid by
- * building its own from the same array.
+ * The choices the create and edit drawers offer, as data. The Chakra
+ * `createListCollection` did not travel: a collection is a rendering concern,
+ * and a `model` module must not import a component library.
  */
 
 import { Temporal, nowInstant, toDate, toEpochMs, type Instant } from "@langwatch/time";

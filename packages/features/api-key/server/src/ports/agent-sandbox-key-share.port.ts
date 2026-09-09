@@ -16,6 +16,6 @@ export const AGENT_SANDBOX_KEY_REUSE_MS = 8 * 60 * 60 * 1000;
  * reuse window, and sealed.
  */
 export abstract class AgentSandboxKeySharePort {
-  abstract tryGet(input: { projectId: string }): Promise<string | undefined>;
+  abstract findSharedKey(input: { projectId: string }): Promise<string | undefined>;
   abstract hold(input: { projectId: string; token: string }): Promise<void>;
 }

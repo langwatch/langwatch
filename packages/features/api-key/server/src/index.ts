@@ -36,10 +36,12 @@ export { ApiKeyBindingIdPort } from "./ports/api-key-binding-id.port.ts";
 export type { AuthzBindingIdDeriver } from "./services/legacy-api-key-grant.service.ts";
 export {
   ApiKeyApp,
-  type ApiKeyAppDependencies,
+  type ApiKeyInfrastructure,
+  type ApiKeySetup,
   type ApiKeyCaller,
   type CreateApiKeyRequest,
   type UpdateApiKeyRequest,
 } from "./app/api-key.app.ts";
+export { apiKeyServer } from "./api-key.server.ts";
 export { createApiKeysRestApp } from "./transport/api-rest/api-key.api.ts";
-export { ApiKeyTrpcApi, type ApiKeyTrpcContext } from "./transport/api-trpc/api-key.api.ts";
+export { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";

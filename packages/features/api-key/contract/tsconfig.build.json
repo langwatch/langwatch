@@ -25,6 +25,9 @@
   ],
   "references": [
     {
+      "path": "../../../api/tsconfig.build.json"
+    },
+    {
       "path": "../../../config/tsconfig.build.json"
     },
     {

@@ -1,31 +1,8 @@
 /**
  * "Create new secret key": the form that decides what a key will be able to do.
- *
- * Moved from `platform/app/src/pages/settings/api-keys/CreateApiKeyDrawer.tsx`.
- * It is mounted INLINE by the screen rather than registered in
- * `platform/app`'s drawer registry — nothing else has ever opened it — so
- * unlike the model-provider family's three overlays it travels whole and leaves
- * no chrome gap behind.
- *
- * Four substitutions, none of them behavioural:
- *
- *   - `ScopeChipPicker` is the harvested `@langwatch/authz-web` surface the
- *     data-governance family created and the model-provider family reused,
- *     reached through `ui/elements/scope-picker` so the package names that
- *     package twice rather than seven times — `ui-screen-closure` counts import
- *     LINES.
- *   - `Drawer` and `Select` come from the Design System rather than from
- *     `~/components/ui/*`.
- *   - The caller's own id and the org member list come from the host and this
- *     package's transport rather than from the session client and `api.*`.
- *   - `getTeamRolePermissions` is gone from the call: the ceiling functions
- *     default to the contract's built-in role bags, which is where the RBAC
- *     family put that vocabulary.
- *
- * THE CEILING IS THE POINT OF THIS FORM. Every level offered is bounded by what
- * the caller holds at the selected scope, because the mint refuses a selection
- * that exceeds it — `api_key_scope_violation` — rather than quietly dropping the
- * one permission. A form that offered more would look valid until it was saved.
+ * Every level offered is bounded by what the caller holds at the selected
+ * scope, because the mint refuses a wider selection (`api_key_scope_violation`)
+ * rather than quietly dropping one permission.
  */
 
 import {
@@ -40,7 +17,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
-import { ScopeChipPicker, type ScopeChipPickerEntry } from "../elements/scope-picker.tsx";
+import type { ApiKeyRole, ApiKeyTrpcRoleBinding } from "@langwatch/api-key-contract";
+import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Select } from "@langwatch/design-system/select";
 import { useEffect, useMemo, useState } from "react";
@@ -64,7 +42,7 @@ import {
 import type { Instant } from "@langwatch/time";
 
 type MyBindings = {
-  data: Array<{ scopeType: string; scopeId: string; role: string }> | undefined;
+  data: Array<{ scopeType: string; scopeId: string; role: ApiKeyRole }> | undefined;
   isLoading: boolean;
 };
 
@@ -81,11 +59,7 @@ export type CreateApiKeyInput = {
   scopeType: string;
   scopeId: string;
   permissions?: string[];
-  bindings: Array<{
-    role: string;
-    scopeType: string;
-    scopeId: string;
-  }>;
+  bindings: ApiKeyTrpcRoleBinding[];
 };
 
 export function CreateApiKeyDrawer({
@@ -120,7 +94,7 @@ export function CreateApiKeyDrawer({
   const [description, setDescription] = useState("");
   const [expirationPreset, setExpirationPreset] = useState("");
   const [customDate, setCustomDate] = useState("");
-  const [selectedScopes, setSelectedScopes] = useState<ScopeChipPickerEntry[]>([]);
+  const [selectedScopes, setSelectedScopes] = useState<ScopeTriadEntry[]>([]);
   const [permissionMode, setPermissionMode] = useState<"all" | "restricted">("all");
   const [categorySelections, setCategorySelections] = useState<Record<string, PermissionSelection>>(
     {},

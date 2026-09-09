@@ -75,7 +75,7 @@ export const resolvedApiKeyTokenSchema = z.discriminatedUnion("type", [
     })
     .strict(),
 ]);
-export type ResolvedApiKeyToken = z.infer<typeof resolvedApiKeyTokenSchema>;
+export type ResolvedApiKeyCredential = z.infer<typeof resolvedApiKeyTokenSchema>;
 
 export const organizationApiKeyResolutionInputSchema = z
   .object({ token: z.string().min(1) })

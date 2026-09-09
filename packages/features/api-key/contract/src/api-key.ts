@@ -16,7 +16,9 @@ export const apiKeyScopeSchema = z
   })
   .strict();
 export type ApiKeyScope = z.infer<typeof apiKeyScopeSchema>;
-export const apiKeyBindingSchema = apiKeyScopeSchema.extend({ id: z.string().min(1) }).strict();
+export const apiKeyBindingSchema = z
+  .object({ ...apiKeyScopeSchema.shape, id: z.string().min(1) })
+  .strict();
 export type ApiKeyBinding = Omit<z.infer<typeof apiKeyBindingSchema>, "customRoleId"> & {
   customRoleId: string | null;
 };
@@ -101,13 +103,13 @@ export const revokeApiKeyInputSchema = z
   })
   .strict();
 export type RevokeApiKeyInput = z.infer<typeof revokeApiKeyInputSchema>;
-export const apiKeyVerificationSchema = apiKeySchema.extend({
-  tokenType: z.literal("apiKey"),
-});
+export const apiKeyVerificationSchema = z
+  .object({ ...apiKeySchema.shape, tokenType: z.literal("apiKey") })
+  .strict();
 export type ApiKeyVerification = z.infer<typeof apiKeyVerificationSchema>;
-export const apiKeyDetailSchema = apiKeySchema.extend({
-  permissions: z.array(apiKeyPermissionSchema),
-});
+export const apiKeyDetailSchema = z
+  .object({ ...apiKeySchema.shape, permissions: z.array(apiKeyPermissionSchema) })
+  .strict();
 export type ApiKeyDetail = z.infer<typeof apiKeyDetailSchema>;
 export type ApiKeyName = { name: string; revoked: boolean };
 export type ApiKeyUser = { id: string; name: string | null; email: string | null };
@@ -158,3 +160,25 @@ export const cliKeyScopeSummarySchema = z
   })
   .strict();
 export type CliKeyScopeSummary = z.infer<typeof cliKeyScopeSummarySchema>;
+
+/** Input shapes of the ApiKeyApi operations. */
+export type ApiKeySelectionInput = {
+  userId: string;
+  organizationId: string;
+  bindings: Array<ApiKeyScope & { role: "CUSTOM" }>;
+  permissions: string[];
+};
+export type ApiKeyListInput = { userId: string; organizationId: string };
+export type ApiKeyListAllInput = { organizationId: string };
+export type ApiKeyVerifyInput = { token: string };
+export type ApiKeyOrgInput = { organizationId: string };
+export type ApiKeyIdInput = { id: string };
+export type ApiKeyOrgIdInput = { id: string; organizationId: string };
+export type ApiKeyMembershipInput = { userId: string; organizationId: string };
+export type ApiKeyAdminKeyInput = { apiKeyId: string; organizationId: string };
+export type ApiKeyCallerReadInput = {
+  id: string;
+  organizationId: string;
+  callerUserId: string | null;
+  callerCanReadAnyKey: boolean;
+};

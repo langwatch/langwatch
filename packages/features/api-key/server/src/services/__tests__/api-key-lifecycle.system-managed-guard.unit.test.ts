@@ -28,7 +28,7 @@ function makeRepository(name: string): ApiKeyRepository {
     hashedSecret: "hashed",
   } as unknown as StoredApiKey;
   return {
-    tryFindByIdInOrganization: vi.fn().mockResolvedValue(row),
+    findByIdInOrganization: vi.fn().mockResolvedValue(row),
     update: vi.fn().mockRejectedValue(new Error("must not be reached")),
     revoke: vi.fn().mockRejectedValue(new Error("must not be reached")),
   } as unknown as ApiKeyRepository;

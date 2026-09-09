@@ -1,4 +1,4 @@
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 
 import type { AgentSandboxKeySharePort } from "../ports/agent-sandbox-key-share.port.ts";
 import {
@@ -15,7 +15,7 @@ import { AgentSandboxKeyMintService } from "../services/agent-sandbox-key-mint.s
 export class PostgresAgentSandboxKeyMintAdapter {
   static create(options: {
     database: PrismaApiKeyDatabase;
-    apiKeys: ApiKeyService;
+    apiKeys: ApiKeyApi;
     share: AgentSandboxKeySharePort;
   }): PostgresAgentSandboxKeyMintAdapter {
     return new PostgresAgentSandboxKeyMintAdapter(options);
@@ -24,7 +24,7 @@ export class PostgresAgentSandboxKeyMintAdapter {
   private constructor(
     private readonly options: {
       database: PrismaApiKeyDatabase;
-      apiKeys: ApiKeyService;
+      apiKeys: ApiKeyApi;
       share: AgentSandboxKeySharePort;
     },
   ) {}

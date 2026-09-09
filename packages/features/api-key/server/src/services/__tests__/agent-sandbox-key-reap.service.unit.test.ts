@@ -1,12 +1,6 @@
 /**
- * What the agent-sandbox sweep is allowed to touch.
- *
- * The sweep holds no organization and no project — it is a fleet-wide predicate
- * over one table — so the reserved name is the only thing standing between it
- * and every customer key in the product. These assertions are about that name
- * and about the clock, because those are the two inputs a widened sweep would
- * get wrong.
- *
+ * What the agent-sandbox sweep may touch: a fleet-wide predicate bounded by
+ * the reserved name and the clock — the two inputs these assertions pin.
  * Spec: packages/features/api-key/specs/api-key.feature
  */
 import { describe, expect, it, vi } from "vitest";

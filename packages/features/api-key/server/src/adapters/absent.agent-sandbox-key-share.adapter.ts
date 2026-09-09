@@ -13,7 +13,7 @@ export class AbsentAgentSandboxKeyShareAdapter extends AgentSandboxKeySharePort 
     return new AbsentAgentSandboxKeyShareAdapter();
   }
 
-  async tryGet(): Promise<string | undefined> {
+  async findSharedKey(): Promise<string | undefined> {
     return undefined;
   }
 

@@ -20,11 +20,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/config": "workspace:*",
-    "@langwatch/time": "workspace:*",
+    "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

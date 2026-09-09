@@ -104,6 +104,26 @@ function toHostTeams(entry: OrganizationGraphEntry): ApiKeyOrganizationTeam[] {
   }));
 }
 
+/** The active project, and the team it sits on, resolved from the org graph. */
+function findActiveProject(organization: OrganizationGraphEntry | undefined, projectId: string) {
+  if (!projectId) return void 0;
+  for (const team of organization?.teams ?? []) {
+    const project = team.projects.find((candidate) => candidate.id === projectId);
+    if (project) return { project, teamId: team.id };
+  }
+  return void 0;
+}
+
+/**
+ * Three states from two answers, order matters: `/cli/auth` bounces a
+ * signed-out reader through SSO, so reading "not signed in" one render too
+ * early would round-trip a signed-in reader. `isSettled()` gates it.
+ */
+function sessionStatusOf(actor: unknown, isSettled: boolean): ApiKeySessionStatus {
+  if (actor) return "authenticated";
+  return isSettled ? "unauthenticated" : "loading";
+}
+
 export function ApiKeyHost({ children }: { children: ReactNode }) {
   const { session, route, feedback, navigation } = useUiCapabilities();
   const activeScope = session.activeScope();
@@ -125,14 +145,10 @@ export function ApiKeyHost({ children }: { children: ReactNode }) {
     [graph, activeScope.organizationId],
   );
 
-  const activeProject = useMemo(() => {
-    if (!activeScope.projectId) return void 0;
-    for (const team of organization?.teams ?? []) {
-      const project = team.projects.find((candidate) => candidate.id === activeScope.projectId);
-      if (project) return { project, teamId: team.id };
-    }
-    return void 0;
-  }, [organization, activeScope.projectId]);
+  const activeProject = useMemo(
+    () => findActiveProject(organization, activeScope.projectId ?? ""),
+    [organization, activeScope.projectId],
+  );
 
   // Everything the reader can SEE: the scope filter's options, and the names the
   // per-row scope chips resolve their ids to. Deliberately wider than the
@@ -169,16 +185,7 @@ export function ApiKeyHost({ children }: { children: ReactNode }) {
 
   const actor = session.currentUser();
 
-  /**
-   * Three states from two answers, order matters: `/cli/auth` bounces a
-   * signed-out reader through SSO, so reading "not signed in" one render too
-   * early would round-trip a signed-in reader. `isSettled()` gates it.
-   */
-  const sessionStatus: ApiKeySessionStatus = actor
-    ? "authenticated"
-    : session.isSettled()
-      ? "unauthenticated"
-      : "loading";
+  const sessionStatus: ApiKeySessionStatus = sessionStatusOf(actor, session.isSettled());
 
   const reading = route.reading();
 

@@ -1,11 +1,7 @@
 /**
- * A key is handed out only once its grants are readable.
- *
- * A key row is a plain insert and its grants are ledger commands, so the two
- * cannot share a transaction. Ordering is the only fail-safety left: the row is
- * written revoked, the grants go next, and the row is un-revoked last. A grant
- * write that is durable but not yet readable refuses here rather than passing.
- *
+ * A key is handed out only once its grants are readable: the row is written
+ * revoked, the grants go next, and the row is un-revoked last, because a key
+ * row and its ledger grants cannot share a transaction.
  * @see specs/api-keys/unified-api-keys.feature
  */
 import { AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
@@ -53,7 +49,7 @@ function makeService(failure: LedgerFailure) {
     })),
     activate: vi.fn(async () => ({ ...existing, id: "key_new", revokedAt: null })),
     update: vi.fn(async () => existing),
-    tryFindByIdInOrganization: vi.fn(async () => existing),
+    findByIdInOrganization: vi.fn(async () => existing),
   } as unknown as ApiKeyRepository;
 
   const grantCalls: Array<Record<string, unknown>> = [];
@@ -201,7 +197,7 @@ describe("given a replace whose new grants do not become readable", () => {
     expect(grantCalls.map((call) => call.method)).not.toContain("revokeBindingsWhere");
   });
 
-  /** @scenario "Replacing a key's grants leaves its metadata alone when the new ones do not land" */
+  // @scenario Replacing a key's grants leaves its metadata alone when the new ones do not land
   it("leaves the key's own row alone", async () => {
     const { service, repository } = makeService("attach");
 

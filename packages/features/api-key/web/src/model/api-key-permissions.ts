@@ -1,31 +1,13 @@
 /**
- * What an API key may be granted, and what the CALLER may grant it.
- *
- * Moved from `platform/app/src/pages/settings/api-keys/utils.ts` with one
- * substitution: the hierarchy rule and the built-in role bags now come from
- * `@langwatch/authz-contract` rather than from `~/server/api/rbac`, which a
- * browser package may not reach — it is 2,239 lines that reach the engine gate
- * and through it a Node-only logger. Both replacements are the ones the RBAC
- * family made for a whole page and the agents family made for a picker:
- *
- *   - `hasPermissionWithHierarchy(list, p)` → `permissionSatisfiedBy({ granted, requested })`
- *   - `getTeamRolePermissions(role)` → `builtinRolePermissions(roleKeyForTeamRole(role))`
- *
- * THE TWO SETS ARE NOT CHARACTER-IDENTICAL AND IT SHOWS IN EXACTLY ONE PLACE.
- * The contract's `admin` bag lists `langy:create`, `langy:update` and
- * `langy:delete` explicitly where the legacy bag left them to `langy:manage` and
- * the hierarchy rule. Everywhere a bag is read through
- * {@link categoryAccessAvailability} that is invisible, because the rule applies
- * the manage implication either way. The one place it is visible is the CLI
- * key's DEFAULT permission list, which filters `defaultCliKeyPermissions()` by
- * plain set membership: an organization admin's minted key now carries those
- * three strings alongside the `langy:manage` it already carried. The key can do
- * exactly what it could before — manage implies all three at the engine — and
- * `cli-key-defaults.unit.test.ts` pins that reading.
+ * What an API key may be granted, and what the CALLER may grant it. The
+ * hierarchy rule and built-in role bags come from `@langwatch/authz-contract`;
+ * the contract's `admin` bag lists `langy:create/update/delete` explicitly
+ * where the legacy bag implied them — see `cli-key-defaults.unit.test.ts`.
  */
 
 import {
   type AccessLevel,
+  type ApiKeyRole,
   categorizablePermissions,
   PERMISSION_CATEGORIES,
   type PermissionCategory,
@@ -41,12 +23,9 @@ import {
 export type ApiKeyTeamRole = "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
 
 /**
- * Every permission a built-in team role holds.
- *
- * The default `getTeamRolePermissions` for every caller in this package. It is
- * still injectable below, because the ceiling calculations are the part of this
- * family most worth testing in isolation and a test that has to construct a real
- * role bag is testing the contract instead.
+ * Every permission a built-in team role holds. Injectable below, because the
+ * ceiling calculations are the part of this family most worth testing in
+ * isolation.
  */
 export function teamRolePermissions(role: string): string[] {
   return [...builtinRolePermissions(roleKeyForTeamRole(role as ApiKeyTeamRole))];
@@ -54,14 +33,8 @@ export function teamRolePermissions(role: string): string[] {
 
 /**
  * Whether the user may hand a category's read or write level to an API key.
- *
- * A level is available when the category declares it, the matching permission
- * array is non-empty, and the user holds every permission in it. The
- * non-empty guard is what keeps a write-only category (project
- * administration) from reading as available: `[].every(...)` is `true`.
- *
- * One copy for both consumers, the category rows and the drawer's
- * select-all — a security-relevant predicate kept in two places drifts.
+ * The non-empty guard keeps a write-only category (project administration)
+ * from reading as available: `[].every(...)` is `true`.
  */
 export function categoryAccessAvailability({
   category,
@@ -259,11 +232,11 @@ export function deriveBindingRole({
   permissionMode: string;
   scopeType: string;
   scopeId: string;
-  myBindings: Array<{ scopeType: string; scopeId: string; role: string }> | undefined;
+  myBindings: Array<{ scopeType: string; scopeId: string; role: ApiKeyRole }> | undefined;
   organizationId: string;
   orgProjects: Array<{ id: string; teamId: string }>;
   isServiceKey: boolean;
-}): string {
+}): ApiKeyRole {
   if (permissionMode !== "all") return "CUSTOM";
   if (isServiceKey) return "ADMIN";
   if (!myBindings) return "VIEWER";
@@ -408,17 +381,10 @@ export function getUserPermissionsAtScope({
     return categorizablePermissions();
   }
   // A non-ADMIN ORGANIZATION-scoped builtin binding grants the org-member bag
-  // only (organization:view, aiTools:view) — the resolver's non-ADMIN branch
-  // never consults the team-role bags for it. Offering the team bag here made
-  // the ceiling overstate what the approve/save endpoints would accept, so a
-  // selection built from it was refused wholesale with "exceeds your own
-  // access". The bag is further narrowed to what a binding at the REQUESTED
-  // scope may carry: both bag permissions are org-exclusive, and the CLI mint
-  // strips org-exclusive permissions from any selection with no ORGANIZATION
-  // binding (`filterToGrantable`) — a TEAM or PROJECT chip covered only by
-  // this fallback therefore has an empty ceiling, not a view-only one that
-  // 422s at approval. CUSTOM org bindings resolve their own permission list
-  // and keep the injected bag.
+  // only, narrowed to what a binding at the REQUESTED scope may carry: both
+  // bag permissions are org-exclusive, and the CLI mint strips org-exclusive
+  // permissions from a selection with no ORGANIZATION binding
+  // (`filterToGrantable`).
   if (binding.scopeType === "ORGANIZATION" && binding.role !== "CUSTOM") {
     return [...builtinRolePermissions("org-member")].filter((permission) =>
       bindingScopeCanGrantPermission({
@@ -432,12 +398,9 @@ export function getUserPermissionsAtScope({
 
 /**
  * The ceiling for a key bound to several scopes at once: the intersection of
- * what the caller holds at each of them.
- *
- * One permission list serves every binding on a key, so a permission held on
- * one team but not on another cannot go out — `assertSelectionWithinCeiling`
- * walks every binding at save time and refuses the whole selection. Offering
- * such a permission would turn a valid-looking form into a scope violation.
+ * what the caller holds at each of them. One permission list serves every
+ * binding on a key — `assertSelectionWithinCeiling` refuses the whole
+ * selection at save time otherwise.
  */
 export function getUserPermissionsAcrossScopes({
   myBindings,
@@ -475,17 +438,10 @@ export function getUserPermissionsAcrossScopes({
 }
 
 /**
- * Narrows category selections to what the ceiling still allows.
- *
- * The ceiling moves while the form is open: selecting one more scope drops
- * the intersection to what the caller holds everywhere, and a level picked
- * under the wider ceiling would otherwise stay selected and leave the form
- * looking valid until the save comes back `api_key_scope_violation`. Write
- * falls back to read where read survives, and to none where neither does,
- * so the rows the user reads are the permissions that actually go out.
- *
- * A category the ceiling no longer covers renders locked, which is the same
- * `categoryAccessAvailability` answer the rows themselves use.
+ * Narrows category selections to what the ceiling still allows. The ceiling
+ * moves while the form is open; write falls back to read where read survives,
+ * and to none where neither does. A category the ceiling no longer covers
+ * renders locked, the same `categoryAccessAvailability` answer the rows use.
  */
 export function clampSelectionsToAvailability({
   selections,

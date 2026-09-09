@@ -69,7 +69,7 @@ export class ApiKeyGrantPolicyService {
     );
   }
 
-  tryValidatePermissionSelection(input: {
+  findValidatedPermissions(input: {
     bindings: ApiKeyScope[];
     permissionMode: string;
     permissions?: string[];
@@ -115,7 +115,7 @@ export class ApiKeyGrantPolicyService {
         continue;
       }
 
-      const personal = await this.repository.tryFindPersonalWorkspaceOwner({
+      const personal = await this.repository.findPersonalWorkspaceOwner({
         organizationId: input.organizationId,
         scopeId: scope.scopeId,
       });

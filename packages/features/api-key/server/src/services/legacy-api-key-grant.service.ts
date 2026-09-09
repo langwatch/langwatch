@@ -37,7 +37,7 @@ export class LegacyApiKeyGrantService {
     );
   }
 
-  static tryLegacyGrantForApiKey(
+  static findLegacyGrantForApiKey(
     apiKey: ApiKey,
     deriveBindingId: AuthzBindingIdDeriver,
   ): AuthzLedgerBindingAttach | null {
@@ -86,7 +86,7 @@ export class LegacyApiKeyGrantService {
 
   mint(apiKey: ApiKey): void {
     try {
-      const binding = LegacyApiKeyGrantService.tryLegacyGrantForApiKey(
+      const binding = LegacyApiKeyGrantService.findLegacyGrantForApiKey(
         apiKey,
         this.options.deriveBindingId,
       );

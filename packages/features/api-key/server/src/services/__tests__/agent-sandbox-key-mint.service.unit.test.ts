@@ -4,7 +4,7 @@
  * Spec: specs/agent-cache/agent-cache.feature
  */
 
-import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyService } from "@langwatch/api-key-contract";
+import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AgentSandboxKeySharePort } from "../../ports/agent-sandbox-key-share.port.ts";
@@ -15,7 +15,7 @@ const create = vi.fn();
 // The mint takes the composed capability now rather than building one from a
 // Prisma client, so the double is the capability itself and no module needs
 // spying on.
-const apiKeys = { create } as unknown as ApiKeyService;
+const apiKeys = { create } as unknown as ApiKeyApi;
 
 /** The share as a process holds it: whatever was last held, for as long as the test runs. */
 class MemoryShare extends AgentSandboxKeySharePort {
@@ -25,7 +25,7 @@ class MemoryShare extends AgentSandboxKeySharePort {
     super();
   }
 
-  async tryGet(): Promise<string | undefined> {
+  async findSharedKey(): Promise<string | undefined> {
     // An unreadable share is one whose sealed entry no longer opens: the
     // instance's secret rotated, or the entry was altered.
     return this.readable ? this.held : undefined;
@@ -38,23 +38,21 @@ class MemoryShare extends AgentSandboxKeySharePort {
 
 /** Nobody owns a shared project; a personal workspace answers its owner. */
 function repositoryOwning(ownerUserId: string | null) {
-  const tryFindPersonalWorkspaceOwner = vi
+  const findPersonalWorkspaceOwner = vi
     .fn()
     .mockResolvedValue(ownerUserId === null ? null : { ownerUserId });
-  return { repository: { tryFindPersonalWorkspaceOwner }, tryFindPersonalWorkspaceOwner };
+  return { repository: { findPersonalWorkspaceOwner }, findPersonalWorkspaceOwner };
 }
 
 function mintService(options: { ownerUserId?: string | null; share?: AgentSandboxKeySharePort }) {
-  const { repository, tryFindPersonalWorkspaceOwner } = repositoryOwning(
-    options.ownerUserId ?? null,
-  );
+  const { repository, findPersonalWorkspaceOwner } = repositoryOwning(options.ownerUserId ?? null);
   return {
     service: AgentSandboxKeyMintService.create({
       apiKeys,
       repository,
       share: options.share ?? new MemoryShare(),
     }),
-    tryFindPersonalWorkspaceOwner,
+    findPersonalWorkspaceOwner,
   };
 }
 
@@ -113,11 +111,11 @@ describe("the agent sandbox key", () => {
        * owner's own, and the owner's ceiling then caps the key.
        */
       it("mints the key as the workspace owner's own", async () => {
-        const { service, tryFindPersonalWorkspaceOwner } = mintService({ ownerUserId: "owner_1" });
+        const { service, findPersonalWorkspaceOwner } = mintService({ ownerUserId: "owner_1" });
 
         await service.mint({ projectId: "project_1", organizationId: "organization_1" });
 
-        expect(tryFindPersonalWorkspaceOwner).toHaveBeenCalledWith({
+        expect(findPersonalWorkspaceOwner).toHaveBeenCalledWith({
           organizationId: "organization_1",
           scopeId: "project_1",
         });
@@ -184,7 +182,7 @@ describe("the agent sandbox key", () => {
         create.mockRejectedValue(new Error("the ledger is unreachable"));
 
         await expect(
-          mintService({}).service.tryGetOrMint({
+          mintService({}).service.findOrMint({
             projectId: "project_1",
             organizationId: "organization_1",
           }),
