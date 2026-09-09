@@ -58,10 +58,13 @@ const renderField = (props: Parameters<typeof Harness>[0]) =>
 const frequencyPicker = () =>
   screen.getByRole("combobox", { name: "Frequency" });
 
-async function pickFrequency(
-  user: ReturnType<typeof userEvent.setup>,
-  label: string,
-) {
+async function pickFrequency({
+  user,
+  label,
+}: {
+  user: ReturnType<typeof userEvent.setup>;
+  label: string;
+}) {
   await user.click(frequencyPicker());
   await user.click(await screen.findByRole("option", { name: label }));
 }
@@ -128,7 +131,7 @@ describe("given the Cadence section of the composer", () => {
         onChangeSpy,
       });
       const user = userEvent.setup();
-      await pickFrequency(user, "Every hour");
+      await pickFrequency({ user, label: "Every hour" });
       expect(onChangeSpy).toHaveBeenLastCalledWith("0 * * * *");
       expect(frequencyPicker()).toHaveTextContent("Every hour");
       expect(screen.queryByTestId("cadence-summary")).toBeNull();

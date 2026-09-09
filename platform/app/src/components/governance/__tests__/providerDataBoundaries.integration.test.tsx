@@ -4,12 +4,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-
+import { SAMPLE_TOOL_CARDS } from "../../../../ee/governance/dashboard/components/toolCatalog/sampleToolCards";
 import { ToolCatalogCard } from "../../../../ee/governance/dashboard/components/toolCatalog/ToolCatalogCards";
-import {
-  SAMPLE_TOOL_CARDS,
-  type ToolCard,
-} from "../../../../ee/governance/dashboard/components/toolCatalog/toolCards";
+import type { ToolCard } from "../../../../ee/governance/dashboard/components/toolCatalog/toolCards";
 import { AgentCard } from "../agents/AgentCard";
 import { SAMPLE_AGENT_ROWS } from "../agents/agentRows";
 
@@ -34,7 +31,11 @@ describe("provider data boundaries", () => {
       const card = sampleTool("sample-copilot-studio");
       renderCard(
         <ToolCatalogCard
-          card={{ ...card, sample, values: sample ? card.values : {} }}
+          card={{
+            ...card,
+            isSample: sample,
+            values: sample ? card.values : {},
+          }}
         />,
       );
       expect(
@@ -49,7 +50,11 @@ describe("provider data boundaries", () => {
       const card = sampleTool("sample-databricks-genie");
       renderCard(
         <ToolCatalogCard
-          card={{ ...card, sample, values: sample ? card.values : {} }}
+          card={{
+            ...card,
+            isSample: sample,
+            values: sample ? card.values : {},
+          }}
         />,
       );
       expect(

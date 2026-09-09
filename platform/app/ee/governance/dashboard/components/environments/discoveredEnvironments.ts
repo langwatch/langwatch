@@ -31,7 +31,7 @@ export interface EnvironmentRow {
   /** The source this row was derived from; absent on a hand-added row. */
   discoveredFrom?: string;
   /** True only for the sample rows, so the table can badge them. */
-  sample?: boolean;
+  isSample?: boolean;
 }
 
 /** The subset of the source DTO this module reads. */
@@ -96,7 +96,13 @@ function isoOf(value: Date | string | null | undefined): string | null {
 }
 
 /**
- * Every environment the configured sources name, oldest source first.
+ * Every environment the configured sources name, in the order the sources
+ * arrived.
+ *
+ * The order is the caller's, not this function's. It used to say "oldest
+ * source first", which it has never done — nothing here reads `createdAt` for
+ * anything but the row's own timestamp. Sorting is the table's business, and
+ * saying so is cheaper than a sort nobody asked for.
  *
  * A source type with no environment key contributes nothing, and so does one
  * whose key is empty — that is a source mid-configuration, not an environment.
@@ -140,7 +146,7 @@ export const SAMPLE_ENVIRONMENTS: EnvironmentRow[] = [
     description: "Customer-facing agents and assistants",
     createdIso: "2026-01-14T09:20:00.000Z",
     createdBy: "Ana Ruiz",
-    sample: true,
+    isSample: true,
   },
   {
     id: "sample-staging",
@@ -148,7 +154,7 @@ export const SAMPLE_ENVIRONMENTS: EnvironmentRow[] = [
     description: "Pre-release testing for agent changes",
     createdIso: "2026-02-02T15:45:00.000Z",
     createdBy: "Ana Ruiz",
-    sample: true,
+    isSample: true,
   },
   {
     id: "sample-sandbox",
@@ -156,6 +162,6 @@ export const SAMPLE_ENVIRONMENTS: EnvironmentRow[] = [
     description: "Experiments, spikes and demos",
     createdIso: "2026-03-19T11:05:00.000Z",
     createdBy: "Tom Beck",
-    sample: true,
+    isSample: true,
   },
 ];

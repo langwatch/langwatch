@@ -194,6 +194,13 @@ describe("given a manager composing an anomaly rule", () => {
         await screen.findByRole("option", { name: /source type/i }),
       );
 
+      // The narrowed picker first. Without it a Scope click that quietly did
+      // nothing leaves the composer on the organization scope, renders no
+      // scope-id block at all, and the sweep below returns [] — green, over a
+      // control that was never on screen.
+      expect(
+        await screen.findByRole("combobox", { name: "Source type" }),
+      ).toBeInTheDocument();
       expect(findNativeSelects(document.body)).toHaveLength(0);
     });
   });

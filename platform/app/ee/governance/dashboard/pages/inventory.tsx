@@ -39,9 +39,9 @@ import {
 import { OttlEditor } from "@ee/governance/dashboard/components/OttlEditor";
 import { PullCadenceField } from "@ee/governance/dashboard/components/PullCadenceField";
 import { TraceDestinationField } from "@ee/governance/dashboard/components/TraceDestinationField";
+import { SAMPLE_TOOL_CARDS } from "@ee/governance/dashboard/components/toolCatalog/sampleToolCards";
 import type { ToolCatalogLayout } from "@ee/governance/dashboard/components/toolCatalog/ToolCatalogCards";
 import { ToolCatalogTab } from "@ee/governance/dashboard/components/toolCatalog/ToolCatalogTab";
-import { SAMPLE_TOOL_CARDS } from "@ee/governance/dashboard/components/toolCatalog/toolCards";
 import {
   composerCadenceError,
   PULL_ADAPTER_FOR_SOURCE,
@@ -284,7 +284,7 @@ function pendingId(mutation: {
  * the note naming the grant that unlocks the writes.
  */
 function IngestionSourceList({
-  sample = false,
+  isSample = false,
   canRead,
   canManage,
   isLoading,
@@ -297,7 +297,7 @@ function IngestionSourceList({
   onArchive,
   createAction,
 }: {
-  sample?: boolean;
+  isSample?: boolean;
   canRead: boolean;
   canManage: boolean;
   isLoading: boolean;
@@ -365,7 +365,7 @@ function IngestionSourceList({
       {canRead && knowsFleet && sources.length > 0 && (
         <IngestionSourcesTable
           sources={sources}
-          sample={sample}
+          isSample={isSample}
           canManage={canManage}
           rotatingId={rotatingId}
           archivingId={archivingId}
@@ -375,7 +375,7 @@ function IngestionSourceList({
         />
       )}
 
-      {canRead && !canManage && !sample && (
+      {canRead && !canManage && !isSample && (
         <PermissionRequiredNotice
           permission="ingestionSources:manage"
           detail="You can read the sources. Adding, editing, rotating a secret, and archiving need this grant."
@@ -886,7 +886,7 @@ function InventorySourcesPane({
   return (
     <IngestionSourceList
       canRead={page.canRead}
-      sample={page.sample.active}
+      isSample={page.sample.active}
       canManage={page.canManage && !page.sample.active}
       isLoading={!page.sample.active && sourcesQuery.isLoading}
       error={page.sample.active ? null : sourcesQuery.error}
@@ -911,6 +911,21 @@ function InventorySourcesPane({
         ) : undefined
       }
     />
+  );
+}
+
+/**
+ * Add environment, in one place.
+ *
+ * The header renders it and so does the empty state, and they must stay the
+ * same control: an empty pane offering a differently-worded button is the
+ * defect the one-create-flow rule exists for.
+ */
+function AddEnvironmentControl({ onAdd }: { onAdd: () => void }) {
+  return (
+    <Button size="sm" colorPalette="orange" onClick={onAdd}>
+      <Plus size={14} /> Add environment
+    </Button>
   );
 }
 
@@ -991,13 +1006,7 @@ function InventoryHeaderActions({
           />
         )}
       {inventoryTab === "environments" && (
-        <Button
-          size="sm"
-          colorPalette="orange"
-          onClick={() => page.setAddingEnvironment(true)}
-        >
-          <Plus size={14} /> Add environment
-        </Button>
+        <AddEnvironmentControl onAdd={() => page.setAddingEnvironment(true)} />
       )}
     </HStack>
   );
@@ -1095,6 +1104,14 @@ function InventoryPage() {
               sources={sourcesQuery.data}
               sampleActive={page.sample.active}
               added={page.addedEnvironments}
+              // The header's own control, rendered a second time. Same
+              // component, so one label and one flow — the empty state never
+              // invents a second doorway with different words.
+              createAction={
+                <AddEnvironmentControl
+                  onAdd={() => page.setAddingEnvironment(true)}
+                />
+              }
             />
           }
           sources={<InventorySourcesPane page={page} />}
@@ -3319,7 +3336,15 @@ function ParserConfigField({
 }) {
   const { isSecret, isMultiline, isRequired, hint, placeholder } =
     parserFieldPresentation({ field, mode });
-  const control = fieldControl({ field, values });
+  // `fieldControl` builds a fresh options array every call, and a select below
+  // hands it straight to `DashboardSelect`, whose collection is keyed on that
+  // array's identity — so an unmemoized call resets highlight and scroll under
+  // an open dropdown. It still rebuilds when `values` change, which is correct:
+  // these options are a function of the form's other answers.
+  const control = useMemo(
+    () => fieldControl({ field, values }),
+    [field, values],
+  );
   const shownHint = control.hint ?? hint;
 
   return (

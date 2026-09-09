@@ -12,7 +12,10 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { Boxes } from "lucide-react";
+import type { ReactNode } from "react";
 import { useState } from "react";
+import { GovernanceEmptyState } from "~/components/governance/empty";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
 import {
   DialogBody,
@@ -164,6 +167,7 @@ export function EnvironmentsTab({
   sources,
   sampleActive,
   added,
+  createAction,
 }: {
   /**
    * Whether the viewer may read the source list the discovered rows come from.
@@ -174,6 +178,12 @@ export function EnvironmentsTab({
   sources: readonly EnvironmentSource[] | undefined;
   sampleActive: boolean;
   added: readonly EnvironmentRow[];
+  /**
+   * The header's own Add environment control, rendered a second time inside
+   * the empty state. A reader looking at an empty pane is the one most likely
+   * to want it. Absent when the reader cannot create, and the copy adjusts.
+   */
+  createAction?: ReactNode;
 }) {
   if (!canRead) {
     return (
@@ -188,24 +198,20 @@ export function EnvironmentsTab({
 
   if (rows.length === 0) {
     return (
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        padding={8}
-        textAlign="center"
-      >
-        <VStack gap={1}>
-          <Text fontSize="sm" fontWeight="medium">
-            No environments yet
-          </Text>
-          <Text fontSize="sm" color="fg.muted" maxWidth="460px">
-            Environments appear here once a source points at one, such as a
-            Power Platform environment or a Databricks workspace. You can also
-            add one by hand with the button above.
-          </Text>
-        </VStack>
-      </Box>
+      <GovernanceEmptyState
+        testId="environments-empty"
+        icon={Boxes}
+        headline="No environments yet"
+        // The sentence no longer points at "the button above": prose naming a
+        // control goes stale the moment the control is renamed, and nothing
+        // checks prose. The header's own control is passed instead.
+        description={
+          createAction
+            ? "Environments appear here once a source points at one, such as a Power Platform environment or a Databricks workspace. You can also add one by hand."
+            : "Environments appear here once a source points at one, such as a Power Platform environment or a Databricks workspace."
+        }
+        action={createAction}
+      />
     );
   }
 
@@ -236,7 +242,7 @@ export function EnvironmentsTab({
                       Discovered from {row.discoveredFrom}
                     </Badge>
                   )}
-                  {row.sample && (
+                  {row.isSample && (
                     <Badge size="xs" variant="surface" colorPalette="orange">
                       sample
                     </Badge>

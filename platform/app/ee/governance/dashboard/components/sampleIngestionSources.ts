@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { Source } from "../pages/ingestionSourceForms";
-import { SAMPLE_TOOL_CARDS } from "./toolCatalog/toolCards";
+import { SAMPLE_TOOL_CARDS } from "./toolCatalog/sampleToolCards";
 
 /** Use the catalog's supported tools for the read-only Sources preview. */
 export const SAMPLE_INGESTION_SOURCES: Source[] = SAMPLE_TOOL_CARDS.flatMap(

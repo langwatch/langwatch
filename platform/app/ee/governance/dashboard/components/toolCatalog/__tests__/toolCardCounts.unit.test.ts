@@ -11,13 +11,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  exactCardCount,
-  formatCardCount,
-  SAMPLE_TOOL_CARDS,
-} from "../toolCards";
+import { SAMPLE_TOOL_CARDS } from "../sampleToolCards";
+import { exactCardCount, formatCardCount } from "../toolCards";
 
-describe("a count on a catalog card", () => {
+describe("given a count on a catalog card", () => {
   describe("when it runs to nine digits", () => {
     /** @scenario "A count of a million or more is shortened on the card" */
     it("is shortened to one decimal place", () => {
@@ -36,7 +33,7 @@ describe("a count on a catalog card", () => {
     });
   });
 
-  describe("at the boundary", () => {
+  describe("when it sits exactly on the million boundary", () => {
     /** @scenario "A count of a million or more is shortened on the card" */
     it("shortens from one million and not before", () => {
       expect(formatCardCount(999_999)).toBe("999,999");
@@ -44,7 +41,7 @@ describe("a count on a catalog card", () => {
     });
   });
 
-  describe("whatever the card shows", () => {
+  describe("when the card has shortened it", () => {
     /** @scenario "A shortened count keeps its exact value on hover" */
     it("can still be read in full", () => {
       // The shortened form is a reading aid. The exact figure is what the
@@ -54,7 +51,7 @@ describe("a count on a catalog card", () => {
     });
   });
 
-  describe("across the sample catalog", () => {
+  describe("when it comes from a sample catalog card", () => {
     /** @scenario "A shortened count keeps its exact value on hover" */
     it("stores every count as a number rather than a formatted string", () => {
       // The type is what keeps money out of the compacting path, so a sample

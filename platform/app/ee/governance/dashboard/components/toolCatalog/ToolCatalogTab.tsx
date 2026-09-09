@@ -5,11 +5,10 @@ import type { ReactNode } from "react";
 
 import { GovernanceEmptyState } from "~/components/governance/empty";
 import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
-
+import { SAMPLE_TOOL_CARDS } from "./sampleToolCards";
 import { ToolCatalogCards, type ToolCatalogLayout } from "./ToolCatalogCards";
 import {
   buildToolCards,
-  SAMPLE_TOOL_CARDS,
   type ToolCard,
   type ToolCardHealth,
   type ToolCardSource,
