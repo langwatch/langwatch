@@ -175,6 +175,7 @@ export const APP_ERROR_CODES = [
   "identity_unsupported_storage_query",
   "identity_verification_expired",
   "identity_verification_invalid",
+  "identity_verification_not_settled",
   "ingestion_source_cap_reached",
   "ingestion_source_not_found",
   "insufficient_permissions",

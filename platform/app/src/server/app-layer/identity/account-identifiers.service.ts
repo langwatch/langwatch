@@ -1,10 +1,8 @@
 import {
   type AttachIdentifierCommandData,
   type DetachIdentifierCommandData,
-  IDENTIFIER_ATTACHED_EVENT_TYPE,
   type IdentifierFact,
   type IdentityFact,
-  type IdentityFactOf,
   IdentityIdentifierAlreadyHeldError,
   IdentityIdentifierNotFoundError,
   type MarkPrimaryCommandData,
@@ -199,7 +197,7 @@ export class AccountIdentifiersService {
     }
 
     const occurredAtMs = this.deps.now();
-    const facts = await this.identity.attachIdentifier({
+    await this.identity.attachIdentifier({
       tenantId: userId,
       userId,
       commandId: this.deps.newCommandId(),
@@ -219,21 +217,39 @@ export class AccountIdentifiersService {
       actor: { type: "user", id: userId },
     });
 
-    const attached = facts.find(
-      (fact): fact is IdentityFactOf<typeof IDENTIFIER_ATTACHED_EVENT_TYPE> =>
-        fact.type === IDENTIFIER_ATTACHED_EVENT_TYPE,
+    // The identifier is read back from the heads, not taken off the returned
+    // facts (ADR-135).
+    //
+    // This link is the whole point of the ceremony: it goes in an email, and
+    // the person who clicks it confirms whatever it names. Taking the id from
+    // the calling path's decision meant minting a link for a row the queue's
+    // re-run might never have written — the guard runs twice, against state
+    // that can move in between, and only the second run's events are stored.
+    // A confirmation link pointing at an identifier that does not exist is a
+    // dead end the person cannot diagnose or retry out of.
+    //
+    // The wait inside `attachIdentifier` is what makes this read meaningful:
+    // by the time it returns, the fold has landed or the window is spent.
+    const heads = await this.heads.findHeads({ userId });
+    const attached = Object.values(heads.identifiers).find(
+      (fact) =>
+        fact.value === normalizedValue &&
+        fact.state !== "DETACHED" &&
+        fact.state !== "DEAD_END",
     );
     if (!attached) {
-      // The guard states nothing when the heads already carry the identifier,
-      // which for this verb means the address is already on the account in a
-      // state the uniqueness read did not catch — a detached one being
-      // re-attached at the same instant. One answer either way.
+      // Nothing live carries the address. Either the guard stated nothing —
+      // for this verb that means the heads already held the identifier in a
+      // state the uniqueness read above did not catch, a detached one being
+      // re-attached at the same instant — or the fold has not landed inside
+      // the window and there is no id to put in a link yet. One answer either
+      // way, because the caller's next move is the same: try again.
       throw new IdentityIdentifierAlreadyHeldError(
-        `add_email_identifier: nothing was attached for ${normalizedValue}`,
+        `add_email_identifier: nothing live carries ${normalizedValue} after the attach`,
       );
     }
 
-    const identifierId = attached.data.identifierId;
+    const identifierId = attached.identifierId;
     await this.sendConfirmationFor({ userId, identifierId, codeChallenge });
     return { identifierId };
   }
