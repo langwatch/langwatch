@@ -7780,6 +7780,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -7801,6 +7806,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -7822,6 +7832,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -7843,6 +7858,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -7914,6 +7934,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -7935,6 +7960,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -7956,6 +7986,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -7977,6 +8012,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8042,6 +8082,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8063,6 +8108,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8084,6 +8134,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8105,6 +8160,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8126,6 +8186,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8177,6 +8242,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8198,6 +8268,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8219,6 +8294,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8240,6 +8320,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8261,6 +8346,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8333,6 +8423,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8354,6 +8449,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8375,6 +8475,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8396,6 +8501,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8417,6 +8527,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8492,6 +8607,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8513,6 +8633,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8534,6 +8659,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8555,6 +8685,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8576,6 +8711,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8627,6 +8767,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8648,6 +8793,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8669,6 +8819,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8690,6 +8845,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8711,6 +8871,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8793,6 +8958,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8814,6 +8984,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8835,6 +9010,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8856,6 +9036,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8877,6 +9062,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8937,6 +9127,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8958,6 +9153,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -8979,6 +9179,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -9000,6 +9205,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -18973,6 +19183,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -18994,6 +19209,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19015,6 +19235,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19036,6 +19261,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19057,6 +19287,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19110,6 +19345,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19131,6 +19371,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19152,6 +19397,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19173,6 +19423,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19219,6 +19474,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19240,6 +19500,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19261,6 +19526,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19282,6 +19552,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19336,6 +19611,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19357,6 +19637,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19378,6 +19663,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -19399,6 +19689,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52502,6 +52797,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52523,6 +52823,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52544,6 +52849,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52565,6 +52875,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52682,6 +52997,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52703,6 +53023,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52724,6 +53049,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52745,6 +53075,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52766,6 +53101,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52859,6 +53199,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52880,6 +53225,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52901,6 +53251,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52922,6 +53277,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52943,6 +53303,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -52991,6 +53356,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53012,6 +53382,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53033,6 +53408,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53054,6 +53434,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53075,6 +53460,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53189,6 +53579,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53210,6 +53605,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53231,6 +53631,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53252,6 +53657,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53273,6 +53683,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53368,6 +53783,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53389,6 +53809,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53410,6 +53835,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53431,6 +53861,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53452,6 +53887,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53502,6 +53942,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53523,6 +53968,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53544,6 +53994,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53565,6 +54020,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53586,6 +54046,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53647,6 +54112,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53668,6 +54138,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53689,6 +54164,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53710,6 +54190,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53731,6 +54216,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53788,6 +54278,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53809,6 +54304,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53830,6 +54330,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53851,6 +54356,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53872,6 +54382,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53921,6 +54436,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53942,6 +54462,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53963,6 +54488,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -53984,6 +54514,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -54043,6 +54578,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -54064,6 +54604,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -54085,6 +54630,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -54106,6 +54656,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -54159,6 +54714,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -54180,6 +54740,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -54201,6 +54766,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -54222,6 +54792,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -54243,6 +54818,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57419,6 +57999,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57440,6 +58025,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57461,6 +58051,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57482,6 +58077,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57670,6 +58270,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57691,6 +58296,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57712,6 +58322,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57733,6 +58348,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57754,6 +58374,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57836,6 +58461,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57857,6 +58487,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57878,6 +58513,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57899,6 +58539,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -57920,6 +58565,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58099,6 +58749,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58120,6 +58775,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58141,6 +58801,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58162,6 +58827,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58217,6 +58887,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58238,6 +58913,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58259,6 +58939,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58280,6 +58965,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58301,6 +58991,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58322,6 +59017,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58405,6 +59105,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58426,6 +59131,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58447,6 +59157,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58468,6 +59183,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58557,6 +59277,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58578,6 +59303,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58599,6 +59329,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58620,6 +59355,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58702,6 +59442,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58723,6 +59468,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58744,6 +59494,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58765,6 +59520,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58847,6 +59607,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58868,6 +59633,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58889,6 +59659,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58910,6 +59685,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58949,6 +59729,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58970,6 +59755,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -58991,6 +59781,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59012,6 +59807,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59033,6 +59833,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59072,6 +59877,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59093,6 +59903,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59114,6 +59929,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59135,6 +59955,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59156,6 +59981,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59252,6 +60082,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59273,6 +60108,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59294,6 +60134,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59315,6 +60160,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59461,6 +60311,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59482,6 +60337,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59503,6 +60363,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59524,6 +60389,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59545,6 +60415,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59634,6 +60509,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59655,6 +60535,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59676,6 +60561,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59697,6 +60587,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59718,6 +60613,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59806,6 +60706,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59827,6 +60732,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59848,6 +60758,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59869,6 +60784,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59972,6 +60892,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -59993,6 +60918,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60014,6 +60944,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60035,6 +60970,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60133,6 +61073,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60154,6 +61099,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60175,6 +61125,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60196,6 +61151,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60237,6 +61197,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60258,6 +61223,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60279,6 +61249,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60300,6 +61275,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60321,6 +61301,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60362,6 +61347,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60383,6 +61373,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60404,6 +61399,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60425,6 +61425,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60446,6 +61451,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60515,6 +61525,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60536,6 +61551,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60557,6 +61577,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60578,6 +61603,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60672,6 +61702,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60693,6 +61728,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60714,6 +61754,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60735,6 +61780,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60756,6 +61806,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60822,6 +61877,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60843,6 +61903,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60864,6 +61929,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60885,6 +61955,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60951,6 +62026,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60972,6 +62052,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -60993,6 +62078,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61014,6 +62104,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61105,6 +62200,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61126,6 +62226,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61147,6 +62252,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61168,6 +62278,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61259,6 +62374,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61280,6 +62400,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61301,6 +62426,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61322,6 +62452,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61423,6 +62558,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61444,6 +62584,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61465,6 +62610,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61486,6 +62636,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61567,6 +62722,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61588,6 +62748,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61609,6 +62774,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61630,6 +62800,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61689,6 +62864,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61710,6 +62890,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61731,6 +62916,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
@@ -61752,6 +62942,11 @@ export interface operations {
                             };
                             trace_id?: string;
                             span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
                         };
                     };
                 };
