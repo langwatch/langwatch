@@ -7,19 +7,14 @@
  * Ops is supplied as a complete capability assembled by the worker root and
  * wrapped in its canonical application so UserApp receives an actual OpsApi.
  */
-import { PostgresAuthAdapter } from "@langwatch/auth-server";
-import { AuthApi, type AuthService, type VerifiedBrowserSession } from "@langwatch/auth-contract";
+import { authServer, AuthUnavailableError, type AuthInfrastructure } from "@langwatch/auth-server";
 import {
   BetterAuthAccountQueriesAdapter,
   PostgresIdentityEmailAdapter,
 } from "@langwatch/identity-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
-import {
-  defineModule,
-  type ApplicationBuilder,
-  type FeatureSetup,
-} from "@langwatch/runtime-composition";
+import type { ApplicationBuilder } from "@langwatch/runtime-composition";
 import {
   userServer,
   type UserAvatarStorage,
@@ -31,7 +26,6 @@ import {
   USER_AVATAR_PURPOSE,
   UserAvatarTooLargeError,
   type UserAvatarMediaType,
-  UserApi,
 } from "@langwatch/user-contract";
 import type { StoredObjectsService } from "@langwatch/stored-object-server";
 
@@ -67,51 +61,32 @@ export class WorkerUserAvatarStorage implements UserAvatarStorage {
   }
 }
 
-type WorkerAuthSetup = FeatureSetup<
-  { users: typeof UserApi },
-  Readonly<{ connection: PrismaConnection; redis?: RedisConnection | null }>,
-  undefined
->;
+/**
+ * What the worker holds behind the auth module.
+ *
+ * It serves no signed-out door, so the front door's collaborators are absent
+ * and every one of its operations refuses by name rather than answering: a
+ * throttle that answered "allowed" on a process with no counter, or a sign-in
+ * router that answered "email" without reading a connection, would be a wrong
+ * answer rather than a missing one.
+ */
+function workerAuthInfrastructure(options: WorkerUserCompositionOptions): AuthInfrastructure {
+  const unreachable = (capability: string) =>
+    new AuthUnavailableError({ capability, processName: "langwatch-worker" });
 
-/** Auth's worker contribution; the runtime supplies the already composed UserApi peer. */
-export class WorkerAuthApp implements AuthService {
-  static readonly contract = AuthApi;
-  static readonly configSchema = undefined;
-  static readonly dependencies = { users: UserApi };
-
-  static create({ infrastructure, dependencies }: WorkerAuthSetup): WorkerAuthApp {
-    return new WorkerAuthApp(
-      PostgresAuthAdapter.create({
-        database: infrastructure.connection.client,
-        redis: infrastructure.redis ?? null,
-        identityEmails: PostgresIdentityEmailAdapter.create({
-          database: infrastructure.connection.client,
-        }).build(),
-        users: dependencies.users,
-      }).build(),
-    );
-  }
-
-  private constructor(private readonly service: AuthService) {}
-
-  tryResolveBrowserSession(input: { verified: VerifiedBrowserSession | null }) {
-    return this.service.tryResolveBrowserSession(input);
-  }
-
-  revokeAllBrowserSessions(input: { userId: string }) {
-    return this.service.revokeAllBrowserSessions(input);
-  }
-
-  revokeBrowserSession(input: { sessionId: string }) {
-    return this.service.revokeBrowserSession(input);
-  }
-
-  revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }) {
-    return this.service.revokeOtherBrowserSessions(input);
-  }
+  return {
+    redis: options.redis ?? null,
+    identityEmails: PostgresIdentityEmailAdapter.create({
+      database: options.connection.client,
+    }).build(),
+    rateLimit: () => Promise.reject(unreachable("front-door counter")),
+    route: () => Promise.reject(unreachable("sign-in router")),
+    signUp: null,
+    invites: null,
+    authProvider: () => Promise.reject(unreachable("sign-in mode")),
+    processName: "langwatch-worker",
+  };
 }
-
-export const workerAuthServer = defineModule("auth").withApp(WorkerAuthApp).build();
 
 export type WorkerUserCompositionOptions = Readonly<{
   connection: PrismaConnection;
@@ -163,8 +138,6 @@ export function installWorkerUser<Infrastructure>(
   options: WorkerUserCompositionOptions,
 ): ApplicationBuilder<Infrastructure> {
   return builder
-    .withModule(workerAuthServer, {
-      infrastructure: { connection: options.connection, redis: options.redis ?? null },
-    })
+    .withModule(authServer, { infrastructure: workerAuthInfrastructure(options) })
     .withModule(userServer, { infrastructure: workerUserInfrastructure(options) });
 }

@@ -10,7 +10,7 @@ import {
 } from "@langwatch/auth-contract";
 import { randomBytes } from "node:crypto";
 
-import type { CliDeviceSessionStorePort } from "../ports/cli-device-session-store.port.ts";
+import type { CliDeviceSessionRepository } from "../repositories/cli-device-session.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
 /** Redis key prefix for device-code records. */
@@ -179,7 +179,7 @@ export class CliDeviceSessionService {
   }
 
   static create(options: {
-    store: CliDeviceSessionStorePort;
+    store: CliDeviceSessionRepository;
     /**
      * Refresh-token lifetime for this deployment, in seconds. Shorten it when
      * a stolen `~/.langwatch/config.json` needs to go stale sooner than the
@@ -194,7 +194,7 @@ export class CliDeviceSessionService {
   }
 
   private constructor(
-    private readonly store: CliDeviceSessionStorePort,
+    private readonly store: CliDeviceSessionRepository,
     readonly refreshTokenTtlSeconds: number,
   ) {}
 

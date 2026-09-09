@@ -1,4 +1,4 @@
-import { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AdminOperationInput } from "@langwatch/ops-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 import { TestUserApi } from "../../services/__tests__/support/test-user-api.ts";
@@ -24,7 +24,7 @@ const user: UserProfile = {
 const updateProfileFake = (email = user.email) =>
   vi.fn(async (): Promise<UserProfile> => ({ ...user, email }));
 
-class AuthFake extends AuthService {
+class AuthFake implements BrowserSessionApi {
   tryResolveBrowserSession = vi.fn(async () => null);
   revokeAllBrowserSessions = vi.fn(async () => undefined);
   revokeBrowserSession = vi.fn(async () => undefined);

@@ -4,7 +4,7 @@
  */
 import {
   CliDeviceSessionService,
-  CliDeviceSessionStorePort,
+  type CliDeviceSessionRepository,
   type AuthCliDeviceFlowRestPorts,
   type AuthDirectoryPort,
 } from "@langwatch/auth-server";
@@ -309,7 +309,7 @@ describe("given a CLI starting a device login", () => {
 // --------------------------------------------------------------------------
 
 /** The grant's substrate, in memory, with no expiry sweeping of its own. */
-class InMemoryDeviceSessionStore extends CliDeviceSessionStorePort {
+class InMemoryDeviceSessionStore implements CliDeviceSessionRepository {
   private readonly values = new Map<string, string>();
   private readonly sets = new Map<string, Set<string>>();
 

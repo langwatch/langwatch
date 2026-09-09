@@ -4,7 +4,7 @@
  * reads the person here, and this application ends their sessions through it.
  */
 import { compare, hash } from "bcrypt";
-import type { AuthService } from "@langwatch/auth-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   BetterAuthAccountQueriesAdapter,
@@ -35,8 +35,11 @@ import {
 } from "@langwatch/user-server";
 
 import type { ApiPersonMailPort } from "../../app/api-person-mail.port.ts";
-import { apiAuthSessionServer } from "../auth/auth-session.composition.ts";
-import type { ApiPersonDeploymentFacts } from "../auth/auth.composition.ts";
+import { authServer } from "@langwatch/auth-server";
+import {
+  apiAuthInfrastructure,
+  type ApiPersonDeploymentFacts,
+} from "../auth/auth.composition.ts";
 import { createIdentityTrpcRouter, createUserTrpcRouter } from "./user-trpc.mount.ts";
 
 import type { ComposedUserFeature } from "./user.composition.types.ts";
@@ -73,7 +76,9 @@ export async function installApiUser(options: {
   /** One person's own AI usage, where this deployment composed a spend ledger. */
   personalUsage?: (() => UserPersonalUsageReader | undefined) | undefined;
   /** The budget request this feature sends, where the deployment composed a gateway. */
-  mail?: Pick<ApiPersonMailPort, "sendBudgetIncreaseRequest"> | undefined;
+  mail?:
+    | Pick<ApiPersonMailPort, "sendBudgetIncreaseRequest" | "sendSignUpVerificationLink">
+    | undefined;
   /** Names this process in every refusal below. */
   processName: string;
 }): Promise<ComposedUserFeature> {
@@ -92,8 +97,18 @@ export async function installApiUser(options: {
     .withInfrastructure({})
     .withProvided(OrganizationApi, organizations)
     .withProvided(OpsApi, adminAccess)
-    .withModule(apiAuthSessionServer, {
-      infrastructure: { prisma, redis: options.redis ?? null },
+    // Auth installs on the SAME runtime, which is what resolves the cycle:
+    // auth reads the person through `UserApi` and the user application ends
+    // their sessions through `AuthApi`.
+    .withModule(authServer, {
+      infrastructure: apiAuthInfrastructure({
+        prisma,
+        redis: options.redis ?? null,
+        rateLimit: options.rateLimit,
+        deployment,
+        ...(options.mail ? { mail: options.mail } : {}),
+        processName,
+      }),
     })
     .withModule(userServer, {
       infrastructure: userInfrastructure({
@@ -107,7 +122,7 @@ export async function installApiUser(options: {
     .boot({ role: "api" });
 
   const app = runtime.module(userServer).provided;
-  const auth = runtime.module(apiAuthSessionServer).provided;
+  const auth = runtime.module(authServer).provided;
 
   return {
     app,
@@ -133,7 +148,7 @@ export function refusingUserFeature(processName: string): ComposedUserFeature {
 
   return {
     app: refusing<UserApi>(),
-    auth: refusing<AuthService>(),
+    auth: refusing<AuthApi>(),
     config: {},
     routers: (mount) => ({
       user: createUserTrpcRouter(mount.runtime),

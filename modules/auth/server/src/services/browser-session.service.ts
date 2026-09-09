@@ -1,17 +1,15 @@
 import {
-  AuthService as AuthCapability,
   browserSessionImpersonationSchema,
   browserSessionSchema,
   verifiedBrowserSessionSchema,
   type BrowserSession,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
-import type { UserApi } from "@langwatch/user-contract";
 import type { IdentityEmailService } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import { Temporal, fromDate } from "@langwatch/time";
-import type { AuthClockPort } from "../ports/auth-clock.port.ts";
-import type { AuthSecondaryStorePort } from "../ports/auth-secondary-store.port.ts";
+import { Temporal, fromDate, type Instant } from "@langwatch/time";
+import type { UserApi } from "@langwatch/user-contract";
+import type { AuthSessionCacheRepository } from "../repositories/auth-session-cache.repository.ts";
 import type { AuthSessionRepository } from "../repositories/auth-session.repository.ts";
 
 const CACHE_PREFIX = "better-auth:";
@@ -21,29 +19,23 @@ const tokenCacheKey = (token: string) => `${CACHE_PREFIX}${token}`;
 
 type CachedSession = { token: string; expiresAt: number };
 
-/** One process-owned service for browser session reads and revocation. */
-export class AuthService extends AuthCapability {
-  static create(options: {
-    clock: AuthClockPort;
-    repository: AuthSessionRepository;
-    secondaryStore: AuthSecondaryStorePort | null;
-    identityEmails: IdentityEmailService;
-    users: UserApi;
-  }): AuthService {
-    return new AuthService(options);
+/** What the browser-session half of the module is built from. */
+export interface BrowserSessionDeps {
+  sessions: AuthSessionRepository;
+  /** Absent where the deployment composed no cache: the database still answers. */
+  cache: AuthSessionCacheRepository | null;
+  identityEmails: IdentityEmailService;
+  users: UserApi;
+  now(): Instant;
+}
+
+/** Browser session reads and revocation, over the rows this module owns. */
+export class BrowserSessionService {
+  static create(deps: BrowserSessionDeps): BrowserSessionService {
+    return new BrowserSessionService(deps);
   }
 
-  private constructor(
-    private readonly options: {
-      clock: AuthClockPort;
-      repository: AuthSessionRepository;
-      secondaryStore: AuthSecondaryStorePort | null;
-      identityEmails: IdentityEmailService;
-      users: UserApi;
-    },
-  ) {
-    super();
-  }
+  private constructor(private readonly deps: BrowserSessionDeps) {}
 
   async tryResolveBrowserSession(input: {
     verified: VerifiedBrowserSession | null;
@@ -53,18 +45,18 @@ export class AuthService extends AuthCapability {
       return null;
     }
 
-    const stored = await this.options.repository.tryFindById({ id: verified.session.id });
+    const stored = await this.deps.sessions.findById({ id: verified.session.id });
     if (!stored) {
       return null;
     }
 
-    const user = await this.options.users.tryFindById({ id: verified.user.id });
+    const user = await this.deps.users.tryFindById({ id: verified.user.id });
     const session = browserSessionSchema.parse({
       user: {
         id: verified.user.id,
         name: verified.user.name ?? null,
         email:
-          (await this.options.identityEmails.tryResolveEmail({ userId: verified.user.id })) ??
+          (await this.deps.identityEmails.tryResolveEmail({ userId: verified.user.id })) ??
           user?.email ??
           verified.user.email ??
           null,
@@ -78,21 +70,18 @@ export class AuthService extends AuthCapability {
     const impersonation = browserSessionImpersonationSchema.safeParse(stored.impersonating);
     if (
       !impersonation.success ||
-      Temporal.Instant.compare(fromDate(impersonation.data.expires), this.options.clock.now()) <= 0
+      Temporal.Instant.compare(fromDate(impersonation.data.expires), this.deps.now()) <= 0
     ) {
       return session;
     }
 
-    const targetIsActive = await this.options.repository.isUserActive({
-      id: impersonation.data.id,
-    });
-    if (!targetIsActive) {
+    // The person being browsed as, read through the ONE directory this process
+    // resolves anybody through: a retired account stops the impersonation here
+    // rather than rendering the back office as somebody who is gone.
+    const impersonatedUser = await this.deps.users.tryFindById({ id: impersonation.data.id });
+    if (!impersonatedUser || impersonatedUser.deactivatedAt !== null) {
       return session;
     }
-
-    const impersonatedUser = await this.options.users.tryFindById({
-      id: impersonation.data.id,
-    });
 
     return browserSessionSchema.parse({
       ...session,
@@ -100,8 +89,8 @@ export class AuthService extends AuthCapability {
         id: impersonation.data.id,
         name: impersonation.data.name ?? null,
         email:
-          (await this.options.identityEmails.tryResolveEmail({ userId: impersonation.data.id })) ??
-          impersonatedUser?.email ??
+          (await this.deps.identityEmails.tryResolveEmail({ userId: impersonation.data.id })) ??
+          impersonatedUser.email ??
           impersonation.data.email ??
           null,
         image: impersonation.data.image ?? null,
@@ -118,18 +107,18 @@ export class AuthService extends AuthCapability {
 
   async revokeAllBrowserSessions({ userId }: { userId: string }): Promise<void> {
     await this.clearCachedSessions({ userId });
-    const deleted = await this.options.repository.deleteAllForUser({ userId });
+    const deleted = await this.deps.sessions.deleteAllForUser({ userId });
     logger.info({ deleted, userId }, "Revoked all browser sessions for user");
   }
 
   async revokeBrowserSession({ sessionId }: { sessionId: string }): Promise<void> {
-    const session = await this.options.repository.tryFindById({ id: sessionId });
+    const session = await this.deps.sessions.findById({ id: sessionId });
     if (!session) {
       return;
     }
 
     await this.clearCachedSessions({ userId: session.userId });
-    const deleted = await this.options.repository.deleteById({ id: sessionId });
+    const deleted = await this.deps.sessions.deleteById({ id: sessionId });
     logger.info({ deleted, sessionId, userId: session.userId }, "Revoked browser session");
   }
 
@@ -140,9 +129,9 @@ export class AuthService extends AuthCapability {
     userId: string;
     keepSessionId: string;
   }): Promise<void> {
-    const keep = await this.options.repository.tryFindById({ id: keepSessionId });
+    const keep = await this.deps.sessions.findById({ id: keepSessionId });
     await this.clearCachedSessions({ userId, keepToken: keep?.sessionToken });
-    const deleted = await this.options.repository.deleteOthersForUser({ userId, keepSessionId });
+    const deleted = await this.deps.sessions.deleteOthersForUser({ userId, keepSessionId });
     logger.info({ deleted, keepSessionId, userId }, "Revoked other browser sessions for user");
   }
 
@@ -153,31 +142,31 @@ export class AuthService extends AuthCapability {
     userId: string;
     keepToken?: string;
   }): Promise<void> {
-    const store = this.options.secondaryStore;
-    if (!store) {
+    const cache = this.deps.cache;
+    if (!cache) {
       return;
     }
 
     try {
       const indexKey = activeSessionsKey(userId);
-      const cached = AuthService.parseCachedSessions(await store.tryGet({ key: indexKey }));
+      const cached = parseCachedSessions(await cache.findValue({ key: indexKey }));
       const retained = cached.filter(({ token }) => token === keepToken);
       for (const { token } of cached) {
         if (token !== keepToken) {
-          await store.delete({ key: tokenCacheKey(token) });
+          await cache.delete({ key: tokenCacheKey(token) });
         }
       }
 
-      for (const token of await this.options.repository.listTokensForUser({ userId })) {
+      for (const token of await this.deps.sessions.listTokensForUser({ userId })) {
         if (token !== keepToken) {
-          await store.delete({ key: tokenCacheKey(token) });
+          await cache.delete({ key: tokenCacheKey(token) });
         }
       }
 
       if (keepToken && retained.length > 0) {
-        await store.set({ key: indexKey, value: JSON.stringify(retained) });
+        await cache.set({ key: indexKey, value: JSON.stringify(retained) });
       } else {
-        await store.delete({ key: indexKey });
+        await cache.delete({ key: indexKey });
       }
     } catch (error) {
       logger.error(
@@ -186,32 +175,32 @@ export class AuthService extends AuthCapability {
       );
     }
   }
+}
 
-  private static parseCachedSessions(value: string | null): CachedSession[] {
-    if (!value) {
+function parseCachedSessions(value: string | null): CachedSession[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) {
       return [];
     }
 
-    try {
-      const parsed: unknown = JSON.parse(value);
-      if (!Array.isArray(parsed)) {
-        return [];
+    return parsed.flatMap((item): CachedSession[] => {
+      if (
+        typeof item === "object" &&
+        item !== null &&
+        typeof item.token === "string" &&
+        typeof item.expiresAt === "number"
+      ) {
+        return [{ token: item.token, expiresAt: item.expiresAt }];
       }
 
-      return parsed.flatMap((item): CachedSession[] => {
-        if (
-          typeof item === "object" &&
-          item !== null &&
-          typeof item.token === "string" &&
-          typeof item.expiresAt === "number"
-        ) {
-          return [{ token: item.token, expiresAt: item.expiresAt }];
-        }
-
-        return [];
-      });
-    } catch {
       return [];
-    }
+    });
+  } catch {
+    return [];
   }
 }

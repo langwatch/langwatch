@@ -11,7 +11,7 @@ import type {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
   BetterAuthPendingInvitePort,
-} from "../../../ports/better-auth.port.ts";
+} from "../better-auth.collaborators.ts";
 import { afterUserCreate, tryBeforeAccountCreate } from "../better-auth-hooks.api.ts";
 
 class LicensedFederationPort implements BetterAuthFederationPort {

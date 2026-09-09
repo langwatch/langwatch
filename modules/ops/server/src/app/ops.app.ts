@@ -29,6 +29,7 @@
 import {
   AuditLogApi,
   type AuditLogApi as AuditLogApiContract,
+  type RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
 import type {
   FeatureFlagRules,
@@ -1313,18 +1314,15 @@ export class OpsApp implements OpsApi {
   async #recordBugReportRead(entry: {
     actorUserId: string;
     action: string;
-    args?: Readonly<Record<string, unknown>>;
+    args?: RecordAuditLogCommand["args"];
     targetId?: string;
   }): Promise<void> {
     await this.#dependencies.auditLog.record({
-      actorId: entry.actorUserId,
-      path: entry.action,
-      input: {
-        ...entry.args,
-        targetKind: BUG_REPORT_TARGET_KIND,
-        ...(entry.targetId === undefined ? {} : { targetId: entry.targetId }),
-      },
-      error: null,
+      userId: entry.actorUserId,
+      action: entry.action,
+      ...(entry.args === undefined ? {} : { args: entry.args }),
+      targetKind: BUG_REPORT_TARGET_KIND,
+      ...(entry.targetId === undefined ? {} : { targetId: entry.targetId }),
     });
   }
 

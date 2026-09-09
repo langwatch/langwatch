@@ -43,7 +43,7 @@ import type { ScimSessionRevocation } from "./scim-user-profile.service.ts";
  * and `ScimDepartmentAssignment` is Governance's two department calls, each
  * declared beside the leaf service that makes the call.
  *
- * Asking for a whole `AuthService` and a whole `GovernanceService` to use three
+ * Asking for a whole `BrowserSessionApi` and a whole `GovernanceService` to use three
  * methods is what forced every test here to build a one-method object and cast
  * it at a service it shares nothing else with. The cast is the signal: a
  * dependency that can only be satisfied by lying about it is asking for more

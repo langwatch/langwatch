@@ -10,7 +10,7 @@ import type {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
   BetterAuthPendingInvitePort,
-} from "../../../ports/better-auth.port.ts";
+} from "../better-auth.collaborators.ts";
 import { afterUserCreate } from "../better-auth-hooks.api.ts";
 
 class StubFederationPort implements BetterAuthFederationPort {

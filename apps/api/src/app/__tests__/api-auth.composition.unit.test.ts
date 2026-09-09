@@ -1,10 +1,10 @@
 /**
  * Spec: specs/server/api-process-auth.feature
  */
-import {
-  AuthService,
-  type BrowserSession,
-  type VerifiedBrowserSession,
+import type {
+  BrowserSession,
+  BrowserSessionApi,
+  VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
@@ -56,7 +56,7 @@ function transportLookingUp(
   };
 }
 
-class TestAuthService extends AuthService {
+class TestAuthService implements BrowserSessionApi {
   readonly tryResolveBrowserSession = vi.fn(
     async (_input: { verified: VerifiedBrowserSession | null }): Promise<BrowserSession | null> =>
       browserSession,
@@ -349,13 +349,19 @@ class RecordingAuthAbsence extends ApiAuthAbsenceReportPort {
 
 function composeAuth(options: { finalized: boolean }) {
   const sessions = new TestSessionTransport();
+  const auth = new TestAuthService();
   const composition = ApiAuthComposition.compose({
     database: stubConnection({ finalized: options.finalized }),
     organizations: new Proxy(OrganizationService.prototype, {}),
     browserSessions: sessions,
+    // The browser-session service and the directory the user runtime already
+    // installed: this composition pairs them with a transport, it does not
+    // build a second of either.
+    auth,
+    directory: testUserApi(),
     processName: "langwatch-api",
   });
-  return { composition, sessions };
+  return { composition, sessions, auth };
 }
 
 class TestSessionTransport extends ApiBrowserSessionTransportPort {
@@ -368,31 +374,16 @@ describe("ApiAuthComposition", () => {
   describe("given the process holds everything the Auth graph reads through", () => {
     /** @scenario "The API process composes its own Auth service" */
     it("pairs the Auth service it built with the supplied transport", () => {
-      const { composition, sessions } = composeAuth({ finalized: false });
+      const { composition, sessions, auth } = composeAuth({ finalized: false });
 
       const dependencies = composition.compose();
 
       expect(dependencies.sessions).toBe(sessions);
-      expect(dependencies.auth).toBeInstanceOf(AuthService);
+      expect(dependencies.auth).toBe(auth);
     });
 
-    /** @scenario "A finalized user's session carries their identifier address" */
-    it("answers a finalized user's session with the identifier address", async () => {
-      const { composition } = composeAuth({ finalized: true });
-
-      const session = await composition.compose().auth.tryResolveBrowserSession({ verified });
-
-      expect(session?.user.email).toBe(IDENTIFIER_ADDRESS);
-    });
-
-    /** @scenario "An unenrolled user's session carries the stored column" */
-    it("answers an unenrolled user's session with the stored column", async () => {
-      const { composition } = composeAuth({ finalized: false });
-
-      const session = await composition.compose().auth.tryResolveBrowserSession({ verified });
-
-      expect(session?.user.email).toBe(STORED_ADDRESS);
-    });
+    // The identifier-versus-stored address fork moved with the service that
+    // owns it: modules/auth/server/src/app/__tests__/browser-session.unit.test.ts.
   });
 
   describe("given a collaborator this process does not hold", () => {

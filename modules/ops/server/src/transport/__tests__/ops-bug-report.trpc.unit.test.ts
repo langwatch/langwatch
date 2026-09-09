@@ -100,7 +100,7 @@ describe("the bugReports tRPC namespace", () => {
       const { impersonatingCaller, record } = harness();
 
       await expect(impersonatingCaller.getAll({})).resolves.toEqual({ reports: [], total: 0 });
-      expect(record.mock.calls[0]?.[0]).toMatchObject({ actorId: "operator" });
+      expect(record.mock.calls[0]?.[0]).toMatchObject({ userId: "operator" });
     });
   });
 
@@ -121,7 +121,8 @@ describe("the bugReports tRPC namespace", () => {
       await staffCaller.getAll({});
 
       expect(record.mock.calls[0]?.[0]).toMatchObject({
-        input: { page: 0, pageSize: 50, hasSearch: false, targetKind: "bugReport" },
+        args: { page: 0, pageSize: 50, hasSearch: false },
+        targetKind: "bugReport",
       });
     });
 
@@ -136,10 +137,10 @@ describe("the bugReports tRPC namespace", () => {
 
       expect(record).toHaveBeenCalledTimes(1);
       expect(record.mock.calls[0]?.[0]).toEqual({
-        actorId: "operator",
-        path: "bugReports.getAll",
-        input: { page: 0, pageSize: 50, hasSearch: true, targetKind: "bugReport" },
-        error: null,
+        userId: "operator",
+        action: "bugReports.getAll",
+        args: { page: 0, pageSize: 50, hasSearch: true },
+        targetKind: "bugReport",
       });
     });
 
@@ -169,10 +170,10 @@ describe("the bugReports tRPC namespace", () => {
 
       await expect(staffCaller.getById({ id: filed.id })).resolves.toMatchObject({ id: filed.id });
       expect(record.mock.calls[0]?.[0]).toEqual({
-        actorId: "operator",
-        path: "bugReports.getById",
-        input: { targetKind: "bugReport", targetId: filed.id },
-        error: null,
+        userId: "operator",
+        action: "bugReports.getById",
+        targetKind: "bugReport",
+        targetId: filed.id,
       });
     });
   });

@@ -7,9 +7,9 @@ import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
 import { createRestRuntime } from "@langwatch/api/rest";
 import { describe, expect, it } from "vitest";
 
-import { CliDeviceSessionStorePort } from "../../ports/cli-device-session-store.port.ts";
+import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
 import { CliDeviceSessionService } from "../../services/cli-device-session.service.ts";
-import type { AuthDirectoryPort } from "../../ports/auth-directory.port.ts";
+import type { AuthDirectoryPort } from "../auth-directory.ts";
 import {
   authCliDeviceFlowRest,
   type AuthCliDeviceFlowApi,
@@ -303,7 +303,7 @@ describe("given a CLI starting a device login", () => {
 // --------------------------------------------------------------------------
 
 /** The grant's substrate, in memory, with no expiry sweeping of its own. */
-class InMemoryDeviceSessionStore extends CliDeviceSessionStorePort {
+class InMemoryDeviceSessionStore implements CliDeviceSessionRepository {
   private readonly values = new Map<string, string>();
   private readonly sets = new Map<string, Set<string>>();
 

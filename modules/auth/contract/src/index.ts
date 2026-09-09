@@ -1,5 +1,4 @@
-export { AuthApi, type AuthApi as AuthApiContract } from "./auth.api.ts";
-export * from "./auth.service.ts";
+export { AuthApi, type AuthApi as AuthApiContract, type BrowserSessionApi } from "./auth.api.ts";
 export * from "./browser-session.ts";
 export * from "./cli-session-keys.ts";
 export * from "./front-door.responses.ts";

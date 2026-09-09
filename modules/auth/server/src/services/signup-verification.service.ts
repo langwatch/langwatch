@@ -4,23 +4,11 @@ import {
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
+import type { SignUpVerificationTokenRepository } from "../repositories/signup-verification.repository.ts";
 
 /**
  * Sign-up's address confirmation (D13, ADR-117 §6).
  */
-
-/** A single-use address-confirmation token, as storage holds it. */
-export interface SignUpVerificationTokenStore {
-  issue(input: { identifier: string; token: string; expires: Instant }): Promise<void>;
-  /**
-   * Spends a token: returns the identifier it was issued for and makes it unusable, or
-   * answers null for a token that never existed, was already spent, or has expired. One
-   * answer for all three on purpose — see `completeVerification`.
-   */
-  tryClaim(input: { token: string; now: Instant }): Promise<{
-    identifier: string;
-  } | null>;
-}
 
 export interface SignUpVerificationMailer {
   sendVerificationLink(input: { email: string; verificationUrl: string }): Promise<void>;
@@ -41,7 +29,7 @@ export interface SignUpAccountFactory {
 }
 
 export interface SignUpVerificationDeps {
-  tokens: SignUpVerificationTokenStore;
+  tokens: SignUpVerificationTokenRepository;
   mailer: SignUpVerificationMailer;
   directory: SignUpAccountDirectory;
   accounts: SignUpAccountFactory;
@@ -110,7 +98,7 @@ export class SignUpVerificationService {
     accountCreated: boolean;
     accountExists: boolean;
   }> {
-    const claimed = await this.deps.tokens.tryClaim({ token, now: this.now() });
+    const claimed = await this.deps.tokens.findAndClaim({ token, now: this.now() });
     const pending = claimed ? readPendingSignUp(claimed.identifier) : null;
 
     if (!pending) {

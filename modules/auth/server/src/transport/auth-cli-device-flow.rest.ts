@@ -17,7 +17,7 @@ import { moduleApi } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
 
-import type { AuthDirectoryPort } from "../ports/auth-directory.port.ts";
+import type { AuthDirectoryPort } from "./auth-directory.ts";
 import {
   DEVICE_CODE_TTL_SECONDS,
   MIN_POLL_INTERVAL_SECONDS,

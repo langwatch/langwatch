@@ -31,8 +31,8 @@
 import {
   authCliDeviceFlowRest,
   CliDeviceSessionService,
-  CliDeviceSessionStorePort,
-  PostgresAuthDirectoryAdapter,
+  type CliDeviceSessionRepository,
+  PrismaAuthDirectoryRepository,
   type AuthCliDeviceFlowApi,
   type CliBrowserSession,
   type CliPersonalWorkspace,
@@ -41,7 +41,7 @@ import type { MountableRestApp, RestErrorHandler } from "@langwatch/api/rest";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { OrganizationApp } from "@langwatch/organization-server";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 
@@ -61,14 +61,12 @@ export function mountAuthCliDeviceFlowRest(
 }
 
 /** The one Redis this process opened, behind the grant's five operations. */
-export class ApiCliDeviceSessionStore extends CliDeviceSessionStorePort {
+export class ApiCliDeviceSessionStore implements CliDeviceSessionRepository {
   static create(redis: RedisConnection): ApiCliDeviceSessionStore {
     return new ApiCliDeviceSessionStore(redis);
   }
 
-  private constructor(private readonly redis: RedisConnection) {
-    super();
-  }
+  private constructor(private readonly redis: RedisConnection) {}
 
   tryGet(key: string): Promise<string | null> {
     return this.redis.get(key);
@@ -116,7 +114,7 @@ export type ApiAuthCliDeviceFlowOptions = Readonly<{
   /** The SAME credential service every other door authenticates through. */
   apiKeys: ApiKeyApi | undefined;
   /** The organization application the personal workspace is ensured on. */
-  organizations: OrganizationApp | undefined;
+  organizations: OrganizationApi | undefined;
   /** The AuthZ graph the project write check runs on. */
   authz: AuthzService | undefined;
   /** This deployment's flag store, for the device journey's rollout gate. */
@@ -178,7 +176,7 @@ export function composeApiAuthCliDeviceFlow(
       store: ApiCliDeviceSessionStore.create(redis),
       refreshTokenTtlSeconds: options.refreshTokenTtlSeconds,
     }),
-    directory: () => PostgresAuthDirectoryAdapter.create({ database: prisma }),
+    directory: () => PrismaAuthDirectoryRepository.create(prisma),
     session: resolveSession,
     apiKeys: () => apiKeys,
     ensurePersonalWorkspace,

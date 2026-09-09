@@ -1,7 +1,10 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
 import type { JoinLookupDecision } from "@langwatch/identity-contract";
 import { useEffect } from "react";
-import { type JoinableOrganization, resolveJoinBeforeCreate } from "../../model/join-before-create.ts";
+import {
+  type JoinableOrganization,
+  resolveJoinBeforeCreate,
+} from "../../model/join-before-create.ts";
 
 /**
  * Join before create (ADR-117 §6): the step between confirming an address and

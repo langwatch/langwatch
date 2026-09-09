@@ -10,11 +10,11 @@ import type { ApiPackagedRestCompositionOptions } from "../api-packaged-rest.com
 import type { ApiTraceIngestComposition } from "../api-trace-ingest.composition.ts";
 import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../features/dataset/dataset.composition.ts";
-import { refusingEvaluatorFeature } from "../../features/evaluator/evaluator.composition.ts";
 import { refusingExperimentFeature } from "../../features/experiment/experiment.composition.ts";
 import { refusingWorkflowFeature } from "../../features/workflow/workflow.composition.ts";
 import {
   stubDashboardFeature,
+  stubEvaluatorFeature,
   stubMonitorFeature,
   stubPresenceFeature,
   stubStoredObjectFeature,
@@ -61,7 +61,7 @@ function composeGuard(usageLimit: ApiTraceIngestComposition["usageLimit"] | unde
     codingAgent: refusingCodingAgentFeature(),
     enterprise: refusingEnterpriseFeature(),
     dataset: refusingDatasetFeature(),
-    evaluator: refusingEvaluatorFeature(),
+    evaluator: stubEvaluatorFeature(),
     dashboard: stubDashboardFeature(),
     legacyErrors: (error) => {
       throw error;

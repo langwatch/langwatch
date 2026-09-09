@@ -4,11 +4,8 @@
  * as a fact rather than off a context.
  */
 import { bindTrpcFact, callerAddressFact, type TrpcRuntime } from "@langwatch/api/trpc";
-import {
-  callerEmailFact,
-  frontDoorTrpcTransport,
-  type FrontDoorApi,
-} from "@langwatch/auth-server";
+import type { AuthApi } from "@langwatch/auth-contract";
+import { callerEmailFact, frontDoorTrpcTransport } from "@langwatch/auth-server";
 
 /** The slice of the process context this surface reads. */
 export interface AuthHostContext {
@@ -19,7 +16,7 @@ export interface AuthHostContext {
 /** Mounts `frontDoor.*` under its own key at the root. */
 export function createFrontDoorTrpcRouter<TContext extends AuthHostContext>(
   runtime: TrpcRuntime<TContext>,
-  app: () => FrontDoorApi,
+  app: () => AuthApi,
 ) {
   return runtime.mount(frontDoorTrpcTransport, app, {
     facts: [

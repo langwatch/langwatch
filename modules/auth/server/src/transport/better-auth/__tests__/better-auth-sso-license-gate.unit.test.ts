@@ -11,7 +11,7 @@ import type {
   BetterAuthFederationPort,
   BetterAuthIdentityCeremoniesPort,
   BetterAuthStoragePort,
-} from "../../../ports/better-auth.port.ts";
+} from "../better-auth.collaborators.ts";
 import { createAuthOptions, type BetterAuthDeploymentConfiguration } from "../better-auth.api.ts";
 import type { SignInRouterShadowPort } from "../sign-in-router-shadow.api.ts";
 

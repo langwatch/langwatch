@@ -32,7 +32,7 @@ import type {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
   BetterAuthPendingInvitePort,
-} from "../../../ports/better-auth.port.ts";
+} from "../better-auth.collaborators.ts";
 
 /** Minimal grants ledger double: nothing in these scenarios reads its output. */
 class StubAuthzGrantsService extends AuthzGrantsService {

@@ -35,6 +35,9 @@
       "path": "../../feature-flag/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
       "path": "../../identity/contract/tsconfig.build.json"
     },
     {

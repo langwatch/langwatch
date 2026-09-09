@@ -127,8 +127,7 @@ export async function createWorkerFoundationApps(options: {
       close: () => runtime.stop(),
     },
     users: runtime.module((await import("@langwatch/user-server")).userServer).provided,
-    auth: runtime.module((await import("./worker-user-app.composition.ts")).workerAuthServer)
-      .provided,
+    auth: runtime.module((await import("@langwatch/auth-server")).authServer).provided,
     ops: runtime.module((await import("@langwatch/ops-server")).opsServer).provided,
     auditLog: auditLog.auditLog(),
     retention: runtime.module(dataRetentionServer).provided,

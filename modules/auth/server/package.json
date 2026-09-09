@@ -32,6 +32,7 @@
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/identity-server": "workspace:*",
     "@langwatch/ksuid": "catalog:",

@@ -4,7 +4,7 @@ import {
   type OrganizationApiKeyResolution,
   type ResolvedApiKeyCredential,
 } from "@langwatch/api-key-contract";
-import { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { LANGY_VK_SECRET_NAME } from "@langwatch/secret-contract";
@@ -1119,7 +1119,7 @@ function testUserApi(): UserApi {
   });
 }
 
-class TestAuthService extends AuthService {
+class TestAuthService implements BrowserSessionApi {
   async tryResolveBrowserSession() {
     return null;
   }

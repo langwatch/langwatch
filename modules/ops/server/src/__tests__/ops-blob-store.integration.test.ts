@@ -16,7 +16,7 @@ import {
   type SchedulerOpsRepository,
 } from "@langwatch/ops-server";
 import type { OpsService } from "@langwatch/ops-contract";
-import { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -46,7 +46,7 @@ class NoopQueuePayloadDecoder extends QueuePayloadDecoderPort {
   }
 }
 
-class NoopAuthService extends AuthService {
+class NoopAuthService implements BrowserSessionApi {
   async tryResolveBrowserSession() {
     return null;
   }

@@ -12,13 +12,13 @@ import {
   isPasswordResetPath,
   normalizedRequestPathname,
   requestPathname,
-  type AuthService,
+  type AuthApi,
 } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   DroppedBetterAuthSecondaryStorageAdapter,
   RedisBetterAuthSecondaryStorageAdapter,
-} from "../../adapters/better-auth-secondary-storage.adapter.ts";
+} from "./better-auth-secondary-storage.ts";
 import type { SignInMethodPolicy } from "@langwatch/identity-contract";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type { UserApi } from "@langwatch/user-contract";
@@ -34,7 +34,7 @@ import type {
   BetterAuthIdentityCeremoniesPort,
   BetterAuthPendingInvitePort,
   BetterAuthStoragePort,
-} from "../../ports/better-auth.port.ts";
+} from "./better-auth.collaborators.ts";
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -520,7 +520,7 @@ function genericOAuthPlugins(
  */
 export type BetterAuthTransportOptions = Readonly<{
   /** The Auth service whose sessions this instance mints and revokes. */
-  auth: AuthService;
+  auth: AuthApi;
   /** The persistence boundary every database hook reads and writes through. */
   database: BetterAuthHooksRepository;
   /** The instance's storage engine — see {@link BetterAuthStoragePort}. */

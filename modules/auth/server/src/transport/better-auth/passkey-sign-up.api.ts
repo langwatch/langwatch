@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
-import type { BetterAuthAnnouncementsPort } from "../../ports/better-auth.port.ts";
+import type { BetterAuthAnnouncementsPort } from "./better-auth.collaborators.ts";
 
 /** Everything the passkey ceremony asks of the user directory. */
 export type PasskeySignUpDirectory = Pick<UserApi, "findByEmail" | "createPasskeyUser">;

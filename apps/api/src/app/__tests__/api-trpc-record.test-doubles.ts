@@ -15,7 +15,8 @@ import { refusingLangyFeature } from "../../features/langy/langy.composition.ts"
 import { refusingOpsFeature } from "../../features/ops/ops.composition.ts";
 import { refusingAnalyticsFeature } from "../../features/analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../features/dataset/dataset.composition.ts";
-import { refusingEvaluatorFeature } from "../../features/evaluator/evaluator.composition.ts";
+import { createEvaluatorTrpcRouter } from "../../features/evaluator/evaluator-trpc.mount.ts";
+import type { ComposedEvaluatorFeature } from "../../features/evaluator/evaluator.composition.types.ts";
 import { refusingPromptFeature } from "../../features/prompt/prompt.composition.ts";
 import { createFeatureFlagTrpcRouter } from "../../features/feature-flag/feature-flag-trpc.mount.ts";
 import type { ComposedFeatureFlagFeature } from "../../features/feature-flag/feature-flag.composition.types.ts";
@@ -65,7 +66,8 @@ import { refusingProjectFeature } from "../../features/project/project.compositi
 import { refusingCodingAgentFeature } from "../../features/coding-agent/coding-agent.composition.ts";
 import { refusingAutomationFeature } from "../../features/automation/automation.composition.ts";
 import { refusingEnterpriseFeature } from "../../features/enterprise/enterprise.composition.ts";
-import { refusingAuthFeature } from "../../features/auth/auth.composition.ts";
+import { composeAuthFeature } from "../../features/auth/auth.composition.ts";
+import { testAuthApi } from "../../features/auth/__tests__/support/test-auth-api.ts";
 import { refusingUserFeature } from "../../features/user/user.composition.ts";
 import { createPresenceTrpcRouter } from "../../features/presence/presence-trpc.mount.ts";
 import type { ComposedPresenceFeature } from "../../features/presence/presence.composition.types.ts";
@@ -286,6 +288,16 @@ export function stubMonitorFeature(): ComposedMonitorFeature {
   };
 }
 
+export function stubEvaluatorFeature(): ComposedEvaluatorFeature {
+  const app = stub<ComposedEvaluatorFeature["app"]>("evaluators");
+  return {
+    router: (mount) => createEvaluatorTrpcRouter(mount.runtime),
+    app,
+    evaluators: stub("evaluators.runtime"),
+    restServices: { evaluators: () => app },
+  };
+}
+
 export function stubRoleFeature(): ComposedRoleFeature {
   return {
     routers: (mount) => ({
@@ -357,7 +369,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     analytics: refusingAnalyticsFeature(),
     featureFlag: stubFeatureFlagFeature(),
     dataset: refusingDatasetFeature(),
-    evaluator: refusingEvaluatorFeature(),
+    evaluator: stubEvaluatorFeature(),
     prompt: refusingPromptFeature(),
     dataRetention: stubDataRetentionFeature(),
     workflow: refusingWorkflowFeature(),
@@ -382,7 +394,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     codingAgent: refusingCodingAgentFeature(),
     automation: refusingAutomationFeature(),
     enterprise: refusingEnterpriseFeature(),
-    auth: refusingAuthFeature("langwatch-api"),
+    auth: composeAuthFeature(testAuthApi()),
     user: refusingUserFeature("langwatch-api"),
     presence: stubPresenceFeature(),
     apiKey: stubApiKeyFeature(),

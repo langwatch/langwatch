@@ -1,5 +1,5 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { AuthService } from "@langwatch/auth-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { ApiTrpcContext, ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { ApiTrpcFeatureApplication } from "../../app-trpc/app-trpc.context.ts";
@@ -21,7 +21,7 @@ export type ComposedUserFeature = Readonly<{
    * signed-in person through the user application and the user application
    * revokes sessions through Auth, so one graph answers both directions.
    */
-  auth: AuthService;
+  auth: AuthApi;
   /** The `ctx.app.config` slice: the operator allow-list, parsed once. */
   config: ApiTrpcFeatureApplication["config"];
 }>;

@@ -3,7 +3,7 @@
  * legacy single sign-on refusal happens before storage, so the repository
  * records whether it was called at all and the rest throw.
  */
-import { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
 import type { UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
@@ -23,7 +23,7 @@ export const backofficeOperator: UserProfile = {
   deactivatedAt: null,
 };
 
-export class AuthStub extends AuthService {
+export class AuthStub implements BrowserSessionApi {
   tryResolveBrowserSession = vi.fn(async () => null);
   revokeAllBrowserSessions = vi.fn(async () => undefined);
   revokeBrowserSession = vi.fn(async () => undefined);

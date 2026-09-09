@@ -3,9 +3,8 @@
  * migration turns on: `createAppTrpcFeatures` built on THIS process's root, with THIS
  * process's policy chain, reachable over the real `/api/trpc` handler.
  */
-import { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { BrowserSession, VerifiedBrowserSession } from "@langwatch/auth-contract";
-import { AuthApp } from "@langwatch/auth-server";
 import type {
   AuthzGetDecisionInput,
   AuthzPermission,
@@ -23,7 +22,8 @@ import { ApiApplication, NoApiTrpcFeatures } from "../../api.application.ts";
 import { ApiAuditPort, ApiAuthorizationPort, ApiRequestPolicy } from "../../api-request.policy.ts";
 import type { UserApi } from "@langwatch/user-contract";
 import { composeAuthFeature } from "../../features/auth/auth.composition.ts";
-import { composeOrganizationFeature } from "../../features/organization/organization.composition.ts";
+import { testAuthApi } from "../../features/auth/__tests__/support/test-auth-api.ts";
+import { installApiOrganization } from "../../features/organization/organization.composition.ts";
 import {
   AuthSessionApiAuthenticationAdapter,
   BetterAuthBrowserSessionTransportAdapter,
@@ -165,33 +165,12 @@ function testApplication(overrides: Record<string, unknown> = {}): ApiTrpcFeatur
   } as unknown as ApiTrpcFeatureApplication;
 }
 
-function testAuthApp(): AuthApp {
-  return AuthApp.create({
-    clientIp: () => "127.0.0.1",
-    rateLimit: async () => ({ allowed: true }),
-    route: async () => ({ kind: "password" }) as never,
-    addressIsRegistered: async () => false,
-    requestSignUpVerification: async () => undefined,
-    completeSignUpVerification: async () => ({
-      email: "person@example.com",
-      accountCreated: true,
-      accountExists: false,
-    }),
-    readInviteLanding: async () => ({
-      organizationName: "LangWatch",
-      inviterName: null,
-      alreadyAccepted: false,
-    }),
-    requestFreshInvite: async () => undefined,
-    resolveAuthProvider: async () => "email",
-  });
-}
 
 function testCollaborators(overrides: Record<string, unknown> = {}) {
   return {
     application: testApplication(),
     annotation: stub("annotation"),
-    auth: testAuthApp(),
+    auth: testAuthApi(),
     dataPrivacy: stub("dataPrivacy"),
     evaluations: stub("evaluations", { mappingsSchema: anySchema }),
     experiments: stub("experiments", { workbenchStateSchema: anySchema }),
@@ -290,13 +269,7 @@ function composeApplication(
     composed: {
       ...stubComposedFeatures(),
       // The signed-out door composes itself off this process's own graph.
-      auth: composeAuthFeature({
-        prisma: prisma.client,
-        peers: { users: {} as UserApi },
-        rateLimit: async () => ({ allowed: true, resetAt: Date.now() + 60_000 }),
-        deployment: {},
-        processName: "langwatch-api",
-      }),
+      auth: composeAuthFeature(testAuthApi()),
     },
     infrastructure,
     collaborators: testCollaborators(),
@@ -501,9 +474,8 @@ const impersonatedSession: BrowserSession = {
   sessionId: "session-1",
 };
 
-class SessionResolvingAuthService extends AuthService {
+class SessionResolvingAuthService implements BrowserSessionApi {
   constructor(private readonly resolved: BrowserSession | null) {
-    super();
   }
 
   async tryResolveBrowserSession(input: {
@@ -543,7 +515,7 @@ class PermittingAuthorization extends ApiAuthorizationPort {
  * context: what F1 broke lived between the auth adapter and the context, so a
  * test that supplies its own context cannot see it.
  */
-function composeSessionApplication(options: {
+async function composeSessionApplication(options: {
   verified: VerifiedBrowserSession | null;
   getAllForUser: (...args: never[]) => Promise<unknown[]>;
   session?: BrowserSession;
@@ -560,7 +532,7 @@ function composeSessionApplication(options: {
       // `organization.*` is the surface under test, so the real feature is
       // composed here. The directory it answers from stays the injected
       // double, because the namespace reads it off `ctx.app.organizations`.
-      organization: composeOrganizationFeature({
+      organization: await installApiOrganization({
         infrastructure,
         peers: { encryption: undefined },
         rateLimit: async () => ({ allowed: true, resetAt: 0 }),
@@ -605,7 +577,7 @@ describe.skip("given a browser session this process has already verified", () =>
     /** @scenario "A verified browser session reaches the surfaces that render the person" */
     it("reaches the organization service instead of refusing the caller", async () => {
       const getAllForUser = vi.fn(async () => []);
-      const application = composeSessionApplication({ verified: verifiedSession, getAllForUser });
+      const application = await composeSessionApplication({ verified: verifiedSession, getAllForUser });
 
       const { status, body } = await callTrpc(application, "organization.getAll", {
         isDemo: false,
@@ -624,7 +596,7 @@ describe.skip("given a browser session this process has already verified", () =>
     /** @scenario "An impersonated session reaches the surface as the impersonated person" */
     it("reaches the service as the impersonated person, carrying the real administrator", async () => {
       const getAllForUser = vi.fn(async () => []);
-      const application = composeSessionApplication({
+      const application = await composeSessionApplication({
         verified: verifiedSession,
         getAllForUser,
         session: impersonatedSession,
@@ -647,7 +619,7 @@ describe.skip("given a browser session this process has already verified", () =>
     /** @scenario "An anonymous caller stays refused by the same surface" */
     it("keeps the same surface unauthorized and never reaches the service", async () => {
       const getAllForUser = vi.fn(async () => []);
-      const application = composeSessionApplication({ verified: null, getAllForUser });
+      const application = await composeSessionApplication({ verified: null, getAllForUser });
 
       const { body } = await callTrpc(application, "organization.getAll", { isDemo: false });
 

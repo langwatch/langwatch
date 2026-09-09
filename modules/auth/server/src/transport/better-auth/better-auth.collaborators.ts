@@ -6,7 +6,7 @@ import type { SignInMethodPolicy } from "@langwatch/identity-contract";
  *
  * There is exactly one such instance per deployment, and that is the whole
  * reason these are ports rather than imports. Whether a cookie verifies is
- * decided entirely by the option set the instance was constructed with — the
+ * decided entirely by the option set the instance was constructed with - the
  * signing secret, the base URL and trusted origins, the cookie prefix, the
  * session model mapping, the secondary-storage prefix, the mounted providers
  * and the provider ids a stored account row is keyed by. A second instance
@@ -20,7 +20,7 @@ import type { SignInMethodPolicy } from "@langwatch/identity-contract";
  */
 
 /**
- * Better Auth's `database:` entry — the storage engine every one of its
+ * Better Auth's `database:` entry - the storage engine every one of its
  * adapters, transactions and join emulations runs on.
  *
  * Typed as the library's own option because it IS that option: an adapter
@@ -46,7 +46,7 @@ export abstract class BetterAuthFederationPort {
   /**
    * Whether this deployment registers any federated method at all.
    *
-   * Synchronous, and answering `false` leaves every route untouched — which is
+   * Synchronous, and answering `false` leaves every route untouched - which is
    * the zero-behaviour-change path an email-mode deployment takes.
    */
   abstract federationCapable(): boolean;
@@ -77,7 +77,7 @@ export abstract class BetterAuthIdentityCeremoniesPort {
 
   /**
    * Returns the row data Better Auth should write, which is what pins the
-   * account id — the live identifier id and the backfill's derived id have to
+   * account id - the live identifier id and the backfill's derived id have to
    * be the same id.
    *
    * The row is read structurally rather than by Better Auth's own type, for
@@ -110,7 +110,7 @@ export type PendingOrganizationInvite = Readonly<{
  * The invitation half of an SSO auto-join.
  *
  * A pending invite WINS over the default membership, because its role and team
- * assignments carry their own grants — an auto-join that ignored it would land
+ * assignments carry their own grants - an auto-join that ignored it would land
  * the person in the organization as a plain member while the invite kept
  * looking unused.
  */

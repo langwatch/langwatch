@@ -17,11 +17,13 @@ import { declareAuthzMiddleware } from "@langwatch/authz-contract";
 
 import { createTrpcRoot, type ApiTrpcContext } from "../../../api.application.ts";
 import { composeGatewayFeature } from "../../../features/gateway/gateway.composition.ts";
-import { refusingAuthFeature } from "../../../features/auth/auth.composition.ts";
+import { composeAuthFeature } from "../../../features/auth/auth.composition.ts";
+import { testAuthApi } from "../../../features/auth/__tests__/support/test-auth-api.ts";
 import { refusingUserFeature } from "../../../features/user/user.composition.ts";
 import {
   stubDashboardFeature,
   stubEvaluationFeature,
+  stubEvaluatorFeature,
   stubMonitorFeature,
   stubRoleFeature,
   stubStoredObjectFeature,
@@ -38,7 +40,6 @@ import {
 import { refusingLangyFeature } from "../../../features/langy/langy.composition.ts";
 import { refusingAnalyticsFeature } from "../../../features/analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../../features/dataset/dataset.composition.ts";
-import { refusingEvaluatorFeature } from "../../../features/evaluator/evaluator.composition.ts";
 import { refusingPromptFeature } from "../../../features/prompt/prompt.composition.ts";
 import { refusingHomeFeature } from "../../../features/project/home.composition.ts";
 import { refusingScenarioFeature } from "../../../features/scenario/scenario.composition.ts";
@@ -171,7 +172,7 @@ export function buildAppTrpcFeatures(
         clickhouse: null,
         virtualKeyPepper: undefined,
       }),
-      auth: refusingAuthFeature("langwatch-api"),
+      auth: composeAuthFeature(testAuthApi()),
       user: refusingUserFeature("langwatch-api"),
       presence: stubPresenceFeature(),
       apiKey: stubApiKeyFeature(),
@@ -181,7 +182,7 @@ export function buildAppTrpcFeatures(
       analytics: refusingAnalyticsFeature(),
       featureFlag: stubFeatureFlagFeature(),
       dataset: refusingDatasetFeature(),
-      evaluator: refusingEvaluatorFeature(),
+      evaluator: stubEvaluatorFeature(),
       prompt: refusingPromptFeature(),
       dataRetention: stubDataRetentionFeature(),
       monitor: stubMonitorFeature(),

@@ -1,7 +1,7 @@
 import { extractEmailDomain, normalizedRequestPathname } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { AuthDirectoryPort } from "../../ports/auth-directory.port.ts";
+import type { AuthDirectoryPort } from "../auth-directory.ts";
 
 const logger = createLogger("langwatch:identity:born-finalized-opt-in.api");
 

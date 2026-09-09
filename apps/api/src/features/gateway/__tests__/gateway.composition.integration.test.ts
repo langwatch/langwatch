@@ -22,12 +22,14 @@ import { ApiApplication } from "../../../api.application.ts";
 import { ApiTrpcFeaturesComposition } from "../../../app/api-trpc-features.composition.ts";
 import { composeEnterpriseGovernanceApplication } from "../../enterprise/enterprise-governance.composition.ts";
 import { composeGatewayFeature } from "../gateway.composition.ts";
-import { refusingAuthFeature } from "../../auth/auth.composition.ts";
+import { composeAuthFeature } from "../../auth/auth.composition.ts";
+import { testAuthApi } from "../../auth/__tests__/support/test-auth-api.ts";
 import { refusingUserFeature } from "../../user/user.composition.ts";
 import {
   stubApiKeyFeature,
   stubDashboardFeature,
   stubEvaluationFeature,
+  stubEvaluatorFeature,
   stubMonitorFeature,
   stubRoleFeature,
   stubStoredObjectFeature,
@@ -43,7 +45,6 @@ import {
 import { refusingLangyFeature } from "../../langy/langy.composition.ts";
 import { refusingAnalyticsFeature } from "../../analytics/analytics.composition.ts";
 import { refusingDatasetFeature } from "../../dataset/dataset.composition.ts";
-import { refusingEvaluatorFeature } from "../../evaluator/evaluator.composition.ts";
 import { refusingPromptFeature } from "../../prompt/prompt.composition.ts";
 import { refusingScenarioFeature } from "../../scenario/scenario.composition.ts";
 import { refusingBugReportFeature } from "../../bug-report/bug-report.composition.ts";
@@ -204,7 +205,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
   const features = ApiTrpcFeaturesComposition.tryCompose({
     composed: {
       gateway,
-      auth: refusingAuthFeature("langwatch-api"),
+      auth: composeAuthFeature(testAuthApi()),
       user: refusingUserFeature("langwatch-api"),
       presence: stubPresenceFeature(),
       apiKey: stubApiKeyFeature(),
@@ -214,7 +215,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       analytics: refusingAnalyticsFeature(),
       featureFlag: stubFeatureFlagFeature(),
       dataset: refusingDatasetFeature(),
-      evaluator: refusingEvaluatorFeature(),
+      evaluator: stubEvaluatorFeature(),
       prompt: refusingPromptFeature(),
       dataRetention: stubDataRetentionFeature(),
       monitor: stubMonitorFeature(),

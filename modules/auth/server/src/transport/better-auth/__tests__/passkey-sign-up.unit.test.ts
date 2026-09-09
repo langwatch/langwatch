@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BetterAuthAnnouncementsPort } from "../../../ports/better-auth.port.ts";
+import { BetterAuthAnnouncementsPort } from "../better-auth.collaborators.ts";
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,

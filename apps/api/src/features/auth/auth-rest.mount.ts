@@ -2,10 +2,10 @@
  * The API process's `/api/auth` door.
  */
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { AuthService } from "@langwatch/auth-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import {
   authRest,
-  PostgresAuthDirectoryAdapter,
+  PrismaAuthDirectoryRepository,
   type AuthDoorApi,
 } from "@langwatch/auth-server";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -25,7 +25,7 @@ export type ApiAuthRestOptions = Readonly<{
   /** The SAME transport every other door verifies a cookie through. */
   sessions: ApiBrowserSessionTransportPort | undefined;
   /** The Auth service a logout revokes the browser session on. */
-  auth: AuthService | undefined;
+  auth: AuthApi | undefined;
   /** The SAME credential service the legacy token check resolves through. */
   apiKeys: ApiKeyApi | undefined;
   /** The process's one guarded connection, or none. */
@@ -65,7 +65,7 @@ export function composeApiAuthRest(options: ApiAuthRestOptions): AuthDoorApi | u
       return resolved?.project.slug ?? null;
     },
     featureFlags: () => featureFlags,
-    directory: () => PostgresAuthDirectoryAdapter.create({ database: prisma }),
+    directory: () => PrismaAuthDirectoryRepository.create(prisma),
     baseUrl: betterAuth.baseUrl,
     federatedLogout: () => Promise.resolve(null),
     runWithIdentityBirth: BetterAuthIdentityBirthAdapter.runWithIdentityBirth,

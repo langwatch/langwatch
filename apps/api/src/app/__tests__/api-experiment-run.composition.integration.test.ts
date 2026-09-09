@@ -26,7 +26,9 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { ApiAuditPort } from "../../api-request.policy.ts";
 import { ApiApplication } from "../../api.application.ts";
 import { composeDatasetService } from "../../features/dataset/dataset.composition.ts";
-import { composeEvaluatorService } from "../../features/evaluator/evaluator.composition.ts";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { UserApi } from "@langwatch/user-contract";
+import { installApiEvaluator } from "../../features/evaluator/evaluator.composition.ts";
 import { composeMonitorService } from "../../features/monitor/monitor.composition.ts";
 import { composeEvaluationFeature } from "../../features/evaluation/evaluation.composition.ts";
 import { composeExperimentFeature } from "../../features/experiment/experiment.composition.ts";
@@ -284,7 +286,7 @@ const successFrames = [
   { type: "done" },
 ];
 
-function composeApplication(options: { redis?: RedisConnection | null } = {}) {
+async function composeApplication(options: { redis?: RedisConnection | null } = {}) {
   const prisma = testPrisma();
   const eventing = testEventing();
   const redis = options.redis === undefined ? testRedis() : null;
@@ -308,15 +310,26 @@ function composeApplication(options: { redis?: RedisConnection | null } = {}) {
     secretDecryptor: { decrypt: (value) => `decrypted:${value}` },
     payloadStaging: AbsentPayloadStagingAdapter.create(),
   });
-  const evaluators = composeEvaluatorService({
+  // The evaluator module, installed exactly as the process installs it. Its
+  // workflow application is read late, because the workflow feature takes this
+  // module's runtime as a peer of its own.
+  const evaluator = await installApiEvaluator({
     infrastructure,
-    peers: { workflows: runtime.workflows, nlpRuntime: runtime.nlpRuntime },
+    peers: {
+      workflows: runtime.workflows,
+      nlpRuntime: runtime.nlpRuntime,
+      workflowApp: () => workflow.app,
+      modelProviders,
+      permissions: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
+      users: createApiFixture<UserApi>(),
+    },
   });
+  const evaluators = evaluator.evaluators;
   const monitors = composeMonitorService({ infrastructure, peers: { evaluators } });
   const workflow = composeWorkflowFeature({
     infrastructure,
     runtime,
-    peers: { datasets, evaluators, modelProviders },
+    peers: { datasets, evaluators: evaluator.app, modelProviders },
   });
   const evaluation = composeEvaluationFeature({
     infrastructure,
@@ -411,7 +424,7 @@ afterEach(() => {
 
 describe("given the workbench run loop composed over this process's own graph", () => {
   it("mounts the four namespaces it shares a graph with, over the real /api/trpc handler", async () => {
-    const { application, prisma } = composeApplication();
+    const { application, prisma } = await composeApplication();
 
     const { status, body } = await callTrpc(application, "experiments.getAllByProjectId", {
       projectId: "project-1",
@@ -427,7 +440,7 @@ describe("given the workbench run loop composed over this process's own graph", 
   });
 
   it("registers the packaged experiment-run pipeline as a producer beside the evaluation one", () => {
-    const { eventing } = composeApplication();
+    const { eventing } = await composeApplication();
 
     const names = eventing.registered.map((entry) => entry.name);
     expect(names).toContain("experiment_run_processing");
@@ -459,7 +472,7 @@ describe("given the workbench run loop composed over this process's own graph", 
       );
       vi.stubGlobal("fetch", fetchSpy);
 
-      const { experiment, redis, eventing } = composeApplication();
+      const { experiment, redis, eventing } = await composeApplication();
       const run = experiment.run;
       expect(run.ports).not.toBeNull();
       expect(run.progress).not.toBeNull();
@@ -530,7 +543,7 @@ describe("given the workbench run loop composed over this process's own graph", 
 
   describe("when the process composed no Redis", () => {
     it("mounts every namespace and refuses to START a run, naming the progress store", async () => {
-      const { application, experiment } = composeApplication({ redis: null });
+      const { application, experiment } = await composeApplication({ redis: null });
 
       const { status } = await callTrpc(application, "experiments.getAllByProjectId", {
         projectId: "project-1",

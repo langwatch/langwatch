@@ -9,7 +9,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import { moduleApi } from "@langwatch/runtime-composition";
 
-import type { AuthDirectoryPort } from "../ports/auth-directory.port.ts";
+import type { AuthDirectoryPort } from "./auth-directory.ts";
 import { isBornFinalizedSignUp } from "./better-auth/born-finalized-opt-in.api.ts";
 import { isAllowedAuthOrigin } from "./better-auth/origin-gate.api.ts";
 

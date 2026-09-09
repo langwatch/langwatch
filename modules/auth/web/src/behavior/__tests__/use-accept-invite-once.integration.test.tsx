@@ -72,7 +72,10 @@ vi.mock("../error-capture.ts", () => ({
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
-import { _resetSubmittedInviteCodesForTests, useAcceptInviteOnce } from "../use-accept-invite-once.ts";
+import {
+  _resetSubmittedInviteCodesForTests,
+  useAcceptInviteOnce,
+} from "../use-accept-invite-once.ts";
 
 function resetMutationState() {
   mockState.mutation = {

@@ -8,18 +8,20 @@ import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { callerEmailFact, frontDoorTrpcTransport, type FrontDoorApi } from "../front-door.trpc.ts";
+import type { AuthApi } from "@langwatch/auth-contract";
+import { callerEmailFact, frontDoorTrpcTransport } from "../front-door.trpc.ts";
 import { authTrpcTestPorts, type AuthTrpcTestContext } from "./auth.trpc.harness.ts";
 
-const isWithinBudget = vi.fn<FrontDoorApi["isWithinBudget"]>();
-const route = vi.fn<FrontDoorApi["route"]>();
-const addressIsRegistered = vi.fn<FrontDoorApi["addressIsRegistered"]>();
-const requestSignUpVerification = vi.fn<FrontDoorApi["requestSignUpVerification"]>();
-const completeSignUpVerification = vi.fn<FrontDoorApi["completeSignUpVerification"]>();
-const readInviteLanding = vi.fn<FrontDoorApi["readInviteLanding"]>();
-const requestFreshInvite = vi.fn<FrontDoorApi["requestFreshInvite"]>();
+const isWithinBudget = vi.fn<AuthApi["isWithinBudget"]>();
+const route = vi.fn<AuthApi["route"]>();
+const addressIsRegistered = vi.fn<AuthApi["addressIsRegistered"]>();
+const requestSignUpVerification = vi.fn<AuthApi["requestSignUpVerification"]>();
+const completeSignUpVerification = vi.fn<AuthApi["completeSignUpVerification"]>();
+const readInviteLanding = vi.fn<AuthApi["readInviteLanding"]>();
+const requestFreshInvite = vi.fn<AuthApi["requestFreshInvite"]>();
 
-const door: FrontDoorApi = {
+/** The seven operations this surface calls; the rest of the module refuses. */
+const door: AuthApi = {
   isWithinBudget,
   route,
   addressIsRegistered,
@@ -27,7 +29,17 @@ const door: FrontDoorApi = {
   completeSignUpVerification,
   readInviteLanding,
   requestFreshInvite,
+  resolveAuthProvider: () => unreached("resolveAuthProvider"),
+  tryResolveBrowserSession: () => unreached("tryResolveBrowserSession"),
+  revokeAllBrowserSessions: () => unreached("revokeAllBrowserSessions"),
+  revokeBrowserSession: () => unreached("revokeBrowserSession"),
+  revokeOtherBrowserSessions: () => unreached("revokeOtherBrowserSessions"),
 };
+
+/** The front door reaches no session operation: naming one here would be a bug. */
+function unreached(operation: string): never {
+  throw new Error(`the front door called ${operation}`);
+}
 
 const trpc = initTRPC.context<AuthTrpcTestContext>().create();
 const router = createTrpcRuntime<AuthTrpcTestContext>({
@@ -137,10 +149,7 @@ describe("the signed-out front door", () => {
       await expect(
         visitor.requestSignUpVerification({ email: "ana@acme.com" }),
       ).resolves.toEqual({ sent: true });
-      expect(requestSignUpVerification).toHaveBeenCalledWith(
-        { session: null },
-        { email: "ana@acme.com" },
-      );
+      expect(requestSignUpVerification).toHaveBeenCalledWith({ email: "ana@acme.com" });
     });
   });
 
@@ -165,7 +174,7 @@ describe("the signed-out front door", () => {
       await expect(visitor.requestFreshInvite({ inviteCode: "code-1" })).resolves.toEqual({
         asked: true,
       });
-      expect(requestFreshInvite).toHaveBeenCalledWith({ session: null }, { inviteCode: "code-1" });
+      expect(requestFreshInvite).toHaveBeenCalledWith({ inviteCode: "code-1" });
     });
   });
 
@@ -180,10 +189,7 @@ describe("the signed-out front door", () => {
         windowSeconds: 3600,
         max: 10,
       });
-      expect(requestSignUpVerification).toHaveBeenCalledWith(
-        { session: { user: { id: "user_ana", email: "ana@acme.com" } } },
-        { email: "ana@acme.com" },
-      );
+      expect(requestSignUpVerification).toHaveBeenCalledWith({ email: "ana@acme.com" });
     });
 
     it("refuses an account the process resolved no address for", async () => {
