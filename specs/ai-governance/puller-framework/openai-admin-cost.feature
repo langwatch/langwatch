@@ -221,7 +221,9 @@ Feature: OpenAI Admin cost puller
       And the source starts the new question from the beginning
       # The provider binds a page token to the exact question that produced it
       # and refuses it under any other, so a replayed token fails the run rather
-      # than returning the wrong page.
+      # than returning the wrong page. That binding is verified against the live
+      # API but the provider publishes no promise about it, so it can change
+      # without notice and without this scenario going red.
 
     @integration
     Scenario: Widening the backfill start makes the source read the older days

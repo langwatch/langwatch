@@ -62,14 +62,34 @@ const API_BASE = "https://api.openai.com/v1/organization";
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /** A run stops here rather than paginating forever; the cursor carries the
- *  rest into the next one. At `PAGE_LIMIT` buckets a page this bounds a run at
- *  roughly ten years, so it is a runaway guard rather than a throttle. */
+ *  rest into the next one. The bound is 20 pages of what the provider actually
+ *  returns, and for daily cost buckets that is 31 a page, not the 180 this
+ *  adapter asks for (see `PAGE_LIMIT`) — so a run reaches about 620 days,
+ *  under two years. Reading the bound off the requested limit overstates it
+ *  nearly six-fold as a decade. A backfill deeper than 620 days therefore
+ *  takes several runs to walk; the cursor makes that safe, but an operator
+ *  sizing a first backfill should expect it. */
 const MAX_PAGES_PER_RUN = 20;
 
 /**
- * The API's own ceiling. Above it the request is REJECTED rather than clamped
- * ("Limit must be less than or equal to 180."), so this is a contract value,
- * not a preference. One page is about six months of daily buckets.
+ * The `limit` this adapter asks for, and NOT what it gets.
+ *
+ * 180 is the published contract value — OpenAI's own OpenAPI document gives it
+ * as the cost report's maximum. The wire does not honour it and does not
+ * complain either: asking `/costs` for `limit=32` answers HTTP 200 with 31
+ * buckets, clamped silently rather than rejected (probe A14), and the probe
+ * kit records the wire ceiling for daily cost buckets as 31 against the
+ * published 180. Where the two disagree the wire is what an integration
+ * receives, so a page here is about one month of daily buckets, not six.
+ *
+ * Not the USAGE endpoints' behaviour, which is the opposite and must not be
+ * blurred with it: those DO reject an over-ceiling limit, naming a maximum per
+ * bucket width (probe A13 — 1440 for `1m`, 168 for `1h`, 31 for `1d`). This
+ * adapter never calls them.
+ *
+ * The value stays at 180 deliberately. Paging follows `next_page` rather than
+ * a row count, so asking for more than the provider will give simply returns
+ * the provider's page and costs nothing.
  */
 const PAGE_LIMIT = 180;
 
@@ -145,6 +165,10 @@ export type OpenAiAdminPullConfig = z.infer<typeof openaiAdminPullConfigSchema>;
  * other, and this adapter holds the cursor still on failure — so without the
  * binding one config edit mid-window would wedge the source permanently, every
  * retry replaying the same dead token.
+ *
+ * That binding is wire-verified (probes A32-A35) but UNCONTRACTED: OpenAI
+ * publishes no promise about it, so it can change without a deprecation and
+ * without anything here going red.
  *
  * `hasKeyGrouping` records whether the in-flight window is being read WITH
  * `api_key_id` in the group-by. It has to be durable for the same reason
@@ -354,10 +378,11 @@ async function safeResponseText(response: {
  * Gated on `param` AND `code` together, and never on the message. Both halves
  * are load-bearing: the endpoint's other rejections carry `param: "start_time"`
  * with `code: "invalid_type"` (an unparseable date), or `code:
- * "invalid_request_error"` with `param: null` (a missing date, an over-ceiling
- * limit). Only this refusal carries both. Reading the English instead would
- * make a sentence the provider is free to reword decide whether months of
- * history are attributed.
+ * "invalid_request_error"` with `param: null` (a missing date). Only this
+ * refusal carries both. An over-ceiling `limit` is NOT among them — this
+ * endpoint clamps it and answers 200 (probe A14). Reading the English instead
+ * would make a sentence the provider is free to reword decide whether months
+ * of history are attributed.
  */
 function isKeyGroupingRefusal(body: string): boolean {
   try {
