@@ -48,7 +48,7 @@ deployment plan.
 | Billing spend ledger, fixed 13-month retention (with ClickHouse) | ✅ | ✅ |
 | Webhook endpoints platform (signed event delivery, retries, replay) | ❌ | ✅ |
 | Billing events APIs (spend-events pull, summaries, replay) | ❌ | ✅ |
-| Anomaly Rules, admin-curated detection + dispatch | ❌ | ✅ |
+| Anomaly Rules, admin-curated detection + signed webhook dispatch | ❌ | ✅ |
 | OCSF/SIEM export (Splunk, Datadog, Sentinel pull API) | ❌ | ✅ |
 | Audit log, org-wide cross-team | ❌ | ✅ |
 | SCIM provisioning | ❌ | ✅ |
@@ -73,7 +73,7 @@ the *common-criteria* baseline:
 | CC6.1, Logical access | RBAC catalog + per-project tenancy + RoleBinding scopes | Apache 2.0 |
 | CC6.6, Logical access (admin) | RBAC ADMIN role + `governance:manage` + `aiTools:manage` | Apache 2.0 |
 | CC6.7, Termination of access | CLI token revoke on user deactivation (CliTokenRevocationService, Phase 1B-1) | Apache 2.0 |
-| CC7.1, Detection | Anomaly rules on activity-event traffic (spend-spike, geo-mismatch, off-hours) | **Enterprise** |
+| CC7.1, Detection | Anomaly rules on activity-event traffic (spend-spike; the other rule types are stored but not evaluated yet) | **Enterprise** |
 | CC7.2, Monitoring | Append-only event_log + 49-day default retention | Apache 2.0 |
 | CC7.2, Monitoring (≥1y) | Per-scope retention policies with extended (multi-year) windows | **Enterprise** |
 | CC7.4, Incident response | OCSF v1.1 SIEM export with cursor pagination | **Enterprise** |
@@ -99,7 +99,7 @@ require Enterprise.
 | Art. 32(1)(d), restoration | Backups (env-configured), trace store replay | Apache 2.0 |
 | Art. 30, record of processing | event_log @ 49d retention | Apache 2.0 |
 | Art. 30, record of processing (extended) | event_log under extended per-scope retention policies | **Enterprise** |
-| Art. 33, breach notification | Anomaly rule dispatch (Slack, PagerDuty, SIEM webhook, email) | **Enterprise** |
+| Art. 33, breach notification | Anomaly rule dispatch, a signed webhook POST to the rule's destination URL (rules cannot be created in the app today) | **Enterprise** |
 | Art. 35, DPIA evidence | OCSF/SIEM export bundle | **Enterprise** |
 
 If your processor agreement requires retention longer than the 49-day
@@ -155,7 +155,7 @@ provider/deployer record-keeping (Art. 18) map onto:
 - **Art. 12(2)(a) period of operation**: Apache 2.0 (trace timestamps in event_log)
 - **Art. 12(2)(b) reference DB used**: Apache 2.0 (`gen_ai.system` + `gen_ai.request.model` attrs on each span)
 - **Art. 12(2)(c) input data check**: Apache 2.0 (prompt + tool-call payloads on traces, redacted via Presidio)
-- **Art. 12(2)(d) human oversight**: **Enterprise** anomaly-rule dispatch (so a person reviews flagged events) + OCSF/SIEM forwarding
+- **Art. 12(2)(d) human oversight**: **Enterprise** anomaly-rule webhook dispatch (so a person reviews flagged events), with OCSF/SIEM forwarding of governance events alongside it. The two are separate paths: anomaly alerts arrive over the webhook, never as a record in the OCSF export
 - **Art. 18(1) record-keeping ≥10y**: Enterprise extended retention policies, with windows set in years to match the record-keeping clause your assessment requires.
 
 Most enterprise-deploying-an-LLM-agent uses fall under Art. 12 (1-3
@@ -167,8 +167,10 @@ explicitly requires the Enterprise retention extension.
 These are deliberate design boundaries that keep the Apache 2.0 floor
 free to run and free to modify:
 
-- **Anomaly detection + dispatch** is Enterprise. The detection is the
-  thing you pay for.
+- **Anomaly detection + webhook dispatch** is Enterprise. The detection is
+  the thing you pay for. Webhook is the only destination type; Slack,
+  PagerDuty and email are not implemented, so route through your own
+  receiver if you need them.
 - **Extended retention** is Enterprise. The default window is sufficient for
   CC7.2 monitoring + Art. 30 GDPR processing-records-baseline.
 - **OCSF/SIEM export** is Enterprise. Apache 2.0 customers can still

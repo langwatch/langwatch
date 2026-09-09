@@ -549,7 +549,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Detection
 
-- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): What the anomaly detector evaluates, what a rule is made of, and why rules cannot be created in the app today.
+- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): What the anomaly detector evaluates, what a rule is made of, how a fired alert reaches you, and why rules cannot be created in the app today.
 
 ## Compliance & Architecture
 

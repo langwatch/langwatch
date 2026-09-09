@@ -241,7 +241,7 @@ is shaped like its first caller. Revisit at the third provider.
 
 **12. `openai_compliance` is deprecated in place, still listed.**
 
-> **[NOT IMPLEMENTED — see revision v3.]** No code path deprecates
+> **[NOT IMPLEMENTED — see revision v3. OVERTAKEN — see revision v5.]** No code path deprecates
 > `openai_compliance`. Its catalog entry carries no `deprecated` flag
 > (`ingestionSourceCatalog.tsx:142-149`), so the picker offers it for new
 > sources exactly as before. The `deprecated` flag itself does exist and is
@@ -252,6 +252,24 @@ is shaped like its first caller. Revisit at the third provider.
 > expect that (`ingestionSourceCatalog.unit.test.ts:19,27-41`) instead of
 > staying green unchanged. Both halves of the decision below — the badge and
 > the badging of this source type — are therefore unbuilt.
+>
+> **[OVERTAKEN — see revision v5.]** The type is deprecated now, by the
+> mechanism this decision rejected rather than the one it chose.
+> `openai_compliance` carries `deprecated: true`
+> (`ingestionSourceCatalog.tsx:199`), and two other types carry it beside it:
+> `copilot_studio` (`:172`) and `claude_compliance` (`:221`).
+> `offeredSourceTypeOptions` filters every flagged entry out of the offered
+> list (`:343-344`), and the picker reads that list through
+> `gatedSourceTypeOptions` (`:376,381`), so all three are **hidden** rather
+> than shown behind a disabled badge. The entries stay in the catalog array
+> so existing rows keep their label and the completeness guard still
+> compiles. What survives of the decision is its intent — the type cannot be
+> chosen for a new source — not its mechanism.
+>
+> **No backfill was done and none is planned.** Rows already configured on
+> any of the three types, and the data those rows already pulled, are
+> untouched; nothing here repairs, re-pulls or removes them, and no owner or
+> date is attached to doing so.
 
 It stays
 registered, stays in the catalog array, and stays **visible** in the picker
@@ -311,7 +329,7 @@ can exist, so there is nothing to repair.
 | Cost figure → ledger | No — `argMax` replacement destroys the prior figure | Money | Human review, plus the no-division and costless-read tests above. A dollar figure is asserted end to end against a captured payload, not a hand-written one. |
 | Provider identity ids leaving for third-party SIEMs | No — an export is a send | Privacy | Human review. `governanceOcsfEvents.clickhouse.repository.ts:236,284` exports `RawOcsfJson` to whatever SIEM an org has wired, and `raw_payload` is **required** on every pull event (`pullerAdapter.ts:96`), so the provider's ids egress by construction. Not introduced here — Anthropic and Genie already do it — but named so it is a decision rather than an accident. |
 | `openai_admin` `pullConfig` shape | No — persists in customer rows | Small (no row exists yet) | Human review of the schema. Validated at create time by `validateConfig`. |
-| `openai_compliance` badged deprecated | Yes | Small | Automated: the two existing catalog tests must stay green **unchanged** — the picker still offers every registered type (Decision 12). **[NOT IMPLEMENTED — v3: nothing badges this type, and the catalog tests were rewritten rather than left unchanged.]** |
+| `openai_compliance` badged deprecated | Yes | Small | Automated: the two existing catalog tests must stay green **unchanged** — the picker still offers every registered type (Decision 12). **[NOT IMPLEMENTED — v3: nothing badges this type, and the catalog tests were rewritten rather than left unchanged. v5: the type is hidden instead of badged, so this gate's condition can never be met as written — see Decision 12.]** |
 | The trailing re-read window | Yes — read-only, bounded by a constant | Small | Automated: the restatement invariant above, plus a test that the watermark does not rewind. |
 | Live pull against the real Admin API | Read-only | None | Required before merge. A fixture alone has never caught a wire-shape error in this codebase. |
 
@@ -396,6 +414,8 @@ extra: {
   listed. A disabled badge achieves the same end. **[v3: the codebase since
   chose hiding for the one type it did retire, and rewrote the catalog tests
   to match; `openai_compliance` itself was never deprecated at all.]**
+  **[v5: this rejection no longer holds — hiding is what shipped, for this
+  type and two others. See Decision 12.]**
 - **A uniqueness guard on duplicate sources** — belongs on every adapter,
   not this one alone.
 - **Extract a shared bucket-report base** — n=2 is a coincidence, and the
@@ -550,6 +570,8 @@ adapter duplicates cursor logic a third provider may justify factoring out.
     the "hide it" alternative this ADR rejected — and the catalog test was
     rewritten to expect that (`ingestionSourceCatalog.unit.test.ts:19,27-41`)
     rather than staying green unchanged as the Gates row required.
+    **[Overtaken in v5: the flag is on the type now, and hiding is the
+    shipped behaviour.]**
   - Stale citations refreshed: `pullerWorker.ts:587` → `:1096`, `:602` →
     `:1110`, `activityMonitor.service.ts:354` → `:379`.
 - **v4 (2026-09-09) — the actor-field divergence is resolved in code.** v3
@@ -592,3 +614,27 @@ adapter duplicates cursor logic a third provider may justify factoring out.
     `ocsfPullEventMapping.ts:108`; `pullerWorker.ts:1080,1110-1112` →
     `ocsfPullEventMapping.ts:43-51,92,123-124`; `openaiAdmin.puller.ts:400,851`
     → `:403,864`.
+
+- **v5 (2026-09-09) — Decision 12 shipped, by the rejected mechanism.** No
+  decision is taken here. v3 recorded Decision 12 as unbuilt; it is built now,
+  and the prose describing it as unbuilt is marked rather than removed so the
+  record of what was decided, and what shipped instead, both survive.
+  - **Three source types are deprecated and hidden.** `copilot_studio`
+    (`ingestionSourceCatalog.tsx:163-179`), `openai_compliance` (`:189-200`)
+    and `claude_compliance` (`:209-222`) each carry `deprecated: true`.
+    `offeredSourceTypeOptions` removes every flagged entry from the offered
+    list (`:343-344`) and `gatedSourceTypeOptions` derives the picker from it
+    (`:376,381`), so none of the three appears in the Add source menu. Their
+    catalog entries remain, which is what keeps their labels resolvable on
+    rows that already exist.
+  - **Hidden, not badged.** Decision 12 chose a visible disabled badge and
+    named hiding as a rejected alternative; the shipped behaviour is hiding.
+    The two are equivalent on the outcome the decision cared about — the type
+    cannot be picked for a new source — and differ on whether a reader of the
+    menu can see that the type once existed. The Gates row for this decision
+    is unmeetable as written and is marked so.
+  - **No backfill.** Nothing was done to data already pulled on a deprecated
+    type, and nothing is planned. Rows stay as they are, with their label
+    intact; no owner and no date are attached to changing that.
+  - Stale citations refreshed: `ingestionSourceCatalog.tsx:142-149` →
+    `:171-181`; `ingestionSourceCatalog.tsx:293` → `:324`.
