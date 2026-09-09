@@ -355,12 +355,24 @@ export const afterUserCreate = async ({
 export const beforeAccountCreate = async ({
   prisma,
   account,
+  linkEvidence,
 }: {
   prisma: PrismaClient;
   account: {
     userId: string;
     providerId: string;
     accountId: string;
+    idToken?: string;
+  };
+  /** ADR-117 §3's evidence rule. Optional so the many tests that predate it
+   *  keep exercising the SSO-domain behaviour below unchanged. */
+  linkEvidence?: {
+    refusalForLink(input: {
+      userId: string;
+      providerId: string;
+      providerAccountId: string;
+      idToken: string | undefined;
+    }): Promise<string | null>;
   };
 }): Promise<void> => {
   const user = await prisma.user.findUnique({
@@ -376,6 +388,35 @@ export const beforeAccountCreate = async ({
     throw APIError.from("FORBIDDEN", {
       code: "USER_DEACTIVATED",
       message: "USER_DEACTIVATED",
+    });
+  }
+
+  // ADR-117 §3, BEFORE the ssoDomain rules below, because this is not one of
+  // them: whether the identity provider's evidence supports attaching this
+  // account to this person is a question every deployment asks, licensed or
+  // not, SSO-enforced or not. A provider that asserted nothing (no ID token,
+  // or no `email_verified` beside the address) refuses nothing, so this is
+  // silent on every path that did not carry the evidence to judge.
+  const refusal = await linkEvidence?.refusalForLink({
+    userId: account.userId,
+    providerId: account.providerId,
+    providerAccountId: account.accountId,
+    idToken: account.idToken,
+  });
+  if (refusal) {
+    logger.warn(
+      {
+        userId: user.id,
+        providerId: account.providerId,
+        reason: refusal,
+      },
+      "Refused a sign-in link on insufficient evidence; a proposal was recorded for an administrator",
+    );
+    // APIError so better-auth carries the code into the callback redirect,
+    // where /auth/error renders the copy registered for it.
+    throw APIError.from("FORBIDDEN", {
+      code: "LINK_NEEDS_APPROVAL",
+      message: "LINK_NEEDS_APPROVAL",
     });
   }
 

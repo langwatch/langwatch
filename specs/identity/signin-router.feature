@@ -209,6 +209,36 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then a LinkProposed event is recorded and the sign-in is refused with guidance
     And confirming the proposal later attaches the identifier and admits the user
 
+  # WHERE THE RULE ABOVE ACTUALLY RUNS.
+  #
+  # The four scenarios above describe the callback service that owns the whole
+  # decision: resolve the person, then link, propose or provision. On every
+  # deployment we run, the identity library owns that resolution instead, and
+  # the only moment it offers before a sign-in method exists is one where the
+  # link has already been chosen. So the same rule is applied there, from the
+  # one shared refusal function, and these two scenarios bind THAT — a
+  # scenario bound only to the service above would be bound to code no
+  # deployment reaches.
+  #
+  # It judges an addition to an account that already signs in some way. A
+  # person with no sign-in method yet is covered by
+  # specs/auth/sso-orphan-user-linking.feature, which binds the same question
+  # against a real callback.
+
+  @unit
+  Scenario: The evidence rule also guards a method added to an established account
+    Given somebody who already signs in one way
+    And a second method whose identity provider says the address is not verified
+    When that method would be attached to their account
+    Then the attachment is refused and nothing is attached
+    And a link proposal is recorded for an admin to confirm
+
+  @unit
+  Scenario: An identity provider that asserts nothing refuses nothing
+    Given a second method whose identity provider makes no claim about the address
+    When that method would be attached to an established account
+    Then it is attached exactly as it was before this rule existed
+
   @unit
   Scenario: No match provisions just-in-time only where the connection allows
     Given a callback subject and email matching no user

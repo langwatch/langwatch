@@ -21,6 +21,7 @@ import {
   sessionCallbackEvidence,
   sessionClaims,
   sessionRevocation,
+  signInLinkEvidence,
   signUpConfirmationEndpoint,
   twoStepAccount,
 } from "~/server/app-layer/identity/runtime";
@@ -69,6 +70,7 @@ interface AccountHookRow {
   userId: string;
   providerId: string;
   accountId: string;
+  idToken?: string;
 }
 
 const legacyDatabaseHooks = () => ({
@@ -86,7 +88,11 @@ const legacyDatabaseHooks = () => ({
     user: { id: string; email: string; name: string };
   }) => afterUserCreate({ prisma, user }),
   beforeAccountCreate: ({ account }: { account: AccountHookRow }) =>
-    beforeAccountCreate({ prisma, account }),
+    beforeAccountCreate({
+      prisma,
+      account,
+      linkEvidence: signInLinkEvidence(),
+    }),
   afterAccountCreate: ({ account }: { account: AccountHookRow }) =>
     afterAccountCreate({ prisma, account }),
   afterAccountUpdate: ({ account }: { account: AccountHookRow }) =>

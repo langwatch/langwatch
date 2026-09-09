@@ -129,6 +129,7 @@ export {
   type CallbackAuditRecord,
   type CallbackLinkOutcome,
   type CallbackUserMatch,
+  linkRefusalFor,
   type SignInCallbackAudit,
   type SignInCallbackDirectoryPort,
   SignInCallbackLinkingService,
