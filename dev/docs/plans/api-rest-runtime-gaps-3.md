@@ -69,7 +69,24 @@ parallel mechanism.
     `packages/features/dataset/server/src/rules/dataset-generate-tools.rules.ts`. Item 2's raw response covers the body;
     what is missing is the session door (14).
 
-## Part C: tRPC (next lane, after the D-o split)
+## Part C: tRPC — LANDED `913e0feaec` (09-09 15:1x)
+
+Public names: `.withAccess(publicRoute({ reason }))` on a procedure (runs on the runtime's `anonymousProcedure`, no
+Actor, identity port never consulted, refused if the contract input names a scope field); `browserSessionFact` and
+`callerAddressFact` declared with `.withFacts(...)`, bound at the mount with `bindTrpcHeader` / `bindTrpcFact`, values
+reach the handler after its arguments in declaration order; `.withPermission([a, b])` is AND, one `permission_denied`
+naming the permission it stopped on. `trpc/runtime.ts` is 1,609 lines; the declaration half (~300 lines) is the cut
+when it passes 1,800.
+
+### Wiring still owed (the consumer lines, one lane)
+
+- `packages/features/monitor/server/src/transport/monitor.trpc.ts:19-31`: `.serviceAuthorized({... permissions: ["evaluations:view", "analytics:view"] ...})` → `.withPermission(["evaluations:view", "analytics:view"])`; `MonitorApp.performanceForProject`'s second check goes.
+- `packages/features/authz/contract/src/declared-middleware.ts:28-43`: `AuthzDeclaration` gains `{ kind: "permission-all"; permissions; via? }` and `{ kind: "public"; reason }`.
+- `apps/api/src/app-trpc/__tests__/authz-declaration-sweep.unit.test.ts:160-177`: `coveredScopeFields` gains `case "permission-all"` (flatMap `forPermission`) and `case "public"` (`[]`).
+- `apps/api/src/app-trpc/app-trpc.policy.ts:122-126`: `createTrpcRuntime({ ..., anonymousProcedure: root.procedure })`, and fact bindings at the mounts that declare them.
+- `packages/features/user/server/src/transport/api-trpc/user.api.ts` (`register` on `publicRoute` + `callerAddressFact`, `otherSessionsToRevoke` on `browserSessionFact`) lands with the user module's conversion off `createTrpcService`.
+
+Original item 13 text follows.
 
 13. An anonymous procedure kind (`register`), the browser session's row id on the Actor or as a fact
     (`otherSessionsToRevoke`), the caller's address as a fact (register throttle), and an AND-composed permission
