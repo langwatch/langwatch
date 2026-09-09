@@ -750,6 +750,14 @@ const LEGACY_PARTIAL: string[] = [
   "specs/monitors/online-evaluator-loop-prevention.feature",
   "specs/navigation/shared-section-navigation-layout.feature",
   "specs/npx-installer/07-lean-install.feature",
+  // Reason: became partially tagged after this list was seeded (#7932 added
+  // three @unit metric scenarios and correctly retired the file's LEGACY_INERT
+  // entry, which no longer applied). Its eight untagged scenarios describe
+  // Prometheus alert rules, Helm chart packaging and dashboards kept in a
+  // separate repository — nothing this TypeScript-only scanner can bind (#3770).
+  // Whether each is implemented is not established, so they are left untagged
+  // rather than mislabelled; the per-scenario audit is tracked by #8024.
+  "specs/observability/process-substrate-alerting.feature",
   "specs/ops/internal-feature-flags.feature",
   "specs/optimization-studio/component-execution.feature",
   "specs/otlp/canonical-metric-ingestion.feature",
