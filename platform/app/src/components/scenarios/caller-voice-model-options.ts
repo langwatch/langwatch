@@ -20,7 +20,11 @@ export interface ProviderCredentialView {
  * signal the chat picker uses; a project with no such provider yields no
  * options, so the picker shows its "add a provider" empty state.
  */
-export function callerVoiceOptions(providers: ProviderCredentialView[]): {
+export function callerVoiceOptions({
+  providers,
+}: {
+  providers: ProviderCredentialView[];
+}): {
   options: string[];
   displayNames: Record<string, string>;
 } {

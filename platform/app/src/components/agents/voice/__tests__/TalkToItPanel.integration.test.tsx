@@ -25,7 +25,11 @@ vi.mock("../voice-transport-client.registry", () => ({
 }));
 
 import { TalkToItPanel } from "../TalkToItPanel";
-import { CONSENT_NOTICE, MIC_DENIED_MESSAGE } from "../talkToItMachine";
+import {
+  CONSENT_NOTICE,
+  MIC_BLOCKED_MESSAGE,
+  MIC_DENIED_MESSAGE,
+} from "../talkToItMachine";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -102,7 +106,7 @@ describe("TalkToItPanel", () => {
                 runId: "voicecall_x",
                 agentId: "agent_1",
                 source: "provider",
-                fetchFailed: false,
+                hasFetchFailed: false,
                 hasAudio: true,
                 audioUrl,
               }),
@@ -192,7 +196,7 @@ describe("TalkToItPanel", () => {
             runId: "voicecall_x",
             agentId: "agent_1",
             source: "provider",
-            fetchFailed: false,
+            hasFetchFailed: false,
             hasAudio: false,
           });
         }
@@ -396,6 +400,33 @@ describe("TalkToItPanel", () => {
       });
       expect(screen.queryByText("Connecting")).not.toBeInTheDocument();
       expect(openCall).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the page's Permissions-Policy blocks the microphone", () => {
+    /** @scenario "A page-level microphone block is named, not reported as a denial" */
+    it("names the policy, never calls getUserMedia and starts no run", async () => {
+      const getUserMedia = vi.fn();
+      Object.defineProperty(navigator, "mediaDevices", {
+        configurable: true,
+        value: { getUserMedia },
+      });
+      Object.defineProperty(document, "featurePolicy", {
+        configurable: true,
+        value: { allowsFeature: (feature: string) => feature !== "microphone" },
+      });
+      try {
+        renderPanel();
+        await waitFor(() => {
+          expect(screen.getByTestId("talk-error")).toHaveTextContent(
+            MIC_BLOCKED_MESSAGE,
+          );
+        });
+        expect(getUserMedia).not.toHaveBeenCalled();
+        expect(openCall).not.toHaveBeenCalled();
+      } finally {
+        Reflect.deleteProperty(document, "featurePolicy");
+      }
     });
   });
 });

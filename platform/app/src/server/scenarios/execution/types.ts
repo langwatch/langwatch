@@ -396,7 +396,7 @@ export const ScenarioExecutionResultSchema = z.object({
   /** The connected agent instance that answered the run, when one did. */
   agentInstance: ScenarioAgentInstanceSchema.optional(),
   /** A voice run LangWatch ended at VOICE_CALL_MAX_SECONDS (AC28). */
-  cutAtLimit: z.boolean().optional(),
+  isCutAtLimit: z.boolean().optional(),
 });
 export type ScenarioExecutionResult = z.infer<
   typeof ScenarioExecutionResultSchema

@@ -69,34 +69,49 @@ describe("AgentTypeSelectorDrawer", () => {
     );
   };
 
-  describe("Basic rendering", () => {
-    it("shows the Choose Agent Connection Type header", async () => {
-      renderDrawer();
-      await waitFor(() => {
-        expect(
-          screen.getByText("Choose Agent Connection Type"),
-        ).toBeInTheDocument();
+  describe("given the drawer is open", () => {
+    describe("when it renders", () => {
+      it("shows the Choose Agent Connection Type header", async () => {
+        renderDrawer();
+        await waitFor(() => {
+          expect(
+            screen.getByText("Choose Agent Connection Type"),
+          ).toBeInTheDocument();
+        });
       });
-    });
 
-    /** @scenario AgentTypeSelectorDrawer shows two options */
-    /** @scenario Agent types available */
-    it("shows only code and workflow agent type options", async () => {
-      renderDrawer();
-      await waitFor(() => {
-        expect(screen.getByText("Code Agent")).toBeInTheDocument();
-        expect(screen.getByText("Workflow Agent")).toBeInTheDocument();
+      /** @scenario AgentTypeSelectorDrawer shows two options */
+      /** @scenario Agent types available */
+      it("shows only code and workflow agent type options", async () => {
+        renderDrawer();
+        await waitFor(() => {
+          expect(screen.getByText("Code Agent")).toBeInTheDocument();
+          expect(screen.getByText("Workflow Agent")).toBeInTheDocument();
+        });
+        expect(screen.queryByText("Prompt Agent")).not.toBeInTheDocument();
       });
-      // Prompt Agent should no longer exist
-      expect(screen.queryByText("Prompt Agent")).not.toBeInTheDocument();
-    });
 
-    it("shows the Voice Agent option", async () => {
-      renderDrawer();
-      await waitFor(() => {
-        expect(screen.getByText("Voice Agent")).toBeInTheDocument();
+      it("shows the Voice Agent option", async () => {
+        renderDrawer();
+        await waitFor(() => {
+          expect(screen.getByText("Voice Agent")).toBeInTheDocument();
+        });
+        expect(screen.getByTestId("agent-type-voice")).toBeInTheDocument();
       });
-      expect(screen.getByTestId("agent-type-voice")).toBeInTheDocument();
+
+      it("shows descriptions for each type", async () => {
+        renderDrawer();
+        await waitFor(() => {
+          expect(
+            screen.getByText(
+              "Write custom Python code to process inputs and generate outputs",
+            ),
+          ).toBeInTheDocument();
+          expect(
+            screen.getByText("Create a new workflow for custom agent logic"),
+          ).toBeInTheDocument();
+        });
+      });
     });
 
     describe("given the release_voice_agents_enabled flag is off", () => {
@@ -111,20 +126,6 @@ describe("AgentTypeSelectorDrawer", () => {
         expect(
           screen.queryByTestId("agent-type-voice"),
         ).not.toBeInTheDocument();
-      });
-    });
-
-    it("shows descriptions for each type", async () => {
-      renderDrawer();
-      await waitFor(() => {
-        expect(
-          screen.getByText(
-            "Write custom Python code to process inputs and generate outputs",
-          ),
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText("Create a new workflow for custom agent logic"),
-        ).toBeInTheDocument();
       });
     });
   });

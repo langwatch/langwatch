@@ -39,7 +39,7 @@ export interface CallRecord {
   turns: CallTurn[];
   /** Whole-call recording, when the provider returned one. */
   audioUrl?: string;
-  cutAtLimit: boolean;
+  isCutAtLimit: boolean;
   source: CallRecordSource;
 }
 
@@ -60,14 +60,14 @@ export function browserTranscriptToCallRecord({
   transcript,
   startedAt,
   endedAt,
-  cutAtLimit,
+  isCutAtLimit,
 }: {
   conversationId: string;
   transport: VoiceTransport;
   transcript: BrowserTranscriptTurn[];
   startedAt: number;
   endedAt: number;
-  cutAtLimit: boolean;
+  isCutAtLimit: boolean;
 }): CallRecord {
   return {
     conversationId,
@@ -76,7 +76,7 @@ export function browserTranscriptToCallRecord({
     endedAt,
     durationMs: Math.max(0, endedAt - startedAt),
     turns: transcript.map((turn) => ({ role: turn.role, text: turn.text })),
-    cutAtLimit,
+    isCutAtLimit,
     source: "browser",
   };
 }

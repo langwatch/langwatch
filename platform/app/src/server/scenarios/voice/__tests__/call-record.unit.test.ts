@@ -35,12 +35,12 @@ describe("browserTranscriptToCallRecord", () => {
         ],
         startedAt: 1000,
         endedAt: 4000,
-        cutAtLimit: true,
+        isCutAtLimit: true,
       });
 
       expect(record.source).toBe("browser");
       expect(record.durationMs).toBe(3000);
-      expect(record.cutAtLimit).toBe(true);
+      expect(record.isCutAtLimit).toBe(true);
       expect(record.audioUrl).toBeUndefined();
       expect(record.turns).toEqual([
         { role: "caller", text: "hello" },

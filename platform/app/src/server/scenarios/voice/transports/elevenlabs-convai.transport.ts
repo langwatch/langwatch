@@ -292,7 +292,7 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
       turns: (body.transcript ?? [])
         .filter((entry) => (entry.message ?? "").trim().length > 0)
         .map(toTurn),
-      cutAtLimit: false,
+      isCutAtLimit: false,
       source: "provider",
     };
     // Audio bytes carry the key to fetch, so they are streamed through the app

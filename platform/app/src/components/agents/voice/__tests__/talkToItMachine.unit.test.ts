@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   initialTalkState,
+  MIC_BLOCKED_MESSAGE,
   MIC_DENIED_MESSAGE,
   MINT_FAILED_PREFIX,
   NO_KEY_MESSAGE,
@@ -24,6 +25,17 @@ describe("talkReducer", () => {
         kind: "error",
         code: "mic_denied",
         message: MIC_DENIED_MESSAGE,
+      });
+    });
+  });
+
+  describe("when the page's Permissions-Policy blocks the microphone", () => {
+    it("names the policy instead of asking the user to allow a prompt they never saw", () => {
+      const state = drive([{ type: "START" }, { type: "MIC_BLOCKED" }]);
+      expect(state).toEqual({
+        kind: "error",
+        code: "mic_blocked",
+        message: MIC_BLOCKED_MESSAGE,
       });
     });
   });
@@ -61,7 +73,7 @@ describe("talkReducer", () => {
         { type: "CONNECTED", conversationId: "conv_1" },
         { type: "LIMIT_REACHED" },
       ]);
-      expect(state).toMatchObject({ kind: "saving", cutAtLimit: true });
+      expect(state).toMatchObject({ kind: "saving", isCutAtLimit: true });
     });
   });
 
@@ -92,13 +104,13 @@ describe("talkReducer", () => {
           runId: "voicecall_1",
           agentId: "agent_1",
           hasAudio: false,
-          fetchFailed: true,
+          hasFetchFailed: true,
         },
       ]);
       expect(state).toMatchObject({
         kind: "done",
         runId: "voicecall_1",
-        fetchFailed: true,
+        hasFetchFailed: true,
         hasAudio: false,
       });
     });

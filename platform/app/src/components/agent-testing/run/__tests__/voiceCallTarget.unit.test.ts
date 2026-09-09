@@ -53,7 +53,7 @@ const PLAN_SUBJECT: RunDialogSubject = {
 };
 
 describe("voiceCallTargetOf", () => {
-  describe("when the selected target is a saved voice agent", () => {
+  describe("given the selected target is a saved voice agent", () => {
     it("resolves the transport, the agent id and the saved row id", () => {
       const result = voiceCallTargetOf({
         form: form({ target: { type: "voice", id: "agent_voice" } }),
@@ -69,8 +69,7 @@ describe("voiceCallTargetOf", () => {
     });
   });
 
-  describe("when the run dialog runs one scenario", () => {
-    /** @scenario "Call it myself against a scenario and be scored on its criteria" */
+  describe("given the run dialog runs one scenario", () => {
     it("carries that scenario id so the call is scored under it", () => {
       const result = voiceCallTargetOf({
         form: form({ target: { type: "voice", id: "agent_voice" } }),
@@ -80,7 +79,7 @@ describe("voiceCallTargetOf", () => {
     });
   });
 
-  describe("when the scope is not a single scenario", () => {
+  describe("given the scope is not a single scenario", () => {
     it("resolves the call but names no scenario to score under", () => {
       const result = voiceCallTargetOf({
         form: form({ target: { type: "voice", id: "agent_voice" } }),
@@ -91,8 +90,7 @@ describe("voiceCallTargetOf", () => {
     });
   });
 
-  describe("when the selected target is not a voice agent", () => {
-    /** @scenario "Existing HTTP, Code and Workflow agent flows are unchanged" */
+  describe("given the selected target is not a voice agent", () => {
     it("resolves no voice-call, so no Call it myself action is offered", () => {
       expect(
         voiceCallTargetOf({
@@ -115,7 +113,7 @@ describe("voiceCallTargetOf", () => {
     });
   });
 
-  describe("when a voice agent has no usable transport config", () => {
+  describe("given a voice agent has no usable transport config", () => {
     it("resolves nothing rather than opening a call it cannot mint", () => {
       const result = voiceCallTargetOf({
         form: form({
@@ -130,7 +128,7 @@ describe("voiceCallTargetOf", () => {
     });
   });
 
-  describe("when the agent id exceeds the shared schema's 128-character limit", () => {
+  describe("given the agent id exceeds the shared schema's 128-character limit", () => {
     it("resolves nothing rather than opening a call with an id the server would reject", () => {
       const result = voiceCallTargetOf({
         form: form({

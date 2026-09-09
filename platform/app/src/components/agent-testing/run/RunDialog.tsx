@@ -258,7 +258,7 @@ function RunDialogContent({
 } & ReturnType<typeof useRunDialogState>) {
   // The panel opens in place of the fields when the person calls the agent
   // themselves; leaving the call returns to the dialog it was opened from.
-  const [calling, setCalling] = useState(false);
+  const [isCalling, setIsCalling] = useState(false);
   const voiceAgentsEnabled = useVoiceAgentsEnabled();
   const voiceCall = voiceAgentsEnabled
     ? voiceCallTargetOf({ form, subject })
@@ -283,10 +283,10 @@ function RunDialogContent({
         data-testid={subject.kind === "case" ? "run-case-dialog" : "run-dialog"}
       >
         <RunDialogHeader subject={subject} />
-        {calling && voiceCall ? (
+        {isCalling && voiceCall ? (
           <RunDialogCallBody
             voiceCall={voiceCall}
-            onBack={() => setCalling(false)}
+            onBack={() => setIsCalling(false)}
           />
         ) : (
           <>
@@ -310,7 +310,9 @@ function RunDialogContent({
               blockedReason={runBlockedReason({ subject, form, controller })}
               warning={offender ? RUN_MISSING_MAPPINGS_TOOLTIP : null}
               onRun={onRun}
-              {...(voiceCall ? { onCallItMyself: () => setCalling(true) } : {})}
+              {...(voiceCall
+                ? { onCallItMyself: () => setIsCalling(true) }
+                : {})}
               caseCount={form.caseCount}
               targetCount={form.runTargets.length}
               onClose={onClose}

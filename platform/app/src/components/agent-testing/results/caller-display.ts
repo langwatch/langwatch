@@ -14,7 +14,10 @@ export function runCallerKind(run: ScenarioRunData): CallerKind | null {
   return run.metadata?.langwatch?.callerKind ?? null;
 }
 
-/** The words a person reads for each caller kind. */
+/**
+ * "You" rather than the vendor-neutral "human", because a panel run's caller
+ * is literally the person reading the table, not a labelled test persona.
+ */
 export function callerLabel(kind: CallerKind): string {
   return kind === "human" ? "You" : "Simulated";
 }

@@ -9,7 +9,10 @@
  * a vendor: the transport does, behind {@link voiceTransportRegistry}.
  */
 
+import { HandledError } from "@langwatch/handled-error";
+
 import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
+import { VOICE_AGENTS_DISABLED_MESSAGE } from "~/server/featureFlag/voiceAgents.message";
 import {
   type BrowserTranscriptTurn,
   browserTranscriptToCallRecord,
@@ -24,29 +27,31 @@ import {
 } from "./voice-transport.registry";
 
 /** The project has no key for this transport, so no session can be minted. */
-export class VoiceKeyMissingError extends Error {
-  readonly code = "voice_key_missing" as const;
+export class VoiceKeyMissingError extends HandledError {
+  declare readonly code: "voice_key_missing";
   constructor(message: string) {
-    super(message);
+    super("voice_key_missing", message, { httpStatus: 400 });
     this.name = "VoiceKeyMissingError";
   }
 }
 
 /** A run cannot be created for an unsaved agent without a name to save it
  *  under. The panel collects one and retries. */
-export class VoiceNameRequiredError extends Error {
-  readonly code = "voice_name_required" as const;
+export class VoiceNameRequiredError extends HandledError {
+  declare readonly code: "voice_name_required";
   constructor() {
-    super("A name is required to save the agent");
+    super("voice_name_required", "A name is required to save the agent", {
+      httpStatus: 400,
+    });
     this.name = "VoiceNameRequiredError";
   }
 }
 
 /** The provider refused the mint (bad agent id, network, API error). */
-export class VoiceMintFailedError extends Error {
-  readonly code = "voice_mint_failed" as const;
+export class VoiceMintFailedError extends HandledError {
+  declare readonly code: "voice_mint_failed";
   constructor(message: string) {
-    super(message);
+    super("voice_mint_failed", message, { httpStatus: 400 });
     this.name = "VoiceMintFailedError";
   }
 }
@@ -56,10 +61,14 @@ export class VoiceMintFailedError extends Error {
  * session token was minted for. Reported without writing anything, so one
  * project cannot pull another's conversation into its runs.
  */
-export class VoiceConversationMismatchError extends Error {
-  readonly code = "voice_conversation_mismatch" as const;
+export class VoiceConversationMismatchError extends HandledError {
+  declare readonly code: "voice_conversation_mismatch";
   constructor() {
-    super("This conversation does not belong to the minted session");
+    super(
+      "voice_conversation_mismatch",
+      "This conversation does not belong to the minted session",
+      { httpStatus: 400 },
+    );
     this.name = "VoiceConversationMismatchError";
   }
 }
@@ -69,11 +78,81 @@ export class VoiceConversationMismatchError extends Error {
  * exists but is not a voice agent. Minting never trusts a client-supplied
  * vendor agent id (AC13/AC29) — the row is the only source of it.
  */
-export class VoiceAgentRowNotFoundError extends Error {
-  readonly code = "agent_not_found" as const;
+export class VoiceAgentRowNotFoundError extends HandledError {
+  declare readonly code: "agent_not_found";
   constructor() {
-    super("The voice agent was not found in this project");
+    super("agent_not_found", "The voice agent was not found in this project", {
+      httpStatus: 404,
+    });
     this.name = "VoiceAgentRowNotFoundError";
+  }
+}
+
+/** The session token failed verification, or was minted for another project. */
+export class VoiceSessionInvalidError extends HandledError {
+  declare readonly code: "voice_session_invalid";
+  constructor() {
+    super("voice_session_invalid", "The session is invalid or has expired", {
+      httpStatus: 400,
+    });
+    this.name = "VoiceSessionInvalidError";
+  }
+}
+
+/** No live auth session behind a voice request. */
+export class VoiceUnauthenticatedError extends HandledError {
+  declare readonly code: "unauthorized";
+  constructor() {
+    super("unauthorized", "Sign in to continue", { httpStatus: 401 });
+    this.name = "VoiceUnauthenticatedError";
+  }
+}
+
+/**
+ * The whole "Talk to it" door is behind the product flag: a project without it
+ * turned on gets the same 404 the drawer and the run dialog render for, not a
+ * 403 that would leak that the door exists at all (AC29).
+ */
+export class VoiceAgentsGateDisabledError extends HandledError {
+  declare readonly code: "voice_agents_disabled";
+  constructor() {
+    super("voice_agents_disabled", VOICE_AGENTS_DISABLED_MESSAGE, {
+      httpStatus: 404,
+    });
+    this.name = "VoiceAgentsGateDisabledError";
+  }
+}
+
+/**
+ * The audio proxy found no run for this conversation in the project, or the
+ * provider had nothing to stream back. Kept 404 (not 400) so it reads like
+ * the resource itself is missing, matching the flag-off and row-not-found
+ * responses on the same door.
+ */
+export class VoiceRecordingUnavailableError extends HandledError {
+  declare readonly code: "voice_recording_unavailable";
+  constructor() {
+    super(
+      "voice_recording_unavailable",
+      "The call recording is not available",
+      {
+        httpStatus: 404,
+      },
+    );
+    this.name = "VoiceRecordingUnavailableError";
+  }
+}
+
+/** The audio proxy has no provider key to fetch the recording with. */
+export class VoiceRecordingKeyMissingError extends HandledError {
+  declare readonly code: "voice_recording_key_missing";
+  constructor() {
+    super(
+      "voice_recording_key_missing",
+      "The call recording is not available",
+      { httpStatus: 404 },
+    );
+    this.name = "VoiceRecordingKeyMissingError";
   }
 }
 
@@ -165,25 +244,24 @@ export interface MintResult {
  * voice agent, {@link VoiceKeyMissingError} when the project has no key, or
  * {@link VoiceMintFailedError} when the provider refuses.
  */
-export async function mintVoiceSession(
-  ports: VoiceSessionPorts,
-  {
-    projectId,
-    transport,
-    agentId: bodyAgentId,
-    agentRowId,
-    maxDurationSeconds,
-  }: {
-    projectId: string;
-    transport: VoiceTransport;
-    /** The vendor agent id from the form. Used only when there is no saved
-     *  row yet — a saved row's own vendor id always wins. */
-    agentId: string;
-    /** The saved agent row id, when the drawer already has one. */
-    agentRowId?: string;
-    maxDurationSeconds: number;
-  },
-): Promise<MintResult> {
+export async function mintVoiceSession({
+  ports,
+  projectId,
+  transport,
+  agentId: bodyAgentId,
+  agentRowId,
+  maxDurationSeconds,
+}: {
+  ports: VoiceSessionPorts;
+  projectId: string;
+  transport: VoiceTransport;
+  /** The vendor agent id from the form. Used only when there is no saved
+   *  row yet — a saved row's own vendor id always wins. */
+  agentId: string;
+  /** The saved agent row id, when the drawer already has one. */
+  agentRowId?: string;
+  maxDurationSeconds: number;
+}): Promise<MintResult> {
   const row = agentRowId
     ? await ports.resolveVoiceAgentRow({ projectId, agentRowId })
     : null;
@@ -230,7 +308,7 @@ export interface FinishResult {
   source: CallRecord["source"];
   /** True only when the provider fetch itself errored (not "not ready yet"):
    *  the panel shows the fetch-failed notice (AC15). */
-  fetchFailed: boolean;
+  hasFetchFailed: boolean;
   hasAudio: boolean;
   /** The same-origin proxy URL the panel plays the recording through, when the
    *  provider returned audio. Absent otherwise, and the panel renders no
@@ -254,18 +332,18 @@ async function fetchProviderRecord(
     conversationId,
     projectId,
   }: { transport: VoiceTransport; conversationId: string; projectId: string },
-): Promise<{ record: CallRecord | null; fetchFailed: boolean }> {
+): Promise<{ record: CallRecord | null; hasFetchFailed: boolean }> {
   const credential = await ports.resolveCredential({ projectId, transport });
-  if (!credential) return { record: null, fetchFailed: false };
+  if (!credential) return { record: null, hasFetchFailed: false };
   try {
     const record = await runnerFor(ports, transport).fetchCallRecord({
       conversationId,
       credential,
       audioProxyUrl: ports.audioProxyUrl({ conversationId, projectId }),
     });
-    return { record, fetchFailed: false };
+    return { record, hasFetchFailed: false };
   } catch {
-    return { record: null, fetchFailed: true };
+    return { record: null, hasFetchFailed: true };
   }
 }
 
@@ -329,25 +407,23 @@ async function resolveScenarioContext(
  * to the live transcript when the provider record is not ready or the fetch
  * fails, marking the latter so the panel can say so (AC15).
  */
-export async function finishVoiceSession(
-  ports: VoiceSessionPorts,
-  input: {
-    /** The verified session token: the project, transport, agent row and
-     *  vendor agent id are read from here, never from the request body. */
-    token: VoiceSessionTokenPayload;
-    projectId: string;
-    name?: string;
-    transcript: BrowserTranscriptTurn[];
-    startedAt: number;
-    endedAt: number;
-    cutAtLimit: boolean;
-    conversationId?: string;
-    /** Set for a "Call it myself" run: the scenario the call is scored under
-     *  (AC23). Absent for a drawer call. */
-    scenarioId?: string;
-  },
-): Promise<FinishResult> {
-  const { token } = input;
+export async function finishVoiceSession(input: {
+  ports: VoiceSessionPorts;
+  /** The verified session token: the project, transport, agent row and
+   *  vendor agent id are read from here, never from the request body. */
+  token: VoiceSessionTokenPayload;
+  projectId: string;
+  name?: string;
+  transcript: BrowserTranscriptTurn[];
+  startedAt: number;
+  endedAt: number;
+  isCutAtLimit: boolean;
+  conversationId?: string;
+  /** Set for a "Call it myself" run: the scenario the call is scored under
+   *  (AC23). Absent for a drawer call. */
+  scenarioId?: string;
+}): Promise<FinishResult> {
+  const { ports, token } = input;
   const transport = token.transport;
   const conversationId = input.conversationId?.trim() || token.sessionId;
   const scenarioRunId = scenarioRunIdForConversation(conversationId);
@@ -366,7 +442,7 @@ export async function finishVoiceSession(
       runId: scenarioRunId,
       agentId: token.agentId ?? existing.agentId ?? "",
       source: "provider",
-      fetchFailed: false,
+      hasFetchFailed: false,
       hasAudio: false,
       scenarioSetId: scenarioContext?.scenarioSetId,
     };
@@ -375,7 +451,7 @@ export async function finishVoiceSession(
   // Prefer the provider's record; fall back to the live transcript when it is
   // not ready or the fetch fails. Fetched BEFORE the agent row is created so a
   // mismatched conversation is rejected without leaving an orphan agent behind.
-  const { record: providerRecord, fetchFailed } = await fetchProviderRecord(
+  const { record: providerRecord, hasFetchFailed } = await fetchProviderRecord(
     ports,
     { transport, conversationId, projectId: input.projectId },
   );
@@ -398,14 +474,14 @@ export async function finishVoiceSession(
   });
 
   const record = providerRecord
-    ? { ...providerRecord, cutAtLimit: input.cutAtLimit }
+    ? { ...providerRecord, isCutAtLimit: input.isCutAtLimit }
     : browserTranscriptToCallRecord({
         conversationId,
         transport,
         transcript: input.transcript,
         startedAt: input.startedAt,
         endedAt: input.endedAt,
-        cutAtLimit: input.cutAtLimit,
+        isCutAtLimit: input.isCutAtLimit,
       });
 
   await ports.writeCallRun({
@@ -421,7 +497,7 @@ export async function finishVoiceSession(
     runId: scenarioRunId,
     agentId: agentRowId,
     source: record.source,
-    fetchFailed,
+    hasFetchFailed,
     hasAudio: Boolean(record.audioUrl),
     audioUrl: record.audioUrl,
     scenarioSetId: scenarioContext?.scenarioSetId,

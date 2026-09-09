@@ -163,6 +163,19 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     And the panel does not stay on "Connecting"
     And no run is created for that attempt
 
+  Scenario: A page-level microphone block is named, not reported as a denial
+    Given "Talk to it" was pressed
+    And the page's Permissions-Policy does not allow the microphone
+    When the panel checks the microphone
+    Then the panel shows "This page is not allowed to use the microphone. Check the Permissions-Policy header on the LangWatch host or reverse proxy, then reload." with a Retry button
+    And the browser is never asked for the microphone
+    And no run is created for that attempt
+
+  Scenario: The app's own headers allow the microphone and the ElevenLabs socket
+    Given a production response from the LangWatch app
+    Then its Permissions-Policy allows the microphone for the app's own origin
+    And its Content-Security-Policy connect-src admits https://api.elevenlabs.io and wss://api.elevenlabs.io
+
   # ---------------------------------------------------------------------------
   # Scenario wiring and run surfaces (integration)
   # ---------------------------------------------------------------------------

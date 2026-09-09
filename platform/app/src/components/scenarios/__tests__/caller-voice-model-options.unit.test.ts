@@ -3,12 +3,12 @@ import { CALLER_VOICES } from "~/server/scenarios/voice/caller-voice.config";
 import { callerVoiceOptions } from "../caller-voice-model-options";
 
 describe("callerVoiceOptions", () => {
-  describe("when the project has an enabled OpenAI provider", () => {
+  describe("given the project has an enabled OpenAI provider", () => {
     /** @scenario The Voice picker lists the OpenAI caller voices when the project has an OpenAI provider */
     it("offers every OpenAI caller voice with its capitalised label", () => {
-      const { options, displayNames } = callerVoiceOptions([
-        { provider: "openai", enabled: true },
-      ]);
+      const { options, displayNames } = callerVoiceOptions({
+        providers: [{ provider: "openai", enabled: true }],
+      });
 
       const openaiVoices = CALLER_VOICES.filter((v) => v.provider === "openai");
       expect(options).toEqual(openaiVoices.map((v) => v.value));
@@ -21,20 +21,27 @@ describe("callerVoiceOptions", () => {
     });
   });
 
-  describe("when the provider is not enabled", () => {
+  describe("given the provider is not enabled", () => {
     /** @scenario The Voice picker lists the OpenAI caller voices when the project has an OpenAI provider */
     it("offers no voices, so the picker shows its add-a-provider state", () => {
       expect(
-        callerVoiceOptions([{ provider: "openai", enabled: false }]),
+        callerVoiceOptions({
+          providers: [{ provider: "openai", enabled: false }],
+        }),
       ).toEqual({ options: [], displayNames: {} });
-      expect(callerVoiceOptions([])).toEqual({ options: [], displayNames: {} });
+      expect(callerVoiceOptions({ providers: [] })).toEqual({
+        options: [],
+        displayNames: {},
+      });
     });
   });
 
-  describe("when only a provider with no caller voices is enabled", () => {
+  describe("given only a provider with no caller voices is enabled", () => {
     it("offers nothing for that provider", () => {
       expect(
-        callerVoiceOptions([{ provider: "no-such-provider", enabled: true }]),
+        callerVoiceOptions({
+          providers: [{ provider: "no-such-provider", enabled: true }],
+        }),
       ).toEqual({ options: [], displayNames: {} });
     });
   });

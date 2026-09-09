@@ -25,45 +25,77 @@ const PAYLOAD: VoiceSessionTokenPayload = {
 };
 
 describe("voice session token", () => {
-  describe("when a token is signed and verified with the same secret", () => {
-    it("round-trips the claims", () => {
-      const token = signVoiceSessionToken(PAYLOAD, SECRET);
-      expect(verifyVoiceSessionToken(token, NOW, SECRET)).toEqual(PAYLOAD);
+  describe("given a signed token", () => {
+    describe("when a token is signed and verified with the same secret", () => {
+      it("round-trips the claims", () => {
+        const token = signVoiceSessionToken({
+          payload: PAYLOAD,
+          secret: SECRET,
+        });
+        expect(
+          verifyVoiceSessionToken({ token, now: NOW, secret: SECRET }),
+        ).toEqual(PAYLOAD);
+      });
     });
-  });
 
-  describe("when the signature does not match the secret", () => {
-    it("verifies to null", () => {
-      const token = signVoiceSessionToken(PAYLOAD, SECRET);
-      expect(verifyVoiceSessionToken(token, NOW, "other-secret")).toBeNull();
+    describe("when the signature does not match the secret", () => {
+      it("verifies to null", () => {
+        const token = signVoiceSessionToken({
+          payload: PAYLOAD,
+          secret: SECRET,
+        });
+        expect(
+          verifyVoiceSessionToken({ token, now: NOW, secret: "other-secret" }),
+        ).toBeNull();
+      });
     });
-  });
 
-  describe("when the payload is edited after signing", () => {
-    it("verifies to null", () => {
-      const token = signVoiceSessionToken(PAYLOAD, SECRET);
-      const [, signature] = token.split(".");
-      const forged = Buffer.from(
-        JSON.stringify({ ...PAYLOAD, projectId: "p2" }),
-        "utf8",
-      ).toString("base64url");
-      expect(
-        verifyVoiceSessionToken(`${forged}.${signature}`, NOW, SECRET),
-      ).toBeNull();
+    describe("when the payload is edited after signing", () => {
+      it("verifies to null", () => {
+        const token = signVoiceSessionToken({
+          payload: PAYLOAD,
+          secret: SECRET,
+        });
+        const [, signature] = token.split(".");
+        const forged = Buffer.from(
+          JSON.stringify({ ...PAYLOAD, projectId: "p2" }),
+          "utf8",
+        ).toString("base64url");
+        expect(
+          verifyVoiceSessionToken({
+            token: `${forged}.${signature}`,
+            now: NOW,
+            secret: SECRET,
+          }),
+        ).toBeNull();
+      });
     });
-  });
 
-  describe("when the token has expired", () => {
-    it("verifies to null", () => {
-      const token = signVoiceSessionToken(PAYLOAD, SECRET);
-      expect(verifyVoiceSessionToken(token, PAYLOAD.exp, SECRET)).toBeNull();
+    describe("when the token has expired", () => {
+      it("verifies to null", () => {
+        const token = signVoiceSessionToken({
+          payload: PAYLOAD,
+          secret: SECRET,
+        });
+        expect(
+          verifyVoiceSessionToken({ token, now: PAYLOAD.exp, secret: SECRET }),
+        ).toBeNull();
+      });
     });
-  });
 
-  describe("when the token is malformed", () => {
-    it("verifies to null", () => {
-      expect(verifyVoiceSessionToken("garbage", NOW, SECRET)).toBeNull();
-      expect(verifyVoiceSessionToken("a.b.c", NOW, SECRET)).toBeNull();
+    describe("when the token is malformed", () => {
+      it("verifies to null", () => {
+        expect(
+          verifyVoiceSessionToken({
+            token: "garbage",
+            now: NOW,
+            secret: SECRET,
+          }),
+        ).toBeNull();
+        expect(
+          verifyVoiceSessionToken({ token: "a.b.c", now: NOW, secret: SECRET }),
+        ).toBeNull();
+      });
     });
   });
 });

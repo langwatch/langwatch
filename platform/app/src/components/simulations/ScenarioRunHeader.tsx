@@ -16,7 +16,7 @@ interface ScenarioRunHeaderProps {
   /** "Simulated" or "You" for a voice run; absent hides the caller line (AC24). */
   caller?: "Simulated" | "You" | null;
   /** True when LangWatch ended the call at the limit; shows a marker (AC28). */
-  cutAtLimit?: boolean;
+  isCutAtLimit?: boolean;
 }
 
 export function ScenarioRunHeader({
@@ -24,7 +24,7 @@ export function ScenarioRunHeader({
   name,
   copyableIds,
   caller,
-  cutAtLimit,
+  isCutAtLimit,
 }: ScenarioRunHeaderProps) {
   return (
     <Box p={5} borderBottom="1px" borderColor="border" w="100%">
@@ -36,7 +36,7 @@ export function ScenarioRunHeader({
               <Text fontSize="lg" fontWeight="semibold">
                 {name}
               </Text>
-              {cutAtLimit ? (
+              {isCutAtLimit ? (
                 <Text
                   fontSize="xs"
                   fontWeight="medium"

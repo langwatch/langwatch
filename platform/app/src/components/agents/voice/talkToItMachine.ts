@@ -15,6 +15,13 @@ import type { VoiceTurn } from "./voice-transport-client.registry";
 
 export const MIC_DENIED_MESSAGE =
   "Microphone access was denied. Allow it in the browser and try again.";
+/**
+ * The page itself is not allowed to use the microphone (a Permissions-Policy
+ * header or an embedding frame without allow="microphone"). The browser never
+ * prompts in this case, so "allow it and try again" would be a dead end.
+ */
+export const MIC_BLOCKED_MESSAGE =
+  "This page is not allowed to use the microphone. Check the Permissions-Policy header on the LangWatch host or reverse proxy, then reload.";
 export const NO_KEY_MESSAGE = "No ElevenLabs key in this project";
 export const CONSENT_NOTICE =
   "This call is recorded and sent to ElevenLabs. LangWatch gateway guardrails do not apply to this session.";
@@ -28,6 +35,7 @@ export const MINT_FAILED_PREFIX = "Could not start the call";
 /** Why an error state exists — steers which copy and link the panel shows. */
 export type ErrorCode =
   | "mic_denied"
+  | "mic_blocked"
   | "key_missing"
   | "mint_failed"
   | "save_failed";
@@ -41,11 +49,11 @@ export type TalkState =
       transcript: VoiceTurn[];
       elapsedMs: number;
     }
-  | { kind: "saving"; transcript: VoiceTurn[]; cutAtLimit: boolean }
+  | { kind: "saving"; transcript: VoiceTurn[]; isCutAtLimit: boolean }
   | {
       kind: "needsName";
       transcript: VoiceTurn[];
-      cutAtLimit: boolean;
+      isCutAtLimit: boolean;
       conversationId?: string;
     }
   | {
@@ -56,14 +64,15 @@ export type TalkState =
       hasAudio: boolean;
       /** Same-origin proxy URL to play the recording, when there is one. */
       audioUrl?: string;
-      fetchFailed: boolean;
-      cutAtLimit: boolean;
+      hasFetchFailed: boolean;
+      isCutAtLimit: boolean;
     }
   | { kind: "error"; code: ErrorCode; message: string };
 
 export type TalkEvent =
   | { type: "START" }
   | { type: "MIC_DENIED" }
+  | { type: "MIC_BLOCKED" }
   | {
       type: "MINT_FAILED";
       code: "key_missing" | "mint_failed";
@@ -80,7 +89,7 @@ export type TalkEvent =
       agentId: string;
       hasAudio: boolean;
       audioUrl?: string;
-      fetchFailed: boolean;
+      hasFetchFailed: boolean;
     }
   | { type: "NAME_REQUIRED" }
   | { type: "SAVE_FAILED"; message: string }
@@ -115,6 +124,12 @@ const talkHandlers: TalkHandlers = {
     message: MIC_DENIED_MESSAGE,
   }),
 
+  MIC_BLOCKED: () => ({
+    kind: "error",
+    code: "mic_blocked",
+    message: MIC_BLOCKED_MESSAGE,
+  }),
+
   MINT_FAILED: (_state, event) => ({
     kind: "error",
     code: event.code,
@@ -144,14 +159,14 @@ const talkHandlers: TalkHandlers = {
 
   HANG_UP: (state) =>
     state.kind === "live"
-      ? { kind: "saving", transcript: state.transcript, cutAtLimit: false }
+      ? { kind: "saving", transcript: state.transcript, isCutAtLimit: false }
       : state,
 
   // The call ends by itself at the limit — the post-call view is reached with
   // no Hang up click (AC12) — and the run is marked cut (AC28-shaped).
   LIMIT_REACHED: (state) =>
     state.kind === "live"
-      ? { kind: "saving", transcript: state.transcript, cutAtLimit: true }
+      ? { kind: "saving", transcript: state.transcript, isCutAtLimit: true }
       : state,
 
   NAME_REQUIRED: (state) =>
@@ -159,7 +174,7 @@ const talkHandlers: TalkHandlers = {
       ? {
           kind: "needsName",
           transcript: state.transcript,
-          cutAtLimit: state.cutAtLimit,
+          isCutAtLimit: state.isCutAtLimit,
         }
       : state,
 
@@ -169,9 +184,9 @@ const talkHandlers: TalkHandlers = {
     agentId: event.agentId,
     hasAudio: event.hasAudio,
     audioUrl: event.audioUrl,
-    fetchFailed: event.fetchFailed,
+    hasFetchFailed: event.hasFetchFailed,
     transcript: transcriptOf(state),
-    cutAtLimit: "cutAtLimit" in state ? state.cutAtLimit : false,
+    isCutAtLimit: "isCutAtLimit" in state ? state.isCutAtLimit : false,
   }),
 
   SAVE_FAILED: (_state, event) => ({

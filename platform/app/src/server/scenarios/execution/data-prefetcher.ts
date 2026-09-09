@@ -1045,7 +1045,7 @@ async function fetchVoiceAgentData({
 
   const config = parseVoiceAgentConfig(agent.config);
 
-  const provider = await findElevenLabsProviderForProject(projectId);
+  const provider = await findElevenLabsProviderForProject({ projectId });
   const credential = provider
     ? await getElevenLabsApiCredential({ modelProviderId: provider.id })
     : null;
