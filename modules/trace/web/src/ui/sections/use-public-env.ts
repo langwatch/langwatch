@@ -1,10 +1,11 @@
 /**
  * What the deployment is, as this package reads it.
+ *
+ * Wholly the static half the shell injected into the HTML: there used to be a
+ * per-viewer half fetched over a `publicEnv` query, gated behind an
+ * `includeCapabilities` flag nothing in this package ever set to true. The
+ * query is gone; this hook was already dead weight for it.
  */
-
-import { useMemo } from "react";
-
-import { api } from "../../behavior/trace-api.ts";
 
 const PUBLIC_APP_CONFIG_META_NAME = "langwatch-public-config";
 
@@ -48,41 +49,12 @@ export function readTracePublicEnvironment(): TracePublicEnvironment {
   }
 }
 
-type ViewerCapabilities = { NEXTAUTH_PROVIDER?: string; canSendEmail?: boolean };
-
 type PublicEnvReading = {
-  data: (TracePublicEnvironment & Partial<ViewerCapabilities>) | undefined;
-  isLoading: boolean;
+  data: TracePublicEnvironment;
+  isLoading: false;
 };
 
-/**
- * The deployment, with or without the per-viewer half.
- */
-export function usePublicEnv(options: { includeCapabilities?: boolean } = {}): PublicEnvReading {
-  const includeCapabilities = options.includeCapabilities ?? false;
-  const capabilities = api.publicEnv.useQuery(
-    {},
-    {
-      enabled: includeCapabilities,
-      staleTime: Infinity,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-  const staticValues = readTracePublicEnvironment();
-  const withCapabilities = capabilities.data ? { ...staticValues, ...capabilities.data } : void 0;
-
-  return useMemo(
-    () => ({
-      data: includeCapabilities ? withCapabilities : staticValues,
-      isLoading: includeCapabilities ? capabilities.isLoading : false,
-    }),
-    [
-      includeCapabilities,
-      capabilities.data,
-      capabilities.isLoading,
-      staticValues.BASE_HOST,
-      staticValues.DEMO_PROJECT_SLUG,
-    ],
-  );
+/** The deployment's static shell config. Never loading: the shell already resolved it. */
+export function usePublicEnv(): PublicEnvReading {
+  return { data: readTracePublicEnvironment(), isLoading: false };
 }

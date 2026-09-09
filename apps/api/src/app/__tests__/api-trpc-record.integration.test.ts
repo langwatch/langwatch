@@ -93,7 +93,6 @@ const RECORD_NAMESPACES = [
   "project",
   "promptTags",
   "prompts",
-  "publicEnv",
   "role",
   "roleBinding",
   "routingPolicy",
@@ -261,7 +260,7 @@ describe("given an API process composed with the packaged tRPC record", () => {
       const record = features.build(stubMount());
 
       expect(Object.keys(record).sort()).toEqual([...RECORD_NAMESPACES].sort());
-      expect(RECORD_NAMESPACES).toHaveLength(91);
+      expect(RECORD_NAMESPACES).toHaveLength(90);
     });
   });
 

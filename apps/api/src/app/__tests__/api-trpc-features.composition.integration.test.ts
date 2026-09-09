@@ -61,7 +61,6 @@ const RECORD_NAMESPACES = [
   "identity",
   "integrationsChecks",
   "presence",
-  "publicEnv",
   "user",
 ] as const;
 
@@ -290,8 +289,7 @@ function composeApplication(
     // audit row below is the one that composition writes.
     composed: {
       ...stubComposedFeatures(),
-      // The signed-out doors compose themselves off this process's own graph,
-      // so `publicEnv`'s answer below is the one that composition produces.
+      // The signed-out door composes itself off this process's own graph.
       auth: composeAuthFeature({
         prisma: prisma.client,
         peers: { users: {} as unknown as UserService },
@@ -410,18 +408,6 @@ describe("given an API process composed with the packaged tRPC collaborators", (
     });
   });
 
-  describe("when the caller has no session at all", () => {
-    it("still answers the signed-out door on the public procedure", async () => {
-      const { application } = composeApplication({ session: null });
-
-      const { status, body } = await callTrpc(application, "publicEnv", {});
-
-      expect(status).toBe(200);
-      expect(body).toMatchObject({
-        result: { data: { NEXTAUTH_PROVIDER: "email" } },
-      });
-    });
-  });
 });
 
 describe("given an API process with no collaborators for the record", () => {

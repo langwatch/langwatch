@@ -743,13 +743,6 @@ export type TraceApiMap = {
     };
   };
 
-  publicEnv: {
-    query: {
-      input: Record<string, never>;
-      output: { NEXTAUTH_PROVIDER?: string; canSendEmail?: boolean } & Record<string, unknown>;
-    };
-  };
-
   featureFlag: {
     isEnabled: {
       query: {
