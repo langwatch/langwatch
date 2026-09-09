@@ -184,33 +184,37 @@ describe("given the only agents are ones a provider named", () => {
   });
 });
 
-describe("given an agent that appears under both origins", () => {
+describe("given a registered agent and a provider agent that share a name", () => {
   describe("when the two names differ only by case and spacing", () => {
-    /** @scenario "An agent found under both origins is listed once" */
-    it("lists it once, as the registered record", () => {
+    /** @scenario "A shared name is not evidence that two agents are one" */
+    it("keeps both rows, each stating its own origin", () => {
       const { rows } = build({
         registeredAgents: [registered({ name: "support-copilot" })],
         discoveredAgents: [discovered({ displayText: "  Support-Copilot " })],
       });
 
-      expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({
-        id: "registered:agent-1",
-        source: "custom",
-        environment: "production",
-      });
+      expect(rows).toHaveLength(2);
+      expect(rows.map((row) => [row.id, row.source])).toEqual([
+        ["registered:agent-1", "custom"],
+        ["discovered:found-1", "databricks"],
+      ]);
     });
-  });
 
-  describe("when the names are merely similar", () => {
-    /** @scenario "An agent found under both origins is listed once" */
-    it("keeps both, because a near miss is two agents until proven otherwise", () => {
+    /** @scenario "A shared name is not evidence that two agents are one" */
+    it("leaves the provider row's fields as unmeasured as any other", () => {
       const { rows } = build({
         registeredAgents: [registered({ name: "support-copilot" })],
-        discoveredAgents: [discovered({ displayText: "support-copilot-v2" })],
+        discoveredAgents: [discovered({ displayText: "support-copilot" })],
       });
 
-      expect(rows).toHaveLength(2);
+      // The registered row's owner and environment do not leak onto the
+      // provider row, which is what a half-done merge would look like.
+      expect(rows[1]).toMatchObject({
+        owner: null,
+        environment: null,
+        registeredDaysAgo: null,
+        lastActiveMinutesAgo: null,
+      });
     });
   });
 });

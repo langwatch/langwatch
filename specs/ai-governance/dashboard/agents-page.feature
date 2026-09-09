@@ -65,11 +65,14 @@ Feature: The AI Governance Agents page
   # the process that runs it; a provider-side agent is found by asking the
   # provider. An admin asking what runs against the organization means both.
   #
-  # The union rule is deliberately narrow. Names are the only signal the two
-  # tables share, so an agent found under both origins is collapsed only on an
-  # exact name (ignoring case and surrounding space), and the registered record
-  # is the survivor because it is the one with an owner, an environment and a
-  # real registration date.
+  # NOTHING IS MATCHED BETWEEN THEM. A registered agent and a provider agent
+  # that share a name are two rows. The name is the only signal the two tables
+  # share, and a merge resting on a string match with no other evidence risks
+  # the worse of the two failures: a duplicate row is visible and a reader can
+  # act on it, while a wrong merge removes an agent from the one page whose job
+  # is to say what exists, and nobody can spot an absence. Over-counting is a
+  # nuisance; under-counting is a lie. The People screen keeps two providers
+  # naming one address as two rows for the same reason.
   # ===========================================================================
 
   @unit
@@ -116,11 +119,12 @@ Feature: The AI Governance Agents page
     And it names the member who owns it
 
   @unit
-  Scenario: An agent found under both origins is listed once
+  Scenario: A shared name is not evidence that two agents are one
     Given a connected agent and a provider agent share a name
     When the agents list is built
-    Then the agent is listed once
-    And the listed row is the registered one
+    Then both are listed
+    And each states its own origin
+    And neither borrows the other's owner or environment
 
   @unit
   Scenario: An agent from a provider the page has no source for is left off
