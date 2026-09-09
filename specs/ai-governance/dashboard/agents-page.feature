@@ -274,12 +274,22 @@ Feature: The AI Governance Agents page
   # THERE IS A NOTHING THIS PAGE CANNOT YET NAME, and the copy is written to
   # stay out of its way. A provider answering "this tenant has no agents" and a
   # provider refusing to answer are different facts, one about the tenant and
-  # one about the credential, and the listing keeps them apart in the log. No
-  # read surfaces them: the outcome events exist and no projection folds them.
+  # one about the credential, and the listing keeps them apart in the log.
+  #
+  # THE GAP HAS MOVED, and this paragraph is kept rather than deleted because
+  # the constraint on the copy has not moved with it. The outcome is now
+  # FOLDED: the pull-run-status projection folds all four listing outcome
+  # events into eleven columns, so for every source the last listing's outcome,
+  # count, refusal reason and status are recorded and queryable. What is still
+  # missing is a READ — no repository method, service or procedure hands those
+  # columns to this screen — so the page has nothing to branch on and still
+  # cannot tell the two apart.
+  #
   # So an empty table with a provider connected says only what is known — these
   # providers are connected, nothing has been listed from them — and offers the
   # ask. It must not claim the tenant is empty, because on a refusal that would
-  # be the exact collapse the three-outcome listing was built to prevent.
+  # be the exact collapse the three-outcome listing was built to prevent. That
+  # holds until the read exists, not until the fold does.
   # ---------------------------------------------------------------------------
 
   @integration
