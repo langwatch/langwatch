@@ -39,7 +39,14 @@ export const simulationRunQueuedEventDataSchema = z.object({
   /** Target the event-driven execution runs against. */
   target: z
     .object({
-      type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
+      type: z.enum([
+        "prompt",
+        "http",
+        "code",
+        "workflow",
+        "connected",
+        "voice",
+      ]),
       referenceId: z.string(),
     })
     .optional(),

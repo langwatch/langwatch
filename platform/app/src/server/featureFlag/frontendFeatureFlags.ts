@@ -59,6 +59,10 @@
  */
 export const FRONTEND_FEATURE_FLAGS = [
   "release_ui_ai_gateway_menu_enabled",
+  // Voice agents: register an ElevenLabs agent, talk to it, call it from a
+  // run, and run scenarios with a simulated caller. Off by default.
+  // See useVoiceAgentsEnabled and specs/features/agents/voice-agents-v1.feature.
+  "release_voice_agents_enabled",
   // Governance: gates the personal-keys / admin oversight /
   // RoutingPolicy / IngestionSource UI surfaces. On by default
   // (ADR-038 Decision 7); SaaS rollout and per-org kill switches are

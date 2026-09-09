@@ -206,6 +206,11 @@ export const UNPUBLISHED = [
     category: "internal",
     why: "the dashboard's download button for scenario runs, session-authenticated in the same way as the trace export",
   },
+  {
+    match: "/api/voice",
+    category: "internal",
+    why: "the Talk to it panel's own back channel: the browser mints a short-lived voice session, reports the finished call and streams its recording through a same-origin proxy. Every call carries a signed session token the panel just received, so an API-key caller has nothing to send; scenario runs against voice agents go through the documented scenario routes",
+  },
   // ── Aliases: older paths kept working ──────────────────────────────────
   {
     match: "/api/github-langy",

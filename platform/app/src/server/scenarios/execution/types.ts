@@ -9,6 +9,7 @@
 import { z } from "zod";
 import { FieldMappingSchema } from "../field-mapping";
 import { runParameterValuesSchema } from "../parameters";
+import { callerVoiceConfigSchema } from "../voice/caller-voice.config";
 
 // ============================================================================
 // Field Mapping Types
@@ -245,6 +246,54 @@ export const ConnectedAgentDataSchema = z.object({
 });
 export type ConnectedAgentData = z.infer<typeof ConnectedAgentDataSchema>;
 
+/**
+ * What a voice run carries to the child: the transport, the agent id on that
+ * transport, and the project's ElevenLabs credential resolved from the
+ * provider row (never stored on the agent). The credential is `null` when the
+ * project has no key, so the child fails the run with a named reason rather
+ * than reaching the vendor with an empty credential — the same way the http
+ * data carries its secrets to the child.
+ */
+export const VoiceTargetSchema = z.object({
+  transport: z.literal("elevenlabs_convai"),
+  agentId: z.string(),
+  credential: z
+    .object({
+      apiKey: z.string(),
+      baseUrl: z.string(),
+    })
+    .nullable(),
+});
+export type VoiceTarget = z.infer<typeof VoiceTargetSchema>;
+
+/** Pre-fetched voice agent configuration for serialized execution. */
+export const VoiceAgentDataSchema = z.object({
+  type: z.literal("voice"),
+  agentId: z.string(),
+  voiceTarget: VoiceTargetSchema,
+  /**
+   * Environment the SDK builds its own OpenAI client from for the simulated
+   * caller's text-to-speech and for the transcription the judge uses. Only
+   * `OPENAI_API_KEY` — transcription runs on OpenAI for every voice run, and
+   * `CALLER_VOICES` offers no ElevenLabs voice today, so no ElevenLabs key
+   * travels here. Resolved from the project's model provider rows and merged
+   * into the child env for a voice target only, mirroring the transport
+   * credential's ride-in-job-data-only handling: never logged, never in an
+   * event. Empty when the project has no OpenAI key, which the child surfaces
+   * as a named failure. Defaulted so a job queued before it existed still
+   * parses.
+   */
+  callerEnv: z.record(z.string(), z.string()).default({}),
+  /**
+   * The whole-call budget in seconds (VOICE_CALL_MAX_SECONDS). The transport
+   * clamps a single turn's wait to it, and the child arms a timer that ends the
+   * call at it so the judge still runs on what was said. Defaulted so a job
+   * queued before the limit existed still parses.
+   */
+  maxCallSeconds: z.number().int().positive().default(300),
+});
+export type VoiceAgentData = z.infer<typeof VoiceAgentDataSchema>;
+
 /** Union type for all supported target adapter data */
 export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   PromptConfigDataSchema,
@@ -252,6 +301,7 @@ export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   CodeAgentDataSchema,
   WorkflowAgentDataSchema,
   ConnectedAgentDataSchema,
+  VoiceAgentDataSchema,
 ]);
 export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
@@ -313,7 +363,7 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 export const TargetConfigSchema = z.object({
-  type: z.enum(["prompt", "http", "code", "workflow", "connected"]),
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
   referenceId: z.string(),
 });
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;
@@ -345,6 +395,8 @@ export const ScenarioExecutionResultSchema = z.object({
   cancelled: z.boolean().optional(),
   /** The connected agent instance that answered the run, when one did. */
   agentInstance: ScenarioAgentInstanceSchema.optional(),
+  /** A voice run LangWatch ended at VOICE_CALL_MAX_SECONDS (AC28). */
+  cutAtLimit: z.boolean().optional(),
 });
 export type ScenarioExecutionResult = z.infer<
   typeof ScenarioExecutionResultSchema
@@ -431,6 +483,13 @@ export const ChildProcessJobDataSchema = z
      * no judge decides, so the run needs no model at all.
      */
     script: ScriptedRunSchema.optional(),
+    /**
+     * The simulated caller's voice, interrupt probability and effects — carried
+     * from the scenario for a voice target only. The child builds the voice
+     * user simulator from it and records the effective values on the run.
+     * Absent for every non-voice run and for a job queued before it existed.
+     */
+    callerVoice: callerVoiceConfigSchema.optional(),
   })
   .superRefine((data, ctx) => {
     if (data.script) return;

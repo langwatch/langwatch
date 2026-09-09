@@ -533,6 +533,13 @@ async function spawnScenarioChildProcess(
       jobData,
       labels: childProcessData.scenario.labels,
       telemetry,
+      // Voice-only: the caller's OpenAI / ElevenLabs keys reach the SDK's TTS
+      // and transcription clients through the child env. Narrowed here so no
+      // other target ever receives them.
+      callerEnv:
+        childProcessData.adapterData?.type === "voice"
+          ? childProcessData.adapterData.callerEnv
+          : undefined,
     });
 
     const packageRoot = resolveAppPackageRoot();

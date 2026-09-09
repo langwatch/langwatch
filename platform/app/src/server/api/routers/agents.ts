@@ -10,6 +10,10 @@ import {
   readAgentPresence,
 } from "~/server/connected-agents/presence.read";
 import type { ConnectedAgentSelectability } from "~/server/connected-agents/selectable";
+import {
+  isVoiceAgentsEnabledForProject,
+  VOICE_AGENTS_DISABLED_MESSAGE,
+} from "~/server/featureFlag/voiceAgents";
 import type { ScenarioParameterDefinition } from "~/server/scenarios/parameters";
 import {
   type AgentComponentConfig,
@@ -31,6 +35,72 @@ import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
+
+/**
+ * Refuses a voice agent write while `projectId`'s flag is off. The single
+ * gate behind `create`, `update`, `copy`, `pushToCopies` and
+ * `syncFromSource` — every door that can leave a voice agent's config
+ * sitting in a project.
+ */
+async function assertVoiceAgentsEnabled(projectId: string): Promise<void> {
+  const enabled = await isVoiceAgentsEnabledForProject({ projectId });
+  if (!enabled) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: VOICE_AGENTS_DISABLED_MESSAGE,
+    });
+  }
+}
+
+/** Maps a `pushToCopies` service failure onto the tRPC error the caller sees. */
+function throwPushToCopiesError(error: unknown): never {
+  if (error instanceof Error) {
+    if (error.message === "Agent not found") {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Agent not found" });
+    }
+    if (
+      error.message === "This agent has no copies to push to" ||
+      error.message === "No valid copies selected to push to"
+    ) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    }
+  }
+  throw error;
+}
+
+/** Maps a `syncFromSource` service failure onto the tRPC error the caller sees. */
+function throwSyncFromSourceError(error: unknown): never {
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    message === "This agent is not a copy and has no source to sync from" ||
+    message === "Source agent has been deleted"
+  ) {
+    throw new TRPCError({
+      code:
+        message === "Source agent has been deleted"
+          ? "NOT_FOUND"
+          : "BAD_REQUEST",
+      message,
+    });
+  }
+  throw error;
+}
+
+/**
+ * Gates `copy`/`pushToCopies`/`syncFromSource`, whose writes carry an
+ * already-typed source config rather than a type chosen in the request: a
+ * voice source must not land in a project whose flag is off, no matter how
+ * many rows are receiving it.
+ */
+async function assertVoiceAgentsEnabledForReceivers(
+  sourceType: string,
+  receivingProjectIds: readonly string[],
+): Promise<void> {
+  if (sourceType !== "voice") return;
+  for (const projectId of receivingProjectIds) {
+    await assertVoiceAgentsEnabled(projectId);
+  }
+}
 
 /**
  * What every agent read carries beside the row (ADR-128): the parameters a
@@ -156,6 +226,9 @@ export const agentsRouter = createTRPCRouter({
       // A connected agent is registered by the SDK from the process that runs
       // it; there is nothing a form could fill in for one.
       if (input.type === "connected") throw new AgentRegisterOnlyError();
+      if (input.type === "voice") {
+        await assertVoiceAgentsEnabled(input.projectId);
+      }
       const agentService = AgentService.create(ctx.prisma);
       // Config is validated by the refine above, safe to cast
       return await agentService.create({
@@ -187,6 +260,22 @@ export const agentsRouter = createTRPCRouter({
     .permission("evaluations:manage")
     .mutation(async ({ ctx, input }) => {
       const agentService = AgentService.create(ctx.prisma);
+
+      // `type` is optional on update, so a config-only edit of a stored voice
+      // agent (e.g. AgentVoiceEditorDrawer's save) never sends it — the gate
+      // must also look at what is actually persisted, not just the payload.
+      // Skip the read when the payload already names "voice"; there is
+      // nothing the stored row could tell us that would change the outcome.
+      const stored =
+        input.type === "voice"
+          ? null
+          : await agentService.getById({
+              id: input.id,
+              projectId: input.projectId,
+            });
+      if (input.type === "voice" || stored?.type === "voice") {
+        await assertVoiceAgentsEnabled(input.projectId);
+      }
 
       // Repository will validate config against the type's DSL schema
       return await agentService.update({
@@ -373,6 +462,13 @@ export const agentsRouter = createTRPCRouter({
       }
 
       const agentService = AgentService.create(ctx.prisma);
+      const source = await agentService.getById({
+        id: input.agentId,
+        projectId: input.sourceProjectId,
+      });
+      await assertVoiceAgentsEnabledForReceivers(source?.type ?? "", [
+        input.projectId,
+      ]);
       try {
         return await agentService.copyAgent(
           {
@@ -456,6 +552,17 @@ export const agentsRouter = createTRPCRouter({
           ? input.copyIds.filter((id) => permittedCopyIds.includes(id))
           : permittedCopyIds;
 
+      const source = await agentService.getById({
+        id: input.agentId,
+        projectId: input.projectId,
+      });
+      await assertVoiceAgentsEnabledForReceivers(
+        source?.type ?? "",
+        copies
+          .filter((c) => copyIdsToPush.includes(c.id))
+          .map((c) => c.projectId),
+      );
+
       try {
         return await agentService.pushToCopies(
           input.agentId,
@@ -463,24 +570,7 @@ export const agentsRouter = createTRPCRouter({
           copyIdsToPush,
         );
       } catch (error) {
-        if (error instanceof Error) {
-          if (error.message === "Agent not found") {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Agent not found",
-            });
-          }
-          if (
-            error.message === "This agent has no copies to push to" ||
-            error.message === "No valid copies selected to push to"
-          ) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: error.message,
-            });
-          }
-        }
-        throw error;
+        throwPushToCopiesError(error);
       }
     }),
 
@@ -526,27 +616,16 @@ export const agentsRouter = createTRPCRouter({
             "You do not have permission to manage evaluations in the source project",
         });
       }
+      await assertVoiceAgentsEnabledForReceivers(source.type, [
+        input.projectId,
+      ]);
       try {
         return await agentService.syncFromSource(
           input.agentId,
           input.projectId,
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (
-          message ===
-            "This agent is not a copy and has no source to sync from" ||
-          message === "Source agent has been deleted"
-        ) {
-          throw new TRPCError({
-            code:
-              message === "Source agent has been deleted"
-                ? "NOT_FOUND"
-                : "BAD_REQUEST",
-            message,
-          });
-        }
-        throw error;
+        throwSyncFromSourceError(error);
       }
     }),
 

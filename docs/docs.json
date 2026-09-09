@@ -148,6 +148,7 @@
                 ]
               },
               "agent-testing/voice-agents",
+              "agent-testing/voice-agents-in-app",
               "agent-testing/red-teaming"
             ]
           },
