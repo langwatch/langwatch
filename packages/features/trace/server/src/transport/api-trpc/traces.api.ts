@@ -465,7 +465,11 @@ export class TracesTrpcApi {
               // Dataset builder persists trace content, so the application resolves
               // full IO (#4991) and truncated rows never corrupt the dataset. The
               // ID-only list read it draws from stays on the preview.
-              return ctx.app.traces.readSampleTraces({ query: input, protections, pageSize: 10 });
+              return ctx.app.traces.readSampleTraces({
+                query: input,
+                protections,
+                pageSize: 10,
+              });
             }),
         )
         .query("getFieldNames", (p) =>

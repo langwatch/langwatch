@@ -4,12 +4,13 @@
  * route group is its own module and the factory only names them in order.
  */
 import { resolver, type EndpointVariables, type ProjectScopedContext } from "@langwatch/api/rest";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
+import type { ResponsesWithResolver } from "hono-openapi";
 import { z } from "zod";
 
 import { traceMetadataUpdateSchema } from "#services/trace-metadata-write.service";
 
-export const logger = createLogger("langwatch:api:traces");
+export const logger: Logger = createLogger("langwatch:api:traces");
 
 /** The handler context every route in this family runs on. */
 export type TraceContext = ProjectScopedContext<EndpointVariables>;
@@ -47,14 +48,14 @@ export const transcriptResponseSchema = z.object({
   subAgents: z.array(z.object({}).passthrough()),
 });
 
-export const traceNotFoundResponse = {
+export const traceNotFoundResponse: ResponsesWithResolver = {
   404: {
     description: "Trace not found",
     content: { "application/json": { schema: resolver(z.object({ message: z.string() })) } },
   },
 };
 
-export const ambiguousPrefixResponse = {
+export const ambiguousPrefixResponse: ResponsesWithResolver = {
   409: {
     description: "Ambiguous trace ID prefix — the prefix matches more than one trace",
     content: {

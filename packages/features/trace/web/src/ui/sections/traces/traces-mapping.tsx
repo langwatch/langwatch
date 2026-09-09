@@ -10,14 +10,14 @@ import { useProjectSpanNames } from "../use-project-span-names.ts";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
+  mapTraceToDatasetEntry,
   type AllTraceMappingSources,
   type MappingState,
-  mapTraceToDatasetEntry,
   SERVER_ONLY_TRACE_SOURCES,
   TRACE_EXPANSIONS,
   TRACE_MAPPING_LABELS,
   TRACE_MAPPINGS,
-} from "@langwatch/trace-contract";
+} from "@langwatch/dataset-contract";
 import { api } from "../../../behavior/trace-api.ts";
 import { Switch } from "@langwatch/design-system/switch";
 

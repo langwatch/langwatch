@@ -14,13 +14,17 @@ import type { ShareApi } from "@langwatch/share-contract";
 import type { TraceApp } from "@langwatch/trace-server";
 import {
   createCollectorRestApp,
+  type CollectorRestPorts,
+} from "@langwatch/trace-server/api-rest/collector";
+import {
   createTraceLegacyRestApp,
+  type TraceLegacyCredentialPort,
+} from "@langwatch/trace-server/api-rest/trace-legacy";
+import {
   createTracesRestApp,
   traceSearchBodyExtensions,
-  type CollectorRestPorts,
-  type TraceLegacyCredentialPort,
   type TracesRestReadPort,
-} from "@langwatch/trace-server";
+} from "@langwatch/trace-server/api-rest/traces";
 import { fromZodError } from "zod-validation-error";
 import { z } from "zod";
 

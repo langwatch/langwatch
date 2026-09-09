@@ -40,7 +40,7 @@ import {
   type TraceFullRecord,
   type TraceFullThreadReadInput,
 } from "@langwatch/trace-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import type { TraceQueryFieldValuesPort } from "../ports/query-field-values.port.ts";
 import type { TraceQueryClassificationPort } from "../ports/trace-query-classification.port.ts";
@@ -54,7 +54,7 @@ import { nowInstant } from "@langwatch/time";
 
 type TraceComposition = {
   repository: TracePort;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   queryFieldValues: TraceQueryFieldValuesPort;
   queryClassification: TraceQueryClassificationPort;
   summaryReader: TraceSummaryReaderPort;

@@ -10,7 +10,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { openProtections } from "../../../repositories/clickhouse/__tests__/open-protections.ts";
 import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
 import { TracesV2TrpcApi } from "../traces-v2.api.ts";
-import { createTranscriptApp, createTranscriptReadPorts } from "./support/transcript-read.support.ts";
+import {
+  createTranscriptApp,
+  createTranscriptReadPorts,
+} from "./support/transcript-read.support.ts";
 
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
@@ -66,7 +69,6 @@ describe("readCodingAgentTranscript", () => {
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections: openProtections,
-        codingAgents,
       });
 
       expect(transcript.agent).toBe("claude_code");
@@ -100,7 +102,6 @@ describe("readCodingAgentTranscript", () => {
         projectId: PROJECT_ID,
         traceId: TRACE_ID,
         protections: openProtections,
-        codingAgents,
       });
 
       expect(transcript.entries).toEqual([]);

@@ -18,6 +18,11 @@ Trace owns portable read, ingress and processing contracts plus the server
 implementation behind them. The app owns authentication, transport mapping and
 process composition.
 
+`TraceApi.recordCapturedSpan` validates a captured LangWatch span, converts it
+through the collector's OTLP mapper, and submits it through the process's existing
+span-ingestion sender. Agent calls this operation for HTTP test history; it owns
+request redaction and agent metadata, while Trace owns conversion and enqueueing.
+
 The canonical `TraceService` owns the characterized read methods: trace records,
 derived events, evaluation spans/events, paged span trees, row-version deltas,
 query-field catalogues, query classification, ingest-wait timing and summary
@@ -136,6 +141,12 @@ media, terminal and anchored-comment UI. Browser code does not authorize,
 compose services or reshape Trace responses.
 
 ## Public surfaces and transports
+
+The server root exposes process composition and services. REST and tRPC
+transports are imported through explicit `@langwatch/trace-server/api-rest/*`
+and `@langwatch/trace-server/api-trpc/*` exports, so a worker naming the
+server root does not also load those handlers. The subpaths resolve to the
+same implementation files used by the API process.
 
 The contract publishes the read, ingress and processing vocabulary: trace and
 span values, the query language, the commands and events the pipeline exchanges,

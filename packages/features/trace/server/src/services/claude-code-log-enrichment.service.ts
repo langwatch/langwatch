@@ -5,7 +5,7 @@
  */
 import { ClaudeCodeSpanEnrichmentService } from "./claude-code-span-enrichment.service.ts";
 import type { Logger } from "@langwatch/observability";
-import { contentAttrKeys, type CodingAgentService } from "@langwatch/coding-agent-contract";
+import { contentAttrKeys, type CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
 import type { Span } from "@langwatch/trace-contract";
@@ -89,7 +89,7 @@ const RESULT_SIZE_ATTR = "tool_result_size_bytes";
 function readContentBody(
   eventName: string,
   attrs: Record<string, string>,
-  codingAgents?: CodingAgentService,
+  codingAgents?: CodingAgentApi,
 ): string | null {
   for (const key of codingAgents?.contentAttrKeys(eventName) ?? contentAttrKeys(eventName)) {
     const value = nonEmptyOrNull(attrs[key]);
@@ -212,7 +212,7 @@ export class ClaudeCodeLogEnrichmentService {
    */
   static mapLogRowsToClaudeContentLogs(
     rows: TraceLogRecordReadRow[],
-    codingAgents?: CodingAgentService,
+    codingAgents?: CodingAgentApi,
   ): ClaudeContentLog[] {
     return rows.map((row) => {
       const attrs = row.attributes;
@@ -248,7 +248,7 @@ export class ClaudeCodeLogEnrichmentService {
     spans: Span[];
     logRows: TraceLogRecordReadRow[];
     traceCanonicalisation: TraceCanonicalisationService;
-    codingAgents?: CodingAgentService;
+    codingAgents?: CodingAgentApi;
   }): Span[] {
     if (spans.length === 0) {
       return spans;
@@ -365,7 +365,7 @@ export class ClaudeCodeLogEnrichmentService {
     occurredAtMs?: number;
     logger?: Logger;
     traceCanonicalisation: TraceCanonicalisationService;
-    codingAgents?: CodingAgentService;
+    codingAgents?: CodingAgentApi;
   }): Promise<Span[]> {
     if (!ClaudeCodeLogEnrichmentService.hasCodingAgentJoinableSpans(spans)) {
       return spans;
@@ -429,7 +429,7 @@ export class ClaudeCodeLogEnrichmentService {
     modelCallRefs: ClaudeSpanRef[];
     logRows: TraceLogRecordReadRow[];
     traceCanonicalisation: TraceCanonicalisationService;
-    codingAgents?: CodingAgentService;
+    codingAgents?: CodingAgentApi;
   }): Span {
     const enrichment = ClaudeCodeSpanEnrichmentService.computeClaudeSpanEnrichment({
       spans: modelCallRefs,
@@ -469,7 +469,7 @@ export class ClaudeCodeLogEnrichmentService {
     modelCallRefs: ClaudeSpanRef[];
     logRows: TraceLogRecordReadRow[];
     traceCanonicalisation: TraceCanonicalisationService;
-    codingAgents?: CodingAgentService;
+    codingAgents?: CodingAgentApi;
   }): Span {
     const isModelCall = readStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null;
 

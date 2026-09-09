@@ -1,5 +1,5 @@
-import type { TraceViewerService } from "./trace-viewer.service.ts";
 import type { Trace } from "./trace-format.schemas.ts";
+import type { RecordCapturedSpanInput } from "./trace-captured-span.commands.ts";
 import type { Span } from "./trace-format.schemas.ts";
 import type {
   SpanSummaryRow,
@@ -13,9 +13,14 @@ import type { SpanDetail, SpanLangwatchSignals } from "./trace-view.contract.ts"
 import type { ElasticSearchEvent } from "./trace-format.schemas.ts";
 import type { DerivedTraceEvent } from "./trace-derived-event.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
-import type { SpanTreeDeltaInput, SpanTreeInput } from "./trace.queries.ts";
+import type { SpanTreeDeltaInput, SpanTreeInput, TraceIngestWaitInput } from "./trace.queries.ts";
 import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
 import { featureApi } from "@langwatch/runtime-composition";
+import type {
+  EvaluationTraceReadInput,
+  EvaluationTraceSpan,
+  EvaluationTraceEvent,
+} from "./trace-evaluation.contract.ts";
 
 /** A reviewer correction target owned by Trace, shared structurally with Annotation. */
 export type TraceSuggestionTarget =
@@ -37,6 +42,10 @@ export type TraceAnnotationCommands = Readonly<{
 
 /** Public Trace operations shared by process peers after boot composition. */
 export interface TraceApi {
+  recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void>;
+  resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
+  getEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;
+  getEvaluationEvents(input: EvaluationTraceReadInput): Promise<EvaluationTraceEvent[]>;
   listTraces(input: {
     query: TraceLegacyListInput;
     protections: unknown;

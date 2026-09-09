@@ -4,7 +4,7 @@ import { TraceEvaluationMappingService } from "../../services/trace-evaluation-m
 import { TraceEventAttributeMappingService } from "../../services/trace-event-attribute-mapping.service.ts";
 import { TraceLlmSpanMessagesService } from "../../services/trace-llm-span-messages.service.ts";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { type AnnotationService, annotationSuggestedOutput } from "@langwatch/annotation-contract";
+import { type AnnotationApi, annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -14,7 +14,7 @@ import { getLangWatchTracer } from "langwatch";
 import { TraceRetentionFloorService } from "../../services/trace-retention-floor.service.ts";
 import { TraceLegacyReadRepository } from "../trace-legacy-read.repository.ts";
 import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/trace-windowed-read.service.ts";
-import { deserializeAttributes, ensureStringRecord } from "@langwatch/trace-server";
+import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
 import type { ExtractedIO } from "#rules/trace-io-text.rules";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
@@ -29,7 +29,7 @@ import type {
 } from "@langwatch/trace-contract";
 import type { Event, Span, Trace } from "@langwatch/trace-contract";
 
-import { findPromptReferenceInAncestors } from "@langwatch/trace-contract";
+import { findPromptReferenceInAncestors } from "@langwatch/prompt-contract";
 import { TraceReadRedactionService } from "../../services/trace-read-redaction.service.ts";
 import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service.ts";
 import { TraceLegacySummaryMappingService } from "../../services/trace-legacy-summary-mapping.service.ts";
@@ -302,7 +302,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     | ((tenantId: string) => Promise<ClickHouseClient>)
     | undefined;
   private readonly filterConditions: TraceLegacyFilterConditions | undefined;
-  private readonly annotations: AnnotationService | undefined;
+  private readonly annotations: AnnotationApi | undefined;
   private readonly traceCanonicalisation: TraceCanonicalisationService;
 
   constructor({
@@ -323,7 +323,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
      * Optional: without it the floor stays at {@link SPAN_READ_FLOOR_LOOKBACK_MS}.
      */
     retentionResolver?: DataRetentionApi;
-    annotations?: AnnotationService;
+    annotations?: AnnotationApi;
     traceCanonicalisation: TraceCanonicalisationService;
   }) {
     super();
@@ -386,7 +386,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     resolveTraceSpans?: ResolveTraceSpansFn;
     resolveTraceSpansBatch?: ResolveTraceSpansBatchFn;
     retentionResolver?: DataRetentionApi;
-    annotations?: AnnotationService;
+    annotations?: AnnotationApi;
     traceCanonicalisation: TraceCanonicalisationService;
   }): TraceLegacyReadClickHouseRepository {
     return new TraceLegacyReadClickHouseRepository({
@@ -2133,7 +2133,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     // definitions to remap id -> name. Deleted definitions are included so
     // historical scoreOptions still resolve.
     if (!this.annotations) {
-      throw new Error("AnnotationService is required for trace annotation projection");
+      throw new Error("AnnotationApi is required for trace annotation projection");
     }
     const [rows, scoreDefs] = await Promise.all([
       this.annotations.listForProjection({ projectId, traceIds, anchor: "all" }),

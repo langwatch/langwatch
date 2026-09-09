@@ -21,7 +21,7 @@ import type {
   PresenceCursorEvent,
   PresenceCursorInput,
   PresenceEvent,
-  PresenceLeaveInput,
+  PresenceLeaveRequest,
   PresenceProjectInput,
   PresenceUpdateInput,
 } from "@langwatch/presence-contract";
@@ -506,8 +506,8 @@ export type TraceApiMap = {
         output: AnnotationQueueRecord;
       };
     };
-    getPendingItemsCount: { query: { input: ProjectScope; output: number } };
-    getAssignedItemsCount: { query: { input: ProjectScope; output: number } };
+    getPendingItemsCount: { query: { input: ProjectScope; output: { count: number } } };
+    getAssignedItemsCount: { query: { input: ProjectScope; output: { count: number } } };
     getQueueItemsCounts: {
       query: { input: ProjectScope; output: { id: string; pendingCount: number }[] };
     };
@@ -786,7 +786,7 @@ export type TraceApiMap = {
         output: { ok: true };
       };
     };
-    leave: { mutation: { input: PresenceLeaveInput; output: { ok: true } } };
+    leave: { mutation: { input: PresenceLeaveRequest; output: { ok: true } } };
     cursor: {
       mutation: { input: Omit<PresenceCursorInput, "user">; output: { ok: true } };
     };

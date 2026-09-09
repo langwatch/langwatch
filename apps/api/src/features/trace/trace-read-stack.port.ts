@@ -12,12 +12,11 @@ import type {
   TraceLegacyFilterInput,
   TraceLegacyListInput,
 } from "@langwatch/trace-contract";
-import type {
-  TraceAppDependencies,
-  TraceEditOverlayTrpcPorts,
-  TracesTrpcPorts,
-  TracesV2TrpcPorts,
-} from "@langwatch/trace-server";
+import type { TraceAppDependencies } from "@langwatch/trace-server";
+import type { TraceViewerService } from "@langwatch/trace-contract";
+import type { TraceEditOverlayTrpcPorts } from "@langwatch/trace-server/api-trpc/trace-edit-overlay";
+import type { TracesTrpcPorts } from "@langwatch/trace-server/api-trpc/traces";
+import type { TracesV2TrpcPorts } from "@langwatch/trace-server/api-trpc/traces-v2";
 
 /**
  * The ClickHouse trace READ stack, which never left `platform/app` and went with
@@ -26,6 +25,7 @@ import type {
 export abstract class ApiTraceReadStackPort {
   /** The ten readers `TraceApp` is composed from. */
   abstract readers(): TraceAppDependencies["traces"];
+  abstract viewer(): TraceViewerService;
   /**
    * The caller's read-time redactions for one project: cost visibility, the
    * data-privacy policy's content categories, the restricted-attribute rules
@@ -42,7 +42,7 @@ export abstract class ApiTraceReadStackPort {
    */
   abstract readPorts(): Pick<
     TracesV2TrpcPorts,
-    "tryGetVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes" | "codingAgentEnrichment"
+    "tryGetVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes"
   >;
   /**
    * The explorer's own: the AI composer, the reserved-metadata write and its
@@ -55,7 +55,6 @@ export abstract class ApiTraceReadStackPort {
     | "tryGetVisibilityCutoffMs"
     | "mappers"
     | "derivedAttrPrefixes"
-    | "codingAgentEnrichment"
     | "queryTranslation"
   >;
   /**

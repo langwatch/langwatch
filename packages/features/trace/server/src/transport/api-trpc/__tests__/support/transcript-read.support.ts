@@ -2,7 +2,6 @@
  * The application and ports the shared transcript read is driven through. `TracesV2TrpcApi.readCodingAgentTranscript` takes the application it reads through and the ports this package does not own; both are assembled from the REAL implementations the API process wires (`readPorts()` in `apps/api/src/app/api-trace-read-stack.composition.ts`), so the log visibility gate, coding-agent join, and transcript derivation all run for real — the only doubles are the two stores the trace is read from.
  */
 
-import { ClaudeCodeLogEnrichmentService } from "../../../../services/claude-code-log-enrichment.service.ts";
 import { TraceReadRedactionService } from "../../../../services/trace-read-redaction.service.ts";
 import { vi } from "vitest";
 import {
@@ -13,7 +12,6 @@ import {
 import type { CodingAgentService } from "@langwatch/coding-agent-contract";
 import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
 import { TraceApp } from "../../../../app/trace.app.ts";
-import type { ClaudeSpanRef } from "../../../../rules/claude-code-message-index.rules.ts";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
@@ -83,17 +81,6 @@ export function createTranscriptReadPorts(): TracesV2ReadPorts {
           throw new Error("the resolved data-privacy policy is not read by a transcript read");
         },
       },
-    },
-    codingAgentEnrichment: {
-      isCodingAgentShapedSpan: ClaudeCodeLogEnrichmentService.isCodingAgentShapedSpan,
-      enrichSpansFromLogs: (input) =>
-        ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs(input),
-      enrichSingleSpanWithLogContent: (input) =>
-        ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent({
-          ...input,
-          modelCallRefs: input.modelCallRefs as ClaudeSpanRef[],
-        }),
-      mapSummaryRowsToRefs: ClaudeCodeLogEnrichmentService.mapSummaryRowsToClaudeRefs,
     },
   };
 }

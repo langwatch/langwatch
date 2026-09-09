@@ -203,10 +203,10 @@ export const FilterSidebar: React.FC = () => {
       if (useDrawerStore.getState().isOpen) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const target = e.target;
-      if (
+      const isTypingTarget =
         target instanceof HTMLElement &&
-        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
-      ) {
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (isTypingTarget) {
         return;
       }
       const key = e.key.toLowerCase();

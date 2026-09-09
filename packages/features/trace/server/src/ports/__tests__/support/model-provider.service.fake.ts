@@ -128,6 +128,10 @@ export class TestModelProviderService extends ModelProviderService {
     return Promise.resolve();
   }
 
+  applyCodexCodingDefaults(): Promise<void> {
+    return Promise.resolve();
+  }
+
   translate(): Promise<never> {
     throw new Error("Not used by Trace tests.");
   }

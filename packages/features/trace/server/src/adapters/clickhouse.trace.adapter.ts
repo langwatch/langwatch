@@ -5,7 +5,7 @@ import {
   type TraceFullReadInput,
   type TraceService as TraceServiceContract,
 } from "@langwatch/trace-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import { TraceClickHousePort, type TraceClickHouseResolver } from "../ports/clickhouse.port.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
@@ -24,7 +24,7 @@ import { TraceService } from "../services/trace.service.ts";
 
 export type ClickHouseTraceAdapterOptions = {
   resolveClient: TraceClickHouseResolver;
-  modelProviders: ModelProviderService;
+  modelProviders: ModelProviderApi;
   queryFieldValues: TraceQueryFieldValuesPort;
   queryClassification?: TraceQueryClassificationPort;
   summaryReader?: TraceSummaryReaderPort;
@@ -43,7 +43,7 @@ export class ClickHouseTraceAdapter {
   }
 
   /** Default API and test composition use this when ClickHouse is disabled. */
-  static createNull(modelProviders: ModelProviderService): TraceServiceContract {
+  static createNull(modelProviders: ModelProviderApi): TraceServiceContract {
     return TraceService.create({
       repository: new NullTraceRepository(),
       modelProviders,

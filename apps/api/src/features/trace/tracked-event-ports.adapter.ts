@@ -31,7 +31,7 @@ import { zodErrorMessage } from "@langwatch/config";
 import { ValidationError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { predefinedEventsSchemas, predefinedEventTypes } from "@langwatch/trace-contract";
-import type { TrackedEventPorts } from "@langwatch/trace-server";
+import type { TrackedEventPorts } from "@langwatch/trace-server/api-rest/tracked-event";
 import { TrackedEventSpanService } from "@langwatch/trace-server";
 import { z } from "zod";
 

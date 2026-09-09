@@ -23,7 +23,7 @@ import {
   RESERVED_OUTPUT_MEDIA_REFS,
   resolveNonBilledCost,
 } from "@langwatch/trace-contract";
-import type { CodingAgentService, LogContentCategory } from "@langwatch/coding-agent-contract";
+import type { CodingAgentApi, LogContentCategory } from "@langwatch/coding-agent-contract";
 import { TraceAttributeRedactionService } from "../../services/trace-attribute-redaction.service.ts";
 
 // ---------------------------------------------------------------------------
@@ -799,7 +799,7 @@ function visibleToLabel(
 export function redactTraceLogContent(
   row: TraceLogRecordDto,
   protections: LogVisibility,
-  codingAgents: Pick<CodingAgentService, "logContentKeys">,
+  codingAgents: Pick<CodingAgentApi, "logContentKeys">,
   derivedAttrPrefixes: TraceDerivedAttrPrefixes,
 ): TraceLogRecordDto {
   const eventName = row.attributes[LOG_EVENT_NAME_ATTR] ?? "";
@@ -858,7 +858,7 @@ export function gateTraceLogVisibility(
     capturedOutputVisibleTo?: string | null;
   },
   visibilityCutoffMs: number | null,
-  codingAgents: Pick<CodingAgentService, "logContentKeys">,
+  codingAgents: Pick<CodingAgentApi, "logContentKeys">,
   derivedAttrPrefixes: TraceDerivedAttrPrefixes,
 ): TraceLogRecordDto {
   const isBeforeCutoff = visibilityCutoffMs !== null && row.timeUnixMs < visibilityCutoffMs;

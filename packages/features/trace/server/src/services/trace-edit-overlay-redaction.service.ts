@@ -1,5 +1,5 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceAttributeRedactionService } from "@langwatch/trace-server";
+import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
 import {
   TRACE_EDIT_SPAN_FIELDS,
   TRACE_EDIT_TRACE_FIELDS,

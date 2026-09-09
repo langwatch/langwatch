@@ -29,7 +29,8 @@
       "default": "./src/repositories/prisma/prisma.trace-edit-overlay.repository.ts"
     },
     "./composition/trace-processing-producer": {
-      "types": "./dist/adapters/trace-processing-producer.adapter.d.ts"
+      "types": "./dist/adapters/trace-processing-producer.adapter.d.ts",
+      "default": "./src/adapters/trace-processing-producer.adapter.ts"
     },
     "./api-trpc/spans": {
       "types": "./dist/transport/api-trpc/spans.api.d.ts",
@@ -85,8 +86,7 @@
     },
     "./api-rest/collector": {
       "types": "./dist/transport/api-rest/collector.api.d.ts",
-      "default": "./src/transport/api-rest/collector.api.ts",
-      "default": "./src/adapters/trace-processing-producer.adapter.ts"
+      "default": "./src/transport/api-rest/collector.api.ts"
     }
   },
   "scripts": {
@@ -96,6 +96,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
     "@aws-sdk/client-s3": "^3.1080.0",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",

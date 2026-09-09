@@ -1,5 +1,5 @@
 import { Input, Textarea } from "@chakra-ui/react";
-import { AnnotationScoreEditor } from "@langwatch/annotation-web/surfaces/annotation-form";
+import { AnnotationScoreEditor } from "@langwatch/annotation-web/annotation-form";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { applyHandledErrorToForm, FormServerError, showErrorToast } from "../errors/index.ts";

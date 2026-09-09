@@ -30,12 +30,7 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contr
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import { type NormalizedAttributes, type NormalizedSpan } from "@langwatch/trace-contract";
 import type { ElasticSearchEvent, Span } from "@langwatch/trace-contract";
-import {
-  ensureStringRecord,
-  type FullSpanRow,
-  mapChRowToNormalized,
-  serializeAttributes,
-} from "@langwatch/trace-server";
+import { ensureStringRecord, type FullSpanRow, mapChRowToNormalized, serializeAttributes } from "./stored-span-row.mapper.ts";
 
 const logger = createLogger("langwatch:app-layer:traces:span-storage-repository");
 import type { SpanInsertData } from "@langwatch/trace-contract";

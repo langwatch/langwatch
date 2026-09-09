@@ -11,7 +11,7 @@ import type {
   TraceInput,
   TraceOutput,
 } from "@langwatch/trace-contract";
-import { TraceAttributeRedactionService } from "@langwatch/trace-server";
+import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
 import { parsePythonInsideJson } from "@langwatch/trace-contract";
 
 // Stable display order for the content categories a drop policy can strip, so

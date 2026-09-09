@@ -10,7 +10,6 @@ import { createTrpcService } from "@langwatch/api/trpc";
 import {
   codingAgentSessionSchema,
   codingAgentTranscriptSchema,
-  type CodingAgentService,
   type CodingAgentTranscript,
 } from "@langwatch/coding-agent-contract";
 import { ValidationError } from "@langwatch/handled-error";
@@ -208,13 +207,6 @@ export type TracesV2TrpcPorts<TMetadata = unknown, TMetadataRaw = unknown> = Rea
     completionTokens: number | null | undefined;
   }): Promise<SpanDetail["costSuggestion"]>;
   /**
-   * The coding-agent log join. Claude Code's real `llm_request` spans carry
-   * tokens and a `request_id` but no message content — that lives in the
-   * trace's OTLP log records, and this is what puts it back on the span
-   * BEFORE protections run.
-   */
-  codingAgentEnrichment: TracesV2CodingAgentEnrichmentPort;
-  /**
    * The prompt-reference walk: an llm span whose `langwatch.prompt.*` lives on
    * a sibling `Prompt.compile` span. Returns the merged params, or null when
    * the walk found nothing.
@@ -245,34 +237,8 @@ export type TracesV2TrpcPorts<TMetadata = unknown, TMetadataRaw = unknown> = Rea
  */
 export type TracesV2ReadPorts = Pick<
   TracesV2TrpcPorts,
-  "tryGetVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes" | "codingAgentEnrichment"
+  "tryGetVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes"
 >;
-
-/** The coding-agent log join, in the two shapes the reads need it. */
-export type TracesV2CodingAgentEnrichmentPort = Readonly<{
-  /** Whether a span is shaped like a coding-agent span at all. */
-  isCodingAgentShapedSpan(span: Span): boolean;
-  /** Bulk: every span of one trace, joined against the trace's log records. */
-  enrichSpansFromLogs(input: {
-    tenantId: string;
-    traceId: string;
-    spans: Span[];
-    occurredAtMs?: number;
-    logRecords: TraceLogRecordReader;
-    traceCanonicalisation: TraceCanonicalisationService;
-    codingAgents: CodingAgentService;
-  }): Promise<Span[]>;
-  /** Single: one span, with the trace's model-call order when it needs it. */
-  enrichSingleSpanWithLogContent(input: {
-    span: Span;
-    modelCallRefs: unknown;
-    logRows: TraceLogRecordReadRow[];
-    traceCanonicalisation: TraceCanonicalisationService;
-    codingAgents: CodingAgentService;
-  }): Span;
-  /** The light summary refs a single-span model-call join pairs against. */
-  mapSummaryRowsToRefs(rows: SpanSummaryRow[]): unknown;
-}>;
 
 // ---------------------------------------------------------------------------
 // Shared input fragments
@@ -370,14 +336,12 @@ async function enrichSpanDetailFromCodingAgentLogs({
   tenantId,
   traceId,
   occurredAtMs,
-  codingAgentEnrichment,
 }: {
   app: TraceApp;
   span: Span;
   tenantId: string;
   traceId: string;
   occurredAtMs?: number;
-  codingAgentEnrichment: TracesV2CodingAgentEnrichmentPort;
 }): Promise<Span> {
   try {
     const needsSiblingRefs =
@@ -388,12 +352,10 @@ async function enrichSpanDetailFromCodingAgentLogs({
         ? app.readSpanSummaries({ projectId: tenantId, traceId, occurredAtMs })
         : Promise.resolve([]),
     ]);
-    return codingAgentEnrichment.enrichSingleSpanWithLogContent({
+    return app.enrichSpanFromCodingAgentLogs({
       span,
-      modelCallRefs: codingAgentEnrichment.mapSummaryRowsToRefs(summaryRows),
+      modelCallRefs: app.mapCodingAgentSummaryRows(summaryRows),
       logRows,
-      traceCanonicalisation: app.canonicalisation,
-      codingAgents: app.codingAgents,
     });
   } catch (error) {
     logger.warn(
@@ -442,14 +404,11 @@ async function loadSpansFullWithProtections({
   // message content, which lives in the trace's OTLP log records. Join it on
   // BEFORE protections run, so the joined content goes through the same
   // redaction pass as any other span content rather than bypassing it.
-  const spans = await ports.codingAgentEnrichment.enrichSpansFromLogs({
-    logRecords: app.logRecords,
-    tenantId: projectId,
+  const spans = await app.enrichSpansFromCodingAgentLogs({
+    projectId,
     traceId,
     spans: storedSpans,
     ...(occurredAtMs !== undefined ? { occurredAtMs } : {}),
-    traceCanonicalisation: app.canonicalisation,
-    codingAgents: app.codingAgents,
   });
 
   return mapSpansToDetailDtos(spans, protections, ports.mappers);
@@ -463,7 +422,6 @@ async function loadTraceLogsWithProtections({
   traceId,
   occurredAtMs,
   protections,
-  codingAgents,
 }: {
   app: TraceApp;
   ports: TracesV2ReadPorts;
@@ -471,7 +429,6 @@ async function loadTraceLogsWithProtections({
   traceId: string;
   occurredAtMs?: number;
   protections: Protections;
-  codingAgents: CodingAgentService;
 }): Promise<TraceLogRecordDto[]> {
   const visibilityCutoffMs = await ports.tryGetVisibilityCutoffMs(projectId);
   const rows = await app.readTraceLogRecords({ projectId, traceId, occurredAtMs });
@@ -488,7 +445,13 @@ async function loadTraceLogsWithProtections({
       },
       protections,
       visibilityCutoffMs,
-      codingAgents,
+      {
+        logContentKeys: (eventName) =>
+          app.codingAgentLogContentKeys(eventName).map((entry) => ({
+            key: entry.key,
+            category: entry.category,
+          })),
+      },
       ports.derivedAttrPrefixes,
     ),
   );
@@ -515,7 +478,6 @@ export class TracesV2TrpcApi {
     traceId,
     occurredAtMs,
     protections,
-    codingAgents,
   }: {
     app: TraceApp;
     ports: TracesV2ReadPorts;
@@ -523,22 +485,17 @@ export class TracesV2TrpcApi {
     traceId: string;
     occurredAtMs?: number;
     protections: Protections;
-    codingAgents: CodingAgentService;
   }): Promise<CodingAgentTranscript> {
     const args = { app, ports, projectId, traceId, occurredAtMs, protections };
     const [spans, logs] = await Promise.all([
       loadSpansFullWithProtections(args),
-      loadTraceLogsWithProtections({ ...args, codingAgents }),
+      loadTraceLogsWithProtections(args),
     ]);
 
-    return codingAgents.buildTranscript({
+    return app.buildCodingAgentTranscript({
       spans,
-      logs: logs.map((row) => ({
-        timestampMs: row.timeUnixMs,
-        attributes: (row.attributes ?? {}) as Record<string, unknown>,
-        serviceName: row.resourceAttributes?.["service.name"] ?? null,
-      })),
-    });
+      logs,
+    }) as CodingAgentTranscript;
   }
 
   static create<
@@ -1136,7 +1093,6 @@ export class TracesV2TrpcApi {
               traceId: input.traceId,
               ...occurredAtFromInput(input),
               protections,
-              codingAgents: ctx.app.traces.codingAgents,
             });
           }),
       )
@@ -1402,7 +1358,6 @@ export class TracesV2TrpcApi {
               traceId: input.traceId,
               ...occurredAtFromInput(input),
               protections,
-              codingAgents: ctx.app.traces.codingAgents,
             });
           }),
       )
@@ -1453,14 +1408,13 @@ export class TracesV2TrpcApi {
             // content goes through the same redaction pass as any other span
             // content (identical order to loadSpansFullWithProtections). Gated so
             // only coding-agent-shaped spans pay the log read.
-            const targetSpan = ports.codingAgentEnrichment.isCodingAgentShapedSpan(span)
+            const targetSpan = ctx.app.traces.isCodingAgentShapedSpan(span)
               ? await enrichSpanDetailFromCodingAgentLogs({
                   app: ctx.app.traces,
                   span,
                   tenantId: input.projectId,
                   traceId: input.traceId,
                   ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
-                  codingAgentEnrichment: ports.codingAgentEnrichment,
                 })
               : span;
 
@@ -1505,7 +1459,7 @@ export class TracesV2TrpcApi {
             // the enriched spanDetail read CHEAPER than before for these spans.
             const needsAncestorPromptWalk =
               spanDetail.type === "llm" &&
-              !ports.codingAgentEnrichment.isCodingAgentShapedSpan(span) &&
+              !ctx.app.traces.isCodingAgentShapedSpan(span) &&
               !ports.hasOwnPromptAttrs(spanDetail.params as Record<string, unknown> | null);
             if (needsAncestorPromptWalk) {
               const enriched = await ports.resolveAncestorPromptParams({

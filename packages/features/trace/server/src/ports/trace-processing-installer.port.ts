@@ -1,5 +1,19 @@
 import type { EventSourcing } from "@langwatch/eventing";
-import type { RecordSpanCommandData, TraceTopicAssignmentPort } from "@langwatch/trace-contract";
+import type {
+  AnnotationAddedEventData,
+  AnnotationRemovedEventData,
+  RecordSpanCommandData,
+  TraceNameChangedEventData,
+  TraceTopicAssignmentPort,
+} from "@langwatch/trace-contract";
+
+/** Commands shared by receiver, reviewer, and background callers of Trace. */
+export interface TraceProcessingCommands {
+  recordSpan(data: RecordSpanCommandData): Promise<unknown>;
+  changeTraceName(data: TraceNameChangedEventData): Promise<unknown>;
+  addAnnotation(data: AnnotationAddedEventData): Promise<unknown>;
+  removeAnnotation(data: AnnotationRemovedEventData): Promise<unknown>;
+}
 
 /** Worker-facing installation capability for Trace's complete processing graph. */
 export abstract class TraceProcessingInstallerPort {
@@ -14,6 +28,6 @@ export abstract class TraceProcessingInstallerPort {
      * It is available only AFTER registration, which is why the process that
      * needs it hands the subscriber a late-bound proxy rather than the command.
      */
-    commands: { recordSpan: (data: RecordSpanCommandData) => Promise<unknown> };
+    commands: TraceProcessingCommands;
   };
 }

@@ -20,7 +20,7 @@ import type {
   FacetTable,
   RangeFacetDef,
 } from "@langwatch/trace-server";
-import { ClickHouseFacetRegistryAdapter } from "@langwatch/trace-server";
+import { ClickHouseFacetRegistryAdapter } from "../adapters/trace-facet-registry.clickhouse.adapter.ts";
 
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
 import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";

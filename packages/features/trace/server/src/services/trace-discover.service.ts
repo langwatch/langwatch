@@ -18,7 +18,7 @@ import type {
   FacetTable,
   RangeFacetDef,
 } from "@langwatch/trace-server";
-import { ClickHouseFacetRegistryAdapter } from "@langwatch/trace-server";
+import { ClickHouseFacetRegistryAdapter } from "../adapters/trace-facet-registry.clickhouse.adapter.ts";
 
 import {
   discoverCacheKey,

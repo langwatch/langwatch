@@ -13,7 +13,7 @@ import {
   THREAD_MAPPINGS,
   TRACE_MAPPINGS,
   tryAndConvertTo,
-} from "@langwatch/trace-contract";
+} from "@langwatch/dataset-contract";
 
 describe("SPAN_SUBFIELDS", () => {
   it("contains * (full span object) as first option", () => {

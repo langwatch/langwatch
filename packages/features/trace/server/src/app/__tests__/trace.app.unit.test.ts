@@ -1,3 +1,6 @@
+import type { TopicApi } from "@langwatch/topic-contract";
+import type { ShareApi } from "@langwatch/share-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  *
@@ -30,7 +33,7 @@ import type {
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
 import type { EvaluationService } from "@langwatch/evaluation-contract";
-import type { CodingAgentService } from "@langwatch/coding-agent-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port.ts";
@@ -132,6 +135,7 @@ function harness(
 
   const app = TraceApp.create({
     traces: {
+      existence: { findExistingTraceIds: async ({ traceIds }) => [...traceIds] },
       read: read as TraceLegacyReadPort,
       spans: spans as TracesV2SpanReader,
       summary,
@@ -143,7 +147,7 @@ function harness(
       editOverlay: {} as TraceEditOverlayStore,
       changeTraceName: async () => undefined,
     },
-    topics: {} as TracesTopicReader,
+    topics: {} as TopicApi,
     broadcast: {
       getTenantEmitter: () => {
         throw new Error("no read in this suite subscribes");
@@ -151,9 +155,9 @@ function harness(
       cleanupTenantEmitter: () => undefined,
     },
     evaluations: {} as EvaluationService,
-    codingAgents: {} as CodingAgentService,
-    share: {} as TraceShareReader,
-    projects: {} as TraceProjectReader,
+    codingAgents: {} as CodingAgentApi,
+    share: {} as ShareApi,
+    projects: {} as ProjectApi,
   });
 
   return {

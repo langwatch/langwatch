@@ -2,7 +2,7 @@
 #
 # Implementation:
 #   packages/prisma-client/prisma/schema.prisma                                                  (which part of the trace an annotation is about)
-#   packages/features/annotation/server/src/transport/api-trpc/annotation.api.ts                                            (anchored writes, anchored reads, suggestion hand-off)
+#   packages/features/annotation/server/src/transport/annotation.trpc.ts                                                    (anchored writes, anchored reads, suggestion hand-off)
 #   packages/features/trace/server/src/services/trace-edit-overlay.service.ts                       (a field suggestion merged into the correction)
 #   [gone] src/server/traces/clickhouse-trace.service.ts                                   (trace-level annotation reads for lists and datasets)
 #   packages/features/trace/web/src/annotation-draft.store.ts                           (what is being written, and about what)

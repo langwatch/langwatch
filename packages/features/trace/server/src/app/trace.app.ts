@@ -1,11 +1,21 @@
 import type { Protections } from "@langwatch/trace-contract";
+import {
+  TraceIngestionUnavailableError,
+  recordCapturedSpanInputSchema,
+  type RecordCapturedSpanInput,
+} from "@langwatch/trace-contract";
+import type { TraceSpanIngestPort } from "../ports/trace-span-ingest.port.ts";
+import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
 /**
  * The trace feature's application: the one typed thing every door is given, replacing five previously-private bags (SpansApplication, TracesApplication, TraceEditOverlayApplication, SharedTraceApplication, TracesV2Application) that agreed by attention, not construction, and couldn't see each other's declarations. What lives here as a rule rather than a service's own concern: attribution (changeTraceName + reviewer-correction stamp the caller as an argument, not a session read, so one op serves a browser/API-key/job caller alike); full resolution (#4991: a content-consuming read resolves offloads, a listing read stays on preview); the partition-pruning hint (occurredAtMs must be OMITTED, never undefined); the visibility-window verdict; and the sample draw (list ids, then read those traces in full). A door may still shape its own paging/limits/redactions, but not decide privately what the application does.
  */
-import type { CodingAgentService } from "@langwatch/coding-agent-contract";
-import type { EvaluationService } from "@langwatch/evaluation-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
-import type { ShareViewer } from "@langwatch/share-contract";
+import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { TopicApi } from "@langwatch/topic-contract";
+import { TraceApi as TraceApiToken } from "@langwatch/trace-contract";
 import type {
   CustomersAndLabelsResult,
   DerivedTraceEvent,
@@ -18,15 +28,19 @@ import type {
   SessionGroupsResult,
   SharedTraceDto,
   Span,
+  SpanDetail,
   SpanLangwatchSignals,
   SpanResourceInfo,
   SpanSummaryRow,
+  ModelUsageStatsRow,
+  ModelSpanSampleRow,
   SpanTreeDeltaInput,
   SpanTreeInput,
   SpanTreeNode,
   SpanTreePage,
   TopicCountsResult,
   Trace,
+  TraceIngestWaitInput,
   TraceCanonicalisationService,
   TraceEditOverlayDto,
   TraceEventRollup,
@@ -35,11 +49,23 @@ import type {
   TraceListFacetCounts,
   TraceListPage,
   TraceService,
+  TraceContentReadService,
+  TraceViewerService,
+  TraceApi,
+  TraceAnnotationCommands,
+  TraceAnnotationMarker,
+  TraceSuggestionTarget,
   TraceSummaryData,
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
 import type { TraceLegacyReadPort } from "../ports/trace-legacy-read.port.ts";
+import type { TraceExistencePort } from "../ports/trace-existence.port.ts";
+import { TraceContentReadServiceImpl } from "../services/trace-content-read.service.ts";
+import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
 import { nowInstant } from "@langwatch/time";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { traceDependencies, type TraceInfrastructure } from "./trace-composition.types.ts";
+import { composeTraceAppDependencies } from "./trace-read.composition.ts";
 
 const logger = createLogger("langwatch:trace:app");
 
@@ -144,6 +170,18 @@ export type TracesV2SpanReader = Readonly<{
     traceIds: string[];
     timeRange: { from: number; to: number };
   }): Promise<Record<string, TraceEventRollup>>;
+  getModelUsageStats(params: {
+    tenantId: string;
+    fromMs: number;
+    limit: number;
+  }): Promise<ModelUsageStatsRow[]>;
+  getRecentSpansByModels(params: {
+    tenantId: string;
+    models: string[];
+    fromMs: number;
+    perModelLimit: number;
+    limit: number;
+  }): Promise<ModelSpanSampleRow[]>;
 }>;
 
 /**
@@ -185,6 +223,42 @@ export type TraceEditOverlayStore = Readonly<{
     }>,
   ): Promise<TraceEditOverlayDto>;
   delete(input: Readonly<{ projectId: string; traceId: string }>): Promise<void>;
+  mergeTraceIOEdit(
+    input: Readonly<{
+      projectId: string;
+      traceId: string;
+      field: "input" | "output";
+      value: string;
+      userId: string | null;
+    }>,
+  ): Promise<TraceEditOverlayDto>;
+  tryRemoveTraceIOEdit(
+    input: Readonly<{
+      projectId: string;
+      traceId: string;
+      field: "input" | "output";
+      userId: string | null;
+    }>,
+  ): Promise<TraceEditOverlayDto | null>;
+  mergeSpanFieldEdit(
+    input: Readonly<{
+      projectId: string;
+      traceId: string;
+      spanId: string;
+      field: "input" | "output";
+      text: string;
+      userId: string | null;
+    }>,
+  ): Promise<TraceEditOverlayDto>;
+  tryRemoveSpanFieldEdit(
+    input: Readonly<{
+      projectId: string;
+      traceId: string;
+      spanId: string;
+      field: "input" | "output";
+      userId: string | null;
+    }>,
+  ): Promise<TraceEditOverlayDto | null>;
 }>;
 
 /**
@@ -238,7 +312,11 @@ export type TraceProjectReader = Readonly<{
 
 /** What the process composes this feature's application from. */
 export interface TraceAppDependencies {
+  spanIngest?: TraceSpanIngestPort;
+  viewer?: TraceViewerService;
+  annotationCommands?: TraceAnnotationCommands;
   traces: Readonly<{
+    existence: TraceExistencePort;
     /** The legacy trace read the `traces.*` and `spans.*` surfaces call. */
     read: TraceLegacyReadPort;
     list: TracesV2ListReader;
@@ -258,12 +336,12 @@ export interface TraceAppDependencies {
       occurredAt: number;
     }): Promise<unknown>;
   }>;
-  topics: TracesTopicReader;
+  topics: TopicApi;
   broadcast: TracesTrpcEmitters;
-  evaluations: EvaluationService;
-  codingAgents: CodingAgentService;
-  share: TraceShareReader;
-  projects: TraceProjectReader;
+  evaluations: EvaluationApi;
+  codingAgents: CodingAgentApi;
+  share: ShareApi;
+  projects: ProjectApi;
 }
 
 /**
@@ -273,12 +351,168 @@ function occurredAtHint(occurredAtMs?: number): { occurredAtMs: number } | Recor
   return occurredAtMs !== undefined ? { occurredAtMs } : {};
 }
 
-export class TraceApp {
-  static create(dependencies: TraceAppDependencies): TraceApp {
+export class TraceApp implements TraceApi {
+  static readonly contract = TraceApiToken;
+  static readonly dependencies = traceDependencies;
+
+  static create(
+    input:
+      | TraceAppDependencies
+      | FeatureSetup<typeof traceDependencies, TraceInfrastructure, undefined>,
+  ): TraceApp {
+    const dependencies =
+      "infrastructure" in input
+        ? composeTraceAppDependencies({
+            ...input.infrastructure.trace,
+            ...input.dependencies,
+            protections: {
+              authz: input.dependencies.authz,
+              projects: input.dependencies.projects,
+              plans: input.dependencies.plans,
+              dataPrivacy: input.dependencies.dataPrivacy,
+              fallbackVisibilityDays: input.infrastructure.trace.fallbackVisibilityDays,
+              processName: input.infrastructure.trace.processName,
+            },
+          })
+        : input;
     return new TraceApp(dependencies);
   }
 
-  private constructor(private readonly dependencies: TraceAppDependencies) {}
+  #contentReader: TraceContentReadService;
+  #dependencies: TraceAppDependencies;
+  private constructor(dependencies: TraceAppDependencies) {
+    this.#dependencies = dependencies;
+    this.#contentReader = TraceContentReadServiceImpl.create(dependencies.traces.read);
+  }
+
+  resolveIngestWaitTimeout(input: TraceIngestWaitInput) {
+    return this.#dependencies.traces.tree.resolveIngestWaitTimeout(input);
+  }
+
+  async recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void> {
+    const parsed = recordCapturedSpanInputSchema.parse(input);
+    const ingest = this.#dependencies.spanIngest;
+    if (!ingest) {
+      throw new TraceIngestionUnavailableError();
+    }
+    await ingest.recordSpan({
+      tenantId: parsed.projectId,
+      span: TraceCollectorSpanService.convertSpanToOtlp(parsed.span),
+      resource: TraceCollectorSpanService.buildResource({
+        reservedTraceMetadata: { user_id: parsed.userId },
+        customMetadata: parsed.customMetadata,
+      }),
+      instrumentationScope: null,
+      occurredAt: parsed.occurredAt,
+    });
+  }
+
+  getEvaluationSpans(input: import("@langwatch/trace-contract").EvaluationTraceReadInput) {
+    return this.#dependencies.traces.tree.getEvaluationSpans(input);
+  }
+
+  getEvaluationEvents(input: import("@langwatch/trace-contract").EvaluationTraceReadInput) {
+    return this.#dependencies.traces.tree.getEvaluationEvents(input);
+  }
+
+  listTraces(input: Parameters<TraceContentReadService["listTraces"]>[0]) {
+    return this.#contentReader.listTraces(input);
+  }
+  readTrace(input: Parameters<TraceContentReadService["readTrace"]>[0]) {
+    return this.#contentReader.readTrace(input);
+  }
+  readTracesWithSpans(input: Parameters<TraceContentReadService["readTracesWithSpans"]>[0]) {
+    return this.#contentReader.readTracesWithSpans(input);
+  }
+  readTracesWithSpansPreview(
+    input: Parameters<TraceContentReadService["readTracesWithSpansPreview"]>[0],
+  ) {
+    return this.#contentReader.readTracesWithSpansPreview(input);
+  }
+  readOrderedSpansForTrace(
+    input: Parameters<TraceContentReadService["readOrderedSpansForTrace"]>[0],
+  ) {
+    return this.#contentReader.readOrderedSpansForTrace(input);
+  }
+  readThreadTraces(input: Parameters<TraceContentReadService["readThreadTraces"]>[0]) {
+    return this.#contentReader.readThreadTraces(input);
+  }
+  readThreadsTraces(input: Parameters<TraceContentReadService["readThreadsTraces"]>[0]) {
+    return this.#contentReader.readThreadsTraces(input);
+  }
+  readSampleTraces(input: Parameters<TraceContentReadService["readSampleTraces"]>[0]) {
+    return this.#contentReader.readSampleTraces(input);
+  }
+  readForViewer(input: Parameters<TraceViewerService["readForViewer"]>[0]) {
+    if (!this.#dependencies.viewer) throw new Error("Trace viewer service is unavailable");
+    return this.#dependencies.viewer.readForViewer(input);
+  }
+
+  findExistingTraceIds(input: {
+    projectId: string;
+    traceIds: readonly string[];
+  }): Promise<string[]> {
+    return this.#dependencies.traces.existence.findExistingTraceIds(input);
+  }
+
+  loadTraces(input: {
+    userId: string;
+    projectId: string;
+    traceIds: readonly string[];
+  }): Promise<ReadonlyArray<Trace>> {
+    return this.readForViewer(input);
+  }
+
+  async writeSuggestion(input: {
+    projectId: string;
+    traceId: string;
+    target: TraceSuggestionTarget;
+    text: string;
+    userId: string;
+  }): Promise<void> {
+    const { projectId, traceId, target, text, userId } = input;
+    const withdrawn = text.length === 0;
+    if (target.kind === "span") {
+      const span = { projectId, traceId, spanId: target.spanId, userId };
+      if (withdrawn) {
+        await this.#dependencies.traces.editOverlay.tryRemoveSpanFieldEdit({
+          ...span,
+          field: target.field,
+        });
+      } else {
+        await this.#dependencies.traces.editOverlay.mergeSpanFieldEdit({
+          ...span,
+          field: target.field,
+          text,
+        });
+      }
+      return;
+    }
+
+    const trace = { projectId, traceId, field: target.field, userId };
+    if (withdrawn) {
+      await this.#dependencies.traces.editOverlay.tryRemoveTraceIOEdit(trace);
+    } else {
+      await this.#dependencies.traces.editOverlay.mergeTraceIOEdit({
+        ...trace,
+        value: text,
+      });
+    }
+  }
+
+  recordAnnotation(input: TraceAnnotationMarker): Promise<void> {
+    if (!this.#dependencies.annotationCommands) {
+      return Promise.reject(new Error("Trace annotation commands are unavailable"));
+    }
+    return this.#dependencies.annotationCommands.add(input);
+  }
+
+  removeAnnotation(input: TraceAnnotationMarker): Promise<void> {
+    if (!this.#dependencies.annotationCommands) {
+      return Promise.reject(new Error("Trace annotation commands are unavailable"));
+    }
+    return this.#dependencies.annotationCommands.remove(input);
+  }
 
   // Collaborators handed to a process port as VALUES: the coding-agent log
   // join reads the trace's logs itself and canonicalises per span, so it
@@ -287,188 +521,85 @@ export class TraceApp {
   // an application importing its own transport would invert the layout.
 
   /** The trace-log read the coding-agent join issues for itself. */
-  get logRecords(): TraceLogRecordReader {
-    return this.dependencies.traces.logRecords;
+  getLogsByTraceId(
+    tenantId: string,
+    traceId: string,
+    occurredAtMs?: number,
+    limit?: number,
+  ): Promise<TraceLogRecordReadRow[]> {
+    return this.readTraceLogRecords({
+      projectId: tenantId,
+      traceId,
+      occurredAtMs,
+      limit,
+    });
   }
 
   /** The canonicaliser the coding-agent join runs over joined span content. */
-  get canonicalisation(): TraceCanonicalisationService {
-    return this.dependencies.traces.canonicalisation;
+  isCodingAgentShapedSpan(span: Span): boolean {
+    return ClaudeCodeLogEnrichmentService.isCodingAgentShapedSpan(span);
   }
 
-  /** The coding-agent capability the join and the transcript build both take. */
-  get codingAgents(): CodingAgentService {
-    return this.dependencies.codingAgents;
-  }
-
-  // -------------------------------------------------------------------------
-  // The legacy trace read
-  // -------------------------------------------------------------------------
-
-  /**
-   * The project's list/search read, keyset-paged. Stays on the stored preview: a grid lists content, it doesn't consume it, and resolving every offloaded value for a page is exactly what #4991 kept off it. The download and sample draws below, which DO consume content, ask for it in full.
-   */
-  listTraces(input: {
-    query: TraceLegacyListInput;
-    protections: unknown;
-    options?: {
-      downloadMode?: boolean;
-      includeSpans?: boolean;
-      resolveBlobs?: boolean;
-      scrollId?: string | null;
-    };
-  }): Promise<TracesForProjectResult> {
-    return this.dependencies.traces.read.getAllTracesForProject(
-      input.query,
-      input.protections,
-      input.options,
-    );
-  }
-
-  /**
-   * One trace with its spans, resolved in full — a drawer read consumes the content it shows, so it never serves the 64 KB preview (#4991). Answers undefined when the project holds no such trace; turning that into a transport error is the door's business.
-   */
-  readTrace(input: {
+  enrichSpansFromCodingAgentLogs(input: {
     projectId: string;
     traceId: string;
-    protections: unknown;
-    withEditOverlay?: boolean;
-  }): Promise<Trace | undefined> {
-    return this.dependencies.traces.read.tryGetById(
-      input.projectId,
-      input.traceId,
-      input.protections,
-      {
-        full: true,
-        ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
-      },
-    );
-  }
-
-  /** Named traces with their spans, resolved in full (#4991). */
-  readTracesWithSpans(input: {
-    projectId: string;
-    traceIds: string[];
-    protections: unknown;
-    occurredAt?: { from: number; to: number };
-    withEditOverlay?: boolean;
-  }): Promise<Trace[]> {
-    return this.dependencies.traces.read.getTracesWithSpans(
-      input.projectId,
-      input.traceIds,
-      input.protections,
-      input.occurredAt,
-      {
-        full: true,
-        ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
-      },
-    );
-  }
-
-  /**
-   * The same traces, on the stored preview — the one read that deliberately does NOT resolve in full: it runs over a whole page at once to render each as a digest, and resolving every offload on all of them is what #4991 kept off the grid.
-   */
-  readTracesWithSpansPreview(input: {
-    projectId: string;
-    traceIds: string[];
-    protections: unknown;
-    withEditOverlay?: boolean;
-  }): Promise<Trace[]> {
-    return this.dependencies.traces.read.getTracesWithSpans(
-      input.projectId,
-      input.traceIds,
-      input.protections,
-      undefined,
-      input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {},
-    );
-  }
-
-  /**
-   * One trace's spans in waterfall order: earliest start first, and where two start together, the longer one first, so a parent is never drawn under the child it contains. Answers no spans, rather than failing, when the project holds no such trace or the trace carries none.
-   */
-  async readOrderedSpansForTrace(input: {
-    projectId: string;
-    traceId: string;
-    protections: unknown;
+    spans: Span[];
+    occurredAtMs?: number;
   }): Promise<Span[]> {
-    const traces = await this.readTracesWithSpans({
-      projectId: input.projectId,
-      traceIds: [input.traceId],
-      protections: input.protections,
-    });
-    const trace = traces.find((candidate) => candidate.trace_id === input.traceId);
-    if (!trace?.spans) return [];
-
-    return trace.spans.sort((a, b) => {
-      const aStart = a.timestamps?.started_at ?? 0;
-      const bStart = b.timestamps?.started_at ?? 0;
-
-      const startDiff = aStart - bStart;
-      if (startDiff === 0) {
-        const aEnd = a.timestamps?.finished_at ?? 0;
-        const bEnd = b.timestamps?.finished_at ?? 0;
-        return bEnd - aEnd;
-      }
-
-      return startDiff;
+    return ClaudeCodeLogEnrichmentService.enrichCodingAgentSpansFromLogs({
+      logRecords: this,
+      tenantId: input.projectId,
+      traceId: input.traceId,
+      spans: input.spans,
+      ...(input.occurredAtMs !== undefined ? { occurredAtMs: input.occurredAtMs } : {}),
+      logger,
+      traceCanonicalisation: this.#dependencies.traces.canonicalisation,
+      codingAgents: this.#dependencies.codingAgents,
     });
   }
 
-  /** Every trace in one conversation, resolved in full (#4991). */
-  readThreadTraces(input: {
-    projectId: string;
-    threadId: string;
-    protections: unknown;
-  }): Promise<Trace[]> {
-    return this.dependencies.traces.read.getTracesByThreadId(
-      input.projectId,
-      input.threadId,
-      input.protections,
-      { full: true },
-    );
-  }
-
-  /** Every trace in each of several conversations, resolved in full (#4991). */
-  readThreadsTraces(input: {
-    projectId: string;
-    threadIds: string[];
-    protections: unknown;
-    withEditOverlay?: boolean;
-  }): Promise<Trace[]> {
-    return this.dependencies.traces.read.getTracesWithSpansByThreadIds(
-      input.projectId,
-      input.threadIds,
-      input.protections,
-      {
-        full: true,
-        ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
-      },
-    );
-  }
-
-  /**
-   * A page of traces drawn for a wizard's sample step, resolved in full — two reads, in this order only: list for ids (no content, stays on preview), then the named traces in full, since sample/dataset builders persist what comes back and a truncated row corrupts the write. Both wizards did this for themselves, one pageSize apart.
-   */
-  async readSampleTraces(input: {
-    query: TraceLegacyListInput;
-    protections: unknown;
-    pageSize: number;
-  }): Promise<Trace[]> {
-    const { groups } = await this.listTraces({
-      query: { ...input.query, groupBy: "none", pageSize: input.pageSize },
-      protections: input.protections,
-    });
-
-    const traceIds = groups.flatMap((group) => group.map((trace) => trace.trace_id));
-    if (traceIds.length === 0) return [];
-
-    return this.readTracesWithSpans({
-      projectId: input.query.projectId,
-      traceIds,
-      protections: input.protections,
-      occurredAt: { from: input.query.startDate, to: input.query.endDate },
+  enrichSpanFromCodingAgentLogs(input: {
+    span: Span;
+    modelCallRefs: unknown;
+    logRows: TraceLogRecordReadRow[];
+  }): Span {
+    return ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent({
+      span: input.span,
+      modelCallRefs: input.modelCallRefs as Parameters<
+        typeof ClaudeCodeLogEnrichmentService.enrichSingleSpanWithClaudeLogContent
+      >[0]["modelCallRefs"],
+      logRows: input.logRows,
+      traceCanonicalisation: this.#dependencies.traces.canonicalisation,
+      codingAgents: this.#dependencies.codingAgents,
     });
   }
+
+  mapCodingAgentSummaryRows(rows: SpanSummaryRow[]): unknown {
+    return ClaudeCodeLogEnrichmentService.mapSummaryRowsToClaudeRefs(rows);
+  }
+
+  codingAgentLogContentKeys(eventName: string): readonly {
+    key: string;
+    category: "input" | "output" | "both";
+  }[] {
+    return this.#dependencies.codingAgents.logContentKeys(eventName);
+  }
+
+  buildCodingAgentTranscript(input: {
+    spans: SpanDetail[];
+    logs: TraceLogRecordReadRow[];
+  }): unknown {
+    return this.#dependencies.codingAgents.buildTranscript({
+      spans: input.spans,
+      logs: input.logs.map((row) => ({
+        timestampMs: row.timeUnixMs,
+        attributes: row.attributes,
+        serviceName: row.resourceAttributes["service.name"] ?? null,
+      })),
+    });
+  }
+
+  // Legacy content reads live on the cohesive content service.
 
   /** The evaluator verdicts on a page of traces, keyed by trace id. */
   readEvaluations(input: {
@@ -476,7 +607,7 @@ export class TraceApp {
     traceIds: string[];
     protections: unknown;
   }): Promise<Record<string, Evaluation[]>> {
-    return this.dependencies.traces.read.getEvaluationsMultiple(
+    return this.#dependencies.traces.read.getEvaluationsMultiple(
       input.projectId,
       input.traceIds,
       input.protections,
@@ -488,17 +619,17 @@ export class TraceApp {
     projectId: string;
     evaluationId: string;
   }): Promise<Record<string, unknown> | null> {
-    return this.dependencies.traces.read.tryGetEvaluationInputs(input);
+    return this.#dependencies.traces.read.tryGetEvaluationInputs(input);
   }
 
   /** Topic and subtopic counts for the filtered window. */
   readTopicCounts(input: TraceLegacyFilterInput): Promise<TopicCountsResult> {
-    return this.dependencies.traces.read.getTopicCounts(input);
+    return this.#dependencies.traces.read.getTopicCounts(input);
   }
 
   /** The distinct customer ids and labels in the filtered window. */
   readCustomersAndLabels(input: TraceLegacyFilterInput): Promise<CustomersAndLabelsResult> {
-    return this.dependencies.traces.read.getCustomersAndLabels(input);
+    return this.#dependencies.traces.read.getCustomersAndLabels(input);
   }
 
   /** Span names, metadata keys and evaluator names the project has produced. */
@@ -507,7 +638,7 @@ export class TraceApp {
     startDate: number;
     endDate: number;
   }): Promise<DistinctFieldNamesResult> {
-    return this.dependencies.traces.read.getDistinctFieldNames(
+    return this.#dependencies.traces.read.getDistinctFieldNames(
       input.projectId,
       input.startDate,
       input.endDate,
@@ -520,7 +651,7 @@ export class TraceApp {
     spanId: string;
     protections: unknown;
   }): Promise<PromptStudioSpanResult | null> {
-    return this.dependencies.traces.read.tryGetSpanForPromptStudio(input);
+    return this.#dependencies.traces.read.tryGetSpanForPromptStudio(input);
   }
 
   // -------------------------------------------------------------------------
@@ -531,7 +662,7 @@ export class TraceApp {
   readTopics(
     input: Readonly<{ projectId: string }>,
   ): Promise<ReadonlyArray<Readonly<{ id: string; name: string; parentId: string | null }>>> {
-    return this.dependencies.topics.getAll(input);
+    return this.#dependencies.topics.getAll(input);
   }
 
   // -------------------------------------------------------------------------
@@ -540,12 +671,12 @@ export class TraceApp {
 
   /** The tenant's live-update emitter, for the duration of one subscription. */
   getTenantEmitter(tenantId: string): NodeJS.EventEmitter {
-    return this.dependencies.broadcast.getTenantEmitter(tenantId);
+    return this.#dependencies.broadcast.getTenantEmitter(tenantId);
   }
 
   /** Releases it when that subscription ends, however it ends. */
   cleanupTenantEmitter(tenantId: string): void {
-    this.dependencies.broadcast.cleanupTenantEmitter(tenantId);
+    this.#dependencies.broadcast.cleanupTenantEmitter(tenantId);
   }
 
   // -------------------------------------------------------------------------
@@ -554,43 +685,43 @@ export class TraceApp {
 
   /** One page of the trace grid. */
   readTraceList(params: Parameters<TracesV2ListReader["getList"]>[0]): Promise<TraceListPage> {
-    return this.dependencies.traces.list.getList(params);
+    return this.#dependencies.traces.list.getList(params);
   }
 
   /** One page of the Sessions lens. */
   readSessionGroups(
     params: Parameters<TracesV2SessionGroupsReader["getSessionGroups"]>[0],
   ): Promise<SessionGroupsResult> {
-    return this.dependencies.traces.sessionGroups.getSessionGroups(params);
+    return this.#dependencies.traces.sessionGroups.getSessionGroups(params);
   }
 
   /** The filter sidebar's counts. */
   readFacets(
     params: Parameters<TracesV2ListReader["getFacets"]>[0],
   ): Promise<TraceListFacetCounts> {
-    return this.dependencies.traces.list.getFacets(params);
+    return this.#dependencies.traces.list.getFacets(params);
   }
 
   /** How many traces have arrived since the grid last painted. */
   readNewCount(params: Parameters<TracesV2ListReader["getNewCount"]>[0]): Promise<number> {
-    return this.dependencies.traces.list.getNewCount(params);
+    return this.#dependencies.traces.list.getNewCount(params);
   }
 
   /** The typeahead's values for one field. */
   readSuggestions(params: Parameters<TracesV2ListReader["getSuggestions"]>[0]): Promise<string[]> {
-    return this.dependencies.traces.list.getSuggestions(params);
+    return this.#dependencies.traces.list.getSuggestions(params);
   }
 
   /** The facet payload the sidebar opens with. */
   readDiscover(params: Parameters<TracesV2ListReader["getDiscover"]>[0]): Promise<DiscoverResult> {
-    return this.dependencies.traces.list.getDiscover(params);
+    return this.#dependencies.traces.list.getDiscover(params);
   }
 
   /** One facet's values, paged. */
   readFacetValues(
     params: Parameters<TracesV2ListReader["getFacetValues"]>[0],
   ): Promise<FacetValuesResult> {
-    return this.dependencies.traces.list.getFacetValues(params);
+    return this.#dependencies.traces.list.getFacetValues(params);
   }
 
   // -------------------------------------------------------------------------
@@ -605,7 +736,7 @@ export class TraceApp {
     visibilityCutoffMs?: number | null;
     full?: boolean;
   }): Promise<TraceSummaryData> {
-    return this.dependencies.traces.summary.getByTraceId(input.projectId, input.traceId, {
+    return this.#dependencies.traces.summary.getByTraceId(input.projectId, input.traceId, {
       ...occurredAtHint(input.occurredAtMs),
       ...(input.visibilityCutoffMs !== undefined
         ? { visibilityCutoffMs: input.visibilityCutoffMs }
@@ -652,7 +783,7 @@ export class TraceApp {
     traceId: string;
     occurredAtMs?: number;
   }): Promise<SpanSummaryRow[]> {
-    return this.dependencies.traces.spans.getSpanSummaryByTraceId({
+    return this.#dependencies.traces.spans.getSpanSummaryByTraceId({
       tenantId: input.projectId,
       traceId: input.traceId,
       ...occurredAtHint(input.occurredAtMs),
@@ -667,7 +798,7 @@ export class TraceApp {
     visibilityCutoffMs?: number | null;
     limit?: number;
   }): Promise<Span[]> {
-    return this.dependencies.traces.spans.getSpansByTraceId({
+    return this.#dependencies.traces.spans.getSpansByTraceId({
       tenantId: input.projectId,
       traceId: input.traceId,
       ...(input.visibilityCutoffMs !== undefined
@@ -687,7 +818,7 @@ export class TraceApp {
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
   }): Promise<{ spans: Span[]; total: number }> {
-    return this.dependencies.traces.spans.getSpansPaginated({
+    return this.#dependencies.traces.spans.getSpansPaginated({
       tenantId: input.projectId,
       traceId: input.traceId,
       limit: input.limit,
@@ -707,7 +838,7 @@ export class TraceApp {
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
   }): Promise<Span[]> {
-    return this.dependencies.traces.spans.getSpansSince({
+    return this.#dependencies.traces.spans.getSpansSince({
       tenantId: input.projectId,
       traceId: input.traceId,
       sinceStartTimeMs: input.sinceStartTimeMs,
@@ -726,7 +857,7 @@ export class TraceApp {
     occurredAtMs?: number;
     visibilityCutoffMs?: number | null;
   }): Promise<Span | null> {
-    return this.dependencies.traces.spans.tryGetSpanById({
+    return this.#dependencies.traces.spans.tryGetSpanById({
       tenantId: input.projectId,
       traceId: input.traceId,
       spanId: input.spanId,
@@ -744,7 +875,7 @@ export class TraceApp {
     spanId: string;
     occurredAtMs?: number;
   }): Promise<ElasticSearchEvent[]> {
-    return this.dependencies.traces.spans.getSpanEvents({
+    return this.#dependencies.traces.spans.getSpanEvents({
       tenantId: input.projectId,
       traceId: input.traceId,
       spanId: input.spanId,
@@ -758,7 +889,7 @@ export class TraceApp {
     traceId: string;
     occurredAtMs?: number;
   }): Promise<Array<{ spanId: string; signals: SpanLangwatchSignals["signals"] }>> {
-    return this.dependencies.traces.spans.getLangwatchSignalsByTraceId({
+    return this.#dependencies.traces.spans.getLangwatchSignalsByTraceId({
       tenantId: input.projectId,
       traceId: input.traceId,
       ...occurredAtHint(input.occurredAtMs),
@@ -771,7 +902,7 @@ export class TraceApp {
     traceId: string;
     occurredAtMs?: number;
   }): Promise<SpanResourceInfo[]> {
-    return this.dependencies.traces.spans.getSpanResourcesByTraceId({
+    return this.#dependencies.traces.spans.getSpanResourcesByTraceId({
       tenantId: input.projectId,
       traceId: input.traceId,
       ...occurredAtHint(input.occurredAtMs),
@@ -784,7 +915,7 @@ export class TraceApp {
     traceId: string;
     occurredAtMs?: number;
   }): Promise<DerivedTraceEvent[]> {
-    return this.dependencies.traces.spans.getTraceEventsByTraceId({
+    return this.#dependencies.traces.spans.getTraceEventsByTraceId({
       tenantId: input.projectId,
       traceId: input.traceId,
       ...occurredAtHint(input.occurredAtMs),
@@ -797,7 +928,7 @@ export class TraceApp {
     traceIds: string[];
     timeRange: { from: number; to: number };
   }): Promise<Record<string, TraceEventRollup>> {
-    return this.dependencies.traces.spans.getTraceEventRollupsByTraceIds({
+    return this.#dependencies.traces.spans.getTraceEventRollupsByTraceIds({
       tenantId: input.projectId,
       traceIds: input.traceIds,
       timeRange: input.timeRange,
@@ -810,12 +941,40 @@ export class TraceApp {
 
   /** One page of the span tree, in `(startTimeMs, spanId)` order. */
   readSpanTreePage(input: SpanTreeInput): Promise<SpanTreePage> {
-    return this.dependencies.traces.tree.getSpanTreePage(input);
+    return this.#dependencies.traces.tree.getSpanTreePage(input);
   }
 
   /** The tree nodes of a live trace whose row version is newer than a mark. */
   readSpanTreeDelta(input: SpanTreeDeltaInput): Promise<SpanTreeNode[]> {
-    return this.dependencies.traces.tree.getSpanTreeDelta(input);
+    return this.#dependencies.traces.tree.getSpanTreeDelta(input);
+  }
+
+  readModelUsageStats(input: {
+    projectId: string;
+    fromMs: number;
+    limit: number;
+  }): Promise<ModelUsageStatsRow[]> {
+    return this.#dependencies.traces.spans.getModelUsageStats({
+      tenantId: input.projectId,
+      fromMs: input.fromMs,
+      limit: input.limit,
+    });
+  }
+
+  readRecentSpansByModels(input: {
+    projectId: string;
+    models: string[];
+    fromMs: number;
+    perModelLimit: number;
+    limit: number;
+  }): Promise<ModelSpanSampleRow[]> {
+    return this.#dependencies.traces.spans.getRecentSpansByModels({
+      tenantId: input.projectId,
+      models: input.models,
+      fromMs: input.fromMs,
+      perModelLimit: input.perModelLimit,
+      limit: input.limit,
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -829,7 +988,7 @@ export class TraceApp {
     occurredAtMs?: number;
     limit?: number;
   }): Promise<TraceLogRecordReadRow[]> {
-    return this.dependencies.traces.logRecords.getLogsByTraceId(
+    return this.#dependencies.traces.logRecords.getLogsByTraceId(
       input.projectId,
       input.traceId,
       input.occurredAtMs,
@@ -848,7 +1007,7 @@ export class TraceApp {
     input: { projectId: string; traceId: string; newName: string; occurredAt?: number },
     by: TraceCaller,
   ): Promise<unknown> {
-    return this.dependencies.traces.changeTraceName({
+    return this.#dependencies.traces.changeTraceName({
       tenantId: input.projectId,
       traceId: input.traceId,
       newName: input.newName,
@@ -862,7 +1021,7 @@ export class TraceApp {
     projectId: string;
     traceId: string;
   }): Promise<TraceEditOverlayDto | null> {
-    return this.dependencies.traces.editOverlay.tryGetByTraceId({
+    return this.#dependencies.traces.editOverlay.tryGetByTraceId({
       projectId: input.projectId,
       traceId: input.traceId,
     });
@@ -875,7 +1034,7 @@ export class TraceApp {
     input: { projectId: string; traceId: string; patch: unknown },
     by: TraceCaller,
   ): Promise<TraceEditOverlayDto> {
-    return this.dependencies.traces.editOverlay.upsert({
+    return this.#dependencies.traces.editOverlay.upsert({
       projectId: input.projectId,
       traceId: input.traceId,
       patch: input.patch,
@@ -885,7 +1044,7 @@ export class TraceApp {
 
   /** Removes the correction outright. */
   deleteTraceEditOverlay(input: { projectId: string; traceId: string }): Promise<void> {
-    return this.dependencies.traces.editOverlay.delete({
+    return this.#dependencies.traces.editOverlay.delete({
       projectId: input.projectId,
       traceId: input.traceId,
     });
@@ -897,16 +1056,16 @@ export class TraceApp {
 
   /** The evaluation runs recorded against one trace. */
   readEvaluationRuns(
-    input: Parameters<EvaluationService["findRunsByTraceId"]>[0],
-  ): ReturnType<EvaluationService["findRunsByTraceId"]> {
-    return this.dependencies.evaluations.findRunsByTraceId(input);
+    input: Parameters<EvaluationApi["findRunsByTraceId"]>[0],
+  ): ReturnType<EvaluationApi["findRunsByTraceId"]> {
+    return this.#dependencies.evaluations.findRunsByTraceId(input);
   }
 
   /** The pre-folded coding-agent session rollup for one trace, or null. */
   readCodingAgentSession(
-    input: Parameters<CodingAgentService["tryGetSessionForTrace"]>[0],
-  ): ReturnType<CodingAgentService["tryGetSessionForTrace"]> {
-    return this.dependencies.codingAgents.tryGetSessionForTrace(input);
+    input: Parameters<CodingAgentApi["tryGetSessionForTrace"]>[0],
+  ): ReturnType<CodingAgentApi["tryGetSessionForTrace"]> {
+    return this.#dependencies.codingAgents.tryGetSessionForTrace(input);
   }
 
   // -------------------------------------------------------------------------
@@ -922,12 +1081,12 @@ export class TraceApp {
     viewer: ShareViewer;
     viewerKey?: string;
   }): Promise<ResolvedShare> {
-    return this.dependencies.share.resolveForViewer(input);
+    return this.#dependencies.share.resolveForViewer(input);
   }
 
   /** The cached share payload for this token AND these redactions, if any. */
   readCachedSharePayload(input: { token: string; protections: Protections }): Promise<unknown> {
-    return this.dependencies.share.findCachedPayload(input);
+    return this.#dependencies.share.findCachedPayload(input);
   }
 
   /** Caches the share payload against this token and these redactions. */
@@ -936,7 +1095,7 @@ export class TraceApp {
     protections: Protections;
     payload: SharedTraceDto;
   }): Promise<void> {
-    return this.dependencies.share.cachePayload(input);
+    return this.#dependencies.share.cachePayload(input);
   }
 
   /** The project card the share page prints above the trace. */
@@ -946,6 +1105,6 @@ export class TraceApp {
     language: string | null;
     framework: string | null;
   } | null> {
-    return this.dependencies.projects.tryGetById(projectId);
+    return this.#dependencies.projects.tryGetById(projectId);
   }
 }

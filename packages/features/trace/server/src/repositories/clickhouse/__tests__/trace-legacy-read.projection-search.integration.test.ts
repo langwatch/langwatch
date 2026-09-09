@@ -6,7 +6,11 @@ import type { Protections } from "@langwatch/trace-contract";
  */
 import { TraceProjectionCompileService } from "../../../services/trace-projection-compile.service.ts";
 import type { AnnotationScoreName } from "@langwatch/annotation-contract";
-import { AnnotationService, type ProjectionAnnotation } from "@langwatch/annotation-contract";
+import {
+  AnnotationService,
+  type ProjectionAnnotation,
+  type AnnotationApi,
+} from "@langwatch/annotation-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -173,7 +177,65 @@ function makeQueryInput(
 /** A fake AnnotationService — no Postgres testcontainer here, so the service's
  *  own mapping (id -> name remap, ProjectedAnnotation shape) is exercised
  *  against canned rows instead of a real join. */
-class FakeAnnotationService extends AnnotationService {
+class FakeAnnotationService extends AnnotationService implements AnnotationApi {
+  createReview(): never {
+    throw new Error("Not used by projection search tests: createReview.");
+  }
+  updateReview(): never {
+    throw new Error("Not used by projection search tests: updateReview.");
+  }
+  deleteReview(): never {
+    throw new Error("Not used by projection search tests: deleteReview.");
+  }
+  listWithFullUsers(): never {
+    throw new Error("Not used by projection search tests: listWithFullUsers.");
+  }
+  listWithUserSummaries(): never {
+    throw new Error("Not used by projection search tests: listWithUserSummaries.");
+  }
+  listReviewQueueItems(): never {
+    throw new Error("Not used by projection search tests: listReviewQueueItems.");
+  }
+  listOptimizedQueues(): never {
+    throw new Error("Not used by projection search tests: listOptimizedQueues.");
+  }
+  configure(): never {
+    throw new Error("Not used by projection search tests: configure.");
+  }
+  listQueues(): never {
+    throw new Error("Not used by projection search tests: listQueues.");
+  }
+  tryGetQueue(): never {
+    throw new Error("Not used by projection search tests: tryGetQueue.");
+  }
+  listQueueItems(): never {
+    throw new Error("Not used by projection search tests: listQueueItems.");
+  }
+  countPendingItems(): never {
+    throw new Error("Not used by projection search tests: countPendingItems.");
+  }
+  countAssignedItems(): never {
+    throw new Error("Not used by projection search tests: countAssignedItems.");
+  }
+  listMemberQueuePendingCounts(): never {
+    throw new Error("Not used by projection search tests: listMemberQueuePendingCounts.");
+  }
+  deleteQueueItems(): never {
+    throw new Error("Not used by projection search tests: deleteQueueItems.");
+  }
+  markQueueItemDone(): never {
+    throw new Error("Not used by projection search tests: markQueueItemDone.");
+  }
+  listQueueItemsPage(): never {
+    throw new Error("Not used by projection search tests: listQueueItemsPage.");
+  }
+  listQueuesWithItems(): never {
+    throw new Error("Not used by projection search tests: listQueuesWithItems.");
+  }
+  queueTraces(): never {
+    throw new Error("Not used by projection search tests: queueTraces.");
+  }
+
   rows: ProjectionAnnotation[] = [];
   scores: AnnotationScoreName[] = [];
 

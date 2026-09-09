@@ -9,7 +9,7 @@ import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,
   type PromptLookupSpan,
-} from "@langwatch/trace-contract";
+} from "@langwatch/prompt-contract";
 import { durationColor } from "../../../model/duration-color.ts";
 import { formatMilliseconds } from "../../../model/format-milliseconds.ts";
 import {

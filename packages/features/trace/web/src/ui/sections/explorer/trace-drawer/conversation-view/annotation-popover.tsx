@@ -3,7 +3,7 @@ import {
   FormFooter,
   SuggestBody,
   type PopoverAnnotationFormInput,
-} from "@langwatch/annotation-web/surfaces/annotation-form";
+} from "@langwatch/annotation-web/annotation-form";
 import { Popover } from "@langwatch/design-system/popover";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { Tooltip } from "@langwatch/design-system/tooltip";

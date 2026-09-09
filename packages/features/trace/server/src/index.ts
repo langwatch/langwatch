@@ -14,7 +14,10 @@ export {
 } from "./adapters/eventing.trace-pipeline.adapter.ts";
 
 export { TraceProcessingServerInstallerAdapter } from "./adapters/eventing.trace-processing-installer.adapter.ts";
-export { TraceProcessingInstallerPort } from "./ports/trace-processing-installer.port.ts";
+export {
+  TraceProcessingInstallerPort,
+  type TraceProcessingCommands,
+} from "./ports/trace-processing-installer.port.ts";
 export {
   DEFERRED_ORIGIN_CHECK_DELAY_MS,
   ORIGIN_GATE_DEDUP_TTL_MS,
@@ -227,65 +230,8 @@ export {
   type TracesTopicReader,
   type TracesTrpcEmitters,
 } from "./app/trace.app.ts";
-export {
-  SpansTrpcApi,
-  type SpansTrpcContext,
-  type SpansTrpcPorts,
-} from "./transport/api-trpc/spans.api.ts";
-export {
-  TraceEditOverlayTrpcApi,
-  type TraceEditOverlayTrpcContext,
-  type TraceEditOverlayTrpcPorts,
-  type TraceEditOverlayVisibilityWindow,
-} from "./transport/api-trpc/trace-edit-overlay.api.ts";
-export {
-  TracesTrpcApi,
-  type TracesTrpcContext,
-  type TracesTrpcPorts,
-} from "./transport/api-trpc/traces.api.ts";
 export { TraceViewerProtectionsService } from "./services/trace-viewer-protections.service.ts";
 export { TraceAttributeRedactionService } from "./services/trace-attribute-redaction.service.ts";
-export {
-  buildContentPrivacy,
-  contentSearchTermsForViewer,
-  gateTraceLogVisibility,
-  mapTraceSummaryToHeader,
-  redactTraceLogContent,
-  redactV2Content,
-  toConversationContextTurn,
-  type TraceContentPrivacyPort,
-  type V2Protections,
-} from "./transport/api-trpc/trace-read-mappers.api.ts";
-export {
-  TracesV2TrpcApi,
-  type TracesV2ReadPorts,
-  type TracesV2TrpcContext,
-  type TracesV2TrpcPorts,
-} from "./transport/api-trpc/traces-v2.api.ts";
-export {
-  SharedTraceTrpcApi,
-  type SharedTraceTrpcContext,
-  type SharedTraceTrpcPorts,
-} from "./transport/api-trpc/shared-trace.api.ts";
-export {
-  gateEvaluations,
-  gateHeaderCost,
-  gateResources,
-  gateSessionCost,
-  gateSessionTitle,
-  gateTreeCost,
-  withoutHiddenResourceAttrs,
-} from "./transport/api-trpc/trace-view-gates.api.ts";
-export {
-  createEventsRestApp,
-  type TrackedEventPorts,
-} from "./transport/api-rest/tracked-event.api.ts";
-export {
-  createExportTracesRestApp,
-  type TraceExportPort,
-  type TraceExportRequestFields,
-  type TraceExportRestPorts,
-} from "./transport/api-rest/trace-export.api.ts";
 export {
   deserializeAttributes,
   ensureStringRecord,
@@ -436,28 +382,6 @@ export { TraceEditOverlayRedactionService } from "./services/trace-edit-overlay-
 export { TraceEditOverlayRestoreService } from "./services/trace-edit-overlay-restore.service.ts";
 export { TraceCollectorSpanService } from "./services/trace-collector-span.service.ts";
 
-// The OTLP receiver: POST /api/otel/v1/{traces,logs,metrics} and the
-// re-dispatcher serving the paths a misconfigured exporter produces. Each
-// signal's collection is a port, so a process composes the ones it holds
-// and mounts nothing for the rest.
-export {
-  classifyTokenType,
-  createOtlpIngestRestApp,
-  peekCustomerTraceIds,
-  type OtlpIngestCredential,
-  type OtlpIngestCredentialPort,
-  type OtlpIngestErrorReportPort,
-  type OtlpIngestIdentity,
-  type OtlpIngestProject,
-  type OtlpIngestRestPorts,
-  type OtlpIngestUsageLimitPort,
-  type OtlpLogCollectionOutcome,
-  type OtlpLogCollectionPort,
-  type OtlpMetricCollectionOutcome,
-  type OtlpMetricCollectionPort,
-  type OtlpTraceCollectionPort,
-} from "./transport/api-rest/otlp-ingest.api.ts";
-export { createOtlpPathAliasRestApp } from "./transport/api-rest/otlp-path-alias.api.ts";
 export type { TraceRequestCollectionResult } from "./services/trace-ingestion.service.ts";
 
 // The download half of the trace read: streaming CSV/JSONL export — the
@@ -515,6 +439,15 @@ export {
 
 /** The agent-readable rendering of a trace. Was `server/traces/trace-formatting.ts`. */
 export { TraceFormattingService } from "./services/trace-formatting.service.ts";
+export {
+  TraceViewerProtectionService,
+  type TraceViewerProtectionOptions,
+} from "./services/trace-viewer-protection.service.ts";
+export {
+  TraceViewerReadService,
+  type TraceViewerServiceOptions,
+} from "./services/trace-viewer.service.ts";
+export { TraceContentReadServiceImpl } from "./services/trace-content-read.service.ts";
 
 /** The REST projection compiler. Was `server/traces/projection/**`. */
 export { TraceProjectionCompileService } from "./services/trace-projection-compile.service.ts";
@@ -524,39 +457,6 @@ export {
   type ProjectionSource,
   type ResolvedField,
 } from "./services/trace-projection-catalog.service.ts";
-
-// The trace READ doors and the SDK collector: POST /api/traces/search and
-// its three siblings, the five deprecated /api/trace/*, /api/thread/*
-// endpoints, and POST /api/collector (the door an SDK posts a whole trace
-// to). Each takes what it cannot own as a port, so a process mounts the
-// ones its own graph can answer.
-export {
-  createTracesRestApp,
-  traceSearchBodyExtensions,
-  type TraceSearchBody,
-  type TracesRestPorts,
-  type TracesRestReadPort,
-} from "./transport/api-rest/traces.api.ts";
-export {
-  createTraceLegacyRestApp,
-  type TraceLegacyCredential,
-  type TraceLegacyCredentialPort,
-  type TraceLegacyReadsPort,
-  type TraceLegacyRestPorts,
-  type TraceLegacySearchFields,
-  type TraceLegacySharePort,
-} from "./transport/api-rest/trace-legacy.api.ts";
-export {
-  createCollectorRestApp,
-  type CollectorCredential,
-  type CollectorCredentialPort,
-  type CollectorErrorReportPort,
-  type CollectorEvaluationReportPort,
-  type CollectorProject,
-  type CollectorRestPorts,
-  type CollectorSpanIngestPort,
-  type CollectorUsageLimitPort,
-} from "./transport/api-rest/collector.api.ts";
 export {
   projectionRequestSchema,
   type CompiledProjection,
@@ -567,3 +467,4 @@ export {
   OtelTraceEdgeMediaTelemetryAdapter,
   TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME,
 } from "./adapters/otel.trace-edge-media-telemetry.adapter.ts";
+export { traceServer, type TraceInfrastructure } from "./trace.server.ts";

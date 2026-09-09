@@ -54,7 +54,8 @@ export function commitRange({
   onChange,
   onClear,
 }: CommitRangeParams): [number, number] | null {
-  if (!Number.isFinite(rawFrom) || !Number.isFinite(rawTo)) return null;
+  const bothFinite = Number.isFinite(rawFrom) && Number.isFinite(rawTo);
+  if (!bothFinite) return null;
   // Honour the [min, max] bounds even if the input came from a typed
   // value that overshot the slider range — a 5h duration filter on a
   // project where the slowest trace is 30s should clamp to the

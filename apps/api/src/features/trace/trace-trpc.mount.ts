@@ -15,16 +15,20 @@ import { createTrpcApiService, type TrpcApiMount, type TrpcApiPorts } from "@lan
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 import {
   SpansTrpcApi,
-  TraceEditOverlayTrpcApi,
-  TracesTrpcApi,
   type SpansTrpcContext,
   type SpansTrpcPorts,
+} from "@langwatch/trace-server/api-trpc/spans";
+import {
+  TraceEditOverlayTrpcApi,
   type TraceEditOverlayTrpcContext,
   type TraceEditOverlayTrpcPorts,
   type TraceEditOverlayVisibilityWindow,
+} from "@langwatch/trace-server/api-trpc/trace-edit-overlay";
+import {
+  TracesTrpcApi,
   type TracesTrpcContext,
   type TracesTrpcPorts,
-} from "@langwatch/trace-server";
+} from "@langwatch/trace-server/api-trpc/traces";
 import type { AnyTRPCRootTypes, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /**

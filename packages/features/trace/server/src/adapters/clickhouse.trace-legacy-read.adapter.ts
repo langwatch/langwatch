@@ -1,5 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { AnnotationService } from "@langwatch/annotation-contract";
+import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createLogger } from "@langwatch/observability";
 import type { NormalizedSpan, TraceCanonicalisationService } from "@langwatch/trace-contract";
@@ -58,7 +58,7 @@ export interface ClickHouseTraceLegacyReadOptions {
   filterConditions?: TraceLegacyFilterConditions | undefined;
   blobResolutionDeps?: BlobResolutionDeps;
   retentionResolver?: DataRetentionApi;
-  annotationService?: AnnotationService;
+  annotationService?: AnnotationApi;
 }
 
 /** Composes the legacy trace read over ClickHouse for a composition root. */

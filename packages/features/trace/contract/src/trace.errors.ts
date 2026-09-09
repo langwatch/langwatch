@@ -110,3 +110,12 @@ export class ClickHouseOverloadedError extends HandledError {
     this.name = "ClickHouseOverloadedError";
   }
 }
+export class TraceIngestionUnavailableError extends HandledError {
+  constructor() {
+    super("service_unavailable", "Trace ingestion is not available on this deployment.", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "TraceIngestionUnavailableError";
+  }
+}

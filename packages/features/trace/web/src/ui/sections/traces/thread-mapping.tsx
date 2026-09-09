@@ -11,7 +11,7 @@ import {
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPING_LABELS,
   TRACE_MAPPINGS,
-} from "@langwatch/trace-contract";
+} from "@langwatch/dataset-contract";
 import { api } from "../../../behavior/trace-api.ts";
 
 /**

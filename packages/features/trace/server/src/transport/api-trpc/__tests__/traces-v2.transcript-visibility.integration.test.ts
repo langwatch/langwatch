@@ -45,7 +45,10 @@ import {
 
 import { TestCodingAgentService } from "../../../services/__tests__/support/coding-agent.service.fake.ts";
 import { TracesV2TrpcApi } from "../traces-v2.api.ts";
-import { createTranscriptApp, createTranscriptReadPorts } from "./support/transcript-read.support.ts";
+import {
+  createTranscriptApp,
+  createTranscriptReadPorts,
+} from "./support/transcript-read.support.ts";
 
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
 const PROJECT_ID = "project_transcript_visibility";
@@ -192,7 +195,6 @@ describe("transcript captured-content matrix for an API-key caller", () => {
       traceId: TRACE_ID,
       occurredAtMs: NOW,
       protections: apiKeyProtections(),
-      codingAgents,
     });
   }
 

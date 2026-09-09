@@ -10,46 +10,108 @@ import type {
   SessionGroupsQuery,
   SessionGroupsRepository,
 } from "../../repositories/session-groups.repository.ts";
-import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
+import type {
+  CodingAgentSession,
+  CodingAgentTracePullRequestLink,
+} from "@langwatch/coding-agent-contract";
 import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
 import { SessionGroupsService } from "../trace-session-groups.service.ts";
-import type { CodingAgentService } from "@langwatch/coding-agent-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 
-/**
- * The coding-agent lookup this read issues, and nothing else. The platform app had a whole CodingAgentService double in its test-utils; this suite reaches exactly one method, so the double states that one and refuses the rest by name rather than carrying another feature's whole surface into this package.
- */
-class TestCodingAgentService {
-  static create(): TestCodingAgentService {
-    return new TestCodingAgentService();
+/** Records the coding-agent lookups and rejects unexpected peer calls. */
+class TestCodingAgentApi {
+  static create(): TestCodingAgentApi {
+    return new TestCodingAgentApi();
   }
 
-  readonly sessionsById = new Map<string, unknown>();
+  readonly sessionsById = new Map<string, CodingAgentSession | null>();
   readonly sessionLookupInputs: Array<{ projectId: string; sessionId: string }> = [];
-  tracePullRequestLinks: unknown[] = [];
+  tracePullRequestLinks: CodingAgentTracePullRequestLink[] = [];
   readonly tracePullRequestInputs: unknown[] = [];
 
-  tryGetBySessionId(input: { projectId: string; sessionId: string }): Promise<unknown> {
+  tryGetBySessionId(input: {
+    projectId: string;
+    sessionId: string;
+  }): Promise<CodingAgentSession | null> {
     this.sessionLookupInputs.push(input);
     return Promise.resolve(this.sessionsById.get(input.sessionId) ?? null);
   }
 
-  linkTraceSessionsToPullRequests(input: unknown): Promise<unknown[]> {
+  linkTraceSessionsToPullRequests(input: unknown): Promise<CodingAgentTracePullRequestLink[]> {
     this.tracePullRequestInputs.push(input);
     return Promise.resolve(this.tracePullRequestLinks);
   }
 
-  asService(): CodingAgentService {
-    return new Proxy(this, {
-      get: (target, property) => {
-        if (property in target) return Reflect.get(target, property);
-        return () => {
-          throw new Error(
-            `the session-groups suite reached codingAgents.${String(property)}, which it does not stub`,
-          );
-        };
-      },
-      has: () => true,
-    }) as unknown as CodingAgentService;
+  logContentKeys(): never {
+    throw new Error("Not used by session group tests: logContentKeys.");
+  }
+
+  contentAttrKeys(): never {
+    throw new Error("Not used by session group tests: contentAttrKeys.");
+  }
+
+  shouldFilterSpan(): never {
+    throw new Error("Not used by session group tests: shouldFilterSpan.");
+  }
+
+  buildTranscript(): never {
+    throw new Error("Not used by session group tests: buildTranscript.");
+  }
+
+  tryGetSessionForTrace(): never {
+    throw new Error("Not used by session group tests: tryGetSessionForTrace.");
+  }
+
+  getSessionEvents(): never {
+    throw new Error("Not used by session group tests: getSessionEvents.");
+  }
+
+  getUsageTotals(): never {
+    throw new Error("Not used by session group tests: getUsageTotals.");
+  }
+
+  listRecent(): never {
+    throw new Error("Not used by session group tests: listRecent.");
+  }
+
+  backfillPullRequestMappings(): never {
+    throw new Error("Not used by session group tests: backfillPullRequestMappings.");
+  }
+
+  listForProject(): never {
+    throw new Error("Not used by session group tests: listForProject.");
+  }
+
+  githubWebBase(): never {
+    throw new Error("Not used by session group tests: githubWebBase.");
+  }
+
+  tryResolveOrganizationForProject(): never {
+    throw new Error("Not used by session group tests: tryResolveOrganizationForProject.");
+  }
+
+  getPullRequestUsage(): never {
+    throw new Error("Not used by session group tests: getPullRequestUsage.");
+  }
+
+  getOrganizationPullRequestUsage(): never {
+    throw new Error("Not used by session group tests: getOrganizationPullRequestUsage.");
+  }
+
+  getPullRequestDetail(): never {
+    throw new Error("Not used by session group tests: getPullRequestDetail.");
+  }
+
+  getPersonalProjectPullRequestUsage(): never {
+    throw new Error("Not used by session group tests: getPersonalProjectPullRequestUsage.");
+  }
+
+  githubConnection(): never {
+    throw new Error("Not used by session group tests: githubConnection.");
+  }
+
+  asService(): TestCodingAgentApi & CodingAgentApi {
+    return this;
   }
 }
 
@@ -124,12 +186,12 @@ class FakeRepository implements SessionGroupsRepository {
 
 function lookupReturning(
   bySessionId: Record<string, CodingAgentSession | null>,
-): TestCodingAgentService & CodingAgentService {
-  const service = TestCodingAgentService.create();
+): TestCodingAgentApi & CodingAgentApi {
+  const service = TestCodingAgentApi.create();
   for (const [sessionId, session] of Object.entries(bySessionId)) {
     service.sessionsById.set(sessionId, session);
   }
-  return service.asService() as unknown as TestCodingAgentService & CodingAgentService;
+  return service.asService();
 }
 
 const CURSOR_SORT = {
@@ -259,11 +321,11 @@ describe("SessionGroupsService", () => {
     it("keeps the list alive when an enrichment lookup throws", async () => {
       const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow()]),
-        codingAgentSessions: {
-          async tryGetBySessionId() {
+        codingAgentSessions: Object.assign(TestCodingAgentApi.create(), {
+          async tryGetBySessionId(): Promise<never> {
             throw new Error("clickhouse hiccup");
           },
-        } as unknown as CodingAgentService,
+        }),
       });
 
       const result = await service.getSessionGroups({

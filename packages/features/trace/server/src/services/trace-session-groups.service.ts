@@ -10,7 +10,7 @@ import type {
   SessionGroupSortColumn,
   SessionGroupsRepository,
 } from "../repositories/session-groups.repository.ts";
-import type { CodingAgentService } from "@langwatch/coding-agent-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 
 /**
  * The Sessions lens read (specs/traces-v2/sessions-lens.feature): true per-session rollups over
@@ -79,14 +79,14 @@ interface SessionGroupsParams {
 export class SessionGroupsService {
   static create(options: {
     repository: SessionGroupsRepository;
-    codingAgentSessions: CodingAgentService;
+    codingAgentSessions: CodingAgentApi;
     resolveOrganizationId?: (projectId: string) => Promise<string | undefined>;
   }): SessionGroupsService {
     return new SessionGroupsService(options);
   }
 
   private readonly repository: SessionGroupsRepository;
-  private readonly codingAgentSessions: CodingAgentService;
+  private readonly codingAgentSessions: CodingAgentApi;
   /**
    * The lens is project-scoped but pull requests are org-scoped, so the join
    * needs the owning organization. Returns undefined for an orphan project,
@@ -100,7 +100,7 @@ export class SessionGroupsService {
     resolveOrganizationId = async () => undefined,
   }: {
     repository: SessionGroupsRepository;
-    codingAgentSessions: CodingAgentService;
+    codingAgentSessions: CodingAgentApi;
     resolveOrganizationId?: (projectId: string) => Promise<string | undefined>;
   }) {
     this.repository = repository;

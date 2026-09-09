@@ -11,13 +11,15 @@ import {
 } from "@langwatch/api/trpc";
 import {
   SharedTraceTrpcApi,
-  TraceQueryClickHouseAdapter,
-  TracesV2TrpcApi,
   type SharedTraceTrpcContext,
   type SharedTraceTrpcPorts,
+} from "@langwatch/trace-server/api-trpc/shared-trace";
+import { TraceQueryClickHouseAdapter } from "@langwatch/trace-server";
+import {
+  TracesV2TrpcApi,
   type TracesV2TrpcContext,
   type TracesV2TrpcPorts,
-} from "@langwatch/trace-server";
+} from "@langwatch/trace-server/api-trpc/traces-v2";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
 /**

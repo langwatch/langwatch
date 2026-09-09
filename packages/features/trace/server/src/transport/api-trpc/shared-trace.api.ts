@@ -427,7 +427,7 @@ export class SharedTraceTrpcApi {
           .handle(async ({ input, ctx }) => {
             const share = await resolveShareForRead({ token: input.token, ctx, ports });
 
-            const { projectId, traceId } = share;
+            const { projectId, resourceId: traceId } = share;
 
             // Cost visibility follows the viewer's OWN `cost:view` permission, so sharing never
             // widens what a viewer could already see in-app (ADR-057). A missing or archived
