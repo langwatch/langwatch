@@ -19,8 +19,14 @@
  * against a workspace that was never going to say yes.
  *
  * The reads it does are deliberately timid: a page cap, a strictly advancing
- * index, and a stop as soon as a page comes back short. A pagination
- * parameter this endpoint ignores would otherwise re-serve page one forever.
+ * index, and a stop the moment a page names nobody. A pagination parameter
+ * this endpoint ignores would otherwise re-serve page one forever.
+ *
+ * The end of the collection is decided by the workspace's own `totalResults`
+ * where it states one. A short page is only the fallback signal, because SCIM
+ * treats `count` as a maximum rather than a promise, and a workspace serving
+ * fewer rows than asked while holding more would otherwise have the rest
+ * dropped without a trace.
  */
 
 import { z } from "zod";
@@ -108,10 +114,20 @@ export function scimUsersAsPeople(
 function readScimPage({ response }: { response: unknown }): {
   users: z.infer<typeof scimUserSchema>[];
   returned: number;
-  malformed: boolean;
+  /**
+   * What the workspace says the whole collection holds, when it says.
+   *
+   * Carried out of here rather than discarded because it is the only reliable
+   * end-of-collection signal: `count` is a requested maximum and a SCIM server
+   * may serve fewer rows than asked while more remain.
+   */
+  totalResults: number | null;
+  isMalformed: boolean;
 } {
   const page = scimPageSchema.safeParse(response);
-  if (!page.success) return { users: [], returned: 0, malformed: true };
+  if (!page.success) {
+    return { users: [], returned: 0, totalResults: null, isMalformed: true };
+  }
 
   const raw = page.data.Resources ?? [];
   const users: z.infer<typeof scimUserSchema>[] = [];
@@ -121,7 +137,32 @@ function readScimPage({ response }: { response: unknown }): {
     // of its list, the same posture `readDirectoryUserRows` takes.
     if (parsed.success) users.push(parsed.data);
   }
-  return { users, returned: raw.length, malformed: false };
+  return {
+    users,
+    returned: raw.length,
+    totalResults: page.data.totalResults ?? null,
+    isMalformed: false,
+  };
+}
+
+/**
+ * Whether the walk has seen the whole collection.
+ *
+ * `totalResults` decides it when the workspace states one. `count` is a
+ * requested MAXIMUM under SCIM, so a server may serve fewer rows than asked
+ * while more remain, and ending on a short page drops those silently. The
+ * short-page test survives only as the fallback for a workspace that omits the
+ * total, which is the one case where it is the best signal available.
+ */
+function isCollectionExhausted(params: {
+  returned: number;
+  totalResults: number | null;
+  /** The index the next request would ask from, already advanced. */
+  nextIndex: number;
+}): boolean {
+  const { returned, totalResults, nextIndex } = params;
+  if (totalResults === null) return returned < PAGE_SIZE;
+  return nextIndex > totalResults;
 }
 
 /**
@@ -153,16 +194,27 @@ export async function listDatabricksPeople(params: {
       });
 
       const read = readScimPage({ response });
-      if (read.malformed) {
+      if (read.isMalformed) {
         return peopleRefused({ reason: "malformed_response", status: null });
       }
       people.push(...scimUsersAsPeople(read.users));
 
-      // A short page is the last page. This is also the guard against a
-      // workspace that ignores `startIndex` entirely: such a workspace serves
-      // a full first page forever, and the index check below stops it.
-      if (read.returned < PAGE_SIZE) return peopleListed(people);
+      // A page that named nobody ends the walk whatever it claims about the
+      // total, because the next request would ask from the same index and be
+      // answered the same way.
+      if (read.returned === 0) return peopleListed(people);
+
       startIndex += read.returned;
+
+      if (
+        isCollectionExhausted({
+          returned: read.returned,
+          totalResults: read.totalResults,
+          nextIndex: startIndex,
+        })
+      ) {
+        return peopleListed(people);
+      }
     }
   } catch (error) {
     if (error instanceof GenieHttpError) {

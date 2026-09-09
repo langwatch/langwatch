@@ -37,10 +37,13 @@ export const GENIE_SPACES_PATH = "/api/2.0/genie/spaces";
 const LISTING_TIMEOUT_MS = 15_000;
 
 /**
- * Pages one on-demand listing will follow. A workspace holds tens of spaces,
- * not thousands, so this is a ceiling rather than a page size — and a listing
- * that hit it still reports what it read, because a truncated list of real
- * agents is worth more to the screen than a refusal.
+ * Pages one on-demand listing will follow.
+ *
+ * A workspace holds tens of spaces, not thousands, so reaching this bound says
+ * something is wrong rather than that the workspace is large. A listing that
+ * hits it refuses: the screen it feeds claims to list the organization's
+ * agents, and a subset presented as that set is a wrong answer rather than a
+ * partial one.
  */
 const LISTING_MAX_PAGES = 20;
 
@@ -228,6 +231,22 @@ export async function listGenieAgents(params: {
       stop: () => pages++ >= LISTING_MAX_PAGES,
       pageSize: LISTING_PAGE_SIZE,
     });
+    // `complete` false means the page bound cut the walk short, so spaces
+    // exist that this read never saw. The same reasoning as the Copilot
+    // inventory: a screen claiming to list the organization's agents cannot
+    // show a subset as the whole set, and the next Sync would walk the same
+    // pages and stop in the same place, so repeating the action cannot
+    // uncover them.
+    // `complete` false means the page bound cut the walk short, so spaces
+    // exist that this read never saw. The same reasoning as the Copilot
+    // inventory: a screen claiming to list the organization's agents cannot
+    // show a subset as the whole set, and the next Sync would walk the same
+    // pages and stop in the same place, so repeating the action cannot
+    // uncover them.
+    if (!walk.complete) {
+      return agentsRefused({ reason: "unavailable", status: null });
+    }
+
     return agentsListed(
       genieSpacesAsAgents({ spaces: walk.spaces, workspaceUrl }),
     );

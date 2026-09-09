@@ -37,29 +37,38 @@ import {
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * How many agents one read will name, across every page it follows.
+ * How many agents one request asks for.
  *
- * A ceiling on the whole walk rather than on one answer. It used to be both,
- * because the read stopped at the first page: a tenant holding more agents
- * than one page returns had the rest silently missing, and every one of them
- * showed its provider identifier wherever a name was expected.
+ * A page size, not a ceiling: the two callers differ on what to do when a
+ * second page exists. The transcript walk stops and says so in the log, because
+ * a missing name costs it a nicety. The inventory follows every page, because
+ * for a screen claiming to list the organization's agents a truncated list is
+ * not a lesser answer, it is a wrong one.
  */
 export const MAX_BOTS = 500;
 
 /**
- * The page size this read asks for, stated as a preference the provider
- * honours rather than a row count it is free to reinterpret.
+ * How many pages one inventory walk will follow.
+ *
+ * A bound rather than a `while`: a provider that echoes the same
+ * `@odata.nextLink` back would otherwise loop until the request budget or the
+ * process died, and that shape has already been seen in a paging reply.
  */
-export const BOT_PAGE_SIZE = 100;
+export const MAX_BOT_PAGES = 40;
 
 /**
- * How many pages one walk will follow before it stops and reports what it has.
+ * Whether a continuation URL points at the same environment that was asked.
  *
- * A bound on a link the provider controls. `MAX_BOTS` already stops a healthy
- * tenant long before this; this stops a provider handing back a next-page link
- * that never resolves to a last page.
+ * An unparseable URL is not the same origin, which is the safe direction: the
+ * caller stops rather than sending the token somewhere it cannot check.
  */
-const MAX_BOT_PAGES = 20;
+function isSameOrigin(candidate: string, environmentUrl: string): boolean {
+  try {
+    return new URL(candidate).origin === new URL(environmentUrl).origin;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * One row of the `bot` table, read once per run to put a name on each
@@ -114,9 +123,11 @@ export function readBotRows(rows: unknown[]): Map<string, BotRecord> {
  * The read itself, answering which of the three things happened rather than
  * throwing or collapsing to an empty list.
  *
- * `hasMorePages` is separate from the rows: the walk warns about it and the
- * listing carries on, and neither can tell a short list from a whole one
- * without being told.
+ * `hasMorePages` is separate from the rows because a caller cannot tell a short
+ * list from a whole one by looking at it. The walk reads one page and warns.
+ * The inventory asks for every page, and a `true` here after that means the
+ * walk hit its own bound rather than the end of the collection -- which it
+ * reports as a refusal rather than as a list.
  */
 export type CopilotBotsRead =
   | {
@@ -126,91 +137,93 @@ export type CopilotBotsRead =
     }
   | { ok: false; refusal: AgentListingRefusal };
 
-/**
- * Reads the bot table, following as many pages as the caller has use for.
- *
- * ONE walk with a bound, rather than a paging read beside a single-page one.
- * The two callers genuinely differ and the difference is already written down
- * in this file: the transcript walk wants names for the conversations it is
- * about to map, where a truncated list of real agents beats a refusal and a
- * second request buys almost nothing; the agent listing is the list itself,
- * and an agent missing from it shows its provider identifier wherever a name
- * belongs. Encoding that as a page bound keeps one implementation and lets
- * each caller state what it needs.
- */
-async function readBotPages(params: {
-  environmentUrl: string;
-  token: string;
-  signal?: AbortSignal;
-  maxPages: number;
-}): Promise<CopilotBotsRead> {
-  const { environmentUrl, token, signal, maxPages } = params;
-  const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${DATAVERSE_API_VERSION}/bots`;
-  const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
-
-  const rows: unknown[] = [];
-  // The provider's own link, followed verbatim. It carries the paging token
-  // and the original query, so rebuilding it here would be a second place for
-  // the two to disagree.
-  let next: string | null = `${base}?${query}`;
-  let pages = 0;
-
-  try {
-    while (next !== null && pages < maxPages && rows.length < MAX_BOTS) {
-      pages += 1;
-      const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-      const response = await ssrfSafeFetch(next, {
-        method: "GET",
-        headers: {
-          ...dataverseHeaders(token),
-          // Stated as a preference because this provider is free to answer a
-          // bare row count with a page of its own choosing, which would make
-          // the page bound above bound a much bigger read than intended.
-          Prefer: `odata.maxpagesize=${BOT_PAGE_SIZE}`,
-        },
-        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-        // Same reasoning as the transcript read: this request carries the
-        // token, and a redirect would hand it to whoever answers.
-        followRedirects: false,
-      });
-
-      if (!response.ok) {
-        // A page that refuses mid-walk refuses the whole read. Returning the
-        // pages already in hand would report a partial list as a complete one,
-        // and the agents missing from it are exactly the ones that then show
-        // an identifier where a name belongs.
-        return { ok: false, refusal: refusalFromStatus(response.status) };
-      }
-      const page = odataPageSchema.parse(await response.json());
-      rows.push(...page.value);
-      next = page["@odata.nextLink"] ?? null;
-    }
-
-    return {
-      ok: true,
-      rows: rows.slice(0, MAX_BOTS),
-      // True when the walk stopped with the provider still offering more, or
-      // when one of this function's own bounds cut it short.
-      hasMorePages: next !== null || rows.length > MAX_BOTS,
-    };
-  } catch (error) {
-    return { ok: false, refusal: refusalFromThrown(error) };
-  }
-}
-
-/**
- * The names the transcript walk needs, from one request.
- *
- * Deliberately one page. This read exists to put a name on the conversations
- * a run is about to map, and a name it does not have costs that conversation
- * a label, not the run. `hasMorePages` is how it says so.
- */
 export async function readCopilotBots(params: {
   environmentUrl: string;
   token: string;
   signal?: AbortSignal;
+  /**
+   * Walk `@odata.nextLink` to the end instead of reading one page.
+   *
+   * Off by default, because the transcript walk wants one page: it names bots
+   * it already saw in a transcript and a second page buys it nothing. The
+   * inventory needs every page, and asking for it explicitly is what keeps
+   * that difference visible at both call sites rather than hidden in here.
+   */
+  followPages?: boolean;
 }): Promise<CopilotBotsRead> {
-  return await readBotPages({ ...params, maxPages: 1 });
+  const { environmentUrl, token, signal, followPages = false } = params;
+  const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${DATAVERSE_API_VERSION}/bots`;
+  const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
+
+  const rows: unknown[] = [];
+  let url = `${base}?${query}`;
+
+  for (let page = 0; page < MAX_BOT_PAGES; page++) {
+    const read = await readBotPage({ url, token, signal });
+    if (!read.ok) return read;
+    rows.push(...read.rows);
+
+    const next = read.next;
+    if (!next) return { ok: true, rows, hasMorePages: false };
+    if (!followPages) return { ok: true, rows, hasMorePages: true };
+
+    // The continuation URL comes from the response body, and the next request
+    // carries the token. A link pointing anywhere but this environment would
+    // hand the credential to whoever answers, so an off-origin one is treated
+    // as a reply that was not the documented shape rather than followed.
+    if (!isSameOrigin(next, environmentUrl)) {
+      return {
+        ok: false,
+        refusal: { reason: "malformed_response", status: null },
+      };
+    }
+    url = next;
+  }
+
+  // The page budget is spent. A provider that keeps handing back a
+  // continuation link this long is either enormous or echoing the same one
+  // back, and neither can be reported as a finished inventory.
+  return { ok: true, rows, hasMorePages: true };
+}
+
+/** One page of the collection, or the reason there is none. */
+type CopilotBotPage =
+  | { ok: true; rows: unknown[]; next: string | undefined }
+  | { ok: false; refusal: AgentListingRefusal };
+
+async function readBotPage(params: {
+  url: string;
+  token: string;
+  signal?: AbortSignal;
+}): Promise<CopilotBotPage> {
+  const { url, token, signal } = params;
+  // Re-armed per request rather than shared across the walk: one budget
+  // spanning every page would abort a healthy later page for the time the
+  // earlier ones spent.
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await ssrfSafeFetch(url, {
+      method: "GET",
+      headers: dataverseHeaders(token),
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+      // Same reasoning as the transcript read: this request carries the token,
+      // and a redirect would hand it to whoever answers.
+      followRedirects: false,
+    });
+
+    if (!response.ok) {
+      return { ok: false, refusal: refusalFromStatus(response.status) };
+    }
+    const parsed = odataPageSchema.parse(await response.json());
+    return {
+      ok: true,
+      rows: parsed.value,
+      next: parsed["@odata.nextLink"],
+    };
+  } catch (error) {
+    return { ok: false, refusal: refusalFromThrown(error) };
+  }
 }
 
 /** Copilot Studio bots as `DiscoveredAgent` rows. */
@@ -254,12 +267,17 @@ export async function listCopilotAgents(params: {
   token: string;
   signal?: AbortSignal;
 }): Promise<AgentListing> {
-  // Follows the provider's next-page link, unlike the transcript walk above.
-  // This IS the list: an agent it stops short of is not a missing label on one
-  // conversation, it is an agent that shows its provider identifier everywhere
-  // a name is expected.
-  const read = await readBotPages({ ...params, maxPages: MAX_BOT_PAGES });
+  const read = await readCopilotBots({ ...params, followPages: true });
   if (!read.ok) return agentsRefused(read.refusal);
+
+  // An inventory that is missing agents must not read as the inventory. Every
+  // later press of Sync would start at the same first page, so the absent ones
+  // are undiscoverable by repeating the action, and a screen showing a subset
+  // as the whole set is worse than one saying it could not enumerate.
+  if (read.hasMorePages) {
+    return agentsRefused({ reason: "unavailable", status: null });
+  }
+
   return agentsListed(
     copilotBotsAsAgents({
       rows: read.rows,

@@ -330,6 +330,90 @@ describe("PersonListingService.syncFromSource", () => {
     });
   });
 
+  // A single wide `try` used to give every throw the verdict "not configured",
+  // which was written for a config that no longer parses. These three drive the
+  // real classifier rather than handing it a refusal, because the defect was
+  // never in the shape of the refusal -- it was in which one got chosen.
+  describe("given the provider cannot be reached", () => {
+    // Driven through the Genie sign-in rather than an admin API: the admin
+    // pullers catch their own transport failures, so a throw there never
+    // reaches the branch under test and the case would pass either way.
+    // Sign-in only makes a request when the credential is a client pair -- a
+    // pasted token short-circuits before any fetch.
+    const genieSignInSource = {
+      id: "src_genie_reach",
+      sourceType: "databricks_genie",
+      parserConfig: {
+        adapter: "databricks_genie",
+        workspaceUrl: "https://example.cloud.databricks.com",
+        credentials: { clientId: "id", clientSecret: "secret" },
+      },
+    };
+
+    it("says unreachable rather than blaming the credential", async () => {
+      fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
+      const { prisma } = fakePrisma({ source: genieSignInSource });
+
+      const result = await PersonListingService.create(prisma).syncFromSource({
+        organizationId,
+        ingestionSourceId: "src_genie_reach",
+        now,
+      });
+
+      expect(result).toEqual({
+        outcome: "refused",
+        refusal: { reason: "unreachable", status: null },
+      });
+    });
+
+    it("says unreachable when the request times out", async () => {
+      fetchMock.mockRejectedValueOnce(
+        new DOMException("The operation timed out.", "TimeoutError"),
+      );
+      const { prisma } = fakePrisma({ source: genieSignInSource });
+
+      const result = await PersonListingService.create(prisma).syncFromSource({
+        organizationId,
+        ingestionSourceId: "src_genie_reach",
+        now,
+      });
+
+      expect(result).toEqual({
+        outcome: "refused",
+        refusal: { reason: "unreachable", status: null },
+      });
+    });
+  });
+
+  describe("given the source config no longer parses", () => {
+    it("refuses as not_configured before any request goes out", async () => {
+      const { prisma } = fakePrisma({
+        source: {
+          id: "src_genie",
+          sourceType: "databricks_genie",
+          parserConfig: {
+            adapter: "databricks_genie",
+            // `workspaceUrl` is required and absent, which is the config-parse
+            // case the old catch-all was actually written for.
+            credentials: { token: "dapi-token" },
+          },
+        },
+      });
+
+      const result = await PersonListingService.create(prisma).syncFromSource({
+        organizationId,
+        ingestionSourceId: "src_genie",
+        now,
+      });
+
+      expect(result).toEqual({
+        outcome: "refused",
+        refusal: { reason: "not_configured", status: null },
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given the source belongs to another organization", () => {
     it("raises rather than decrypting its credentials", async () => {
       // The seam scopes the read by organization in the predicate, so another

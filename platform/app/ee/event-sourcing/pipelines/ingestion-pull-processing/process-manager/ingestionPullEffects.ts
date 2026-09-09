@@ -358,20 +358,28 @@ function retryOrGiveUp({
   /** Names the list in the log line, so a search can tell the two apart. */
   what: string;
 }): void {
-  if (intentContext.attempt >= maxAttempts) return;
-  logger.warn(
-    {
-      sourceId: payload.sourceId,
-      requestId: payload.requestId,
-      attempt: intentContext.attempt,
-      error: error instanceof Error ? error.message : String(error),
-    },
-    `${what} listing failed; retrying`,
-  );
+  const context = {
+    sourceId: payload.sourceId,
+    requestId: payload.requestId,
+    attempt: intentContext.attempt,
+    error: error instanceof Error ? error.message : String(error),
+  };
+
+  // Attempts are spent. The durable event deliberately carries a reason and no
+  // message, because a provider's reply can quote a token or a person's name
+  // and that event is read by a screen. The log is therefore the only place the
+  // detail survives, so the terminal attempt has to write one: returning here
+  // silently left the one failure that actually needs explaining with nothing
+  // recorded anywhere.
+  if (intentContext.attempt >= maxAttempts) {
+    logger.warn(context, `${what} listing failed; attempts spent`);
+    return;
+  }
+
+  logger.warn(context, `${what} listing failed; retrying`);
   throw error;
 }
 
-/** What a listing port answered, with the count named the same either way. */
 /**
  * `Counts` is whatever the listed arm of one entity's port reports, passed
  * through untouched. It is generic because the two entities do not count the

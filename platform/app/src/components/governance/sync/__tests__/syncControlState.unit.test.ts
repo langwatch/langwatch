@@ -17,10 +17,10 @@ import { governanceSyncStatus } from "../syncControlState";
 
 const inputs = (over: Partial<Parameters<typeof governanceSyncStatus>[0]>) => ({
   canManage: true,
-  sourcesLoading: false,
+  isLoadingSources: false,
   sourceCount: 1,
   isAsking: false,
-  asked: false,
+  hasAsked: false,
   ...over,
 });
 
@@ -41,14 +41,14 @@ describe("the state of a governance sync control", () => {
     /** @scenario "A second press while a sync is in flight says so rather than doing nothing" */
     it("outranks having no provider left to ask", () => {
       expect(
-        governanceSyncStatus(inputs({ asked: true, sourceCount: 0 })),
+        governanceSyncStatus(inputs({ hasAsked: true, sourceCount: 0 })),
       ).toEqual({ state: "asked" });
     });
 
     /** @scenario "A second press while a sync is in flight says so rather than doing nothing" */
     it("yields to a request currently being recorded", () => {
       expect(
-        governanceSyncStatus(inputs({ asked: true, isAsking: true })),
+        governanceSyncStatus(inputs({ hasAsked: true, isAsking: true })),
       ).toEqual({ state: "asking" });
     });
   });
@@ -76,7 +76,9 @@ describe("the state of a governance sync control", () => {
     /** @scenario "An organization with no listing provider is told so" */
     it("says it is still checking rather than claiming none", () => {
       expect(
-        governanceSyncStatus(inputs({ sourcesLoading: true, sourceCount: 0 })),
+        governanceSyncStatus(
+          inputs({ isLoadingSources: true, sourceCount: 0 }),
+        ),
       ).toEqual({ state: "unavailable", because: "checking" });
     });
   });

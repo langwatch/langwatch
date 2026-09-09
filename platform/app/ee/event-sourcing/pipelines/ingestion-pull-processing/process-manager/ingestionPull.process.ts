@@ -317,11 +317,11 @@ function listingRequestedHandler({
     }
 
     const inFlight = state[slot];
-    const busy =
+    const isBusy =
       inFlight != null &&
       inFlight.requestId !== view.requestId &&
       ctx.now - inFlight.startedAt < INGESTION_PULL_STALE_LISTING_MS;
-    if (busy) {
+    if (isBusy) {
       return settle({ state, after: schedulingRef(ctx) });
     }
 

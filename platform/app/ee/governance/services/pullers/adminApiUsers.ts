@@ -64,11 +64,11 @@ function readMemberRows({ response }: { response: unknown }): {
   members: z.infer<typeof memberSchema>[];
   hasMore: boolean;
   lastId: string | null;
-  malformed: boolean;
+  isMalformed: boolean;
 } {
   const page = memberPageSchema.safeParse(response);
   if (!page.success) {
-    return { members: [], hasMore: false, lastId: null, malformed: true };
+    return { members: [], hasMore: false, lastId: null, isMalformed: true };
   }
 
   const members: z.infer<typeof memberSchema>[] = [];
@@ -82,7 +82,7 @@ function readMemberRows({ response }: { response: unknown }): {
     members,
     hasMore: page.data.has_more === true,
     lastId,
-    malformed: false,
+    isMalformed: false,
   };
 }
 
@@ -145,7 +145,7 @@ async function fetchMemberPage(params: {
   }
 
   const read = readMemberRows({ response: await response.json() });
-  if (read.malformed) {
+  if (read.isMalformed) {
     return {
       ok: false,
       refusal: { reason: "malformed_response", status: null },
