@@ -16,7 +16,11 @@ export {
 export { parsePrismaDatamodel, type PrismaDatamodelModel } from "./datamodel.ts";
 export { type GuardMiddleware, type GuardNext, type GuardParams } from "./guard-middleware.ts";
 export { guardEnMasse } from "./mass-delete-guard.ts";
-export { guardProjectId, PROJECT_TENANCY_REGIMES, SCOPED_MODEL_NAMES } from "./multi-tenancy-guard.ts";
+export {
+  guardProjectId,
+  PROJECT_TENANCY_REGIMES,
+  SCOPED_MODEL_NAMES,
+} from "./multi-tenancy-guard.ts";
 export {
   guardOrganizationId,
   ORG_BEARING_MODEL_NAMES,
@@ -52,8 +56,19 @@ export {
   withQueryTiming,
 } from "./slow-query-warning.ts";
 export {
+  PrismaRepository,
+  TransactionalPrismaRepository,
+  prismaRepositories,
+  type PrismaRepositoryClient,
+  type PrismaRepositoryDefinition,
+  type PrismaRepositoryFactoryInput,
+  type PrismaRepositoryTransactionClient,
+} from "./prisma-repository.ts";
+export {
   prismaTables,
   scopedPrismaClient,
   type PrismaRelationException,
+  type PrismaTables,
   type ScopedPrismaClient,
+  type PrismaModelClient,
 } from "./ownership.ts";

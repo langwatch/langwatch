@@ -1,13 +1,26 @@
-import { prismaTableCatalogue, type PrismaTableModel } from "./table-catalogue.ts";
-import { parsePrismaDatamodelRelations } from "./datamodel.ts";
+import {
+  prismaModelFieldCatalogue,
+  prismaRelationCatalogue,
+  prismaTableCatalogue,
+  type PrismaTableModel,
+} from "./table-catalogue.ts";
 import type { PrismaClient } from "./generated/client.ts";
 
 export type { PrismaTableModel } from "./table-catalogue.ts";
 
+export type PrismaTables<Models extends readonly PrismaTableModel[]> = Readonly<{
+  readonly store: "prisma";
+  readonly tables: Readonly<{
+    [Index in keyof Models]: Models[Index] extends PrismaTableModel
+      ? (typeof prismaTableCatalogue)[Models[Index]]
+      : never;
+  }>;
+}>;
+
 /** Claims physical tables on this installation's single Prisma datasource. */
 export function prismaTables<
   const Models extends readonly [PrismaTableModel, ...PrismaTableModel[]],
->(...models: Models) {
+>(...models: Models): PrismaTables<Models> {
   if (models.length === 0) {
     throw new Error("A Prisma repository must declare at least one model.");
   }
@@ -19,14 +32,29 @@ export function prismaTables<
     return prismaTableCatalogue[model];
   });
 
-  return Object.freeze({ store: "prisma", tables: Object.freeze(tables) });
+  return Object.freeze({ store: "prisma", tables: Object.freeze(tables) }) as PrismaTables<Models>;
 }
 
 type PrismaDelegateKey<Model extends PrismaTableModel> = Uncapitalize<Model> & keyof PrismaClient;
 
+/** Native model delegates, preserving Prisma's select/include inference. */
+export type PrismaModelClient<Model extends PrismaTableModel> = Readonly<
+  Pick<PrismaClient, PrismaDelegateKey<Model>>
+>;
+
+type ScopedPrismaDelegate<Delegate> = {
+  readonly [Method in keyof Delegate]: Delegate[Method] extends (
+    ...arguments_: infer Arguments
+  ) => infer Result
+    ? (...arguments_: Arguments) => Promise<Awaited<Result>>
+    : never;
+};
+
 /** Only delegates for declared models, plus a transaction that preserves this scope. */
 export type ScopedPrismaClient<Models extends readonly PrismaTableModel[]> = Readonly<
-  Pick<PrismaClient, PrismaDelegateKey<Models[number]>> & {
+  {
+    [Key in PrismaDelegateKey<Models[number]>]: ScopedPrismaDelegate<PrismaClient[Key]>;
+  } & {
     transaction<Result>(
       callback: (client: ScopedPrismaClient<Models>) => Promise<Result>,
     ): Promise<Result>;
@@ -42,21 +70,58 @@ export interface PrismaRelationException {
 }
 
 type RelationIndex = ReadonlyMap<string, ReadonlyMap<string, PrismaTableModel>>;
+type FieldIndex = ReadonlyMap<string, ReadonlySet<string>>;
+
+function isPrismaTableModel(value: string): value is PrismaTableModel {
+  return Object.hasOwn(prismaTableCatalogue, value);
+}
 
 function relationIndex(): RelationIndex {
   const fields = new Map<string, Map<string, PrismaTableModel>>();
-  for (const relation of parsePrismaDatamodelRelations()) {
-    const modelRelations = fields.get(relation.model) ?? new Map<string, PrismaTableModel>();
-    modelRelations.set(relation.field, relation.target as PrismaTableModel);
-    fields.set(relation.model, modelRelations);
+  for (const [model, modelRelations] of Object.entries(prismaRelationCatalogue)) {
+    const relations = new Map<string, PrismaTableModel>();
+    for (const [field, target] of Object.entries(modelRelations)) {
+      if (!isPrismaTableModel(target)) {
+        throw new Error(`Unknown Prisma relation target ${target} for ${model}.${field}.`);
+      }
+      relations.set(field, target);
+    }
+    fields.set(model, relations);
   }
   return fields;
 }
 
+function fieldIndex(): FieldIndex {
+  return new Map(
+    Object.entries(prismaModelFieldCatalogue).map(([model, fields]) => [model, new Set(fields)]),
+  );
+}
+
 const relations = relationIndex();
+const fields = fieldIndex();
+const UNSAFE_MUTATION_OPERATIONS = new Set([
+  "delete",
+  "deleteMany",
+  "update",
+  "updateMany",
+  "updateManyAndReturn",
+  "upsert",
+]);
+const RELATION_READ_OPERATIONS = new Set([
+  "aggregate",
+  "count",
+  "findFirst",
+  "findFirstOrThrow",
+  "findMany",
+  "findUnique",
+  "findUniqueOrThrow",
+  "groupBy",
+]);
 
 function ownershipError(message: string): Error {
-  return new Error(`Prisma repository capability denied ${message}. Use the owning FeatureApi instead.`);
+  return new Error(
+    `Prisma repository capability denied ${message}. Use the owning FeatureApi instead.`,
+  );
 }
 
 function assertRelationAccess(
@@ -75,6 +140,7 @@ function assertRelationAccess(
   }
 
   const modelRelations = relations.get(model);
+  const modelFields = fields.get(model);
   for (const [key, child] of Object.entries(value)) {
     const target = modelRelations?.get(key);
     if (target) {
@@ -90,6 +156,7 @@ function assertRelationAccess(
       assertRelationAccess(child, target, operation, claimedModels, exceptions);
       continue;
     }
+    if (modelFields?.has(key)) continue;
     assertRelationAccess(child, model, operation, claimedModels, exceptions);
   }
 }
@@ -99,31 +166,35 @@ function delegateName(model: PrismaTableModel): string {
 }
 
 function scopedClient<Models extends readonly PrismaTableModel[]>(
-  client: PrismaClient,
-  models: Models,
+  client: object,
+  models: readonly PrismaTableModel[],
   exceptions: readonly PrismaRelationException[],
+  transaction:
+    | (<Result>(callback: (transactionClient: object) => Promise<Result>) => Promise<Result>)
+    | undefined,
 ): ScopedPrismaClient<Models> {
   const claimedModels = new Set<PrismaTableModel>(models);
   const claimedDelegates = new Map(models.map((model) => [delegateName(model), model]));
   const allDelegates = new Set(
     Object.keys(prismaTableCatalogue).map((model) => delegateName(model as PrismaTableModel)),
   );
-  const source = client as unknown as Record<string, unknown>;
-
   return new Proxy(
     {},
     {
       get(_target, property) {
         if (typeof property !== "string") return undefined;
         if (property === "transaction") {
-          return async <Result>(callback: (transaction: ScopedPrismaClient<Models>) => Promise<Result>) => {
-            const transaction = source.$transaction;
-            if (typeof transaction !== "function") {
-              throw ownershipError("transaction because the underlying client has no transaction function");
+          return async <Result>(
+            callback: (transaction: ScopedPrismaClient<Models>) => Promise<Result>,
+          ) => {
+            if (!transaction) {
+              throw ownershipError(
+                "transaction because the underlying client has no transaction function",
+              );
             }
-            return Reflect.apply(transaction, client, [
-              (transactionClient: PrismaClient) => callback(scopedClient(transactionClient, models, exceptions)),
-            ]) as Promise<Result>;
+            return transaction((transactionClient) =>
+              callback(scopedClient(transactionClient, models, exceptions, undefined)),
+            );
           };
         }
         const model = claimedDelegates.get(property);
@@ -133,7 +204,7 @@ function scopedClient<Models extends readonly PrismaTableModel[]>(
           }
           return undefined;
         }
-        const delegate = source[property];
+        const delegate = Reflect.get(client, property);
         if (!delegate || typeof delegate !== "object") {
           throw ownershipError(`delegate ${property} is unavailable`);
         }
@@ -143,7 +214,15 @@ function scopedClient<Models extends readonly PrismaTableModel[]>(
             if (typeof method !== "function") return method;
             return (...args: unknown[]) => {
               assertRelationAccess(args[0], model, String(operation), claimedModels, exceptions);
-              return Reflect.apply(method, delegateTarget, args);
+              if (UNSAFE_MUTATION_OPERATIONS.has(String(operation))) {
+                throw ownershipError(
+                  `${String(operation)} because Prisma relationMode cascades are not scoped`,
+                );
+              }
+              const result = Reflect.apply(method, delegateTarget, args);
+              return new Promise((resolve, reject) => {
+                Promise.resolve(result).then(resolve, reject);
+              });
             };
           },
         });
@@ -170,6 +249,28 @@ export function scopedPrismaClient<const Models extends readonly PrismaTableMode
       throw new Error(`Unknown Prisma model ${String(model)} in repository capability.`);
     }
   }
-  const exceptions = options.relationExceptions ?? [];
-  return scopedClient(client, models, exceptions);
+  const exceptions = Object.freeze(
+    (options.relationExceptions ?? []).map((exception) => {
+      const target = relations.get(exception.model)?.get(exception.relation);
+      if (
+        !Object.hasOwn(prismaTableCatalogue, exception.model) ||
+        !target ||
+        typeof exception.relation !== "string" ||
+        typeof exception.operation !== "string" ||
+        typeof exception.reason !== "string" ||
+        typeof exception.removalCondition !== "string" ||
+        !exception.reason.trim() ||
+        !exception.removalCondition.trim() ||
+        !RELATION_READ_OPERATIONS.has(exception.operation)
+      ) {
+        throw new Error(
+          "A Prisma relation exception must name a read relation, reason, and removal condition.",
+        );
+      }
+      return Object.freeze({ ...exception });
+    }),
+  );
+  return scopedClient(client, Object.freeze([...models]), exceptions, (callback) =>
+    client.$transaction(callback),
+  );
 }

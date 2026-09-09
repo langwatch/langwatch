@@ -44,6 +44,16 @@ describe("Prisma ownership catalogue generation", () => {
     expect(checked.stderr).toContain("Prisma table catalogue is stale");
   });
 
+  it("captures optional relations and rejects stale relation metadata", () => {
+    const world = fixture(
+      "model User {\n id String @id\n profile Profile?\n}\nmodel Profile {\n id String @id\n}\n",
+    );
+    expect(world.run().status).toBe(0);
+    expect(readFileSync(world.output, "utf8")).toContain('"profile": "Profile"');
+    writeFileSync(world.schemaFile, "model User {\n id String @id\n}\nmodel Profile {\n id String @id\n}\n");
+    expect(world.run("--check").status).not.toBe(0);
+  });
+
   it.each(["", 'model User {\n id String @id\n @@schema("identity")\n}\n'])(
     "rejects unsupported schema %j",
     (schema) => {
