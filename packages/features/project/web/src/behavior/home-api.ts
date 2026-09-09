@@ -1,20 +1,20 @@
 /**
- * The procedures the project home calls, and the hooks that call them.
- * Hand-written until the mounted router can generate it (ADR-130).
- * `home`/`plan`/`integrationsChecks`/`analytics`/`scenarios` are
- * load-bearing tRPC cache-key segments — the home and briefing recent-items
- * reads share one cache entry only because they spell the path identically.
+ * Procedures this package calls: derived namespaces from contract, borrowed
+ * ones from features not yet split. Segment names are load-bearing for React
+ * Query cache.
  */
 
 import type { TimeseriesBucket } from "@langwatch/analytics-contract";
-import { createFeatureApi } from "@langwatch/api/web";
+import type {
+  homeTrpc,
+  integrationsChecksTrpc,
+  projectTrpc,
+} from "@langwatch/project-contract";
+import { createFeatureApi, type ContractApiMap } from "@langwatch/api/web";
 
 /**
- * What kind of thing the reader touched.
- *
- * `@langwatch/project-server`'s own union, restated rather than imported: a web
- * package may not name a server package, and this is the wire's vocabulary
- * either way.
+ * What kind of thing the reader touched. Restated rather than imported: a web
+ * package may not name a server package, and this is the wire's vocabulary.
  */
 export type RecentItemType =
   | "prompt"
@@ -34,15 +34,11 @@ export type RecentItem = {
   updatedAt: string;
 };
 
-export type HomeApiMap = {
+type BorrowedProcedures = {
   organization: {
     /**
-     * The workspace graph, narrowed to the project the home is about.
-     *
-     * THE SAME PATH AND THE SAME INPUT the application shell asks with, which
-     * under tRPC's path-plus-input cache key is the same entry: the home, the
-     * sidebar and the two switchers read one workspace and cannot disagree
-     * about which project is on screen.
+     * Workspace graph narrowed to the project. THE SAME PATH AND INPUT the
+     * shell asks, which under tRPC cache key is the same entry.
      */
     getAll: {
       query: {
@@ -56,7 +52,6 @@ export type HomeApiMap = {
               name: string;
               slug: string;
               firstMessage?: boolean | null;
-              /** The project's ingestion key, where the deployment hands it over. */
               apiKey?: string | null;
             }>;
           }>;
@@ -65,24 +60,10 @@ export type HomeApiMap = {
     };
   };
 
-  home: {
-    /** What this reader touched recently, newest first. */
-    getRecentItems: {
-      query: {
-        input: { projectId: string; limit: number };
-        output: RecentItem[];
-      };
-    };
-  };
-
   plan: {
     /**
-     * The organization's plan.
-     *
-     * Read for one branch: the "Considering LangWatch?" ask is offered to a
-     * free organization and to nobody else, and "not answered yet" hides it —
-     * a paying customer watching that pitch flash up is the product forgetting
-     * who they are.
+     * The organization's plan. "Considering LangWatch?" is offered to free
+     * orgs only; a paying customer watching it is a wiring bug.
      */
     getActivePlan: {
       query: {
@@ -92,42 +73,10 @@ export type HomeApiMap = {
     };
   };
 
-  integrationsChecks: {
-    /**
-     * How far through setup this project is.
-     *
-     * THE SAME PATH AND INPUT the onboarding checklist, the setup hairline and
-     * the home's own reach check all ask with, so React Query answers three
-     * readers from one request and they can never disagree about whether the
-     * project has data.
-     */
-    getCheckStatus: {
-      query: {
-        input: { projectId: string };
-        output: {
-          /** Whether a trace has ever arrived. The only boolean here. */
-          firstMessage: boolean;
-          /** The rest are COUNTS, and the checklist reads "more than none". */
-          workflows: number;
-          datasets: number;
-          onlineEvaluations: number;
-          simulations: number;
-          modelProviders: number;
-          prompts: number;
-          teamMembers: number;
-        };
-      };
-    };
-  };
-
   analytics: {
     /**
-     * The figures the briefing's vanity strip and its error line are drawn from.
-     *
-     * The input is the shared analytics filter shape, which this family neither
-     * narrows nor validates — it composes one and hands it over — so it travels
-     * as the record the procedure parses. The ANSWER is typed, because the
-     * briefing reads buckets out of it by series name.
+     * Briefing's vanity strip and error line figures. Input is the shared
+     * analytics filter; output is typed for series lookups.
      */
     getTimeseries: {
       query: {
@@ -141,7 +90,9 @@ export type HomeApiMap = {
   };
 
   scenarios: {
-    /** The simulation sets the briefing rolls up into one pass/fail line. */
+    /**
+     * Simulation sets the briefing rolls up into one pass/fail line.
+     */
     getExternalSetSummaries: {
       query: {
         input: { projectId: string };
@@ -158,12 +109,8 @@ export type HomeApiMap = {
 
   tracesV2: {
     /**
-     * How often each value of one facet occurs in a window.
-     *
-     * Read for exactly one thing: the error-message shapes in this window
-     * against the one before it, which is what turns "errors are up" into
-     * "these errors are up". `totalDistinct` against the page length is how the
-     * briefing knows whether it is comparing the whole set or a truncation.
+     * Facet value frequencies in a window. Error message shapes compared to
+     * the prior period; `totalDistinct` tells whether we see the whole set.
      */
     facetValues: {
       query: {
@@ -182,5 +129,10 @@ export type HomeApiMap = {
     };
   };
 };
+
+export type HomeApiMap = ContractApiMap<typeof homeTrpc> &
+  ContractApiMap<typeof integrationsChecksTrpc> &
+  ContractApiMap<typeof projectTrpc> &
+  BorrowedProcedures;
 
 export const homeApi = createFeatureApi<HomeApiMap>();
