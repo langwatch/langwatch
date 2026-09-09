@@ -101,3 +101,15 @@ unknown as`, no `try*`, no inline `import()`, comments ≤5 lines, `HandledError
 Report: each item one paragraph with public names and the pinning test; the exact consumer lines (stored-object `/api/files`,
 image-proxy, rum, gateway-internal, scim intake, trace OTLP alias, experiment v3, auth, automation); exit outputs
 verbatim; scenarios retagged / added / left; what is still open for parts B and C.
+
+## Part E - LANDED a8e843e6ba (09-09)
+
+- `RestTransportDocs.requestBody` publishes a raw-body route's request schema (io input, 3.1 spelling); a route
+  declaring both `withInput` and `docs.requestBody` publishes its body twice, no refusal yet (cheap assert beside
+  `assertParsedBodyFree` when wanted).
+- `TARGET_KIND_BY_ROUTER` names nine more kinds (`model_provider` for the Codex row, snake_case like the table);
+  two-segment prefix looked up before the root. Older namespaces (annotation, dataset, dashboard, topic, suite,
+  share) still unnamed.
+- Body and multipart declaration types moved to `rest/request.ts`, docs type to `rest/openapi.ts`;
+  `declaration.ts` 1,820 -> 1,764. Under 1,500 needs the body-shaped asserts (~130 lines) and the builder's
+  source-declaring half to move too.
