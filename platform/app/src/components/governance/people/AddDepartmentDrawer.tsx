@@ -22,6 +22,59 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 /**
+ * The one field and the write behind it.
+ *
+ * Split from the drawer so that component is about which of the three states
+ * it draws — unresolved, refused, or the form — and this is about what happens
+ * when the reader presses Create. State and callbacks only: the drawer owns
+ * every piece of markup.
+ */
+function useCreateDepartment({
+  organizationId,
+  closeDrawer,
+}: {
+  organizationId: string;
+  closeDrawer: () => void;
+}) {
+  const utils = api.useUtils();
+
+  const form = useForm<{ name: string }>({ defaultValues: { name: "" } });
+  const {
+    formState: { errors },
+    handleSubmit,
+    register,
+  } = form;
+
+  const createMutation = api.departments.create.useMutation({
+    onSuccess: async () => {
+      toaster.create({ title: "Department created", type: "success" });
+      closeDrawer();
+      await utils.departments.list.invalidate({ organizationId });
+    },
+    // A rejected name belongs beside the field the reader is looking at, so the
+    // form takes the validation failure first and only what it cannot show
+    // falls through to a toast.
+    onError: (error) => {
+      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
+        return;
+      showErrorToast({ error, fallbackTitle: "Couldn't create department" });
+    },
+  });
+
+  const submit = handleSubmit(({ name }) => {
+    createMutation.mutate({ organizationId, name: name.trim() });
+  });
+
+  return {
+    form,
+    errors,
+    register,
+    submit,
+    isPending: createMutation.isPending,
+  };
+}
+
+/**
  * Creating a department, as the section's ordinary right-side drawer.
  *
  * A drawer rather than a modal because that is the one create surface this app
@@ -57,33 +110,9 @@ export function AddDepartmentDrawer({ open = true }: { open?: boolean }) {
   const isResolved = !isLoading && organizationId !== "";
 
   const { closeDrawer } = useDrawer();
-  const utils = api.useUtils();
-
-  const form = useForm<{ name: string }>({ defaultValues: { name: "" } });
-  const {
-    formState: { errors },
-    handleSubmit,
-    register,
-  } = form;
-
-  const createMutation = api.departments.create.useMutation({
-    onSuccess: async () => {
-      toaster.create({ title: "Department created", type: "success" });
-      closeDrawer();
-      await utils.departments.list.invalidate({ organizationId });
-    },
-    // A rejected name belongs beside the field the reader is looking at, so the
-    // form takes the validation failure first and only what it cannot show
-    // falls through to a toast.
-    onError: (error) => {
-      if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }))
-        return;
-      showErrorToast({ error, fallbackTitle: "Couldn't create department" });
-    },
-  });
-
-  const submit = handleSubmit(({ name }) => {
-    createMutation.mutate({ organizationId, name: name.trim() });
+  const { form, errors, register, submit, isPending } = useCreateDepartment({
+    organizationId,
+    closeDrawer,
   });
 
   return (
@@ -92,7 +121,7 @@ export function AddDepartmentDrawer({ open = true }: { open?: boolean }) {
       placement="end"
       size="md"
       onOpenChange={({ open: isOpen }) => {
-        if (!isOpen && !createMutation.isPending) closeDrawer();
+        if (!isOpen && !isPending) closeDrawer();
       }}
     >
       <Drawer.Content bg="bg">
@@ -147,7 +176,7 @@ export function AddDepartmentDrawer({ open = true }: { open?: boolean }) {
               <Button
                 variant="ghost"
                 onClick={closeDrawer}
-                disabled={createMutation.isPending}
+                disabled={isPending}
               >
                 Cancel
               </Button>
@@ -157,7 +186,7 @@ export function AddDepartmentDrawer({ open = true }: { open?: boolean }) {
                   form association the drawer does not need. */}
               <Button
                 colorPalette="orange"
-                loading={createMutation.isPending}
+                loading={isPending}
                 onClick={() => void submit()}
               >
                 Create
