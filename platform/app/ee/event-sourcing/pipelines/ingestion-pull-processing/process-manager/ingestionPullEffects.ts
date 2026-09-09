@@ -9,9 +9,9 @@ import {
   observeIngestionPullDuration,
 } from "~/server/metrics";
 
-import { AGENT_LISTING_FAILED_REASON } from "../schemas/constants";
+import { LISTING_FAILED_REASON } from "../schemas/constants";
 import type {
-  IngestionPullAgentListingIntent,
+  IngestionPullListingIntent,
   IngestionPullRunIntent,
 } from "./ingestionPullProcess.types";
 
@@ -66,6 +66,21 @@ export interface AgentListingPort {
   >;
 }
 
+/**
+ * The same contract for people. A separate interface rather than a shared one
+ * with a renamed count, because these are the two ports the composition root
+ * wires and each names what it returns: a reader of `pipelineSet.ts` should
+ * not have to check which list a `count` belongs to.
+ */
+export interface PeopleListingPort {
+  list(params: {
+    sourceId: string;
+  }): Promise<
+    | { outcome: "listed"; personCount: number }
+    | { outcome: "refused"; reason: string; status: number | null }
+  >;
+}
+
 /** The pipeline commands the effect reports its outcome through. */
 export interface IngestionPullOutcomeCommands {
   recordRunCompleted(args: {
@@ -96,6 +111,23 @@ export interface IngestionPullOutcomeCommands {
     requestedAt: number;
     agentCount: number;
   }): Promise<void>;
+  recordPeopleListed(args: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    requestId: string;
+    requestedAt: number;
+    personCount: number;
+  }): Promise<void>;
+  recordPeopleListingRefused(args: {
+    tenantId: string;
+    occurredAt: number;
+    sourceId: string;
+    requestId: string;
+    requestedAt: number;
+    reason: string;
+    status: number | null;
+  }): Promise<void>;
   recordAgentsListingRefused(args: {
     tenantId: string;
     occurredAt: number;
@@ -110,6 +142,7 @@ export interface IngestionPullOutcomeCommands {
 export interface IngestionPullDispatchDeps {
   runPort: IngestionPullRunPort;
   agentListingPort: AgentListingPort;
+  peopleListingPort: PeopleListingPort;
   /**
    * Late-bound on purpose: the executor is declared while the pipeline is
    * being built, and these are the SAME pipeline's commands — they only
@@ -206,11 +239,14 @@ function retryOrGiveUp({
   intentContext,
   maxAttempts,
   payload,
+  what,
 }: {
   error: unknown;
   intentContext: IntentContext;
   maxAttempts: number;
-  payload: IngestionPullAgentListingIntent;
+  payload: IngestionPullListingIntent;
+  /** Names the list in the log line, so a search can tell the two apart. */
+  what: string;
 }): void {
   if (intentContext.attempt >= maxAttempts) return;
   logger.warn(
@@ -220,34 +256,62 @@ function retryOrGiveUp({
       attempt: intentContext.attempt,
       error: error instanceof Error ? error.message : String(error),
     },
-    "Agent listing failed; retrying",
+    `${what} listing failed; retrying`,
   );
   throw error;
 }
 
+/** What a listing port answered, with the count named the same either way. */
+type ListingOutcome =
+  | { outcome: "listed"; count: number }
+  | { outcome: "refused"; reason: string; status: number | null };
+
+interface ListingOutcomeEnvelope {
+  tenantId: string;
+  occurredAt: number;
+  sourceId: string;
+  requestId: string;
+  requestedAt: number;
+}
+
 /**
- * The `listAgents` intent executor: one listing per dispatch.
+ * One listing per dispatch, whichever list was asked for.
  *
- * At-least-once + idempotent, like the pull. A redelivered intent re-lists
- * and re-records the same sightings, which the sighting repository absorbs,
- * and the outcome commands carry deterministic idempotency keys, so a
- * redelivery cannot write a second outcome event for one request.
+ * ONE body for agents and people, because the judgement it encodes is the same
+ * one and it is the subtle part: a provider that refuses is NOT a failed
+ * effect, so it records and returns without retrying, while our own side
+ * giving out retries and only then becomes a `listing_failed` refusal. Two
+ * copies of that would be two chances to get the distinction wrong, and the
+ * one that drifted would quietly retry a provider that already said no.
  *
- * Three outcomes reach the log, not two. A provider that refuses is not a
- * failed effect: the listing did its job and found out the answer is no, so
- * it records that and does not retry. Only our own side giving out is worth
- * a retry, and only that becomes a `listing_failed` refusal once retries run
- * out — kept apart from the provider's own reasons so a reader is never told
- * to go fix a credential that was fine.
+ * At-least-once + idempotent, like the pull. A redelivered intent re-lists and
+ * re-records the same sightings, which the sighting repositories absorb, and
+ * the outcome commands carry deterministic idempotency keys, so a redelivery
+ * cannot write a second outcome event for one request.
  */
-export function createAgentListingHandler(
+function createListingHandler(
   deps: IngestionPullDispatchDeps,
-): IntentExecutor<IngestionPullAgentListingIntent> {
+  listing: {
+    what: string;
+    list: (sourceId: string) => Promise<ListingOutcome>;
+    recordListed: (
+      commands: IngestionPullOutcomeCommands,
+      args: ListingOutcomeEnvelope & { count: number },
+    ) => Promise<void>;
+    recordRefused: (
+      commands: IngestionPullOutcomeCommands,
+      args: ListingOutcomeEnvelope & {
+        reason: string;
+        status: number | null;
+      },
+    ) => Promise<void>;
+  },
+): IntentExecutor<IngestionPullListingIntent> {
   const maxAttempts = deps.maxAttempts ?? INGESTION_PULL_MAX_ATTEMPTS;
   const clock = deps.clock ?? (() => Date.now());
 
   return async (
-    payload: IngestionPullAgentListingIntent,
+    payload: IngestionPullListingIntent,
     intentContext: IntentContext,
   ) => {
     const commands = deps.commands();
@@ -258,29 +322,33 @@ export function createAgentListingHandler(
       requestedAt: payload.requestedAt,
     };
 
-    let result: Awaited<ReturnType<AgentListingPort["list"]>>;
+    let result: ListingOutcome;
     try {
-      result = await deps.agentListingPort.list({
-        sourceId: payload.sourceId,
-      });
+      result = await listing.list(payload.sourceId);
     } catch (error) {
       // Rethrows below the cap so the outbox retries; at the cap it records
       // the one refusal that means "we could not ask" and returns.
-      retryOrGiveUp({ error, intentContext, maxAttempts, payload });
+      retryOrGiveUp({
+        error,
+        intentContext,
+        maxAttempts,
+        payload,
+        what: listing.what,
+      });
       // The message stayed in the log line and out of the event: a thrown
       // provider error can carry a response body, and this event is read by
       // an admin. The reason code is enough to act on.
-      await commands.recordAgentsListingRefused({
+      await listing.recordRefused(commands, {
         ...outcomeEnvelope,
         occurredAt: clock(),
-        reason: AGENT_LISTING_FAILED_REASON,
+        reason: LISTING_FAILED_REASON,
         status: null,
       });
       return;
     }
 
     if (result.outcome === "refused") {
-      await commands.recordAgentsListingRefused({
+      await listing.recordRefused(commands, {
         ...outcomeEnvelope,
         occurredAt: clock(),
         reason: result.reason,
@@ -289,10 +357,59 @@ export function createAgentListingHandler(
       return;
     }
 
-    await commands.recordAgentsListed({
+    await listing.recordListed(commands, {
       ...outcomeEnvelope,
       occurredAt: clock(),
-      agentCount: result.agentCount,
+      count: result.count,
     });
   };
+}
+
+/**
+ * The `listAgents` intent executor.
+ *
+ * Three outcomes reach the log, not two. A provider that refuses is not a
+ * failed effect: the listing did its job and found out the answer is no.
+ */
+export function createAgentListingHandler(
+  deps: IngestionPullDispatchDeps,
+): IntentExecutor<IngestionPullListingIntent> {
+  return createListingHandler(deps, {
+    what: "Agent",
+    list: async (sourceId) => {
+      const result = await deps.agentListingPort.list({ sourceId });
+      return result.outcome === "refused"
+        ? result
+        : { outcome: "listed", count: result.agentCount };
+    },
+    recordListed: (commands, { count, ...rest }) =>
+      commands.recordAgentsListed({ ...rest, agentCount: count }),
+    recordRefused: (commands, args) =>
+      commands.recordAgentsListingRefused(args),
+  });
+}
+
+/**
+ * The `listPeople` intent executor.
+ *
+ * The count it records is what was WRITTEN, not what the provider named: the
+ * service drops anyone on the erasure suppression list before recording, and
+ * this event must not report people this deployment deliberately did not keep.
+ */
+export function createPeopleListingHandler(
+  deps: IngestionPullDispatchDeps,
+): IntentExecutor<IngestionPullListingIntent> {
+  return createListingHandler(deps, {
+    what: "People",
+    list: async (sourceId) => {
+      const result = await deps.peopleListingPort.list({ sourceId });
+      return result.outcome === "refused"
+        ? result
+        : { outcome: "listed", count: result.personCount };
+    },
+    recordListed: (commands, { count, ...rest }) =>
+      commands.recordPeopleListed({ ...rest, personCount: count }),
+    recordRefused: (commands, args) =>
+      commands.recordPeopleListingRefused(args),
+  });
 }

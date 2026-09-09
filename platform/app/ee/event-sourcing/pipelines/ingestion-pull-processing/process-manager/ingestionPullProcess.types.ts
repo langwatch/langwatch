@@ -14,6 +14,8 @@ export const INGESTION_PULL_PROCESS_INTENT_TYPES = {
   RUN: "run",
   /** List the source's agents once, for one request. */
   LIST_AGENTS: "listAgents",
+  /** List the source's people once, for one request. */
+  LIST_PEOPLE: "listPeople",
 } as const;
 
 export const ingestionPullRunIntentSchema = z.object({
@@ -32,14 +34,18 @@ export type IngestionPullRunIntent = z.infer<
  * no organization id — the executor's port resolves that from the source, the
  * same way the pull's port does, which keeps tenancy out of the process state
  * and out of the content boundary.
+ *
+ * ONE schema for both listings. Which list was asked for is the intent's own
+ * type, so putting it in the payload as well would be a second place to keep
+ * it, and a second place for the two to disagree.
  */
-export const ingestionPullAgentListingIntentSchema = z.object({
+export const ingestionPullListingIntentSchema = z.object({
   sourceId: z.string(),
   requestId: z.string(),
   requestedAt: z.number(),
 });
-export type IngestionPullAgentListingIntent = z.infer<
-  typeof ingestionPullAgentListingIntentSchema
+export type IngestionPullListingIntent = z.infer<
+  typeof ingestionPullListingIntentSchema
 >;
 
 /** The intents this process may emit; typed so handlers get `ctx.intents.run`. */
@@ -48,7 +54,10 @@ export type IngestionPullIntents = {
     typeof ingestionPullRunIntentSchema
   >;
   [INGESTION_PULL_PROCESS_INTENT_TYPES.LIST_AGENTS]: IntentSpec<
-    typeof ingestionPullAgentListingIntentSchema
+    typeof ingestionPullListingIntentSchema
+  >;
+  [INGESTION_PULL_PROCESS_INTENT_TYPES.LIST_PEOPLE]: IntentSpec<
+    typeof ingestionPullListingIntentSchema
   >;
 };
 
@@ -70,6 +79,15 @@ export interface IngestionPullProcessState {
    * handlers read it as optional.
    */
   currentAgentsListing?: {
+    requestId: string;
+    startedAt: number;
+  } | null;
+  /**
+   * The people listing in flight, if any. Tracked SEPARATELY from the agent
+   * one rather than sharing a slot: the two ask different providers different
+   * questions, and one in flight is no reason to refuse the other.
+   */
+  currentPeopleListing?: {
     requestId: string;
     startedAt: number;
   } | null;

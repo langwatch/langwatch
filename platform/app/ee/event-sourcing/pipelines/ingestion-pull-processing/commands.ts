@@ -10,6 +10,9 @@ import {
   ingestionPullAgentsListingRequestedEventDataSchema,
   ingestionPullConfiguredCommandDataSchema,
   ingestionPullDisabledEventDataSchema,
+  ingestionPullPeopleListedEventDataSchema,
+  ingestionPullPeopleListingRefusedEventDataSchema,
+  ingestionPullPeopleListingRequestedEventDataSchema,
   ingestionPullRunCompletedEventDataSchema,
   ingestionPullRunFailedEventDataSchema,
 } from "./schemas/events";
@@ -174,5 +177,81 @@ export const RecordIngestionPullAgentsListingRefusedCommand = defineCommand({
     identity({
       sourceId: data.sourceId,
       suffix: `${data.requestId}:agents_refused`,
+    }),
+});
+
+export const RequestIngestionPullPeopleListingCommand = defineCommand({
+  commandType: INGESTION_PULL_COMMAND_TYPES.REQUEST_PEOPLE_LISTING,
+  eventType: INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REQUESTED,
+  eventVersion: INGESTION_PULL_EVENT_VERSIONS.PEOPLE_LISTING_REQUESTED,
+  aggregateType: "ingestion_pull",
+  schema: ingestionPullPeopleListingRequestedEventDataSchema,
+  aggregateId: (data) => data.sourceId,
+  idempotencyKey: (data) =>
+    identity({
+      sourceId: data.sourceId,
+      suffix: `${data.requestId}:people_requested`,
+    }),
+  spanAttributes: (data) => ({
+    "payload.source_id": data.sourceId,
+    "payload.request_id": data.requestId,
+  }),
+  makeJobId: (data) =>
+    identity({
+      sourceId: data.sourceId,
+      suffix: `${data.requestId}:people_requested`,
+    }),
+});
+
+export const RecordIngestionPullPeopleListedCommand = defineCommand({
+  commandType: INGESTION_PULL_COMMAND_TYPES.RECORD_PEOPLE_LISTED,
+  eventType: INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTED,
+  eventVersion: INGESTION_PULL_EVENT_VERSIONS.PEOPLE_LISTED,
+  aggregateType: "ingestion_pull",
+  schema: ingestionPullPeopleListedEventDataSchema,
+  aggregateId: (data) => data.sourceId,
+  idempotencyKey: (data) =>
+    identity({
+      sourceId: data.sourceId,
+      suffix: `${data.requestId}:people_listed`,
+    }),
+  // A count, never a name. The people themselves are rows in the identity
+  // tables behind the erasure machinery; a span is neither erasable nor
+  // scoped, so nothing about a person may travel on one.
+  spanAttributes: (data) => ({
+    "payload.source_id": data.sourceId,
+    "payload.request_id": data.requestId,
+    "payload.person_count": data.personCount,
+  }),
+  makeJobId: (data) =>
+    identity({
+      sourceId: data.sourceId,
+      suffix: `${data.requestId}:people_listed`,
+    }),
+});
+
+export const RecordIngestionPullPeopleListingRefusedCommand = defineCommand({
+  commandType: INGESTION_PULL_COMMAND_TYPES.RECORD_PEOPLE_LISTING_REFUSED,
+  eventType: INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REFUSED,
+  eventVersion: INGESTION_PULL_EVENT_VERSIONS.PEOPLE_LISTING_REFUSED,
+  aggregateType: "ingestion_pull",
+  schema: ingestionPullPeopleListingRefusedEventDataSchema,
+  aggregateId: (data) => data.sourceId,
+  idempotencyKey: (data) =>
+    identity({
+      sourceId: data.sourceId,
+      suffix: `${data.requestId}:people_refused`,
+    }),
+  // The reason is a fixed code and the status a number, so neither can carry
+  // a provider body into a span the way an error message would.
+  spanAttributes: (data) => ({
+    "payload.source_id": data.sourceId,
+    "payload.request_id": data.requestId,
+    "payload.reason": data.reason,
+  }),
+  makeJobId: (data) =>
+    identity({
+      sourceId: data.sourceId,
+      suffix: `${data.requestId}:people_refused`,
     }),
 });

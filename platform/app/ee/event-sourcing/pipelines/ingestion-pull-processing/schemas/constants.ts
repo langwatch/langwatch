@@ -14,6 +14,19 @@ export const INGESTION_PULL_EVENT_TYPES = {
   AGENTS_LISTING_REQUESTED: "lw.obs.ingestion_pull.agents_listing_requested",
   AGENTS_LISTED: "lw.obs.ingestion_pull.agents_listed",
   AGENTS_LISTING_REFUSED: "lw.obs.ingestion_pull.agents_listing_refused",
+  /**
+   * The same three, for the people a source's provider lists.
+   *
+   * Their own event types rather than one listing event with an entity field.
+   * A reader asking "when did we last learn who works here" should not have to
+   * filter a mixed stream, and the two lists refuse for different reasons at
+   * different times: a credential can be entitled to enumerate agents and not
+   * people, which is one event saying refused and another saying listed on the
+   * same source in the same minute.
+   */
+  PEOPLE_LISTING_REQUESTED: "lw.obs.ingestion_pull.people_listing_requested",
+  PEOPLE_LISTED: "lw.obs.ingestion_pull.people_listed",
+  PEOPLE_LISTING_REFUSED: "lw.obs.ingestion_pull.people_listing_refused",
 } as const;
 
 export const INGESTION_PULL_PROCESSING_EVENT_TYPES = [
@@ -24,6 +37,9 @@ export const INGESTION_PULL_PROCESSING_EVENT_TYPES = [
   INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REQUESTED,
   INGESTION_PULL_EVENT_TYPES.AGENTS_LISTED,
   INGESTION_PULL_EVENT_TYPES.AGENTS_LISTING_REFUSED,
+  INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REQUESTED,
+  INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTED,
+  INGESTION_PULL_EVENT_TYPES.PEOPLE_LISTING_REFUSED,
 ] as const;
 
 export type IngestionPullProcessingEventType =
@@ -38,6 +54,10 @@ export const INGESTION_PULL_COMMAND_TYPES = {
   RECORD_AGENTS_LISTED: "lw.obs.ingestion_pull.record_agents_listed",
   RECORD_AGENTS_LISTING_REFUSED:
     "lw.obs.ingestion_pull.record_agents_listing_refused",
+  REQUEST_PEOPLE_LISTING: "lw.obs.ingestion_pull.request_people_listing",
+  RECORD_PEOPLE_LISTED: "lw.obs.ingestion_pull.record_people_listed",
+  RECORD_PEOPLE_LISTING_REFUSED:
+    "lw.obs.ingestion_pull.record_people_listing_refused",
 } as const;
 
 export const INGESTION_PULL_PROCESSING_COMMAND_TYPES = [
@@ -48,6 +68,9 @@ export const INGESTION_PULL_PROCESSING_COMMAND_TYPES = [
   INGESTION_PULL_COMMAND_TYPES.REQUEST_AGENTS_LISTING,
   INGESTION_PULL_COMMAND_TYPES.RECORD_AGENTS_LISTED,
   INGESTION_PULL_COMMAND_TYPES.RECORD_AGENTS_LISTING_REFUSED,
+  INGESTION_PULL_COMMAND_TYPES.REQUEST_PEOPLE_LISTING,
+  INGESTION_PULL_COMMAND_TYPES.RECORD_PEOPLE_LISTED,
+  INGESTION_PULL_COMMAND_TYPES.RECORD_PEOPLE_LISTING_REFUSED,
 ] as const;
 
 export type IngestionPullProcessingCommandType =
@@ -62,6 +85,9 @@ export const INGESTION_PULL_EVENT_VERSIONS = {
   AGENTS_LISTING_REQUESTED: "2026-09-09",
   AGENTS_LISTED: "2026-09-09",
   AGENTS_LISTING_REFUSED: "2026-09-09",
+  PEOPLE_LISTING_REQUESTED: "2026-09-09",
+  PEOPLE_LISTED: "2026-09-09",
+  PEOPLE_LISTING_REFUSED: "2026-09-09",
 } as const;
 
 /**
@@ -85,8 +111,11 @@ export type IngestionPullRunOutcome =
 /**
  * The refusal reason for a listing that never reached the provider — our own
  * side gave out, after retries. Kept apart from the provider's own reasons
- * (`AgentListingRefusalReason`) so a reader can tell "your credential was
- * rejected" from "we could not ask", and so a later read surface does not
- * offer an admin a fix for a problem they do not have.
+ * (`ListingRefusalReason`) so a reader can tell "your credential was rejected"
+ * from "we could not ask", and so a later read surface does not offer an admin
+ * a fix for a problem they do not have.
+ *
+ * One value for both listings: what failed is our side, which knows nothing
+ * about whether it was asking for agents or for people.
  */
-export const AGENT_LISTING_FAILED_REASON = "listing_failed";
+export const LISTING_FAILED_REASON = "listing_failed";

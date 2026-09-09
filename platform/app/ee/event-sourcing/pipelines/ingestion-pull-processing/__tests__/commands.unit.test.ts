@@ -5,8 +5,11 @@ import {
   ConfigureIngestionPullCommand,
   RecordIngestionPullAgentsListedCommand,
   RecordIngestionPullAgentsListingRefusedCommand,
+  RecordIngestionPullPeopleListedCommand,
+  RecordIngestionPullPeopleListingRefusedCommand,
   RecordIngestionPullRunCompletedCommand,
   RequestIngestionPullAgentsListingCommand,
+  RequestIngestionPullPeopleListingCommand,
 } from "../commands";
 
 const baseData = {
@@ -168,6 +171,125 @@ describe("agent listing commands", () => {
     it("accepts a refusal that came without an HTTP status", () => {
       const result =
         RecordIngestionPullAgentsListingRefusedCommand.schema.validate({
+          ...envelope,
+          reason: "unreachable",
+          status: null,
+        });
+
+      expect(result.success).toBe(true);
+    });
+  });
+});
+
+describe("the people listing commands", () => {
+  const envelope = {
+    tenantId: "gov-project",
+    occurredAt: Date.parse("2026-09-09T10:00:00Z"),
+    sourceId: "source-1",
+    requestId: "req-1",
+    requestedAt: Date.parse("2026-09-09T09:59:00Z"),
+  };
+
+  /** Runs the command the way the runtime does, and returns its one event. */
+  const emit = (command: unknown, data: Record<string, unknown>): Event => {
+    const Command = command as new () => {
+      handle(c: { tenantId: string; data: Record<string, unknown> }): Event[];
+    };
+    return new Command().handle({ tenantId: "gov-project", data })[0] as Event;
+  };
+
+  describe("the request that starts a listing", () => {
+    it("commits to the pull aggregate, so one source is one ordered stream", () => {
+      const event = emit(RequestIngestionPullPeopleListingCommand, {
+        ...envelope,
+      });
+
+      expect(event.aggregateType).toBe("ingestion_pull");
+      expect(event.aggregateId).toBe("source-1");
+    });
+
+    it("settles a redelivery of one press onto the same event", () => {
+      const key = (requestId: string) =>
+        emit(RequestIngestionPullPeopleListingCommand, {
+          ...envelope,
+          requestId,
+        }).idempotencyKey;
+
+      expect(key("req-1")).toBe(key("req-1"));
+      expect(key("req-1")).not.toBe(key("req-2"));
+    });
+
+    /**
+     * The two listings share an aggregate and can share a request id. If they
+     * also shared an idempotency key, asking for people right after asking for
+     * agents would silently settle onto the agent request and never run.
+     */
+    it("cannot collide with an agent request carrying the same id", () => {
+      const people = emit(RequestIngestionPullPeopleListingCommand, {
+        ...envelope,
+      }).idempotencyKey;
+      const agents = emit(RequestIngestionPullAgentsListingCommand, {
+        ...envelope,
+      }).idempotencyKey;
+
+      expect(people).not.toBe(agents);
+    });
+  });
+
+  describe("the two outcomes", () => {
+    it("cannot collide with each other", () => {
+      const listed = emit(RecordIngestionPullPeopleListedCommand, {
+        ...envelope,
+        personCount: 0,
+      }).idempotencyKey;
+      const refused = emit(RecordIngestionPullPeopleListingRefusedCommand, {
+        ...envelope,
+        reason: "unauthorized",
+        status: 403,
+      }).idempotencyKey;
+
+      expect(listed).not.toBe(refused);
+      expect(listed).toContain("req-1");
+      expect(refused).toContain("req-1");
+    });
+
+    it("cannot collide with the agent outcomes on the same request", () => {
+      const people = emit(RecordIngestionPullPeopleListedCommand, {
+        ...envelope,
+        personCount: 1,
+      }).idempotencyKey;
+      const agents = emit(RecordIngestionPullAgentsListedCommand, {
+        ...envelope,
+        agentCount: 1,
+      }).idempotencyKey;
+
+      expect(people).not.toBe(agents);
+    });
+
+    it("accepts a zero count, because an empty answer is still an answer", () => {
+      const result = RecordIngestionPullPeopleListedCommand.schema.validate({
+        ...envelope,
+        personCount: 0,
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.data).toMatchObject({ personCount: 0 });
+    });
+
+    it("refuses a listing with no reason at all", () => {
+      const result =
+        RecordIngestionPullPeopleListingRefusedCommand.schema.validate({
+          ...envelope,
+          reason: "",
+          status: null,
+        });
+
+      expect(result.success).toBe(false);
+    });
+
+    it("accepts a refusal that came without an HTTP status", () => {
+      const result =
+        RecordIngestionPullPeopleListingRefusedCommand.schema.validate({
           ...envelope,
           reason: "unreachable",
           status: null,

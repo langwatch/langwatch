@@ -57,7 +57,7 @@ describe("agent listing outcomes", () => {
 
     it("carries no agents to read, so a caller cannot count them as zero", () => {
       const refused = agentsRefused({ reason: "unauthorized", status: 403 });
-      expect(refused).not.toHaveProperty("agents");
+      expect(refused).not.toHaveProperty("items");
     });
   });
 
@@ -116,7 +116,7 @@ describe("listCopilotAgents", () => {
         signal: undefined,
       });
 
-      expect(listing).toEqual({ outcome: "empty", agents: [] });
+      expect(listing).toEqual({ outcome: "empty", items: [] });
     });
   });
 
@@ -146,7 +146,7 @@ describe("listCopilotAgents", () => {
 
       expect(listing).toEqual({
         outcome: "listed",
-        agents: [
+        items: [
           {
             // Verbatim, not folded: the folded form is a join key, not an id.
             rawAgentId: "BOT-1",
@@ -229,7 +229,7 @@ describe("listGenieAgents", () => {
 
       const listing = await listGenieAgents({ workspaceUrl, token: "t" });
 
-      expect(listing).toEqual({ outcome: "empty", agents: [] });
+      expect(listing).toEqual({ outcome: "empty", items: [] });
     });
   });
 
@@ -258,7 +258,7 @@ describe("listGenieAgents", () => {
 
       expect(listing).toEqual({
         outcome: "listed",
-        agents: [
+        items: [
           {
             rawAgentId: "s1",
             displayText: "Revenue Analyst",

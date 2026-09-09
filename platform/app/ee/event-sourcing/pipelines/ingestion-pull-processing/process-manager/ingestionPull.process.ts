@@ -68,6 +68,7 @@ export const INITIAL_INGESTION_PULL_STATE: IngestionPullProcessState = {
   cursor: null,
   currentRun: null,
   currentAgentsListing: null,
+  currentPeopleListing: null,
 };
 
 type Ctx = ProcessHandlerContext<IngestionPullIntents>;
@@ -140,6 +141,7 @@ export const handlePullDisabled: EventHandler<
       cron: null,
       currentRun: null,
       currentAgentsListing: null,
+      currentPeopleListing: null,
     },
     nextWakeAt: null,
     intents: [],
@@ -183,6 +185,13 @@ export const handlePullRunFailed: EventHandler<
 };
 
 /**
+ * Which listing a handler owns. The two are tracked in separate slots because
+ * one in flight is no reason to refuse the other: they ask different providers
+ * different questions.
+ */
+type ListingSlot = "currentAgentsListing" | "currentPeopleListing";
+
+/**
  * Clears the listing this event is about, and leaves a listing it is not
  * about alone. Mirrors the `currentRun` guard: a late outcome from a
  * superseded request must not cancel the one actually in flight.
@@ -190,95 +199,134 @@ export const handlePullRunFailed: EventHandler<
 function clearListing({
   state,
   requestId,
+  slot,
 }: {
   state: IngestionPullProcessState;
   requestId: string | null;
+  slot: ListingSlot;
 }): IngestionPullProcessState {
-  const isCurrent =
-    requestId !== null && state.currentAgentsListing?.requestId === requestId;
-  return {
-    ...state,
-    currentAgentsListing: isCurrent ? null : state.currentAgentsListing,
-  };
+  const isCurrent = requestId !== null && state[slot]?.requestId === requestId;
+  return { ...state, [slot]: isCurrent ? null : state[slot] };
 }
 
 /**
  * Turns one ask into one dispatched listing.
  *
- * Every arm settles through `settle`, so asking a source about its agents
- * never disturbs the pull schedule it is already keeping. That is the whole
- * reason this is not `handlePullConfigured`: that one settles the source to
- * its next cron tick, and an admin pressing a button is asking for now.
+ * Every arm settles through `settle`, so asking a source what it knows never
+ * disturbs the pull schedule it is already keeping. That is the whole reason
+ * this is not `handlePullConfigured`: that one settles the source to its next
+ * cron tick, and an admin pressing a button is asking for now.
+ *
+ * One body for both lists. The rules it encodes — degrade on a missing
+ * request id, drop a second ask while one is in flight, key the intent on the
+ * request — are the same rules, and a second copy is a second chance for one
+ * of them to be forgotten in a way that costs a source its next pull.
  */
-export const handleAgentsListingRequested: EventHandler<
-  IngestionPullProcessState,
-  unknown,
-  IngestionPullIntents
-> = (state, payload, ctx) => {
-  const view = ingestionPullProcessEventViewSchema.parse(payload);
-  // Degrade rather than throw, like the configured handler: evolve re-runs a
-  // committed event on every retry, so a malformed one would poison the
-  // subscriber forever.
-  if (view.requestId === null) {
-    return settle({ state, after: schedulingRef(ctx) });
-  }
+function listingRequestedHandler({
+  slot,
+  dispatch,
+}: {
+  slot: ListingSlot;
+  dispatch: (
+    ctx: Ctx,
+    args: { sourceId: string; requestId: string },
+  ) => ProcessIntent;
+}): EventHandler<IngestionPullProcessState, unknown, IngestionPullIntents> {
+  return (state, payload, ctx) => {
+    const view = ingestionPullProcessEventViewSchema.parse(payload);
+    // Degrade rather than throw, like the configured handler: evolve re-runs a
+    // committed event on every retry, so a malformed one would poison the
+    // subscriber forever.
+    if (view.requestId === null) {
+      return settle({ state, after: schedulingRef(ctx) });
+    }
 
-  const inFlight = state.currentAgentsListing;
-  const busy =
-    inFlight != null &&
-    inFlight.requestId !== view.requestId &&
-    ctx.now - inFlight.startedAt < INGESTION_PULL_STALE_LISTING_MS;
-  if (busy) {
-    return settle({ state, after: schedulingRef(ctx) });
-  }
+    const inFlight = state[slot];
+    const busy =
+      inFlight != null &&
+      inFlight.requestId !== view.requestId &&
+      ctx.now - inFlight.startedAt < INGESTION_PULL_STALE_LISTING_MS;
+    if (busy) {
+      return settle({ state, after: schedulingRef(ctx) });
+    }
 
-  return settle({
-    state: {
-      ...state,
-      sourceId: view.sourceId,
-      currentAgentsListing: { requestId: view.requestId, startedAt: ctx.now },
-    },
-    after: schedulingRef(ctx),
+    return settle({
+      state: {
+        ...state,
+        sourceId: view.sourceId,
+        [slot]: { requestId: view.requestId, startedAt: ctx.now },
+      },
+      after: schedulingRef(ctx),
+      intents: [
+        dispatch(ctx, {
+          sourceId: view.sourceId,
+          requestId: view.requestId,
+        }),
+      ],
+    });
+  };
+}
+
+/**
+ * Frees the slot once a listing is over, however it ended.
+ *
+ * A refusal frees the source for another attempt exactly like a success does,
+ * and both leave the pull schedule untouched: a provider declining to list
+ * says nothing about whether it will serve the rows the pull reads. The count
+ * lives in the event, not here — the process needs to know only that the
+ * request is over.
+ */
+function listingSettledHandler({
+  slot,
+}: {
+  slot: ListingSlot;
+}): EventHandler<IngestionPullProcessState, unknown, IngestionPullIntents> {
+  return (state, payload, ctx) => {
+    const view = ingestionPullProcessEventViewSchema.parse(payload);
+    return settle({
+      state: clearListing({ state, requestId: view.requestId, slot }),
+      after: schedulingRef(ctx),
+    });
+  };
+}
+
+export const handleAgentsListingRequested = listingRequestedHandler({
+  slot: "currentAgentsListing",
+  dispatch: (ctx, { sourceId, requestId }) =>
     // Keyed on the request, so a redelivery of this event dispatches the same
     // intent rather than a second one.
-    intents: [
-      ctx.intents.listAgents(`agents:${view.requestId}`, {
-        sourceId: view.sourceId,
-        requestId: view.requestId,
-        requestedAt: ctx.at,
-      }),
-    ],
-  });
-};
+    ctx.intents.listAgents(`agents:${requestId}`, {
+      sourceId,
+      requestId,
+      requestedAt: ctx.at,
+    }),
+});
 
-export const handleAgentsListed: EventHandler<
-  IngestionPullProcessState,
-  unknown,
-  IngestionPullIntents
-> = (state, payload, ctx) => {
-  const view = ingestionPullProcessEventViewSchema.parse(payload);
-  // The count lives in the event, not here: the process needs to know only
-  // that the request is over. What the provider said is a fact for readers.
-  return settle({
-    state: clearListing({ state, requestId: view.requestId }),
-    after: schedulingRef(ctx),
-  });
-};
+export const handleAgentsListed = listingSettledHandler({
+  slot: "currentAgentsListing",
+});
 
-export const handleAgentsListingRefused: EventHandler<
-  IngestionPullProcessState,
-  unknown,
-  IngestionPullIntents
-> = (state, payload, ctx) => {
-  const view = ingestionPullProcessEventViewSchema.parse(payload);
-  // A refusal frees the source for another attempt exactly like a success
-  // does, and leaves the pull schedule untouched: a provider declining to
-  // list its agents says nothing about whether it will serve transcripts.
-  return settle({
-    state: clearListing({ state, requestId: view.requestId }),
-    after: schedulingRef(ctx),
-  });
-};
+export const handleAgentsListingRefused = listingSettledHandler({
+  slot: "currentAgentsListing",
+});
+
+export const handlePeopleListingRequested = listingRequestedHandler({
+  slot: "currentPeopleListing",
+  dispatch: (ctx, { sourceId, requestId }) =>
+    ctx.intents.listPeople(`people:${requestId}`, {
+      sourceId,
+      requestId,
+      requestedAt: ctx.at,
+    }),
+});
+
+export const handlePeopleListed = listingSettledHandler({
+  slot: "currentPeopleListing",
+});
+
+export const handlePeopleListingRefused = listingSettledHandler({
+  slot: "currentPeopleListing",
+});
 
 export const ingestionPullWake: WakeHandler<
   IngestionPullProcessState,
