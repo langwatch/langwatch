@@ -58,6 +58,9 @@ vi.mock(
     }),
     identityEmail: () => ({ resolveEmail: async () => null }),
     identityService: () => ({}),
+    signInLinkEvidence: () => ({
+      refusalForLink: async () => null,
+    }),
     identityGuards: () => ({}),
     identityProjectionStore: () => ({}),
     twoStepAccount: () => ({}),
