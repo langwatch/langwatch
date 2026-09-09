@@ -98,6 +98,7 @@ import { useActivePlan } from "~/hooks/useActivePlan";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { SAMPLE_INGESTION_SOURCES } from "../components/sampleIngestionSources";
+import { SOURCE_HEALTH_REFRESH } from "../logic/sourceHealthDisplay";
 import {
   type DestinationContext,
   type Source,
@@ -528,7 +529,7 @@ function useInventoryPanes({
     { organizationId: orgId },
     {
       enabled: !!orgId && canRead && canReadActivity,
-      refetchOnWindowFocus: false,
+      ...SOURCE_HEALTH_REFRESH,
       retry: false,
     },
   );
@@ -595,7 +596,7 @@ function useIngestionSourcesPage() {
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId && canRead, refetchOnWindowFocus: false },
+    { enabled: !!orgId && canRead, ...SOURCE_HEALTH_REFRESH },
   );
 
   const panes = useInventoryPanes({

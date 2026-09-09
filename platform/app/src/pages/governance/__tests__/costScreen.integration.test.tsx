@@ -187,6 +187,45 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe("the governance cost screen", () => {
+  /** @scenario "A cost-only viewer sees provider costs inside the billed card" */
+  it("shows provider bars in the billed card without people or activity permissions", () => {
+    harness.permissions = ["governanceCost:view", "organization:view"];
+    harness.query.data = summaryFixture({
+      providers: [
+        { provider: "openai_admin", amountUsd: 100, cellsWithoutAmount: 0 },
+        {
+          provider: "anthropic_admin",
+          amountUsd: 23.45,
+          cellsWithoutAmount: 0,
+        },
+      ],
+    });
+    renderScreen();
+    const card = within(screen.getByTestId("cost-lane-billed"));
+    expect(card.getByText("$123.45")).toBeInTheDocument();
+    expect(card.getByText("OpenAI")).toBeInTheDocument();
+    expect(card.getByText("Anthropic")).toBeInTheDocument();
+    expect(card.getByText("$100.00")).toBeInTheDocument();
+    expect(card.getByText("$23.45")).toBeInTheDocument();
+    expect(card.queryByText("$67.89")).not.toBeInTheDocument();
+  });
+
+  /** @scenario "Missing provider prices are not displayed as zero" */
+  it("shows an unavailable provider amount and preserves a refund", () => {
+    harness.query.data = summaryFixture({
+      providers: [
+        { provider: "openai_admin", amountUsd: null, cellsWithoutAmount: 1 },
+        { provider: "anthropic_admin", amountUsd: -2, cellsWithoutAmount: 0 },
+      ],
+    });
+    renderScreen();
+    const card = within(screen.getByTestId("cost-lane-billed"));
+    expect(card.getByText("OpenAI")).toBeInTheDocument();
+    expect(card.getByText("USD amount unavailable")).toBeInTheDocument();
+    expect(card.getByText("-$2.00")).toBeInTheDocument();
+    expect(card.queryByText("$0.00")).not.toBeInTheDocument();
+  });
+
   describe("given an admin with Costs enabled", () => {
     /** @scenario "The unfinished Billed address stays unavailable when Costs is enabled" */
     it("shows not found at the unfinished Billed address", () => {

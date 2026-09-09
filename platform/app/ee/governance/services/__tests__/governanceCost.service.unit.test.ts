@@ -112,6 +112,16 @@ function rollupReturning({
 } = {}) {
   return {
     sumDaysByLane: vi.fn().mockResolvedValue(rows),
+    sumWindowByProvider: vi.fn().mockResolvedValue(
+      rows
+        .filter((row) => row.costSource === "pulled")
+        .map((row) => ({
+          provider: "openai_admin",
+          amountNanoUsd: row.amountNanoUsd,
+          cellsWithoutAmount: row.cellsWithoutAmount,
+          currenciesWithoutUsdAmount: row.currenciesWithoutUsdAmount,
+        })),
+    ),
     hasRowsForSource: vi.fn().mockResolvedValue(hasSourceRows),
   } as unknown as GovernanceCostRollupClickHouseRepository;
 }
@@ -138,6 +148,70 @@ function laneRow(
 const NANO = 1_000_000_000;
 
 describe("GovernanceCostService.summary", () => {
+  it("keeps the billed headline and provider costs on the same read during ingestion", async () => {
+    const costRollup = rollupReturning({
+      rows: [laneRow({ costSource: "pulled", amountNanoUsd: 100 * NANO })],
+    });
+    Object.assign(costRollup, {
+      sumWindowByProvider: vi.fn().mockResolvedValue([
+        {
+          provider: "openai_admin",
+          amountNanoUsd: 101 * NANO,
+          cellsWithoutAmount: 0,
+          currenciesWithoutUsdAmount: [],
+        },
+      ]),
+    });
+    const result = await createService({
+      prisma: prismaWithGovProject("gov-1"),
+      costRollup,
+    }).summary({ organizationId: "org-1", windowDays: 7 });
+    expect(result.billed.amountUsd).toBe(101);
+    expect(result.providers[0]?.amountUsd).toBe(result.billed.amountUsd);
+  });
+  it("reads provider amounts for the same tenant and window and withholds incomplete USD", async () => {
+    const costRollup = rollupReturning();
+    const readProviders = vi.fn().mockResolvedValue([
+      {
+        provider: "openai_admin",
+        amountNanoUsd: 3 * NANO,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+      },
+      {
+        provider: "anthropic_admin",
+        amountNanoUsd: 9 * NANO,
+        cellsWithoutAmount: 1,
+        currenciesWithoutUsdAmount: ["EUR"],
+      },
+      {
+        provider: "copilot_studio",
+        amountNanoUsd: -2 * NANO,
+        cellsWithoutAmount: 0,
+        currenciesWithoutUsdAmount: [],
+      },
+    ]);
+    Object.assign(costRollup, { sumWindowByProvider: readProviders });
+    const service = createService({
+      prisma: prismaWithGovProject("gov-1"),
+      costRollup,
+    });
+    const result = await service.summary({
+      organizationId: "org-1",
+      windowDays: 7,
+      now: new Date("2026-08-07T12:00:00Z"),
+    });
+    expect(readProviders).toHaveBeenCalledWith({
+      tenantId: "gov-1",
+      fromDay: "2026-08-01",
+      toDay: "2026-08-07",
+    });
+    expect(result.providers).toEqual([
+      { provider: "openai_admin", amountUsd: 3, cellsWithoutAmount: 0 },
+      { provider: "anthropic_admin", amountUsd: null, cellsWithoutAmount: 1 },
+      { provider: "copilot_studio", amountUsd: -2, cellsWithoutAmount: 0 },
+    ]);
+  });
   describe("given a deployment with no cost store", () => {
     describe("when requesting the summary", () => {
       it("reports unavailable with null amounts rather than zeros", async () => {
@@ -624,6 +698,7 @@ describe("GovernanceCostService.summary", () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: {
+            sumWindowByProvider: vi.fn().mockResolvedValue([]),
             sumDaysByLane: vi
               .fn()
               .mockRejectedValue(new Error("cost rollup is down")),

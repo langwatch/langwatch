@@ -171,6 +171,7 @@ describe("the directory read inside the Dataverse source", () => {
   });
 
   describe("when the source reads the directory", () => {
+    /** @scenario "A directory read records a row per person beside the conversations" */
     it("records a directory event per user beside the conversations", async () => {
       const result = await runPull({ readDirectory: true });
 
@@ -185,6 +186,7 @@ describe("the directory read inside the Dataverse source", () => {
       expect(storedDirectoryDay(result.cursor)).toBe(today());
     });
 
+    /** @scenario "The directory read asks only for the fields it records" */
     it("selects only the fields it records, and keeps the token off redirects", async () => {
       await runPull({ readDirectory: true });
       const [call] = usersCalls();
@@ -204,6 +206,7 @@ describe("the directory read inside the Dataverse source", () => {
       expect(usersCalls()).toHaveLength(1);
     });
 
+    /** @scenario "A directory spanning pages is read to the end and counted as one day" */
     it("follows Graph's own next link and records both pages as one day", async () => {
       usersReplies = [
         {
@@ -224,6 +227,7 @@ describe("the directory read inside the Dataverse source", () => {
       expect(storedDirectoryDay(result.cursor)).toBe(today());
     });
 
+    /** @scenario "A directory next-page link off Microsoft Graph is refused and the day held" */
     it("refuses a next link that is not Microsoft Graph, and holds the day", async () => {
       usersReplies = [
         {
@@ -264,6 +268,7 @@ describe("the directory read inside the Dataverse source", () => {
       expect(storedDirectoryDay(result.cursor)).toBeNull();
     });
 
+    /** @scenario "A directory answer that is not a page holds the day rather than emptying the tenant" */
     it("holds a body that is not a page rather than recording an empty tenant", async () => {
       usersReplies = [{ status: 200, body: { error: "oops" } }];
 

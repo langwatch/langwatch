@@ -176,6 +176,35 @@ export class DiscoveredPersonRepository {
     });
   }
 
+  /**
+   * The people behind a batch of provider identifiers, keyed the way a pull
+   * arrives: by the identifier the provider used, not by our own row id.
+   *
+   * Scoped by provider as well as organization because `rawActorId` only means
+   * something relative to the provider that issued it — the same opaque id at
+   * two providers is two people, and `DiscoveredPerson` is unique on the triple
+   * for exactly that reason. An empty list short-circuits so a batch that
+   * proved nobody pays no query.
+   */
+  async findByActorIds(
+    client: Client,
+    params: {
+      organizationId: string;
+      provider: string;
+      rawActorIds: string[];
+    },
+  ): Promise<{ id: string; rawActorId: string }[]> {
+    if (params.rawActorIds.length === 0) return [];
+    return await client.discoveredPerson.findMany({
+      where: {
+        organizationId: params.organizationId,
+        provider: params.provider,
+        rawActorId: { in: params.rawActorIds },
+      },
+      select: { id: true, rawActorId: true },
+    });
+  }
+
   /** The identity screen's read: an organization's people, newest-seen first. */
   listByOrganization(client: Client, params: { organizationId: string }) {
     return client.discoveredPerson.findMany({

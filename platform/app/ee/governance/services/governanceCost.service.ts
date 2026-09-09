@@ -226,6 +226,12 @@ export interface GovernanceCostSummaryDto {
   unavailableReason: GovernanceCostUnavailableReason | null;
   /** What the provider billed, pulled from their own reporting. */
   billed: GovernanceCostLaneDto;
+  /** Pulled rollup costs by provider, regardless of person attribution. */
+  providers: Array<{
+    provider: string;
+    amountUsd: number | null;
+    cellsWithoutAmount: number;
+  }>;
   /** What the gateway metered as it served the traffic. */
   gateway: GovernanceCostLaneDto;
   /**
@@ -306,6 +312,7 @@ function unavailable({
   return {
     unavailableReason: reason,
     billed: laneWithoutFigure(),
+    providers: [],
     gateway: laneWithoutFigure(),
     azureBilling: null,
     seats: { status: "awaiting_data" },
@@ -394,18 +401,32 @@ export class GovernanceCostService {
     // still fails the whole summary: this screen is about money, and a money
     // lane that swallowed its own failure would render an absence as a
     // measurement.
-    const [rows, seats, staleSources, azureBilling, unpricedWindow] =
+    const [rows, seats, staleSources, azureBilling, unpricedWindow, providers] =
       await Promise.all([
         costRollup.sumDaysByLane({ tenantId, fromDay, toDay }),
         this.readSeats({ tenantId }),
         this.readStaleSources({ organizationId }),
         this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
         this.readUnpricedWindow({ organizationId }),
+        costRollup.sumWindowByProvider({ tenantId, fromDay, toDay }),
       ]);
 
     return {
       unavailableReason: null,
-      billed: totalFor(rows, GOVERNANCE_COST_SOURCE.PULLED),
+      // Ingestion can advance between reads. The headline and provider bars
+      // must describe the same snapshot, even while a backfill is writing.
+      billed: {
+        ...spenderFigure(providers),
+        currenciesWithoutUsdAmount: [
+          ...new Set(
+            providers.flatMap((row) => row.currenciesWithoutUsdAmount),
+          ),
+        ].sort(),
+      },
+      providers: providers.map((row) => ({
+        provider: row.provider,
+        ...spenderFigure([row]),
+      })),
       gateway: totalFor(rows, GOVERNANCE_COST_SOURCE.GATEWAY),
       azureBilling,
       seats,
@@ -828,7 +849,9 @@ function spenderKey(provider: string, rawActorId: string): string {
  * total (`figureFor`): any unpriced cell withholds the whole figure, because
  * the priced part alone reads as the complete one.
  */
-function spenderFigure(rows: readonly SpenderGroup[]): {
+function spenderFigure(
+  rows: readonly Pick<SpenderGroup, "amountNanoUsd" | "cellsWithoutAmount">[],
+): {
   amountUsd: number | null;
   cellsWithoutAmount: number;
 } {

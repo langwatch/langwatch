@@ -254,15 +254,69 @@ amortized *billed* money, and ours is a list-rate estimate.
 
 ### §4. One daily rollup, filled by a fold projection, read through a thin service
 
-The screen never talks to providers and never merges numbers itself:
+The screen never talks to providers and never merges numbers itself.
 
-```text
-event_log ── gateway-spend events ──┬─(existing projections)──► gateway_spend / budget ledger  (sibling tables)
-          ├─ pulled-usage events  ──┴─(rollup fold projection)──► governance_cost_rollup_1d ──┐
-          └─ roster count events ─────(seat count projection)───► governance_seat_count_1d ───┤   ← designed only, not built (v3.12)
-                                                                                              ├──► thin cost service ──► screen
-                                                      Postgres (names, seat price list) ──────┘
+> **[DIAGRAM REPLACED — see revision v3.13.]** One ASCII diagram stood here,
+> and three things it drew are not what the code does: seat counts do not come
+> from a projection table (`governance_seat_count_1d` was never built — v3.12),
+> Postgres holds no seat price list (§6's pricing was reversed — v3.11), and it
+> had no lane for source health, which §4a's own implementation note says is
+> derived at read from the same Postgres rows. Replaced by the two below, split
+> because the write path and the read path fail in different ways and a reader
+> is nearly always asking about one of them. The decision above is unchanged.
+
+```mermaid
+flowchart LR
+  P["Provider APIs<br/>(OpenAI, Anthropic, Microsoft,<br/>Databricks, Azure)"]
+  W["Pull run, bounded<br/>page cap, chunk cap,<br/>watermark, settling re-read"]
+  G["AI Gateway<br/>request metering"]
+  EL[("event_log")]
+  FP["GovernanceCostRollupFoldProjection<br/>registered on BOTH money pipelines"]
+  R[("governance_cost_rollup_1d<br/>CostSource: pulled or gateway")]
+  OE[("governance_ocsf_events<br/>audit rows and seat reports")]
+  GS[("gateway_spend and budget ledger<br/>sibling projections")]
+  PG[("Postgres<br/>IngestionSource run history,<br/>DiscoveredPerson")]
+
+  P --> W
+  W -->|"audit event per row"| OE
+  W -->|"priced usage event<br/>(omitted when a read yields no row)"| EL
+  W -->|"run outcome: errorCount,<br/>lastSuccessAt, unpriced window"| PG
+  G --> EL
+  EL --> FP
+  EL --> GS
+  FP --> R
 ```
+
+*Write path: bounded pull runs and gateway metering both append events; one
+fold projection registered on both money pipelines writes one daily rollup.*
+
+```mermaid
+flowchart LR
+  R[("governance_cost_rollup_1d")]
+  OE[("governance_ocsf_events")]
+  PG[("Postgres")]
+  S["GovernanceCostService"]
+  B["Billed card<br/>every provider's own reported total,<br/>summed across the window"]
+  M["Metered card<br/>gateway total"]
+  ST["Seat card<br/>counts only, never money"]
+  N["Notices: sources with failing pulls,<br/>unpriced window, Azure bill note"]
+  SP["Spender breakdown<br/>(provider, rawActorId, agent)"]
+
+  R -->|"sumDaysByLane: CostSource = pulled"| S
+  R -->|"sumDaysByLane: CostSource = gateway"| S
+  R -->|"sumWindowBySpender: pulled lane only"| S
+  OE -->|"findLatestSeatReports"| S
+  PG -->|"run history, then deriveSourceHealth<br/>read-time, never written to status"| S
+  PG -->|"DiscoveredPerson display text"| S
+  S --> B
+  S --> M
+  S --> ST
+  S --> N
+  S --> SP
+```
+
+*Read path: one service, four stores, three lanes that are labeled separately
+and never summed into one figure.*
 
 The rollup projection consumes the **events** (gateway-spend and
 pulled-usage events on the log) — the `gateway_spend` table and the
@@ -1186,7 +1240,7 @@ then.
   becomes journal-backed on a separate infra track; not an ADR
   risk.
 - **Puller success/failure must be recorded per run** — today
-  `assertRunMadeProgress` (`pullerWorker.ts:261-289`) raises but records
+  `assertRunMadeProgress` (`pullerWorker.ts:280-307`) raises but records
   no consecutive-failure count, the error counter has no
   production writer, and no last-successful-pull field exists
   (`lastEventAt` is not pull success), so a silently-failing puller is
@@ -1887,6 +1941,38 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
+- **v3.13 (2026-09-09).** Documentation caught up with the code. No decision is
+  taken, and no decision prose is rewritten — the §4 **diagram** is replaced and
+  a marker above it says what it used to show.
+  - **The §4 diagram is now two mermaid diagrams**, write path and read path,
+    drawn from `governanceCostRollup.foldProjection.ts:501-516` and
+    `governanceCost.service.ts:363-410`. Three things the old diagram drew are
+    not what ships: the seat lane comes from the latest seat-report rows in
+    `governance_ocsf_events` (`governanceCost.service.ts:679-695`), not from
+    `governance_seat_count_1d`, which was never built (v3.12); Postgres holds
+    no seat price list, since §6's pricing was reversed (v3.11); and the
+    diagram had no lane at all for **source health**, which §4a's own
+    implementation note says is derived at read from `IngestionSource` run
+    history (`governanceCost.service.ts:573-609`,
+    `pullers/sourceHealth.ts`) — the notices beside the cards are as much a
+    read of the cost service as the figures are.
+  - **The write path now shows the pull run as bounded.** A run reads a capped
+    number of pages or chunks, advances a watermark and re-reads a settling
+    window (`anthropicAdmin.puller.ts:145-149`,
+    `databricksWarehouseCost.ts:55-115`) rather than crawling a history — the
+    property that makes "a pull that changes nothing still appends an event"
+    affordable, and the one the old single-line diagram left implicit.
+  - **The billed card is named for what it is:** every pulled provider's own
+    reported total, summed across the window
+    (`governanceCost.service.ts:900-914`). §2's connected view, which would
+    have split that total by gateway detail, is still unbuilt — and its input,
+    §7's key-to-bill mapping, was deleted (v3.11). The eight parked
+    key-coverage scenarios in `specs/governance/governance-cost-screen.feature`
+    that described that split were removed in the same pass; the shipped
+    contract they are replaced by is already bound by scenarios elsewhere in
+    that file ("Each lane renders its own labeled total", "A refund-heavy
+    billed day renders negative as reported", "A lane with usage we cannot
+    state in US dollars holds no total").
 - **v3.12 (2026-09-08, captain: Sergio Esteban).** Two internal-consistency
   findings from review, both about wave assignment being readable from the
   document rather than inferred. No design reversal:

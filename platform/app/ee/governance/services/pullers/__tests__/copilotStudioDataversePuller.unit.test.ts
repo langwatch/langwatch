@@ -1314,6 +1314,29 @@ describe("given an Azure bill that does not fit in one reply", () => {
     });
   });
 
+  describe("when the next page field is present but empty", () => {
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it.each([
+      "",
+      "   ",
+    ])("ends the walk on %j and keeps the days it already read", async (nextLink) => {
+      responseQueue.push({
+        status: 200,
+        body: costPage({ day: 20260801, cost: 1.5, nextLink }),
+      });
+
+      const days = await readTheBill();
+
+      // Null here would hold the window and later give it up with the day
+      // below unpriced again, which is what an empty marker used to cost.
+      expect(days?.map((day) => day.day)).toEqual(["2026-08-01"]);
+      expect(costCalls()).toHaveLength(1);
+      expect(errors.join(" ")).not.toContain(
+        "refusing an Azure cost next-page link",
+      );
+    });
+  });
+
   describe("when the next page points somewhere that is not Azure", () => {
     /** @scenario "A next page cannot move the Azure token to another host" */
     it("holds the window rather than report half a bill", async () => {

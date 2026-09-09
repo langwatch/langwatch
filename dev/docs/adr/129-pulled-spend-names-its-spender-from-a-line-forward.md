@@ -78,9 +78,18 @@ only rebuilt by replay.
      `userId` (`:802`), so naming adds no new buckets — only the event's
      actor field changes, under Decision 2's line.
    - **Databricks: surface `executed_by` into the actor payload** for the
-     billing-usage rows that carry it (~80% of spend; the Genie lane is $0
+     statement-history rows that carry it (~80% of spend; the Genie lane is $0
      until 2027-01-31). Restatement keys and buckets stay byte-identical
      (Decision 4); rows without a resolvable single person stay `""`.
+     **[CORRECTED — see revision v3.]** v2 wrote "the billing-usage rows".
+     `executed_by` is a column of **`system.query.history`**, the statement
+     history the warehouse-cost query already reads
+     (`databricksGenie.puller.ts:406`). `system.billing.usage`
+     (`databricksGenie.puller.ts:497`) names no person at all — it is read for
+     hourly DBU quantity per warehouse and SKU, priced through
+     `system.billing.list_prices` (`:519`) — so the money and the name come
+     from two different tables joined by hour and warehouse, which is why an
+     unbilled hour can carry a name and no dollars.
    - **Anthropic: paused.** The admin usage report structurally has no
      person dimension (`anthropicAdmin.puller.ts:751` — deliberately `""`),
      and the compliance feed's actor is a raw **email address**
@@ -131,7 +140,7 @@ only rebuilt by replay.
 |---|---|---|---|
 | Event schema field (defaulted, additive) | Yes | Large (log contract) | Automated: legacy-fixture parse test |
 | Fold cell keying by actor | Yes (code), rows accrue | Large (money display) | Automated: invariant tests above; ships dark behind `release_pulled_usage_cost_enabled` (`registry.ts:165`, FALSE) |
-| Databricks billing query change | Yes | Medium (customer warehouse, read-only) | Automated: adapter unit + key-parity test (Decision 4) |
+| Databricks warehouse-cost query change | Yes | Medium (customer warehouse, read-only) | Automated: adapter unit + key-parity test (Decision 4). The change adds a column to the `system.query.history` leg, not to the `system.billing.usage` aggregate |
 | `PULLED_ACTOR_NAMING_STARTS_AT` value | **No** (wrong value = double count in the gap) | Large | Human review in the release PR: constant ≥ merge date, checked by a named reviewer |
 | Rollup rebuild / migration | — | — | **None. Deliberately: nothing to gate — no migration ships.** |
 
@@ -172,7 +181,7 @@ function actorForPulledDay(opts: {
 
 - Positive: the cost screen answers "who spent this" for OpenAI and most Databricks bills (the #7880 ruling made real); no migration, no rebuild, no rollout risk beyond the dark flag.
 - Negative: history before the line stays nameless **forever** for pre-existing sources — bought deliberately as the twice-guard. Anthropic and Copilot money stays nameless while paused, so per-person totals will not sum to the company total; the gap is exactly those providers and should read as "not assignable to a person", not as a bug.
-- Neutral: rollup row count grows per-actor for post-line days (bounded by provider-reported user counts; `RawActorId` sits last in the sort key so cardinality never widens the prefix — ADR-128 §21). Newly named actors flow into person discovery on the existing pull path (`pullerWorker.ts:534-536`, `syncPeopleFactsFromPull`), so OpenAI user ids start minting discovered-person rows once the flag opens.
+- Neutral: rollup row count grows per-actor for post-line days (bounded by provider-reported user counts; `RawActorId` sits last in the sort key so cardinality never widens the prefix — ADR-128 §21). Newly named actors flow into person discovery on the existing pull path (`pullerWorker.ts:516-519`, `syncPeopleFactsFromPull`), so OpenAI user ids start minting discovered-person rows once the flag opens.
 
 ## Open questions
 
@@ -182,3 +191,4 @@ None blocking. Follow-up (owner: Sergio): whether to surface "named from <date>"
 
 - v1 (2026-09-06) — Initial. Framing + four forks locked by Sergio Esteban (captain). Overruled recommendations recorded: provider scope (all, not two), shared helper (yes, not one-off).
 - v2 (2026-09-06) — Post-red-team rewrite, direction approved by Sergio. Scope narrowed by Sergio's ruling to **OpenAI + Databricks now, Anthropic + Copilot paused** (supersedes v1's "all pullers"; the v1 fork record stands as history). New Decision 4: actor rides the payload, never the key — restatement keys and buckets are byte-identical before and after. Citations corrected against code (OpenAI `userId` dimension `:802`, actor `:848`; `currencyCode` defaults `"USD"`; compliance actor is an email `:50`). Added: pre-event erasure suppression note (Decision 6), person-discovery consequence.
+- v3 (2026-09-09) — Documentation caught up with the code. No decision is taken here. **Correction:** Decision 5 attributed `executed_by` to "the billing-usage rows". It is a column of `system.query.history` (`databricksGenie.puller.ts:406`); `system.billing.usage` (`:497`) carries no person column and is read only for hourly DBU quantity by warehouse and SKU, priced against `system.billing.list_prices` (`:519`). The Gates row naming a "Databricks billing query" is renamed to the warehouse-cost query for the same reason.

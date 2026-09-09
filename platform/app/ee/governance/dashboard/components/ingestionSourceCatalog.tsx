@@ -74,6 +74,9 @@ export interface SourceTypeOption {
   /**
    * True when this source type may no longer be chosen for a new source,
    * but rows already configured on it still exist and must keep rendering.
+   * Covers both a type that was retired and one that was offered before it
+   * worked: either way, choosing it buys an admin a source that stays
+   * silent, so it leaves the picker and keeps its definition.
    *
    * Deprecating rather than deleting is deliberate. The completeness guard
    * below requires every `SourceType` to appear here, and `SOURCE_TYPE_LABEL`
@@ -143,9 +146,13 @@ export const SOURCE_TYPE_OPTIONS = [
     value: "openai_compliance",
     label: "OpenAI Enterprise Compliance",
     mode: "s3",
-    blurb:
-      "Pulls compliance JSONL drops from an S3 bucket OpenAI writes to (Enterprise Compliance API).",
+    blurb: "Not available. Choosing this source would never deliver any data.",
     icon: <OpenAI />,
+    // Offered before the path behind it was finished, so an admin who picked
+    // it got a source that stayed silent. Kept rather than deleted for the
+    // same reason as the Copilot entry above: the completeness guard below
+    // and `SOURCE_TYPE_LABEL` both need it.
+    deprecated: true,
   },
   {
     value: "openai_admin",
@@ -159,8 +166,14 @@ export const SOURCE_TYPE_OPTIONS = [
     value: "claude_compliance",
     label: "Anthropic Claude Enterprise Compliance",
     mode: "pull",
-    blurb: "Polls Anthropic's compliance API with a workspace API key.",
+    blurb: "Not available. Choosing this source would never deliver any data.",
     icon: <Anthropic />,
+    // Same shape as the OpenAI entry above, with a known mechanism (#7583):
+    // the form collects a workspace API key that no pull-config builder ever
+    // puts where the adapter reads it, so every run authenticates with an
+    // unresolved template. Hiding it stops new sources being configured on
+    // that path; rows already on it are untouched.
+    deprecated: true,
   },
   {
     value: "anthropic_admin",

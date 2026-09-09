@@ -21,7 +21,6 @@ import {
   useMemo,
   useState,
 } from "react";
-
 import {
   CostLanePanel,
   SeatLanePanel,
@@ -48,6 +47,7 @@ import {
   CostPanelEmpty,
   costPanelEmpty,
 } from "~/components/governance/costs/CostPanelEmpty";
+import { CostProviderBreakdown } from "~/components/governance/costs/CostProviderBreakdown";
 import {
   CostSpenderError,
   CostSpenderList,
@@ -560,9 +560,8 @@ function CostLanes({
   interval: TimeInterval;
   sample: boolean;
 }) {
-  // Both lanes' shapes come off the one series the totals above them were
-  // summed from, so a card's sparkline and its figure cannot describe
-  // different money.
+  // Trends use daily rollup totals; provider bars and the billed headline
+  // share their own window read so ongoing ingestion cannot split them.
   const seriesOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
     data.series.map((day) => ({ day: day.day, value: pick(day) }));
   const trendOf = (pick: (day: GovernanceCostDayDto) => number | null) =>
@@ -583,7 +582,7 @@ function CostLanes({
         <CostLanePanel
           testId="cost-lane-billed"
           label="Billed by provider"
-          description="What your providers report they will invoice."
+          description="Provider-reported costs recorded for this period."
           amountUsd={data.billed.amountUsd}
           cellsWithoutAmount={data.billed.cellsWithoutAmount}
           currenciesWithoutUsdAmount={data.billed.currenciesWithoutUsdAmount}
@@ -596,7 +595,9 @@ function CostLanes({
           trendPct={trendPctOf((day) => day.billedUsd)}
           interval={interval}
           sample={sample}
-        />
+        >
+          <CostProviderBreakdown providers={data.providers ?? []} />
+        </CostLanePanel>
         <CostLanePanel
           testId="cost-lane-gateway"
           label="Metered by gateway"

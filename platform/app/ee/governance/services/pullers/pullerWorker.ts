@@ -42,11 +42,6 @@ import {
   loadErasureSuppression,
   partitionSuppressedEvents,
 } from "../erasureSuppression.service";
-import {
-  type GovernanceOcsfEventInput,
-  OCSF_ACTIVITY,
-  OCSF_SEVERITY,
-} from "../governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
 import { PersonDiscoveryService } from "../personDiscovery.service";
 import type {
@@ -68,6 +63,7 @@ import {
   pullerAdapterRegistry,
   registerBuiltInPullers,
 } from "./index";
+import { mapToOcsfRow } from "./ocsfPullEventMapping";
 import { buildPulledUsageRecord } from "./pulledUsageRecord";
 
 const logger = createLogger("langwatch:workers:ingestionPuller");
@@ -479,10 +475,11 @@ async function writePulledEvents({
   // their next pass: each re-reads a window behind its own watermark so a
   // restated figure is not missed, so an actor erased today is re-read and
   // re-written on the next run (ADR-128 §9 step 1). `event.actor` is what
-  // becomes `ActorEmail` and rides inside the raw OCSF payload, and it is the
-  // actor id the cost record carries — one check covers both writes because a
-  // suppressed event is not written at all rather than written and erased
-  // again later.
+  // becomes the audit row's actor — `ActorEmail` when it is an address and
+  // `ActorUserId` when it is anything else (`ocsfActorFields`) — and rides
+  // inside the raw OCSF payload, and it is the actor id the cost record
+  // carries. One check covers every one of those writes because a suppressed
+  // event is not written at all rather than written and erased again later.
   const suppression = await loadErasureSuppression({
     prisma,
     organizationId: source.organizationId,
@@ -627,6 +624,7 @@ async function syncPeopleFactsFromPull({
   try {
     await DirectoryDepartmentSyncService.create(prisma).applyDirectoryEvents({
       organizationId: source.organizationId,
+      provider: source.sourceType,
       events,
     });
   } catch (error) {
@@ -1037,83 +1035,4 @@ function earliest(existing: Date | null, candidate: Date): Date {
 
 function latest(existing: Date | null, candidate: Date): Date {
   return existing && existing > candidate ? existing : candidate;
-}
-
-/**
- * Map a NormalizedPullEvent to a GovernanceOcsfEventInput row. Each
- * pull event becomes ONE OCSF row (ClassUid 6003 / API Activity, with
- * ActivityId INVOKE for completion-style events). The raw_payload is
- * preserved verbatim under metadata.extension.raw_event so SIEM
- * consumers can still drill back to the source-of-truth bytes.
- *
- * EventId includes the source id so two same-type sources cannot collide.
- *
- * `tenantId` MUST be the hidden internal_governance Project ID for the
- * org — same key the trace-fold subscriber and OCSF export service use.
- * Resolved by the worker before this is called.
- */
-function mapToOcsfRow({
-  event,
-  tenantId,
-  ingestionSourceId,
-  sourceType,
-}: {
-  event: NormalizedPullEvent;
-  tenantId: string;
-  ingestionSourceId: string;
-  sourceType: string;
-}): GovernanceOcsfEventInput {
-  const eventTime = new Date(event.event_timestamp);
-  const safeEventTime = Number.isFinite(eventTime.getTime())
-    ? eventTime
-    : new Date();
-  const eventId = `${sourceType}:${ingestionSourceId}:${event.source_event_id}`;
-  const occurredAtMs = safeEventTime.getTime();
-  const rawOcsfJson = JSON.stringify({
-    class_uid: 6003,
-    category_uid: 6,
-    activity_id: OCSF_ACTIVITY.INVOKE,
-    type_uid: 6003 * 100 + OCSF_ACTIVITY.INVOKE,
-    severity_id: OCSF_SEVERITY.INFO,
-    time: occurredAtMs,
-    actor: {
-      user: { uid: "", email_addr: event.actor },
-      enduser: { uid: "" },
-    },
-    api: { operation: event.action },
-    dst_endpoint: { name: event.target },
-    metadata: {
-      product: { name: "LangWatch", vendor_name: "LangWatch" },
-      extension: {
-        uid: "langwatch.governance",
-        source_type: sourceType,
-        source_id: ingestionSourceId,
-        ingest_mode: "pull",
-        cost_usd: event.cost_usd,
-        tokens_input: event.tokens_input,
-        tokens_output: event.tokens_output,
-        raw_event: event.raw_payload,
-        ...(event.extra ?? {}),
-      },
-    },
-  });
-  return {
-    tenantId,
-    eventId,
-    // Pull events are atomic — synthesize a stable trace id from the
-    // event id so SIEM-side pivot ("show me this trace") still works.
-    traceId: `pull:${eventId}`,
-    sourceId: ingestionSourceId,
-    sourceType,
-    activityId: OCSF_ACTIVITY.INVOKE,
-    severityId: OCSF_SEVERITY.INFO,
-    eventTime: safeEventTime,
-    actorUserId: "",
-    actorEmail: event.actor,
-    actorEnduserId: "",
-    actionName: event.action,
-    targetName: event.target,
-    anomalyAlertId: "",
-    rawOcsfJson,
-  };
 }

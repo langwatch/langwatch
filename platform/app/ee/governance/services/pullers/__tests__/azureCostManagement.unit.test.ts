@@ -211,6 +211,28 @@ describe("reading an Azure Cost Management daily reply", () => {
         null,
       );
     });
+
+    /** @scenario "A cost reply spread over several pages is read whole" */
+    it.each([
+      "",
+      " ",
+      "\n\t",
+    ])("reports no link when the field is present but empty (%j), keeping the days it read", (nextLink) => {
+      const read = readAzureCostRows({
+        response: replyOf({
+          columns: ["Cost", "UsageDate", "MeterCategory"],
+          rows: [[1.25, 20260823, "Storage"]],
+          nextLink,
+        }),
+      });
+
+      // An empty marker is "there is no next page". Reported as a link it
+      // would reach the caller's host check, name no host, be refused like a
+      // foreign one, and cost the window the day below.
+      expect(read.nextLink).toBe(null);
+      expect(read.days).toHaveLength(1);
+      expect(read.days[0]?.day).toBe("2026-08-23");
+    });
   });
 
   describe("when the reply is not the shape this reads at all", () => {

@@ -19,6 +19,13 @@ export const SAMPLE_INGESTION_SOURCES: Source[] = SAMPLE_TOOL_CARDS.flatMap(
             status: "active",
             errorCount: 0,
             lastSuccessAt: null,
+            pullStatus: {
+              lastRunAt: null,
+              outcome: null,
+              error: null,
+              backfillThrough: null,
+              hasMore: null,
+            },
             lastEventAt: null,
             traceProjectId: null,
             traceProjectArchived: false,

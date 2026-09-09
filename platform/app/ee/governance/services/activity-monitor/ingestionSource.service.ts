@@ -41,6 +41,9 @@ import {
 } from "~/generated/prisma/client";
 import { isEnterpriseTier } from "~/server/api/enterprise";
 import { getApp } from "~/server/app-layer/app";
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { resolveGovProjectId } from "../govProject";
+import { PrismaIngestionPullRunProjectionRepository } from "../pullers/repositories/ingestion-pull-run-projection.prisma.repository";
 import { withAzureBillIdentity } from "./azureBillIdentity";
 import {
   type AzureBillReader,
@@ -491,6 +494,27 @@ export class IngestionSourceService {
       where: { organizationId, archivedAt: null },
       orderBy: [{ name: "asc" }],
     });
+  }
+
+  async lastPullRun({
+    sourceId,
+    organizationId,
+  }: {
+    sourceId: string;
+    organizationId: string;
+  }) {
+    const projectId = await resolveGovProjectId({
+      prisma: this.prisma,
+      organizationId,
+    });
+    if (!projectId) return null;
+    const projection = await new PrismaIngestionPullRunProjectionRepository(
+      this.prisma,
+    ).load(sourceId, {
+      tenantId: createTenantId(projectId),
+      aggregateId: sourceId,
+    });
+    return projection?.state ?? null;
   }
 
   /**

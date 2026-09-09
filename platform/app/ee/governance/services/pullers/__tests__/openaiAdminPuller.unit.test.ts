@@ -100,10 +100,21 @@ const KEY_GROUPING_REFUSAL = errorResponse({
  * `amount.value` is a JSON number in DOLLARS. The sibling adapter's provider
  * reports cents; a decimal shift here would report a hundred times this.
  *
- * The field list is the endpoint's own and nothing more. There is deliberately
- * no email here: the cost result carries amount, line_item, project_id,
- * user_id, api_key_id and quantity, and inventing an address in the fixture is
- * exactly what let the adapter read one that never arrives and name nobody.
+ * The field list is the endpoint's entire key set, checked against the saved
+ * raw responses rather than against what this adapter happens to read — a
+ * fixture trimmed to the fields under test cannot show that the ones left over
+ * are tolerated, and this schema passes them through into `raw_payload`.
+ *
+ * The report DOES send a `user_email` beside the opaque `user-…` id — every
+ * one of the 2,720 captured rows carries both — so the fixture carries one
+ * too: the adapter deliberately reads the id and never the address, and a
+ * fixture that omitted the address could not tell that choice apart from there
+ * being nothing to read. Both fields ride along because the request groups by
+ * the user dimension; the address is an attribute of that grouping, not a
+ * dimension you can group by. Note the user grouping is wire-verified rather
+ * than contract-guaranteed — OpenAI's published schema omits `user_id` from
+ * the cost `group_by` enum the live API accepts, so it could change without a
+ * deprecation and without anything here going red.
  */
 function costRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -111,8 +122,13 @@ function costRow(overrides: Record<string, unknown> = {}) {
     amount: { value: 0.0025945, currency: "usd" },
     line_item: "gpt-5, input",
     project_id: "proj_a",
+    project_name: "Default project",
     organization_id: "org_acme",
+    organization_name: "ACME",
+    quantity: 5189,
+    quantity_unit: "tokens",
     user_id: "user-1",
+    user_email: "person@acme.test",
     api_key_id: "key_a",
     ...overrides,
   };
@@ -144,6 +160,45 @@ describe("given an OpenAI Admin cost source", () => {
   beforeEach(() => {
     fetchMock.mockReset();
     for (const level of Object.values(logged)) level.mockReset();
+  });
+  it("preserves a provider rate-limit wait for the durable retry", async () => {
+    fetchMock.mockResolvedValue(
+      new Response("private upstream payload", {
+        status: 429,
+        headers: { "retry-after": "120" },
+      }),
+    );
+    await expect(
+      new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG),
+    ).rejects.toMatchObject({
+      message: "OpenAI rate limit exceeded (HTTP 429).",
+      retryAfterMs: 120_000,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("still reports the rate-limit wait when draining the body fails", async () => {
+    // Same guard as the Anthropic puller's: a rejected cancel() must not
+    // escape in place of the DispatchError, or the provider's Retry-After
+    // never reaches the scheduler. A real Response resolves cancel(), so the
+    // rejection is planted here.
+    const response = new Response("private upstream payload", {
+      status: 429,
+      headers: { "retry-after": "120" },
+    });
+    Object.defineProperty(response, "body", {
+      value: {
+        cancel: () => Promise.reject(new Error("stream already errored")),
+      },
+    });
+    fetchMock.mockResolvedValue(response);
+
+    await expect(
+      new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG),
+    ).rejects.toMatchObject({
+      message: "OpenAI rate limit exceeded (HTTP 429).",
+      retryAfterMs: 120_000,
+    });
   });
 
   describe("when the provider reports a day's spend", () => {
@@ -199,7 +254,7 @@ describe("given an OpenAI Admin cost source", () => {
     });
 
     /** @scenario "Spend is attributed to the person the provider named" */
-    it("names the person by the identifier on the row, not by an address the report never sends", async () => {
+    it("names the person by the opaque id on the row, not by the address sent beside it", async () => {
       fetchMock.mockResolvedValue(jsonResponse(page()));
 
       const result = await new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG);
@@ -209,6 +264,13 @@ describe("given an OpenAI Admin cost source", () => {
       // is the whole provider discovering nobody.
       expect(event.actor).toBe("user-1");
       expect(event.extra?.actorUserId).toBe("user-1");
+      // The row the adapter read did carry an address — this is the half that
+      // makes the two lines above a choice rather than the only thing on offer.
+      expect(JSON.parse(event.raw_payload as string).user_email).toBe(
+        "person@acme.test",
+      );
+      expect(event.actor).not.toContain("@");
+      expect(event.extra?.actorUserId).not.toContain("@");
     });
 
     /** @scenario "Spend the provider attributes to nobody names nobody" */

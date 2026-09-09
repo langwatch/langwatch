@@ -69,6 +69,53 @@ describe("given the ingestion-source catalog", () => {
     });
   });
 
+  describe("when a source type was offered before it worked", () => {
+    /*
+     * The compliance pair. Both were pickable and neither had anything
+     * reading it, so a source configured on one stayed silent forever. They
+     * leave the picker exactly the way the retired Copilot type did.
+     */
+    const NEVER_BUILT = ["openai_compliance", "claude_compliance"] as const;
+
+    /** @scenario "A source type nothing reads can no longer be chosen" */
+    it("is not offered on any plan", () => {
+      for (const isEnterprise of [true, false]) {
+        const offered = gatedSourceTypeOptions({ isEnterprise }).map(
+          (o) => o.value,
+        );
+        // The guard against a vacuous pass: a filter that dropped everything
+        // would satisfy the absences below while breaking the whole menu.
+        expect(offered).toContain("otel_generic");
+        expect(offered).toContain("openai_admin");
+        for (const value of NEVER_BUILT) {
+          expect(offered).not.toContain(value);
+        }
+      }
+    });
+
+    /** @scenario "Sources already configured on an unread type still display" */
+    it("still resolves the display definition for sources configured on it", () => {
+      for (const value of NEVER_BUILT) {
+        // A configured row reads its name here without a fallback, so the
+        // entry has to survive the hiding or the row's name goes blank.
+        expect(SOURCE_TYPE_LABEL[value]).toBeTruthy();
+        const option = SOURCE_TYPE_OPTIONS.find((o) => o.value === value);
+        expect(option).toBeDefined();
+        expect(option?.icon).toBeTruthy();
+      }
+    });
+
+    /** @scenario "A source type nothing reads can no longer be chosen" */
+    it("says in the blurb that the source is not available", () => {
+      for (const value of NEVER_BUILT) {
+        const option = SOURCE_TYPE_OPTIONS.find((o) => o.value === value);
+        expect(option?.blurb).toMatch(/not available/i);
+        // The old copy described a poller that was never written.
+        expect(option?.blurb).not.toMatch(/polls|pulls/i);
+      }
+    });
+  });
+
   describe("when an enterprise plan gates the options", () => {
     /** @scenario "The composer and the menu share one plan gate" */
     it("locks nothing", () => {

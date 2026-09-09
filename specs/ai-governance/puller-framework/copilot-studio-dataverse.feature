@@ -203,10 +203,16 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     When the puller records the conversation
     Then every turn names the product "microsoft/copilot-studio" as its model
     And no attribute reports which model the agent was configured with
-    # Written expecting a real model and revised on the evidence: the agent
-    # record in the environment carries a name, a language, an authentication
-    # mode and dates, and no model. There is nothing to read, so the trace
-    # reports no model rather than a field no query can fill.
+    # Written expecting a real model and revised on the evidence: nothing the
+    # source reads names one. It asks the agent record for its id, its name and
+    # when it changed, and the conversation row carries the conversation rather
+    # than the agent's settings. That is an absent field in what is read, not a
+    # claim the agent has no model configured — the model is recorded, on that
+    # same agent record, in a settings column this source does not ask for. It
+    # stays unasked-for because it names a model family for the agent as it is
+    # configured today, not the model that answered this turn, so it could not
+    # price a conversation without inventing precision. The trace therefore
+    # reports no model rather than a field no query here can fill.
     #
     # Both halves are the requirement, and stating only the second would be
     # wrong: a product label IS emitted, on purpose. Cost enrichment runs on
@@ -516,9 +522,14 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
     Given Microsoft answers the cost read with more rows than one page holds
     When the cost read runs
     Then the days on every page are recorded
+    And a reply offering an empty next page ends the walk with those days kept
     # The captured probe fits in one page and still carries the field that
     # offers a second. A reader that stops at the first page under-reports
     # the bill and does so silently.
+    # An empty next-page field is Microsoft saying there is no next page, not
+    # a link to nowhere. Read as a link it names no host, fails the host check
+    # and is refused like a foreign one, which holds the window and later
+    # gives it up with the days already read unpriced again.
 
   @unit
   Scenario: A next page cannot move the Azure token to another host

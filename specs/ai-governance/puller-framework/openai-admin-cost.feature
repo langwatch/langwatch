@@ -150,8 +150,10 @@ Feature: OpenAI Admin cost puller
       When the puller records it
       Then the record names that person by the identifier the provider gave
       And the record carries the provider's own id for that person
-      # The identifier is an opaque one, not an email address: the cost report
-      # has no address field. Turning it into a name is the identity engine's
+      # The identifier is the provider's opaque one, not an email address. The
+      # report does send an address beside it, and reading that instead is the
+      # thing being refused: the id is stable and an address on a money row is
+      # heavier to erase. Turning the id into a name is the identity engine's
       # job, and it needs the record to name somebody at all to have anything
       # to work from.
 
@@ -219,7 +221,9 @@ Feature: OpenAI Admin cost puller
       And the source starts the new question from the beginning
       # The provider binds a page token to the exact question that produced it
       # and refuses it under any other, so a replayed token fails the run rather
-      # than returning the wrong page.
+      # than returning the wrong page. That binding is verified against the live
+      # API but the provider publishes no promise about it, so it can change
+      # without notice and without this scenario going red.
 
     @integration
     Scenario: Widening the backfill start makes the source read the older days
