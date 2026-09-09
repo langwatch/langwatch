@@ -44,10 +44,14 @@ export class BroadcastTenantRateLimiterAdapter {
   private readonly config: TierConfig;
   private readonly buckets = new Map<string, Bucket>();
   private readonly warnedTenants = new Set<string>();
-  private cleanupTimer: NodeJS.Timeout | null;
+  private cleanupTimer: NodeJS.Timeout | null = null;
 
   constructor(config?: TierConfig) {
     this.config = config ?? DEFAULT_TIERS;
+  }
+
+  start(): void {
+    if (this.cleanupTimer) return;
     this.cleanupTimer = setInterval(() => this.cleanupStaleBuckets(), CLEANUP_INTERVAL_MS);
   }
 
