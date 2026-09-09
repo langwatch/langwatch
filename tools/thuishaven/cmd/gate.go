@@ -51,18 +51,20 @@ func positiveInt(s string) int {
 	return n
 }
 
-// runGate is `haven gate` — answer one Claude Code PreToolUse hook.
+// runGate answers one PreToolUse hook in the selected client protocol.
 //
-// There is no install flag: `haven setup gate-hook` registers this in the
-// worktree's own .claude/settings.local.json, and it is opt-in — `haven up`
-// installs nothing that changes how another tool behaves. A command whose job
-// is answering hooks should not also be the thing that installs them.
+// Optional `haven setup` features register worktree-local hooks. Keeping setup
+// separate ensures `haven up` does not change how another tool behaves.
 //
 // It always exits 0. Exit code 2 BLOCKS the tool call, and an unrecovered Go
 // panic exits with exactly 2, so returning an error from here would risk
 // converting a haven bug into a machine-wide tool-call blocker. Every failure
 // inside Gate already resolves to "defer".
-func runGate(_ context.Context, d deps, _ invocation) error {
+func runGate(_ context.Context, d deps, inv invocation) error {
+	if inv.value("--client") == "codex" {
+		d.orch.GateCodex(os.Stdin, os.Stdout)
+		return nil
+	}
 	d.orch.Gate(os.Stdin, os.Stdout)
 	return nil
 }

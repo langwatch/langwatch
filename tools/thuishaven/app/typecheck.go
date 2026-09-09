@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 
@@ -22,15 +21,22 @@ func (o *Orchestrator) Typecheck(ctx context.Context, repoDir string, extraArgs 
 	if o.sem == nil {
 		return fmt.Errorf("semaphore not wired")
 	}
-	slots := domain.TypecheckSlots(o.sys.TotalMemory(), runtime.NumCPU(), slotsOverride)
+	slots := o.checkSlots()
+	if slotsOverride > 0 {
+		slots = slotsOverride
+	}
 	// "checks" is the same semaphore `haven slot run` (and through it every
 	// delegated `pnpm typecheck` / `pnpm lint` on the machine) counts against:
 	// one counter for everything that saturates the cores, ADR-064 + ADR-095.
-	release, slot, err := o.sem.Acquire(ctx, "checks", slots)
-	if err != nil {
-		return err
+	slot := 0
+	if slots > 0 {
+		release, acquired, err := o.sem.Acquire(ctx, "checks", slots)
+		if err != nil {
+			return err
+		}
+		defer release()
+		slot = acquired
 	}
-	defer release()
 	if !o.cfg.IsAgent {
 		fmt.Printf("\x1b[2mhaven: typecheck slot %d/%d\x1b[0m\n", slot, slots)
 	} else {
@@ -44,12 +50,8 @@ func (o *Orchestrator) Typecheck(ctx context.Context, repoDir string, extraArgs 
 	if maxRSSOverrideMB > 0 {
 		rl.MaxRSSBytes = int64(maxRSSOverrideMB) << 20
 	}
-	// The `typecheck` script takes a machine-wide slot of its own
-	// (dev/scripts/check-queue.mjs). We already hold one here, so turn that
-	// gate off for this run: counting it twice would queue it behind itself, and
-	// the reaper's duration ceiling would then be spent waiting rather than
-	// typechecking. The pid marker is what agent shells honor, and it only
-	// convinces a descendant.
+	// Nested explicit Haven commands recognize this owner instead of taking
+	// another slot behind the one this process already holds.
 	env := []string{"CHECK_SLOTS=0", "CHECK_QUEUE_HELD=" + strconv.Itoa(os.Getpid())}
 	return o.sup.RunOnceBounded(ctx, "typecheck", repoDir, shell, env, ReapLimits(rl))
 }

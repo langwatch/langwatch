@@ -8,6 +8,7 @@ package semaphore
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -36,7 +37,7 @@ func (s *Semaphore) Acquire(ctx context.Context, name string, slots int) (func()
 		select {
 		case <-ctx.Done():
 			return nil, 0, ctx.Err()
-		case <-time.After(250 * time.Millisecond):
+		case <-time.After(100 * time.Millisecond):
 		}
 	}
 }
@@ -56,9 +57,10 @@ func (s *Semaphore) TryAcquire(name string, slots int) (release func(), slot int
 	for i := 0; i < slots; i++ {
 		f, err := os.OpenFile(filepath.Join(dir, fmt.Sprintf("slot-%d", i)), os.O_CREATE|os.O_RDWR, 0o600)
 		if err != nil {
-			continue
+			return nil, 0, false, err
 		}
-		if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err == nil {
+		lockErr := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if lockErr == nil {
 			release := func() {
 				_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 				_ = f.Close()
@@ -66,6 +68,9 @@ func (s *Semaphore) TryAcquire(name string, slots int) (release func(), slot int
 			return release, i + 1, true, nil
 		}
 		_ = f.Close()
+		if !errors.Is(lockErr, syscall.EWOULDBLOCK) && !errors.Is(lockErr, syscall.EAGAIN) {
+			return nil, 0, false, lockErr
+		}
 	}
 	return nil, 0, false, nil
 }

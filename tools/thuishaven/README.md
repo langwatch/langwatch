@@ -21,17 +21,17 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 | `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                         |
 | `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database  |
 
-Two more are there only when the worktree asked for them (`haven up +storybook
-+mail`) — developer tools rather than parts of the product:
+Two more are there only when the worktree asked for them (`haven up
++design-system +mail-room`) — developer tools rather than parts of the product:
 
-| Hostname                                       | Service                                  |
-| ---------------------------------------------- | ---------------------------------------- |
-| `design-system.<slug>.langwatch.localhost`     | The design system's Storybook            |
-| `mails.design-system.<slug>.langwatch.localhost` | The mail studio — every message previewed |
+| Hostname                                   | Service                                   |
+| ------------------------------------------ | ----------------------------------------- |
+| `design-system.<slug>.langwatch.localhost` | The design system's Storybook             |
+| `mail-room.<slug>.langwatch.localhost`     | The mail studio — every message previewed |
 
-Both answer to more than one spelling, so nothing has to be remembered: `ds`
-stands in for `design-system`, and the studio answers to `mail` as well as
-`mails` under either. The hostnames above are the canonical ones haven prints.
+The design system answers to a shorter spelling too: `ds` stands in for
+`design-system`. The mail studio has no alias — its hostname is
+`mail-room.<slug>`, full stop.
 
 The **app and its API are one origin**: open `app.<slug>.langwatch.localhost` for
 the UI and hit `app.<slug>.langwatch.localhost/api` for the API. There is no
@@ -82,7 +82,7 @@ haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
                  switch between "all" and per-service logs, q detaches (the stack
                  keeps running; haven down stops it). +svc/-svc picks services and
-                 sticks (+langy, -nlp, -gateway, +storybook, +mail); a fresh
+                 sticks (+langy, -nlp, -gateway, +design-system, +mail-room); a fresh
                  worktree runs ui + api + workers + nlp + gateway + idp, with
                  langy and the two developer tools off. -w watches
                  the Go services via
@@ -427,8 +427,8 @@ registry, and dashboard stay the same.
   machine**: on a development stack with no container runtime reachable (neither
   `colima` nor `docker` on PATH) haven resolves the host tier by itself rather than
   running no manager at all, and prints `no container runtime; running langyagent on
-  the host because this is a development stack; set LANGY_UNSAFE_HOST_ACCESS=0 to
-  refuse`. That one line is the whole point: a quieter isolation posture than the one
+the host because this is a development stack; set LANGY_UNSAFE_HOST_ACCESS=0 to
+refuse`. That one line is the whole point: a quieter isolation posture than the one
   you believe you have is never inferred in silence. `LANGY_UNSAFE_HOST_ACCESS=0`
   refuses it, and a stack that is not a development one (`NODE_ENV` / `ENVIRONMENT`
   naming anything outside `local`/`dev`/`development`/`test`) still fails closed:
@@ -502,14 +502,35 @@ registry, and dashboard stay the same.
   one plain line per item, then one summary counting each kind separately
   ("reclaimed 158 job scratch dirs, 2.1 GB; 3 worktrees, 500 MB"). A zap record
   never lands on the stream a progress render or a parsed line is using.
+
 - **`haven typecheck`.** Run `pnpm typecheck` under a machine-wide slot so parallel
-  typechecks across worktrees don't exhaust RAM (bounded by memory / CPU). The
-  `typecheck` script slots itself too (`dev/scripts/check-queue.mjs`,
-  `CHECK_SLOTS`), so this command passes `CHECK_SLOTS=0` to the run it
-  spawns and stays the only thing counting it.
+  typechecks across worktrees don't exhaust RAM (bounded by memory / CPU). It shares the `checks` semaphore with `haven slot run` and
+  hook-launched commands. Plain repository scripts run directly.
 - **AI-gated HMR.** `haven hmr on [--ttl 30s] | off` defers Vite reloads while an
   agent edits, then fires one catch-up reload — a human's browser isn't thrashed
   through broken intermediate states. Opt-in and always time-bounded.
+
+## Optional agent hooks
+
+Run either setup command in the worktree where you want Haven to admit heavy
+agent commands, or name both features in one invocation:
+
+```sh
+haven setup gate-hook codex-gate-hook
+```
+
+`gate-hook` merges the Claude hook into `.claude/settings.local.json`;
+`codex-gate-hook` merges the Codex hook into `.codex/hooks.json`. Both files stay
+gitignored and local to that worktree. Existing hooks survive, and repeating
+setup does not add another Haven hook. `haven up` installs neither integration.
+
+For Codex, open `/hooks` in a trusted project to review and trust the installed
+hook. Hooks are enabled by default; setup does not change an explicit disabled
+feature setting. The command uses the same Haven admission and execution path
+as Claude, with Codex-compatible hook output and no added compiler memory caps.
+Command rewriting applies only in automatically approving permission modes;
+default, plan, or missing modes keep the normal permission flow unchanged.
+See [the official Codex hook documentation](https://learn.chatgpt.com/docs/hooks).
 
 ## Forward ideas
 

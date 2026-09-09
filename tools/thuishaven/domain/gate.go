@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 	"unicode"
@@ -85,6 +86,9 @@ var workerFlags = []string{"--maxWorkers", "--max-workers", "VITEST_MAX_WORKERS"
 
 // ClassifyCommand reports whether a command is heavy and, if so, what kind.
 func ClassifyCommand(command string) (RunKind, bool) {
+	if ungatedCommandMode(command) {
+		return SingleProcessRun, false
+	}
 	if !containsAny(command, heavyCommands) && !invokesAny(command, heavyBinaries) {
 		return SingleProcessRun, false
 	}
@@ -98,6 +102,33 @@ func ClassifyCommand(command string) (RunKind, bool) {
 	}
 }
 
+// Watches cannot hold a finite check slot for the lifetime of a dev session.
+// Informational flags bypass admission only for a single shell command, so
+// `tsc --version && pnpm typecheck` still counts the check that follows.
+func ungatedCommandMode(command string) bool {
+	words := ShellWords(command)
+	for i, word := range words {
+		switch word {
+		case "--watch", "--watch=true", "--lsp":
+			return true
+		case "-w":
+			if invokesAny(strings.Join(words[:i], " "), []string{"tsc", "tsgo", "vitest"}) {
+				return true
+			}
+		}
+	}
+	if strings.ContainsAny(command, ";&|\n`$") {
+		return false
+	}
+	for _, word := range words {
+		switch word {
+		case "--help", "--version", "--init":
+			return true
+		}
+	}
+	return false
+}
+
 // CallerSetWorkers reports whether the command already carries a worker count.
 func CallerSetWorkers(command string) bool { return containsAny(command, workerFlags) }
 
@@ -105,7 +136,25 @@ func CallerSetWorkers(command string) bool { return containsAny(command, workerF
 // heavy class. Wrapping a second time would make the outer hold the slot the
 // inner is waiting for.
 func AlreadyWrapped(command string) bool {
-	return strings.Contains(command, havenRunMarker)
+	words := ShellWords(command)
+	for i, word := range words {
+		binary := filepath.Base(word)
+		if (binary != "haven" && !strings.HasPrefix(binary, "haven.")) || i+1 >= len(words) {
+			continue
+		}
+		if i > 0 && words[i-1] != "&&" && words[i-1] != ";" && words[i-1] != "||" {
+			continue
+		}
+		switch words[i+1] {
+		case "run", "typecheck":
+			return true
+		case "slot":
+			if i+2 < len(words) && words[i+2] == "run" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // havenRunMarker is the subcommand and flag a wrapped command carries. Written

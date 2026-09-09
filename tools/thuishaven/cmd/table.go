@@ -457,8 +457,11 @@ var table = []commandSpec{
 	},
 	{
 		name:    "gate",
-		summary: "answer a Claude Code PreToolUse hook on stdin (install it with `haven setup gate-hook`)",
-		run:     runGate,
+		summary: "answer a coding-agent PreToolUse hook on stdin (opt in with `haven setup`)",
+		flags: []flagSpec{
+			{long: "--client", takesValue: true, value: "<client>", summary: "hook output protocol: claude (default) or codex"},
+		},
+		run: runGate,
 	},
 	{
 		name:    "slot",

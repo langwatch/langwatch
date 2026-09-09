@@ -104,13 +104,13 @@ type Store interface {
 	ReapEvents() []domain.ReapEvent
 }
 
-// ClaudeSettings writes another tool's configuration, which is why it is not on
+// AgentHookSettings writes another tool's configuration, which is why it is not on
 // Store: everything Store persists is haven's OWN state — stacks, slugs,
 // selections, the daemon record, heavy-run slots. This edits a file in the
-// developer's repo that belongs to Claude Code, and only `haven setup` uses it.
-type ClaudeSettings interface {
+// developer's repo that belongs to an agent client, and only `haven setup` uses it.
+type AgentHookSettings interface {
 	// EnsureHook registers command as a PreToolUse hook in repoRoot's
-	// .claude/settings.local.json — untracked and per worktree. It merges: an
+	// local agent configuration — untracked and per worktree. It merges: an
 	// existing hooks block survives and an entry already present is left alone,
 	// so it reports whether anything actually changed.
 	EnsureHook(repoRoot, command string) (installed bool, err error)

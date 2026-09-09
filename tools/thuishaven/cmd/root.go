@@ -21,6 +21,7 @@ import (
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/claudesettings"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhousedocker"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/codexsettings"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/colima"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dashboard"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/dockerjanitor"
@@ -189,9 +190,11 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	disableDLP, disableDLPSet := dotenvLookup("LANGWATCH_DISABLE_GOOGLE_DLP")
 
 	cfg := app.Config{
-		Naming:  naming,
-		Home:    havenHome(),
-		IdleTTL: envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
+		CheckEnv:      slotCheckEnv(),
+		CheckPressure: os.Getenv("CHECK_PRESSURE"),
+		Naming:        naming,
+		Home:          havenHome(),
+		IdleTTL:       envDuration("HAVEN_IDLE_TTL", 4*time.Hour),
 		// Four days spans a long weekend away from a worktree; a fortnight (the
 		// old default) meant a dozen dead stacks' databases sat on the shared
 		// ClickHouse's small memory cap before the first prune ever fired.
@@ -228,7 +231,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
 		Container: rt, Janitor: dockerjanitor.New(rt), Jobs: jobscratch.New(),
 		ProcTel: procmetrics.New(observabilityEndpoints().OTLPHTTPPort),
-		Claude:  claudesettings.New(), Log: logger,
+		Claude:  claudesettings.New(), Codex: codexsettings.New(), Log: logger,
 	})
 	return deps{
 		orch: orch,

@@ -27,6 +27,13 @@ var Features = []Feature{{
 		"    typechecks and builds started by an agent then take a machine-wide slot\n" +
 		"    instead of all landing at once. Hooks are read at session start, so new\n" +
 		"    Claude Code sessions pick it up.",
+}, {
+	Name:    "codex-gate-hook",
+	Summary: "queue heavy commands from Codex through the same machine-wide gate",
+	Detail: "Registers `haven gate` in this worktree's .codex/hooks.json.\n" +
+		"    Existing hooks and settings remain intact. In a trusted Codex project,\n" +
+		"    open /hooks to review and trust the new hook before it can run. Hooks\n" +
+		"    are enabled by default; this does not change your feature settings.",
 }}
 
 // InstallFeature installs one feature by name and reports whether it changed
@@ -34,26 +41,24 @@ var Features = []Feature{{
 func (o *Orchestrator) InstallFeature(name string) (bool, error) {
 	switch name {
 	case "gate-hook":
-		return o.installGateHook()
+		return o.installGateHook(o.claude, "")
+	case "codex-gate-hook":
+		return o.installGateHook(o.codex, "codex")
 	default:
 		return false, fmt.Errorf("unknown feature %q", name)
 	}
 }
 
-// installGateHook registers the gate in this checkout's own Claude settings.
+// installGateHook registers the gate in this checkout's selected agent settings.
 //
-// .claude/settings.local.json, deliberately: .gitignore carries
-// `**/.claude/settings.local.json*` while .claude/settings.json is checked in,
-// so this configures the developer's checkout without committing a hook into
-// everyone else's. The root comes from git's own toplevel, which in a worktree
-// resolves to that worktree — so each gets its own, matching the fact that
-// each already gets its own stack and slug.
-func (o *Orchestrator) installGateHook() (bool, error) {
+// Each adapter writes a gitignored file under this worktree, so opting in
+// does not install a hook for another checkout or change shared settings.
+func (o *Orchestrator) installGateHook(settings AgentHookSettings, client string) (bool, error) {
 	if o.cfg.RepoRoot == "" {
 		return false, fmt.Errorf("no repository root: run this from inside a checkout")
 	}
-	if o.claude == nil {
-		return false, fmt.Errorf("no Claude settings writer is wired in")
+	if settings == nil {
+		return false, fmt.Errorf("no agent hook settings writer is wired in")
 	}
 	self, err := os.Executable()
 	if err != nil || self == "" {
@@ -65,5 +70,9 @@ func (o *Orchestrator) installGateHook() (bool, error) {
 	// Quoted, because the path is the one thing here haven does not choose: a
 	// checkout under a directory with a space would otherwise install a hook that
 	// splits into two words and fails on every tool call.
-	return o.claude.EnsureHook(o.cfg.RepoRoot, domain.ShellQuote(self)+" gate")
+	command := domain.ShellQuote(self) + " gate"
+	if client != "" {
+		command += " --client " + client
+	}
+	return settings.EnsureHook(o.cfg.RepoRoot, command)
 }

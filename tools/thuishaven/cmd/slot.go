@@ -39,7 +39,7 @@ import (
 const checkSlotName = "checks"
 
 const (
-	slotPollInterval  = 500 * time.Millisecond
+	slotPollInterval  = 100 * time.Millisecond
 	slotHeartbeat     = 30 * time.Second
 	slotMaxWait       = 30 * time.Minute
 	slotAnnounceAfter = 150 * time.Millisecond

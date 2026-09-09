@@ -30,7 +30,7 @@ COMMANDS
 EXAMPLES
     haven up                     # stack up in the background + attached log view
     haven up +langy              # add a service here, now and from now on
-    haven up +storybook +mail    # add the design-system Storybook + mail studio
+    haven up +design-system +mail-room  # add the design-system Storybook + mail studio
     haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
     haven status                 # every stack + shared-server health, one shot
     haven logs nlp -t            # tail one service live
@@ -55,13 +55,14 @@ hostname through the portless proxy:
     nlp.portless.langwatch.localhost         NLP engine (Go)
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
 
-Two more only when the worktree asked for them ("haven up +storybook +mail"):
+Two more only when the worktree asked for them ("haven up +design-system +mail-room"):
 
-    design-system.portless.langwatch.localhost        The design system's Storybook
-    mails.design-system.portless.langwatch.localhost  The mail studio
+    design-system.portless.langwatch.localhost  The design system's Storybook
+    mail-room.portless.langwatch.localhost      The mail studio
 
-Both take a shorter spelling too: "ds" stands in for "design-system", and the
-studio answers to "mail" as well as "mails" under either.
+The design system takes a shorter spelling too: "ds" stands in for
+"design-system". The mail studio has no alias — its hostname is
+mail-room.<slug>, full stop.
 
 The app and its API share ONE origin: open app.<slug>.langwatch.localhost for the
 UI and hit app.<slug>.langwatch.localhost/api for the API — one URL, not two.
@@ -124,27 +125,20 @@ var envHelpText = `Environment variables.
 
   Machine load: slots, pressure and reaping
     HAVEN_TYPECHECK_SLOTS=N      Cap concurrent "haven typecheck" runs (default:
-                                 one per ~4 GiB RAM, capped at CPU count).
+                                 the shared CHECK_SLOTS policy).
     HAVEN_TYPECHECK_MAX_RSS_MB   Kill a typecheck run over this RSS (default 6144
                                  = 6 GiB) or over 10 minutes wall-clock — a
                                  runaway typecheck shouldn't sit on a slot
                                  forever.
-    CHECK_SLOTS=N                Caps concurrent whole-repo checks ("pnpm
-                                 typecheck", "pnpm lint") machine wide (0
-                                 disables — from a person's shell; agent shells
-                                 carry CLAUDECODE and a gate-off there is
-                                 ignored). With haven installed those runs are
-                                 delegated to "haven slot run", which gates on
-                                 the same flock semaphore "haven typecheck"
-                                 holds — one counter for everything that
-                                 saturates the cores. Both set CHECK_SLOTS=0
-                                 with their pid in CHECK_QUEUE_HELD for the run
-                                 they spawn, so a run is never counted twice
-                                 and cannot queue behind itself; the marker
-                                 only convinces a descendant, and only when it
-                                 names one of those two wrappers.
-                                 CHECK_QUEUE_IMPL=js forces the JavaScript
-                                 queue in dev/scripts/check-queue.mjs.
+    CHECK_SLOTS=N                Concurrent checks across optional agent hooks,
+                                 "haven slot run" and "haven typecheck". The
+                                 default uses available machine capacity; plain
+                                 repository scripts run directly. A live queue
+                                 owner is recognized through CHECK_QUEUE_HELD
+                                 so descendants do not take another slot.
+    CHECK_PRESSURE=green|amber|red
+                                 Override the measured machine pressure when
+                                 resolving the shared queue's capacity.
     HAVEN_SLOT_HELD=1            Set by "haven run" inside the command it spawns:
                                  this run is already admitted, do not admit again.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.

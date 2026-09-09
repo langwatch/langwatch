@@ -41,7 +41,7 @@ type hookReply struct {
 
 type hookSpecificOutput struct {
 	HookEventName            string         `json:"hookEventName"`
-	PermissionDecision       string         `json:"permissionDecision"`
+	PermissionDecision       string         `json:"permissionDecision,omitempty"`
 	PermissionDecisionReason string         `json:"permissionDecisionReason,omitempty"`
 	UpdatedInput             map[string]any `json:"updatedInput,omitempty"`
 }
@@ -141,8 +141,8 @@ func (o *Orchestrator) decideHeavy(p hookPayload, command string, kind domain.Ru
 			hint = &h
 		}
 		return refuse(level, queueDepth, hint)
-	case domain.Background, domain.Narrow, domain.Queue:
-		// All three run under haven's slot; they differ in how the wrapped run
+	case domain.Admit, domain.Background, domain.Narrow, domain.Queue:
+		// All admitted runs hold a slot; decisions differ in how the wrapped run
 		// behaves. Rewriting needs an approval, so a session that still prompts is
 		// left alone entirely.
 		if !autoApprovingModes[p.PermissionMode] {
@@ -290,16 +290,10 @@ func transcriptSize(path string) int64 {
 	return fi.Size()
 }
 
-// slotState reports how many heavy runs are live and how many are allowed.
-//
-// The limit discounts what the compressor is already holding rather than
-// trusting total RAM, because on a machine with a container VM holding several
-// GiB os.totalmem() overstates what this process can have (ADR-090).
+// slotState uses the shared capacity policy; the claim ledger supplies a
+// best-effort estimate, while the flock at execution time enforces admission.
 func (o *Orchestrator) slotState() slotState {
-	return slotState{
-		live:  o.store.HeavyRuns(),
-		limit: domain.HeavySlots(o.sys.MemStat(), runtime.NumCPU()),
-	}
+	return slotState{live: o.store.HeavyRuns(), limit: max(1, o.checkSlots())}
 }
 
 // fullWidth is the width a unit run takes when nobody narrows it: half the

@@ -68,3 +68,16 @@ func TestTypecheckCountsAgainstTheSharedChecksSemaphore(t *testing.T) {
 		t.Fatalf("typecheck must gate on the shared %q semaphore, got %q", "checks", sem.lastName)
 	}
 }
+
+func TestTypecheckDefaultUsesTheSharedCapacityPolicy(t *testing.T) {
+	sem := &fakeSemaphore{}
+	orch := runOrch(&fakeStore{}, &fakeSupervisor{})
+	orch.sem = sem
+	orch.cfg.CheckEnv.CheckSlots = "2"
+	if err := orch.Typecheck(context.Background(), "/repo", nil, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if sem.lastSlots != 2 {
+		t.Fatalf("typecheck ignored the shared queue capacity: %d", sem.lastSlots)
+	}
+}

@@ -18,6 +18,7 @@ import (
 func runOrch(store *fakeStore, sup *fakeSupervisor) *Orchestrator {
 	return &Orchestrator{
 		store: store,
+		sem:   &fakeSemaphore{},
 		sup:   sup,
 		sys:   &fakeSystem{memStat: domain.MemStat{TotalBytes: 64 << 30}, now: time.Now()},
 		log:   zap.NewNop(),

@@ -12,9 +12,11 @@ import (
 // Config carries the knobs the orchestrator + daemon need. Everything here is
 // resolved once by the composition root (cmd) and injected.
 type Config struct {
-	Naming  domain.Naming
-	Home    string        // thuishaven home dir (~/.langwatch/portless)
-	IdleTTL time.Duration // reap stacks whose heartbeat is older than this (0 = only reap dead launchers)
+	CheckEnv      domain.CheckEnv
+	CheckPressure string
+	Naming        domain.Naming
+	Home          string        // thuishaven home dir (~/.langwatch/portless)
+	IdleTTL       time.Duration // reap stacks whose heartbeat is older than this (0 = only reap dead launchers)
 	// DBIdleTTL is how long a worktree's databases may sit unused before the
 	// daemon prunes them in the background (0 disables pruning). Only databases
 	// haven itself tracked (via the activity clock) are ever touched, and the

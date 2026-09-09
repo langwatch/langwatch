@@ -42,7 +42,8 @@ type Orchestrator struct {
 	jobs JobScratch
 	// claude edits Claude Code's own settings, which only `haven setup` does.
 	// Nil everywhere else, including in tests that never install a feature.
-	claude ClaudeSettings
+	claude AgentHookSettings
+	codex  AgentHookSettings
 	log    *zap.Logger
 
 	// isGoverning guards the slow half of a pressure tick, which runs off the
@@ -77,7 +78,8 @@ type Deps struct {
 	Janitor   ContainerJanitor
 	Jobs      JobScratch
 	ProcTel   ProcTelemetry
-	Claude    ClaudeSettings
+	Claude    AgentHookSettings
+	Codex     AgentHookSettings
 	Log       *zap.Logger
 }
 
@@ -93,7 +95,7 @@ func New(d Deps) *Orchestrator {
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
 		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
-		container: d.Container, janitor: d.Janitor, jobs: d.Jobs, procTel: d.ProcTel, claude: d.Claude, log: d.Log,
+		container: d.Container, janitor: d.Janitor, jobs: d.Jobs, procTel: d.ProcTel, claude: d.Claude, codex: d.Codex, log: d.Log,
 	}
 }
 
@@ -222,8 +224,8 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		}
 		// The extra ways in (see domain.ServiceHostAliases): every alias points at
 		// the same listener, so nobody has to remember whether the design system
-		// answers to `ds` or the studio to `mail` rather than `mails`. Recorded on
-		// the service, so teardown removes exactly what was registered.
+		// answers to `ds`. Recorded on the service, so teardown removes exactly
+		// what was registered.
 		for _, alias := range domain.ServiceHostAliases[r.Name] {
 			svc.Aliases = append(svc.Aliases, o.cfg.Naming.Hostname(alias, slug))
 		}

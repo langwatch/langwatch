@@ -2,10 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -30,28 +32,12 @@ type HeavyRun struct {
 	Workers int
 }
 
-// heavyRunPoll is how often a waiter re-checks. Frequent enough that a freed
-// slot is taken promptly, rare enough that a dozen waiters cost nothing.
-const heavyRunPoll = 500 * time.Millisecond
-
 // slotState is the machine's occupancy at one moment: how many heavy runs are
 // live, and how many are allowed.
 type slotState struct{ live, limit int }
 
 func (s slotState) free() bool    { return s.live < s.limit }
 func (s slotState) position() int { return s.live - s.limit + 1 }
-
-// queuedLine is what a waiting run says once, so it never looks hung. It names
-// the position, and the retry estimate when one can be quoted honestly.
-func (o *Orchestrator) queuedLine(s slotState, caller domain.CallerKind, key string) string {
-	position := s.position()
-	line := fmt.Sprintf("haven: %d heavy runs already active (limit %d), queued at position %d",
-		s.live, s.limit, position)
-	if hint, ok := domain.NewRetryHint(position, o.store.ObservedDuration(key), caller); ok {
-		line += " — " + hint.Describe()
-	}
-	return line
-}
 
 // RunHeavy takes a machine-wide slot, runs the command, and releases.
 //
@@ -70,7 +56,7 @@ func (o *Orchestrator) RunHeavy(ctx context.Context, r HeavyRun) error {
 	caller := domain.CallerFromAgentID(r.AgentID, r.Interactive)
 	key := domain.DurationKey(r.Shell)
 
-	waited, queued, release, err := o.takeHeavySlot(ctx, waiter{caller: caller, key: key, shell: r.Shell})
+	waited, queued, release, err := o.takeHeavySlot(ctx, waiter{caller: caller, shell: r.Shell})
 	if err != nil {
 		return err
 	}
@@ -88,10 +74,8 @@ func (o *Orchestrator) RunHeavy(ctx context.Context, r HeavyRun) error {
 	}
 
 	started := o.sys.Now()
-	// The inner script takes a machine-wide slot of its own. We already hold
-	// one, so turn that gate off for this run: counting it twice would queue it
-	// behind itself. The pid marker is what agent shells honor, and it only
-	// convinces a descendant.
+	// Nested explicit Haven commands recognize this owner instead of taking
+	// another slot behind the one this process already holds.
 	env := []string{"CHECK_SLOTS=0", "CHECK_QUEUE_HELD=" + strconv.Itoa(os.Getpid()), "HAVEN_SLOT_HELD=1"}
 	if r.Workers > 0 {
 		env = append(env, "VITEST_MAX_WORKERS="+strconv.Itoa(r.Workers))
@@ -108,88 +92,77 @@ func (o *Orchestrator) RunHeavy(ctx context.Context, r HeavyRun) error {
 }
 
 // waiter is who is asking for a slot and what for: the caller kind picks the
-// ceiling, the key is what the wait estimate is quoted from, and the shell is
-// what gets recorded against the claim.
+// ceiling, and the shell is what gets recorded against the claim.
 type waiter struct {
 	caller domain.CallerKind
-	key    string
 	shell  string
 }
 
-// takeHeavySlot waits for room, claims it, and checks that the claim did not
-// over-subscribe the machine.
-//
-// The check is the point. Two waiters can pass the same poll before either
-// writes its marker, and a cap both of them passed is not a cap — so a claim
-// that turns out to be one too many is given straight back and the wait
-// resumes. Past the caller's ceiling the claim is kept regardless, for the same
-// reason the wait itself gives up there: a run that starts late beats one that
-// never starts, and a wedged queue must not be able to block work entirely.
-func (o *Orchestrator) takeHeavySlot(ctx context.Context, w waiter) (waited time.Duration, queued bool, release func(), err error) {
-	caller, key, shell := w.caller, w.key, w.shell
-	start := o.sys.Now()
+// takeHeavySlot uses the same flock pool as manual checks. The claim ledger is
+// telemetry only; acquiring a second admission gate would count one run twice.
+func (o *Orchestrator) takeHeavySlot(ctx context.Context, w waiter) (time.Duration, bool, func(), error) {
+	waited, queued, release, err := o.acquireCheckSlot(ctx, w.caller.WaitCeiling())
+	if err != nil {
+		return waited, queued, release, err
+	}
+	claimRelease, claimErr := o.store.ClaimHeavyRun(o.sys.Getpid(), w.shell)
+	if claimErr != nil {
+		o.log.Warn("could not record heavy-run telemetry")
+		return waited, queued, release, nil
+	}
+	return waited, queued, func() { claimRelease(); release() }, nil
+}
+
+func (o *Orchestrator) checkSlots() int {
+	pressure := domain.ResolveCheckPressure(o.cfg.CheckPressure, domain.ClassifyPressure(o.sys.MemStat()), o.cfg.CheckEnv.CI)
+	slots, _ := domain.ResolveCheckSlots(domain.CheckMachine{
+		TotalRAMBytes: o.sys.TotalMemory(), NumCPU: runtime.NumCPU(), Pressure: pressure,
+	}, o.cfg.CheckEnv)
+	return slots
+}
+
+func (o *Orchestrator) acquireCheckSlot(ctx context.Context, ceiling time.Duration) (time.Duration, bool, func(), error) {
 	noRelease := func() {}
-	for {
-		_, queued, err = o.waitForHeavySlot(ctx, caller, key)
-		if err != nil {
-			return o.sys.Now().Sub(start), queued, noRelease, err
-		}
-
-		release, err = o.store.ClaimHeavyRun(o.sys.Getpid(), shell)
-		if err != nil {
-			// A slot we cannot record is a slot nobody else can see. Run anyway: a
-			// miscounted slot is a far better outcome than a command that never runs.
-			o.log.Warn("could not record the heavy-run claim; running uncounted")
-			return o.sys.Now().Sub(start), queued, noRelease, nil
-		}
-
-		elapsed := o.sys.Now().Sub(start)
-		if o.withinHeavyCap() || elapsed >= caller.WaitCeiling() {
-			return elapsed, queued, release, nil
-		}
-		release()
+	if err := ctx.Err(); err != nil {
+		return 0, false, noRelease, err
 	}
-}
-
-// withinHeavyCap re-reads occupancy WITH this process's own claim counted, so
-// the answer is "is the machine still inside its cap now that I am on it".
-func (o *Orchestrator) withinHeavyCap() bool {
-	return o.store.HeavyRuns() <= domain.HeavySlots(o.sys.MemStat(), runtime.NumCPU())
-}
-
-// waitForHeavySlot blocks until a slot frees or the ceiling is reached,
-// reporting position so a queued run never looks hung.
-//
-// Reaching the ceiling proceeds anyway rather than failing. The ceiling exists
-// to stop an agent idling past its cache floor, and a run that starts late is
-// strictly better than one that never starts — a wedged queue must not be able
-// to block work entirely.
-func (o *Orchestrator) waitForHeavySlot(ctx context.Context, caller domain.CallerKind, key string) (waited time.Duration, queued bool, err error) {
-	start := o.sys.Now()
-	ceiling := caller.WaitCeiling()
-	announced := false
-	for {
-		s := slotState{live: o.store.HeavyRuns(), limit: domain.HeavySlots(o.sys.MemStat(), runtime.NumCPU())}
-		if s.free() {
-			return o.sys.Now().Sub(start), announced, nil
-		}
-
-		waited := o.sys.Now().Sub(start)
-		if waited >= ceiling {
-			fmt.Fprintf(os.Stderr, "haven: no slot after %s, starting anyway (%d of %d busy)\n",
-				waited.Round(time.Second), s.live, s.limit)
-			return waited, true, nil
-		}
-
-		if !announced {
-			announced = true
-			fmt.Fprintln(os.Stderr, o.queuedLine(s, caller, key))
-		}
-
+	slots := o.checkSlots()
+	if slots == 0 {
+		return 0, false, noRelease, nil
+	}
+	if o.sem == nil {
+		return 0, false, noRelease, fmt.Errorf("semaphore not wired")
+	}
+	start := time.Now()
+	waitCtx, cancel := context.WithTimeout(ctx, ceiling)
+	defer cancel()
+	var queued atomic.Bool
+	done, announced := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(announced)
+		timer := time.NewTimer(150 * time.Millisecond)
+		defer timer.Stop()
 		select {
-		case <-ctx.Done():
-			return o.sys.Now().Sub(start), true, ctx.Err()
-		case <-time.After(heavyRunPoll):
+		case <-done:
+		case <-timer.C:
+			queued.Store(true)
+			fmt.Fprintf(os.Stderr, "haven: waiting for a shared check slot (limit %d)\n", slots)
 		}
+	}()
+	release, _, err := o.sem.Acquire(waitCtx, "checks", slots)
+	close(done)
+	<-announced
+	waited := time.Since(start)
+	if err != nil {
+		if ctx.Err() != nil {
+			return waited, queued.Load(), noRelease, ctx.Err()
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			fmt.Fprintf(os.Stderr, "haven: no slot after %s, starting anyway\n", waited.Round(time.Second))
+			return waited, true, noRelease, nil
+		}
+		o.log.Warn("could not acquire the shared check slot; running uncounted")
+		return waited, queued.Load(), noRelease, nil
 	}
+	return waited, queued.Load(), release, nil
 }
