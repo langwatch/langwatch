@@ -1014,73 +1014,40 @@ Feature: One cost screen, three honest lanes
       Then the request is refused
       And the cost lanes still answer for them
 
-  Rule: The total shown is the bill; gateway detail splits it
-
-    # Every scenario under this rule says what a reader is SHOWN, and nothing
-    # shows it yet: there is no connected view, and no arithmetic behind it —
-    # the caller-less `combineProviderDay` and its tests were removed as dead
-    # code (#7923). So these stay parked rather than bound. They become @unit
-    # the day a reader can see the numbers, and the day something says which
-    # bill pays for which gateway key — that link is not recorded yet.
-
-    @unimplemented
-    Scenario: Gateway detail splits the bill and the remainder is its own line
-      Given a bill of six dollars for a provider day
-      And four dollars twenty of gateway spend on keys that bill covers
-      When the connected view is drawn
-      Then the total shown is six dollars
-      And four dollars twenty is shown as attributed
-      And one dollar eighty is shown as not seen by the gateway
-
-    @unimplemented
-    Scenario: Gateway spend above the bill is shown as a variance, never subtracted
-      Given a bill of six dollars for a provider day
-      And six dollars fifty of gateway spend on keys that bill covers
-      When the connected view is drawn
-      Then the total shown is still six dollars
-      And fifty cents is shown as metering running over the bill
-      And nothing is subtracted from the total
-
-    @unimplemented
-    Scenario: A refunded day stays negative
-      Given a provider day whose bill is a refund
-      When the connected view is drawn
-      Then the total shown is negative
-      # Clamping it to zero would silently eat money.
-
-    @unimplemented
-    Scenario: A day the bill has not reached yet is marked estimated
-      Given a key covered by a bill
-      And gateway spend on a day no bill has reported yet
-      When the connected view is drawn
-      Then the day shows the gateway figure marked as estimated
-
-    @unimplemented
-    Scenario: The estimate becomes the bill when the bill lands
-      Given a day shown as estimated from gateway spend
-      When the provider's bill for that day arrives
-      Then the day shows the bill and is no longer marked estimated
-
-    @unimplemented
-    Scenario: Gateway spend no bill covers stands alone
-      Given gateway spend on a key no bill covers
-      When the connected view is drawn
-      Then that spend is shown on its own as metered
-      And it is not counted against any bill
-
-    @unimplemented
-    Scenario: A bill and its keys in different currencies are not combined
-      Given a bill in euros covering keys metered in dollars
-      And the provider published no dollar figure of its own
-      When the connected view is drawn
-      Then the bill and the gateway spend are shown separately in their own currencies
-      And no split is shown for that day
-
-    @unimplemented
-    Scenario: The parts of a day always add up to its total
-      Given any provider day with a bill
-      When the connected view is drawn
-      Then the attributed part and the part not seen by the gateway add up to the total exactly
+  # =========================================================================
+  # THE CONNECTED VIEW WAS DESIGNED AND ITS INPUT WAS REMOVED.
+  #
+  # A rule here used to park eight scenarios for a view that would show one
+  # provider day as a bill split into the part the gateway saw and the part it
+  # did not — "$4.20 of the $6.00 attributed; $1.80 not seen by gateway" — plus
+  # a variance line when metering ran over, and an estimated tag until the bill
+  # landed. Every one of them started from an admin's mapping saying which
+  # gateway keys a given bill pays for. That mapping was deleted outright on
+  # 2026-09-04 (ADR-128 section 7, marked deleted; the model, migration,
+  # service, repository, tests and its own fifteen-scenario spec all went with
+  # it), and nothing replaced it. A scenario cannot describe a split whose only
+  # input no longer exists, so the eight were removed rather than left parked:
+  # a parked scenario is a promise, and this one had stopped being one.
+  #
+  # What ships instead is the wave-1 shape, and it is bound elsewhere in this
+  # file rather than restated here:
+  #
+  #   - the lanes stand side by side, each labeled with its own figure, and
+  #     nothing merges them - "Each lane renders its own labeled total";
+  #   - a provider day that is a refund shows negative, unclamped - "A
+  #     refund-heavy billed day renders negative as reported";
+  #   - a lane holding usage billed in a currency we cannot state in dollars
+  #     withholds its total and says which currency - "A lane with usage we
+  #     cannot state in US dollars holds no total" and "A lane with no total
+  #     says why instead of showing a figure";
+  #   - a day the provider may still restate is marked as able to change, from
+  #     the settling window rather than from the absence of a bill - see
+  #     specs/governance/governance-cost-restatement-markers.feature.
+  #
+  # If the connected view is ever revived it needs a new coverage decision
+  # first; these scenarios would be written against that, not recovered from
+  # here.
+  # =========================================================================
 
   # A REFUSAL IS NOT A FAILURE.
   #

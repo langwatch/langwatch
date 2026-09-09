@@ -109,19 +109,37 @@ general hazard recorded against the Genie warehouse-cost work; it is
 restated here because it is easy to reintroduce and silent when wrong.
 
 **6. Identity rides the event as raw provider ids, in the extras bag.**
-`actor` carries `user_email`. The raw `user_id` and the `api_key_id` ride in
-`extra`, which `pullerWorker.ts:587` spreads into `metadata.extension` —
-exactly the shape `databricksGenie.puller.ts:2596-2602` already ships for
-per-person attribution. **`NormalizedPullEvent` does not change**, so no
-published contract moves and no sibling adapter is touched.
+
+> **[CORRECTED — see revision v3.]** This decision was written as "`actor`
+> carries `user_email`". The adapter shipped the opposite and deliberately
+> so: `actor` carries the provider's **opaque `user-…` id**, and the email
+> reaches `raw_payload` only, through the row schema's `.passthrough()`
+> (`openaiAdmin.puller.ts:400,851` and the comment above them). The id is the
+> stable key, the erasure suppression list is keyed on exactly that string,
+> and a raw address is heavier on a money row. The decision below stands with
+> "the raw user id" read wherever it says "`user_email`".
+
+`actor` carries the row's raw `user_id`. That same id and the `api_key_id`
+also ride in `extra`, which `pullerWorker.ts:1096` spreads into
+`metadata.extension` — exactly the shape `databricksGenie.puller.ts` already
+ships for per-person attribution. **`NormalizedPullEvent` does not change**,
+so no published contract moves and no sibling adapter is touched.
 
 Populating the real `ActorUserId` column was considered and rejected. It is
-hardcoded to `""` for every puller (`pullerWorker.ts:602`), and the one
-surface named to justify filling it — `activityMonitor.service.ts:354` —
-reads `actorEmail || actorUserId || actorEnduserId`. OpenAI sends
-`user_email` on **every** row, so the email always wins that `||` and the
-column write would never be read. A published-contract change for a value
-nothing observes is cost with no benefit.
+hardcoded to `""` for every puller (`pullerWorker.ts:1110`), and the one
+surface named to justify filling it — `activityMonitor.service.ts:379` —
+reads `actorEmail || actorUserId || actorEnduserId`, so whatever `actor`
+holds wins that `||` and a column write would never be read.
+
+> **[SUPERSEDED IN PART — see revision v3.]** The rejection above was
+> reasoned from an email in `actor`. With an opaque id there instead, the
+> consequence is that the OCSF **actor email** column
+> (`pullerWorker.ts:1080,1112`) receives an opaque id rather than an address,
+> while the actor **id** column beside it stays `""`. The intended contract
+> is the plain one: **opaque ids belong in the actor id field, and the email
+> field carries addresses only** — a column named for an address must not be
+> read as holding one. This ADR records the divergence; it does not rule on
+> how the fields are filled.
 
 This follows ADR-088 Decision 13's principle — write the provider's raw id,
 resolve the person later, never call a directory at pull time. OpenAI
@@ -199,7 +217,21 @@ diverge on money units, timestamp format, page-token binding and a
 retention floor Anthropic has no equivalent of. An abstraction built at n=2
 is shaped like its first caller. Revisit at the third provider.
 
-**12. `openai_compliance` is deprecated in place, still listed.** It stays
+**12. `openai_compliance` is deprecated in place, still listed.**
+
+> **[NOT IMPLEMENTED — see revision v3.]** No code path deprecates
+> `openai_compliance`. Its catalog entry carries no `deprecated` flag
+> (`ingestionSourceCatalog.tsx:142-149`), so the picker offers it for new
+> sources exactly as before. The `deprecated` flag itself does exist and is
+> carried by one other type, but its shipped behaviour is the opposite of
+> what this decision chose: `gatedSourceTypeOptions` **filters a deprecated
+> option out of the picker** (`ingestionSourceCatalog.tsx:293`) rather than
+> showing it behind a disabled badge, and the catalog test was rewritten to
+> expect that (`ingestionSourceCatalog.unit.test.ts:19,27-41`) instead of
+> staying green unchanged. Both halves of the decision below — the badge and
+> the badging of this source type — are therefore unbuilt.
+
+It stays
 registered, stays in the catalog array, and stays **visible** in the picker
 behind a `deprecated` badge that disables it for new sources. Hiding it was
 rejected: `ingestionSourceCatalog.unit.test.ts:27-31` asserts the picker
@@ -231,7 +263,7 @@ can exist, so there is nothing to repair.
 | No float round-trip on money | Sub-cent figures keep every digit | `amount` parsed as `string \| number` and stringified once; a string input survives byte-identical |
 | A costless read writes no money | A missing row never overwrites a present one | Unit test: a bucket whose row vanished emits an event with **no** `pulled_usage` key, and `buildPulledUsageRecord` returns null |
 | Re-pulling an unchanged window records nothing new | At-least-once delivery is free | Same window pulled twice; ledger row count unchanged |
-| Identity reaches the audit row | Attribution is visible where a surface already reads it | OCSF row asserts `ActorEmail` = the row's email, and `metadata.extension.actorUserId` / `.apiKeyId` = the row's raw ids |
+| Identity reaches the audit row | Attribution is visible where a surface already reads it | OCSF row asserts the actor field = the row's raw `user_id`, and `metadata.extension.actorUserId` / `.apiKeyId` = the row's raw ids. **[v3: as shipped that actor field is the OCSF actor *email* column, which is the divergence Decision 6 now records — the address itself reaches `raw_payload` only.]** |
 | The watermark never moves backwards | A re-read window, or a page returned out of order, must not rewind progress | Unit test: a response whose last bucket precedes the stored watermark leaves the watermark unchanged |
 | A corrected bucket replaces, never adds | Restatement is the whole point of the re-read window | Same window pulled twice with a changed `amount.value`; the ledger shows the new figure once, and the row count is unchanged |
 | Below the floor the day survives, only the key is lost | A 400 on key grouping must not cost history | Unit test: a floor 400 triggers one retry with `user_id` only, and the resulting rows still carry `user_id` |
@@ -257,7 +289,7 @@ can exist, so there is nothing to repair.
 | Cost figure → ledger | No — `argMax` replacement destroys the prior figure | Money | Human review, plus the no-division and costless-read tests above. A dollar figure is asserted end to end against a captured payload, not a hand-written one. |
 | Provider identity ids leaving for third-party SIEMs | No — an export is a send | Privacy | Human review. `governanceOcsfEvents.clickhouse.repository.ts:236,284` exports `RawOcsfJson` to whatever SIEM an org has wired, and `raw_payload` is **required** on every pull event (`pullerAdapter.ts:96`), so the provider's ids egress by construction. Not introduced here — Anthropic and Genie already do it — but named so it is a decision rather than an accident. |
 | `openai_admin` `pullConfig` shape | No — persists in customer rows | Small (no row exists yet) | Human review of the schema. Validated at create time by `validateConfig`. |
-| `openai_compliance` badged deprecated | Yes | Small | Automated: the two existing catalog tests must stay green **unchanged** — the picker still offers every registered type (Decision 12). |
+| `openai_compliance` badged deprecated | Yes | Small | Automated: the two existing catalog tests must stay green **unchanged** — the picker still offers every registered type (Decision 12). **[NOT IMPLEMENTED — v3: nothing badges this type, and the catalog tests were rewritten rather than left unchanged.]** |
 | The trailing re-read window | Yes — read-only, bounded by a constant | Small | Automated: the restatement invariant above, plus a test that the watermark does not rewind. |
 | Live pull against the real Admin API | Read-only | None | Required before merge. A fixture alone has never caught a wire-shape error in this codebase. |
 
@@ -266,7 +298,9 @@ can exist, so there is nothing to repair.
 **No migration, and no contract change.** `NormalizedPullEvent` is untouched
 (Decision 6): identity travels in the existing `extra` bag, which the worker
 already spreads into `metadata.extension`. `ActorUserId` stays the empty
-string, as it is for every puller today.
+string, as it is for every puller today — which is the half of the field pair
+Decision 6's v3 correction names: the id column is empty while the column
+named for an email holds an opaque id.
 
 ```ts
 // What the adapter puts in the existing `extra` record. Raw and unresolved:
@@ -316,8 +350,8 @@ extra: {
   correction never reaches the ledger, in a product where nothing would
   notice. Rejected in Decision 9.
 - **Extend `NormalizedPullEvent` and populate `ActorUserId`** — a
-  published-contract change whose value no surface reads, because
-  `actorEmail` always wins the `||` that would have exposed it.
+  published-contract change whose value no surface reads, because whatever
+  `actor` holds always wins the `||` that would have exposed it.
 - **The declarative `http_polling` adapter** — the framework's documented
   default, and genuinely unusable here: its `eventMapping.extra` is a flat
   `z.record(z.string())` that cannot build the nested `dimensions` map the
@@ -326,7 +360,9 @@ extra: {
   beyond an opaque page token.
 - **Hide `openai_compliance` from the picker** — breaks two passing catalog
   tests and contradicts a spec scenario promising every supported type is
-  listed. A disabled badge achieves the same end.
+  listed. A disabled badge achieves the same end. **[v3: the codebase since
+  chose hiding for the one type it did retire, and rewrote the catalog tests
+  to match; `openai_compliance` itself was never deprecated at all.]**
 - **A uniqueness guard on duplicate sources** — belongs on every adapter,
   not this one alone.
 - **Extract a shared bucket-report base** — n=2 is a coincidence, and the
@@ -424,7 +460,8 @@ adapter duplicates cursor logic a third provider may justify factoring out.
   ships the extras shape. Decision 12 now keeps `openai_compliance`
   **visible with a disabled badge**: hiding it would have broken two passing
   catalog tests and a spec scenario promising every supported type is
-  listed.
+  listed. **[v3: neither half of that shipped — see the marker on Decision
+  12.]**
 
   Four gaps were closed without reopening a fork: the watermark takes
   `max(watermark, lastBucketStart)`, retiring an unstated dependence on
@@ -445,3 +482,29 @@ adapter duplicates cursor logic a third provider may justify factoring out.
   one day after page one ended. That observation is recorded as **not
   relied upon**. Two findings survived every attack unchanged: money-unit
   handling, and the costless-read guard. Captain: Sergio Esteban.
+- **v3 (2026-09-09) — documentation caught up with the code.** No decision is
+  taken here; two statements the ADR made are corrected against the adapter as
+  it stands, and the prose they correct is left in place so the record of the
+  decision survives.
+  - **Decision 6's `actor` is the raw `user_id`, not `user_email`.** The
+    adapter reads the id deliberately and says why in its own comment
+    (`openaiAdmin.puller.ts:390-401,835-851`): the id is stable, the erasure
+    suppression list is keyed on exactly that string, and the address is
+    heavier on a money row. The email is not dropped — it survives into
+    `raw_payload` through the row schema's `.passthrough()`.
+  - **Consequence, recorded rather than ruled on:** the worker writes
+    `actorEmail: event.actor` and `actorUserId: ""`
+    (`pullerWorker.ts:1080,1110-1112`), so today the OCSF column named for an
+    email address holds an opaque provider id while the actor id column beside
+    it is empty. The intended contract is the plain one — opaque ids belong in
+    the actor id field, and the email field carries addresses only.
+  - **Decision 12 was never implemented.** `openai_compliance` carries no
+    `deprecated` flag (`ingestionSourceCatalog.tsx:142-149`) and the picker
+    still offers it for new sources. The `deprecated` flag exists and one other
+    source type carries it, but `gatedSourceTypeOptions` **removes** a
+    deprecated option from the picker (`ingestionSourceCatalog.tsx:293`) —
+    the "hide it" alternative this ADR rejected — and the catalog test was
+    rewritten to expect that (`ingestionSourceCatalog.unit.test.ts:19,27-41`)
+    rather than staying green unchanged as the Gates row required.
+  - Stale citations refreshed: `pullerWorker.ts:587` → `:1096`, `:602` →
+    `:1110`, `activityMonitor.service.ts:354` → `:379`.
