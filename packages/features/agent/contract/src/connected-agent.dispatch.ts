@@ -1,15 +1,3 @@
-/**
- * What one turn to a connected agent is asked for, and what it answers with
- * (ADR-128, "Transport").
- *
- * Types only. The dispatcher that carries a turn to a live instance is the
- * server's; these are the shapes its callers speak, so a caller — the relay
- * route, a simulation turn, an experiment column — states what it sends and
- * what it reads back without reaching for the runtime that does it.
- *
- * @see specs/agents/connected-agents.feature
- */
-
 import type { CallEnvelope, CallOutput } from "./connected-agent.protocol.ts";
 
 /** What a caller hands the dispatcher for one turn. */

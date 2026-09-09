@@ -4,9 +4,12 @@
  * @see specs/agents/connected-agents.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LiveInstance } from "../../ports/connected-agent-runtime.port.ts";
-import type { ConnectedAgentRuntime } from "../../ports/connected-agent-runtime.port.ts";
+import type { LiveInstance } from "../connected-agent-runtime.service.ts";
+import type { ConnectedAgentRuntime } from "../connected-agent-runtime.service.ts";
 import { NO_PRESENCE, ConnectedAgentPresenceService } from "../connected-agent-presence.service.ts";
+
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import { ConnectedAgentRuntimeService } from "../connected-agent-runtime.service.ts";
 
 const listLive = vi.fn();
 
@@ -31,7 +34,8 @@ let runtime: ConnectedAgentRuntime;
 
 beforeEach(() => {
   listLive.mockReset();
-  runtime = { registry: { listLive } } as unknown as ConnectedAgentRuntime;
+  runtime = ConnectedAgentRuntimeService.create({ store: SessionStateStoreFactory.memory() });
+  vi.spyOn(runtime.registry, "listLive").mockImplementation(listLive);
 });
 
 describe("ConnectedAgentPresenceService.readAgentPresence", () => {

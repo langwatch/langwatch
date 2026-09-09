@@ -1,3 +1,6 @@
+import type { AgentService } from "../services/agent.service.ts";
+import { createConnectedAgentFixture } from "./connected-agent.fixture.ts";
+import { createLongPollFixture } from "./connected-agent.fixture.ts";
 /**
  * The rest of the HTTP long-poll transport's lifecycle: a call answered through the frames
  * (ADR-128, "Transport").
@@ -7,14 +10,11 @@ import {
   AgentSessionUnknownError,
   PRESENCE_TTL_SECONDS,
   PROTOCOL_VERSION,
-  type Agent,
-  type AgentService,
 } from "@langwatch/agent-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter.ts";
-import type { ConnectCredentialPort } from "../ports/connect-credential.port.ts";
-import type { AgentLastSeenWriter } from "../projections/connected-agent-presence.projection.ts";
-import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter.ts";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
+import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 import { AgentSessionService } from "../services/connected-agent-session.service.ts";
 import { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
 
@@ -22,23 +22,21 @@ const projectId = "project_poll_lifecycle";
 const instanceId = "inst_poll_lifecycle";
 
 const credentials = { authorization: "Bearer sk-lw-test", projectId };
-const resolved = { project: { id: projectId, slug: "poll-lifecycle" }, userId: null };
+const resolved = {
+  project: { id: projectId, slug: "poll-lifecycle" },
+  principalId: "key:test",
+  userId: null,
+};
 
-const fakeAgents = {} as AgentService;
-const fakeAgentRepository: AgentLastSeenWriter = { touchLastSeenAt: async () => undefined };
-const fakeCredentials = {} as ConnectCredentialPort;
-const fakeAgentPlatformUrl = () => "https://example.test/agents";
+const fakeAgents = createConnectedAgentFixture();
+const fakeCredentials: ConnectedAgentCredentials = {
+  resolve: async () => {
+    throw new Error("Credential lookup is not configured for this test");
+  },
+};
 
 function registeringAgentService(): AgentService {
-  return {
-    registerConnected: async (input: Parameters<AgentService["registerConnected"]>[0]) =>
-      ({
-        id: input.id,
-        name: input.name,
-        environment: input.identity.environment,
-        type: "connected",
-      }) as unknown as Agent,
-  } as unknown as AgentService;
+  return createConnectedAgentFixture();
 }
 
 function registerFrameBody() {
@@ -61,8 +59,8 @@ function registerFrameBody() {
 /** Registers one instance through the transport and returns its id, token and dispatch agent. */
 async function registerInstance(transport: LongPollTransportService) {
   const answer = await transport.register({ credentials, body: registerFrameBody() });
-  const agentId = (answer.body.frame as { agents: { id: string }[] }).agents[0]!.id;
-  const token = answer.body.instanceToken as string;
+  const agentId = (answer.frame as { agents: { id: string }[] }).agents[0]!.id;
+  const token = answer.instanceToken as string;
   return {
     agentId,
     token,
@@ -90,16 +88,15 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
     /** @scenario "A result posted over HTTP answers the dispatcher" */
     it("answers the dispatcher's outcome once it posts an ack and a result", async () => {
       vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
-      const runtime = ConnectedAgentRuntimeAdapter.create({
+      const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: ConnectedAgentStateAdapter.memory(),
+        store: SessionStateStoreFactory.memory(),
       });
-      const transport = LongPollTransportService.create({
+      const transport = createLongPollFixture({
         runtime,
         agents: registeringAgentService(),
-        agentRepository: fakeAgentRepository,
         credentials: fakeCredentials,
-        agentPlatformUrl: fakeAgentPlatformUrl,
+        publicBaseUrl: "https://example.test",
         replicaCount: 1,
         pollWaitMs: 2_000,
       });
@@ -128,16 +125,15 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
     /** @scenario "A cancel reaches a polling instance" */
     it("answers the next poll with a cancel frame for that call", async () => {
       vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
-      const runtime = ConnectedAgentRuntimeAdapter.create({
+      const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: ConnectedAgentStateAdapter.memory(),
+        store: SessionStateStoreFactory.memory(),
       });
-      const transport = LongPollTransportService.create({
+      const transport = createLongPollFixture({
         runtime,
         agents: registeringAgentService(),
-        agentRepository: fakeAgentRepository,
         credentials: fakeCredentials,
-        agentPlatformUrl: fakeAgentPlatformUrl,
+        publicBaseUrl: "https://example.test",
         replicaCount: 1,
         pollWaitMs: 2_000,
       });
@@ -176,16 +172,15 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
     /** @scenario "A deregister posted over HTTP retires the instance at once" */
     it("is no longer live and the token answers agent_session_unknown", async () => {
       vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
-      const runtime = ConnectedAgentRuntimeAdapter.create({
+      const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
-        store: ConnectedAgentStateAdapter.memory(),
+        store: SessionStateStoreFactory.memory(),
       });
-      const transport = LongPollTransportService.create({
+      const transport = createLongPollFixture({
         runtime,
         agents: registeringAgentService(),
-        agentRepository: fakeAgentRepository,
         credentials: fakeCredentials,
-        agentPlatformUrl: fakeAgentPlatformUrl,
+        publicBaseUrl: "https://example.test",
         replicaCount: 1,
         pollWaitMs: 200,
       });
@@ -228,19 +223,18 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
     it("fails a call dispatched to its agent with agent_offline", async () => {
       let now = Date.now();
       vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue(resolved);
-      const store = ConnectedAgentStateAdapter.memory({ now: () => now });
-      const runtime = ConnectedAgentRuntimeAdapter.create({
+      const store = SessionStateStoreFactory.memory({ now: () => now });
+      const runtime = ConnectedAgentRuntimeService.create({
         podId: "pod_solo",
         store,
         firstTurnGraceMs: 20,
         firstTurnPollMs: 5,
       });
-      const transport = LongPollTransportService.create({
+      const transport = createLongPollFixture({
         runtime,
         agents: registeringAgentService(),
-        agentRepository: fakeAgentRepository,
         credentials: fakeCredentials,
-        agentPlatformUrl: fakeAgentPlatformUrl,
+        publicBaseUrl: "https://example.test",
         replicaCount: 1,
         pollWaitMs: 20,
         now: () => now,
@@ -259,14 +253,13 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
 });
 
 function build() {
-  const store = ConnectedAgentStateAdapter.memory();
-  const runtime = ConnectedAgentRuntimeAdapter.create({ podId: "pod_solo", store });
-  const transport = LongPollTransportService.create({
+  const store = SessionStateStoreFactory.memory();
+  const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
+  const transport = createLongPollFixture({
     runtime,
     agents: fakeAgents,
-    agentRepository: fakeAgentRepository,
     credentials: fakeCredentials,
-    agentPlatformUrl: fakeAgentPlatformUrl,
+    publicBaseUrl: "https://example.test",
     replicaCount: 1,
   });
   return { store, runtime, transport };

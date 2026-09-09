@@ -1,17 +1,4 @@
-/**
- * A connected agent's config: an agent the SDK registered from a decorated
- * function in the customer's own code (ADR-128).
- *
- * The config holds what the function declares and nothing about the runtime.
- * Presence lives on `Agent.lastSeenAt` and in the gateway's own store, so a
- * config read here never says whether an instance is up.
- *
- * The parameter shape is restated here rather than imported from the scenario
- * contract for the reason `connected-agent.protocol.ts` restates the name
- * grammar: this package stays zod-only, and a dependency on the scenario
- * contract would make the agent contract heavier than the wire it describes.
- * The two shapes are the same by test, not by import.
- */
+/** SDK-declared configuration; runtime presence is stored separately (ADR-128). */
 import { z } from "zod";
 import { baseAgentConfigSchema } from "./base.ts";
 
@@ -30,7 +17,8 @@ export const connectedParameterDefinitionSchema = z
   })
   .strict();
 
-export const connectedAgentConfigSchema = baseAgentConfigSchema.omit({ description: true }).extend({
+export const connectedAgentConfigSchema = z.object({
+  ...baseAgentConfigSchema.omit({ description: true }).shape,
   parameters: z.array(connectedParameterDefinitionSchema).default([]),
   /** Per-call budget in milliseconds, capped by the platform. */
   timeoutMs: z.number().int().positive().optional(),

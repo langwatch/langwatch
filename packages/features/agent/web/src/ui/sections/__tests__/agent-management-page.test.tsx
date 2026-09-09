@@ -1,0 +1,355 @@
+/** @vitest-environment jsdom */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type {
+  Agent,
+  AgentCopy,
+  AgentHistoryEntry,
+  AgentWithFields,
+  CreateAgentCommand,
+  RelatedAgentEntities,
+  UpdateAgentCommand,
+} from "@langwatch/agent-contract";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { afterEach, describe, expect, it } from "vitest";
+import type { AgentClient } from "../../../model/agent-client.ts";
+import {
+  type AgentCardRenderInput,
+  type AgentManagementCardPort,
+  type AgentManagementFeedbackPort,
+  type AgentManagementLifecyclePort,
+  type AgentManagementNavigationPort,
+  AgentManagementPage,
+  type AgentArchiveDialogInput,
+  type AgentCopyDialogInput,
+  type AgentPageCompositionPort,
+  type AgentPushDialogInput,
+  type AgentWithFields as WireAgentWithFields,
+} from "../agent-management-page.tsx";
+
+afterEach(cleanup);
+
+const agent: AgentWithFields = {
+  id: "agent_1",
+  projectId: "project_1",
+  name: "HTTP agent",
+  type: "http",
+  workflowId: null,
+  copiedFromAgentId: null,
+  archivedAt: null,
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-02T00:00:00.000Z"),
+  copyCount: 1,
+  config: {
+    name: "HTTP",
+    description: "HTTP API endpoint",
+    url: "https://example.test/run",
+    method: "POST",
+  },
+  inputFields: [],
+  outputFields: [],
+  fieldsResolved: true,
+};
+
+class TestAgentBrowser implements AgentClient {
+  readonly copyCalls: unknown[] = [];
+  readonly pushCalls: unknown[] = [];
+
+  getById(): Promise<AgentWithFields> {
+    return Promise.resolve(agent);
+  }
+
+  create(_input: CreateAgentCommand): Promise<AgentWithFields> {
+    return Promise.resolve(agent);
+  }
+
+  update(_input: UpdateAgentCommand): Promise<AgentWithFields> {
+    return Promise.resolve(agent);
+  }
+
+  relatedEntities(): Promise<RelatedAgentEntities> {
+    return Promise.resolve({ workflow: null });
+  }
+
+  cascadeArchive(): Promise<{
+    agent: Agent;
+    archivedWorkflow: { id: string } | null;
+  }> {
+    return Promise.resolve({ agent, archivedWorkflow: null });
+  }
+
+  archive(): Promise<Agent> {
+    return Promise.resolve(agent);
+  }
+
+  getCopies(): Promise<AgentCopy[]> {
+    return Promise.resolve([
+      {
+        id: "agent_copy",
+        name: "Agent copy",
+        projectId: "project_2",
+        fullPath: "Org / Team / Project",
+      },
+    ]);
+  }
+
+  copy(input: unknown): Promise<{
+    id: string;
+    projectId: string;
+    name: string;
+    copiedFromAgentId: string;
+  }> {
+    this.copyCalls.push(input);
+    return Promise.resolve({
+      id: "agent_copy",
+      projectId: "project_2",
+      name: "HTTP agent",
+      copiedFromAgentId: agent.id,
+    });
+  }
+
+  pushToCopies(input: unknown): Promise<{
+    pushedTo: number;
+    selectedCopies: number;
+  }> {
+    this.pushCalls.push(input);
+    return Promise.resolve({ pushedTo: 1, selectedCopies: 1 });
+  }
+
+  syncFromSource(): Promise<{ ok: true }> {
+    return Promise.resolve({ ok: true });
+  }
+
+  getHistory(): Promise<AgentHistoryEntry[]> {
+    return Promise.resolve([]);
+  }
+}
+
+class TestAgentPageComposition implements AgentPageCompositionPort {
+  renderHeader(): ReactNode {
+    return null;
+  }
+
+  renderArchiveDialog(_input: AgentArchiveDialogInput): ReactNode {
+    if (!_input.open) return null;
+    return (
+      <button type="button" onClick={_input.onConfirm}>
+        Confirm archive
+      </button>
+    );
+  }
+
+  renderCopyDialog(input: AgentCopyDialogInput): ReactNode {
+    if (!input.open) return null;
+    return (
+      <button type="button" onClick={() => void input.onCopy("project_2")}>
+        Confirm copy
+      </button>
+    );
+  }
+
+  renderPushDialog(input: AgentPushDialogInput): ReactNode {
+    if (!input.open || input.copies.length === 0) return null;
+    return (
+      <button type="button" onClick={() => void input.onPush()}>
+        Confirm push
+      </button>
+    );
+  }
+}
+
+class TestNavigation implements AgentManagementNavigationPort {
+  openEditor(): void {}
+
+  openTypeSelector(): void {}
+
+  openHistory(): void {}
+
+  openWorkflow(): void {}
+}
+
+class TestFeedback implements AgentManagementFeedbackPort {
+  showSuccess(): void {}
+
+  showError(): void {}
+}
+
+class TestLifecycle implements AgentManagementLifecyclePort {
+  agentsChangedCalls = 0;
+  agentArchivedCalls = 0;
+
+  async agentsChanged(): Promise<void> {
+    this.agentsChangedCalls += 1;
+  }
+
+  async agentArchived(): Promise<void> {
+    this.agentArchivedCalls += 1;
+  }
+}
+
+class TestCard implements AgentManagementCardPort {
+  render(props: AgentCardRenderInput): ReactNode {
+    return (
+      <div>
+        <button type="button" onClick={props.onReplicate}>
+          Replicate to another project
+        </button>
+        <button type="button" onClick={props.onPushToCopies}>
+          Push to replicas
+        </button>
+        <button type="button" onClick={props.onSyncFromSource}>
+          Sync from source
+        </button>
+        <button type="button" onClick={props.onDelete}>
+          Delete agent
+        </button>
+      </div>
+    );
+  }
+}
+
+/** The same agent as the browser holds it, with the instants the wire carries. */
+const wireAgent: WireAgentWithFields = {
+  id: agent.id,
+  projectId: agent.projectId,
+  name: agent.name,
+  type: "http",
+  workflowId: null,
+  copiedFromAgentId: null,
+  archivedAt: null,
+  createdAt: agent.createdAt.toISOString(),
+  updatedAt: agent.updatedAt.toISOString(),
+  copyCount: 1,
+  config: {
+    name: "HTTP",
+    description: "HTTP API endpoint",
+    url: "https://example.test/run",
+    method: "POST",
+  },
+  inputFields: [],
+  outputFields: [],
+  fieldsResolved: true,
+};
+
+function renderPage(browser: TestAgentBrowser, lifecycle = new TestLifecycle()) {
+  render(
+    <ChakraProvider value={defaultSystem}>
+      <AgentManagementPage
+        data={{
+          projectId: "project_1",
+          agents: browser,
+          items: [wireAgent],
+          isLoading: false,
+          copyProjects: [{ label: "Project 2", value: "project_2", hasCreatePermission: true }],
+        }}
+        navigation={new TestNavigation()}
+        feedback={new TestFeedback()}
+        lifecycle={lifecycle}
+        composition={new TestAgentPageComposition()}
+        card={new TestCard()}
+      />
+    </ChakraProvider>,
+  );
+}
+
+describe("AgentManagementPage", () => {
+  it("replicates the selected agent to the project chosen by the host dialog", async () => {
+    const browser = new TestAgentBrowser();
+    const lifecycle = new TestLifecycle();
+    renderPage(browser, lifecycle);
+
+    fireEvent.click(await screen.findByText("Replicate to another project"));
+    fireEvent.click(screen.getByText("Confirm copy"));
+
+    await waitFor(() => {
+      expect(browser.copyCalls).toEqual([
+        {
+          agentId: "agent_1",
+          projectId: "project_2",
+          sourceProjectId: "project_1",
+        },
+      ]);
+      expect(lifecycle.agentsChangedCalls).toBe(1);
+    });
+  });
+
+  it("loads replicas and pushes only the selected replica identifiers", async () => {
+    const browser = new TestAgentBrowser();
+    const lifecycle = new TestLifecycle();
+    renderPage(browser, lifecycle);
+
+    fireEvent.click(await screen.findByText("Push to replicas"));
+    fireEvent.click(await screen.findByText("Confirm push"));
+
+    await waitFor(() => {
+      expect(browser.pushCalls).toEqual([
+        {
+          agentId: "agent_1",
+          projectId: "project_1",
+          copyIds: ["agent_copy"],
+        },
+      ]);
+      expect(lifecycle.agentsChangedCalls).toBe(1);
+    });
+  });
+
+  it("refreshes the visible agent data after syncing a copied agent", async () => {
+    const browser = new TestAgentBrowser();
+    const lifecycle = new TestLifecycle();
+    renderPage(browser, lifecycle);
+
+    fireEvent.click(await screen.findByText("Sync from source"));
+
+    await waitFor(() => expect(lifecycle.agentsChangedCalls).toBe(1));
+  });
+
+  it("keeps archive confirmation in the host dialog and runs the archive lifecycle", async () => {
+    const browser = new TestAgentBrowser();
+    const lifecycle = new TestLifecycle();
+    renderPage(browser, lifecycle);
+
+    fireEvent.click(await screen.findByText("Delete agent"));
+    fireEvent.click(await screen.findByText("Confirm archive"));
+
+    await waitFor(() => expect(lifecycle.agentArchivedCalls).toBe(1));
+  });
+
+  describe("given the project has no agent of any kind", () => {
+    /** @scenario "An empty agents page still opens the new agent flow" */
+    it("draws an empty state whose control opens the new agent flow", async () => {
+      const browser = new TestAgentBrowser();
+      const openTypeSelectorCalls: unknown[] = [];
+      class EmptyNavigation implements AgentManagementNavigationPort {
+        openEditor(): void {}
+        openTypeSelector(): void {
+          openTypeSelectorCalls.push(true);
+        }
+        openHistory(): void {}
+        openWorkflow(): void {}
+      }
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <AgentManagementPage
+            data={{
+              projectId: "project_1",
+              agents: browser,
+              items: [],
+              isLoading: false,
+              copyProjects: [],
+            }}
+            navigation={new EmptyNavigation()}
+            feedback={new TestFeedback()}
+            lifecycle={new TestLifecycle()}
+            composition={new TestAgentPageComposition()}
+            card={new TestCard()}
+          />
+        </ChakraProvider>,
+      );
+
+      fireEvent.click(await screen.findByText("Create your first agent"));
+
+      expect(openTypeSelectorCalls).toEqual([true]);
+    });
+  });
+});

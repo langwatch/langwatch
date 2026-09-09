@@ -24,7 +24,6 @@ function traceFor(
       url: "https://agent.test/answer",
       method: "POST",
       auth: { type: "bearer", token: "secret" },
-      ...(overrides.testContext ? {} : {}),
     }),
     requestBody: '{"question":"hi"}',
     requestHeaders: { Authorization: "Bearer redacted" },

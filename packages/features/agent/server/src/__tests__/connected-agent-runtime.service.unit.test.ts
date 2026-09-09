@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CALL_ENVELOPE_KEYS, RESULT_TTL_SECONDS } from "@langwatch/agent-contract";
 
 import { buildCallEnvelope, type StoredResult, storedCallSchema } from "@langwatch/agent-contract";
-import type { InstanceMeta } from "../ports/connected-agent-runtime.port.ts";
-import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter.ts";
+import type { InstanceMeta } from "../services/connected-agent-runtime.service.ts";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import {
   callAckKey,
   callKey,
@@ -17,8 +17,8 @@ import {
   replyChannel,
   resultKey,
 } from "../rules/connected-agent-keys.rules.ts";
-import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter.ts";
-import type { ConnectedAgentRuntime } from "../ports/connected-agent-runtime.port.ts";
+import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
+import type { ConnectedAgentRuntime } from "../services/connected-agent-runtime.service.ts";
 
 const projectId = "proj_1";
 
@@ -142,9 +142,9 @@ async function connectInstance({
 }
 
 async function startRuntime(overrides: { firstTurnGraceMs?: number } = {}): Promise<void> {
-  runtime = ConnectedAgentRuntimeAdapter.create({
+  runtime = ConnectedAgentRuntimeService.create({
     podId: "pod_a",
-    store: ConnectedAgentStateAdapter.memory(),
+    store: SessionStateStoreFactory.memory(),
     firstTurnGraceMs: 300,
     firstTurnPollMs: 20,
     resultPollMs: 50,
@@ -173,7 +173,7 @@ afterEach(async () => {
   await runtime.store.close();
 });
 
-describe("CallDispatcherAdapter", () => {
+describe("ConnectedAgentDispatchService", () => {
   describe("when the instance answers", () => {
     /** @scenario "A call reaches an instance connected to another app replica" */
     it("returns the output, the session and the instance", async () => {
@@ -306,7 +306,9 @@ describe("CallDispatcherAdapter", () => {
   });
 
   describe("when no instance is live", () => {
-    /** @scenario "A call to an agent with no live instance is refused after the first-turn grace" */
+    /**
+     * @scenario "A call to an agent with no live instance is refused after the first-turn grace"
+     */
     it("waits the grace, then fails with agent_offline", async () => {
       const started = Date.now();
       await expect(
@@ -692,8 +694,8 @@ describe("buildCallEnvelope", () => {
         run: { scenarioRunId: "run_1" },
         judgmentRequest: { criteria: ["never leaks"] },
         metadata: { langwatch: { targetType: "connected" } },
-      } as const;
-      const envelope = buildCallEnvelope(body as never);
+      };
+      const envelope = buildCallEnvelope(body);
       expect(Object.keys(envelope).sort()).toEqual([...CALL_ENVELOPE_KEYS].sort());
       expect(envelope).not.toHaveProperty("judgmentRequest");
       expect(envelope).not.toHaveProperty("metadata");

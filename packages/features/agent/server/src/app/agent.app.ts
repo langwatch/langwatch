@@ -1,206 +1,331 @@
-/**
- * The agent feature's application: what all of its doors call.
- */
-import type {
-  AgentService,
-  AgentTestRunResult,
-  AgentTestTurnResult,
-  AgentWithFields,
+import { TraceApi } from "@langwatch/trace-contract";
+import type { AgentCallSignal } from "@langwatch/agent-contract";
+import {
+  AgentApi,
+  type AgentWorkflowInput,
+  type UpdateAgentWorkflowConfigInput,
+  agentServerConfigSchema,
+  linkedWorkflowId,
+  type Agent,
+  type AgentWithFields,
+  type AgentProjectInput,
+  type GetAgentInput,
+  type AgentIdsInput,
+  type ListAgentsInput,
+  type CreateAgentCommand,
+  type UpdateAgentCommand,
+  type CopyAgentCommand,
+  type AgentCopiesInput,
+  type AgentReferenceInput,
+  type PushAgentCopiesInput,
+  type ConnectedAgentsInput,
+  type ConnectedAgentsEnvironmentInput,
+  type RegisterConnectedAgentInput,
+  type HttpAgentTestInput,
+  type AgentConnection,
+  type AgentConnectCredentials,
+  type AgentConnectFramesInput,
+  type AgentConnectPollInput,
+  AgentNotFoundError,
+  AgentHttpTestingUnavailableError,
+  AgentConnectionsUnavailableError,
+  AgentSourcePermissionDeniedError,
+  AgentOwnerOnlyError,
+  connectedAgentSelectability,
+  DEFAULT_CALL_TIMEOUT_MS,
+  MAX_CALL_TIMEOUT_MS,
+  type AgentCallInput,
+  type AgentCallContext,
+  type DispatchAgent,
+  type DispatchCall,
 } from "@langwatch/agent-contract";
-import { nanoid } from "nanoid";
-import type { AgentTestPort } from "../ports/agent-test.port.ts";
-import { declaredAgentParameters } from "../rules/agent-view.rules.ts";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
+import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
+import { ScenarioApi } from "@langwatch/scenario-contract";
+import { UserApi } from "@langwatch/user-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { Instant } from "@langwatch/time";
+import { z } from "zod";
+import type { AgentRepositories } from "../repositories/agent.repositories.ts";
+import { agentWithResolvedFields, declaredAgentParameters } from "../rules/agent-view.rules.ts";
+import { AgentService } from "../services/agent.service.ts";
+import { AgentCopyService } from "../services/agent-copy.service.ts";
+import { ConnectedAgentService } from "../services/connected-agent.service.ts";
 import {
   ConnectedAgentPresenceService,
   type AgentPresence,
 } from "../services/connected-agent-presence.service.ts";
+import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
 
-/** `AgentWithFields.ownerUserId` is optional; the presence view needs it settled. */
-function withOwnerUserId<T extends AgentWithFields>(agent: T): T & { ownerUserId: string | null } {
-  return { ...agent, ownerUserId: agent.ownerUserId ?? null };
+const agentAppConfigSchema = z.object({
+  publicBaseUrl: z.url(),
+  connected: agentServerConfigSchema.nullable(),
+  httpTesting: z.boolean().optional(),
+});
+export type AgentAppConfig = z.infer<typeof agentAppConfigSchema>;
+export interface AgentInfrastructure {
+  redis?: RedisConnection | null;
 }
+type AgentSetup = FeatureSetup<
+  typeof AgentApp.dependencies,
+  AgentInfrastructure,
+  AgentAppConfig,
+  AgentRepositories
+>;
 
-/** What the process composes this feature's application from. */
-export interface AgentAppDependencies {
-  agents: AgentService;
-  /**
-   * Runs "Test agent" through the Scenario feature's execution pipeline.
-   */
-  testing?: AgentTestPort;
-  /**
-   * Reads presence (ADR-128) off the connected-agent runtime. Absent on a
-   * process that never installed the runtime (a test double, or a process that composes no
-   * connected-agent transport): every agent then reads as offline with no instances, the
-   */
-  connected?: {
-    presence: (input: {
-      projectId: string;
-      agents: { id: string; type: string }[];
-    }) => Promise<Map<string, AgentPresence>>;
+export class AgentApp implements AgentApi {
+  static readonly contract = AgentApi;
+  static readonly configSchema = agentAppConfigSchema;
+  static readonly dependencies = {
+    apiKeys: ApiKeyApi,
+    auditLog: AuditLogApi,
+    permissions: AuthzApi,
+    projects: ProjectApi,
+    scenarios: ScenarioApi,
+    traces: TraceApi,
+    users: UserApi,
+    workflows: WorkflowApi,
   };
-}
 
-export class AgentApp {
-  static create(dependencies: AgentAppDependencies): AgentApp {
-    return new AgentApp(dependencies);
-  }
+  readonly #agents: AgentService;
+  readonly #copies: AgentCopyService;
+  readonly #connected: ConnectedAgentService | undefined;
+  readonly #httpTesting: HttpAgentTestService | undefined;
+  readonly #auditLog: AuditLogApi;
+  readonly #permissions: AuthzApi;
+  readonly #projects: ProjectApi;
+  readonly #scenarios: ScenarioApi;
+  readonly #users: UserApi;
+  readonly #workflows: WorkflowApi;
 
-  private constructor(private readonly dependencies: AgentAppDependencies) {}
+  private constructor({
+    repositories,
+    dependencies,
+    infrastructure,
+    config,
+    resources,
+  }: AgentSetup) {
+    this.#agents = AgentService.create(repositories.agents);
+    this.#copies = AgentCopyService.create(repositories.agents, dependencies.workflows);
+    this.#auditLog = dependencies.auditLog;
+    this.#permissions = dependencies.permissions;
+    this.#projects = dependencies.projects;
+    this.#scenarios = dependencies.scenarios;
+    this.#users = dependencies.users;
+    this.#workflows = dependencies.workflows;
+    this.#httpTesting = config.httpTesting
+      ? HttpAgentTestService.create({
+          workflows: dependencies.workflows,
+          traces: dependencies.traces,
+        })
+      : void 0;
 
-  /**
-   * The platform's agent-id scheme.
-   */
-  static nextAgentId(): string {
-    return `agent_${nanoid()}`;
-  }
-
-  /**
-   * Every non-archived agent in one project, each carrying what ADR-128
-   * added: the parameters a connected agent declares, the owner of a personal one, its
-   * presence, and whether the reader may choose it. Other kinds read as offline with no
-   * instances and no owner.
-   */
-  async getAll(input: Parameters<AgentService["getAll"]>[0] & { viewerUserId?: string | null }) {
-    const agents = await this.dependencies.agents.getAll({ projectId: input.projectId });
-    const owned = agents.map(withOwnerUserId);
-    const [owners, presence] = await this.readOwnersAndPresence({
-      agents: owned,
-      projectId: input.projectId,
-    });
-    return owned.map((agent) => this.toConnectedView(agent, owners, presence, input.viewerUserId));
-  }
-
-  /** One agent, by id, inside one project, carrying the same connected view. */
-  async getById(input: Parameters<AgentService["getById"]>[0] & { viewerUserId?: string | null }) {
-    const agent = withOwnerUserId(
-      await this.dependencies.agents.getById({ id: input.id, projectId: input.projectId }),
-    );
-    const [owners, presence] = await this.readOwnersAndPresence({
-      agents: [agent],
-      projectId: input.projectId,
-    });
-    return this.toConnectedView(agent, owners, presence, input.viewerUserId);
-  }
-
-  /** The declared parameters, owner and presence one agent row carries. */
-  private toConnectedView<T extends AgentWithFields & { ownerUserId: string | null }>(
-    agent: T,
-    owners: Map<string, { userId: string; name: string | null }>,
-    presence: Map<string, AgentPresence>,
-    viewerUserId?: string | null,
-  ) {
-    return {
-      ...agent,
-      parameters: declaredAgentParameters(agent),
-      ...ConnectedAgentPresenceService.agentPresenceView({
-        agent,
-        owners,
-        presence,
-        viewerUserId,
-      }),
-    };
-  }
-
-  /** The two reads a connected view is built from, run together. */
-  private readOwnersAndPresence({
-    agents,
-    projectId,
-  }: {
-    agents: { id: string; type: string; ownerUserId: string | null }[];
-    projectId: string;
-  }) {
-    return Promise.all([
-      this.dependencies.agents.ownersOf(agents),
-      this.dependencies.connected
-        ? this.dependencies.connected.presence({ projectId, agents })
-        : Promise.resolve(new Map<string, AgentPresence>()),
-    ]);
-  }
-
-  /** One page of the project's non-archived agents. */
-  list(input: Parameters<AgentService["list"]>[0]) {
-    return this.dependencies.agents.list(input);
-  }
-
-  /** Stores a new agent. The id is the caller's, or {@link nextAgentId}'s. */
-  create(input: Parameters<AgentService["create"]>[0]) {
-    return this.dependencies.agents.create(input);
-  }
-
-  /** Replaces an agent's stored configuration. */
-  update(input: Parameters<AgentService["update"]>[0]) {
-    return this.dependencies.agents.update(input);
-  }
-
-  /** Soft-deletes one agent. */
-  archive(input: Parameters<AgentService["archive"]>[0]) {
-    return this.dependencies.agents.archive(input);
-  }
-
-  /** What else in the project points at this agent. */
-  relatedEntities(input: Parameters<AgentService["relatedEntities"]>[0]) {
-    return this.dependencies.agents.relatedEntities(input);
-  }
-
-  /** Archives the agent and whatever the archive must take with it. */
-  cascadeArchive(input: Parameters<AgentService["cascadeArchive"]>[0]) {
-    return this.dependencies.agents.cascadeArchive(input);
-  }
-
-  /** Every copy made from one source agent, across projects. */
-  getCopies(input: Parameters<AgentService["getCopies"]>[0]) {
-    return this.dependencies.agents.getCopies(input);
-  }
-
-  /** The agent one copy was made from. */
-  getSourceOfCopy(input: Parameters<AgentService["getSourceOfCopy"]>[0]) {
-    return this.dependencies.agents.getSourceOfCopy(input);
-  }
-
-  /** Copies one agent into another project. */
-  copy(input: Parameters<AgentService["copy"]>[0]) {
-    return this.dependencies.agents.copy(input);
-  }
-
-  /** Pushes a source agent's configuration onto the named copies. */
-  pushToCopies(input: Parameters<AgentService["pushToCopies"]>[0]) {
-    return this.dependencies.agents.pushToCopies(input);
-  }
-
-  /** Pulls the source agent's configuration back onto this copy. */
-  syncFromSource(input: Parameters<AgentService["syncFromSource"]>[0]) {
-    return this.dependencies.agents.syncFromSource(input);
-  }
-
-  /** One agent's edit history. */
-  getHistory(input: Parameters<AgentService["getHistory"]>[0]) {
-    return this.dependencies.agents.getHistory(input);
-  }
-
-  /** The display names of the owners of a set of agents, by owner user id. */
-  ownersOf(rows: Parameters<AgentService["ownersOf"]>[0]) {
-    return this.dependencies.agents.ownersOf(rows);
-  }
-
-  /**
-   * Sends one turn to an agent, through the same adapter a simulation turn
-   * uses, and answers what it returned.
-   */
-  async testTurn(input: {
-    id: string;
-    projectId: string;
-    message: string;
-    params?: Record<string, string | number | boolean>;
-    actorId: string;
-  }): Promise<AgentTestTurnResult> {
-    const agent = await this.dependencies.agents.getById({
-      id: input.id,
-      projectId: input.projectId,
-    });
-    if (!this.dependencies.testing) {
-      throw new Error("This process composed no agent test runner, so no turn can be sent.");
+    if (config.connected) {
+      const connected = ConnectedAgentService.create({
+        agents: this.#agents,
+        apiKeys: dependencies.apiKeys,
+        authz: dependencies.permissions,
+        projects: dependencies.projects,
+        redis: infrastructure.redis ?? null,
+        config: config.connected,
+        publicBaseUrl: config.publicBaseUrl,
+      });
+      this.#connected = connected;
+      resources.ownService({
+        name: "agent-connections",
+        start: () => connected.start(),
+        stop: () => connected.close(),
+      });
     }
-    return this.dependencies.testing.sendTurn({
+  }
+
+  static create(setup: AgentSetup): AgentApp {
+    return new AgentApp(setup);
+  }
+
+  async getAll(input: AgentProjectInput & { viewerUserId?: string | null }) {
+    return this.#enrich(await this.#agents.getAll(input), input);
+  }
+
+  async getById(input: GetAgentInput & { viewerUserId?: string | null }) {
+    const agent = await this.#agents.getById(input);
+    const [enriched] = await this.#enrich([agent], input);
+    return enriched!;
+  }
+
+  list(input: ListAgentsInput) {
+    return this.#agents.list(input);
+  }
+
+  async listWithPresence(input: ListAgentsInput & { viewerUserId?: string | null }) {
+    const page = await this.#agents.list(input);
+    return { ...page, data: await this.#enrich(page.data, input) };
+  }
+
+  async create(input: CreateAgentCommand) {
+    return this.#withFields(await this.#agents.create(input));
+  }
+
+  async update(input: UpdateAgentCommand) {
+    return this.#withFields(await this.#agents.update(input));
+  }
+
+  archive(input: GetAgentInput) {
+    return this.#agents.archive(input);
+  }
+  exists(input: GetAgentInput) {
+    return this.#agents.exists(input);
+  }
+  getNamesByIds(input: AgentIdsInput) {
+    return this.#agents.getNamesByIds(input);
+  }
+  getReferenceStates(input: AgentIdsInput) {
+    return this.#agents.getReferenceStates(input);
+  }
+
+  listWorkflowConfigs(input: AgentWorkflowInput) {
+    return this.#agents.listWorkflowConfigs(input);
+  }
+
+  updateWorkflowConfig(input: UpdateAgentWorkflowConfigInput): Promise<void> {
+    return this.#agents.updateWorkflowConfig(input);
+  }
+  registerConnected(input: RegisterConnectedAgentInput) {
+    return this.#agents.registerConnected(input);
+  }
+  touchLastSeenAt(input: GetAgentInput & { at: Instant }) {
+    return this.#agents.touchLastSeenAt(input);
+  }
+  getConnectedByName(input: ConnectedAgentsInput) {
+    return this.#agents.getConnectedByName(input);
+  }
+  getConnectedByNameAndEnvironment(input: ConnectedAgentsEnvironmentInput) {
+    return this.#agents.getConnectedByNameAndEnvironment(input);
+  }
+
+  async relatedEntities(input: GetAgentInput) {
+    const agent = await this.#agents.getById(input);
+    const workflowId = linkedWorkflowId(agent);
+    const workflows = workflowId
+      ? await this.#workflows.listSummaries({
+          projectId: input.projectId,
+          workflowIds: [workflowId],
+        })
+      : [];
+    return { workflow: workflows[0] ?? null };
+  }
+
+  async cascadeArchive(input: GetAgentInput) {
+    const agent = await this.#agents.getById(input);
+    const workflowId = linkedWorkflowId(agent);
+    const archivedWorkflow = workflowId
+      ? await this.#workflows.archiveLinked({ workflowId, projectId: input.projectId })
+      : null;
+    return { agent: await this.#agents.archive(input), archivedWorkflow };
+  }
+
+  async getCopies(input: AgentCopiesInput) {
+    const copies = await this.#copies.getCopies(input);
+    const paths = await this.#projects.listPaths({
+      projectIds: [...new Set(copies.map((copy) => copy.projectId))],
+    });
+    const pathsById = new Map(paths.map((path) => [path.projectId, path.fullPath]));
+    return copies.map((copy) => {
+      const fullPath = pathsById.get(copy.projectId);
+      if (fullPath === void 0) {
+        throw new ProjectNotFoundError("Agent copy project not found", {
+          meta: { projectId: copy.projectId },
+        });
+      }
+
+      return { ...copy, fullPath };
+    });
+  }
+
+  copy(input: CopyAgentCommand) {
+    return this.#copies.copy(input);
+  }
+  pushToCopies(input: PushAgentCopiesInput) {
+    return this.#copies.pushToCopies(input);
+  }
+  getSourceOfCopy(input: AgentReferenceInput) {
+    return this.#copies.getSourceOfCopy(input);
+  }
+  syncFromSource(input: AgentReferenceInput) {
+    return this.#copies.syncFromSource(input);
+  }
+
+  async getCopiesForActor(input: AgentReferenceInput & { actorId: string }) {
+    await this.#agents.getById({ id: input.agentId, projectId: input.projectId });
+    const copies = await this.getCopies({ sourceAgentId: input.agentId });
+    const allowed = await this.#permittedCopies(copies, input.actorId, "evaluations:view");
+    return copies.filter((copy) => allowed.has(copy.id));
+  }
+
+  async copyForActor(input: CopyAgentCommand & { actorId: string }) {
+    await this.#assertSourcePermission(input.actorId, input.sourceProjectId);
+    return this.copy(input);
+  }
+
+  async pushToCopiesForActor(input: AgentReferenceInput & { actorId: string; copyIds?: string[] }) {
+    const copies = await this.#copies.getCopies({ sourceAgentId: input.agentId });
+    const allowed = await this.#permittedCopies(copies, input.actorId, "evaluations:manage");
+    const copyIds = input.copyIds ? input.copyIds.filter((id) => allowed.has(id)) : [...allowed];
+    return this.pushToCopies({
+      sourceAgentId: input.agentId,
+      sourceProjectId: input.projectId,
+      copyIds,
+    });
+  }
+
+  async syncFromSourceForActor(input: AgentReferenceInput & { actorId: string }) {
+    const source = await this.getSourceOfCopy(input);
+    await this.#assertSourcePermission(input.actorId, source.projectId);
+    return this.syncFromSource(input);
+  }
+
+  async getHistory(input: AgentReferenceInput) {
+    await this.#agents.getById({ id: input.agentId, projectId: input.projectId });
+    const entries = await this.#auditLog.listEntityHistory({
+      projectId: input.projectId,
+      entityId: input.agentId,
+      actionPrefix: "agents.",
+      argumentNames: ["id", "agentId", "newAgentId"],
+      limit: 100,
+    });
+    const userIds = [...new Set(entries.flatMap((entry) => (entry.userId ? [entry.userId] : [])))];
+    const users = userIds.length ? await this.#users.getProfiles({ userIds }) : [];
+    const byId = new Map(
+      users.map((user) => [user.id, { id: user.id, name: user.name, email: user.email }]),
+    );
+    return entries.map(({ userId, ...entry }) => ({
+      ...entry,
+      user: userId ? (byId.get(userId) ?? null) : null,
+    }));
+  }
+
+  async ownersOf(agents: readonly { ownerUserId: string | null }[]) {
+    const userIds = [
+      ...new Set(agents.flatMap((agent) => (agent.ownerUserId ? [agent.ownerUserId] : []))),
+    ];
+    const users = userIds.length ? await this.#users.getProfiles({ userIds }) : [];
+    const names = new Map(users.map((user) => [user.id, user.name]));
+    return new Map(userIds.map((userId) => [userId, { userId, name: names.get(userId) ?? null }]));
+  }
+
+  async testTurn(
+    input: GetAgentInput & {
+      actorId: string;
+      message: string;
+      params?: Record<string, string | number | boolean>;
+    },
+  ) {
+    const agent = await this.#withFields(await this.#agents.getById(input));
+    return this.#scenarios.testAgentTurn({
       projectId: input.projectId,
       agent,
       message: input.message,
@@ -209,26 +334,163 @@ export class AgentApp {
     });
   }
 
-  /**
-   * Schedules one scripted "Test agent" run, saving nothing, and answers with
-   * the run's ids so the caller can open the run drawer on it.
-   */
-  async testRun(input: {
-    agentId: string;
-    projectId: string;
-    actorId: string;
-  }): Promise<AgentTestRunResult> {
-    const agent = await this.dependencies.agents.getById({
-      id: input.agentId,
-      projectId: input.projectId,
-    });
-    if (!this.dependencies.testing) {
-      throw new Error("This process composed no agent test runner, so no run can be scheduled.");
-    }
-    return this.dependencies.testing.scheduleRun({
+  async testRun(input: AgentReferenceInput & { actorId: string }) {
+    const agent = await this.#withFields(
+      await this.#agents.getById({ id: input.agentId, projectId: input.projectId }),
+    );
+    return this.#scenarios.testAgentRun({
       projectId: input.projectId,
       agent,
       actor: { id: input.actorId, label: "user" },
     });
+  }
+
+  executeHttpTest(input: HttpAgentTestInput & { actorId: string }) {
+    if (!this.#httpTesting) throw new AgentHttpTestingUnavailableError();
+    return this.#httpTesting.execute(input);
+  }
+
+  acceptConnection(connection: AgentConnection, credentials: AgentConnectCredentials) {
+    return this.#connections().acceptConnection(connection, credentials);
+  }
+  async call(input: AgentCallInput, context: AgentCallContext) {
+    const agent = await this.#agents.getById({ id: input.id, projectId: input.projectId });
+    if (agent.type !== "connected") throw new AgentNotFoundError(input.id, input.projectId);
+    const ownerUserId = agent.ownerUserId;
+    if (
+      ownerUserId &&
+      !connectedAgentSelectability({ ownerUserId, viewerUserId: context.viewerUserId }).selectable
+    ) {
+      const owners = await this.ownersOf([{ ownerUserId }]);
+      throw new AgentOwnerOnlyError({
+        agentId: agent.id,
+        agentName: agent.name,
+        ownerUserId,
+        ownerName: owners.get(ownerUserId)?.name ?? null,
+      });
+    }
+
+    const outcome = await this.#connections().dispatch({
+      projectId: input.projectId,
+      agent: {
+        id: agent.id,
+        name: agent.name,
+        environment: agent.environment ?? null,
+        timeoutMs: Math.min(agent.config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
+        isSticky: agent.config.sticky ?? false,
+      },
+      call: {
+        threadId: input.threadId ?? crypto.randomUUID(),
+        messages: input.messages,
+        newMessages: input.newMessages ?? input.messages.slice(-1),
+        params: input.params ?? {},
+        session: input.session,
+        traceparent: input.traceparent ?? context.traceparent,
+        run: input.run ?? {},
+      },
+      signal: context.signal,
+    });
+
+    return {
+      output: outcome.output,
+      ...(outcome.session !== void 0 ? { session: outcome.session } : {}),
+      instance: { hostname: outcome.instance.hostname, label: outcome.instance.label },
+      durationMs: outcome.durationMs,
+    };
+  }
+  connectRegister(body: unknown, credentials: AgentConnectCredentials) {
+    return this.#connections().connectRegister(body, credentials);
+  }
+  connectPoll(input: AgentConnectPollInput, credentials: AgentConnectCredentials) {
+    return this.#connections().connectPoll(input, credentials);
+  }
+  callConnected(input: {
+    projectId: string;
+    agent: DispatchAgent;
+    call: DispatchCall;
+    signal?: AgentCallSignal;
+  }) {
+    return this.#connections().dispatch(input);
+  }
+  getPresence(input: { projectId: string; agents: readonly { id: string; type: string }[] }) {
+    return this.#connections().listPresence(input);
+  }
+  connectFrames(input: AgentConnectFramesInput, credentials: AgentConnectCredentials) {
+    return this.#connections().connectFrames(input, credentials);
+  }
+
+  #connections(): ConnectedAgentService {
+    if (!this.#connected) throw new AgentConnectionsUnavailableError();
+    return this.#connected;
+  }
+
+  async #withFields(agent: Agent): Promise<AgentWithFields> {
+    const workflowId = linkedWorkflowId(agent);
+    const fields = workflowId
+      ? await this.#workflows.listFields({ projectId: agent.projectId, workflowIds: [workflowId] })
+      : {};
+    return agentWithResolvedFields(agent, fields);
+  }
+
+  async #enrich(agents: Agent[], input: AgentProjectInput & { viewerUserId?: string | null }) {
+    const owned = agents.map((agent) => ({ ...agent, ownerUserId: agent.ownerUserId ?? null }));
+    const workflowIds = [
+      ...new Set(
+        agents.flatMap((agent) => (linkedWorkflowId(agent) ? [linkedWorkflowId(agent)!] : [])),
+      ),
+    ];
+    const [owners, presence, fields] = await Promise.all([
+      this.ownersOf(owned),
+      this.#connected?.listPresence({ projectId: input.projectId, agents }) ??
+        Promise.resolve(new Map<string, AgentPresence>()),
+      workflowIds.length
+        ? this.#workflows.listFields({ projectId: input.projectId, workflowIds })
+        : Promise.resolve({}),
+    ]);
+
+    return owned.map((agent) => ({
+      ...agentWithResolvedFields(agent, fields),
+      environment: agent.environment ?? null,
+      ownerUserId: agent.ownerUserId ?? null,
+      hostLabel: agent.hostLabel ?? null,
+      lastSeenAt: agent.lastSeenAt ?? null,
+      parameters: declaredAgentParameters(agent),
+      ...ConnectedAgentPresenceService.agentPresenceView({
+        agent,
+        owners,
+        presence,
+        viewerUserId: input.viewerUserId,
+      }),
+    }));
+  }
+
+  async #permittedCopies(
+    copies: readonly { id: string; projectId: string }[],
+    actorId: string,
+    permission: AuthzPermission,
+  ) {
+    const allowed = await Promise.all(
+      copies.map(async (copy) => ({
+        id: copy.id,
+        allowed: await this.#permissions.hasProjectPermission({
+          userId: actorId,
+          projectId: copy.projectId,
+          permission,
+        }),
+      })),
+    );
+    return new Set(allowed.filter((copy) => copy.allowed).map((copy) => copy.id));
+  }
+
+  async #assertSourcePermission(actorId: string, projectId: string): Promise<void> {
+    if (
+      !(await this.#permissions.hasProjectPermission({
+        userId: actorId,
+        projectId,
+        permission: "evaluations:manage",
+      }))
+    ) {
+      throw new AgentSourcePermissionDeniedError();
+    }
   }
 }

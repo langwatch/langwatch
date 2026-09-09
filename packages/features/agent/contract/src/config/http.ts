@@ -24,7 +24,8 @@ export const httpAuthSchema = z.discriminatedUnion("type", [
 
 export const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
 
-export const httpAgentConfigSchema = baseAgentConfigSchema.extend({
+export const httpAgentConfigSchema = z.object({
+  ...baseAgentConfigSchema.shape,
   url: z.string().min(1, "URL is required"),
   method: z.enum(HTTP_METHODS).default("POST"),
   headers: z.array(httpHeaderSchema).optional(),

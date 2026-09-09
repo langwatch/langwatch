@@ -36,7 +36,8 @@ export type PayloadViolation = z.infer<typeof payloadViolationSchema>;
  * The error a stored result carries: what the instance sent, plus the fields the gateway
  * adds when the refusal is its own.
  */
-export const storedResultErrorSchema = resultErrorSchema.extend({
+export const storedResultErrorSchema = z.object({
+  ...resultErrorSchema.shape,
   payload: payloadViolationSchema.optional(),
 });
 export type StoredResultError = z.infer<typeof storedResultErrorSchema>;

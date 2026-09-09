@@ -1,20 +1,17 @@
+import { createConnectedAgentFixture } from "./connected-agent.fixture.ts";
+import { createLongPollFixture } from "./connected-agent.fixture.ts";
 /**
  * The project fence of connected agents: the instance id is chosen by the connecting
  * process, so a session of one project must never read, drain or answer a call of another.
  * @see specs/agents/connected-agents.feature
  */
-import {
-  AgentCallForeignProjectError,
-  CALL_KEY_SLACK_SECONDS,
-  type AgentService,
-} from "@langwatch/agent-contract";
+import { AgentCallForeignProjectError, CALL_KEY_SLACK_SECONDS } from "@langwatch/agent-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import type { StoredCall } from "@langwatch/agent-contract";
-import type { AgentRepository } from "../repositories/agent.repository.ts";
-import type { ConnectCredentialPort } from "../ports/connect-credential.port.ts";
-import { ConnectedAgentStateAdapter } from "../adapters/connected-agent-state.adapter.ts";
-import type { AgentStateStorePort } from "@langwatch/agent-contract";
+import type { ConnectedAgentCredentials } from "../services/connected-agent-credential.service.ts";
+import { SessionStateStoreFactory } from "@langwatch/redis-client";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import {
   callAckKey,
   callKey,
@@ -22,9 +19,11 @@ import {
   pendingKey,
   resultKey,
 } from "../rules/connected-agent-keys.rules.ts";
-import { ConnectedAgentRuntimeAdapter } from "../adapters/connected-agent-runtime.adapter.ts";
-import { AgentSessionService, type SessionInfo } from "../services/connected-agent-session.service.ts";
-import { LongPollTransportService } from "../services/connected-agent-long-poll.service.ts";
+import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
+import {
+  AgentSessionService,
+  type SessionInfo,
+} from "../services/connected-agent-session.service.ts";
 
 const victimProjectId = "project_victim";
 const attackerProjectId = "project_attacker";
@@ -33,22 +32,23 @@ const agentId = "agent_victim";
 const callId = "call_victim";
 const token = "ait_attacker_token";
 
-const fakeAgents = {} as AgentService;
-const fakeAgentRepository = {} as AgentRepository;
-const fakeCredentials = {} as ConnectCredentialPort;
-const fakeAgentPlatformUrl = () => "https://example.test/agents";
+const fakeAgents = createConnectedAgentFixture();
+const fakeCredentials: ConnectedAgentCredentials = {
+  resolve: async () => {
+    throw new Error("Credential lookup is not configured for this test");
+  },
+};
 
-type MemoryStore = AgentStateStorePort;
+type MemoryStore = SessionStateStore;
 
 function build() {
-  const store = ConnectedAgentStateAdapter.memory();
-  const runtime = ConnectedAgentRuntimeAdapter.create({ podId: "pod_solo", store });
+  const store = SessionStateStoreFactory.memory();
+  const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
   const options = {
     runtime,
     agents: fakeAgents,
-    agentRepository: fakeAgentRepository,
     credentials: fakeCredentials,
-    agentPlatformUrl: fakeAgentPlatformUrl,
+    publicBaseUrl: "https://example.test",
     replicaCount: 1,
   };
   return { store, runtime, options };
@@ -58,6 +58,7 @@ function sessionOf(projectId: string): SessionInfo {
   return {
     instanceId,
     projectId,
+    principalId: "key:test",
     projectSlug: projectId,
     agentIds: new Set([agentId]),
     meta: {
@@ -187,9 +188,10 @@ describe("the project fence of connected agent state", () => {
     /** @scenario "A poll from another project leaves the calls of an instance untouched" */
     it("answers no frame and leaves the parked call waiting", async () => {
       const { store, options } = build();
-      const transport = LongPollTransportService.create({ ...options, pollWaitMs: 40 });
+      const transport = createLongPollFixture({ ...options, pollWaitMs: 40 });
       vi.spyOn(AgentSessionService.prototype, "authenticate").mockResolvedValue({
         project: { id: attackerProjectId, slug: "attacker" },
+        principalId: "key:test",
         userId: null,
       });
       vi.spyOn(AgentSessionService.prototype, "refreshPresence").mockResolvedValue(undefined);
@@ -200,6 +202,7 @@ describe("the project fence of connected agent state", () => {
           token,
           instanceId,
           projectId: attackerProjectId,
+          principalId: "key:test",
           projectSlug: "attacker",
           agentIds: [agentId],
           meta: sessionOf(attackerProjectId).meta,

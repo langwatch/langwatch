@@ -4,7 +4,7 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import type { ConnectedAgentView } from "@langwatch/agent-contract";
+import type { ConnectedAgentBrowser as ConnectedAgentView } from "../agent-client.ts";
 import { describe, expect, it } from "vitest";
 import {
   environmentTone,

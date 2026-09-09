@@ -1,28 +1,7 @@
-/**
- * The trace one HTTP agent test writes, and the redaction that decides what of
- * it is safe to keep.
- *
- * When somebody tests an HTTP agent the platform records the exchange so the
- * agent's test history can show it. That record is durable and queryable, so
- * the credential handling here is the whole point of the module rather than a
- * detail of it: what a person types on the Auth tab, and what they type on the
- * Headers tab, both have to come out of the stored request.
- *
- * The span is built here and handed to the process to ingest — the OTLP
- * conversion and the collector are not this feature's.
- */
 import crypto from "node:crypto";
+import type { HttpAuth } from "@langwatch/agent-contract";
 import type { CustomMetadata, Span } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
-
-type AuthInput = {
-  type: "none" | "bearer" | "api_key" | "basic";
-  token?: string;
-  headerName?: string;
-  apiKeyValue?: string;
-  username?: string;
-  password?: string;
-};
 
 export type TraceTestContext = {
   url: string;
@@ -31,35 +10,13 @@ export type TraceTestContext = {
   output_path?: string;
 };
 
-/**
- * Header names whose value is a credential often enough that keeping it is not
- * worth the one case where reading it would have helped.
- *
- * The Auth tab is not the only way a token reaches a request: an author who
- * types `X-API-Key: sk-live-…` on the Headers tab has configured a credential
- * the auth-aware redaction below knows nothing about, and trace storage is not
- * where it should end up. Names are kept either way, so the trace still shows
- * which headers the request carried.
- */
+// Match credential words without hiding ordinary headers such as X-Api-Version.
 const CREDENTIAL_HEADER_WORD =
   /(^|[-_])(authorization|auth|cookie2?|api[-_]?key|token|secret|password|credential)s?([-_]|$)/i;
 
 const REDACTED = "[REDACTED]";
 
-/**
- * Sanitizes request headers for trace storage by redacting credential values.
- *
- * Whole words, so `X-Auth-Token` and `X-Amz-Security-Token` lose their values
- * while `X-Api-Version`, `X-Idempotency-Key` and `WWW-Authenticate` keep
- * theirs: half the value of recording headers is the ones somebody came to
- * read. `Authorization` keeps its scheme, since "the Bearer token was wrong"
- * and "no credential was sent at all" are different bugs and the trace should
- * be able to tell them apart.
- *
- * Erring towards redaction: a header whose name reads like a credential is
- * treated as one, because the cost of hiding an obscure version string is a
- * question, and the cost of storing a live token is an incident.
- */
+/** Retain header names and authorization schemes, but never their credential values. */
 export function sanitizeHeadersForTrace({
   headers,
   customAuthHeaderName,
@@ -69,10 +26,10 @@ export function sanitizeHeadersForTrace({
   customAuthHeaderName?: string;
 }): Record<string, string> {
   const sanitized = { ...headers };
-  const customLower = customAuthHeaderName?.toLowerCase();
+  const customLower = customAuthHeaderName?.trim().toLowerCase();
 
   for (const key of Object.keys(sanitized)) {
-    const lower = key.toLowerCase();
+    const lower = key.trim().toLowerCase();
 
     if (lower === "authorization") {
       const [scheme, ...rest] = sanitized[key]!.split(" ");
@@ -88,10 +45,6 @@ export function sanitizeHeadersForTrace({
   return sanitized;
 }
 
-/**
- * Builds the test_context metadata for an HTTP agent test trace.
- * Includes request details but never includes auth credential values.
- */
 export function buildTraceTestContext({
   url,
   method,
@@ -100,7 +53,7 @@ export function buildTraceTestContext({
 }: {
   url: string;
   method: string;
-  auth?: AuthInput;
+  auth?: HttpAuth;
   outputPath?: string;
 }): TraceTestContext {
   const hasAuth = !!auth && auth.type !== "none";
@@ -113,9 +66,6 @@ export function buildTraceTestContext({
   };
 }
 
-/**
- * Generates a W3C-compatible trace ID (32 hex chars) and span ID (16 hex chars).
- */
 export function generateTraceIds() {
   return {
     traceId: crypto.randomBytes(16).toString("hex"),
@@ -123,10 +73,6 @@ export function generateTraceIds() {
   };
 }
 
-/**
- * Builds a W3C traceparent header value for distributed tracing.
- * Format: {version}-{traceId}-{spanId}-{flags}
- */
 export function buildTraceparentHeader({
   traceId,
   spanId,
@@ -147,13 +93,6 @@ export type AgentTestTrace = Readonly<{
   occurredAt: number;
 }>;
 
-/**
- * Builds the span for one HTTP agent test execution.
- *
- * Ingestion is the process's — this only decides what the record says, which
- * includes running every request header through `sanitizeHeadersForTrace`
- * before it can reach storage.
- */
 export function buildAgentTestTrace({
   agentId,
   userId,
@@ -204,9 +143,9 @@ export function buildAgentTestTrace({
   };
 
   const outputValue = {
-    ...(result.status !== undefined ? { status: result.status } : {}),
-    ...(result.response !== undefined ? { body: result.response } : {}),
-    ...(result.extractedOutput !== undefined ? { extracted_output: result.extractedOutput } : {}),
+    ...(result.status !== void 0 ? { status: result.status } : {}),
+    ...(result.response !== void 0 ? { body: result.response } : {}),
+    ...(result.extractedOutput !== void 0 ? { extracted_output: result.extractedOutput } : {}),
     ...(result.error ? { error: result.error } : {}),
   };
 

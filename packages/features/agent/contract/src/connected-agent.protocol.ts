@@ -1,21 +1,6 @@
-/**
- * The frames of the connected agent socket (ADR-128, "Contract").
- *
- * Every frame is JSON text with a `type` and the protocol version. The SDK
- * keeps a copy of these shapes; a drift test on its side pins them to this
- * file. Browser-safe: zod and nothing else.
- */
-
 import { z } from "zod";
 
-/**
- * The parameter-name grammar and cap, restated here rather than imported from
- * the scenario contract: this module is the wire contract the SDK keeps its
- * own copy of, and it must stay free of every dependency but zod.
- *
- * @see `SCENARIO_PARAMETER_NAME_PATTERN` and `MAX_PARAMETER_NAME_LENGTH` in
- *   `@langwatch/scenario-contract`, which these two mirror.
- */
+/** Wire grammar is standalone for SDK parity; see ADR-128. */
 const MAX_PARAMETER_NAME_LENGTH = 64;
 const SCENARIO_PARAMETER_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -67,7 +52,8 @@ export const registerAgentSchema = z.object({
   sticky: z.boolean().optional(),
 });
 
-export const registerFrameSchema = versioned.extend({
+export const registerFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("register"),
   sdk: sdkSchema,
   instance: registerInstanceSchema,
@@ -75,7 +61,8 @@ export const registerFrameSchema = versioned.extend({
 });
 export type RegisterFrame = z.infer<typeof registerFrameSchema>;
 
-export const registeredFrameSchema = versioned.extend({
+export const registeredFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("registered"),
   agents: z.array(
     z.object({
@@ -104,7 +91,8 @@ export const REFUSED_CODES = [
 ] as const;
 export type RefusedCode = (typeof REFUSED_CODES)[number];
 
-export const refusedFrameSchema = versioned.extend({
+export const refusedFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("refused"),
   code: z.enum(REFUSED_CODES),
   message: z.string(),
@@ -152,12 +140,15 @@ export const CALL_ENVELOPE_KEYS = [
   "run",
 ] as const;
 
-export const callFrameSchema = versioned
-  .extend({ type: z.literal("call") })
-  .merge(callEnvelopeSchema);
+export const callFrameSchema = z.object({
+  ...versioned.shape,
+  type: z.literal("call"),
+  ...callEnvelopeSchema.shape,
+});
 export type CallFrame = z.infer<typeof callFrameSchema>;
 
-export const ackFrameSchema = versioned.extend({
+export const ackFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("ack"),
   callId: z.string().min(1),
 });
@@ -172,26 +163,29 @@ export const resultErrorSchema = z.object({
   message: z.string().max(4000),
 });
 
-export const resultFrameSchema = versioned
-  .extend({
+export const resultFrameSchema = z
+  .object({
+    ...versioned.shape,
     type: z.literal("result"),
     callId: z.string().min(1),
     output: outputSchema.optional(),
     session: sessionSchema,
     error: resultErrorSchema.optional(),
   })
-  .refine((frame) => (frame.output !== undefined) !== (frame.error !== undefined), {
+  .refine((frame) => (frame.output !== void 0) !== (frame.error !== void 0), {
     message: "A result carries an output or an error, and never both",
   });
 export type ResultFrame = z.infer<typeof resultFrameSchema>;
 
-export const cancelFrameSchema = versioned.extend({
+export const cancelFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("cancel"),
   callId: z.string().min(1),
 });
 export type CancelFrame = z.infer<typeof cancelFrameSchema>;
 
-export const deregisterFrameSchema = versioned.extend({
+export const deregisterFrameSchema = z.object({
+  ...versioned.shape,
   type: z.literal("deregister"),
 });
 export type DeregisterFrame = z.infer<typeof deregisterFrameSchema>;

@@ -1,18 +1,4 @@
-/**
- * When a connected agent still counts as present (ADR-128, "Presence").
- *
- * A connected agent writes `lastSeenAt` while its process holds a socket. An
- * agent not seen for thirty days no longer appears in the agents list and is
- * refused as a run target. Nothing is written to say so: the row comes back
- * as soon as the process connects again and writes `lastSeenAt`.
- *
- * The module holds no framework import, so the browser can read the same
- * predicate the server reads. The Prisma `where` fragment that applies this
- * rule to a query lives in the repository, which is the only place allowed
- * to name Prisma types.
- *
- * @see specs/agents/connected-agents.feature
- */
+/** Read visibility and run selectability are separate policies (ADR-128). */
 
 import { nowInstant, toEpochMs, type Instant, type TimeInput } from "@langwatch/time";
 
@@ -26,12 +12,7 @@ export function connectedAgentSeenCutoff(now: Instant = nowInstant()): Instant {
   return now.subtract({ milliseconds: CONNECTED_AGENT_UNSEEN_DAYS * DAY_MS });
 }
 
-/**
- * Whether the presence of a connected agent is too old to count.
- *
- * A row with no `lastSeenAt` is never stale: only a connected agent writes
- * the column, and it writes it on the register that creates the row.
- */
+/** Read visibility and run selectability are separate policies (ADR-128). */
 export function isConnectedAgentStale({
   lastSeenAt,
   now = nowInstant(),

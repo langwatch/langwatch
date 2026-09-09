@@ -8,7 +8,7 @@ import {
   AgentTypeSelectorDrawer as AgentTypeSelector,
   type AgentType,
   type AgentTypeSelectorDrawerProps as PresentationalProps,
-} from "@langwatch/agent-web/screens/agent-management";
+} from "@langwatch/agent-web/agent-management";
 import { getComplexProps, useDrawer } from "@langwatch/ui-drawer";
 
 import { withHost } from "../../../../ui/sections/ui-page";

@@ -42,46 +42,56 @@ const agentViewRecordSchema = agentRecordSchema.pick({
 });
 
 export const agentSchema = z.discriminatedUnion("type", [
-  agentRecordSchema.extend({
+  z.object({
+    ...agentRecordSchema.shape,
     type: z.literal("signature"),
     config: signatureAgentConfigSchema,
   }),
-  agentRecordSchema.extend({
+  z.object({
+    ...agentRecordSchema.shape,
     type: z.literal("code"),
     config: codeAgentConfigSchema,
   }),
-  agentRecordSchema.extend({
+  z.object({
+    ...agentRecordSchema.shape,
     type: z.literal("workflow"),
     config: workflowAgentConfigSchema,
   }),
-  agentRecordSchema.extend({
+  z.object({
+    ...agentRecordSchema.shape,
     type: z.literal("http"),
     config: httpAgentConfigSchema,
   }),
-  agentRecordSchema.extend({
+  z.object({
+    ...agentRecordSchema.shape,
     type: z.literal("connected"),
     config: connectedAgentConfigSchema,
   }),
 ]);
 
 export const agentViewSchema = z.discriminatedUnion("type", [
-  agentViewRecordSchema.extend({
+  z.object({
+    ...agentViewRecordSchema.shape,
     type: z.literal("signature"),
     config: signatureAgentConfigSchema,
   }),
-  agentViewRecordSchema.extend({
+  z.object({
+    ...agentViewRecordSchema.shape,
     type: z.literal("code"),
     config: codeAgentConfigSchema,
   }),
-  agentViewRecordSchema.extend({
+  z.object({
+    ...agentViewRecordSchema.shape,
     type: z.literal("workflow"),
     config: workflowAgentConfigSchema,
   }),
-  agentViewRecordSchema.extend({
+  z.object({
+    ...agentViewRecordSchema.shape,
     type: z.literal("http"),
     config: httpAgentConfigSchema,
   }),
-  agentViewRecordSchema.extend({
+  z.object({
+    ...agentViewRecordSchema.shape,
     type: z.literal("connected"),
     config: connectedAgentConfigSchema,
   }),
@@ -101,15 +111,7 @@ export type AgentView = z.infer<typeof agentViewSchema>;
 export type AgentFields = z.infer<typeof agentFieldsSchema>;
 export type AgentWithFields = z.infer<typeof agentWithFieldsSchema>;
 
-/**
- * An agent with its config already parsed into the shape its type declares,
- * plus the replica count the agents page reads.
- *
- * The name the platform has always used for a read agent. It is {@link Agent}
- * itself now — the discriminated union parses the config — with the one extra
- * field a list read adds, so the two are the same value and neither reader has
- * to know which one it was handed.
- */
+/** Includes the copy count displayed by list consumers. */
 export type TypedAgent = Agent & {
   _count?: { copiedAgents: number };
 };

@@ -1,6 +1,6 @@
 /** Which page key the Agents address answers, and what it is wrapped in. */
 
-import { agentScreens } from "@langwatch/agent-web/screens/agent-management";
+import { agentScreens } from "@langwatch/agent-web/agent-management";
 import type { ComponentType } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

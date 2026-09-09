@@ -1,47 +1,38 @@
-/**
- * A connected agent as the agents page and its drawer read it (ADR-128).
- *
- * One name can be several agents: the same function connected from
- * production, from a staging box and from every developer's laptop. Each one
- * is a card of its own, and the card says which environment it is, whether a
- * process holds it right now, and who or what machine it belongs to.
- *
- * `AgentListView` is the row `agents.getAll`/`getById` actually answer: the
- * stored agent plus the presence and owner ADR-128 adds to EVERY row, not
- * only a connected one (`AgentApp.getAll`'s `toConnectedView`). Typing the
- * query's output as this — rather than the narrower `AgentWithFields` — is
- * what lets a screen filter `type === "connected"` straight into a
- * {@link ConnectedAgentView} with no cast.
- */
+/** Connected-agent presence and ownership displayed by the management UI (ADR-128). */
 import type { AgentWithFields } from "./agent.ts";
 import type { ConnectedAgentConfig } from "./config/connected.ts";
 import type { ConnectedAgentSelectability } from "./connected-agent.selectable.ts";
-
-/** A moment as this contract carries it: a stored value on the server, and the
- *  ISO string tRPC hands the browser for the same field. */
-type WireMoment = AgentWithFields["createdAt"];
+import { z } from "zod";
 
 /** The SDK that registered an agent, as the card prints it. */
-export interface ConnectedAgentSdk {
-  name: string;
-  version: string;
-  language: string;
-}
+export const connectedAgentSdkSchema = z.object({
+  name: z.string(),
+  version: z.string(),
+  language: z.string(),
+});
+export type ConnectedAgentSdk = z.infer<typeof connectedAgentSdkSchema>;
 
 /** One instance of a connected agent, as the drawer's table reads it. */
-export interface ConnectedAgentInstance {
-  instanceId: string;
-  hostname: string;
-  username: string;
-  pid: number;
-  label: string | null;
-  sdk: ConnectedAgentSdk;
-  connectedAt: WireMoment | string;
-  inflight: number;
-  maxConcurrency: number;
-}
+export const connectedAgentInstanceSchema = z.object({
+  instanceId: z.string(),
+  hostname: z.string(),
+  username: z.string(),
+  pid: z.number(),
+  label: z.string().nullable(),
+  sdk: connectedAgentSdkSchema,
+  connectedAt: z.date(),
+  inflight: z.number(),
+  maxConcurrency: z.number(),
+});
+export type ConnectedAgentInstance = z.infer<typeof connectedAgentInstanceSchema>;
 
 /** The owner of an agent, as every surface reports it. */
+export const agentPresenceSchema = z.object({
+  status: z.enum(["online", "offline"]),
+  instances: z.array(connectedAgentInstanceSchema),
+});
+export type AgentPresence = z.infer<typeof agentPresenceSchema>;
+
 export interface ConnectedAgentOwner {
   userId: string;
   name: string | null;
@@ -53,12 +44,12 @@ export interface ConnectedAgentView extends ConnectedAgentSelectability {
   name: string;
   environment: string | null;
   hostLabel: string | null;
-  lastSeenAt: WireMoment | string | null;
+  lastSeenAt: AgentWithFields["createdAt"] | null;
   status: "online" | "offline";
   instances: ConnectedAgentInstance[];
   owner: ConnectedAgentOwner | null;
   parameters: ConnectedAgentConfig["parameters"];
-  config: { description?: string; sdk?: ConnectedAgentSdk } & Record<string, unknown>;
+  config: { description?: string; sdk?: ConnectedAgentSdk };
 }
 
 /** One row of `agents.getAll`/`getById`, as `AgentApp` actually answers it. */

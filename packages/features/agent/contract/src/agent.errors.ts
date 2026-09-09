@@ -76,49 +76,81 @@ export class AgentRegisterOnlyError extends HandledError {
   }
 }
 
-export class InvalidAgentConfigError extends Error {
+export class InvalidAgentConfigError extends HandledError {
   readonly name = "InvalidAgentConfigError";
 
   constructor(
     readonly agentType: AgentType,
     readonly issues?: unknown,
   ) {
-    super(`The configuration is not valid for an agent of type "${agentType}".`);
+    super(
+      "invalid_agent_config",
+      `The configuration is not valid for an agent of type "${agentType}".`,
+      {
+        httpStatus: 400,
+        fault: "customer",
+        meta: { agentType },
+      },
+    );
   }
 }
 
-export class AgentIsNotCopyError extends Error {
+export class AgentIsNotCopyError extends HandledError {
   readonly name = "AgentIsNotCopyError";
 
   constructor(
     readonly agentId: string,
     readonly projectId: string,
   ) {
-    super(`Agent "${agentId}" is not a copy and has no source to synchronize.`);
+    super(
+      "agent_is_not_copy",
+      `Agent "${agentId}" is not a copy and has no source to synchronize.`,
+      {
+        httpStatus: 400,
+        fault: "customer",
+        meta: { agentId, projectId },
+      },
+    );
   }
 }
 
-export class AgentSourceNotFoundError extends Error {
+export class AgentSourceNotFoundError extends HandledError {
   readonly name = "AgentSourceNotFoundError";
 
   constructor(readonly sourceAgentId: string) {
-    super(`Source agent "${sourceAgentId}" was not found.`);
+    super("agent_source_not_found", `Source agent "${sourceAgentId}" was not found.`, {
+      httpStatus: 404,
+      fault: "customer",
+      meta: { sourceAgentId },
+    });
   }
 }
 
-export class AgentCopiesNotFoundError extends Error {
+export class AgentCopiesNotFoundError extends HandledError {
   readonly name = "AgentCopiesNotFoundError";
 
   constructor(readonly sourceAgentId: string) {
-    super(`Agent "${sourceAgentId}" has no copies.`);
+    super("agent_copies_not_found", `Agent "${sourceAgentId}" has no copies.`, {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { sourceAgentId },
+    });
   }
 }
 
-export class AgentCopySelectionError extends Error {
+export class AgentCopySelectionError extends HandledError {
   readonly name = "AgentCopySelectionError";
 
   constructor(readonly sourceAgentId: string) {
-    super(`No valid copies of agent "${sourceAgentId}" were selected.`);
+    super(
+      "agent_copy_selection_invalid",
+      `No valid copies of agent "${sourceAgentId}" were selected.`,
+      {
+        httpStatus: 400,
+        fault: "customer",
+        meta: { sourceAgentId },
+      },
+    );
   }
 }
 
@@ -171,3 +203,53 @@ export const agentProblemSchema = z.discriminatedUnion("error", [
 ]);
 
 export type AgentProblem = z.infer<typeof agentProblemSchema>;
+
+export class AgentAlreadyExistsError extends HandledError {
+  readonly name = "AgentAlreadyExistsError";
+
+  constructor(
+    readonly agentId: string,
+    readonly projectId: string,
+  ) {
+    super("agent_already_exists", "An agent with this identifier already exists.", {
+      httpStatus: 409,
+      fault: "customer",
+      meta: { agentId, projectId },
+    });
+  }
+}
+
+export class AgentHttpTestingUnavailableError extends HandledError {
+  constructor() {
+    super(
+      "agent_http_testing_unavailable",
+      "HTTP agent testing is not configured in this process.",
+      {
+        httpStatus: 503,
+        fault: "platform",
+      },
+    );
+  }
+}
+
+export class AgentConnectionsUnavailableError extends HandledError {
+  constructor() {
+    super("agent_connections_unavailable", "Connected agents are not configured in this process.", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+  }
+}
+
+export class AgentSourcePermissionDeniedError extends HandledError {
+  constructor() {
+    super(
+      "agent_source_permission_denied",
+      "You do not have permission to manage evaluations in the source project",
+      {
+        httpStatus: 401,
+        fault: "customer",
+      },
+    );
+  }
+}

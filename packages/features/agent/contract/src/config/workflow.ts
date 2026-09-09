@@ -2,7 +2,8 @@ import { z } from "zod";
 import { agentInputBindingSchema } from "../fields.ts";
 import { baseAgentConfigSchema } from "./base.ts";
 
-export const workflowAgentConfigSchema = baseAgentConfigSchema.extend({
+export const workflowAgentConfigSchema = z.object({
+  ...baseAgentConfigSchema.shape,
   isCustom: z.boolean().optional(),
   workflow_id: z.string().optional(),
   publishedId: z.string().optional(),

@@ -4,7 +4,7 @@
  * — same params, same clearing of every other `drawer.*` key.
  */
 
-import type { AgentEditorDrawer } from "@langwatch/agent-web/screens/agent-management";
+import type { AgentEditorDrawer } from "@langwatch/agent-web/agent-management";
 import { DRAWER_OPEN_PARAM } from "../../../model/ui-drawer-address";
 
 /** The parameter an editor drawer reads the agent's id from. */

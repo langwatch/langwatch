@@ -12,9 +12,17 @@ export const codeParameterSchema = z.object({
   hidden: z.boolean().optional(),
 });
 
-export const codeAgentConfigSchema = baseAgentConfigSchema.extend({
+export const codeAgentConfigSchema = z.object({
+  ...baseAgentConfigSchema.shape,
   parameters: z
-    .array(z.union([codeParameterSchema, fieldSchema]))
+    .array(
+      z.union([
+        codeParameterSchema,
+        fieldSchema.refine((field) => field.identifier !== "code", {
+          message: "The code parameter must have type code and a string value.",
+        }),
+      ]),
+    )
     .refine(
       (parameters) =>
         parameters.some(

@@ -1,17 +1,12 @@
-/**
- * What a listing says about a connected agent row the caller may read but may
- * not run.
- *
- * @see specs/agents/connected-agents.feature
- */
+/** @see specs/agents/connected-agents.feature */
+import type { ConnectedAgentOwner } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
 import {
   ConnectedAgentPresenceService,
-  type AgentOwnerView,
   type AgentPresence,
 } from "../connected-agent-presence.service.ts";
 
-const NO_OWNERS = new Map<string, AgentOwnerView>();
+const NO_OWNERS = new Map<string, ConnectedAgentOwner>();
 const NO_PRESENCE_MAP = new Map<string, AgentPresence>();
 
 function view({

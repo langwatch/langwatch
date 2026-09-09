@@ -43,9 +43,7 @@ export function mapAgentRow(row: AgentRow): Agent {
     hostLabel: row.hostLabel ?? null,
     identityKey: row.identityKey ?? null,
     lastSeenAt: row.lastSeenAt ?? null,
-  } as Record<string, unknown>;
-  if (row._count) {
-    agent.copyCount = row._count.copiedAgents;
-  }
+    ...(row._count ? { copyCount: row._count.copiedAgents } : {}),
+  };
   return agentSchema.parse(agent);
 }

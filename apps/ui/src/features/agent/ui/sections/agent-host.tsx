@@ -5,28 +5,30 @@
  */
 
 import {
-  agentApi,
   AgentManagementHostProvider,
-  ConnectedAgentsSection,
   type AgentFailureNotice,
-  type AgentManagementHostPort,
-} from "@langwatch/agent-web/screens/agent-management";
+  type AgentManagementHost,
+} from "@langwatch/agent-web/agent-management";
+import { organizationApi } from "@langwatch/organization-web/organization-client";
 import { useMemo, type ReactNode } from "react";
+import { useDrawer } from "@langwatch/ui-drawer";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { resolveUiFailureCopy } from "../../../../behavior/ui-feedback";
 import { useUiRpc } from "../../../../behavior/ui-rpc";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { openAgentEditor, openConnectedAgentDrawer } from "../../behavior/agent-editor";
-import { TrpcAgentBrowserAdapter } from "../../behavior/trpc-agent-browser.adapter";
+import { TrpcAgentClient } from "../../behavior/trpc-agent.client";
 import { agentCopyTargets } from "../../model/agent-copy-targets";
 
 export function AgentHost({ children }: { children: ReactNode }) {
+  const { openDrawer } = useDrawer();
   const { session, navigation, route, feedback } = useUiCapabilities();
   const scope = session.activeScope();
   const rpc = useUiRpc();
 
-  const organizations = agentApi.organization.getAll.useQuery({ isDemo: false });
+  const organizations = organizationApi.organization.getAll.useQuery({ isDemo: false });
+  const organizationQueries = organizationApi.useUtils();
 
   // A refused graph is a state, not an empty one: the project below is read
   // off this query, so a refusal left the agents screen empty forever.
@@ -35,9 +37,8 @@ export function AgentHost({ children }: { children: ReactNode }) {
     fallbackTitle: "Couldn't load your agents",
   });
 
-  const agents = useMemo(() => TrpcAgentBrowserAdapter.create(rpc), [rpc]);
+  const agents = useMemo(() => TrpcAgentClient.create(rpc), [rpc]);
 
-  /** The project the address is about, resolved from the one graph read rather than a second query. */
   const project = useMemo(() => {
     if (!scope.projectId) return void 0;
     for (const organization of organizations.data ?? []) {
@@ -59,7 +60,7 @@ export function AgentHost({ children }: { children: ReactNode }) {
   );
 
   const reading = route.reading();
-  const host = useMemo<AgentManagementHostPort>(
+  const host = useMemo<AgentManagementHost>(
     () => ({
       project: () => project,
       agents: () => agents,
@@ -84,15 +85,29 @@ export function AgentHost({ children }: { children: ReactNode }) {
           agentId,
           setQuery: (next) => route.setQuery(next),
         }),
-      connectedSection: () => ConnectedAgentsSection,
       openConnectedAgent: (agentId) =>
         openConnectedAgentDrawer({
           query: reading.query,
           agentId,
           setQuery: (next) => route.setQuery(next),
         }),
+      openTestRun: ({ scenarioRunId, batchRunId }) =>
+        openDrawer("scenarioRunDetail", {
+          urlParams: { variant: "agent-testing", scenarioRunId, batchRunId },
+        }),
+      refreshAgentLimit: () => organizationQueries.licenseEnforcement.checkLimit.invalidate(),
     }),
-    [project, agents, copyTargets, reading, route, navigation, feedback],
+    [
+      project,
+      agents,
+      copyTargets,
+      reading,
+      route,
+      navigation,
+      feedback,
+      openDrawer,
+      organizationQueries,
+    ],
   );
 
   if (failure.departing) return <UiPageLoading />;

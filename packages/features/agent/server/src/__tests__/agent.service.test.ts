@@ -1,126 +1,84 @@
-import type { AgentsDatabase } from "../index.ts";
-import { PrismaAgentAdapter } from "../index.ts";
 import { describe, expect, it, vi } from "vitest";
+import { createAgentAppFixture } from "../testing.ts";
 
-function row(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "agent_1",
-    projectId: "project_1",
-    name: "Answerer",
-    type: "signature",
-    config: {
-      prompt: "Answer clearly",
-      inputs: [{ identifier: "question", type: "str" as const }],
-      outputs: [{ identifier: "answer", type: "str" as const }],
-    },
-    workflowId: null,
-    copiedFromAgentId: null,
-    archivedAt: null,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
-    ...overrides,
-  };
-}
+const projectId = "project_1";
+const config = {
+  prompt: "Answer clearly",
+  inputs: [{ identifier: "question", type: "str" as const }],
+  outputs: [{ identifier: "answer", type: "str" as const }],
+};
 
-function setup() {
-  const create = vi.fn(async ({ data }: { data: Record<string, unknown> }) => row(data));
-  const database = {
-    agent: {
-      findFirst: vi.fn(async () => null),
-      findMany: vi.fn(async () => []),
-      count: vi.fn(async () => 0),
-      create,
-      update: vi.fn(async () => row()),
-    },
-  } as unknown as AgentsDatabase;
-  const service = PrismaAgentAdapter.create({
-    database,
-    workflows: {
-      fields: async () => ({}),
-      related: async () => null,
-      copy: async () => ({ workflowId: "workflow_copy" }),
-      archive: async ({ workflowId }) => ({ id: workflowId }),
-      remove: async () => undefined,
-    },
-    auditLog: { history: async () => [] },
-    generateId: () => "agent_generated",
-  });
-  return { service, create, database };
-}
-
-describe("Agents service", () => {
-  /** @scenario A created agent is validated, persisted and returned resolved */
+describe("AgentApp entity operations", () => {
+  /** @scenario "A created agent is validated, persisted and returned resolved" */
   it("validates, persists, and enriches a created agent", async () => {
-    const { service, create } = setup();
-    const agent = await service.create({
-      projectId: "project_1",
-      name: "Answerer",
-      type: "signature",
-      config: row().config,
-    });
+    const { app, repositories } = createAgentAppFixture();
+    const create = vi.spyOn(repositories.agents, "create");
+    const agent = await app.create({ projectId, name: "Answerer", type: "signature", config });
 
-    expect(agent).toMatchObject({
-      id: "agent_generated",
-      fieldsResolved: true,
-      inputFields: [{ identifier: "question", type: "str" }],
-      outputFields: [{ identifier: "answer", type: "str" }],
-    });
     expect(create).toHaveBeenCalledOnce();
+    expect(agent).toMatchObject({
+      fieldsResolved: true,
+      inputFields: config.inputs,
+      outputFields: config.outputs,
+    });
+    expect(agent.id).toMatch(/^agent_/);
+    expect(await repositories.agents.getById({ id: agent.id, projectId })).toMatchObject({
+      id: agent.id,
+      name: "Answerer",
+      config,
+    });
   });
 
   /** @scenario "Invalid config is rejected before persistence" */
-  it("rejects a config that does not match its declared type before persistence", async () => {
-    const { service, create } = setup();
+  it("rejects incompatible config before persistence", async () => {
+    const { app, repositories } = createAgentAppFixture();
+    const create = vi.spyOn(repositories.agents, "create");
+
     await expect(
-      service.create({
-        projectId: "project_1",
+      app.create({
+        projectId,
         name: "Broken code",
         type: "code",
         config: { parameters: [] },
       }),
-    ).rejects.toMatchObject({ name: "InvalidAgentConfigError" });
+    ).rejects.toMatchObject({ name: "InvalidAgentConfigError", agentType: "code" });
     expect(create).not.toHaveBeenCalled();
+    expect(await repositories.agents.findAll({ projectId })).toEqual([]);
   });
 
-  it("checks active references without leaking the repository", async () => {
-    const { service, database } = setup();
-    vi.mocked(database.agent.findFirst).mockResolvedValue({ id: "agent_1" });
+  it("checks active references in the requested project", async () => {
+    const { app } = createAgentAppFixture();
+    const created = await app.create({ projectId, name: "Answerer", type: "signature", config });
 
-    await expect(service.exists({ id: "agent_1", projectId: "project_1" })).resolves.toBe(true);
-    expect(database.agent.findFirst).toHaveBeenCalledWith({
-      where: {
-        id: "agent_1",
-        projectId: "project_1",
-        archivedAt: null,
-      },
-      select: { id: true },
-    });
+    expect(await app.exists({ id: created.id, projectId })).toBe(true);
+    expect(await app.exists({ id: created.id, projectId: "other" })).toBe(false);
+    await app.archive({ id: created.id, projectId });
+    expect(await app.exists({ id: created.id, projectId })).toBe(false);
   });
 
   /** @scenario "A missing singular agent read throws" */
-  it("throws a concrete error carrying both identifiers when an agent is absent", async () => {
-    const { service } = setup();
+  it("throws a concrete error carrying both identifiers when absent", async () => {
+    const { app } = createAgentAppFixture();
 
-    await expect(
-      service.getById({ id: "agent_missing", projectId: "project_1" }),
-    ).rejects.toMatchObject({
+    await expect(app.getById({ id: "agent_missing", projectId })).rejects.toMatchObject({
       name: "AgentNotFoundError",
       agentId: "agent_missing",
-      projectId: "project_1",
+      projectId,
     });
   });
 
-  it("does not persist a type-only update with an incompatible config", async () => {
-    const { service, database } = setup();
-    vi.mocked(database.agent.findFirst).mockResolvedValue(row());
+  /** @scenario "Invalid config is rejected before persistence" */
+  it("does not persist a type-only update with incompatible config", async () => {
+    const { app, repositories } = createAgentAppFixture();
+    const created = await app.create({ projectId, name: "Answerer", type: "signature", config });
+    const before = await repositories.agents.getById({ id: created.id, projectId });
+    const update = vi.spyOn(repositories.agents, "update");
 
-    await expect(
-      service.update({
-        id: "agent_1",
-        projectId: "project_1",
-        type: "code",
-      }),
-    ).rejects.toMatchObject({ name: "InvalidAgentConfigError" });
-    expect(database.agent.update).not.toHaveBeenCalled();
+    await expect(app.update({ id: created.id, projectId, type: "code" })).rejects.toMatchObject({
+      name: "InvalidAgentConfigError",
+      agentType: "code",
+    });
+    expect(update).not.toHaveBeenCalled();
+    expect(await repositories.agents.getById({ id: created.id, projectId })).toEqual(before);
   });
 });

@@ -1,130 +1,138 @@
-/**
- * @vitest-environment node
- *
- * What every agent read carries beside the row (ADR-128): the parameters a
- * connected agent declares, the owner of a personal one, and its presence.
- *
- * @see specs/agents/connected-agents.feature
- */
-import { describe, expect, it, vi } from "vitest";
-import type { AgentService, AgentWithFields } from "@langwatch/agent-contract";
+import { describe, expect, it, onTestFinished } from "vitest";
+import { PROTOCOL_VERSION } from "@langwatch/agent-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { UserApi } from "@langwatch/user-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createAgentAppFixture } from "../../testing.ts";
 
-import { AgentApp } from "../agent.app.ts";
-import { NO_PRESENCE, type AgentPresence } from "../../services/connected-agent-presence.service.ts";
-
-const connectedAgent: AgentWithFields = {
+const projectId = "project_1";
+const connected = {
   id: "agent_1",
-  projectId: "project_1",
+  projectId,
   name: "support-agent",
-  workflowId: null,
-  copiedFromAgentId: null,
-  archivedAt: null,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  environment: "production",
-  ownerUserId: null,
-  hostLabel: null,
-  identityKey: "support-agent@production",
-  lastSeenAt: new Date(),
-  type: "connected",
   config: {
     sdk: { name: "langwatch", version: "1.0.0", language: "python" },
     parameters: [{ name: "model", defaultValue: "gpt-5-mini" }],
   },
-  inputFields: [],
-  outputFields: [],
-  fieldsResolved: true,
+  identity: {
+    environment: "production",
+    ownerUserId: null,
+    hostLabel: null,
+    identityKey: "support-agent@production",
+  },
 };
 
-function fakeAgents(overrides: Partial<AgentService> = {}): AgentService {
-  return {
-    getAll: vi.fn(),
-    getById: vi.fn(),
-    ownersOf: vi.fn().mockResolvedValue(new Map()),
-    ...overrides,
-  } as unknown as AgentService;
-}
-
 describe("AgentApp connected views", () => {
-  describe("given a process that composed the connected-agent runtime", () => {
-    it("carries the agent's declared parameters, owner and presence on getAll", async () => {
-      const presence: AgentPresence = {
-        status: "online",
-        instances: [
+  it("reports the parameters and live instance registered through its connected runtime", async () => {
+    const { app, resources } = createAgentAppFixture({
+      config: {
+        publicBaseUrl: "https://langwatch.test",
+        connected: { replicaCount: 1, relayMaxPayloadMb: void 0 },
+      },
+      apiKeys: createApiFixture<ApiKeyApi>({
+        findResolvedToken: async () => ({
+          type: "legacyProjectKey",
+          project: {
+            id: projectId,
+            name: "Project",
+            slug: "project",
+            teamId: "team_1",
+            organizationId: "org_1",
+            isPersonal: false,
+            ownerUserId: null,
+          },
+        }),
+      }),
+    });
+    const services = resources.sealServices();
+    onTestFinished(async () => {
+      for (const service of services) await service.stop();
+      await resources.close();
+    });
+    for (const service of services) await service.start();
+
+    const registered = await app.connectRegister(
+      {
+        type: "register",
+        protocol: PROTOCOL_VERSION,
+        sdk: connected.config.sdk,
+        instance: {
+          id: "instance_1",
+          hostname: "host",
+          username: "user",
+          pid: 1,
+          startedAt: new Date().toISOString(),
+          inFlightCallIds: [],
+        },
+        agents: [
           {
-            instanceId: "inst_1",
-            hostname: "host",
-            username: "user",
-            pid: 1,
-            label: null,
-            sdk: { name: "langwatch", version: "1.0.0", language: "python" },
-            connectedAt: new Date(),
-            inflight: 0,
-            maxConcurrency: 1,
+            name: connected.name,
+            environment: "production",
+            parameters: {
+              type: "object",
+              properties: { model: { type: "string", default: "gpt-5-mini" } },
+            },
           },
         ],
-      };
-      const app = AgentApp.create({
-        agents: fakeAgents({
-          getAll: vi.fn().mockResolvedValue([connectedAgent]),
-          ownersOf: vi.fn().mockResolvedValue(new Map()),
-        }),
-        connected: {
-          presence: vi.fn().mockResolvedValue(new Map([["agent_1", presence]])),
-        },
-      });
+      },
+      { authorization: "Bearer sk-lw-test", projectId },
+    );
+    expect(registered.frame.type).toBe("registered");
 
-      const [agent] = await app.getAll({ projectId: "project_1" });
+    const agents = await app.getAll({ projectId });
 
-      expect(agent?.parameters).toEqual([{ name: "model", defaultValue: "gpt-5-mini" }]);
-      expect(agent?.owner).toBeNull();
-      expect(agent?.status).toBe("online");
-      expect(agent?.instances).toHaveLength(1);
+    expect(agents).toHaveLength(1);
+    expect(agents[0]?.parameters).toEqual([
+      { name: "model", type: "string", defaultValue: "gpt-5-mini" },
+    ]);
+    expect(agents[0]?.owner).toBeNull();
+    expect(agents[0]?.status).toBe("online");
+    expect(agents[0]?.instances).toMatchObject([{ instanceId: "instance_1", hostname: "host" }]);
+  });
+
+  it("reports offline and no instances when no connected runtime is composed", async () => {
+    const { app } = createAgentAppFixture();
+    await app.registerConnected(connected);
+
+    expect(await app.getById({ id: connected.id, projectId })).toMatchObject({
+      status: "offline",
+      instances: [],
+      parameters: connected.config.parameters,
     });
   });
 
-  describe("given a process that composed no connected-agent runtime", () => {
-    it("reads every agent as offline with no instances on getById", async () => {
-      const app = AgentApp.create({
-        agents: fakeAgents({
-          getById: vi.fn().mockResolvedValue(connectedAgent),
-          ownersOf: vi.fn().mockResolvedValue(new Map()),
-        }),
-      });
-
-      const agent = await app.getById({ id: "agent_1", projectId: "project_1" });
-
-      expect(agent.status).toBe(NO_PRESENCE.status);
-      expect(agent.instances).toEqual(NO_PRESENCE.instances);
+  it("lists personal and hosted rows while preventing a project key selecting a personal row", async () => {
+    const { app } = createAgentAppFixture({
+      users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
     });
-  });
-});
-
-describe("given one name and one environment holding two rows", () => {
-  describe("when a project key lists the project's agents", () => {
-    /** @scenario "A listing carries every row of a name, whoever holds it" */
-    it("answers both rows, marking the personal one as not selectable", async () => {
-      const personal = {
-        ...connectedAgent,
-        id: "agent_personal",
+    await app.registerConnected({
+      ...connected,
+      id: "agent_personal",
+      identity: {
+        ...connected.identity,
         environment: "development",
-        ownerUserId: "u_1",
-      };
-      const hosted = {
-        ...connectedAgent,
-        id: "agent_hosted",
+        ownerUserId: "user_1",
+        identityKey: "personal",
+      },
+    });
+    await app.registerConnected({
+      ...connected,
+      id: "agent_hosted",
+      identity: {
+        ...connected.identity,
         environment: "development",
         hostLabel: "acme-laptop",
-      };
-      const app = AgentApp.create({
-        agents: fakeAgents({ getAll: vi.fn().mockResolvedValue([personal, hosted]) }),
-      });
-
-      const rows = await app.getAll({ projectId: "project_1", viewerUserId: null });
-
-      expect(rows.map((row) => row.id)).toEqual(["agent_personal", "agent_hosted"]);
-      expect(rows[0]?.selectable).toBe(false);
-      expect(rows[1]?.selectable).toBe(true);
+        identityKey: "hosted",
+      },
     });
+
+    const rows = await app.getAll({ projectId, viewerUserId: null });
+
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.id === "agent_personal")).toMatchObject({
+      selectable: false,
+      owner: { userId: "user_1", name: null },
+    });
+    expect(rows.find((row) => row.id === "agent_hosted")?.selectable).toBe(true);
   });
 });

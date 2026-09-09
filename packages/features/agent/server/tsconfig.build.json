@@ -11,11 +11,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": [
-    "./src/index.ts",
-    "./src/transport/api-rest/agent-legacy-facade.api.ts",
-    "./src/testing.ts"
-  ],
+  "files": ["./src/index.ts", "./src/testing.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -40,6 +36,21 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../api-key/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../audit-log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../runtime-composition/tsconfig.build.json"
+    },
+    {
       "path": "../../../handled-error/tsconfig.build.json"
     },
     {
@@ -53,9 +64,6 @@
     },
     {
       "path": "../../scenario/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../task/tsconfig.build.json"
     },
     {
       "path": "../../../time/tsconfig.build.json"

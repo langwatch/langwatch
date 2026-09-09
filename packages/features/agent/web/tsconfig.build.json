@@ -12,10 +12,11 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "files": [
-    "./src/screens/agent-management/index.ts",
-    "./src/surfaces/connected-agents/index.ts",
-    "./src/surfaces/agent-http-editor/index.ts",
-    "./src/surfaces/browser-port/index.ts"
+    "./src/agent-management.ts",
+    "./src/connected-agents.ts",
+    "./src/agent-http-editor.ts",
+    "./src/agent-client.ts",
+    "./src/agent-editors.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -31,14 +32,16 @@
     "**/testing.tsx"
   ],
   "references": [
+    { "path": "../../../handled-error/tsconfig.build.json" },
+    { "path": "../../scenario/contract/tsconfig.build.json" },
     {
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../../design-system/tsconfig.build.json"
+      "path": "../../../api/tsconfig.build.json"
     },
     {
-      "path": "../../../api/tsconfig.build.json"
+      "path": "../../../design-system/tsconfig.build.json"
     },
     {
       "path": "../../../time/tsconfig.build.json"

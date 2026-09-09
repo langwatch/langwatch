@@ -5,7 +5,6 @@
 
 import {
   AgentRegisterRefusedError,
-  type AgentService,
   DEFAULT_CALL_TIMEOUT_MS,
   DEFAULT_CONCURRENCY,
   MAX_CALL_TIMEOUT_MS,
@@ -19,11 +18,11 @@ import {
   scopeColumns,
 } from "@langwatch/agent-contract";
 import { HandledError } from "@langwatch/handled-error";
+import type { AgentService } from "./agent.service.ts";
 import { createLogger } from "@langwatch/observability";
-import type { AgentPlatformUrlBuilder } from "../transport/api-rest/agent-legacy.api.ts";
 import { ConnectedAgentParameterSpecService } from "./connected-agent-parameter-spec.service.ts";
-import type { ConnectedAgentRuntime, InstanceMeta } from "../ports/connected-agent-runtime.port.ts";
-import type { ResolvedConnectCredential } from "../ports/connect-credential.port.ts";
+import type { ConnectedAgentRuntime, InstanceMeta } from "./connected-agent-runtime.service.ts";
+import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
 import type { SessionInfo } from "./connected-agent-session.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:registration");
@@ -31,7 +30,7 @@ const logger = createLogger("langwatch:connected-agents:registration");
 type ConnectedAgentRegistrationOptions = {
   runtime: ConnectedAgentRuntime;
   agents: AgentService;
-  agentPlatformUrl: AgentPlatformUrlBuilder;
+  publicBaseUrl: string;
   now: () => number;
 };
 
@@ -40,16 +39,16 @@ export class ConnectedAgentRegistrationService {
     return new ConnectedAgentRegistrationService(options);
   }
 
-  private readonly runtime: ConnectedAgentRuntime;
-  private readonly agents: AgentService;
-  private readonly agentPlatformUrl: AgentPlatformUrlBuilder;
-  private readonly now: () => number;
+  readonly #runtime: ConnectedAgentRuntime;
+  readonly #agents: AgentService;
+  readonly #publicBaseUrl: string;
+  readonly #now: () => number;
 
   private constructor(options: ConnectedAgentRegistrationOptions) {
-    this.runtime = options.runtime;
-    this.agents = options.agents;
-    this.agentPlatformUrl = options.agentPlatformUrl;
-    this.now = options.now;
+    this.#runtime = options.runtime;
+    this.#agents = options.agents;
+    this.#publicBaseUrl = options.publicBaseUrl.replace(/\/+$/, "");
+    this.#now = options.now;
   }
 
   /** Upserts the rows of a register frame and records the instance as live. */
@@ -64,7 +63,12 @@ export class ConnectedAgentRegistrationService {
   }): Promise<{ session: SessionInfo; registered: RegisteredFrame }> {
     const projectId = resolved.project.id;
     const userId = resolved.userId;
-    const agents = await this.registerAgents({ frame, projectId, userId });
+    await this.#runtime.ownership.claim({
+      projectId,
+      instanceId: frame.instance.id,
+      principalId: resolved.principalId,
+    });
+    const agents = await this.#registerAgents({ frame, projectId, userId });
 
     const meta: InstanceMeta = {
       instanceId: frame.instance.id,
@@ -74,21 +78,22 @@ export class ConnectedAgentRegistrationService {
       pid: frame.instance.pid,
       sdk: frame.sdk,
       label: frame.instance.label ?? null,
-      podId: this.runtime.podId,
-      connectedAt: this.now(),
+      podId: this.#runtime.podId,
+      connectedAt: this.#now(),
       maxConcurrency: frame.instance.maxConcurrency ?? DEFAULT_CONCURRENCY,
     };
     const session: SessionInfo = {
+      principalId: resolved.principalId,
       instanceId: frame.instance.id,
       projectId,
       projectSlug: resolved.project.slug,
       agentIds: new Set(agents.map((agent) => agent.id)),
       meta,
     };
-    await this.runtime.registry.register({
+    await this.#runtime.registry.register({
       meta,
       agentIds: [...session.agentIds],
-      now: this.now(),
+      now: this.#now(),
     });
     logger.info(
       {
@@ -109,11 +114,7 @@ export class ConnectedAgentRegistrationService {
           name: agent.name,
           environment: agent.environment,
           id: agent.id,
-          url: this.agentPlatformUrl({
-            projectSlug: session.projectSlug,
-            agentId: agent.id,
-            agentType: "connected",
-          }),
+          url: `${this.#publicBaseUrl}/${session.projectSlug}/agents?drawer.open=agentConnectedDetail&drawer.agentId=${encodeURIComponent(agent.id)}`,
           parameterNotes: agent.notes,
         })),
         heartbeatIntervalMs,
@@ -123,7 +124,7 @@ export class ConnectedAgentRegistrationService {
   }
 
   /** Upserts every agent of the frame; refuses the frame on the first bad one. */
-  private async registerAgents({
+  async #registerAgents({
     frame,
     projectId,
     userId,
@@ -174,7 +175,7 @@ export class ConnectedAgentRegistrationService {
         environment,
         scope,
       });
-      const row = await this.agents.registerConnected({
+      const row = await this.#agents.registerConnected({
         id: `agent_${crypto.randomUUID().replace(/-/g, "").slice(0, 21)}`,
         projectId,
         name: agent.name,

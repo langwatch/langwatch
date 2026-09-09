@@ -4,6 +4,10 @@
 
 const PREFIX = "v1";
 
+export function instanceOwnerKey(projectId: string, instanceId: string): string {
+  return `agent_instance_owner:${PREFIX}:${projectId}:${instanceId}`;
+}
+
 /** ZSET of live instance ids of one agent, scored by last seen. */
 export function instanceSetKey(projectId: string, agentId: string): string {
   return `agent_instance:${PREFIX}:${projectId}:${agentId}`;

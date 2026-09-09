@@ -1,5 +1,5 @@
 /**
- * `AgentHost` read the organization graph without checking for a refusal, so a failed `organization.getAll` left the agents screen with no project and no error — same gap `TraceHost` and `OrganizationHost` had.
+ * Refusing the organization graph must show a failure instead of an empty Agents screen.
  * @vitest-environment jsdom
  * Spec: specs/auth/session-failure.feature
  */
@@ -11,13 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const graph = vi.hoisted(() => ({ error: null as unknown }));
 const departures = vi.hoisted(() => [] as string[]);
 
-vi.mock("@langwatch/agent-web/screens/agent-management", async () => {
-  const actual = await vi.importActual<
-    typeof import("@langwatch/agent-web/screens/agent-management")
-  >("@langwatch/agent-web/screens/agent-management");
+vi.mock("@langwatch/organization-web/organization-client", () => {
   return {
-    ...actual,
-    agentApi: {
+    organizationApi: {
+      useUtils: () => ({ licenseEnforcement: { checkLimit: { invalidate: vi.fn() } } }),
       organization: {
         getAll: {
           useQuery: () => ({ data: void 0, error: graph.error, isLoading: false }),

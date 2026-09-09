@@ -16,10 +16,10 @@ Feature: Agents package boundary
   Scenario: Agents is the strict layout reference feature
     Given Agents declares layoutVersion 0 in feature.json
     Then contract artifacts use subject.artifact.ts names
-    And the server uses services, repositories, ports and api surface directories
-    And concrete adapters use technology.subject.artifact.ts names
-    And service, repository and API behaviour is owned by classes
-    And PrismaAgentAdapter binds the private repository without AgentService importing it
+    And the server uses app, services, repositories and flat transport directories
+    And Prisma implementations use prisma.subject.repository.ts names
+    And AgentApp owns private services which receive private repository interfaces
+    And the installer selects a repository backend without the App importing Prisma
 
   @unit @agents
   Scenario: Persisted rows are mapped into contract agents
@@ -32,7 +32,7 @@ Feature: Agents package boundary
   @unit @agents
   Scenario: A created agent is validated, persisted and returned resolved
     Given a create command whose config matches its declared agent type
-    When AgentService handles it
+    When AgentApp handles it
     Then the repository is asked to persist it exactly once
     And the agent comes back with its input and output fields resolved from that config
 
@@ -54,14 +54,14 @@ Feature: Agents package boundary
   Scenario: Internal RPC invokes the injected agent service
     Given an authenticated product user may manage agents in a project
     When the user creates an agent through the internal RPC interface
-    Then the package-owned router invokes AgentService once
+    Then the package-owned router invokes the installed AgentApp
     And it returns an Agents contract response
 
   @integration @rest
   Scenario: Legacy REST forwards to the same agent service
     Given a valid project API key
     When a client creates an agent through the legacy REST interface
-    Then the REST adapter invokes the same AgentService command as internal RPC
+    Then the REST handler invokes the same AgentApp command as internal RPC
     And the response preserves the documented REST status and shape
     And the REST adapter does not call Prisma or the internal HTTP server
 
@@ -104,10 +104,10 @@ Feature: Agents package boundary
     Then the archived agent is absent
 
   @unit @agents
-  Scenario: Linked workflow behaviour uses an injected capability
+  Scenario: Linked workflow behaviour uses the injected Workflow API
     Given an agent operation needs to read, copy or archive a linked workflow
-    When AgentService performs the operation
-    Then it invokes the workflow capability supplied by the composition root
+    When AgentApp performs the operation
+    Then it invokes the complete WorkflowApi supplied by the composition root
     And Agents server imports no Workflows server or repository implementation
 
   @architecture @web @typecheck
@@ -120,17 +120,17 @@ Feature: Agents package boundary
   @architecture @web @typecheck
   Scenario: Agent web private presentation has named ownership
     Given Agent browser presentation is not part of a public screen or surface
-    Then package-wide browser ports and portable model remain under model
-    And management, history, editor, and HTTP presentation remain in named private features
-    And their model, behavior, elements, blocks, and sections follow the governed web dependency direction
-    And no flat root source or generic components bucket is present
+    Then presentation lives in ui and browser state and actions live in behavior
+    And reusable browser values live in model
+    And named root entries expose controlled management and editor composition
+    And the package has no nested private feature buckets or forwarding classes
 
   @architecture @web
-  Scenario: Remaining Agent drawers are recorded as incomplete migration work
-    Given the Agent Management screen, history drawer, type selector, and HTTP editor are package-owned
+  Scenario: Agent owns reusable editor presentation
+    Given the Agent Management screen, history drawer, type selector, and editors are package-owned
     Then the browser application composes their project, route, transport, replication targets, and notices
-    And Agent list, code-editor, workflow-editor, workflow-target-editor, and workflow-selector drawers remain platform-owned behaviour
-    And those retained drawers are explicit next vertical slices rather than compatibility-only adapters
+    And Agent owns list, code, workflow, workflow-target, workflow-selector, HTTP and connected editor presentation
+    And Scenario and Suite hosts receive controlled Agent editors rather than owning a second implementation
 
   Rule: The Agents page is served from the browser application
 
@@ -196,13 +196,49 @@ Feature: Agents package boundary
     And the editor receives the established response, output, error, status, duration, header, rendered body, and warning fields
 
   @architecture @registration
-  Scenario: Each runtime installs only its Agents adapter
+  Scenario: Each runtime composes one Agent graph
     Given no Agents installer has been called
     Then importing an Agents package registers no route or background work
-    When the internal server installs Agents
-    Then only the RPC fragment is mounted
-    When the public API installs Agents
-    Then only the legacy REST adapter is mounted
+    When the API process installs Agent
+    Then its RPC, REST and connection protocols use the same AgentApp
+    When the worker process installs Agent
+    Then dispatch and presence use its composed App without mounting inbound transports
+    And each process starts and stops the connected runtime with its owned resources
+
+  @integration @postgres @agents
+  Scenario: Concurrent SDK registrations preserve one project identity
+    Given multiple registrations name the same project and connected identity
+    When the registrations arrive concurrently
+    Then all successful registrations return the same persisted agent id
+    And registration revives an archived identity without replacing its id
+    And the same identity in another project remains a separate agent
+
+  @integration @postgres @agents
+  Scenario: Optional SDK config is stored as JSON
+    Given SDK configuration contains omitted optional values in objects
+    When Agent persists the configuration
+    Then absent properties are omitted at every object level
+    And invalid non-JSON values do not become a successful write
+
+  @integration @authorization
+  Scenario: Extra application facts cannot alter persistence scope
+    Given an App input includes viewer and actor metadata
+    When the repository reads or lists agents
+    Then its database filter contains only the declared project and query fields
+    And a cross-project read or mutation throws AgentNotFoundError
+
+  @unit @web
+  Scenario: Failed reads cannot appear as an empty list or authorize deletion
+    Given fetching agents or their related entities fails
+    When the management screen or editor renders
+    Then it shows the failure and offers retry
+    And it does not enable deletion based on unknown related entities
+
+  @unit @web
+  Scenario: Test agent is wired to the real management action
+    Given an authorized user views an authored or connected agent
+    When they select Test agent
+    Then the browser client invokes the declared test-run procedure for the active project
 
   @architecture
   Scenario: Coding-agent observability remains a separate feature

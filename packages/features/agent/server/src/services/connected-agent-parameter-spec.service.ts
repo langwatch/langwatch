@@ -62,7 +62,7 @@ function scalarTypeOf(property: Record<string, unknown>): {
 }
 
 /** A string the text type accepts, cut to the cap, or nothing. */
-function coerceString(value: unknown): string | undefined {
+function findCoercedString(value: unknown): string | undefined {
   if (typeof value === "string") {
     return value.slice(0, MAX_PARAMETER_VALUE_LENGTH);
   }
@@ -75,13 +75,13 @@ function coerceString(value: unknown): string | undefined {
 }
 
 /** A scalar the declared type accepts, or nothing. */
-function coerceValue(
+function findCoercedValue(
   value: unknown,
   type: ScenarioParameterType,
 ): ScenarioParameterValue | undefined {
   switch (type) {
     case "string":
-      return coerceString(value);
+      return findCoercedString(value);
     case "number":
       return typeof value === "number" && Number.isFinite(value) ? value : undefined;
     case "boolean":
@@ -90,7 +90,7 @@ function coerceValue(
 }
 
 /** The closed list of one property, cut to the cap, with a note when cut. */
-function optionsOf({
+function findOptions({
   name,
   property,
   type,
@@ -106,7 +106,7 @@ function optionsOf({
   }
 
   const values = property.enum
-    .map((value) => coerceValue(value, type))
+    .map((value) => findCoercedValue(value, type))
     .filter((value): value is ScenarioParameterValue => value !== undefined);
   if (values.length === 0) {
     return undefined;
@@ -220,12 +220,12 @@ function normalizeProperty({
     );
   }
 
-  const defaultValue = coerceValue(property.default, type);
+  const defaultValue = findCoercedValue(property.default, type);
   const description =
     typeof property.description === "string"
       ? property.description.slice(0, MAX_PARAMETER_DESCRIPTION_LENGTH)
       : undefined;
-  const options = optionsOf({ name, property, type, notes });
+  const options = findOptions({ name, property, type, notes });
 
   return {
     name,

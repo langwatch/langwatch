@@ -5,6 +5,17 @@ import { describe, expect, it } from "vitest";
 import { buildTraceTestContext, sanitizeHeadersForTrace } from "../agent-test-tracing.rules.ts";
 
 describe("sanitizeHeadersForTrace()", () => {
+  it("redacts header names normalized by HTTP execution", () => {
+    const sanitized = sanitizeHeadersForTrace({
+      headers: { " Authorization ": "Bearer secret-token", " X-Customer ": "secret-key" },
+      customAuthHeaderName: "X-Customer",
+    });
+
+    expect(sanitized).toEqual({
+      " Authorization ": "Bearer [REDACTED]",
+      " X-Customer ": "[REDACTED]",
+    });
+  });
   describe("when Authorization header contains a bearer token", () => {
     /** @scenario "Bearer token is redacted in trace" */
     /** @scenario "Authorization headers are redacted in captured request headers" */
@@ -167,8 +178,8 @@ describe("buildTraceTestContext()", () => {
         method: "POST",
         auth: {
           type: "api_key",
-          headerName: "X-API-Key",
-          apiKeyValue: "secret-key",
+          header: "X-API-Key",
+          value: "secret-key",
         },
       });
 
@@ -182,8 +193,8 @@ describe("buildTraceTestContext()", () => {
         method: "POST",
         auth: {
           type: "api_key",
-          headerName: "X-API-Key",
-          apiKeyValue: "secret-key",
+          header: "X-API-Key",
+          value: "secret-key",
         },
       });
 

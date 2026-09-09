@@ -13,7 +13,7 @@ import {
   AgentSandboxKeyMintService,
   RedisAgentSandboxKeyShareAdapter,
 } from "@langwatch/api-key-server";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import type { MiddlewareHandler } from "hono";
 import { describe, expect, it } from "vitest";
@@ -33,7 +33,7 @@ const fakeEncryption: SecretEncryptionPort = {
 
 /** Captures the permission list the real mint function actually requested. */
 function fakeApiKeys(): {
-  apiKeys: ApiKeyService;
+  apiKeys: ApiKeyApi;
   grantedPermissions: () => string[];
   minted: () => { userId: string | null; createdByUserId: string | null }[];
 } {
@@ -52,7 +52,7 @@ function fakeApiKeys(): {
       });
       return { token: `sandbox-token-${minted.length}`, apiKey: { id: "key_sandbox" } };
     },
-  } as unknown as ApiKeyService;
+  } as unknown as ApiKeyApi;
   return { apiKeys, grantedPermissions: () => granted, minted: () => minted };
 }
 
@@ -117,11 +117,11 @@ function sandboxKeySecurity(grantedPermissions: readonly string[]): AppRestSecur
  * the share is this process's own, sealed the same way), and a repository that
  * answers who — if anyone — owns the workspace the project sits in.
  */
-function mintOver(options: { apiKeys: ApiKeyService; ownerUserId?: string }) {
+function mintOver(options: { apiKeys: ApiKeyApi; ownerUserId?: string }) {
   return AgentSandboxKeyMintService.create({
     apiKeys: options.apiKeys,
     repository: {
-      tryFindPersonalWorkspaceOwner: async () =>
+      findPersonalWorkspaceOwner: async () =>
         options.ownerUserId ? { ownerUserId: options.ownerUserId } : null,
     },
     share: RedisAgentSandboxKeyShareAdapter.create({

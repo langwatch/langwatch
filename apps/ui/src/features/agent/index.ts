@@ -1,6 +1,6 @@
 /** Agents: screen, three dialogs and two overlays, all in `@langwatch/agent-web`. */
 
-import { agentApi } from "@langwatch/agent-web/screens/agent-management";
+import { agentApi } from "@langwatch/agent-web/agent-management";
 import { lazyDrawer } from "@langwatch/ui-drawer";
 import { uiFeature } from "../../behavior/ui-feature";
 import { agentPageLoaders } from "./ui/sections/agent-routes";

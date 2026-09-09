@@ -4,7 +4,7 @@
  */
 
 import { formatDistanceStrict, nowInstant, toEpochMs, type TimeInput } from "@langwatch/time";
-import type { ConnectedAgentView } from "@langwatch/agent-contract";
+import type { ConnectedAgentBrowser } from "./agent-client.ts";
 
 /** The scope a development card belongs to: a person, or a machine. */
 export type ConnectedAgentScope =
@@ -20,7 +20,9 @@ export function isConnectedAgent(agent: { type: string }): boolean {
 /**
  * The cards in the order the page draws them.
  */
-export function sortConnectedAgents(agents: readonly ConnectedAgentView[]): ConnectedAgentView[] {
+export function sortConnectedAgents(
+  agents: readonly ConnectedAgentBrowser[],
+): ConnectedAgentBrowser[] {
   const order = new Map<string, number>();
   for (const agent of agents) {
     if (!order.has(agent.name)) order.set(agent.name, order.size);
@@ -32,7 +34,10 @@ export function sortConnectedAgents(agents: readonly ConnectedAgentView[]): Conn
   });
 }
 
-function byPresenceThenEnvironment(left: ConnectedAgentView, right: ConnectedAgentView): number {
+function byPresenceThenEnvironment(
+  left: ConnectedAgentBrowser,
+  right: ConnectedAgentBrowser,
+): number {
   if (left.status !== right.status) return left.status === "online" ? -1 : 1;
   return (left.environment ?? "").localeCompare(right.environment ?? "");
 }
@@ -64,7 +69,7 @@ export function presenceLabel({
 }
 
 /** How many instances hold the agent, as the card prints it beside the SDK. */
-export function instanceCountLabel(agent: ConnectedAgentView): string | null {
+export function instanceCountLabel(agent: ConnectedAgentBrowser): string | null {
   if (agent.status !== "online") return null;
   const count = Math.max(agent.instances.length, 1);
   return `${count} ${count === 1 ? "instance" : "instances"}`;
@@ -76,14 +81,14 @@ export function instanceCountLabel(agent: ConnectedAgentView): string | null {
  * project with no chip. Every card with an owner or a machine draws it, since
  * that is all that tells two cards of one name and environment apart.
  */
-export function scopeOf(agent: ConnectedAgentView): ConnectedAgentScope {
+export function scopeOf(agent: ConnectedAgentBrowser): ConnectedAgentScope {
   if (agent.owner) return { kind: "owner", label: agent.owner.name ?? "Owner" };
   if (agent.hostLabel) return { kind: "host", label: agent.hostLabel };
   return null;
 }
 
 /** The SDK line of a card, or nothing when the agent recorded none. */
-export function sdkLabel(agent: ConnectedAgentView): string | null {
+export function sdkLabel(agent: ConnectedAgentBrowser): string | null {
   const sdk = agent.config.sdk ?? agent.instances[0]?.sdk;
   if (!sdk?.name) return null;
   return sdk.version ? `${sdk.name} ${sdk.version}` : sdk.name;

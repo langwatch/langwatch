@@ -20,6 +20,67 @@ describe("agent config contract", () => {
   it("rejects a code agent without a code parameter", () => {
     expect(() => parseAgentConfig("code", { parameters: [] })).toThrow();
   });
+
+  it.each([42, null, {}, []])(
+    "rejects a malformed code value %j through the generic field branch",
+    (value) => {
+      expect(() =>
+        parseAgentConfig("code", {
+          parameters: [{ identifier: "code", type: "code", value }],
+        }),
+      ).toThrow();
+    },
+  );
+
+  it("rejects a malformed duplicate beside a valid code parameter", () => {
+    expect(() =>
+      parseAgentConfig("code", {
+        parameters: [
+          { identifier: "code", type: "code", value: "print(1)" },
+          { identifier: "code", type: "str", value: 42 },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  it("keeps HTTP defaults and base fields while stripping unknown fields", () => {
+    expect(
+      parseAgentConfig("http", {
+        url: "https://example.com",
+        description: "Send a request",
+        unexpected: true,
+        auth: { type: "bearer", token: "test-token", unexpected: true },
+      }),
+    ).toEqual({
+      url: "https://example.com",
+      method: "POST",
+      description: "Send a request",
+      auth: { type: "bearer", token: "test-token" },
+    });
+  });
+
+  it("keeps connected defaults and omits the excluded description", () => {
+    expect(
+      parseAgentConfig("connected", {
+        name: "Connected agent",
+        description: "This field is not persisted",
+        sdk: { name: "langwatch", version: "1", language: "python", unexpected: true },
+      }),
+    ).toEqual({
+      name: "Connected agent",
+      parameters: [],
+      sdk: { name: "langwatch", version: "1", language: "python" },
+    });
+  });
+
+  it("still rejects extra fields in a strict connected parameter", () => {
+    expect(() =>
+      parseAgentConfig("connected", {
+        parameters: [{ name: "temperature", unexpected: true }],
+        sdk: { name: "langwatch", version: "1", language: "python" },
+      }),
+    ).toThrow();
+  });
 });
 
 describe("agent transport contract", () => {

@@ -20,10 +20,6 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./legacy-rest": {
-      "types": "./dist/transport/api-rest/agent-legacy-facade.api.d.ts",
-      "default": "./src/transport/api-rest/agent-legacy-facade.api.ts"
-    },
     "./testing": {
       "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
@@ -38,28 +34,31 @@
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
-    "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
-    "@trpc/server": "^11.18.0",
-    "hono": "^4.12.27",
-    "hono-openapi": "^1.3.1",
     "nanoid": "^6.0.0",
-    "ws": "^8.21.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@langwatch/scenario-server": "workspace:*",
+    "@langwatch/actor": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
+    "@trpc/server": "^11.18.0",
     "@types/ws": "^8.18.1",
+    "hono": "^4.12.27",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.0",
+    "ws": "^8.21.0"
   }
 }

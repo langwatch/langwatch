@@ -6,6 +6,22 @@ import {
   workflowAgentConfigSchema,
 } from "./config/index.ts";
 import { z } from "zod";
+import { HTTP_METHODS, httpAuthSchema, httpHeaderSchema } from "./config/http.ts";
+
+export const httpAgentTestInputSchema = z.object({
+  projectId: z.string(),
+  agentId: z.string().optional(),
+  url: z.string().url(),
+  method: z.enum(HTTP_METHODS),
+  headers: httpHeaderSchema.array().optional(),
+  auth: httpAuthSchema.optional(),
+  bodyTemplate: z.string(),
+  templateVariables: z.record(z.string(), z.json()).optional(),
+  outputPath: z.string().optional(),
+  timeoutMs: z.number().positive().optional(),
+});
+
+export type HttpAgentTestInput = z.infer<typeof httpAgentTestInputSchema>;
 
 const createAgentRequestBaseSchema = z.object({
   name: z.string().min(1).max(255),
@@ -14,23 +30,28 @@ const createAgentRequestBaseSchema = z.object({
 });
 
 const createAgentRequestVariants = [
-  createAgentRequestBaseSchema.extend({
+  z.object({
+    ...createAgentRequestBaseSchema.shape,
     type: z.literal("signature"),
     config: signatureAgentConfigSchema,
   }),
-  createAgentRequestBaseSchema.extend({
+  z.object({
+    ...createAgentRequestBaseSchema.shape,
     type: z.literal("code"),
     config: codeAgentConfigSchema,
   }),
-  createAgentRequestBaseSchema.extend({
+  z.object({
+    ...createAgentRequestBaseSchema.shape,
     type: z.literal("workflow"),
     config: workflowAgentConfigSchema,
   }),
-  createAgentRequestBaseSchema.extend({
+  z.object({
+    ...createAgentRequestBaseSchema.shape,
     type: z.literal("http"),
     config: httpAgentConfigSchema,
   }),
-  createAgentRequestBaseSchema.extend({
+  z.object({
+    ...createAgentRequestBaseSchema.shape,
     type: z.literal("connected"),
     config: connectedAgentConfigSchema,
   }),
@@ -44,11 +65,26 @@ const createAgentCommandBaseSchema = z.object({
 });
 
 export const createAgentCommandSchema = z.discriminatedUnion("type", [
-  createAgentCommandBaseSchema.merge(createAgentRequestVariants[0]),
-  createAgentCommandBaseSchema.merge(createAgentRequestVariants[1]),
-  createAgentCommandBaseSchema.merge(createAgentRequestVariants[2]),
-  createAgentCommandBaseSchema.merge(createAgentRequestVariants[3]),
-  createAgentCommandBaseSchema.merge(createAgentRequestVariants[4]),
+  z.object({
+    ...createAgentCommandBaseSchema.shape,
+    ...createAgentRequestVariants[0].shape,
+  }),
+  z.object({
+    ...createAgentCommandBaseSchema.shape,
+    ...createAgentRequestVariants[1].shape,
+  }),
+  z.object({
+    ...createAgentCommandBaseSchema.shape,
+    ...createAgentRequestVariants[2].shape,
+  }),
+  z.object({
+    ...createAgentCommandBaseSchema.shape,
+    ...createAgentRequestVariants[3].shape,
+  }),
+  z.object({
+    ...createAgentCommandBaseSchema.shape,
+    ...createAgentRequestVariants[4].shape,
+  }),
 ]);
 
 export const updateAgentRequestSchema = z.object({
@@ -58,7 +94,8 @@ export const updateAgentRequestSchema = z.object({
   workflowId: z.string().nullable().optional(),
 });
 
-export const updateAgentCommandSchema = updateAgentRequestSchema.extend({
+export const updateAgentCommandSchema = z.object({
+  ...updateAgentRequestSchema.shape,
   id: z.string(),
   projectId: z.string(),
 });
@@ -82,3 +119,11 @@ export type UpdateAgentCommand = z.input<typeof updateAgentCommandSchema>;
 export type UpdateAgentRequest = z.input<typeof updateAgentRequestSchema>;
 export type ArchiveAgentCommand = z.infer<typeof archiveAgentCommandSchema>;
 export type CopyAgentCommand = z.infer<typeof copyAgentCommandSchema>;
+
+export type RegisterConnectedAgentInput = {
+  id: string;
+  projectId: string;
+  name: string;
+  config: import("./config/connected.ts").ConnectedAgentConfig;
+  identity: import("./connected-agent.identity.ts").ConnectedAgentIdentity;
+};

@@ -25,7 +25,8 @@ export const agentChatMessageSchema = z.object({
   content: z.string().optional(),
 });
 
-export const signatureAgentConfigSchema = baseAgentConfigSchema.extend({
+export const signatureAgentConfigSchema = z.object({
+  ...baseAgentConfigSchema.shape,
   configId: z.string().optional(),
   handle: z.string().nullable().optional(),
   versionMetadata: z

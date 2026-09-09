@@ -8,7 +8,6 @@ import {
   AgentCallForeignProjectError,
   AgentPayloadTooLargeError,
   AgentRegisterRefusedError,
-  type AgentService,
   CALL_KEY_SLACK_SECONDS,
   PROTOCOL_VERSION,
   RESULT_TTL_SECONDS,
@@ -18,10 +17,11 @@ import {
   type RegisterFrame,
   type RegisteredFrame,
   type ResultFrame,
+  type AgentConnectCredentials,
   relayPayloadCaps,
 } from "@langwatch/agent-contract";
+import type { AgentService } from "./agent.service.ts";
 import { createLogger } from "@langwatch/observability";
-import type { AgentPlatformUrlBuilder } from "../transport/api-rest/agent-legacy.api.ts";
 import { resultCapViolation } from "../rules/connected-agent-caps.rules.ts";
 import {
   type InstanceGone,
@@ -38,27 +38,20 @@ import {
   resultKey,
 } from "../rules/connected-agent-keys.rules.ts";
 import { ConnectedAgentRegistrationService } from "./connected-agent-registration.service.ts";
-import {
-  ConnectedAgentPresenceProjection,
-  type AgentLastSeenWriter,
-} from "../projections/connected-agent-presence.projection.ts";
-import type { ConnectedAgentRuntime, InstanceMeta } from "../ports/connected-agent-runtime.port.ts";
+import { ConnectedAgentLastSeenService } from "./connected-agent-last-seen.service.ts";
+import type { ConnectedAgentRuntime, InstanceMeta } from "./connected-agent-runtime.service.ts";
 import { nowInstant } from "@langwatch/time";
 import {
-  type ConnectCredentialPort,
+  type ConnectedAgentCredentials,
   type ResolvedConnectCredential,
-} from "../ports/connect-credential.port.ts";
+} from "./connected-agent-credential.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:session");
 
 /** The headers a transport authenticates with, however it carries them. */
-export interface ConnectCredentials {
-  authorization: string | undefined;
-  projectId: string | undefined;
-}
-
 /** One registered instance, as both transports see it. */
 export interface SessionInfo {
+  principalId: string;
   instanceId: string;
   projectId: string;
   projectSlug: string;
@@ -69,10 +62,8 @@ export interface SessionInfo {
 export interface SessionCoreOptions {
   runtime: ConnectedAgentRuntime;
   agents: AgentService;
-  /** The repository that owns the presence projection's write. */
-  agentRepository: AgentLastSeenWriter;
-  credentials: ConnectCredentialPort;
-  agentPlatformUrl: AgentPlatformUrlBuilder;
+  credentials: ConnectedAgentCredentials;
+  publicBaseUrl: string;
   /** The app replicas of this deployment, for the no-Redis refusal. */
   replicaCount: number;
   /** `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`; the default cap when absent. */
@@ -86,29 +77,29 @@ export class AgentSessionService {
   }
 
   readonly runtime: ConnectedAgentRuntime;
-  private readonly agents: AgentService;
-  private readonly agentRepository: AgentLastSeenWriter;
-  private readonly credentials: ConnectCredentialPort;
-  private readonly agentPlatformUrl: AgentPlatformUrlBuilder;
-  private readonly replicaCount: number;
-  private readonly relayMaxPayloadMb: number | undefined;
+  readonly #agents: AgentService;
+  readonly #lastSeen: ConnectedAgentLastSeenService;
+  readonly #credentials: ConnectedAgentCredentials;
+  readonly #publicBaseUrl: string;
+  readonly #replicaCount: number;
+  readonly #relayMaxPayloadMb: number | undefined;
   readonly now: () => number;
 
-  private readonly registrations: ConnectedAgentRegistrationService;
+  readonly #registrations: ConnectedAgentRegistrationService;
 
   private constructor(options: SessionCoreOptions) {
     this.runtime = options.runtime;
-    this.agents = options.agents;
-    this.agentRepository = options.agentRepository;
-    this.credentials = options.credentials;
-    this.agentPlatformUrl = options.agentPlatformUrl;
-    this.replicaCount = options.replicaCount;
-    this.relayMaxPayloadMb = options.relayMaxPayloadMb;
+    this.#agents = options.agents;
+    this.#lastSeen = ConnectedAgentLastSeenService.create(options.agents);
+    this.#credentials = options.credentials;
+    this.#publicBaseUrl = options.publicBaseUrl.replace(/\/+$/, "");
+    this.#replicaCount = options.replicaCount;
+    this.#relayMaxPayloadMb = options.relayMaxPayloadMb;
     this.now = options.now ?? (() => nowInstant().epochMilliseconds);
-    this.registrations = ConnectedAgentRegistrationService.create({
+    this.#registrations = ConnectedAgentRegistrationService.create({
       runtime: this.runtime,
-      agents: this.agents,
-      agentPlatformUrl: this.agentPlatformUrl,
+      agents: this.#agents,
+      publicBaseUrl: this.#publicBaseUrl,
       now: this.now,
     });
   }
@@ -118,8 +109,8 @@ export class AgentSessionService {
    * several replicas and no Redis, a call on one pod could never reach an
    * instance held by another.
    */
-  tryReplicaRefusal(): AgentRegisterRefusedError | null {
-    if (this.runtime.store.shared || this.replicaCount <= 1) {
+  findReplicaRefusal(): AgentRegisterRefusedError | null {
+    if (this.runtime.store.shared || this.#replicaCount <= 1) {
       return null;
     }
 
@@ -133,7 +124,7 @@ export class AgentSessionService {
   async authenticate({
     authorization,
     projectId,
-  }: ConnectCredentials): Promise<ResolvedConnectCredential> {
+  }: AgentConnectCredentials): Promise<ResolvedConnectCredential> {
     const header = authorization ?? "";
     const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
     if (!token) {
@@ -143,7 +134,7 @@ export class AgentSessionService {
       });
     }
 
-    return this.credentials.resolve({ token, projectId: projectId ?? null });
+    return this.#credentials.resolve({ token, projectId: projectId ?? null });
   }
 
   /** Upserts the rows of a register frame and records the instance as live. */
@@ -152,7 +143,7 @@ export class AgentSessionService {
     resolved: ResolvedConnectCredential;
     heartbeatIntervalMs: number;
   }): Promise<{ session: SessionInfo; registered: RegisteredFrame }> {
-    return this.registrations.registerInstance(input);
+    return this.#registrations.registerInstance(input);
   }
 
   /** The refused frame for an error, and the refusal it stands for. */
@@ -192,7 +183,8 @@ export class AgentSessionService {
    * or it was routed at an instance that never registered its agent, in
    * which case the call is refused for that instance here and now.
    */
-  async tryReadCallForSession(session: SessionInfo, callId: string): Promise<StoredCall | null> {
+  async findCallForSession(session: SessionInfo, callId: string): Promise<StoredCall | null> {
+    await this.runtime.ownership.claim(session);
     const raw = await this.runtime.store.tryGet(callKey(session.projectId, callId));
     if (!raw) {
       return null;
@@ -207,7 +199,7 @@ export class AgentSessionService {
       return null;
     }
 
-    this.assertOwnProject(session, stored);
+    this.#assertOwnProject(session, stored);
     if (
       stored.instanceId !== session.instanceId ||
       !session.agentIds.has(stored.envelope.agentId)
@@ -221,11 +213,6 @@ export class AgentSessionService {
         },
         "call routed at an instance that did not register its agent, refusing it",
       );
-      await this.writeResult({
-        stored,
-        result: { instanceId: session.instanceId, undelivered: true },
-      });
-
       return null;
     }
 
@@ -237,12 +224,12 @@ export class AgentSessionService {
    * run the turn on another instance. The function cannot have started.
    */
   async undeliver(session: SessionInfo, callId: string): Promise<void> {
-    const stored = await this.tryReadStoredCall(session, callId);
-    if (!stored || stored.instanceId !== session.instanceId) {
+    const stored = await this.findCallForSession(session, callId);
+    if (!stored) {
       return;
     }
 
-    await this.writeResult({
+    await this.#writeResult({
       stored,
       result: { instanceId: session.instanceId, undelivered: true },
     });
@@ -254,8 +241,8 @@ export class AgentSessionService {
 
   /** The instance started the function: the call can no longer be retried elsewhere. */
   async ack(session: SessionInfo, callId: string): Promise<void> {
-    const stored = await this.tryReadStoredCall(session, callId);
-    if (!stored || stored.instanceId !== session.instanceId) {
+    const stored = await this.findCallForSession(session, callId);
+    if (!stored) {
       return;
     }
 
@@ -264,20 +251,20 @@ export class AgentSessionService {
       "1",
       ttlOf(stored, this.now()),
     );
-    await this.nudgeReply(stored, { callId, kind: "ack" });
+    await this.#nudgeReply(stored, { callId, kind: "ack" });
   }
 
   /** The instance answered: the result lands under its cap or as a payload error. */
   async result(session: SessionInfo, frame: ResultFrame): Promise<void> {
-    const stored = await this.tryReadStoredCall(session, frame.callId);
-    if (!stored || stored.instanceId !== session.instanceId) {
+    const stored = await this.findCallForSession(session, frame.callId);
+    if (!stored) {
       return;
     }
 
     const violation = resultCapViolation({
       output: frame.output,
       session: frame.session,
-      caps: relayPayloadCaps(this.relayMaxPayloadMb),
+      caps: relayPayloadCaps(this.#relayMaxPayloadMb),
     });
     const result: StoredResult = violation
       ? tooLarge(session, violation)
@@ -287,11 +274,12 @@ export class AgentSessionService {
           session: frame.session,
           error: frame.error,
         };
-    await this.writeResult({ stored, result });
+    await this.#writeResult({ stored, result });
   }
 
   /** Keeps the instance live for every agent it serves. */
   async refreshPresence(session: SessionInfo): Promise<void> {
+    await this.runtime.ownership.claim(session);
     await this.runtime.registry.refresh({
       projectId: session.projectId,
       instanceId: session.instanceId,
@@ -300,8 +288,7 @@ export class AgentSessionService {
       meta: session.meta,
     });
     for (const agentId of session.agentIds) {
-      void ConnectedAgentPresenceProjection.touchAgentLastSeen({
-        repository: this.agentRepository,
+      void this.#lastSeen.touch({
         projectId: session.projectId,
         agentId,
         now: this.now(),
@@ -315,6 +302,7 @@ export class AgentSessionService {
    * deadline.
    */
   async retire(session: SessionInfo, activeCallIds: Iterable<string>): Promise<void> {
+    await this.runtime.ownership.claim(session);
     await this.runtime.registry.deregister({
       projectId: session.projectId,
       instanceId: session.instanceId,
@@ -322,12 +310,12 @@ export class AgentSessionService {
       now: this.now(),
     });
     for (const callId of activeCallIds) {
-      const stored = await this.tryReadStoredCall(session, callId);
-      if (!stored || stored.instanceId !== session.instanceId) {
+      const stored = await this.findCallForSession(session, callId);
+      if (!stored) {
         continue;
       }
 
-      await this.writeResult({
+      await this.#writeResult({
         stored,
         result: { instanceId: session.instanceId, disconnected: true },
       });
@@ -346,30 +334,12 @@ export class AgentSessionService {
     );
   }
 
-  async tryReadStoredCall(session: SessionInfo, callId: string): Promise<StoredCall | null> {
-    const raw = await this.runtime.store.tryGet(callKey(session.projectId, callId));
-    if (!raw) {
-      return null;
-    }
-
-    let stored: StoredCall;
-    try {
-      stored = storedCallSchema.parse(JSON.parse(raw));
-    } catch {
-      return null;
-    }
-
-    this.assertOwnProject(session, stored);
-
-    return stored;
-  }
-
   /**
    * The instance id is chosen by the connecting process, so a session may
    * name an instance another project registered. A call is only ever the
    * session's own when the envelope carries the credential's project.
    */
-  private assertOwnProject(session: SessionInfo, stored: StoredCall): void {
+  #assertOwnProject(session: SessionInfo, stored: StoredCall): void {
     if (stored.projectId === session.projectId) {
       return;
     }
@@ -386,7 +356,7 @@ export class AgentSessionService {
     throw new AgentCallForeignProjectError({ callId: stored.envelope.callId });
   }
 
-  private async writeResult({
+  async #writeResult({
     stored,
     result,
   }: {
@@ -398,13 +368,13 @@ export class AgentSessionService {
       JSON.stringify(result),
       RESULT_TTL_SECONDS,
     );
-    await this.nudgeReply(stored, {
+    await this.#nudgeReply(stored, {
       callId: stored.envelope.callId,
       kind: "result",
     });
   }
 
-  private async nudgeReply(stored: StoredCall, nudge: ReplyNudge): Promise<void> {
+  async #nudgeReply(stored: StoredCall, nudge: ReplyNudge): Promise<void> {
     await this.runtime.store.publish(replyChannel(stored.replyTo), JSON.stringify(nudge));
   }
 }

@@ -27,6 +27,21 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../api-key/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../audit-log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../runtime-composition/tsconfig.build.json"
+    },
+    {
       "path": "../../../handled-error/tsconfig.build.json"
     },
     {
@@ -42,9 +57,6 @@
       "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../task/tsconfig.build.json"
-    },
-    {
       "path": "../../../time/tsconfig.build.json"
     },
     {
@@ -52,9 +64,6 @@
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../scenario/server/tsconfig.build.json"
     },
     {
       "path": "../../../test-harness/tsconfig.build.json"

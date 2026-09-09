@@ -1,213 +1,90 @@
-/**
- * A connected agent's identity, config and type are the SDK's to write, not a caller's:
- * (ADR-128, "A connected agent cannot be edited by hand").
- * @see specs/agents/connected-agents.feature
- */
-import type {
-  Agent,
-  AgentConfig,
-  ConnectedAgentConfig,
-  UpdateAgentCommand,
+import {
+  AgentRegisterOnlyError,
+  type RegisterConnectedAgentInput,
 } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
-import type { AgentsAuditLogPort, AgentsWorkflowPort } from "../../ports/agent.port.ts";
-import type { AgentCopyRecord, PersistAgentInput } from "../../repositories/agent.repository.ts";
-import { AgentRepository } from "../../repositories/agent.repository.ts";
+import { MemoryAgentRepository } from "../../repositories/memory/memory.agent.repository.ts";
 import { AgentService } from "../agent.service.ts";
 
-function connectedAgent(overrides: Partial<Agent> = {}): Agent {
-  return {
-    id: "agent_1",
-    projectId: "project_1",
-    name: "support-agent",
-    type: "connected",
-    config: {
-      parameters: [],
-      sdk: { name: "langwatch", version: "1.0.0", language: "python" },
-    } as AgentConfig,
-    workflowId: null,
-    copiedFromAgentId: null,
-    archivedAt: null,
-    createdAt: new Date(0),
-    updatedAt: new Date(0),
+const registration: RegisterConnectedAgentInput = {
+  id: "agent_1",
+  projectId: "project_1",
+  name: "support-agent",
+  config: { parameters: [], sdk: { name: "langwatch", version: "1", language: "python" } },
+  identity: {
     environment: "production",
     ownerUserId: null,
     hostLabel: null,
     identityKey: "support-agent@production",
-    lastSeenAt: new Date(0),
-    ...overrides,
-  } as Agent;
-}
-
-class MemoryAgentRepository extends AgentRepository {
-  constructor(private agents: Agent[]) {
-    super();
-  }
-
-  async tryFindById(input: { id: string; projectId: string }): Promise<Agent | null> {
-    return (
-      this.agents.find(
-        (a) => a.id === input.id && a.projectId === input.projectId && !a.archivedAt,
-      ) ?? null
-    );
-  }
-
-  async tryFindByIdOnly(id: string): Promise<Agent | null> {
-    return this.agents.find((a) => a.id === id && !a.archivedAt) ?? null;
-  }
-
-  async tryFindByIdIncludingArchived(input: {
-    id: string;
-    projectId: string;
-  }): Promise<Agent | null> {
-    return this.agents.find((a) => a.id === input.id && a.projectId === input.projectId) ?? null;
-  }
-
-  async findAll(): Promise<Agent[]> {
-    return this.agents;
-  }
-
-  async findReferenceStates(): Promise<never[]> {
-    return [];
-  }
-
-  async findNamesByIds(): Promise<never[]> {
-    return [];
-  }
-
-  async exists(input: { id: string; projectId: string }): Promise<boolean> {
-    return this.agents.some((a) => a.id === input.id && a.projectId === input.projectId);
-  }
-
-  async findPage(): Promise<{ data: Agent[]; total: number }> {
-    return { data: this.agents, total: this.agents.length };
-  }
-
-  async create(input: PersistAgentInput): Promise<Agent> {
-    const { identity, type, ...rest } = input;
-    const agent = connectedAgent({
-      ...rest,
-      ...identity,
-      type: type as "connected",
-      config: input.config as ConnectedAgentConfig,
-    });
-    this.agents.push(agent);
-    return agent;
-  }
-
-  async update(input: UpdateAgentCommand & { type: string; config?: AgentConfig }): Promise<Agent> {
-    const agent = this.agents.find((a) => a.id === input.id && a.projectId === input.projectId);
-    if (!agent) throw new Error("not found");
-    Object.assign(agent, input);
-    return agent;
-  }
-
-  async archive(input: { id: string; projectId: string }): Promise<Agent> {
-    const agent = this.agents.find((a) => a.id === input.id && a.projectId === input.projectId);
-    if (!agent) throw new Error("not found");
-    agent.archivedAt = new Date();
-    return agent;
-  }
-
-  async findCopies(): Promise<AgentCopyRecord[]> {
-    return [];
-  }
-
-  async updateNameAndConfig(): Promise<void> {
-    /* not used by these scenarios */
-  }
-
-  async tryFindByIdentityKey(): Promise<Agent | null> {
-    return null;
-  }
-
-  async findConnectedByName(): Promise<Agent[]> {
-    return [];
-  }
-  async findConnectedByNameAndEnvironment(): Promise<Agent[]> {
-    return [];
-  }
-
-  async reregisterConnected(): Promise<Agent> {
-    throw new Error("not used by these scenarios");
-  }
-
-  async touchLastSeenAt(): Promise<void> {
-    /* not used by these scenarios */
-  }
-
-  async findUserNamesByIds(): Promise<Map<string, string | null>> {
-    return new Map();
-  }
-}
-
-const noopWorkflows: AgentsWorkflowPort = {
-  fields: async () => ({}),
-  related: async () => null,
-  copy: async () => ({ workflowId: "workflow_copy" }),
-  archive: async ({ workflowId }) => ({ id: workflowId }),
-  remove: async () => undefined,
+  },
 };
 
-const noopAuditLog: AgentsAuditLogPort = { history: async () => [] };
+function setup() {
+  const repository = MemoryAgentRepository.create();
 
-function service(agents: Agent[]) {
-  return AgentService.create({
-    repository: new MemoryAgentRepository(agents),
-    workflows: noopWorkflows,
-    auditLog: noopAuditLog,
-  });
+  return { repository, service: AgentService.create(repository) };
 }
 
-describe("AgentService create/update against a connected agent", () => {
-  describe("when a caller creates an agent of type connected", () => {
-    /** @scenario "A connected agent cannot be created by hand" */
-    it("refuses the request with agent_register_only", async () => {
-      const agents = service([]);
+describe("AgentService connected Agent write guard", () => {
+  it("rejects manual connected-agent creation before persistence", async () => {
+    const { service, repository } = setup();
 
-      await expect(
-        agents.create({
-          projectId: "project_1",
-          name: "support-agent",
-          type: "connected",
-          config: { parameters: [], sdk: { name: "x", version: "1", language: "python" } },
-        }),
-      ).rejects.toMatchObject({ code: "agent_register_only" });
-    });
+    expect(() =>
+      service.create({
+        projectId: registration.projectId,
+        name: registration.name,
+        type: "connected",
+        config: registration.config,
+      }),
+    ).toThrow(AgentRegisterOnlyError);
+    expect(await repository.findAll({ projectId: registration.projectId })).toEqual([]);
   });
 
-  describe("when an archived connected agent is renamed by hand", () => {
-    /** @scenario "An archived connected agent is still registered from code" */
-    it("refuses the rename and keeps the row's registered name", async () => {
-      const row = connectedAgent({ archivedAt: new Date() });
-      const agents = service([row]);
+  it("rejects renaming an archived connected agent and preserves its registered name", async () => {
+    const { service, repository } = setup();
+    await service.registerConnected(registration);
+    await service.archive(registration);
+    const before = await repository.getByIdIncludingArchived(registration);
 
-      await expect(
-        agents.update({ id: row.id, projectId: row.projectId, name: "renamed" }),
-      ).rejects.toMatchObject({ code: "agent_register_only" });
-      expect(row.name).toBe("support-agent");
+    await expect(service.update({ ...registration, name: "renamed" })).rejects.toMatchObject({
+      code: "agent_register_only",
     });
+    expect(await repository.getByIdIncludingArchived(registration)).toEqual(before);
+    expect(before.name).toBe("support-agent");
   });
 
-  describe("when a connected agent is archived through the REST agents API", () => {
-    /** @scenario "A connected agent can be archived, and nothing else edited" */
-    it("archives the row, and still refuses a config or type edit", async () => {
-      const row = connectedAgent();
-      const agents = service([row]);
+  it("allows archive but refuses config and type changes", async () => {
+    const { service, repository } = setup();
+    await service.registerConnected(registration);
+    const archived = await service.archive(registration);
 
-      const archived = await agents.archive({ id: row.id, projectId: row.projectId });
-      expect(archived.archivedAt).not.toBeNull();
+    expect(archived.archivedAt).toBeInstanceOf(Date);
+    await expect(
+      service.update({
+        id: registration.id,
+        projectId: registration.projectId,
+        config: { parameters: [], sdk: { name: "langwatch", version: "2", language: "python" } },
+      }),
+    ).rejects.toMatchObject({ code: "agent_register_only" });
+    await expect(
+      service.update({
+        id: registration.id,
+        projectId: registration.projectId,
+        type: "signature",
+      }),
+    ).rejects.toMatchObject({ code: "agent_register_only" });
+    expect(await repository.getByIdIncludingArchived(registration)).toEqual(archived);
+  });
 
-      await expect(
-        agents.update({
-          id: row.id,
-          projectId: row.projectId,
-          config: { parameters: [], sdk: { name: "x", version: "2", language: "python" } },
-        }),
-      ).rejects.toMatchObject({ code: "agent_register_only" });
-      await expect(
-        agents.update({ id: row.id, projectId: row.projectId, type: "signature" }),
-      ).rejects.toMatchObject({ code: "agent_register_only" });
+  it("does not disclose or modify a connected Agent through another project", async () => {
+    const { service, repository } = setup();
+    const before = await service.registerConnected(registration);
+    const foreign = { id: registration.id, projectId: "project_other" };
+
+    await expect(service.update({ ...foreign, name: "renamed" })).rejects.toMatchObject({
+      code: "agent_not_found",
     });
+    await expect(service.archive(foreign)).rejects.toMatchObject({ code: "agent_not_found" });
+    expect(await repository.getById(registration)).toEqual(before);
   });
 });

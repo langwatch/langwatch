@@ -1,104 +1,126 @@
-import type {
-  Agent,
-  AgentConfig,
-  AgentName,
-  AgentReferenceState,
-  AgentType,
-  UpdateAgentCommand,
+import {
+  AgentNotFoundError,
+  type AgentWorkflowInput,
+  type UpdateAgentWorkflowConfigInput,
+  AgentAlreadyExistsError,
+  AgentSourceNotFoundError,
+  agentReferenceStateSchema,
+  connectedAgentSeenCutoff,
+  type GetAgentInput,
+  type AgentProjectInput,
+  type AgentIdsInput,
+  type ListAgentsInput,
+  type ConnectedAgentsInput,
+  type ConnectedAgentsEnvironmentInput,
 } from "@langwatch/agent-contract";
-import { connectedAgentSeenCutoff } from "@langwatch/agent-contract";
-import type { AgentsDatabase } from "../../ports/agent.port.ts";
-import type { AgentCopyRecord, PersistAgentInput } from "../agent.repository.ts";
-import { AgentRepository } from "../agent.repository.ts";
-import { mapAgentRow, type AgentRow } from "./prisma.agent.mapper.ts";
+import { PrismaRepository } from "@langwatch/prisma-client";
+import {
+  isRecordNotFoundError,
+  isUniqueConstraintError,
+  uniqueConstraintTargets,
+} from "@langwatch/prisma-client/errors";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { nowInstant, toDate } from "@langwatch/time";
+import { z } from "zod";
+import type {
+  AgentRepository,
+  PersistAgentInput,
+  UpdatePersistedAgentInput,
+  UpdateAgentCopyInput,
+  RegisterPersistedAgentInput,
+  AgentPresenceInput,
+} from "../agent.repository.ts";
+import { mapAgentRow } from "./prisma.agent.mapper.ts";
 
-/**
- * The `where` fragment that keeps a stale connected agent out of a read.
- *
- * Spread into a `where`; the alternatives travel under `AND` so a call site
- * that declares an `OR` of its own does not drop them. Every other agent
- * type has no presence, so only connected rows are filtered.
- *
- * Only this repository may name the Prisma `where` shape (the predicate
- * itself, `isConnectedAgentStale`'s inverse, is the contract's).
- */
-function connectedAgentVisibleWhere(now: Date = new Date()): {
-  AND: Array<Record<string, unknown>>;
-} {
+function connectedAgentVisibleWhere(): Prisma.AgentWhereInput {
   return {
-    AND: [
-      {
-        OR: [
-          { type: { not: "connected" } },
-          { lastSeenAt: null },
-          { lastSeenAt: { gte: connectedAgentSeenCutoff(now) } },
-        ],
-      },
+    OR: [
+      { type: { not: "connected" } },
+      { lastSeenAt: null },
+      { lastSeenAt: { gte: toDate(connectedAgentSeenCutoff(nowInstant())) } },
     ],
   };
 }
 
-type AgentCopyRow = {
-  id: string;
-  name: string;
-  projectId: string;
-  project: {
-    name: string;
-    team: { name: string; organization: { name: string } };
-  };
-};
+const jsonSchema: z.ZodType<Prisma.JsonValue> = z.lazy(() =>
+  z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonSchema), configSchema]),
+);
 
-export class PrismaAgentRepository extends AgentRepository {
-  static create(database: AgentsDatabase): PrismaAgentRepository {
-    return new PrismaAgentRepository(database);
+const configSchema: z.ZodType<Prisma.JsonObject> = z
+  .record(z.string(), jsonSchema.optional())
+  .transform((config) =>
+    Object.fromEntries(
+      Object.entries(config).flatMap(([key, value]) => (value === void 0 ? [] : [[key, value]])),
+    ),
+  );
+
+export class PrismaAgentRepository
+  extends PrismaRepository.for("Agent")
+  implements AgentRepository
+{
+  static readonly create = this.factory((prisma) => new PrismaAgentRepository(prisma));
+
+  async listWorkflowConfigs(input: AgentWorkflowInput) {
+    const agents = await this.prisma.agent.findMany({
+      where: { projectId: input.projectId, workflowId: input.workflowId, archivedAt: null },
+      select: { id: true, config: true },
+    });
+
+    return agents.map(({ id, config }) => ({
+      id,
+      config: z.record(z.string(), z.unknown()).safeParse(config).data ?? {},
+    }));
   }
 
-  private constructor(private readonly database: AgentsDatabase) {
-    super();
+  async updateWorkflowConfig(input: UpdateAgentWorkflowConfigInput): Promise<void> {
+    await this.prisma.agent
+      .update({
+        where: { id: input.id, projectId: input.projectId, workflowId: input.workflowId },
+        data: { config: configSchema.parse(input.config) },
+      })
+      .catch((error: unknown) => {
+        if (isRecordNotFoundError(error)) throw new AgentNotFoundError(input.id, input.projectId);
+        throw error;
+      });
   }
 
-  async tryFindById(input: { id: string; projectId: string }): Promise<Agent | null> {
-    const row = await this.database.agent.findFirst({
+  async getById(input: GetAgentInput) {
+    const row = await this.prisma.agent.findFirst({
       where: { id: input.id, projectId: input.projectId, archivedAt: null },
     });
-    return this.tryMapOptionalRow(row);
+    if (!row) throw new AgentNotFoundError(input.id, input.projectId);
+
+    return mapAgentRow(row);
   }
 
-  async tryFindByIdOnly(id: string): Promise<Agent | null> {
-    const row = await this.database.agent.findFirst({
-      where: { id, archivedAt: null },
-    });
-    return this.tryMapOptionalRow(row);
+  async getByIdOnly(id: string) {
+    const row = await this.prisma.agent.findFirst({ where: { id, archivedAt: null } });
+    if (!row) throw new AgentSourceNotFoundError(id);
+
+    return mapAgentRow(row);
   }
 
-  async tryFindByIdIncludingArchived(input: {
-    id: string;
-    projectId: string;
-  }): Promise<Agent | null> {
-    const row = await this.database.agent.findFirst({
+  async getByIdIncludingArchived(input: GetAgentInput) {
+    const row = await this.prisma.agent.findFirst({
       where: { id: input.id, projectId: input.projectId },
     });
-    return this.tryMapOptionalRow(row);
+    if (!row) throw new AgentNotFoundError(input.id, input.projectId);
+
+    return mapAgentRow(row);
   }
 
-  async findAll(input: { projectId: string }): Promise<Agent[]> {
-    const rows = await this.database.agent.findMany({
-      where: {
-        projectId: input.projectId,
-        archivedAt: null,
-        ...connectedAgentVisibleWhere(),
-      },
+  async findAll(input: AgentProjectInput) {
+    const rows = await this.prisma.agent.findMany({
+      where: { projectId: input.projectId, archivedAt: null, AND: [connectedAgentVisibleWhere()] },
       orderBy: { updatedAt: "desc" },
       include: { _count: { select: { copiedAgents: true } } },
     });
-    return rows.map((row) => mapAgentRow(row as AgentRow));
+
+    return rows.map(mapAgentRow);
   }
 
-  async findReferenceStates(input: {
-    ids: string[];
-    projectId: string;
-  }): Promise<AgentReferenceState[]> {
-    return (await this.database.agent.findMany({
+  async findReferenceStates(input: AgentIdsInput) {
+    const rows = await this.prisma.agent.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: {
         id: true,
@@ -108,212 +130,190 @@ export class PrismaAgentRepository extends AgentRepository {
         ownerUserId: true,
         lastSeenAt: true,
       },
-    })) as AgentReferenceState[];
+    });
+
+    return agentReferenceStateSchema.array().parse(rows);
   }
 
-  async findNamesByIds(input: { ids: string[]; projectId: string }): Promise<AgentName[]> {
-    return (await this.database.agent.findMany({
+  findNamesByIds(input: AgentIdsInput) {
+    return this.prisma.agent.findMany({
       where: { id: { in: input.ids }, projectId: input.projectId },
       select: { id: true, name: true },
-    })) as AgentName[];
-  }
-
-  async exists(input: { id: string; projectId: string }): Promise<boolean> {
-    const row = await this.database.agent.findFirst({
-      where: { id: input.id, projectId: input.projectId, archivedAt: null },
-      select: { id: true },
     });
-    return row !== null;
   }
 
-  async findPage(input: {
-    projectId: string;
-    page: number;
-    limit: number;
-  }): Promise<{ data: Agent[]; total: number }> {
+  async exists(input: GetAgentInput) {
+    return (
+      (await this.prisma.agent.count({
+        where: { id: input.id, projectId: input.projectId, archivedAt: null },
+      })) > 0
+    );
+  }
+
+  async findPage(input: ListAgentsInput) {
     const where = {
       projectId: input.projectId,
       archivedAt: null,
-      ...connectedAgentVisibleWhere(),
+      AND: [connectedAgentVisibleWhere()],
     };
     const [rows, total] = await Promise.all([
-      this.database.agent.findMany({
+      this.prisma.agent.findMany({
         where,
         orderBy: { updatedAt: "desc" },
         skip: (input.page - 1) * input.limit,
         take: input.limit,
       }),
-      this.database.agent.count({ where }),
+      this.prisma.agent.count({ where }),
     ]);
-    return {
-      data: rows.map((row) => mapAgentRow(row as AgentRow)),
-      total,
-    };
+
+    return { data: rows.map(mapAgentRow), total };
   }
 
-  async create(input: PersistAgentInput): Promise<Agent> {
-    const data: Record<string, unknown> = {
-      id: input.id,
-      projectId: input.projectId,
-      name: input.name,
-      type: input.type,
-      config: input.config,
-    };
-    if (input.workflowId !== undefined) data.workflowId = input.workflowId;
-    if (input.copiedFromAgentId !== undefined) {
-      data.copiedFromAgentId = input.copiedFromAgentId;
-    }
-    if (input.identity) {
-      data.environment = input.identity.environment;
-      data.ownerUserId = input.identity.ownerUserId;
-      data.hostLabel = input.identity.hostLabel;
-      data.identityKey = input.identity.identityKey;
-      data.lastSeenAt = new Date();
-    }
-    const row = await this.database.agent.create({ data });
-    return mapAgentRow(row as AgentRow);
-  }
-
-  async update(
-    input: UpdateAgentCommand & { type: AgentType; config?: AgentConfig },
-  ): Promise<Agent> {
-    const data: Record<string, unknown> = {};
-    if (input.name !== undefined) data.name = input.name;
-    if (input.type !== undefined) data.type = input.type;
-    if (input.config !== undefined) data.config = input.config;
-    if (input.workflowId !== undefined) data.workflowId = input.workflowId;
-    const row = await this.database.agent.update({
-      where: { id: input.id, projectId: input.projectId },
-      data,
-    });
-    return mapAgentRow(row as AgentRow);
-  }
-
-  async archive(input: { id: string; projectId: string }): Promise<Agent> {
-    const row = await this.database.agent.update({
-      where: { id: input.id, projectId: input.projectId },
-      data: { archivedAt: new Date() },
-    });
-    return mapAgentRow(row as AgentRow);
-  }
-
-  async findCopies(sourceAgentId: string): Promise<AgentCopyRecord[]> {
-    const rows = (await this.database.agent.findMany({
-      where: { copiedFromAgentId: sourceAgentId, archivedAt: null },
-      select: {
-        id: true,
-        name: true,
-        projectId: true,
-        project: {
-          select: {
-            name: true,
-            team: {
-              select: {
-                name: true,
-                organization: { select: { name: true } },
-              },
-            },
-          },
+  async create(input: PersistAgentInput) {
+    const row = await this.prisma.agent
+      .create({
+        data: {
+          id: input.id,
+          projectId: input.projectId,
+          name: input.name,
+          type: input.type,
+          config: configSchema.parse(input.config),
+          workflowId: input.workflowId,
+          copiedFromAgentId: input.copiedFromAgentId,
+          environment: input.identity?.environment,
+          ownerUserId: input.identity?.ownerUserId,
+          hostLabel: input.identity?.hostLabel,
+          identityKey: input.identity?.identityKey,
+          lastSeenAt: input.identity ? new Date() : void 0,
         },
-      },
-    })) as AgentCopyRow[];
-    return rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      projectId: row.projectId,
-      fullPath: `${row.project.team.organization.name} / ${row.project.team.name} / ${row.project.name}`,
-    }));
+      })
+      .catch((error: unknown) => this.#writeError(error, input));
+
+    return mapAgentRow(row);
   }
 
-  async updateNameAndConfig(input: {
-    id: string;
-    projectId: string;
-    name: string;
-    config: AgentConfig;
-  }): Promise<void> {
-    await this.database.agent.update({
+  async update(input: UpdatePersistedAgentInput) {
+    const row = await this.prisma.agent
+      .update({
+        where: { id: input.id, projectId: input.projectId },
+        data: {
+          name: input.name,
+          type: input.type,
+          config: configSchema.parse(input.config),
+          workflowId: input.workflowId,
+        },
+      })
+      .catch((error: unknown) => this.#writeError(error, input));
+
+    return mapAgentRow(row);
+  }
+
+  async archive(input: GetAgentInput) {
+    const row = await this.prisma.agent
+      .update({
+        where: { id: input.id, projectId: input.projectId, archivedAt: null },
+        data: { archivedAt: new Date() },
+      })
+      .catch((error: unknown) => this.#writeError(error, input));
+
+    return mapAgentRow(row);
+  }
+
+  findCopies(sourceAgentId: string) {
+    return this.prisma.agent.findMany({
+      where: { copiedFromAgentId: sourceAgentId, archivedAt: null },
+      select: { id: true, name: true, projectId: true },
+    });
+  }
+
+  async updateNameAndConfig(input: UpdateAgentCopyInput): Promise<void> {
+    await this.prisma.agent.update({
       where: { id: input.id, projectId: input.projectId },
-      data: { name: input.name, config: input.config },
+      data: { name: input.name, config: configSchema.parse(input.config) },
     });
   }
 
-  async tryFindByIdentityKey(input: {
-    projectId: string;
-    identityKey: string;
-  }): Promise<Agent | null> {
-    const row = await this.database.agent.findFirst({
-      where: { projectId: input.projectId, identityKey: input.identityKey },
-    });
-    return this.tryMapOptionalRow(row);
-  }
-
-  async findConnectedByNameAndEnvironment(input: {
-    projectId: string;
-    name: string;
-    environment: string;
-  }): Promise<Agent[]> {
-    const rows = await this.database.agent.findMany({
+  async findConnectedByNameAndEnvironment(input: ConnectedAgentsEnvironmentInput) {
+    const rows = await this.prisma.agent.findMany({
       where: {
         projectId: input.projectId,
-        type: "connected",
         name: input.name,
         environment: input.environment,
+        type: "connected",
         archivedAt: null,
-        ...connectedAgentVisibleWhere(),
+        AND: [connectedAgentVisibleWhere()],
       },
     });
-    return rows.map((row) => mapAgentRow(row as AgentRow));
+
+    return rows.map(mapAgentRow);
   }
 
-  async findConnectedByName(input: { projectId: string; name: string }): Promise<Agent[]> {
-    const rows = await this.database.agent.findMany({
+  async findConnectedByName(input: ConnectedAgentsInput) {
+    const rows = await this.prisma.agent.findMany({
       where: {
         projectId: input.projectId,
+        name: input.name,
         type: "connected",
-        name: input.name,
         archivedAt: null,
-        ...connectedAgentVisibleWhere(),
+        AND: [connectedAgentVisibleWhere()],
       },
     });
-    return rows.map((row) => mapAgentRow(row as AgentRow));
+
+    return rows.map(mapAgentRow);
   }
 
-  async reregisterConnected(input: {
-    id: string;
-    projectId: string;
-    name: string;
-    config: AgentConfig;
-  }): Promise<Agent> {
-    const row = await this.database.agent.update({
+  async registerConnected(input: RegisterPersistedAgentInput) {
+    const config = configSchema.parse(input.config);
+    const lastSeenAt = new Date();
+    const identity = { projectId: input.projectId, identityKey: input.identity.identityKey };
+    const row = await this.prisma.agent
+      .upsert({
+        where: {
+          projectId_identityKey: identity,
+        },
+        create: {
+          id: input.id,
+          projectId: input.projectId,
+          name: input.name,
+          type: "connected",
+          config,
+          environment: input.identity.environment,
+          ownerUserId: input.identity.ownerUserId,
+          hostLabel: input.identity.hostLabel,
+          identityKey: input.identity.identityKey,
+          lastSeenAt,
+        },
+        update: { name: input.name, config, archivedAt: null, lastSeenAt },
+      })
+      .catch((error: unknown) => {
+        const targets = uniqueConstraintTargets(error);
+        const identityConflict =
+          targets.includes("identityKey") || targets.includes("Agent_projectId_identityKey_key");
+        if (!identityConflict) {
+          return this.#writeError(error, input);
+        }
+
+        // Prisma can emulate compound-key upserts; another registrant may insert first.
+        return this.prisma.agent.update({
+          where: { projectId_identityKey: identity },
+          data: { name: input.name, config, archivedAt: null, lastSeenAt },
+        });
+      });
+
+    return mapAgentRow(row);
+  }
+
+  async touchLastSeenAt(input: AgentPresenceInput): Promise<void> {
+    await this.prisma.agent.update({
       where: { id: input.id, projectId: input.projectId },
-      data: {
-        name: input.name,
-        config: input.config,
-        archivedAt: null,
-        lastSeenAt: new Date(),
-      },
-    });
-    return mapAgentRow(row as AgentRow);
-  }
-
-  async touchLastSeenAt(input: { id: string; projectId: string; at: Date }): Promise<void> {
-    await this.database.agent.update({
-      where: { id: input.id, projectId: input.projectId },
-      data: { lastSeenAt: input.at },
+      data: { lastSeenAt: toDate(input.at) },
     });
   }
 
-  async findUserNamesByIds(ids: readonly string[]): Promise<Map<string, string | null>> {
-    if (ids.length === 0) return new Map();
-    const users = (await this.database.user.findMany({
-      where: { id: { in: [...ids] } },
-      select: { id: true, name: true },
-    })) as Array<{ id: string; name: string | null }>;
-    return new Map(users.map((user) => [user.id, user.name]));
-  }
-
-  private tryMapOptionalRow(row: unknown): Agent | null {
-    if (!row) return null;
-    return mapAgentRow(row as AgentRow);
+  #writeError(error: unknown, input: GetAgentInput): never {
+    if (isRecordNotFoundError(error)) throw new AgentNotFoundError(input.id, input.projectId);
+    if (isUniqueConstraintError(error))
+      throw new AgentAlreadyExistsError(input.id, input.projectId);
+    throw error;
   }
 }

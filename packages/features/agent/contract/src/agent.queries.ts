@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { agentSchema, agentViewSchema, agentWithFieldsSchema } from "./agent.ts";
 import { agentTypeSchema } from "./config/index.ts";
+import { agentResponseSchema } from "./agent-rest.schemas.ts";
 
 export const agentPaginationSchema = z.object({
   page: z.number().int().positive(),
@@ -98,10 +99,43 @@ export type RelatedAgentEntities = z.infer<typeof relatedAgentEntitiesSchema>;
 export type AgentReferenceState = z.infer<typeof agentReferenceStateSchema>;
 export type AgentName = z.infer<typeof agentNameSchema>;
 export type GetAgentResult = z.infer<typeof getAgentResultSchema>;
+export type GetAgentInput = z.infer<typeof getAgentQuerySchema>;
+export type ListAgentsInput = z.infer<typeof listAgentsQuerySchema>;
+
+export type AgentProjectInput = { projectId: string };
+export type AgentReferenceInput = { agentId: string; projectId: string };
+export type AgentIdsInput = { ids: string[]; projectId: string };
+export type AgentCopiesInput = { sourceAgentId: string; allowedProjectIds?: string[] };
+export type PushAgentCopiesInput = {
+  sourceAgentId: string;
+  sourceProjectId: string;
+  copyIds?: string[];
+};
+export type ConnectedAgentsInput = { projectId: string; name: string };
+export type ConnectedAgentsEnvironmentInput = ConnectedAgentsInput & { environment: string };
 
 /** One agent as the legacy tRPC reads render it, copy count included. */
-export const agentWithLegacyCopyCountSchema = z.intersection(
+export const agentOverviewSchema = z.intersection(
   agentWithFieldsSchema,
+  agentResponseSchema.omit({
+    id: true,
+    name: true,
+    type: true,
+    config: true,
+    createdAt: true,
+    updatedAt: true,
+    platformUrl: true,
+  }),
+);
+export type AgentOverview = z.infer<typeof agentOverviewSchema>;
+export const agentOverviewPageSchema = z.object({
+  data: agentOverviewSchema.array(),
+  pagination: agentPaginationSchema,
+});
+export type AgentOverviewPage = z.infer<typeof agentOverviewPageSchema>;
+
+export const agentWithLegacyCopyCountSchema = z.intersection(
+  agentOverviewSchema,
   z.object({ _count: z.object({ copiedAgents: z.number() }) }),
 );
 
@@ -127,6 +161,10 @@ export const agentPushToCopiesSchema = z.object({
 
 /** A copy pulled back into line with the agent it came from. */
 export const agentSyncFromSourceSchema = z.object({ ok: z.literal(true) });
+export type AgentCascadeArchive = z.infer<typeof agentCascadeArchiveSchema>;
+export type AgentCopyCreated = z.infer<typeof agentCopyCreatedSchema>;
+export type AgentPushToCopies = z.infer<typeof agentPushToCopiesSchema>;
+export type AgentSyncFromSource = z.infer<typeof agentSyncFromSourceSchema>;
 
 /**
  * What a test turn answered: the adapter's output, how long it took, and the

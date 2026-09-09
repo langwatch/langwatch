@@ -1,4 +1,20 @@
+import type { AgentCallSignal } from "./connected-agent.connection.ts";
 import { featureApi } from "@langwatch/runtime-composition";
+import type { Instant } from "@langwatch/time";
+import type { AgentPresence } from "./connected-agent.view.ts";
+import type { AgentCallInput, AgentCallContext, AgentCallResult } from "./connected-agent.call.ts";
+import type {
+  AgentConnection,
+  AgentConnectCredentials,
+  AgentConnectFramesInput,
+  AgentConnectPollInput,
+  AgentConnectPollAnswer,
+  AgentConnectRegisterAnswer,
+} from "./connected-agent.connection.ts";
+import type { CallOutcome, DispatchAgent, DispatchCall } from "./connected-agent.dispatch.ts";
+import type { RegisterConnectedAgentInput } from "./agent.commands.ts";
+import type { HttpAgentTestInput } from "./agent.commands.ts";
+import type { HttpProxyResult } from "./agent.queries.ts";
 import type { Agent, AgentWithFields } from "./agent.ts";
 import type { AgentReferenceState } from "./agent.queries.ts";
 import type {
@@ -11,18 +27,78 @@ import type {
   AgentCopy,
   AgentHistoryEntry,
   AgentPage,
+  AgentOverview,
+  AgentOverviewPage,
   RelatedAgentEntities,
 } from "./agent.queries.ts";
 import type { AgentTestRunResult, AgentTestTurnResult } from "./agent.queries.ts";
 
 /** Callable capability exposed by the composed Agent application. */
 export interface AgentApi {
-  getAll(input: { projectId: string; viewerUserId?: string | null }): Promise<AgentWithFields[]>;
+  listWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]>;
+  updateWorkflowConfig(input: UpdateAgentWorkflowConfigInput): Promise<void>;
+  getPresence(input: {
+    projectId: string;
+    agents: readonly { id: string; type: string }[];
+  }): Promise<Map<string, AgentPresence>>;
+  call(input: AgentCallInput, context: AgentCallContext): Promise<AgentCallResult>;
+  acceptConnection(
+    connection: AgentConnection,
+    credentials: AgentConnectCredentials,
+  ): Promise<void>;
+  connectRegister(
+    body: unknown,
+    credentials: AgentConnectCredentials,
+  ): Promise<AgentConnectRegisterAnswer>;
+  connectPoll(
+    input: AgentConnectPollInput,
+    credentials: AgentConnectCredentials,
+  ): Promise<AgentConnectPollAnswer>;
+  connectFrames(
+    input: AgentConnectFramesInput,
+    credentials: AgentConnectCredentials,
+  ): Promise<{ accepted: number }>;
+  callConnected(input: {
+    projectId: string;
+    agent: DispatchAgent;
+    call: DispatchCall;
+    signal?: AgentCallSignal;
+  }): Promise<CallOutcome>;
+  exists(input: { id: string; projectId: string }): Promise<boolean>;
+  registerConnected(input: RegisterConnectedAgentInput): Promise<Agent>;
+  touchLastSeenAt(input: { id: string; projectId: string; at: Instant }): Promise<void>;
+  executeHttpTest(input: HttpAgentTestInput & { actorId: string }): Promise<HttpProxyResult>;
+  listWithPresence(input: {
+    projectId: string;
+    page: number;
+    limit: number;
+    viewerUserId?: string | null;
+  }): Promise<AgentOverviewPage>;
+  getCopiesForActor(input: {
+    agentId: string;
+    projectId: string;
+    actorId: string;
+  }): Promise<AgentCopy[]>;
+  copyForActor(
+    input: CopyAgentCommand & { actorId: string },
+  ): Promise<import("./agent.queries.ts").AgentCopyCreated>;
+  pushToCopiesForActor(input: {
+    agentId: string;
+    projectId: string;
+    copyIds?: string[];
+    actorId: string;
+  }): Promise<import("./agent.queries.ts").AgentPushToCopies>;
+  syncFromSourceForActor(input: {
+    agentId: string;
+    projectId: string;
+    actorId: string;
+  }): Promise<{ ok: true }>;
+  getAll(input: { projectId: string; viewerUserId?: string | null }): Promise<AgentOverview[]>;
   getById(input: {
     id: string;
     projectId: string;
     viewerUserId?: string | null;
-  }): Promise<AgentWithFields>;
+  }): Promise<AgentOverview>;
   list(input: { projectId: string; page: number; limit: number }): Promise<AgentPage>;
   create(input: CreateAgentCommand): Promise<AgentWithFields>;
   update(input: UpdateAgentCommand): Promise<AgentWithFields>;
@@ -75,3 +151,7 @@ export interface AgentApi {
 }
 
 export const AgentApi = featureApi<AgentApi>("agent");
+
+export type AgentWorkflowInput = { projectId: string; workflowId: string };
+export type AgentWorkflowConfig = { id: string; config: Record<string, unknown> };
+export type UpdateAgentWorkflowConfigInput = AgentWorkflowInput & AgentWorkflowConfig;

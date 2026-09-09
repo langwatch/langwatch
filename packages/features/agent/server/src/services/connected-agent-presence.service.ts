@@ -5,50 +5,22 @@
 
 import {
   connectedAgentSelectability,
-  type Agent,
+  type AgentPresence,
+  type ConnectedAgentInstance,
+  type ConnectedAgentOwner,
   type ConnectedAgentSelectability,
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
-import type { ConnectedAgentRuntime, LiveInstance } from "../ports/connected-agent-runtime.port.ts";
+import type { ConnectedAgentRuntime, LiveInstance } from "./connected-agent-runtime.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:presence");
 
-export type AgentPresenceStatus = "online" | "offline";
-
-/** One instance as the agents page shows it. */
-export interface AgentInstanceView {
-  instanceId: string;
-  hostname: string;
-  username: string;
-  pid: number;
-  label: string | null;
-  sdk: { name: string; version: string; language: string };
-  connectedAt: Agent["createdAt"];
-  inflight: number;
-  maxConcurrency: number;
-}
-
-export interface AgentPresence {
-  status: AgentPresenceStatus;
-  instances: AgentInstanceView[];
-}
+export type { AgentPresence } from "@langwatch/agent-contract";
 
 /** Presence for an agent that can never be connected: offline, nothing. */
 export const NO_PRESENCE: AgentPresence = { status: "offline", instances: [] };
 
-/** The owner of an agent, as every surface reports it. */
-export interface AgentOwnerView {
-  userId: string;
-  name: string | null;
-}
-
-/**
- * The owner, the presence and the selectability of one agent, as the response
- * schemas declare them. A row a caller may read but may not choose is answered
- * all the same, marked with the reason, so the client can show it and say why
- * it is not on offer.
- */
 export class ConnectedAgentPresenceService {
   static create(): ConnectedAgentPresenceService {
     return new ConnectedAgentPresenceService();
@@ -61,11 +33,11 @@ export class ConnectedAgentPresenceService {
     viewerUserId,
   }: {
     agent: { id: string; ownerUserId: string | null };
-    owners: Map<string, AgentOwnerView>;
+    owners: Map<string, ConnectedAgentOwner>;
     presence: Map<string, AgentPresence>;
     /** The person behind the caller; nothing for a key that names none. */
     viewerUserId?: string | null;
-  }): { owner: AgentOwnerView | null } & AgentPresence & ConnectedAgentSelectability {
+  }): { owner: ConnectedAgentOwner | null } & AgentPresence & ConnectedAgentSelectability {
     const { status, instances } = presence.get(agent.id) ?? NO_PRESENCE;
 
     return {
@@ -130,7 +102,7 @@ export class ConnectedAgentPresenceService {
   private constructor() {}
 }
 
-function toView(instance: LiveInstance): AgentInstanceView {
+function toView(instance: LiveInstance): ConnectedAgentInstance {
   return {
     instanceId: instance.instanceId,
     hostname: instance.hostname,

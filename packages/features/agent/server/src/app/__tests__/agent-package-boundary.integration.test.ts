@@ -3,42 +3,32 @@
  * @vitest-environment node
  * @see packages/features/agent/specs/package-boundary.feature
  */
-import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentTrpcApi, type AgentTrpcContext } from "../../transport/api-trpc/agent.api.ts";
-import { buildAgentApps } from "../../transport/api-rest/__tests__/agent-rest.test-harness.ts";
+import { agentTrpcTransport } from "../../transport/agent.trpc.ts";
+import { agentTrpcCaller } from "../../transport/__tests__/agent-trpc.fixture.ts";
+import { buildAgentApps } from "../../transport/__tests__/agent-rest.fixture.ts";
 
 const PROJECT_ID = "project_agents";
 const OTHER_PROJECT_ID = "project_elsewhere";
 
-function harness() {
-  const apps = buildAgentApps();
-  const trpc = initTRPC.context<AgentTrpcContext>().create();
-  const router = AgentTrpcApi.create(trpc, {
-    protected: trpc.procedure,
-    policy: () => (procedure) => procedure,
-  });
-  const caller = router.createCaller({
-    app: { agents: apps.app },
-    actor: () => ({ id: "user_1" }),
-    authorize: async () => {},
-    can: async () => true,
-  });
+async function harness() {
+  const apps = await buildAgentApps();
+  const caller = agentTrpcCaller({ declaration: agentTrpcTransport, app: apps.app });
 
   return { ...apps, caller };
 }
 
 describe("given one agent service behind both supported interfaces", () => {
-  let api: ReturnType<typeof harness>;
+  let api: Awaited<ReturnType<typeof harness>>;
 
-  beforeEach(() => {
-    api = harness();
+  beforeEach(async () => {
+    api = await harness();
   });
 
   describe("when a product user creates an agent through internal RPC", () => {
     /** @scenario "Internal RPC invokes the injected agent service" */
     it("invokes the injected service once and answers a contract agent", async () => {
-      const create = vi.spyOn(api.agentService, "create");
+      const create = vi.spyOn(api.repository, "create");
 
       const agent = await api.caller.create({
         projectId: PROJECT_ID,
@@ -59,7 +49,7 @@ describe("given one agent service behind both supported interfaces", () => {
   describe("when a client creates an agent through legacy REST", () => {
     /** @scenario "Legacy REST forwards to the same agent service" */
     it("reaches the same service command and preserves the documented status", async () => {
-      const create = vi.spyOn(api.agentService, "create");
+      const create = vi.spyOn(api.repository, "create");
 
       const response = await api.legacy("/api/agents", {
         method: "POST",

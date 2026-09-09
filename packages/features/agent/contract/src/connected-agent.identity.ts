@@ -1,15 +1,3 @@
-/**
- * The identity of a connected agent (ADR-128, "Identity").
- *
- * One row per project, name, environment and scope. The environment is what
- * the SDK resolved; the scope is derived from it and from the credential that
- * registered: a development agent belongs to the key's owner, or to the host
- * when the key names no person. Every other environment is shared.
- *
- * Browser-safe: no node imports, so the run dialog and the CLI can build the
- * same keys.
- */
-
 /** The environment every SDK resolves when nothing names one. */
 export const DEVELOPMENT_ENVIRONMENT = "development";
 
@@ -66,12 +54,6 @@ export type ConnectedAgentScope =
   | { kind: "owner"; userId: string }
   | { kind: "host"; hostLabel: string };
 
-/**
- * The scope a register frame lands in.
- *
- * `development` with a key that names a person is that person's; with a
- * project or service key it is the host's. Any other environment is shared.
- */
 export function deriveScope({
   environment,
   userId,
