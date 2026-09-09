@@ -94,7 +94,7 @@
     "@clickhouse/parser": "0.3.0",
     "@copilotkit/runtime": "~1.8.14",
     "@copilotkit/shared": "1.8.13",
-    "@elevenlabs/elevenlabs-js": "^2.58.0",
+    "@elevenlabs/elevenlabs-js": "2.58.0",
     "@google-cloud/dlp": "^6.7.0",
     "@hono/node-server": "^2.0.6",
     "@hono/standard-validator": "^0.2.3",
