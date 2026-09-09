@@ -6,7 +6,7 @@ import {
   type BrowserSession,
   type VerifiedBrowserSession,
 } from "@langwatch/auth-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type { IdentityEmailService } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, fromDate } from "@langwatch/time";
@@ -28,7 +28,7 @@ export class AuthService extends AuthCapability {
     repository: AuthSessionRepository;
     secondaryStore: AuthSecondaryStorePort | null;
     identityEmails: IdentityEmailService;
-    users: UserService;
+    users: UserApi;
   }): AuthService {
     return new AuthService(options);
   }
@@ -39,7 +39,7 @@ export class AuthService extends AuthCapability {
       repository: AuthSessionRepository;
       secondaryStore: AuthSecondaryStorePort | null;
       identityEmails: IdentityEmailService;
-      users: UserService;
+      users: UserApi;
     },
   ) {
     super();

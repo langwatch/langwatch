@@ -394,7 +394,7 @@ function deviceFlowWorld(
             return Promise.reject(overrides.validateSelectionError());
           return Promise.resolve(input.selection);
         },
-        tryResolveDefaultCliSelection: () => Promise.resolve({ bindings: [], permissions: [] }),
+        findDefaultCliSelection: () => Promise.resolve({ bindings: [], permissions: [] }),
         revokeCliLoginKeyForLogout: (input: { apiKeyId: string; userId: string }) => {
           world.revokedForLogout.push({ apiKeyId: input.apiKeyId, userId: input.userId });
           return Promise.resolve();

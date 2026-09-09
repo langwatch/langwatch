@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {

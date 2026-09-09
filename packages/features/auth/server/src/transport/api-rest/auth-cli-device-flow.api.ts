@@ -11,7 +11,7 @@ import {
 } from "@langwatch/api/rest";
 import {
   ApiKeyScopeViolationError,
-  type ApiKeyService,
+  type ApiKeyApi,
   type CliKeyScopeSummary,
   type CliKeySelection,
 } from "@langwatch/api-key-contract";
@@ -69,10 +69,10 @@ export type AuthCliDeviceFlowRestPorts = Readonly<{
    * through — the SAME one every other door on this process authenticates on.
    */
   apiKeys: () => Pick<
-    ApiKeyService,
+    ApiKeyApi,
     | "mintCliLoginKey"
     | "validateCliSelection"
-    | "tryResolveDefaultCliSelection"
+    | "findDefaultCliSelection"
     | "revokeCliLoginKeyForLogout"
   >;
   /**
@@ -959,7 +959,7 @@ export function createAuthCliDeviceFlowRestApp(options: {
         }
         try {
           keySelection =
-            (await ports.apiKeys().tryResolveDefaultCliSelection({
+            (await ports.apiKeys().findDefaultCliSelection({
               userId: person.id,
               organizationId: organization_id,
             })) ?? undefined;

@@ -108,7 +108,7 @@ function authWorld() {
     revokeBrowserSession: vi.fn(() => Promise.resolve()),
   };
   const apiKeys = {
-    tryResolveToken: () =>
+    findResolvedToken: () =>
       Promise.resolve({ type: "legacyProjectKey" as const, project: { slug: "acme" } }),
   };
   const featureFlags = { isEnabled: () => Promise.resolve(false) };

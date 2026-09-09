@@ -400,7 +400,7 @@ function guardWorld(
           });
         },
         validateCliSelection: (input: { selection: unknown }) => Promise.resolve(input.selection),
-        tryResolveDefaultCliSelection: () => Promise.resolve({ bindings: [], permissions: [] }),
+        findDefaultCliSelection: () => Promise.resolve({ bindings: [], permissions: [] }),
         revokeCliLoginKeyForLogout: () => Promise.resolve(),
       }) as never,
     ensurePersonalWorkspace: () =>

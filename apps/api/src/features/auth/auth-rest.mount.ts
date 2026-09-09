@@ -1,7 +1,7 @@
 /**
  * The API process's `/api/auth` door.
  */
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthService } from "@langwatch/auth-contract";
 import { PostgresAuthDirectoryAdapter, type AuthRestPorts } from "@langwatch/auth-server";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -21,7 +21,7 @@ export type ApiAuthRestOptions = Readonly<{
   /** The Auth service a logout revokes the browser session on. */
   auth: AuthService | undefined;
   /** The SAME credential service the legacy token check resolves through. */
-  apiKeys: ApiKeyService | undefined;
+  apiKeys: ApiKeyApi | undefined;
   /** The process's one guarded connection, or none. */
   prisma: PrismaClient | undefined;
   /** This deployment's flag store, for the born-finalized entrance. */
@@ -43,7 +43,7 @@ export function composeApiAuthRest(options: ApiAuthRestOptions): AuthRestPorts |
       return auth.tryResolveBrowserSession({ verified });
     },
     tryFindProjectSlugByToken: async ({ token }) => {
-      const resolved = await apiKeys.tryResolveToken({ token });
+      const resolved = await apiKeys.findResolvedToken({ token });
       return resolved?.project.slug ?? null;
     },
     featureFlags: () => featureFlags,

@@ -36,7 +36,7 @@ import {
   type CliBrowserSessionPort,
   type CliPersonalWorkspace,
 } from "@langwatch/auth-server";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OrganizationApp } from "@langwatch/organization-server";
@@ -97,7 +97,7 @@ export type ApiAuthCliDeviceFlowOptions = Readonly<{
   /** How this process turns a request into a signed-in person, or none. */
   session: ((request: Request) => Promise<{ id: string } | null>) | undefined;
   /** The SAME credential service every other door authenticates through. */
-  apiKeys: ApiKeyService | undefined;
+  apiKeys: ApiKeyApi | undefined;
   /** The organization application the personal workspace is ensured on. */
   organizations: OrganizationApp | undefined;
   /** The AuthZ graph the project write check runs on. */

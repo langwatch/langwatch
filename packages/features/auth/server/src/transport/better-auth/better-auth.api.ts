@@ -1,3 +1,8 @@
+export type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/server";
 import { passkey } from "@better-auth/passkey";
 import {
   isCredentialMutationPath,

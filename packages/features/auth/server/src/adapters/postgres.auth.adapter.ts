@@ -1,5 +1,5 @@
 import type { AuthService as AuthCapability } from "@langwatch/auth-contract";
-import type { UserService } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 import type { IdentityEmailService } from "@langwatch/identity-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -127,7 +127,7 @@ export class PostgresAuthAdapter {
     database: PrismaAuthDatabase;
     redis: RedisConnection | null;
     identityEmails: IdentityEmailService;
-    users: UserService;
+    users: UserApi;
   }): PostgresAuthAdapter {
     return new PostgresAuthAdapter(input);
   }
@@ -137,7 +137,7 @@ export class PostgresAuthAdapter {
       database: PrismaAuthDatabase;
       redis: RedisConnection | null;
       identityEmails: IdentityEmailService;
-      users: UserService;
+      users: UserApi;
     },
   ) {}
 
