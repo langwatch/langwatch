@@ -131,16 +131,82 @@ func TestNoUntypedFallback(t *testing.T) {
 }
 
 func TestResourceParamName(t *testing.T) {
-	cases := []struct{ path, want string }{
-		{"/api/prompts", "promptid"},
-		{"/api/prompts/{id}", "promptid"},
-		{"/api/v1/prompts/{id}/versions", "versionid"},
-		{"/api/evaluators/{idOrSlug}", "evaluatorid"},
-		{"/", ""},
+	cases := []struct {
+		path, param, want string
+	}{
+		// Capture's own use (no target param): scans from the path's end.
+		{"/api/prompts", "", "promptid"},
+		{"/api/prompts/{id}", "", "promptid"},
+		{"/api/v1/prompts/{id}/versions", "", "versionid"},
+		{"/", "", ""},
+
+		// A bare id resolves through the segment BEFORE its own placeholder,
+		// not the path's trailing segment - a bare id can be followed by
+		// more path, not just precede it.
+		{"/api/prompts/{id}", "id", "promptid"},
+		{"/api/evaluators/{idOrSlug}", "idOrSlug", "evaluatorid"},
+		{"/api/agents/{id}/call", "id", "agentid"},
+		{"/api/agents/{id}/test", "id", "agentid"},
+		{"/api/prompts/{id}/versions/{versionId}/restore", "id", "promptid"},
+		{"/api/prompts/{id}/versions/{versionId}/restore", "versionId", "versionid"},
+		{"/api/groups/{id}/bindings", "id", "groupid"},
+		{"/api/groups/{id}/bindings/{bindingId}", "id", "groupid"},
+		{"/api/monitors/{id}/toggle", "id", "monitorid"},
+		{"/api/webhooks/v1/endpoints/{id}/deliveries", "id", "endpointid"},
+		{"/api/webhooks/v1/endpoints/{id}/roll-secret", "id", "endpointid"},
+		{"/api/run-plans/{id}/run", "id", "runplanid"},
+
+		// Dated-address forms (bare / latest / YYYY-MM-DD) name the same
+		// resource, so all three must land in the same bucket.
+		{"/api/api-keys/{id}", "id", "apikeyid"},
+		{"/api/api-keys/latest/{id}", "id", "apikeyid"},
+		{"/api/api-keys/2026-08-07/{id}", "id", "apikeyid"},
+		{"/api/dashboards/2026-08-07/{id}", "id", "dashboardid"},
+
+		// slugOrId is the dataset family's own spelling of idOrSlug.
+		{"/api/dataset/{slugOrId}", "slugOrId", "datasetid"},
 	}
 	for _, testCase := range cases {
-		if got := resourceParamName(testCase.path); got != testCase.want {
-			t.Errorf("resourceParamName(%q) = %q, want %q", testCase.path, got, testCase.want)
+		if got := resourceParamName(testCase.path, testCase.param); got != testCase.want {
+			t.Errorf("resourceParamName(%q, %q) = %q, want %q", testCase.path, testCase.param, got, testCase.want)
+		}
+	}
+}
+
+func TestBareIDKey(t *testing.T) {
+	cases := []struct {
+		name string
+		want bool
+	}{
+		{"id", true},
+		{"_id", true},
+		{"idOrSlug", true},
+		{"slugOrId", true},
+		{"slug", true},
+		{"promptId", false},
+		{"name", false},
+	}
+	for _, testCase := range cases {
+		if got := bareIDKey(testCase.name); got != testCase.want {
+			t.Errorf("bareIDKey(%q) = %v, want %v", testCase.name, got, testCase.want)
+		}
+	}
+}
+
+func TestIsVersionSegment(t *testing.T) {
+	cases := []struct {
+		segment string
+		want    bool
+	}{
+		{"latest", true},
+		{"2026-08-07", true},
+		{"2026-8-07", false}, // not zero-padded, not the address grammar
+		{"v1", false},
+		{"prompts", false},
+	}
+	for _, testCase := range cases {
+		if got := isVersionSegment(testCase.segment); got != testCase.want {
+			t.Errorf("isVersionSegment(%q) = %v, want %v", testCase.segment, got, testCase.want)
 		}
 	}
 }
@@ -164,5 +230,40 @@ func TestResolveParamPrecedence(t *testing.T) {
 	empty := NewSymbolTable()
 	if _, ok := ResolveParam(captured, empty, "/api/things/{thingId}"); ok {
 		t.Fatal("unresolvable param must fail")
+	}
+}
+
+// Client-chosen slugs (a param the CALLER names, not one the server assigns)
+// resolve to a fixed literal: both sides probe the identical value, and a
+// 404 for a slug that does not exist is a comparable outcome, not a skip.
+func TestResolveParamClientChosenSlugs(t *testing.T) {
+	symbols := NewSymbolTable()
+	cases := []struct {
+		param, path, want string
+	}{
+		{"provider", "/api/model-providers/{provider}", "openai"},
+		{"tag", "/api/prompts/tags/{tag}", "apidiff-tag"},
+		{"name", "/api/agent-cache/{name}", "apidiff-agent-cache-entry"},
+		{"repository", "/api/coding-agent/pull-request-usage", "apidiff/apidiff"},
+		{"from", "/api/webhooks/v1/events", synthDateTime},
+	}
+	for _, testCase := range cases {
+		param := Param{Name: testCase.param, In: "query", Required: true}
+		got, ok := ResolveParam(param, symbols, testCase.path)
+		if !ok || got != testCase.want {
+			t.Errorf("ResolveParam(%q) = %q, %v; want %q", testCase.param, got, ok, testCase.want)
+		}
+	}
+}
+
+// Regression: a bare {id} on /api/projects/{id}/regenerate-api-key must
+// NEVER resolve to the seeded project id. Minting it would rotate the
+// project's own API key mid-run, invalidating the credential every later
+// probe on that side authenticates with.
+func TestResolveParamNeverRotatesSeededProjectKey(t *testing.T) {
+	empty := NewSymbolTable()
+	param := Param{Name: "id", In: "path", Required: true}
+	if got, ok := ResolveParam(param, empty, "/api/projects/{id}/regenerate-api-key"); ok {
+		t.Fatalf("regenerate-api-key id resolved to %q; must stay unresolved", got)
 	}
 }

@@ -2,6 +2,7 @@ package apidiff
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -260,7 +261,7 @@ func NewSymbolTable() *SymbolTable {
 // Returns the captured IDs.
 func (table *SymbolTable) Capture(operationPath string, body any) []string {
 	captured := make([]string, 0)
-	table.captureValue(resourceParamName(operationPath), body, &captured)
+	table.captureValue(resourceParamName(operationPath, ""), body, &captured)
 	return captured
 }
 
@@ -315,36 +316,75 @@ func lookupBuckets(paramName, operationPath string) []string {
 	if !bareIDKey(paramName) {
 		return []string{normalized}
 	}
-	if resource := resourceParamName(operationPath); resource != "" {
+	if resource := resourceParamName(operationPath, paramName); resource != "" {
 		return []string{resource}
 	}
 	return nil
 }
 
 // bareIDKey reports whether a key or parameter name carries no resource of
-// its own ("id", "idOrSlug", "slug") and must be typed by its path.
+// its own ("id", "idOrSlug", "slugOrId", "slug") and must be typed by its
+// path. idOrSlug and slugOrId are the same shape written both ways across
+// the REST surface - dataset routes use the latter.
 func bareIDKey(name string) bool {
 	switch normalizeParamName(name) {
-	case "id", "idorslug", "slug", "_id":
+	case "id", "idorslug", "slugorid", "slug", "_id":
 		return true
 	}
 	return false
 }
 
-// resourceParamName derives the parameter bucket a path's own resource
-// implies: the last literal segment before any placeholder, singularized —
-// /api/prompts and /api/prompts/{id}/versions both name "promptid" and
-// "versionid" respectively.
-func resourceParamName(operationPath string) string {
+// versionSegmentPattern matches a dated-address snapshot segment
+// (YYYY-MM-DD). Every REST family that carries dated addressing serves the
+// same resource at three equivalent paths - bare, "latest", and the dated
+// snapshot - so none of the three may change which resource a bare id names.
+var versionSegmentPattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+func isVersionSegment(segment string) bool {
+	return segment == "latest" || versionSegmentPattern.MatchString(segment)
+}
+
+// resourceParamName derives the parameter bucket a path parameter's own
+// resource implies: the nearest literal segment before that parameter's own
+// placeholder in the path (skipping dated-address segments), singularized.
+// Position matters, not just "the path's last literal segment" - a bare id
+// can be followed by more path, not just precede it:
+// /api/agents/{id}/call names "agentid" for {id}, not "callid", and
+// /api/prompts/{id}/versions/{versionId}/restore names "promptid" for {id}
+// and "versionid" for {versionId}.
+//
+// paramName "" (Capture's use, filing a just-created resource's own id) has
+// no placeholder to anchor on, so the scan starts at the path's end instead
+// - /api/prompts/{id}/versions names "versionid" there, the collection the
+// response belongs to, not the {id} already in the path.
+func resourceParamName(operationPath, paramName string) string {
 	segments := strings.Split(strings.Trim(operationPath, "/"), "/")
-	for index := len(segments) - 1; index >= 0; index-- {
+	start := len(segments) - 1
+	if paramName != "" {
+		if position := placeholderIndex(segments, paramName); position >= 0 {
+			start = position - 1
+		}
+	}
+	for index := start; index >= 0; index-- {
 		segment := segments[index]
-		if segment == "" || strings.HasPrefix(segment, "{") {
+		if segment == "" || strings.HasPrefix(segment, "{") || isVersionSegment(segment) {
 			continue
 		}
 		return normalizeParamName(singularize(segment)) + "id"
 	}
 	return ""
+}
+
+// placeholderIndex returns the index of a parameter's own {name} segment in
+// a split path, or -1 when the path never names it.
+func placeholderIndex(segments []string, paramName string) int {
+	placeholder := "{" + paramName + "}"
+	for index, segment := range segments {
+		if segment == placeholder {
+			return index
+		}
+	}
+	return -1
 }
 
 // singularize trims a trailing plural "s" (prompts → prompt), leaving words
@@ -362,7 +402,13 @@ func isIDKey(key string) bool {
 }
 
 // SeededConstants maps normalized parameter names to the fixed identities
-// the deterministic seed creates (packages/prisma-client/prisma/seed.ts).
+// the deterministic seed creates (packages/prisma-client/prisma/seed.ts), and
+// to a handful of literal values the CLIENT picks rather than the server  - 
+// a slug the caller names, not an id the server assigns, so there is nothing
+// to mint or capture. Both sides get the same literal, so the request is
+// still identical between A and B; the response may legitimately 404 when
+// the named resource does not exist, and that is itself a comparable probe
+// rather than a skip.
 var SeededConstants = map[string]string{
 	"projectid":      "local-dev-project",
 	"project":        "local-dev-project",
@@ -372,11 +418,31 @@ var SeededConstants = map[string]string{
 	"organization":   "local-dev-organization",
 	"teamid":         "local-dev-team",
 	"team":           "local-dev-team",
+	// Client-chosen slugs (see the comment above): PUT /api/model-providers/{provider}
+	// configures a fixed provider catalog entry; PUT/DELETE /api/prompts/tags/{tag}
+	// and PUT /api/prompts/{id}/tags/{tag} name a caller-chosen tag; PUT/GET/DELETE
+	// /api/agent-cache/{name} names a caller-chosen cache entry; the "repository"
+	// query param on GET /api/coding-agent/pull-request-usage names an owner/repo
+	// slug; the "from" query param on GET /api/webhooks/v1/events is a cursor
+	// timestamp, reusing the same fixed instant every synthesized payload uses.
+	"provider":   "openai",
+	"tag":        "apidiff-tag",
+	"name":       "apidiff-agent-cache-entry",
+	"repository": "apidiff/apidiff",
+	"from":       synthDateTime,
 }
 
 // ResolveParam picks a value for a path or required query parameter: spec
 // examples/defaults first, then seeded constants matched by name, then the
 // symbol table, typed by the parameter name and the operation's own path.
+//
+// A bare {id} is deliberately NOT also resolved against the seeded
+// project/organization/team constants by matching its own path's resource
+// (e.g. /api/projects/{id}) the way a literally-named {projectId} is: one
+// matching path in this union is POST /api/projects/{id}/regenerate-api-key,
+// which would rotate the seeded project's own API key away from under every
+// later probe still to run on that side. Minting that id is a hazard, not a
+// convenience, so it stays unresolved and the operation stays skipped.
 func ResolveParam(param Param, symbols *SymbolTable, operationPath string) (string, bool) {
 	if param.HasValue {
 		return fmt.Sprint(param.Example), true
