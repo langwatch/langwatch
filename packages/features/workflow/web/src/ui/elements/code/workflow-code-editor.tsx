@@ -251,6 +251,130 @@ const onSaveAndClose = {
 
 const EMPTY_FIELDS: readonly PythonField[] = [];
 
+// React Flow's `panActivationKeyCode` defaults to `Space`, so it registers a
+// document-level keydown handler that preventDefaults every Space — which
+// swallows the keystroke before the browser turns it into a `beforeinput` for
+// Monaco. Shield ONLY Space (and not the other ~dozen keys React Flow
+// watches) so editor shortcuts that legitimately bubble (Cmd+A select-all,
+// Cmd+Z undo, etc.) still reach Monaco's standalone keybinding service above
+// the editor root.
+function shieldSpaceFromReactFlow(editor: MonacoEditorInstance) {
+  const editorRoot = editor.getDomNode?.();
+  if (!editorRoot) return;
+
+  const shieldSpace = (e: KeyboardEvent) => {
+    const isPlainSpace = e.code === "Space" && !e.metaKey && !e.ctrlKey && !e.altKey;
+    if (isPlainSpace) {
+      e.stopPropagation();
+    }
+  };
+  editorRoot.addEventListener("keydown", shieldSpace);
+  editorRoot.addEventListener("keypress", shieldSpace);
+  editorRoot.addEventListener("keyup", shieldSpace);
+  editor.onDidDispose?.(() => {
+    editorRoot.removeEventListener("keydown", shieldSpace);
+    editorRoot.removeEventListener("keypress", shieldSpace);
+    editorRoot.removeEventListener("keyup", shieldSpace);
+  });
+}
+
+// Drag-and-drop secret chips from SecretsIndicator. The chip puts the secret
+// name on the dataTransfer; we translate the drop point into an editor
+// position and insert `secrets.NAME` there.
+function wireSecretDragAndDrop(editor: MonacoEditorInstance) {
+  const editorRoot = editor.getDomNode?.();
+  if (!editorRoot) return;
+
+  const onDragOver = (e: DragEvent) => {
+    const isSecretDrag = e.dataTransfer?.types.includes("text/x-langwatch-secret");
+    if (isSecretDrag) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    }
+  };
+  const onDrop = (e: DragEvent) => {
+    const name = e.dataTransfer?.getData("text/x-langwatch-secret");
+    if (!name) return;
+    e.preventDefault();
+    const target = editor.getTargetAtClientPoint?.(e.clientX, e.clientY);
+    const pos = target?.position ?? editor.getPosition();
+    if (!pos) return;
+    editor.focus();
+    editor.executeEdits("secret-drop", [
+      {
+        range: {
+          startLineNumber: pos.lineNumber,
+          endLineNumber: pos.lineNumber,
+          startColumn: pos.column,
+          endColumn: pos.column,
+        },
+        text: `secrets.${name}`,
+        forceMoveMarkers: true,
+      },
+    ]);
+  };
+  editorRoot.addEventListener("dragover", onDragOver);
+  editorRoot.addEventListener("drop", onDrop);
+  editor.onDidDispose?.(() => {
+    editorRoot.removeEventListener("dragover", onDragOver);
+    editorRoot.removeEventListener("drop", onDrop);
+  });
+}
+
+// Persist view state on dispose. Doing it here (rather than on every edit)
+// keeps writes cheap; the editor is short-lived inside a modal so dispose
+// fires reliably on close.
+function persistViewStateOnDispose({
+  editor,
+  viewStateKey,
+}: {
+  editor: MonacoEditorInstance;
+  viewStateKey: string | undefined;
+}) {
+  if (!viewStateKey) return;
+  editor.onDidDispose?.(() => {
+    try {
+      const state = editor.saveViewState();
+      if (state) {
+        localStorage.setItem(`langwatch.monaco.viewstate:${viewStateKey}`, JSON.stringify(state));
+      }
+    } catch {
+      // localStorage quota / serialisation — silently skip
+    }
+  });
+}
+
+function wireEditorSaveShortcuts(editor: MonacoEditorInstance) {
+  editor.onKeyDown((e) => {
+    // Escape is INTENTIONALLY not handled here — Monaco itself uses it to
+    // dismiss the suggest widget, hover, parameter-hint, etc. If none of
+    // those are open, Monaco won't stop propagation and the surrounding
+    // Dialog will close on its own. That gives Escape the expected
+    // contextual feel: first press closes the open widget, a *second* press
+    // dismisses the modal.
+
+    // Cmd/Ctrl+S → Save (keep modal open). Bound here too so the shortcut
+    // works even when Monaco has the keystroke captured before it reaches
+    // the window-level listener.
+    const isSaveShortcut = (e.metaKey || e.ctrlKey) && !e.shiftKey && e.code === "KeyS";
+    if (isSaveShortcut) {
+      e.preventDefault();
+      e.stopPropagation();
+      onSave.fn();
+      return;
+    }
+    // Cmd/Ctrl+Enter → Save & Close. Mirrors the Notebook "run cell" muscle
+    // memory.
+    const isSaveAndCloseShortcut =
+      (e.metaKey || e.ctrlKey) && (e.code === "Enter" || e.code === "NumpadEnter");
+    if (isSaveAndCloseShortcut) {
+      e.preventDefault();
+      e.stopPropagation();
+      onSaveAndClose.fn();
+    }
+  });
+}
+
 export function WorkflowCodeEditor({
   code,
   setCode,
@@ -373,106 +497,10 @@ export function WorkflowCodeEditor({
           // not the other ~dozen keys React Flow watches) so editor shortcuts
           // that legitimately bubble (Cmd+A select-all, Cmd+Z undo, etc.) still
           // reach Monaco's standalone keybinding service above the editor root.
-          const editorRoot = editor.getDomNode?.();
-          const shieldSpace = (e: KeyboardEvent) => {
-            if (e.code === "Space" && !e.metaKey && !e.ctrlKey && !e.altKey) {
-              e.stopPropagation();
-            }
-          };
-          if (editorRoot) {
-            editorRoot.addEventListener("keydown", shieldSpace);
-            editorRoot.addEventListener("keypress", shieldSpace);
-            editorRoot.addEventListener("keyup", shieldSpace);
-            editor.onDidDispose?.(() => {
-              editorRoot.removeEventListener("keydown", shieldSpace);
-              editorRoot.removeEventListener("keypress", shieldSpace);
-              editorRoot.removeEventListener("keyup", shieldSpace);
-            });
-          }
-
-          // Drag-and-drop secret chips from SecretsIndicator. The chip puts the
-          // secret name on the dataTransfer; we translate the drop point into
-          // an editor position and insert `secrets.NAME` there.
-          if (editorRoot) {
-            const onDragOver = (e: DragEvent) => {
-              if (e.dataTransfer?.types.includes("text/x-langwatch-secret")) {
-                e.preventDefault();
-                if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-              }
-            };
-            const onDrop = (e: DragEvent) => {
-              const name = e.dataTransfer?.getData("text/x-langwatch-secret");
-              if (!name) return;
-              e.preventDefault();
-              const target = editor.getTargetAtClientPoint?.(e.clientX, e.clientY);
-              const pos = target?.position ?? editor.getPosition();
-              if (!pos) return;
-              editor.focus();
-              editor.executeEdits("secret-drop", [
-                {
-                  range: {
-                    startLineNumber: pos.lineNumber,
-                    endLineNumber: pos.lineNumber,
-                    startColumn: pos.column,
-                    endColumn: pos.column,
-                  },
-                  text: `secrets.${name}`,
-                  forceMoveMarkers: true,
-                },
-              ]);
-            };
-            editorRoot.addEventListener("dragover", onDragOver);
-            editorRoot.addEventListener("drop", onDrop);
-            editor.onDidDispose?.(() => {
-              editorRoot.removeEventListener("dragover", onDragOver);
-              editorRoot.removeEventListener("drop", onDrop);
-            });
-          }
-
-          // Persist view state on dispose. Doing it here (rather than on every
-          // edit) keeps writes cheap; the editor is short-lived inside a modal
-          // so dispose fires reliably on close.
-          if (viewStateKey) {
-            editor.onDidDispose?.(() => {
-              try {
-                const state = editor.saveViewState();
-                if (state) {
-                  localStorage.setItem(
-                    `langwatch.monaco.viewstate:${viewStateKey}`,
-                    JSON.stringify(state),
-                  );
-                }
-              } catch {
-                // localStorage quota / serialisation — silently skip
-              }
-            });
-          }
-
-          editor.onKeyDown((e) => {
-            // Escape is INTENTIONALLY not handled here — Monaco itself uses it
-            // to dismiss the suggest widget, hover, parameter-hint, etc. If
-            // none of those are open, Monaco won't stop propagation and the
-            // surrounding Dialog will close on its own. That gives Escape the
-            // expected contextual feel: first press closes the open widget,
-            // a *second* press dismisses the modal.
-
-            // Cmd/Ctrl+S → Save (keep modal open). Bound here too so the
-            // shortcut works even when Monaco has the keystroke captured
-            // before it reaches the window-level listener.
-            if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.code === "KeyS") {
-              e.preventDefault();
-              e.stopPropagation();
-              onSave.fn();
-              return;
-            }
-            // Cmd/Ctrl+Enter → Save & Close. Mirrors the Notebook "run cell"
-            // muscle memory.
-            if ((e.metaKey || e.ctrlKey) && (e.code === "Enter" || e.code === "NumpadEnter")) {
-              e.preventDefault();
-              e.stopPropagation();
-              onSaveAndClose.fn();
-            }
-          });
+          shieldSpaceFromReactFlow(editor);
+          wireSecretDragAndDrop(editor);
+          persistViewStateOnDispose({ editor, viewStateKey });
+          wireEditorSaveShortcuts(editor);
           registerCompletion(monaco, editor, {
             language,
             endpoint: `/api/workflows/code-completion?projectId=${projectId}`,

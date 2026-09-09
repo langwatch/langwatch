@@ -2,6 +2,11 @@ import {
   workflowDslSchema,
   workflowFieldSchema,
   workflowFieldNodeSchema,
+  fieldSchema,
+  getMappingSurfaceInputs,
+  getWorkflowEndInputs,
+  studioWorkflowSchema,
+  type WorkflowMappingFields,
   type WorkflowDsl,
   type WorkflowField,
 } from "@langwatch/workflow-contract";
@@ -13,6 +18,25 @@ type WorkflowDslMetadata = {
 };
 
 export class WorkflowDslService {
+  mappingFields(dsl: unknown): WorkflowMappingFields {
+    const parsed = studioWorkflowSchema.safeParse(dsl);
+    if (!parsed.success) {
+      // Historical invalid graphs remain listable, with their unresolved shape explicit.
+      return { inputFields: [], outputFields: [], fieldsResolved: false };
+    }
+    const graph = parsed.data;
+    const inputFields = getMappingSurfaceInputs(graph.edges ?? [], graph.nodes).map((input) => ({
+      identifier: input.identifier,
+      type: input.type,
+      ...(input.optional ? { optional: true } : {}),
+    }));
+    const outputFields = getWorkflowEndInputs(graph).map((output) =>
+      fieldSchema.parse({ identifier: output.identifier, type: output.type }),
+    );
+
+    return { inputFields, outputFields, fieldsResolved: true };
+  }
+
   static create(): WorkflowDslService {
     return new WorkflowDslService();
   }

@@ -1,3 +1,4 @@
+import { explainSerializedError } from "@langwatch/handled-error/presentation";
 import { createLogger } from "@langwatch/observability";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { toError } from "@langwatch/ui-host/errors";
@@ -30,6 +31,41 @@ export interface FetchSSEOptions<T> {
 
   /** Error handler */
   onError?: (error: Error) => void;
+
+  /**
+   * Cancels the stream from the outside — a Stop button, or a component
+   * unmounting mid-run. The server treats the disconnect as the cancel signal.
+   */
+  signal?: AbortSignal;
+}
+
+/**
+ * Reads the sentence a refused request came back with.
+ *
+ * Two body shapes reach here. Routes on `@langwatch/api` answer with a coded
+ * envelope whose wire `message` is deliberately the code slug, so the words
+ * come from the client error registry, keyed by `code`. Legacy SecuredApp
+ * routes answer `{ error }` — a dataset still normalising (425), a node with
+ * no model (422) — and that sentence is the one telling the user what to fix.
+ * Falling back to `statusText` reduced every one of them to "Unprocessable
+ * Entity".
+ */
+async function describeRefusal(response: Response): Promise<string> {
+  const body = (await response
+    .clone()
+    .json()
+    .catch(() => null)) as { code?: unknown; error?: unknown } | null;
+
+  if (typeof body?.code === "string") {
+    const explained = explainSerializedError(body as Parameters<typeof explainSerializedError>[0]);
+    return explained.description || explained.title;
+  }
+
+  if (typeof body?.error === "string") return body.error;
+
+  return response.status >= 500
+    ? `Server error: ${response.status} ${response.statusText}`
+    : response.statusText;
 }
 
 /**
@@ -45,15 +81,26 @@ export async function fetchSSE<T>({
   chunkTimeout = 480_000,
   headers = {},
   onError,
+  signal,
 }: FetchSSEOptions<T>): Promise<void> {
   // Wrap in a Promise so timeout errors can properly reject
   // instead of becoming unhandled exceptions
   return new Promise((resolve, reject) => {
     const controller = new AbortController();
+    const abortFromSignal = () => controller.abort();
     let timeoutId: NodeJS.Timeout | undefined;
     let isSettled = false;
 
+    if (signal?.aborted) {
+      resolve();
+      return;
+    }
+    signal?.addEventListener("abort", abortFromSignal, { once: true });
+
     const cleanup = () => {
+      // The caller owns `signal` and outlives this request. Without the removal
+      // a settled stream's controller is retained until the caller aborts.
+      signal?.removeEventListener("abort", abortFromSignal);
       controller.abort();
       if (timeoutId) clearTimeout(timeoutId);
     };
@@ -102,12 +149,7 @@ export async function fetchSSE<T>({
           return;
         }
 
-        const error = new Error(
-          response.status >= 500
-            ? `Server error: ${response.status} ${response.statusText}`
-            : response.statusText,
-        );
-        handleError(error);
+        handleError(new Error(await describeRefusal(response)));
       },
 
       onmessage(ev) {

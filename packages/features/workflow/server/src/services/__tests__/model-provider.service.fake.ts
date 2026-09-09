@@ -81,6 +81,10 @@ export class TestModelProviderService extends ModelProviderService {
     throw new Error("Not used by Workflow tests.");
   }
 
+  assertApiKeyMayWriteDefaultScopes(): Promise<never> {
+    throw new Error("Not used by Workflow tests.");
+  }
+
   upsertCost(): Promise<never> {
     throw new Error("Not used by Workflow tests.");
   }

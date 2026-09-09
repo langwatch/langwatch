@@ -43,6 +43,18 @@ const workflow = (id = "workflow_1", projectId = "project_1"): Workflow => ({
 });
 
 class FakeWorkflowRepository extends WorkflowRepository {
+  async listFieldSources(): Promise<never> {
+    throw new Error("not used by this test");
+  }
+  async listSummaries(): Promise<never> {
+    throw new Error("not used by this test");
+  }
+  async archiveLinked(): Promise<never> {
+    throw new Error("not used by this test");
+  }
+  async deleteUncommitted(): Promise<never> {
+    throw new Error("not used by this test");
+  }
   private readonly workflows = new Map<string, Workflow>();
   private readonly versions = new Map<string, WorkflowVersion>();
 

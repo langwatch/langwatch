@@ -3,6 +3,7 @@ import type {
   WorkflowDsl,
   WorkflowVersion,
   WorkflowWithVersion,
+  WorkflowReference,
 } from "@langwatch/workflow-contract";
 
 export type PersistWorkflowInput = {
@@ -44,6 +45,16 @@ export type WorkflowVersionHistoryRecord = {
 };
 
 export abstract class WorkflowRepository {
+  abstract listFieldSources(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<{ id: string; dsl: unknown }[]>;
+  abstract listSummaries(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<{ id: string; name: string }[]>;
+  abstract archiveLinked(input: WorkflowReference): Promise<{ id: string }>;
+  abstract deleteUncommitted(input: WorkflowReference): Promise<void>;
   abstract tryFindById(input: {
     id: string;
     projectId: string;

@@ -41,7 +41,7 @@ import {
   buildCodeConfig,
   DEFAULT_CODE,
   getCodeFromConfig,
-} from "../../../../model/code-agent-config.ts";
+} from "@langwatch/agent-web/agent-editors";
 import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
 import { api } from "../../../../model/workflow-api-client.ts";

@@ -3,22 +3,20 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import {
-  PrismaWorkflowAgentMappingAdapter,
-  type WorkflowAgentMappingDatabase,
-} from "../prisma.workflow-agent-mapping.adapter.ts";
+import { WorkflowAgentMappingAdapter } from "../workflow-agent-mapping.adapter.ts";
 
 /** The adapter under test, over the fake rows one case supplies. */
 const recompute = (input: {
-  database: WorkflowAgentMappingDatabase;
+  agents: AgentApi;
   workflowId: string;
   projectId: string;
   dsl: unknown;
 }): Promise<void> =>
-  PrismaWorkflowAgentMappingAdapter.create({
-    database: input.database,
-    logger: { error: () => undefined },
+  WorkflowAgentMappingAdapter.create({
+    agents: input.agents,
   }).recompute({
     workflowId: input.workflowId,
     projectId: input.projectId,
@@ -29,12 +27,7 @@ const recompute = (input: {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Builds a minimal DSL with the given input identifiers and a single output.
- *
- * Each entry edge has sourceHandle "outputs.<identifier>", which is the shape
- * that getInputsOutputs / getEntryInputs expect.
- */
+// Entry edges identify the mapping surface even without entry node declarations.
 function buildDSL({ inputs, output }: { inputs: string[]; output: string }) {
   const edges = inputs.map((identifier, i) => ({
     id: `e-entry-${i}`,
@@ -61,47 +54,29 @@ function buildDSL({ inputs, output }: { inputs: string[]; output: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Prisma mock factory
+// Agent API fixture
 // ---------------------------------------------------------------------------
 
-function buildPrismaMock({
+function buildAgentApi({
   agents,
 }: {
   agents: Array<{ id: string; config: Record<string, unknown> }>;
 }) {
   const updatedConfigs: Record<string, Record<string, unknown>> = {};
 
-  const prisma = {
-    agent: {
-      findMany: vi.fn().mockResolvedValue(agents),
-      update: vi
-        .fn()
-        .mockImplementation(
-          async ({
-            where,
-            data,
-          }: {
-            where: { id: string; projectId?: string };
-            data: { config: Record<string, unknown> };
-          }) => {
-            expect(where.projectId).toBeDefined();
-            updatedConfigs[where.id] = data.config as Record<string, unknown>;
-            return { id: where.id, config: data.config };
-          },
-        ),
-    },
-  } as unknown as WorkflowAgentMappingDatabase;
+  const agentsApi = createApiFixture<AgentApi>({
+    listWorkflowConfigs: vi.fn<AgentApi["listWorkflowConfigs"]>().mockResolvedValue(agents),
+    updateWorkflowConfig: vi.fn<AgentApi["updateWorkflowConfig"]>(async (input) => {
+      expect(input.projectId).toBe("proj-1");
+      expect(input.workflowId).toBe("wf-1");
+      updatedConfigs[input.id] = input.config;
+    }),
+  });
 
-  return { prisma, updatedConfigs };
+  return { agentsApi, updatedConfigs };
 }
 
-/**
- * Builds a DSL where the entry node has a real `data.outputs` declaration, and
- * only the identifiers listed in `wiredIdentifiers` have downstream edges.
- * Any identifier declared in `entryOutputs` but absent from `wiredIdentifiers`
- * is "unwired" — it is a declared output with no edge, which is the scenario
- * that triggers bug #3362.
- */
+// Declared, unwired entry outputs must still become scenario inputs.
 function buildUnwiredDSL({
   entryOutputs,
   wiredIdentifiers,
@@ -158,7 +133,7 @@ function buildUnwiredDSL({
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("PrismaWorkflowAgentMappingAdapter", () => {
+describe("WorkflowAgentMappingAdapter", () => {
   describe("when a workflow agent has no scenarioMappings and conventional inputs", () => {
     /** @scenario Auto-computes mappings when workflow with conventional inputs is saved */
     it("maps query to scenario input field", async () => {
@@ -166,12 +141,12 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
         inputs: ["query", "history"],
         output: "response",
       });
-      const { prisma, updatedConfigs } = buildPrismaMock({
+      const { agentsApi, updatedConfigs } = buildAgentApi({
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -195,12 +170,12 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
         inputs: ["query", "history"],
         output: "response",
       });
-      const { prisma, updatedConfigs } = buildPrismaMock({
+      const { agentsApi, updatedConfigs } = buildAgentApi({
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -224,12 +199,12 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
         inputs: ["query", "history"],
         output: "response",
       });
-      const { prisma, updatedConfigs } = buildPrismaMock({
+      const { agentsApi, updatedConfigs } = buildAgentApi({
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -242,24 +217,21 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
 
     it("queries agents by workflowId and projectId excluding archived", async () => {
       const dsl = buildDSL({ inputs: ["query"], output: "response" });
-      const { prisma } = buildPrismaMock({
+      const { agentsApi } = buildAgentApi({
         agents: [{ id: "agent-1", config: {} }],
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
       });
 
-      expect(prisma.agent.findMany).toHaveBeenCalledWith(
+      expect(agentsApi.listWorkflowConfigs).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: {
-            workflowId: "wf-1",
-            projectId: "proj-1",
-            archivedAt: null,
-          },
+          workflowId: "wf-1",
+          projectId: "proj-1",
         }),
       );
     });
@@ -271,7 +243,7 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
       const existingMappings = {
         query: { type: "source", sourceId: "scenario", path: ["input"] },
       };
-      const { prisma } = buildPrismaMock({
+      const { agentsApi } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -281,13 +253,13 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
       });
 
-      expect(prisma.agent.update).not.toHaveBeenCalled();
+      expect(agentsApi.updateWorkflowConfig).not.toHaveBeenCalled();
     });
   });
 
@@ -296,18 +268,18 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
     it("skips auto-compute and leaves scenarioMappings empty", async () => {
       // Blank template: entry outputs "question", end inputs "output"
       const dsl = buildDSL({ inputs: ["question"], output: "output" });
-      const { prisma } = buildPrismaMock({
+      const { agentsApi } = buildAgentApi({
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
       });
 
-      expect(prisma.agent.update).not.toHaveBeenCalled();
+      expect(agentsApi.updateWorkflowConfig).not.toHaveBeenCalled();
     });
   });
 
@@ -319,7 +291,7 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
       const staleExistingMappings = {
         old_query: { type: "source", sourceId: "scenario", path: ["input"] },
       };
-      const { prisma, updatedConfigs } = buildPrismaMock({
+      const { agentsApi, updatedConfigs } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -332,13 +304,13 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
       });
 
-      expect(prisma.agent.update).toHaveBeenCalled();
+      expect(agentsApi.updateWorkflowConfig).toHaveBeenCalled();
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
       const mappings = config!.scenarioMappings as Record<string, unknown>;
@@ -353,7 +325,7 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
       const currentMappings = {
         prompt: { type: "source", sourceId: "scenario", path: ["input"] },
       };
-      const { prisma } = buildPrismaMock({
+      const { agentsApi } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -366,13 +338,13 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
       });
 
-      expect(prisma.agent.update).not.toHaveBeenCalled();
+      expect(agentsApi.updateWorkflowConfig).not.toHaveBeenCalled();
     });
 
     it("preserves user-set mappings for non-stale keys when another key is stale", async () => {
@@ -389,7 +361,7 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
           path: ["custom", "user_picked"],
         },
       };
-      const { prisma, updatedConfigs } = buildPrismaMock({
+      const { agentsApi, updatedConfigs } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -402,13 +374,13 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
       });
 
-      expect(prisma.agent.update).toHaveBeenCalled();
+      expect(agentsApi.updateWorkflowConfig).toHaveBeenCalled();
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
       const mappings = config!.scenarioMappings as Record<
@@ -448,7 +420,7 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
           },
         ],
       };
-      const { prisma, updatedConfigs } = buildPrismaMock({
+      const { agentsApi, updatedConfigs } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -468,13 +440,13 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
       });
 
-      expect(prisma.agent.update).toHaveBeenCalled();
+      expect(agentsApi.updateWorkflowConfig).toHaveBeenCalled();
       const config = updatedConfigs["agent-1"];
       expect(config).toBeDefined();
       // Stale scenarioOutputField must be removed, not left pointing at
@@ -490,7 +462,7 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
       const currentMappings = {
         prompt: { type: "source", sourceId: "scenario", path: ["input"] },
       };
-      const { prisma, updatedConfigs } = buildPrismaMock({
+      const { agentsApi, updatedConfigs } = buildAgentApi({
         agents: [
           {
             id: "agent-1",
@@ -504,13 +476,13 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
       });
 
-      expect(prisma.agent.update).toHaveBeenCalled();
+      expect(agentsApi.updateWorkflowConfig).toHaveBeenCalled();
       const config = updatedConfigs["agent-1"];
       expect(config!.scenarioOutputField).toBe("new_out");
       // Input mappings are preserved verbatim.
@@ -526,33 +498,32 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
   describe("when no agents are linked to the workflow", () => {
     it("does not attempt any updates", async () => {
       const dsl = buildDSL({ inputs: ["query"], output: "response" });
-      const { prisma } = buildPrismaMock({ agents: [] });
+      const { agentsApi } = buildAgentApi({ agents: [] });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
       });
 
-      expect(prisma.agent.update).not.toHaveBeenCalled();
+      expect(agentsApi.updateWorkflowConfig).not.toHaveBeenCalled();
     });
   });
 
-  describe("when Prisma throws an error", () => {
+  describe("when Agent persistence throws an error", () => {
     /** @scenario Auto-compute does not block the workflow save on failure */
     it("does not propagate the error (non-blocking)", async () => {
       const dsl = buildDSL({ inputs: ["query"], output: "response" });
-      const prisma = {
-        agent: {
-          findMany: vi.fn().mockRejectedValue(new Error("DB connection lost")),
-          update: vi.fn(),
-        },
-      } as unknown as WorkflowAgentMappingDatabase;
+      const agentsApi = createApiFixture<AgentApi>({
+        listWorkflowConfigs: vi
+          .fn<AgentApi["listWorkflowConfigs"]>()
+          .mockRejectedValue(new Error("DB connection lost")),
+      });
 
       await expect(
         recompute({
-          database: prisma,
+          agents: agentsApi,
           workflowId: "wf-1",
           projectId: "proj-1",
           dsl,
@@ -562,7 +533,7 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
   });
 
   describe("when the entry node declares a field with no downstream edge (unwired)", () => {
-    /** @scenario Auto-compute on workflow save includes an unwired entry field in scenarioMappings */
+    /** @scenario Auto-compute includes unwired entry fields */
     it("includes the unwired field in the auto-computed scenarioMappings", async () => {
       // Entry node declares "new_field" but no downstream edge exists for it.
       const dsl = buildUnwiredDSL({
@@ -570,12 +541,12 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
         wiredIdentifiers: [],
         output: "response",
       });
-      const { prisma, updatedConfigs } = buildPrismaMock({
+      const { agentsApi, updatedConfigs } = buildAgentApi({
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,
@@ -599,12 +570,12 @@ describe("PrismaWorkflowAgentMappingAdapter", () => {
         wiredIdentifiers: ["query"],
         output: "response",
       });
-      const { prisma, updatedConfigs } = buildPrismaMock({
+      const { agentsApi, updatedConfigs } = buildAgentApi({
         agents: [{ id: "agent-1", config: { type: "workflow" } }],
       });
 
       await recompute({
-        database: prisma,
+        agents: agentsApi,
         workflowId: "wf-1",
         projectId: "proj-1",
         dsl,

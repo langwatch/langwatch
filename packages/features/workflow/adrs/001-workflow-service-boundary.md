@@ -18,6 +18,12 @@ published-version selection, DSL validation, archive/copy operations and the
 execution dispatch capability. Evaluation runs remain owned by Evaluation;
 `/workflows/:id/evaluate` is application API composition over both services.
 
+`WorkflowApi.executeComponent` returns the requested component's final execution
+state from the process's existing Studio dispatcher. HTTP agent tests use that
+operation; Agent does not receive an engine-dispatch callback. API composition
+shares the dispatcher with the Studio authoring transport. The legacy Workflow
+composition still supplies that owner service to the App at boot.
+
 ## Contracts and validation
 
 The contract uses Zod 4 schemas for portable definitions and versions. The
@@ -37,6 +43,12 @@ The service receives its private Workflow repository and the canonical Dataset
 service used by workflow copying. Prisma is confined to
 `repositories/prisma`, and the process composes one service via
 `PostgresWorkflowAdapter`.
+
+Linked Agent operations use `WorkflowApi` for batched field discovery,
+summaries, archive, copy and failed-copy cleanup. Every persistence operation
+keeps the project predicate. Invalid historical graphs report unresolved fields;
+valid graphs preserve their declared outputs. Cleanup clears version pointers
+and parent references before deleting versions and the workflow.
 
 Studio execution materializes referenced datasets through an explicit
 `DatasetService`; it does not read a process-global application instance.
@@ -103,6 +115,12 @@ Service reads return a value or throw concrete errors such as
 service boundary.
 
 ## Consequences
+
+Workflow computes scenario mapping defaults when a graph is saved. It reads and
+updates linked Agent configs through the complete `AgentApi`; Agent owns the
+project/workflow-scoped persistence. Refresh preserves valid custom mappings and
+unrelated config fields. Refresh failures are logged without failing the saved
+workflow version.
 
 Workflow behaviour has one implementation shared by transports and workers;
 Prisma and infrastructure remain at the composition edge. Existing transports

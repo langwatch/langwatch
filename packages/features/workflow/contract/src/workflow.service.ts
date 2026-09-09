@@ -16,8 +16,19 @@ import type {
   WorkflowWithVersion,
 } from "./workflow.ts";
 import type { StudioClientEvent } from "./studio-events.ts";
+import type { WorkflowMappingFields, WorkflowReference } from "./workflow.api.ts";
 
 export abstract class WorkflowService {
+  abstract listFields(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<Record<string, WorkflowMappingFields>>;
+  abstract listSummaries(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<{ id: string; name: string }[]>;
+  abstract archiveLinked(input: WorkflowReference): Promise<{ id: string }>;
+  abstract deleteUncommitted(input: WorkflowReference): Promise<void>;
   abstract enrichStudioEvent(input: {
     event: StudioClientEvent;
     projectId: string;

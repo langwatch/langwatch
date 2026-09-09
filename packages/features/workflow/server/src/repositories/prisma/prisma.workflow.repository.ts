@@ -5,7 +5,9 @@ import {
   type Workflow,
   type WorkflowVersion,
   type WorkflowWithVersion,
+  type WorkflowReference,
 } from "@langwatch/workflow-contract";
+import { z } from "zod";
 import {
   WorkflowRepository,
   type PersistWorkflowInput,
@@ -20,12 +22,15 @@ export type WorkflowDatabase = {
     findMany(args: unknown): Promise<unknown[]>;
     create(args: unknown): Promise<unknown>;
     update(args: unknown): Promise<unknown>;
+    delete(args: unknown): Promise<unknown>;
   };
   workflowVersion: {
     findFirst(args: unknown): Promise<unknown>;
     findMany(args: unknown): Promise<unknown[]>;
     create(args: unknown): Promise<unknown>;
     update(args: unknown): Promise<unknown>;
+    updateMany(args: unknown): Promise<unknown>;
+    deleteMany(args: unknown): Promise<unknown>;
   };
 };
 
@@ -65,6 +70,51 @@ const mapVersion = (row: unknown, includeDsl = true): WorkflowVersion => {
 };
 
 export class PrismaWorkflowRepository extends WorkflowRepository {
+  async listFieldSources(input: { projectId: string; workflowIds: string[] }) {
+    const rows = await this.database.workflow.findMany({
+      where: { id: { in: input.workflowIds }, projectId: input.projectId, archivedAt: null },
+      select: { id: true, currentVersion: { select: { dsl: true } } },
+    });
+    const sources = z
+      .array(z.object({ id: z.string(), currentVersion: z.object({ dsl: z.unknown() }).nullish() }))
+      .parse(rows);
+
+    return sources.map(({ id, currentVersion }) => ({ id, dsl: currentVersion?.dsl }));
+  }
+
+  async listSummaries(input: { projectId: string; workflowIds: string[] }) {
+    const rows = await this.database.workflow.findMany({
+      where: { id: { in: input.workflowIds }, projectId: input.projectId, archivedAt: null },
+      select: { id: true, name: true },
+    });
+
+    return z.array(z.object({ id: z.string(), name: z.string() })).parse(rows);
+  }
+
+  async archiveLinked(input: WorkflowReference): Promise<{ id: string }> {
+    const row = await this.database.workflow.update({
+      where: { id: input.workflowId, projectId: input.projectId },
+      data: { archivedAt: new Date() },
+      select: { id: true },
+    });
+
+    return z.object({ id: z.string() }).parse(row);
+  }
+
+  async deleteUncommitted(input: WorkflowReference): Promise<void> {
+    const where = { workflowId: input.workflowId, projectId: input.projectId };
+    await this.database.workflow.update({
+      where: { id: input.workflowId, projectId: input.projectId },
+      data: { currentVersionId: null, latestVersionId: null },
+    });
+    // Version pointers and parentage must be cleared before restrictive foreign keys allow deletion.
+    await this.database.workflowVersion.updateMany({ where, data: { parentId: null } });
+    await this.database.workflowVersion.deleteMany({ where });
+    await this.database.workflow.delete({
+      where: { id: input.workflowId, projectId: input.projectId },
+    });
+  }
+
   static create(database: WorkflowDatabase): PrismaWorkflowRepository {
     return new PrismaWorkflowRepository(database);
   }

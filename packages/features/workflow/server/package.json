@@ -33,6 +33,7 @@
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "^3.1080.0",
     "@aws-sdk/client-lambda": "^3.1080.0",
+    "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
@@ -41,6 +42,7 @@
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
@@ -54,6 +56,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
   }

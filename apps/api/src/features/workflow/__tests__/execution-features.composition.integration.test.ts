@@ -9,17 +9,15 @@ import type {
   AuthzService,
   PermissionDecision,
 } from "@langwatch/authz-contract";
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { AbsentPayloadStagingAdapter } from "@langwatch/stored-object-server";
 import { describe, expect, it, vi } from "vitest";
 import { ApiAuditPort } from "../../../api-request.policy.ts";
-import {
-  ApiApplication,
-  MissingAgentService,
-} from "../../../api.application.ts";
+import { ApiApplication } from "../../../api.application.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService, ProjectWithTeam } from "@langwatch/project-contract";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
@@ -214,8 +212,8 @@ function testModelProviders(): ModelProviderService {
   } as unknown as ModelProviderService;
 }
 
-function testAgents(): AgentService {
-  return stub<AgentService>("agents");
+function testAgents(): AgentApi {
+  return createApiFixture<AgentApi>();
 }
 
 function testClickHouse() {
@@ -405,7 +403,7 @@ function composeApplication(
   if (!features) throw new Error("the record refused to compose against its collaborators");
 
   const application = ApiApplication.create({
-    agents: new MissingAgentService(),
+    agents: createApiFixture<AgentApi>(),
     features,
     http: {
       createContext: async () => ({

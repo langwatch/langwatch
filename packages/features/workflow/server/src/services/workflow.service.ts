@@ -20,6 +20,7 @@ import {
   type WorkflowVersionHistoryMode,
   type WorkflowWithVersion,
   type StudioClientEvent,
+  type WorkflowReference,
 } from "@langwatch/workflow-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import type { DatasetService } from "@langwatch/dataset-contract";
@@ -48,6 +49,24 @@ export type WorkflowServiceOptions = {
 
 /** Canonical Workflow lifecycle. Persistence and cross-feature capabilities are injected. */
 export class WorkflowService extends WorkflowServiceContract {
+  async listFields(input: { projectId: string; workflowIds: string[] }) {
+    const sources = await this.options.repository.listFieldSources(input);
+
+    return Object.fromEntries(sources.map(({ id, dsl }) => [id, this.dsl.mappingFields(dsl)]));
+  }
+
+  listSummaries(input: { projectId: string; workflowIds: string[] }) {
+    return this.options.repository.listSummaries(input);
+  }
+
+  archiveLinked(input: WorkflowReference) {
+    return this.options.repository.archiveLinked(input);
+  }
+
+  deleteUncommitted(input: WorkflowReference) {
+    return this.options.repository.deleteUncommitted(input);
+  }
+
   static create(options: WorkflowServiceOptions): WorkflowService {
     return new WorkflowService(options);
   }

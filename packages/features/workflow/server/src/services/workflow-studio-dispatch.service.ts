@@ -12,6 +12,12 @@ import type {
 import type { WorkflowStudioStreamPort } from "../ports/workflow.port.ts";
 import { WorkflowNlpExecutionService } from "./workflow-nlp-execution.service.ts";
 import { nowInstant } from "@langwatch/time";
+import {
+  WorkflowExecutionFailedError,
+  executeWorkflowComponentInputSchema,
+  type ExecuteWorkflowComponentInput,
+  type ExecutionState,
+} from "@langwatch/workflow-contract";
 
 const logger = createLogger("langwatch:workflows:studio-dispatch");
 
@@ -71,6 +77,39 @@ export class WorkflowStudioDispatchService {
     } finally {
       reader.releaseLock();
     }
+  }
+
+  async executeComponent(input: ExecuteWorkflowComponentInput): Promise<ExecutionState> {
+    const parsed = executeWorkflowComponentInputSchema.parse(input);
+    let state: ExecutionState | undefined;
+    await this.postEvent({
+      projectId: parsed.projectId,
+      event: {
+        type: "execute_component",
+        payload: {
+          trace_id: parsed.traceId,
+          workflow: parsed.workflow,
+          node_id: parsed.nodeId,
+          inputs: parsed.inputs,
+          origin: parsed.origin,
+        },
+      },
+      onEvent(event) {
+        if (
+          event.type === "component_state_change" &&
+          event.payload.component_id === parsed.nodeId
+        ) {
+          state = event.payload.execution_state;
+        }
+        if (event.type === "error") {
+          throw new WorkflowExecutionFailedError();
+        }
+      },
+    });
+    if (!state) {
+      throw new WorkflowExecutionFailedError();
+    }
+    return state;
   }
 
   /**

@@ -22,7 +22,10 @@
  * background job without knowing which it is serving.
  */
 import type { DatasetService } from "@langwatch/dataset-contract";
-import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
+import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
+import { WorkflowApi, WorkflowExecutionFailedError } from "@langwatch/workflow-contract";
+import type { ExecuteWorkflowComponentInput } from "@langwatch/workflow-contract";
+import type { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
 import type {
   ArchiveWorkflowCommand,
   CopyWorkflowCommand,
@@ -36,7 +39,9 @@ import type {
   WorkflowVersionHistoryEntry,
   WorkflowVersionHistoryMode,
   WorkflowWithVersion,
+  WorkflowReference,
 } from "@langwatch/workflow-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nanoid } from "nanoid";
 import type {
   WorkflowAgentMappingPort,
@@ -56,8 +61,9 @@ export interface WorkflowCaller {
 
 /** What the process composes this feature's application from. */
 export interface WorkflowAppDependencies {
+  studioDispatch?: WorkflowStudioDispatchService;
   workflows: WorkflowService;
-  evaluators: EvaluatorService;
+  evaluators: EvaluatorApi;
   /** The dataset copies a Studio graph carries with it into another project. */
   datasets: DatasetService;
   /** How a Studio graph is prepared before any version of it is written. */
@@ -68,20 +74,28 @@ export interface WorkflowAppDependencies {
   workflowRows: WorkflowRowPort;
 }
 
-export class WorkflowApp {
-  static create(dependencies: WorkflowAppDependencies): WorkflowApp {
-    return new WorkflowApp(dependencies);
+export class WorkflowApp implements WorkflowApi {
+  static readonly contract = WorkflowApi;
+  static readonly dependencies = {} as const;
+
+  static create(
+    setup: FeatureSetup<Readonly<Record<never, never>>, WorkflowAppDependencies, undefined>,
+  ): WorkflowApp {
+    return new WorkflowApp(setup.infrastructure);
   }
 
-  private constructor(private readonly dependencies: WorkflowAppDependencies) {
+  #dependencies: WorkflowAppDependencies;
+
+  private constructor(dependencies: WorkflowAppDependencies) {
+    this.#dependencies = dependencies;
     this.studioVersions = WorkflowStudioVersionService.create({
-      workflows: dependencies.workflows,
-      studioDsl: dependencies.studioDsl,
-      agentMappings: dependencies.agentMappings,
+      workflows: this.#dependencies.workflows,
+      studioDsl: this.#dependencies.studioDsl,
+      agentMappings: this.#dependencies.agentMappings,
     });
     this.studioCopies = WorkflowStudioCopyService.create({
-      datasets: dependencies.datasets,
-      rows: dependencies.workflowRows,
+      datasets: this.#dependencies.datasets,
+      rows: this.#dependencies.workflowRows,
     });
   }
 
@@ -90,9 +104,17 @@ export class WorkflowApp {
 
   // -- the workflow itself ---------------------------------------------------
 
+  async executeComponent(input: ExecuteWorkflowComponentInput) {
+    const dispatch = this.#dependencies.studioDispatch;
+    if (!dispatch) {
+      throw new WorkflowExecutionFailedError();
+    }
+    return dispatch.executeComponent(input);
+  }
+
   /** Every non-archived workflow in the project. */
   list(input: { projectId: string }): Promise<Workflow[]> {
-    return this.dependencies.workflows.list(input);
+    return this.#dependencies.workflows.list(input);
   }
 
   /** One workflow, optionally with its current version. */
@@ -101,7 +123,28 @@ export class WorkflowApp {
     projectId: string;
     includeVersion?: boolean;
   }): Promise<WorkflowWithVersion> {
-    return this.dependencies.workflows.getById(input);
+    return this.#dependencies.workflows.getById(input);
+  }
+
+  /** Verifies that a workflow belongs to the requested project. */
+  assertInProject(input: { workflowId: string; projectId: string }): Promise<void> {
+    return this.#dependencies.workflows.assertInProject(input);
+  }
+
+  listFields(input: { projectId: string; workflowIds: string[] }) {
+    return this.#dependencies.workflows.listFields(input);
+  }
+
+  listSummaries(input: { projectId: string; workflowIds: string[] }) {
+    return this.#dependencies.workflows.listSummaries(input);
+  }
+
+  archiveLinked(input: WorkflowReference) {
+    return this.#dependencies.workflows.archiveLinked(input);
+  }
+
+  deleteUncommitted(input: WorkflowReference) {
+    return this.#dependencies.workflows.deleteUncommitted(input);
   }
 
   /**
@@ -118,7 +161,7 @@ export class WorkflowApp {
     event: StudioClientEvent;
     projectId: string;
   }): Promise<StudioClientEvent> {
-    return this.dependencies.workflows.prepareStudioEvent(input);
+    return this.#dependencies.workflows.prepareStudioEvent(input);
   }
 
   /**
@@ -135,7 +178,7 @@ export class WorkflowApp {
     input: Omit<CreateWorkflowCommand, "authorId">,
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
-    return this.dependencies.workflows.create({ ...input, authorId: by.id });
+    return this.#dependencies.workflows.create({ ...input, authorId: by.id });
   }
 
   /** Copies a workflow into another project, attributed to its caller. */
@@ -143,7 +186,7 @@ export class WorkflowApp {
     input: Omit<CopyWorkflowCommand, "authorId">,
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
-    return this.dependencies.workflows.copy({ ...input, authorId: by.id });
+    return this.#dependencies.workflows.copy({ ...input, authorId: by.id });
   }
 
   /** The version history of one workflow. */
@@ -152,27 +195,27 @@ export class WorkflowApp {
     projectId: string;
     mode: WorkflowVersionHistoryMode;
   }): Promise<WorkflowVersionHistoryEntry[]> {
-    return this.dependencies.workflows.getVersionHistory(input);
+    return this.#dependencies.workflows.getVersionHistory(input);
   }
 
   /** Makes a stored version current again. */
   restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
-    return this.dependencies.workflows.restoreVersion(input);
+    return this.#dependencies.workflows.restoreVersion(input);
   }
 
   /** Publishes one version, attributed to the caller who asked for it. */
   publish(input: Omit<PublishWorkflowCommand, "actorId">, by: WorkflowCaller): Promise<Workflow> {
-    return this.dependencies.workflows.publish({ ...input, actorId: by.id });
+    return this.#dependencies.workflows.publish({ ...input, actorId: by.id });
   }
 
   /** Withdraws the published version. */
   unpublish(input: { id: string; projectId: string }): Promise<Workflow> {
-    return this.dependencies.workflows.unpublish(input);
+    return this.#dependencies.workflows.unpublish(input);
   }
 
   /** Archives one workflow, or restores it when `unarchive` is set. */
   archive(input: ArchiveWorkflowCommand): Promise<Workflow> {
-    return this.dependencies.workflows.archive(input);
+    return this.#dependencies.workflows.archive(input);
   }
 
   // -- the Studio's own save and copy ----------------------------------------
@@ -225,14 +268,14 @@ export class WorkflowApp {
    * `EvaluatorApp.evaluatorService` keeps.
    */
   get workflowService(): WorkflowService {
-    return this.dependencies.workflows;
+    return this.#dependencies.workflows;
   }
 
   // -- the evaluator a published workflow is wrapped in -----------------------
 
   /** Every evaluator in the project. */
   listEvaluators(input: { projectId: string }): Promise<Evaluator[]> {
-    return this.dependencies.evaluators.getAll(input);
+    return this.#dependencies.evaluators.getAll(input);
   }
 
   /**
@@ -249,20 +292,20 @@ export class WorkflowApp {
     name: string;
   }): Promise<Evaluator> {
     const { workflowId, projectId, name } = input;
-    const existing = await this.dependencies.evaluators.tryGetByWorkflow({
+    const [existing] = await this.#dependencies.evaluators.listByWorkflow({
       workflowId,
       projectId,
     });
 
     if (existing) {
-      return this.dependencies.evaluators.update({
+      return this.#dependencies.evaluators.update({
         id: existing.id,
         projectId,
         data: { name },
       });
     }
 
-    return this.dependencies.evaluators.create({
+    return this.#dependencies.evaluators.create({
       id: `evaluator_${nanoid()}`,
       projectId,
       name,
@@ -283,10 +326,10 @@ export class WorkflowApp {
     workflowId: string;
     projectId: string;
   }): Promise<void> {
-    const linked = await this.dependencies.evaluators.tryGetByWorkflow(input);
+    const [linked] = await this.#dependencies.evaluators.listByWorkflow(input);
     if (!linked) return;
 
-    await this.dependencies.evaluators.archive({
+    await this.#dependencies.evaluators.archive({
       id: linked.id,
       projectId: input.projectId,
     });

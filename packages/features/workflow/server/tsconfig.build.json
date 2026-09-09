@@ -26,6 +26,7 @@
     "**/testing.tsx"
   ],
   "references": [
+    { "path": "../../agent/contract/tsconfig.build.json" },
     {
       "path": "../../../api/tsconfig.build.json"
     },

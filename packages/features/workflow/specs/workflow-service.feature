@@ -1,5 +1,19 @@
 Feature: Workflow service boundary
 
+  Scenario: Linked features discover workflow fields without reading workflow tables
+    Given a project has valid, invalid and archived workflow graphs
+    When a peer lists fields for those workflow identifiers
+    Then one project-scoped batch excludes archived workflows
+    And invalid graphs report unresolved fields
+    And valid graphs preserve all declared input and output identifiers
+
+  Scenario: A failed peer copy removes only the newly copied workflow
+    Given a copied workflow has current and latest version pointers and version parentage
+    When the peer deletes its uncommitted workflow in the target project
+    Then version pointers and parentage are cleared before deleting versions
+    And the workflow is deleted last
+    And every write is constrained to the target project
+
   @unit
   Scenario: A workflow definition is versioned through one service
     Given a valid workflow DSL
