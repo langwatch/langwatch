@@ -15,6 +15,16 @@
  * runs the real role bag, so a grant missing from it fails these tests rather
  * than shipping a screen nobody can open.
  *
+ * THE MOCKS LIVE HERE, WHICH PUTS ONE OBLIGATION ON EVERY SUITE THAT IMPORTS
+ * IT: nothing imported above this module may reach a module mocked below.
+ * `vi.mock` is hoisted within the file that writes it, so these registrations
+ * happen when this module is evaluated — an import placed earlier in a suite
+ * that transitively pulls `~/utils/api` would bind the real client, and the
+ * failure would look like a missing tRPC provider rather than an import order.
+ * Today no suite does (`~/components/governance/sample`, the only non-harness
+ * import above it, reaches none of them). Keep it that way, or move the import
+ * below this one.
+ *
  * The page is the right level for these assertions rather than the panes: two
  * of the rules under test — where the actions sit, and that no native select
  * is anywhere on screen — are claims about the whole screen, and a pane test
