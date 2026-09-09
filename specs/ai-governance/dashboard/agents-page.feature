@@ -81,6 +81,16 @@ Feature: The AI Governance Agents page
     And each says which of the two it came from
 
   @unit
+  Scenario: The organization's agents read leaves out what does not belong on it
+    When the organization's own agents are read
+    Then only agents registered from code are read
+    And an archived agent is left out
+    And an agent nobody has seen for thirty days is left out
+    And the hidden governance project's agents are left out
+    # The five other agent kinds are optimization studio components, not
+    # things that run against the organization on their own.
+
+  @unit
   Scenario: An agent a provider named carries no owner and no environment
     Given the only agents are ones a provider named
     When the agents list is built
