@@ -22,6 +22,18 @@ function completenessOf(
   return stored === "complete" || stored === "truncated" ? stored : null;
 }
 
+/**
+ * Maps a row onto projection state by spreading whatever columns are left over
+ * after the envelope is destructured, so a new column needs no edit here.
+ *
+ * The catch, and the reason this is written down: the spread is typed by the
+ * GENERATED client, not by `schema.prisma`. Add a column to the schema and this
+ * function stops compiling -- `state` is missing the new field -- which reads
+ * exactly like a missing-fields bug in this file and is not one. The fix is to
+ * regenerate (`pnpm run prisma:generate:typescript`), never to name the new
+ * fields here. A hand-written state literal elsewhere, such as a test fixture,
+ * genuinely does have to list them; this one does not.
+ */
 function fromRow(row: Row): StoredProjection<IngestionPullRunStatusData> {
   const {
     id: _id,

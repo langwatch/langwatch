@@ -4864,6 +4864,50 @@ model IngestionPullRunProjection {
   LastReadThroughAt   Float?  @map("lastReadThroughAt")
   LastRunCompleteness String? @map("lastRunCompleteness")
 
+  /// The last time somebody asked this source to enumerate its agents, and how
+  /// that ask ended. A listing is a different scope on the same connection as
+  /// the pull above: a credential that cannot enumerate a directory still pulls
+  /// cost perfectly, so no health, coverage or completeness reader may treat a
+  /// refusal here as the source failing to pull.
+  ///
+  /// Count is set ONLY when the outcome is listed, and stays null on a refusal.
+  /// Zero is a real answer meaning the provider returned an empty list, so a
+  /// zero default would manufacture that answer for a source that refused.
+  /// Reason is set only on a refusal and is a plain string, never an enum and
+  /// never a foreign key, because the log outlives the vocabulary. Status is
+  /// nullable even when refused, because a refusal we generated ourselves has
+  /// no HTTP status, and it is never rendered to a customer.
+  LastAgentsListingAt      Float?  @map("lastAgentsListingAt")
+  LastAgentsListingOutcome String? @map("lastAgentsListingOutcome")
+  LastAgentsListingCount   Int?    @map("lastAgentsListingCount")
+  LastAgentsListingReason  String? @map("lastAgentsListingReason")
+  LastAgentsListingStatus  Int?    @map("lastAgentsListingStatus")
+
+  /// The same for people, in its own set of columns rather than sharing the
+  /// agents set with a kind discriminator. A source can be refused for people
+  /// and fine for agents, and one shared set holds only the most recent listing
+  /// of either kind, so syncing people would erase an agents refusal and the
+  /// agents page would go back to not knowing after briefly knowing.
+  ///
+  /// LastPeopleDirectoryCount is everyone the provider's directory named.
+  /// LastPeopleWithheldCount is how many of those this deployment does not hold
+  /// because erasure suppression removed them: a SUBSET of the directory count,
+  /// never an addition to it. Adding the two counts the same people twice.
+  /// Subtracting is the valid arithmetic, and the surviving total is that
+  /// subtraction rather than a third column that could disagree.
+  ///
+  /// The withheld count is safe to show as a CURRENT figure and never as a
+  /// series: it moving from zero to one at a known moment says an erasure
+  /// happened then, which on a small tenant identifies the person as surely as
+  /// a name would. So no trend line, no history drawer, no per-run export, and
+  /// never beside a per-person list.
+  LastPeopleListingAt      Float?  @map("lastPeopleListingAt")
+  LastPeopleListingOutcome String? @map("lastPeopleListingOutcome")
+  LastPeopleDirectoryCount Int?    @map("lastPeopleDirectoryCount")
+  LastPeopleWithheldCount  Int?    @map("lastPeopleWithheldCount")
+  LastPeopleListingReason  String? @map("lastPeopleListingReason")
+  LastPeopleListingStatus  Int?    @map("lastPeopleListingStatus")
+
   CreatedAt         Float  @map("createdAt")
   UpdatedAt         Float  @map("updatedAt")
   OccurredAt        Float  @map("occurredAt")

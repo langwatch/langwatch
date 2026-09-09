@@ -1,6 +1,6 @@
 import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 
 import {
@@ -11,6 +11,7 @@ import {
   type AgentsLayout,
   AgentsLayoutControl,
   AgentsList,
+  agentsUnlistedCopy,
   applyAgentFilters,
   DEFAULT_AGENTS_LAYOUT,
   type GovernanceAgentRow,
@@ -32,10 +33,15 @@ import {
   SampleDataToggle,
   useSampleMode,
 } from "~/components/governance/sample";
+import {
+  GovernanceSyncButton,
+  governanceSyncStatus,
+} from "~/components/governance/sync";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { HandledErrorAlert } from "~/features/errors";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -191,10 +197,18 @@ function useAddAgentDeepLink() {
 function AgentsEmptyState({
   copy,
   onAct,
+  actionDisabled = false,
   testId,
 }: {
   copy: GovernanceEmptyStateCopy;
   onAct: () => void;
+  /**
+   * The pane's action is a second doorway to a control in the header, so it
+   * has to be shut whenever that control is. An empty state offering a press
+   * the header has already disabled is the same defect as a live button that
+   * silently does nothing, moved down the page.
+   */
+  actionDisabled?: boolean;
   testId: string;
 }) {
   return (
@@ -207,7 +221,11 @@ function AgentsEmptyState({
         // Weight comes from the descriptor, never from this call site: every
         // state passing through here would otherwise take the component's
         // default and draw "Clear filters" as loudly as "Register agent".
-        <GovernanceEmptyStateAction emphasis={copy.emphasis} onClick={onAct}>
+        <GovernanceEmptyStateAction
+          emphasis={copy.emphasis}
+          onClick={onAct}
+          disabled={actionDisabled}
+        >
           {copy.actionLabel}
         </GovernanceEmptyStateAction>
       }
@@ -252,6 +270,92 @@ function useAgentsScreen() {
 }
 
 /**
+ * Asking the connected providers what agents they have.
+ *
+ * ASYNCHRONOUS, and everything below follows from that. The mutation returns
+ * when the request has been RECORDED. A pipeline calls the provider after
+ * that, and the answer reaches this page only through the next read. So this
+ * hook reports what was started and never what was found, and the toast says
+ * reloading is how the reader sees a result.
+ *
+ * `asked` is remembered for the life of the mounted page rather than timed
+ * out. A second request arriving while one is in flight is DROPPED by the
+ * process manager, not queued, and this page has no way to learn when the
+ * first one settled — no read surfaces the listing outcome (the events are in
+ * the log and no projection folds them). A timer would be a guess at when
+ * pressing works again; a reload is the thing that actually shows the result,
+ * and it clears this too.
+ *
+ * The sources read is on the view grant and runs for every reader, because the
+ * empty pane needs to name the connected providers whether or not the reader
+ * may press anything.
+ */
+function useAgentSync({
+  orgId,
+  canManage,
+}: {
+  orgId: string;
+  canManage: boolean;
+}) {
+  const [asked, setAsked] = useState(false);
+  const sources = api.governanceAgents.syncSources.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+  const mutation = api.governanceAgents.requestListing.useMutation({
+    onSuccess: (result) => {
+      setAsked(true);
+      toaster.create({
+        title: "Sync requested",
+        // What was asked, not what was found. The providers have not answered
+        // yet and this page will not notice when they do.
+        description: `Asked ${result.requested} ${
+          result.requested === 1 ? "provider" : "providers"
+        } to list their agents. Reload this page in a moment to see what came back.`,
+        type: "success",
+      });
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't request a sync" }),
+  });
+
+  const connected = sources.data ?? [];
+  const status = governanceSyncStatus({
+    canManage,
+    sourcesLoading: sources.isLoading,
+    sourceCount: connected.length,
+    isAsking: mutation.isPending,
+    asked,
+  });
+
+  return {
+    connected,
+    state: status.state,
+    // Every unpressable state carries its own sentence, in this page's words.
+    // A disabled control with no reason is indistinguishable from a broken
+    // one, so the cause and the sentence are decided together here rather
+    // than left to whichever call site draws the button.
+    reason:
+      status.state === "asked"
+        ? "Already asked. Reload the page to see what the providers reported."
+        : status.state !== "unavailable"
+          ? null
+          : AGENT_SYNC_UNAVAILABLE_REASONS[status.because],
+    press: () => {
+      if (status.state !== "ready") return;
+      mutation.mutate({ organizationId: orgId });
+    },
+  };
+}
+
+/** One sentence per way of not being pressable. See `governanceSyncStatus`. */
+const AGENT_SYNC_UNAVAILABLE_REASONS = {
+  no_grant: "Only an administrator can ask a provider to list its agents.",
+  checking: "Checking which providers can list agents.",
+  no_provider: "No connected provider can list agents.",
+} as const;
+
+/**
  * The agents, and whatever stands in for them.
  *
  * The filter row is deliberately NOT here. It belongs to the page header, one
@@ -266,7 +370,7 @@ function AgentsPane({
   layout,
   sample,
   isLoading,
-  onRegister,
+  noAgents,
   onClearFilters,
 }: {
   rows: readonly GovernanceAgentRow[];
@@ -274,7 +378,19 @@ function AgentsPane({
   layout: AgentsLayout;
   sample: boolean;
   isLoading: boolean;
-  onRegister: () => void;
+  /**
+   * What to show when the organization holds no agents at all, decided by the
+   * page rather than here. Which nothing this is depends on whether a provider
+   * that can list agents is connected, which is a read this pane does not
+   * make; the words and the press travel together so a state cannot arrive
+   * with the other page's action attached to it.
+   */
+  noAgents: {
+    copy: GovernanceEmptyStateCopy;
+    onAct: () => void;
+    actionDisabled: boolean;
+    testId: string;
+  };
   onClearFilters: () => void;
 }) {
   const visible = applyAgentFilters(rows, filters);
@@ -299,9 +415,10 @@ function AgentsPane({
   // the list is empty rather than on the fact that it is.
   return rows.length === 0 ? (
     <AgentsEmptyState
-      copy={AGENTS_EMPTY_COPY}
-      onAct={onRegister}
-      testId="agents-empty"
+      copy={noAgents.copy}
+      onAct={noAgents.onAct}
+      actionDisabled={noAgents.actionDisabled}
+      testId={noAgents.testId}
     />
   ) : (
     <AgentsEmptyState
@@ -317,6 +434,13 @@ function AgentsPage() {
   const { openDrawer } = useDrawer();
   const openRegister = () => openDrawer("addAgent");
   useAddAgentDeepLink();
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const sync = useAgentSync({
+    orgId: organization?.id ?? "",
+    canManage: hasAnyPermission("governance:manage"),
+  });
   const { sample, rows, isLoading, error } = useAgentsScreen();
   const { filters, setFilter, clearFilters } = useAgentFilters();
   // Gated on the unfiltered set, never the visible one: a reader who filters
@@ -326,6 +450,26 @@ function AgentsPage() {
   const showControls = rows.length > 0;
   // Over the whole fleet, not the filtered view — see `summarizeAgentFleet`.
   const summary = rows.length > 0 ? summarizeAgentFleet({ rows }) : null;
+  // WHICH nothing this is. A reader with a provider connected and a reader
+  // with none have different moves available, and offering the wrong one is
+  // the page failing to notice what it already knows. The third possibility —
+  // a provider that refused to answer — cannot be told apart from an empty
+  // tenant here, because nothing surfaces the listing outcome; see
+  // `agentsUnlistedCopy`, which is worded so it never claims either.
+  const noAgents =
+    sync.connected.length > 0
+      ? {
+          copy: agentsUnlistedCopy(sync.connected.map((source) => source.name)),
+          onAct: sync.press,
+          actionDisabled: sync.state !== "ready",
+          testId: "agents-empty-unlisted",
+        }
+      : {
+          copy: AGENTS_EMPTY_COPY,
+          onAct: openRegister,
+          actionDisabled: false,
+          testId: "agents-empty",
+        };
 
   return (
     <GovernanceLayout pageTitle="Agents · AI Governance · LangWatch">
@@ -339,6 +483,20 @@ function AgentsPage() {
             {showControls && (
               <AgentsLayoutControl layout={layout} onChange={selectLayout} />
             )}
+            {/* Ghost, so the one outlined control in this row stays the action
+                that creates something of the organization's own — the same
+                arrangement the people header uses for `Run match pass`.
+                It is rendered for every reader rather than gated on the manage
+                grant, which is where this departs from that header: a reader
+                who cannot press it is the one least able to work out why the
+                page will not refresh, and a disabled control that says so
+                tells them, where an absent one does not. */}
+            <GovernanceSyncButton
+              label="Sync agents"
+              state={sync.state}
+              reason={sync.reason}
+              onPress={sync.press}
+            />
             <SampleDataToggle
               active={sample.active}
               onToggle={sample.toggle}
@@ -395,7 +553,7 @@ function AgentsPage() {
           layout={layout}
           sample={sample.active}
           isLoading={isLoading}
-          onRegister={openRegister}
+          noAgents={noAgents}
           onClearFilters={clearFilters}
         />
       </VStack>

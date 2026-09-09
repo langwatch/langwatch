@@ -71,14 +71,21 @@ export function createPeopleListingPort({
           status: result.refusal.status,
         };
       }
-      // "Empty" flattens to a zero count and loses nothing: a refusal took the
-      // other arm above, so a zero here can only mean the provider answered.
-      // The event is what a reader sees, and it keeps the two apart by being a
-      // different event entirely.
-      return {
-        outcome: "listed",
-        personCount: result.outcome === "empty" ? 0 : result.recorded,
-      };
+      // "Empty" flattens to zeroes and loses nothing: a refusal took the other
+      // arm above, so zeroes here can only mean the provider answered and
+      // named none, with none withheld. The event is what a reader sees, and it
+      // keeps a refusal apart by being a different event entirely.
+      //
+      // Both counts travel. The recorded total is deliberately NOT passed on:
+      // it is `directoryPersonCount - withheldPersonCount`, and a third stored
+      // number is a third thing that can disagree with the other two.
+      return result.outcome === "empty"
+        ? { outcome: "listed", directoryPersonCount: 0, withheldPersonCount: 0 }
+        : {
+            outcome: "listed",
+            directoryPersonCount: result.named,
+            withheldPersonCount: result.withheld,
+          };
     },
   };
 }

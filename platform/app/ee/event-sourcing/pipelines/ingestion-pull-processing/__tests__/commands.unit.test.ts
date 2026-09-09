@@ -240,7 +240,8 @@ describe("the people listing commands", () => {
     it("cannot collide with each other", () => {
       const listed = emit(RecordIngestionPullPeopleListedCommand, {
         ...envelope,
-        personCount: 0,
+        directoryPersonCount: 0,
+        withheldPersonCount: 0,
       }).idempotencyKey;
       const refused = emit(RecordIngestionPullPeopleListingRefusedCommand, {
         ...envelope,
@@ -256,7 +257,8 @@ describe("the people listing commands", () => {
     it("cannot collide with the agent outcomes on the same request", () => {
       const people = emit(RecordIngestionPullPeopleListedCommand, {
         ...envelope,
-        personCount: 1,
+        directoryPersonCount: 1,
+        withheldPersonCount: 0,
       }).idempotencyKey;
       const agents = emit(RecordIngestionPullAgentsListedCommand, {
         ...envelope,
@@ -269,11 +271,40 @@ describe("the people listing commands", () => {
     it("accepts a zero count, because an empty answer is still an answer", () => {
       const result = RecordIngestionPullPeopleListedCommand.schema.validate({
         ...envelope,
-        personCount: 0,
+        directoryPersonCount: 0,
+        withheldPersonCount: 0,
       });
 
       expect(result.success).toBe(true);
-      expect(result.data).toMatchObject({ personCount: 0 });
+      expect(result.data).toMatchObject({
+        directoryPersonCount: 0,
+        withheldPersonCount: 0,
+      });
+    });
+
+    /**
+     * Both counts are required rather than defaulted. A writer that knows only
+     * the surviving total has lost the provider's number already, and letting
+     * it omit the field would store that loss as a zero indistinguishable from
+     * a provider that withheld nobody.
+     */
+    it("refuses a listing that names only one of the two counts", () => {
+      const result = RecordIngestionPullPeopleListedCommand.schema.validate({
+        ...envelope,
+        directoryPersonCount: 5,
+      });
+
+      expect(result.success).toBe(false);
+    });
+
+    it("refuses a withheld count the provider's number cannot cover", () => {
+      const result = RecordIngestionPullPeopleListedCommand.schema.validate({
+        ...envelope,
+        directoryPersonCount: 2,
+        withheldPersonCount: -1,
+      });
+
+      expect(result.success).toBe(false);
     });
 
     it("refuses a listing with no reason at all", () => {

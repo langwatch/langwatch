@@ -119,7 +119,12 @@ describe("PersonListingService.syncFromSource", () => {
         now,
       });
 
-      expect(result).toEqual({ outcome: "listed", recorded: 2 });
+      expect(result).toEqual({
+        outcome: "listed",
+        recorded: 2,
+        named: 2,
+        withheld: 0,
+      });
       expect(sightings).toHaveLength(2);
       expect(sightings[0]).toMatchObject({
         organizationId,
@@ -189,13 +194,27 @@ describe("PersonListingService.syncFromSource", () => {
       });
 
       expect(sightings.map((row) => row.rawActorId)).toEqual(["user-2"]);
-      expect(result).toEqual({ outcome: "listed", recorded: 1 });
+      // Both sides of the erasure check are reported: the provider named two,
+      // one was withheld here. A result carrying only the survivor cannot tell
+      // a caller which of the two numbers it is holding.
+      expect(result).toEqual({
+        outcome: "listed",
+        recorded: 1,
+        named: 2,
+        withheld: 1,
+      });
     });
 
     /**
-     * `listed` with a count of zero is not `empty`: the tenant has staff, and
-     * this deployment is right not to hold their names. Reporting it as empty
-     * would say something false about the tenant.
+     * A `recorded` of zero is not `empty`: the tenant has staff, and this
+     * deployment is right not to hold their names. Reporting it as empty would
+     * say something false about the tenant.
+     *
+     * This is the case that makes both counts necessary. `recorded` is zero and
+     * `named` is one, so a reader can still say the provider named somebody. A
+     * result carrying only the zero is indistinguishable from a provider that
+     * named nobody, and that reading sends an admin to debug a healthy
+     * provider.
      */
     it("still reads as a listing when every listed person is erased", async () => {
       fetchMock.mockResolvedValueOnce(
@@ -216,7 +235,12 @@ describe("PersonListingService.syncFromSource", () => {
         now,
       });
 
-      expect(result).toEqual({ outcome: "listed", recorded: 0 });
+      expect(result).toEqual({
+        outcome: "listed",
+        recorded: 0,
+        named: 1,
+        withheld: 1,
+      });
       expect(sightings).toEqual([]);
     });
   });

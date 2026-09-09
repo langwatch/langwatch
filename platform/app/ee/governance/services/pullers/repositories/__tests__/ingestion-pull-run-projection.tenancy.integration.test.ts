@@ -62,6 +62,21 @@ function projectionFor(
       LastRunScheduledFor: 1_500,
       LastReadThroughAt: null,
       LastRunCompleteness: null,
+      // A listed agents outcome and a refused people one, on the same row at
+      // the same time: the two kinds keep their own columns precisely so this
+      // is representable, and a fixture that only ever carried one kind would
+      // not notice a repository that dropped the other.
+      LastAgentsListingAt: 2_000,
+      LastAgentsListingOutcome: "listed",
+      LastAgentsListingCount: 12,
+      LastAgentsListingReason: null,
+      LastAgentsListingStatus: null,
+      LastPeopleListingAt: 2_000,
+      LastPeopleListingOutcome: "refused",
+      LastPeopleDirectoryCount: null,
+      LastPeopleWithheldCount: null,
+      LastPeopleListingReason: "listing_failed",
+      LastPeopleListingStatus: 403,
       CreatedAt: 1_000,
       UpdatedAt: 2_000,
       LastEventOccurredAt: 2_000,

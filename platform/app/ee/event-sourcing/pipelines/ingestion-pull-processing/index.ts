@@ -18,3 +18,4 @@ export {
   type IngestionPullRunStatusData,
   IngestionPullRunStatusFoldProjection,
 } from "./projections/ingestionPullRunStatus.foldProjection";
+export { INGESTION_PULL_PROCESSING_PIPELINE_NAME } from "./schemas/constants";
