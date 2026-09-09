@@ -167,6 +167,7 @@ describe("filter-translator", () => {
         });
       });
 
+      /** @scenario "Filtering to traces that contain an error narrows the query" */
       it("translates traces.error filter for true using ContainsErrorStatus", () => {
         const result = translateFilter("traces.error", ["true"]);
         expect(result.whereClause).toContain("ts.ContainsErrorStatus = 1");
@@ -174,6 +175,7 @@ describe("filter-translator", () => {
         expect(result.requiredJoins).toHaveLength(0);
       });
 
+      /** @scenario "Filtering to traces without an error narrows the query" */
       it("translates traces.error filter for false using ContainsErrorStatus", () => {
         const result = translateFilter("traces.error", ["false"]);
         expect(result.whereClause).toContain("ts.ContainsErrorStatus = 0");
@@ -182,10 +184,82 @@ describe("filter-translator", () => {
         expect(result.requiredJoins).toHaveLength(0);
       });
 
+      /** @scenario "Asking for both error states filters nothing" */
       it("returns no-op when both true and false are specified", () => {
         const result = translateFilter("traces.error", ["true", "false"]);
         expect(result.whereClause).toBe("1=1");
         expect(result.params).toEqual({});
+      });
+    });
+
+    describe("when a filter value is not one the field can apply", () => {
+      /** @scenario "A filter value the field does not accept is refused" */
+      it("refuses an option label sent in place of the traces.error value", () => {
+        expect(() =>
+          translateFilter("traces.error", ["Traces with error"]),
+        ).toThrow(
+          expect.objectContaining({ code: "validation_error" }) as Error,
+        );
+      });
+
+      it("names the field and the values it accepts", () => {
+        let thrown: any;
+        try {
+          translateFilter("traces.error", ["Traces with error"]);
+        } catch (error) {
+          thrown = error;
+        }
+        expect(thrown.meta.fields).toEqual(["filters.traces.error"]);
+        expect(thrown.reasons[0].meta).toMatchObject({
+          field: "filters.traces.error",
+          type: "unsupported_filter_value",
+          expected: ["true", "false"],
+          received: "Traces with error",
+        });
+      });
+
+      /** @scenario "The annotation filter refuses a value it cannot apply" */
+      it("refuses an option label sent in place of the annotations.hasAnnotation value", () => {
+        expect(() =>
+          translateFilter("annotations.hasAnnotation", ["Has Annotation"]),
+        ).toThrow(
+          expect.objectContaining({ code: "validation_error" }) as Error,
+        );
+      });
+
+      /** @scenario "The evaluation pass filter refuses a value it cannot apply" */
+      it("refuses an option label sent in place of the evaluations.passed value", () => {
+        expect(() =>
+          translateFilter("evaluations.passed", ["Passed"], "evaluator-1"),
+        ).toThrow(
+          expect.objectContaining({ code: "validation_error" }) as Error,
+        );
+      });
+
+      /** @scenario "A metadata value filter sent without its metadata key is refused" */
+      it("refuses metadata.value with no metadata key", () => {
+        expect(() => translateFilter("metadata.value", ["prod"])).toThrow(
+          expect.objectContaining({ code: "validation_error" }) as Error,
+        );
+      });
+
+      /** @scenario "An event metric value filter sent without its metric key is refused" */
+      it("refuses events.metrics.value with no metric key", () => {
+        expect(() =>
+          translateFilter("events.metrics.value", ["0", "1"], "thumbs_up"),
+        ).toThrow(
+          expect.objectContaining({ code: "validation_error" }) as Error,
+        );
+      });
+
+      it("still accepts the values the options endpoint returns", () => {
+        expect(() => translateFilter("traces.error", ["true"])).not.toThrow();
+        expect(() =>
+          translateFilter("annotations.hasAnnotation", ["false"]),
+        ).not.toThrow();
+        expect(() =>
+          translateFilter("metadata.value", ["prod"], "env"),
+        ).not.toThrow();
       });
     });
 

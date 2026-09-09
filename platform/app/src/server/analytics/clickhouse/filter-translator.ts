@@ -16,6 +16,7 @@
  * are semantically equivalent to EXISTS.
  */
 
+import { assertFilterValuesAreSupported } from "../../filters/supported-values";
 import type { FilterField } from "../../filters/types";
 import { type CHTable, tableAliases } from "./field-mappings";
 
@@ -162,6 +163,11 @@ export function translateFilter(
     return noOpFilter;
   }
 
+  // Before any SQL: a value this field cannot translate is refused, never
+  // widened. Several handlers below fall back to "1=1" when they recognise
+  // nothing, which returns the unfiltered answer under a filtered request.
+  assertFilterValuesAreSupported({ field, values, key, subkey });
+
   const handler = filterHandlers[field];
   return handler ? handler(values, key, subkey, spanTimePredicate) : noOpFilter;
 }
@@ -249,6 +255,8 @@ function translateMetadataValueFilter(
   key?: string,
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
+  // `translateFilter` refuses this field without a key, so this only guards
+  // a direct call.
   if (!key) {
     return { whereClause: "1=1", requiredJoins: [], params: {} };
   }
@@ -346,7 +354,8 @@ function translateErrorFilter(values: string[]): FilterTranslation {
     };
   }
 
-  // Both or neither - no filtering
+  // Both states selected: every row, which is what was asked for. Values
+  // outside {true, false} never reach here; `translateFilter` refuses them.
   return { whereClause: "1=1", requiredJoins: [], params: {} };
 }
 
@@ -665,6 +674,8 @@ function translateEventMetricValueFilter(
 ): FilterTranslation {
   const ts = tableAliases.trace_summaries;
 
+  // `translateFilter` refuses this field without a metric key, so this only
+  // guards a direct call.
   if (!metricKey) {
     return { whereClause: "1=1", requiredJoins: [], params: {} };
   }
@@ -752,7 +763,8 @@ function translateAnnotationFilter(values: string[]): FilterTranslation {
     };
   }
 
-  // Both or neither - no filtering
+  // Both states selected: every row, which is what was asked for. Values
+  // outside {true, false} never reach here; `translateFilter` refuses them.
   return { whereClause: "1=1", requiredJoins: [], params: {} };
 }
 
