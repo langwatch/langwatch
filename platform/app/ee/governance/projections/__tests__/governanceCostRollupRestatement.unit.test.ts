@@ -682,4 +682,43 @@ describe("a correction that lands in a different cell", () => {
       );
     });
   });
+
+  // Not a bound scenario, and deliberately so: this is a control on the ONE
+  // reader that has no ordering to give. The daily comparator re-derives a day
+  // by folding whatever `findCostEventsForDay` hands back, which is a GROUP BY
+  // with no ORDER BY on it, so the retraction reaching the fold BEFORE the
+  // observation it withdraws is an ordinary case there rather than a corner.
+  //
+  // Fold the retraction first without this and the observation behind it puts
+  // the money back, so the comparator reports the day as disagreeing with its
+  // own history on every run for as long as the day is kept -- a permanent
+  // false alarm on the one alert that says the money on the screen is wrong.
+  describe("when the log hands the retraction back before the observation", () => {
+    it("reaches the same emptied cell either way round", () => {
+      const observed = observedEvent({
+        costNanoMinor: BILLED,
+        observedAtMs: FIRST_PULL,
+        id: "evt-pulled-first",
+      });
+      const retraction = retractionEvent({ observedAtMs: SECOND_PULL });
+
+      const inOrder = fold([observed, retraction]);
+      const reversed = fold([retraction, observed]);
+
+      expect(governanceCostRollupTotals(inOrder).amountNanoMinor).toBe(0);
+      expect(governanceCostRollupTotals(reversed).amountNanoMinor).toBe(0);
+
+      // Zeroed rather than dropped in both orders. An item removed instead
+      // reads as "we hold no figure", which withholds the whole day's total.
+      expect(governanceCostRollupTotals(reversed).amountNanoUsd).toBe(0);
+
+      // Both orders name the same thing as what the cell held before, so the
+      // "revised, was $X" copy does not depend on delivery order either.
+      expect(reversed.previousAmountNanoUsd).toBe(
+        inOrder.previousAmountNanoUsd,
+      );
+      expect(reversed.revisedAt).toBe(inOrder.revisedAt);
+      expect(reversed.lastObservedAt).toBe(SECOND_PULL);
+    });
+  });
 });

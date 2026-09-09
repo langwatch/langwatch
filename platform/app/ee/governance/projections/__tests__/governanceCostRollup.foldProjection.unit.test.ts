@@ -379,11 +379,23 @@ describe("GovernanceCostRollupFoldProjection", () => {
     // Neither carries a cost, and their dimensions are pre-resolution — the
     // gateway only settles model and provider after dispatch — so grouping
     // them would file a permanent amount-less row beside the real one.
+    //
+    // The list stays EXACT rather than becoming a "does not include" check.
+    // Exactness is what makes an accidental subscription fail here, and a
+    // subscription is not a thing anyone adds by accident twice.
+    //
+    // The retraction belongs on it and is not a counter-example to the rule
+    // above: it is not pre-resolution and it does not lack a cost. It carries
+    // the retracted cell's own resolved dimensions and states its amount as
+    // zero on purpose, so it addresses one existing cell rather than filing a
+    // new amount-less one. Leaving it off is what breaks the fold — the
+    // projection would never see the event that withdraws a superseded charge.
     it("does not react to the events that carry no money", () => {
       expect(projection().eventTypes).toEqual([
         "lw.gateway.spend.confirmed",
         "lw.gateway.spend.failed",
         "lw.obs.pulled_usage.observed",
+        "lw.obs.pulled_usage.retracted",
       ]);
     });
   });
