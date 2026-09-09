@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   Collapsible,
@@ -9,10 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  groupObservedDepartments,
-  type ObservedDepartment,
-} from "@ee/governance/services/logic/observedDepartments";
+import { groupObservedDepartments } from "@ee/governance/services/logic/observedDepartments";
 import {
   Archive,
   ChevronDown,
@@ -31,10 +29,14 @@ import {
   sourceForTarget,
 } from "~/components/governance/PeopleTable";
 import { AssignDepartmentDialog } from "~/components/governance/people/AssignDepartmentDialog";
+import {
+  type DepartmentRecord,
+  type DepartmentTableRow,
+  mergeDepartmentRows,
+} from "~/components/governance/people/departmentRows";
 import { PeopleFilterBar } from "~/components/governance/people/PeopleFilterBar";
 import {
   SPEND_WINDOW_DAYS,
-  SPEND_WINDOW_LABEL,
   usePeopleFilters,
 } from "~/components/governance/people/peopleFilters";
 import {
@@ -48,7 +50,10 @@ import {
   SAMPLE_DEPARTMENTS,
   samplePeopleRows,
 } from "~/components/governance/people/samplePeople";
-import { UnifiedPeopleTable } from "~/components/governance/people/UnifiedPeopleTable";
+import {
+  providerLabel,
+  UnifiedPeopleTable,
+} from "~/components/governance/people/UnifiedPeopleTable";
 import {
   SampleDataBanner,
   SampleDataToggle,
@@ -85,8 +90,8 @@ type MatchSuggestion = RouterOutputs["governancePeople"]["suggestions"][number];
 
 /**
  * The People page: everyone who used AI through a connected source and everyone
- * the connected providers named, on one table, and the departments that spend
- * rolls up to on a second tab.
+ * the connected providers named, on one table, and every department either the
+ * organization or a connected directory names, on one table on a second tab.
  *
  * ONE TABLE. The screen used to carry two — a spend ranking and a separate
  * "people the providers see" list — which asked the reader to join two
@@ -341,7 +346,7 @@ function PeoplePage() {
 
         <PeopleSummaryStrip
           rows={allRows}
-          departmentCount={departmentTab.departments.length}
+          departmentCount={departmentTab.recordCount}
           sampleActive={sample.active}
           reads={reads}
         />
@@ -465,8 +470,7 @@ function PeopleTabsSection({
       <Tabs.Content value="departments" paddingTop={4}>
         <DepartmentsTabPane
           orgId={orgId}
-          departments={departmentTab.departments}
-          observed={departmentTab.observed}
+          rows={departmentTab.rows}
           isLoading={!sample.active && reads.departments.isLoading}
           error={sample.active ? null : reads.departments.error}
           // Invented rows carry no record to rename or archive.
@@ -530,16 +534,24 @@ function usePeopleRefreshers({ orgId }: { orgId: string }) {
 }
 
 /**
- * Both lists the Departments tab shows: the organization's own departments, and
- * the ones the connected providers name.
+ * The Departments tab's one list, and the figure the summary strip counts.
  *
- * The two are worked out together because sample mode has to answer for both at
- * once — a screen showing invented departments alongside a real observed list,
- * or the reverse, would be telling the reader two different stories. The
- * invented shapes are built by hand: a sample department is a name with nothing
- * behind it, so the identifiers are made up here to give the list something to
- * key rows by, and the observed counts descend so the panel reads like a real
- * directory rather than a row of identical numbers.
+ * The two come back together because they are two readings of the same thing
+ * and must not be built from different data: `rows` is every department the tab
+ * shows, the organization's own and the ones the connected directories name;
+ * `recordCount` is how many of those the organization actually created, which
+ * is what the strip's "departments" figure has always meant and what spend
+ * rolls up by.
+ *
+ * Sample mode answers for both at once — a screen showing invented departments
+ * beside a real directory reading, or the reverse, would be telling the reader
+ * two stories. The invented shapes are built by hand: a sample department is a
+ * name with nothing behind it, so the identifiers are made up here to give the
+ * rows something to key by, the counts descend so the list reads like a real
+ * directory rather than a column of identical numbers, and the invented
+ * departments deliberately carry the SAME names as the invented directory ones,
+ * because that collision is the case the merge exists to handle and a sample
+ * that never shows it is teaching the wrong shape.
  */
 function departmentTabRows({
   sampleActive,
@@ -547,26 +559,31 @@ function departmentTabRows({
 }: {
   sampleActive: boolean;
   reads: ReturnType<typeof usePeopleReads>;
-}): {
-  departments: readonly DepartmentListItem[];
-  observed: ObservedDepartment[];
-} {
+}): { rows: DepartmentTableRow[]; recordCount: number } {
   if (!sampleActive) {
+    const departments = reads.departments.data ?? [];
     return {
-      departments: reads.departments.data ?? [],
-      observed: groupObservedDepartments(reads.people.data ?? []),
+      rows: mergeDepartmentRows({
+        departments,
+        observed: groupObservedDepartments(reads.people.data ?? []),
+      }),
+      recordCount: departments.length,
     };
   }
 
+  const departments: DepartmentListItem[] = SAMPLE_DEPARTMENTS.map(
+    (name, index) => ({ id: `sample-department-${index}`, name }),
+  );
   return {
-    departments: SAMPLE_DEPARTMENTS.map((name, index) => ({
-      id: `sample-department-${index}`,
-      name,
-    })),
-    observed: SAMPLE_DEPARTMENTS.map((name, index) => ({
-      name,
-      peopleCount: 4 - index,
-    })),
+    rows: mergeDepartmentRows({
+      departments,
+      observed: SAMPLE_DEPARTMENTS.map((name, index) => ({
+        name,
+        peopleCount: 4 - index,
+        providers: ["copilot_studio_dataverse"],
+      })),
+    }),
+    recordCount: departments.length,
   };
 }
 
@@ -630,29 +647,35 @@ function PeopleSummaryStrip({
     <GovernanceSummaryBar
       testId="people-summary-strip"
       items={[
+        // A hint survives only where the label cannot say the thing itself.
+        // "people" is a bare noun and the figure runs larger than the member
+        // count, so the population is worth naming; "unmatched" is our word
+        // rather than the reader's; "departments" counts only the ones the
+        // organization created, which the tab below no longer makes obvious now
+        // that it lists the discovered ones on the same table. "without a
+        // department" already states its whole condition, so it carries none.
         {
           key: "people",
           value: summary.people,
           label: "people",
-          hint: "Metered by the gateway or named by a connected source",
+          hint: "Metered by the gateway or named by a source",
         },
         {
           key: "departments",
           value: summary.departments,
           label: "departments",
-          hint: "Spend rolls up by these",
+          hint: "The ones you created",
         },
         {
           key: "unmatched",
           value: summary.unmatched,
           label: "unmatched",
-          hint: "No account of yours is tied to them yet",
+          hint: "No account is tied to them yet",
         },
         {
           key: "unassigned",
           value: summary.unassigned,
           label: "without a department",
-          hint: "Their spend rolls up under Unassigned",
         },
       ]}
     />
@@ -899,9 +922,12 @@ function PeopleReadIssues({
  * piece of the screen, and the pane's job is the arrangement of the pieces
  * rather than what any one of them turns out to be.
  *
- * The window note is printed under every one of them. The page offers no time
- * control any more, so the only way a reader can know how far back the money
- * was measured is for the page to say it.
+ * Nothing is printed under the table but the count. The page offers no time
+ * control, so its window still has to be stated — it is stated on the two
+ * headings it is true of (`UnifiedPeopleTable`), and how far the ranking
+ * reaches is stated in the sort menu (`PeopleFilterBar`), which is the control
+ * it is true of. A paragraph under the table said both to a reader who was
+ * looking at neither.
  */
 function PeopleTableSection({
   rows,
@@ -928,19 +954,16 @@ function PeopleTableSection({
 
   if (rows.length === 0) {
     return (
-      <>
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          padding={6}
-          color="fg.muted"
-          fontSize="sm"
-        >
-          {emptyPeopleLine({ department })}
-        </Box>
-        <TableScopeNote />
-      </>
+      <Box
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="md"
+        padding={6}
+        color="fg.muted"
+        fontSize="sm"
+      >
+        {emptyPeopleLine({ department })}
+      </Box>
     );
   }
 
@@ -954,35 +977,7 @@ function PeopleTableSection({
       <Text fontSize="xs" color="fg.muted">
         {rows.length} {rows.length === 1 ? "person" : "people"} shown.
       </Text>
-      <TableScopeNote />
     </>
-  );
-}
-
-/**
- * The two limits of this table, said out loud: how far back the money was
- * measured, and how far the sort reaches.
- *
- * Both are here for the same reason. The page used to answer the first with a
- * chip the reader could change, and the chip was a fiction — only the metered
- * half of the table moved with it. The sort chip has the same shape of problem
- * and it is still on screen: it drives the spend read, so it ranks the people
- * that read returned, and everybody a connected source merely named keeps their
- * own order however the chip is set. That limit is real and this change does
- * not fix it; ranking both halves needs a read that measures both, which is not
- * this screen's to build. What this screen owes the reader in the meantime is
- * the truth about what they are looking at, so a reader who sets
- * "Sort · Last active" and watches a third of the rows stay put learns why here
- * instead of concluding the control is broken.
- */
-function TableScopeNote() {
-  return (
-    <Text fontSize="xs" color="fg.subtle">
-      Spend and requests are measured over the {SPEND_WINDOW_LABEL}; everything
-      else covers the whole record. Sorting ranks the people with measured spend
-      — anyone a connected source named but nothing measured follows, most
-      recently seen first.
-    </Text>
   );
 }
 
@@ -1008,8 +1003,7 @@ function emptyPeopleLine({ department }: { department: string | null }) {
 
 function DepartmentsTabPane({
   orgId,
-  departments,
-  observed,
+  rows,
   isLoading,
   error,
   canManage,
@@ -1017,8 +1011,7 @@ function DepartmentsTabPane({
   onChanged,
 }: {
   orgId: string;
-  departments: readonly DepartmentListItem[];
-  observed: ObservedDepartment[];
+  rows: readonly DepartmentTableRow[];
   isLoading: boolean;
   error: unknown;
   /** Whether per-row actions are offered on these particular rows. */
@@ -1038,11 +1031,9 @@ function DepartmentsTabPane({
         fallbackTitle="Couldn't load departments"
       />
 
-      <ObservedDepartmentsPanel observed={observed} />
-
       <DepartmentList
         orgId={orgId}
-        departments={departments}
+        rows={rows}
         isLoading={isLoading}
         onChanged={onChanged}
         canManage={canManage}
@@ -1056,83 +1047,6 @@ function DepartmentsTabPane({
       )}
 
       <AssignmentGuide />
-    </VStack>
-  );
-}
-
-/**
- * The departments the connected providers actually name, with how many people
- * each one covers.
- *
- * A separate panel from "Departments" below, not a merge into it, and the
- * separation is the honest shape rather than a shortcut. That panel is the
- * organization's own `Department` list: every row was created by an
- * administrator, spend rolls up by it, and each row can be renamed and
- * archived. These names are free text a provider asserted, mostly about people
- * who hold no LangWatch account. Listing them together would offer Rename and
- * Archive on rows that are not records at all, and quietly redefine what the
- * spend list means.
- *
- * Hidden when the providers name none — an empty panel would suggest the
- * directory was read and came back blank, which is the same picture as a
- * directory that was never switched on.
- */
-function ObservedDepartmentsPanel({
-  observed,
-}: {
-  observed: ObservedDepartment[];
-}) {
-  if (observed.length === 0) return null;
-
-  return (
-    <VStack
-      align="stretch"
-      gap={0}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      overflow="hidden"
-    >
-      <Box
-        paddingY={2}
-        paddingX={3}
-        borderBottomWidth="1px"
-        borderColor="border.muted"
-        backgroundColor="bg.subtle"
-      >
-        <Text
-          fontSize="xs"
-          fontWeight="semibold"
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          Departments the providers see
-        </Text>
-        <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-          What the connected directories call these people. Create the ones you
-          want to attribute spend by — spend rolls up by your own departments,
-          not by these.
-        </Text>
-      </Box>
-      {observed.map((department) => (
-        <HStack
-          key={department.name}
-          paddingY={2}
-          paddingX={3}
-          borderBottomWidth="1px"
-          borderColor="border.muted"
-          fontSize="sm"
-          justifyContent="space-between"
-        >
-          <Text fontWeight="medium">{department.name}</Text>
-          <Text fontSize="xs" color="fg.muted">
-            {department.peopleCount === 1
-              ? "1 person"
-              : `${department.peopleCount} people`}
-          </Text>
-        </HStack>
-      ))}
     </VStack>
   );
 }
@@ -1331,19 +1245,19 @@ function AssignmentLink({
 
 function DepartmentList({
   orgId,
-  departments,
+  rows,
   isLoading,
   onChanged,
   canManage,
 }: {
   orgId: string;
-  departments: readonly DepartmentListItem[];
+  rows: readonly DepartmentTableRow[];
   isLoading: boolean;
   onChanged: () => Promise<void>;
   canManage: boolean;
 }) {
-  const [editing, setEditing] = useState<DepartmentListItem | null>(null);
-  const [archiving, setArchiving] = useState<DepartmentListItem | null>(null);
+  const [editing, setEditing] = useState<DepartmentRecord | null>(null);
+  const [archiving, setArchiving] = useState<DepartmentRecord | null>(null);
 
   const archiveMutation = api.departments.archive.useMutation({
     onSuccess: async () => {
@@ -1361,7 +1275,7 @@ function DepartmentList({
   return (
     <>
       <DepartmentListPanel
-        departments={departments}
+        rows={rows}
         isLoading={isLoading}
         canManage={canManage}
         onRename={setEditing}
@@ -1400,27 +1314,35 @@ function DepartmentList({
 }
 
 /**
- * The bordered list itself: a header carrying the count, and a row per
- * department.
+ * The one departments table: a header carrying the count, and a row per
+ * department, whether the organization created it or a connected directory
+ * named it.
+ *
+ * There were two of these stacked on each other until the reader had to work
+ * out for themselves why "Engineering" was printed twice on one screen. The
+ * distinction that earned the second table is now a badge on the row saying
+ * which provider named it, and nothing else — no heading of its own, no
+ * paragraph explaining the split, because there is no split left to explain.
+ * `mergeDepartmentRows` owns what happens when both name the same department.
  *
  * Separate from the component above only because that one also owns the rename
- * drawer and the archive confirmation, and holding a list, a drawer and a
- * dialog in one body made the list hard to find among them. Nothing here
+ * drawer and the archive confirmation, and holding a table, a drawer and a
+ * dialog in one body made the table hard to find among them. Nothing here
  * decides anything — it renders what it is handed and reports which row the
  * reader picked.
  */
 function DepartmentListPanel({
-  departments,
+  rows,
   isLoading,
   canManage,
   onRename,
   onArchive,
 }: {
-  departments: readonly DepartmentListItem[];
+  rows: readonly DepartmentTableRow[];
   isLoading: boolean;
   canManage: boolean;
-  onRename: (department: DepartmentListItem) => void;
-  onArchive: (department: DepartmentListItem) => void;
+  onRename: (department: DepartmentRecord) => void;
+  onArchive: (department: DepartmentRecord) => void;
 }) {
   return (
     <VStack
@@ -1447,7 +1369,7 @@ function DepartmentListPanel({
         <Text>Departments</Text>
         {!isLoading && (
           <Text fontWeight="normal" textTransform="none" letterSpacing="normal">
-            {departments.length}
+            {rows.length}
           </Text>
         )}
       </HStack>
@@ -1455,19 +1377,19 @@ function DepartmentListPanel({
         <Box padding={4}>
           <Spinner />
         </Box>
-      ) : departments.length === 0 ? (
+      ) : rows.length === 0 ? (
         <Box padding={4} color="fg.muted" fontSize="sm">
           {canManage
             ? "No departments yet. Create one to start attributing spend."
             : "No departments yet."}
         </Box>
       ) : (
-        departments.map((dept) => (
+        rows.map((row) => (
           <DepartmentRow
-            key={dept.id}
-            department={dept}
-            onRename={() => onRename(dept)}
-            onArchive={() => onArchive(dept)}
+            key={row.key}
+            row={row}
+            onRename={() => row.record && onRename(row.record)}
+            onArchive={() => row.record && onArchive(row.record)}
             canManage={canManage}
           />
         ))
@@ -1477,49 +1399,92 @@ function DepartmentListPanel({
 }
 
 function DepartmentRow({
-  department,
+  row,
   onRename,
   onArchive,
   canManage,
 }: {
-  department: DepartmentListItem;
+  row: DepartmentTableRow;
   onRename: () => void;
   onArchive: () => void;
   canManage: boolean;
 }) {
+  // Rename and Archive act on a `Department` record. A row a directory named
+  // and nobody created is not one — there is no row to rename and nothing to
+  // archive — so it is offered neither, which is the same rule the separate
+  // panel used to enforce by being a separate panel.
+  const actionable = canManage && row.record !== null;
+
   return (
     <HStack
+      data-testid={`department-row-${row.name}`}
       paddingY={2}
       paddingX={3}
       borderBottomWidth="1px"
       borderColor="border.muted"
       fontSize="sm"
       justifyContent="space-between"
+      gap={3}
     >
-      <Text fontWeight="medium">{department.name}</Text>
-      {canManage && (
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <Button
-              variant="ghost"
-              size="xs"
-              aria-label={`Actions for ${department.name}`}
-            >
-              <MoreVertical size={14} />
-            </Button>
-          </Menu.Trigger>
-          <Menu.Content>
-            <Menu.Item value="rename" onClick={onRename}>
-              <Pencil size={14} /> Rename
-            </Menu.Item>
-            <Menu.Item value="archive" color="red.500" onClick={onArchive}>
-              <Archive size={14} /> Archive
-            </Menu.Item>
-          </Menu.Content>
-        </Menu.Root>
-      )}
+      <HStack gap={2} minWidth={0}>
+        <Text fontWeight="medium" truncate>
+          {row.name}
+        </Text>
+        {row.providers.map((provider) => (
+          <Badge
+            key={provider}
+            size="sm"
+            variant="surface"
+            colorPalette="gray"
+            flexShrink={0}
+          >
+            {providerLabel(provider)}
+          </Badge>
+        ))}
+      </HStack>
+      <HStack gap={2} flexShrink={0}>
+        <Text fontSize="xs" color="fg.muted">
+          {directoryHeadcount(row)}
+        </Text>
+        {actionable && (
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button
+                variant="ghost"
+                size="xs"
+                aria-label={`Actions for ${row.name}`}
+              >
+                <MoreVertical size={14} />
+              </Button>
+            </Menu.Trigger>
+            <Menu.Content>
+              <Menu.Item value="rename" onClick={onRename}>
+                <Pencil size={14} /> Rename
+              </Menu.Item>
+              <Menu.Item value="archive" color="red.500" onClick={onArchive}>
+                <Archive size={14} /> Archive
+              </Menu.Item>
+            </Menu.Content>
+          </Menu.Root>
+        )}
+      </HStack>
     </HStack>
   );
+}
+
+/**
+ * How many people the connected directories filed under this department.
+ *
+ * An em dash where no directory named it, never "0 people": the figure counts
+ * the directories' people and not the members an administrator assigned, so a
+ * zero beside a department somebody created would report it empty when it may
+ * hold half the company. We did not measure that, and the dash says so.
+ */
+function directoryHeadcount(row: DepartmentTableRow): string {
+  if (row.directoryPeopleCount === null) return "—";
+  return row.directoryPeopleCount === 1
+    ? "1 person"
+    : `${row.directoryPeopleCount} people`;
 }
 
 export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {

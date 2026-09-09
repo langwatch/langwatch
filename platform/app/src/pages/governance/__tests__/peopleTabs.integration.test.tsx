@@ -607,25 +607,41 @@ describe("the filter row", () => {
 
   describe("when a frame is left over in the address from an older link", () => {
     /** @scenario "The spend window is fixed and stated, not chosen" */
-    it("ignores it, reads a year, and says so under the table", () => {
+    it("ignores it, reads a year, and heads the two figures with it", () => {
       harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
       renderPeopleAt(["/governance/people?frame=last_2_years"]);
 
       expect(harness.inputs["activityMonitor.spendByUser"]).toMatchObject({
         windowDays: 365,
       });
-      expect(
-        screen.getByText(/measured over the last 12 months/),
-      ).toBeInTheDocument();
+      // The window is stated on the columns it is true of. Both of them: one
+      // heading carrying it would leave the other figure ambiguous.
+      const spend = screen.getByRole("columnheader", { name: /Spend/ });
+      const requests = screen.getByRole("columnheader", { name: /Requests/ });
+      expect(spend).toHaveTextContent("last 12 months");
+      expect(requests).toHaveTextContent("last 12 months");
       expect(
         screen.queryByRole("button", { name: /Time frame/ }),
       ).not.toBeInTheDocument();
     });
+
+    it("prints no paragraph under the table restating either limit", () => {
+      // The count line stays; the paragraph that followed it said the window
+      // and the sort's reach to a reader looking at neither control.
+      harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
+      renderPeopleAt(["/governance/people"]);
+
+      expect(screen.getByText(/person shown\./)).toBeInTheDocument();
+      expect(
+        screen.queryByText(/everything else covers the whole record/),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/Sorting ranks/)).not.toBeInTheDocument();
+    });
   });
 
-  describe("when the sort chip is on screen", () => {
+  describe("when the sort chip is opened", () => {
     /** @scenario "The page says how far the sort reaches" */
-    it("says under the table which rows the ranking reaches", () => {
+    it("says in the menu which rows the ranking reaches", async () => {
       harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
       harness.answers["governancePeople.list"] = {
         data: [
@@ -637,19 +653,18 @@ describe("the filter row", () => {
       };
       renderPeopleAt(["/governance/people?sort=lastActivity"]);
 
-      const note = screen.getByText(/Sorting ranks the people/);
+      const row = screen.getByTestId("people-filter-row");
+      await userEvent.click(within(row).getByText("Sort"));
+
+      const note = await screen.findByText(/Ranks the people/);
+      expect(note).toHaveTextContent("Ranks the people with measured spend");
       expect(note).toHaveTextContent(
-        "Sorting ranks the people with measured spend",
-      );
-      expect(note).toHaveTextContent(
-        "anyone a connected source named but nothing measured follows, most recently seen first",
+        "Anyone a connected source named but nothing measured follows, most recently seen first",
       );
       // The limit is stated, not worked around: the chip is still offered and
       // the unrankable rows are still on the table. Hiding either would trade
       // an honest limitation for a worse one.
-      expect(
-        within(screen.getByTestId("people-filter-row")).getByText("Sort"),
-      ).toBeInTheDocument();
+      expect(within(row).getByText("Sort")).toBeInTheDocument();
       expect(
         screen.getByRole("row", { name: /Named Only/ }),
       ).toBeInTheDocument();

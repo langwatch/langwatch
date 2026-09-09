@@ -14,8 +14,9 @@
  *    attributes to it, and it can be renamed and archived.
  *
  * `departmentLabelFor` picks one to SHOW; `groupObservedDepartments` counts
- * only the first, because a panel headed "departments the providers see" that
- * counted our own assignments would be reporting our answers back to us.
+ * only the first, because the discovered half of the Departments tab is a
+ * report of what the connected directories say, and counting our own
+ * assignments into it would be reporting our answers back to us.
  *
  * Framework-free on purpose: the People page imports it directly, so it must
  * not drag anything server-side or browser-side across that boundary.
@@ -25,6 +26,13 @@
 
 /** Only what these functions read, so each is callable from a test with a literal. */
 export interface PersonDepartmentFacts {
+  /**
+   * The connected source that named this person — `DiscoveredPerson.provider`,
+   * a slug such as `openai_admin`. It is what puts a provider's name on a
+   * discovered department: the department is free text, so the only thing that
+   * says where the text came from is the people filed under it.
+   */
+  provider: string;
   directoryDepartment: string | null;
   erasedAt: Date | null;
   link: { departmentName: string | null } | null;
@@ -58,36 +66,53 @@ export function departmentLabelFor(
   return directoryDepartmentOf(person) ?? person.link?.departmentName ?? null;
 }
 
-/** A department name the providers used, and how many people they used it for. */
+/** A department name the providers used, and who used it for how many people. */
 export interface ObservedDepartment {
   name: string;
   peopleCount: number;
+  /**
+   * Every provider whose directory filed somebody under this name, sorted so
+   * two reads render the same badges in the same order. Never empty: a name
+   * only appears here because a provider's directory used it.
+   */
+  providers: string[];
 }
 
 /**
  * The distinct departments the providers filed discovered people under,
- * busiest first.
+ * busiest first, each carrying the providers that named it.
  *
- * This is not the `Department` list and must never be rendered as one: these
+ * This is not the `Department` list and must never be presented as one: these
  * names carry no id, cannot be renamed or archived, and no spend rolls up by
- * them. What they are good for is telling an administrator which departments
- * their directory actually contains before they create a single one.
+ * them. The Departments tab shows both on one table and tells them apart by a
+ * badge naming the provider, which is why the providers are gathered here
+ * rather than left for the page to re-derive.
  *
- * Ties break on name so the order is stable across reads — a panel that
+ * Ties break on name so the order is stable across reads — a list that
  * reshuffles equal-count rows between refreshes reads as though the data
  * changed.
  */
 export function groupObservedDepartments(
   people: PersonDepartmentFacts[],
 ): ObservedDepartment[] {
-  const countByName = new Map<string, number>();
+  const byName = new Map<
+    string,
+    { peopleCount: number; providers: Set<string> }
+  >();
   for (const person of people) {
     const name = directoryDepartmentOf(person);
     if (name === null) continue;
-    countByName.set(name, (countByName.get(name) ?? 0) + 1);
+    const entry = byName.get(name) ?? { peopleCount: 0, providers: new Set() };
+    entry.peopleCount += 1;
+    entry.providers.add(person.provider);
+    byName.set(name, entry);
   }
-  return [...countByName]
-    .map(([name, peopleCount]) => ({ name, peopleCount }))
+  return [...byName]
+    .map(([name, { peopleCount, providers }]) => ({
+      name,
+      peopleCount,
+      providers: [...providers].sort(),
+    }))
     .sort(
       (a, b) => b.peopleCount - a.peopleCount || a.name.localeCompare(b.name),
     );

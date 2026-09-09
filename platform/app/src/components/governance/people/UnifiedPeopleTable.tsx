@@ -16,6 +16,7 @@ import { Menu } from "~/components/ui/menu";
 import type { RouterOutputs } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
+import { SPEND_WINDOW_LABEL } from "./peopleFilters";
 import type { PeopleRow, PersonMatchStatus } from "./peopleRows";
 
 type IngestionSource = RouterOutputs["ingestionSources"]["list"][number];
@@ -77,6 +78,35 @@ export function providerLabel(provider: string): string {
   return label.replace(/\s*\([^)]*\)\s*$/, "");
 }
 
+/**
+ * A column heading over a figure the spend read measured, with the window it
+ * measured over under it.
+ *
+ * The window belongs here rather than in a note beneath the table: it is true
+ * of these two columns and of nothing else on the row, and a reader wondering
+ * what "$412.40" covers is looking at the column, not at the last line of the
+ * card. The two headings both carry it because the two figures are both
+ * windowed, and one of them saying so would leave the other ambiguous.
+ */
+function MeasuredHeading({ children }: { children: string }) {
+  return (
+    <VStack align="end" gap={0}>
+      <Text as="span">{children}</Text>
+      <Text
+        as="span"
+        fontSize="10px"
+        fontWeight="normal"
+        color="fg.subtle"
+        textTransform="none"
+        letterSpacing="normal"
+        whiteSpace="nowrap"
+      >
+        {SPEND_WINDOW_LABEL}
+      </Text>
+    </VStack>
+  );
+}
+
 const notMeasured = (
   <Text color="fg.muted" aria-label="not measured">
     —
@@ -118,7 +148,7 @@ export function UnifiedPeopleTable({
       // the table sideways, which is ordinary, rather than reading a row that
       // has been shredded to fit. At 1280 the table is wider than this floor,
       // so nothing scrolls.
-      minWidth="60rem"
+      minWidth="62rem"
       containerProps={{ overflowX: "auto" }}
     >
       <Table.Header>
@@ -131,12 +161,13 @@ export function UnifiedPeopleTable({
           {/* The measured columns are sized in rem rather than in percent: a
               percentage of a narrow window left "$412.40" broken across two
               lines as "$412.4" and "0", which is not a smaller figure but a
-              different one. These widths hold a five-figure amount. */}
-          <Table.ColumnHeader width="6rem" textAlign="end">
-            Spend
+              different one. These widths hold a five-figure amount, and the
+              window note under each heading on one line. */}
+          <Table.ColumnHeader width="7.5rem" textAlign="end">
+            <MeasuredHeading>Spend</MeasuredHeading>
           </Table.ColumnHeader>
-          <Table.ColumnHeader width="6.5rem" textAlign="end">
-            Requests
+          <Table.ColumnHeader width="7.5rem" textAlign="end">
+            <MeasuredHeading>Requests</MeasuredHeading>
           </Table.ColumnHeader>
           <Table.ColumnHeader width="7.25rem">Last active</Table.ColumnHeader>
           {/* Wide enough for a badge over a member's name; the width freed by

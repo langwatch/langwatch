@@ -127,7 +127,8 @@ const discovered = (over: Record<string, unknown>) => ({
 /**
  * The page is two tabs. Everyone the providers named sits on the merged table
  * on the People tab (the default address); the departments their directories
- * named sit on the Departments tab, beside the list the administrator keeps.
+ * named sit on the Departments tab, on the same table as the ones the
+ * administrator created.
  */
 const renderPage = (entry = "/governance/people") =>
   render(
@@ -164,7 +165,8 @@ describe("given people the providers named", () => {
       expect(within(row).getByText("Engineering")).toBeInTheDocument();
     });
 
-    it("lists the departments the providers see with a headcount each", () => {
+    /** @scenario "A department only a directory named carries its provider and no row actions" */
+    it("lists them on the one table, each with its provider and a headcount", () => {
       harness.people = [
         discovered({
           id: "a",
@@ -181,18 +183,72 @@ describe("given people the providers named", () => {
       ];
       renderPage(DEPARTMENTS_TAB);
 
-      expect(screen.getByText("Departments the providers see")).toBeVisible();
-      expect(screen.getByText("2 people")).toBeVisible();
-      expect(screen.getByText("1 person")).toBeVisible();
+      // One table, one heading. The second panel and the paragraph explaining
+      // why it existed are gone; the badge carries the whole distinction.
+      expect(
+        screen.queryByText("Departments the providers see"),
+      ).not.toBeInTheDocument();
+
+      const engineering = screen.getByTestId("department-row-Engineering");
+      expect(
+        within(engineering).getByText("Microsoft Copilot Studio"),
+      ).toBeVisible();
+      expect(within(engineering).getByText("2 people")).toBeVisible();
+      expect(
+        within(screen.getByTestId("department-row-GTM")).getByText("1 person"),
+      ).toBeVisible();
     });
 
-    it("keeps the organization's own department list separate and still empty", () => {
-      // The directory naming departments must not put rows in the list an
-      // administrator creates, renames and archives — that list is the spend
-      // attribution entity, and nothing here was created by anybody.
+    /** @scenario "A department only a directory named carries its provider and no row actions" */
+    it("offers no rename or archive on a department nobody created", () => {
+      // Rename and Archive act on a `Department` record. A name a directory
+      // asserted is not one, which is the difference the separate panel used to
+      // enforce by being separate.
       harness.people = [
         discovered({ displayText: "A", directoryDepartment: "Engineering" }),
       ];
+      renderPage(DEPARTMENTS_TAB);
+
+      expect(screen.getByText("Engineering")).toBeVisible();
+      expect(
+        screen.queryByRole("button", { name: "Actions for Engineering" }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the organization created the same department the directory names", () => {
+    /** @scenario "A department the organization created and one a directory names are one row" */
+    it("renders one row carrying the record's actions and the provider badge", () => {
+      harness.departments = [{ id: "dept_1", name: "Engineering" }];
+      harness.people = [
+        discovered({ displayText: "A", directoryDepartment: "Engineering" }),
+      ];
+      renderPage(DEPARTMENTS_TAB);
+
+      expect(screen.getAllByTestId(/^department-row-/)).toHaveLength(1);
+      const row = screen.getByTestId("department-row-Engineering");
+      expect(within(row).getByText("Microsoft Copilot Studio")).toBeVisible();
+      // It is still the organization's record, so it can still be managed.
+      expect(
+        screen.getByRole("button", { name: "Actions for Engineering" }),
+      ).toBeVisible();
+    });
+  });
+
+  describe("when no directory named a department for anybody", () => {
+    /** @scenario "A department no directory named reports no headcount rather than zero" */
+    it("reports no directory headcount rather than zero", () => {
+      harness.departments = [{ id: "dept_1", name: "Finance" }];
+      harness.people = [discovered({ displayText: "Maria Silva" })];
+      renderPage(DEPARTMENTS_TAB);
+
+      const row = screen.getByTestId("department-row-Finance");
+      expect(within(row).getByText("—")).toBeVisible();
+      expect(within(row).queryByText("0 people")).not.toBeInTheDocument();
+    });
+
+    it("says the table is empty when nobody created one either", () => {
+      harness.people = [discovered({ displayText: "Maria Silva" })];
       renderPage(DEPARTMENTS_TAB);
 
       expect(
@@ -200,17 +256,6 @@ describe("given people the providers named", () => {
           "No departments yet. Create one to start attributing spend.",
         ),
       ).toBeVisible();
-    });
-  });
-
-  describe("when no directory named a department for anybody", () => {
-    it("offers no departments panel rather than an empty one", () => {
-      harness.people = [discovered({ displayText: "Maria Silva" })];
-      renderPage(DEPARTMENTS_TAB);
-
-      expect(
-        screen.queryByText("Departments the providers see"),
-      ).not.toBeInTheDocument();
     });
   });
 

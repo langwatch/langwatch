@@ -126,13 +126,17 @@ Feature: The People page is two tabs, People and Departments
     Given an address left over from before the time frame was removed
     When sam opens the People page at it
     Then the spend read is asked for a year regardless of what the address names
-    And the page says under the table that spend and requests cover the last 12 months
+    And the Spend and Requests headings say the figures cover the last 12 months
     And no control offers to change that window
+    # The window is stated on the two columns it is true of and nowhere else.
+    # It used to be one half of a paragraph under the table, which said it to a
+    # reader who was looking at the figures rather than at the last line of the
+    # card, and said it beside a second sentence about the sort.
 
   @integration
   Scenario: The page says how far the sort reaches
-    When sam opens the People page
-    Then the page says under the table that sorting ranks the people with measured spend
+    When sam opens the sort control
+    Then it says the ranking reaches the people with measured spend
     And it says the people a connected source named but nothing measured follow, most recently seen first
     # The other half of what the time frame got wrong, and it is still on
     # screen. The sort chip drives the spend read, so it ranks the rows that
@@ -141,8 +145,11 @@ Feature: The People page is two tabs, People and Departments
     # both, which is not this screen's to build — so the limit is made visible
     # rather than hidden, because a reader who sets "Sort · Last active" and
     # watches a third of the rows stay put would otherwise conclude the control
-    # is broken. The chip is not hidden and the table is not narrowed to
-    # rankable rows: either would trade an honest limitation for a worse one.
+    # is broken. It is said in the sort menu, on the control it is true of,
+    # rather than in a paragraph under the table: the reader who needs it is
+    # the one reaching for the control. The chip is not hidden and the table is
+    # not narrowed to rankable rows: either would trade an honest limitation
+    # for a worse one.
 
   @integration
   Scenario: The department chip filters the table to that department
@@ -342,6 +349,48 @@ Feature: The People page is two tabs, People and Departments
     And no drawer is asked for
 
   # ── Departments tab ───────────────────────────────────────────────────────
+  #
+  # ONE TABLE HERE TOO. The tab used to stack two lists: the departments the
+  # organization created, and a separate panel headed "departments the providers
+  # see" holding the names the connected directories use. Both list departments,
+  # both were on screen at once, and on a tenant where the two agree the reader
+  # was shown "Engineering" twice with a paragraph between them explaining why.
+  #
+  # They are one table. A row a directory named carries a badge saying which
+  # provider named it, and that badge is the entire distinction — no second
+  # heading, no explanatory paragraph. The difference the two tables were
+  # protecting is still real and still enforced: only a row with a `Department`
+  # record behind it is offered Rename and Archive, because only a record can be
+  # renamed or archived.
+
+  @integration
+  Scenario: A department the organization created and one a directory names are one row
+    Given the organization created a department named Engineering
+    And a connected directory files people under Engineering too
+    When sam opens the Departments tab
+    Then Engineering is one row, not two
+    And that row carries a badge naming the provider whose directory used it
+    # Two rows reading the same word, differing in nothing the reader can see,
+    # is the confusion the second table caused. One department, one row.
+
+  @integration
+  Scenario: A department only a directory named carries its provider and no row actions
+    Given a connected directory files people under a department the organization never created
+    When alice opens the Departments tab
+    Then that department is a row on the same table
+    And it carries a badge naming the provider
+    And it is offered neither Rename nor Archive
+    # There is no record to rename and nothing to archive. The badge says where
+    # the name came from; the missing menu says what can be done about it.
+
+  @integration
+  Scenario: A department no directory named reports no headcount rather than zero
+    Given the organization created a department no connected directory names
+    When sam opens the Departments tab
+    Then its headcount reads as an em dash rather than zero
+    # The headcount counts the people the directories filed under the name, not
+    # the members an administrator assigned. A zero would report a department
+    # empty when it may hold half the company.
 
   @integration
   Scenario: The Departments tab offers no controls to a viewer without the manage grant
