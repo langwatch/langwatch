@@ -95,10 +95,21 @@ export interface IngestionPullRunStatusData {
    * twice. Subtracting is the valid arithmetic, and the surviving total is that
    * subtraction rather than a third field that could disagree with these two.
    *
-   * The withheld count is safe to show as a CURRENT figure and never as a
-   * series: it moving from zero to one at a known moment says an erasure
-   * happened then, which on a small tenant identifies the person as surely as a
-   * name would. So no trend line, no history drawer, no per-run export, and
+   * This row is a sink the withheld count is allowed to sit in, because it is
+   * inside our boundary, under our retention, and readable only by those we
+   * granted this tenant's data to. The event log holds the same count per run
+   * for the same reason, deliberately.
+   *
+   * It must not be forwarded to a sink outside that boundary — telemetry
+   * export above all, whose readers are every engineer with a dashboard login
+   * rather than the readers of this tenant. The test is who can read the sink,
+   * not whether the sink holds a series; the field doc on `withheldPersonCount`
+   * in `../schemas/events` is the full statement of it.
+   *
+   * What the product may draw with it is limited by the same disclosure: a
+   * CURRENT figure only, because this number moving from zero to one at a known
+   * moment says an erasure happened then, which on a small tenant identifies
+   * the person as surely as a name would. No trend line, no history drawer, and
    * never beside a per-person list.
    */
   LastPeopleListingAt: number | null;
@@ -307,30 +318,41 @@ export class IngestionPullRunStatusFoldProjection
    * syncing people would erase an agents refusal and a broken source would
    * read as fine because a DIFFERENT sync had succeeded.
    *
-   * There is no fence of their own here, and that is a DEPENDENCY on another
-   * module rather than a property of this one. These four handlers assume they
-   * only ever see accepted outcomes, in acceptance order, and simply overwrite
-   * their columns with whatever arrives last. Nothing below would notice two
-   * outcomes landing out of order: the older answer would silently win and a
-   * refusal could be buried under a stale listed.
+   * IF YOU ARE ABOUT TO EMIT A LISTING OUTCOME FROM ANYWHERE OTHER THAN THE
+   * EXISTING PROCESS MANAGER -- a backfill, an admin repair tool, a second
+   * pipeline, a migration script -- THEN YOU MUST GUARANTEE TWO THINGS, and
+   * this fold cannot check either of them for you:
    *
-   * What makes the assumption true is the process manager, in
-   * `process-manager/ingestionPull.process.ts`. `listingRequestedHandler`
-   * drops a second ask while `currentAgentsListing` / `currentPeopleListing`
-   * is set, and `listingSettledHandler` ignores an outcome whose `requestId`
-   * is not the one being tracked, so at most one listing of each kind is ever
-   * in flight and its outcome is accepted once. Replay inherits the same order
-   * because the log holds only what was accepted.
+   *   1. SINGLE IN FLIGHT. At most one listing of each kind outstanding per
+   *      source at a time.
+   *   2. ACCEPT ONCE, IN ORDER. An outcome is appended once, and outcomes for
+   *      one source reach the log in the order they were accepted.
    *
-   * A fence here was considered and rejected: the only signal available is the
-   * timestamp, and an admin replaying a corrected outcome is precisely an older
-   * timestamp arriving later, so a monotonic fence would drop the legitimate
-   * repair to guard against a producer that does not exist. One authoritative
-   * mechanism beats two weak ones.
+   * Break either and this projection keeps the OLDER answer without complaint:
+   * a refusal buried under a stale listed, a page telling a customer their
+   * directory synced fine while the credential that reads it is dead. There is
+   * no error, no log line and no failing test -- the wrong number simply sits
+   * there looking like a number.
    *
-   * So the constraint travels with the producer, not with this fold: ANY new
-   * producer of listing outcomes has to preserve single-in-flight and
-   * accept-once, or this projection keeps the older answer without complaint.
+   * That is because these four handlers have no fence of their own. They
+   * overwrite their columns with whatever arrives last, and nothing below
+   * inspects a timestamp to notice that "last" was not "newest". The absence of
+   * a fence here is a DEPENDENCY on the producer, not a property of this fold.
+   *
+   * Today the only producer is the process manager in
+   * `process-manager/ingestionPull.process.ts`, and it holds both guarantees:
+   * `listingRequestedHandler` drops a second ask while `currentAgentsListing` /
+   * `currentPeopleListing` is set, and `listingSettledHandler` ignores an
+   * outcome whose `requestId` is not the one being tracked. Replay inherits the
+   * order because the log holds only what was accepted. Read those two
+   * functions before writing a third producer; matching them is the bar.
+   *
+   * Do not respond to this by adding a fence here. It was considered and
+   * rejected: the only signal available is the timestamp, and an admin
+   * replaying a corrected outcome is precisely an older timestamp arriving
+   * later, so a monotonic fence would drop the legitimate repair to guard
+   * against a producer that does not exist. One authoritative mechanism beats
+   * two weak ones -- keep the guarantee where the ordering is actually known.
    */
   handleIngestionPullAgentsListed(
     event: IngestionPullAgentsListedEvent,

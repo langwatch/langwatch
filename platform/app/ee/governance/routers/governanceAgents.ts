@@ -99,9 +99,9 @@ export const governanceAgentsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("governance:manage")
     .mutation(async ({ ctx, input }) => {
-      return await GovernanceAgentSyncService.create(
-        ctx.prisma,
-        agentListingDispatcher(),
-      ).requestListing({ organizationId: input.organizationId });
+      return await GovernanceAgentSyncService.create({
+        prisma: ctx.prisma,
+        dispatch: agentListingDispatcher(),
+      }).requestListing({ organizationId: input.organizationId });
     }),
 });

@@ -10,40 +10,53 @@
  * by comments, which is backwards -- they are the only two where being wrong
  * discloses something about a real person.
  *
- * RULE 1. `LastPeopleWithheldCount` may be read as a CURRENT figure and never
- * as a series. Not a trend line, not a history drawer, not a per-run export,
- * never beside a per-person list. A step from N to N+1 at a known moment says
- * an erasure happened at that moment, and on a small tenant that names the
- * person as surely as printing their name would.
+ * RULE 1. `LastPeopleWithheldCount` counts the people this deployment erased
+ * and does not hold. Where it may go is decided by WHO CAN READ THE SINK, not
+ * by whether the sink keeps one figure or a history. Inside our boundary it may
+ * be kept per run and deliberately is -- the event log and the run status row
+ * both hold it, because an operator entitled to the number needs to see it
+ * move. It must not reach a sink whose readers are wider than the set we
+ * granted this tenant's data to, telemetry export above all, where even a
+ * single current value is already too far. What the PRODUCT may draw with it
+ * is separately limited to a current figure: no trend line, no history drawer,
+ * never beside a per-person list.
  *
  * RULE 2. `LastAgentsListingStatus` and `LastPeopleListingStatus` hold an HTTP
  * status for an operator reading a support ticket. They are never rendered to
- * a customer.
+ * a customer. A span is an operator surface, so a status there is fine; the
+ * customer-facing trees are the boundary that matters for these two.
  *
  * WHAT THIS FILE CAN AND CANNOT PROVE, stated plainly so nobody retires the
  * question by pointing at a green run:
  *
- * It proves the field NAMES do not appear in the customer-facing trees, that
- * the VALUES do not survive the one function where they are in scope beside a
- * customer-bound output, and that no storage exists from which a trend could be
- * drawn. It cannot prove a rename: someone who copies the value into a field
- * called `httpStatus` defeats the name scan, and only review catches that. It
- * is a guard against the likely mistake, not a proof of the rule.
+ * It proves the two status NAMES do not appear in the customer-facing trees,
+ * and that no command's span attributes carry the withheld count. It cannot
+ * prove a rename: someone who copies a value into a field called `httpStatus`
+ * defeats the name scan, and only review catches that. It is a guard against
+ * the likely mistake, not a proof of the rule.
  *
- * The trend rule is guarded at its PRECONDITION rather than at the chart,
- * because there is no chart to point at and there may never be one. You cannot
- * draw a series without stored history, so this asserts the history does not
- * exist. The day someone adds a per-run withheld row, this fails -- which is
- * the moment the conversation needs to happen, not the day a chart appears.
+ * TWO LESSONS FROM WRITING IT, both paid for:
+ *
+ * The people-listed SPAN carried the withheld count in shipped code while
+ * every comment in the feature said it must not. Prose in four files stopped
+ * nothing; the guard below would have. If you add another sink outside our
+ * boundary -- a metric, a webhook, a CSV export, a log line -- it needs its own
+ * block here, because neither block below will see it.
+ *
+ * And the first version of the span check read a property that did not exist,
+ * defaulted to an empty object, and passed against the very leak it was written
+ * for. A guard that cannot fail is worse than no guard, because it answers the
+ * question for everyone who comes after. Mutate anything you add here and watch
+ * it go red before you believe it.
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-
+import * as pipelineCommands from "@ee/event-sourcing/pipelines/ingestion-pull-processing/commands";
+import type { IngestionPullRunStatusData } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
 import { buildIngestionSourceMirror } from "@ee/governance/services/pullers/repositories/ingestionSourceMirror";
 import { describe, expect, it } from "vitest";
-import type { IngestionPullRunStatusData } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** `platform/app/` -- parent of both `src/` and `ee/`. */
@@ -148,6 +161,10 @@ function stateWithSentinels(): IngestionPullRunStatusData {
   return {
     SourceId: "source-1",
     Enabled: true,
+    Cron: null,
+    CreatedAt: 1_000,
+    UpdatedAt: 1_000,
+    LastEventOccurredAt: 1_200,
     Cursor: "cursor-A",
     ConsecutiveErrors: 0,
     LastSuccessAt: 1_000,
@@ -174,123 +191,236 @@ function stateWithSentinels(): IngestionPullRunStatusData {
 describe("given the listing outcome columns exist", () => {
   describe("when a customer-facing surface is built", () => {
     /** @scenario "An operator-only HTTP status never reaches a customer" */
-    it.each(OPERATOR_ONLY_FIELDS)(
-      "does not name %s anywhere a customer can reach",
-      (field) => {
-        const hits = occurrencesOf(field);
+    it.each(
+      OPERATOR_ONLY_FIELDS,
+    )("does not name %s anywhere a customer can reach", (field) => {
+      const hits = occurrencesOf(field);
 
-        expect(
-          hits,
-          [
-            `${field} is named in a customer-facing file: ${hits.join(", ")}.`,
-            "",
-            "This column holds a raw HTTP status from a provider, kept so an",
-            "operator reading a support ticket can tell a 403 from a 500. It is",
-            "not a customer-facing fact: a tenant admin shown '403' learns that",
-            "some credential somewhere was refused, which is not actionable by",
-            "them and is a detail about our integration rather than about their",
-            "data. Show them the OUTCOME (refused) and a sentence they can act",
-            "on; leave the status in the operator's view.",
-            "",
-            "If you need to branch on it server-side to CHOOSE that sentence,",
-            "do the branching in ee/governance/services/pullers/ and let only",
-            "the resulting words cross into these trees.",
-          ].join("\n"),
-        ).toEqual([]);
-      },
-    );
+      expect(
+        hits,
+        [
+          `${field} is named in a customer-facing file: ${hits.join(", ")}.`,
+          "",
+          "This column holds a raw HTTP status from a provider, kept so an",
+          "operator reading a support ticket can tell a 403 from a 500. It is",
+          "not a customer-facing fact: a tenant admin shown '403' learns that",
+          "some credential somewhere was refused, which is not actionable by",
+          "them and is a detail about our integration rather than about their",
+          "data. Show them the OUTCOME (refused) and a sentence they can act",
+          "on; leave the status in the operator's view.",
+          "",
+          "If you need to branch on it server-side to CHOOSE that sentence,",
+          "do the branching in ee/governance/services/pullers/ and let only",
+          "the resulting words cross into these trees.",
+        ].join("\n"),
+      ).toEqual([]);
+    });
 
     /** @scenario "The mirror carries no sensitive value onto a customer row" */
     it("keeps all three sensitive values out of the ingestion source mirror", () => {
-      const mirror = buildIngestionSourceMirror({ state: stateWithSentinels() });
+      const mirror = buildIngestionSourceMirror({
+        state: stateWithSentinels(),
+      });
       const leaked = scalarsOf(mirror);
 
       // `IngestionSource` rows ARE customer-adjacent -- the sources screen
       // reads them. The mirror is the one function where the sensitive columns
       // sit in scope beside a customer-bound output, so it is the only place a
       // value could cross by accident rather than by decision.
+      //
+      // One assertion covering all three rather than three assertions: the
+      // message below is the whole point of this guard, and a per-sentinel
+      // `expect` would print it only for whichever sentinel happens to be
+      // checked first.
+      const escaped = [
+        [AGENTS_STATUS_SENTINEL, "LastAgentsListingStatus"],
+        [PEOPLE_STATUS_SENTINEL, "LastPeopleListingStatus"],
+        [WITHHELD_SENTINEL, "LastPeopleWithheldCount"],
+      ] as const;
+
       expect(
-        leaked,
+        escaped
+          .filter(([sentinel]) => leaked.includes(sentinel))
+          .map(([, field]) => field),
         [
-          "A sentinel from a sensitive column reached the ingestion source",
-          "mirror. The mirror writes onto IngestionSource, which the sources",
-          "screen renders, so a value that arrives here is one schema change",
-          "away from a customer's eyes.",
+          "A value from a sensitive column reached the ingestion source mirror.",
+          "",
+          "The mirror writes onto IngestionSource, which the sources screen",
+          "renders. A value that arrives here is one field addition away from a",
+          "customer's eyes, and it arrives without anyone deciding it should.",
+          "",
+          "Two of these are operator-only HTTP statuses. The third is the count",
+          "of people this deployment does not hold: safe as one current figure,",
+          "never as a series, and putting it on a row that other code copies,",
+          "caches and exports is how it quietly becomes a series.",
+          "",
           `Mirror was: ${JSON.stringify(mirror)}`,
         ].join("\n"),
-      ).not.toContain(AGENTS_STATUS_SENTINEL);
-      expect(leaked).not.toContain(PEOPLE_STATUS_SENTINEL);
-      expect(leaked).not.toContain(WITHHELD_SENTINEL);
+      ).toEqual([]);
 
-      // And the names. `status` alone is a legitimate mirror key -- it holds
-      // "active" -- so this looks for the compound names only.
+      // And the names, so a future mirror field cannot carry one under an
+      // alias. `status` alone is a legitimate mirror key -- it holds "active"
+      // -- so this looks for the compound names only.
       const keys = Object.keys(mirror).join(",").toLowerCase();
       expect(keys).not.toContain("listingstatus");
       expect(keys).not.toContain("withheld");
     });
   });
 
-  describe("when the withheld count is stored", () => {
-    /** @scenario "No history exists from which a trend could be drawn" */
-    it("is stored once, as a single current figure with no per-run history", () => {
-      const schema = fs.readFileSync(
-        path.join(APP_ROOT, "prisma/schema.prisma"),
-        "utf8",
-      );
+  describe("when a command exports a telemetry span", () => {
+    /**
+     * @scenario "The erasure count never rides a span"
+     *
+     * This block exists because this exact leak SHIPPED. The people-listed
+     * command carried `payload.withheld_person_count`, and a person reading the
+     * file caught it -- the rule was written down in four places and enforced
+     * in none of them.
+     *
+     * THE TEST IS THE REACH, NOT THE SHAPE. Our own stores may keep this count
+     * per run and deliberately do: the event log and the run status row sit
+     * inside our boundary, under our retention, readable only by those we
+     * granted this tenant's data to, and an operator entitled to it needs to
+     * see the count move. A span is different in kind -- it leaves over a
+     * plain exporter to a backend with its own retention and a reader set of
+     * every engineer with a dashboard login. So even a single current figure
+     * on a span is already too far, and no amount of aggregating makes it
+     * acceptable.
+     *
+     * Scoped to the withheld count. The two HTTP statuses are operator-only,
+     * and a span is an operator surface, so a status there is allowed; it is
+     * the reach past our boundary that rules this one number out.
+     *
+     * Every command in the pipeline is checked rather than the four listing
+     * ones, so a count copied onto an unrelated span is caught too.
+     */
+    it("carries no withheld count on any command's span", () => {
+      const listingData = {
+        sourceId: "source-1",
+        requestId: "request-1",
+        requestedAt: 1_000,
+        agentCount: 7,
+        directoryPersonCount: 30,
+        withheldPersonCount: WITHHELD_SENTINEL,
+        reason: "listing_failed",
+        status: PEOPLE_STATUS_SENTINEL,
+      };
 
-      // Column declarations only -- the `///` doc comments above the column
-      // discuss the rule at length and must not count as storage.
-      const declarations = schema
-        .split("\n")
-        .map((line, i) => ({ line: line.trim(), number: i + 1 }))
-        .filter(
-          ({ line }) =>
-            !line.startsWith("///") &&
-            !line.startsWith("//") &&
-            /LastPeopleWithheldCount|withheldPersonCount|WithheldHistory/i.test(
-              line,
-            ),
-        );
+      // Every exported command that defines span attributes, discovered from
+      // the module rather than listed here: a new command gets this guard
+      // without anyone remembering to add it.
+      //
+      // The real attribute functions are EXECUTED. Reading the source for the
+      // string would pass just as happily against a dead code path, and it was
+      // running one of these that proved the original leak was live rather
+      // than vestigial.
+      const commands = Object.entries(pipelineCommands).filter(
+        ([, value]) =>
+          typeof (value as { getSpanAttributes?: unknown })
+            ?.getSpanAttributes === "function",
+      ) as [string, { getSpanAttributes?: (data: never) => unknown }][];
 
       expect(
-        declarations.map((d) => `${d.number}: ${d.line}`),
+        commands.length,
+        "No command in the pipeline exposes span attributes. Either the module moved or the accessor was renamed; either way this guard is now scanning nothing.",
+      ).toBeGreaterThan(0);
+
+      // Note the accessor name. An earlier draft of this test reached for a
+      // property called `spanAttributes`, got `undefined`, defaulted to `{}`
+      // and passed against a span that really was carrying the count. The
+      // optional chaining turned the guard into decoration and nothing said
+      // so, which is why the filter above asserts a non-empty set rather than
+      // trusting that it found something.
+      const offenders: string[] = [];
+      for (const [name, command] of commands) {
+        let attributes: unknown;
+        try {
+          attributes = command.getSpanAttributes?.(listingData as never);
+        } catch {
+          // A command whose attribute function cannot read this payload is not
+          // one that carries our field; only the people-listed data shape has
+          // a withheld count at all.
+          continue;
+        }
+        if (typeof attributes !== "object" || attributes === null) continue;
+
+        for (const [key, value] of Object.entries(attributes)) {
+          if (value === WITHHELD_SENTINEL || /withheld/i.test(key)) {
+            offenders.push(`${name}: ${key}=${String(value)}`);
+          }
+        }
+      }
+
+      expect(
+        offenders,
         [
-          "The withheld count is stored in more than one place, or in a shape",
-          "that keeps more than the current value.",
+          "A command puts the withheld people count on a telemetry span.",
           "",
-          "It may be shown as a CURRENT figure and never as a series. A step",
-          "from N to N+1 at a known moment says an erasure happened at that",
-          "moment; on a tenant with four people that identifies the person as",
-          "precisely as a name would. One overwritten column cannot express a",
-          "series, which is the property being preserved here -- you cannot",
-          "draw a trend line from a value that has no history.",
+          `Offending attributes: ${offenders.join(", ")}.`,
           "",
-          "If a per-run withheld figure is genuinely needed, that is a privacy",
-          "review, not a migration.",
+          "That number counts the people this deployment erased and does not",
+          "hold. A span leaves over a plain exporter to a backend with its own",
+          "retention and a reader set of every engineer with a dashboard login",
+          "-- readers far wider than the set we granted this tenant's data to.",
+          "",
+          "THE TEST IS THE REACH, NOT THE SHAPE. Keeping it per run is fine",
+          "inside our boundary and we do it deliberately: the event log and the",
+          "run status row both hold it, because an operator entitled to it needs",
+          "to see the count move. Reducing it to a single current figure does",
+          "NOT make a span acceptable -- crossing the boundary is the problem,",
+          "so even one value there is already too far.",
+          "",
+          "'No names on spans' is not a sufficient test for this field. The",
+          "COUNT is the sensitive fact, because it counts erasures: N to N+1 at",
+          "a known moment says an erasure happened then, and on a small tenant",
+          "that identifies the person as surely as a name would.",
+          "",
+          "The directory count may stay -- it is what the provider named, which",
+          "our erasure does not move. Adding any new sink: ask who can read it.",
         ].join("\n"),
-      ).toHaveLength(1);
-
-      // The single declaration must be nullable and scalar: `Int?`, not a
-      // relation to a table of them.
-      expect(declarations[0]?.line).toMatch(/^LastPeopleWithheldCount\s+Int\?/);
+      ).toEqual([]);
     });
-
-    /**
-     * The OTHER half of rule 1 -- that the withheld count is a subset, so a
-     * visible-people figure SUBTRACTS it rather than adding it -- has no guard
-     * here on purpose.
-     *
-     * Nothing computes that figure yet. A test asserting `30 - 4 === 26`
-     * against inline constants would exercise arithmetic rather than this
-     * codebase, pass forever, and read on the next audit as though the subset
-     * rule were covered. That is worse than the gap it papers over.
-     *
-     * The fold's own tests already assert both counts survive a listing with
-     * the subset relation intact. When something finally renders a
-     * visible-people figure, the guard belongs beside it, asserting that
-     * function returns the directory count MINUS the withheld one -- 34 for a
-     * tenant of 30 people is a fabricated headcount that overstates our reach
-     * into their directory, and it is the error a reader cannot detect.
-     */
   });
+
+  /**
+   * TWO GUARDS THAT ARE DELIBERATELY ABSENT. Both are written down because an
+   * absent guard is invisible, and the next reader deserves to know it was a
+   * decision rather than an oversight.
+   *
+   * FIRST: there is no "stored only once" check, and an earlier draft of this
+   * file had one.
+   *
+   * That draft counted `LastPeopleWithheldCount` declarations in
+   * `schema.prisma`, insisted on exactly one, and argued in its failure
+   * message that a single overwritten column cannot express a series. It would
+   * have failed the day anyone added a legitimate internal per-run store --
+   * and this feature already HAS one, on purpose: the event log keeps the
+   * count for every run, because an operator entitled to the number needs to
+   * see it move.
+   *
+   * So that guard did not encode the rule; it encoded a misreading of it, and
+   * it would have blocked correct work while teaching the next reader the
+   * wrong test. The rule is about REACH -- who can read the sink -- and the
+   * span guard above is where reach is actually checkable.
+   *
+   * If you are adding a sink for this count, the question is not "is it one
+   * value or a history". It is "who can read it". Inside our boundary, under
+   * our retention, readable only by those we granted this tenant's data to:
+   * fine. Anything wider: not, at any shape or resolution.
+   *
+   * SECOND: the other half of rule 1 -- that the withheld count is a subset,
+   * so a visible-people figure SUBTRACTS it rather than adding it -- has no
+   * guard either.
+   *
+   * Nothing computes that figure yet. A test asserting `30 - 4 === 26` against
+   * inline constants would exercise arithmetic rather than this codebase, pass
+   * forever, and read on the next audit as though the subset rule were
+   * covered. That is worse than the gap it papers over.
+   *
+   * The fold's own tests already assert both counts survive a listing with the
+   * subset relation intact. When something finally renders a visible-people
+   * figure, the guard belongs beside it, asserting that function returns the
+   * directory count MINUS the withheld one -- 34 for a tenant of 30 people is
+   * a fabricated headcount that overstates our reach into their directory, and
+   * it is the error a reader cannot detect.
+   */
 });

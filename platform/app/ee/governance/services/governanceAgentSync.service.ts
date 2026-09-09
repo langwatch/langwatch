@@ -57,19 +57,39 @@ export interface AgentListingRequestResult {
   sources: AgentSyncSource[];
 }
 
-export class GovernanceAgentSyncService {
-  private constructor(
-    private readonly prisma: PrismaClient,
-    private readonly dispatch: AgentListingDispatcher,
-    private readonly newRequestId: () => string,
-  ) {}
+/**
+ * What this service needs to do its job, named rather than ordered.
+ *
+ * `prisma` and `dispatch` are both edges of the system and a positional pair
+ * of them is two chances to swap the arguments silently; `newRequestId` is a
+ * seam for tests, which is exactly the argument a call site should never have
+ * to count places to reach. Every sibling factory in this directory takes its
+ * dependencies this way.
+ */
+export interface GovernanceAgentSyncDeps {
+  prisma: PrismaClient;
+  dispatch: AgentListingDispatcher;
+  /** Defaulted to a nanoid. Named so a test can pin it without positioning. */
+  newRequestId?: () => string;
+}
 
-  static create(
-    prisma: PrismaClient,
-    dispatch: AgentListingDispatcher,
-    newRequestId: () => string = () => nanoid(),
-  ): GovernanceAgentSyncService {
-    return new GovernanceAgentSyncService(prisma, dispatch, newRequestId);
+export class GovernanceAgentSyncService {
+  private readonly prisma: PrismaClient;
+  private readonly dispatch: AgentListingDispatcher;
+  private readonly newRequestId: () => string;
+
+  private constructor({
+    prisma,
+    dispatch,
+    newRequestId = () => nanoid(),
+  }: GovernanceAgentSyncDeps) {
+    this.prisma = prisma;
+    this.dispatch = dispatch;
+    this.newRequestId = newRequestId;
+  }
+
+  static create(deps: GovernanceAgentSyncDeps): GovernanceAgentSyncService {
+    return new GovernanceAgentSyncService(deps);
   }
 
   /**
@@ -83,15 +103,14 @@ export class GovernanceAgentSyncService {
    * dispatching nothing would hide it.
    */
   static forReads(prisma: PrismaClient): GovernanceAgentSyncService {
-    return new GovernanceAgentSyncService(
+    return new GovernanceAgentSyncService({
       prisma,
-      () => {
+      dispatch: () => {
         throw new Error(
           "GovernanceAgentSyncService.forReads cannot dispatch a listing",
         );
       },
-      () => nanoid(),
-    );
+    });
   }
 
   /**
