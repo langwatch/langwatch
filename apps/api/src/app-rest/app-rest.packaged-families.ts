@@ -3,14 +3,9 @@
  * services this process actually composed. The platform application mounted all of these
  * through a single all-or-nothing enumeration over thirty-two product services.
  */
-import type {
-  AgentApp,
-  AgentCallDeps,
-  AgentPlatformUrlBuilder,
-  ConnectedAgentRuntime,
-  LongPollTransportService,
-} from "@langwatch/agent-server";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { AgentPlatformUrlBuilder } from "@langwatch/agent-server";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type {
   AppRestBroadcast,
   AppRestManagementAuditPort,
@@ -33,7 +28,6 @@ import {
 } from "@langwatch/coding-agent-server";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApp, DatasetDirectUploadAuthorizer } from "@langwatch/dataset-server";
-import { createDatasetRestApp } from "@langwatch/dataset-server";
 import type { GovernanceApp, ScimApp, WebhookApp } from "@langwatch/enterprise-api";
 import {
   createGovernanceRestApp,
@@ -42,7 +36,6 @@ import {
 } from "@langwatch/enterprise-api";
 import type { EnterpriseFeature } from "@langwatch/enterprise-plan-gate";
 import type { EvaluatorApp } from "@langwatch/evaluator-server";
-import { createEvaluatorsRestApp } from "@langwatch/evaluator-server";
 import type { ExperimentApp } from "@langwatch/experiment-server";
 import { createExperimentsRestApp } from "@langwatch/experiment-server";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -96,6 +89,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ApiErrorBody } from "@langwatch/api/rest";
 
 import { mountDashboardRest } from "../features/dashboard/dashboard-rest.mount.ts";
+import { mountEvaluatorRest } from "../features/evaluator/evaluator-rest.mount.ts";
 import { mountMonitorRest } from "../features/monitor/monitor-rest.mount.ts";
 import type { ApiHandlerManagedCredentialPort } from "./app-rest.process-features.ts";
 
@@ -112,7 +106,7 @@ export type ApiPackagedRestServices = Readonly<{
   /** The per-project expiring entry store the agent cache reads and writes. */
   agentCache?: (() => AgentCacheStore) | undefined;
   /** The deprecated `/api/agents` family's read/write capability. */
-  agents?: (() => AgentApp) | undefined;
+  agents?: (() => AgentApi) | undefined;
   /**
    * The connected-agent transport (ADR-128), layered onto `/api/v1/agents`'s
    * `/connect/*` and `/:id/call` routes. Absent takes those two route groups
@@ -120,12 +114,11 @@ export type ApiPackagedRestServices = Readonly<{
    */
   agentsV1?:
     | (() => {
-        connectedRuntime: () => ConnectedAgentRuntime;
-        connect: { transport: () => LongPollTransportService; relayMaxPayloadMb?: number };
-        call: Omit<AgentCallDeps, "agents">;
+        connect: { relayMaxPayloadMb?: number };
+        call: { relayMaxPayloadMb?: number };
       })
     | undefined;
-  apiKeys?: (() => ApiKeyService) | undefined;
+  apiKeys?: (() => ApiKeyApi) | undefined;
   automation?: (() => AutomationApp) | undefined;
   /** Fan-out to every browser watching one tenant. */
   broadcast?: (() => AppRestBroadcast) | undefined;
@@ -389,31 +382,20 @@ export function mountApiPackagedRestFamilies(options: {
       : null,
   );
 
-  const datasets = services.datasets;
-  const authorizeDirectUpload = ports.authorizeDatasetDirectUpload;
-  mount(
-    "dataset",
-    datasets && authorizeDirectUpload
-      ? () =>
-          createDatasetRestApp({
-            security,
-            app: datasets,
-            platformUrl: ports.platformUrl,
-            authorizeDirectUpload,
-          })
-      : null,
-  );
+  // `/api/dataset` is converted: the family is declared by the module and
+  // mounted from the dataset feature's own composition, not from here.
+  mount("dataset", null);
 
   const evaluators = services.evaluators;
   mount(
     "evaluators",
     evaluators
       ? () =>
-          createEvaluatorsRestApp({
-            security,
-            app: evaluators,
+          mountEvaluatorRest({
+            evaluators,
+            credential: ports.handlerManagedCredential,
             platformUrl: ports.platformUrl,
-            organizationMiddleware: ports.organizationMiddleware,
+            errors: ports.legacyErrors,
           })
       : null,
   );

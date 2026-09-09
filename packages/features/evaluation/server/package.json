@@ -17,6 +17,10 @@
     "./workflow-evaluation": {
       "types": "./dist/adapters/workflow-evaluation.adapter.d.ts",
       "default": "./src/adapters/workflow-evaluation.adapter.ts"
+    },
+    "./composition/evaluation-cost": {
+      "types": "./dist/repositories/prisma/prisma.evaluation-cost.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.evaluation-cost.repository.ts"
     }
   },
   "scripts": {

@@ -10,11 +10,11 @@
  * `platformUrl`. A miss is `null`, and the fallback drops the navigate.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { DatasetService } from "@langwatch/dataset-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { ExperimentService } from "@langwatch/experiment-contract";
 import { type LangyNavigateResourceKind, LangyNavigateResourcePort } from "@langwatch/langy-server";
-import type { MonitorService } from "@langwatch/monitor-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
@@ -26,10 +26,10 @@ import { agentDrawerPath } from "../agent/agent-platform-url.ts";
  */
 export type ApiLangyNavigateResources = Readonly<{
   prompts?: PromptService | undefined;
-  datasets?: DatasetService | undefined;
+  datasets?: DatasetApi | undefined;
   workflows?: WorkflowService | undefined;
   experiments?: ExperimentService | undefined;
-  monitors?: MonitorService | undefined;
+  monitors?: MonitorApi | undefined;
   evaluators?: EvaluatorService | undefined;
   agents?: AgentApi | undefined;
   simulations?: SimulationService | undefined;
@@ -86,7 +86,7 @@ export class ApiLangyNavigateResourceAdapter extends LangyNavigateResourcePort {
         return `/experiments/${encodeURIComponent(target)}`;
       }
       case "monitor": {
-        const monitor = await services.monitors?.tryGetMonitorById({
+        const monitor = await services.monitors?.findById({
           id: resourceId,
           projectId,
         });

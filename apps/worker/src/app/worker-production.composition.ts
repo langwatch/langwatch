@@ -200,9 +200,11 @@ import {
 import type { WorkerProjectStorageDatabase } from "./worker-object-storage.composition.ts";
 import type { WorkerTraceCapabilityDatabase } from "./worker-trace-capability-services.composition.ts";
 import {
+  createWorkerDatasetApp,
   createWorkerDatasetNormalization,
-  createWorkerDatasetWrites,
 } from "./worker-dataset-normalization.composition.ts";
+import { MonitorApi } from "@langwatch/monitor-contract";
+import { createWorkerMonitorApp } from "./worker-evaluation-execution.composition.ts";
 import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { installWorkerFeatureFlags } from "./worker-feature-flags.composition.ts";
@@ -731,9 +733,16 @@ export class WorkerProductionComposition {
     const dataPrivacyApis = new LocalFeatureApis();
     dataPrivacyApis.declare(DataPrivacyApi);
     options.resources?.own("worker record-path data privacy peer", () => dataPrivacyApis.close());
+    // The monitor application installs below, over the grants graph the tenant
+    // half opens. Bound the moment it does; a listing asked for before then
+    // refuses by name rather than answering off a second reading.
+    const monitorApis = new LocalFeatureApis();
+    monitorApis.declare(MonitorApi);
+    options.resources?.own("worker record-path monitor peer", () => monitorApis.close());
     const traceServices = createWorkerTraceCapabilityServices({
       database: traceDatabase,
       dataPrivacy: dataPrivacyApis.reference(DataPrivacyApi),
+      monitors: monitorApis.reference(MonitorApi),
     });
     // ONE publisher, three producers. Trace, Langy and Scenario all advance
     // projections a tenant's tabs are watching, and all three publish the same
@@ -1032,13 +1041,32 @@ export class WorkerProductionComposition {
             ...(options.observability ? { logger: options.observability.logger } : {}),
           })
         : undefined;
-    const automationDatasets =
-      options.connection && traceRecords
-        ? createWorkerDatasetWrites({
+    // The ONE dataset application this process installs. Both halves that
+    // reach a dataset read it: the automation append below, and the studio
+    // datasets an evaluation run materialises.
+    const datasets =
+      options.connection && options.resources
+        ? await createWorkerDatasetApp({
             database: options.connection.client,
             storage: objectStorage,
+            resources: options.resources,
           })
         : undefined;
+    const automationDatasets = traceRecords ? datasets : undefined;
+    // The ONE monitor application this process installs, for the monitor a
+    // queued evaluation command names.
+    const monitors =
+      options.connection && options.resources && tenancy
+        ? await createWorkerMonitorApp({
+            database: options.connection.client,
+            permissions: tenancy.authorization,
+            resources: options.resources,
+          })
+        : undefined;
+    if (monitors) {
+      monitorApis.bind(MonitorApi, monitors);
+      monitorApis.ready();
+    }
     // Boot connects annotation dispatch before settlement consumes jobs.
     const annotationQueueDispatch = new Deferred<
       (input: QueueAnnotationTracesInput) => Promise<void>
@@ -1206,7 +1234,9 @@ export class WorkerProductionComposition {
       modelProviders &&
       plans &&
       options.resources &&
-      evaluationAnalytics
+      evaluationAnalytics &&
+      datasets &&
+      monitors
         ? await createWorkerObservabilityApps({
             connection: options.connection,
             config: options.config,
@@ -1232,6 +1262,8 @@ export class WorkerProductionComposition {
             commands: traceCommands,
             evaluation: {
               database: options.connection.client,
+              datasets,
+              monitors,
               modelProviders: modelProviders.modelProviders,
               models: modelProviders,
               secretDecryptor: resolveWorkerStoredSecretCipher(options.config),

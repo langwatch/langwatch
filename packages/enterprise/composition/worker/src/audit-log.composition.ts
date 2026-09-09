@@ -18,6 +18,7 @@ export class EnterpriseWorkerAuditLog {
   }): Promise<EnterpriseWorkerAuditLog> {
     const runtime = await createApp({ name: "enterprise-worker:audit-log" })
       .withPersistence("postgres", { prisma: options.prisma })
+      .withInfrastructure({})
       .withFeature(auditLogServer)
       .boot({
         role: "worker",

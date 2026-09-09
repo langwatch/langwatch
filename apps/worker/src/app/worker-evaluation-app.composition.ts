@@ -17,7 +17,7 @@ import {
 import { EvaluationApp } from "@langwatch/evaluation-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import {
   ContractWorkflowDslMigrationAdapter,
   HttpWorkflowNlpRuntimeAdapter,
@@ -43,6 +43,8 @@ export type WorkerEvaluationAppComposition = Readonly<{
 
 export type WorkerEvaluationWorkflowCompositionInput = Readonly<{
   database: PrismaClient;
+  /** The ONE dataset application this process installed, read by the studio. */
+  datasets: DatasetApi;
   modelProviders: ModelProviderService;
   secretDecryptor: WorkflowEnvironmentDecryptor;
   nlpServiceUrl: string | undefined;
@@ -70,7 +72,7 @@ export function createWorkerEvaluationWorkflows(
     : UnconfiguredWorkflowNlpRuntimeAdapter.create();
   const workflows = PostgresWorkflowAdapter.create({
     database: input.database,
-    datasets: PostgresDatasetAdapter.create({ database: input.database }).build(),
+    datasets: input.datasets,
     modelProviders: input.modelProviders,
     nlpRuntime,
     projectEnvironment: PrismaWorkflowProjectEnvironmentAdapter.create({

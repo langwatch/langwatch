@@ -1,4 +1,6 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
@@ -32,6 +34,10 @@ import {
 
 export type WorkerEvaluationInfrastructure = Readonly<{
   database: PrismaClient;
+  /** The ONE dataset application this process installed. */
+  datasets: DatasetApi;
+  /** The ONE monitor application this process installed. */
+  monitors: MonitorApi;
   modelProviders: ModelProviderService;
   models: WorkerModelProviders;
   secretDecryptor: WorkflowEnvironmentDecryptor;
@@ -86,6 +92,7 @@ const workerEvaluationApp = {
   >) {
     const workflows = createWorkerEvaluationWorkflows({
       database: infrastructure.database,
+      datasets: infrastructure.datasets,
       modelProviders: infrastructure.modelProviders,
       secretDecryptor: infrastructure.secretDecryptor,
       nlpServiceUrl: infrastructure.nlpServiceUrl,
@@ -94,6 +101,7 @@ const workerEvaluationApp = {
     const execution = createWorkerEvaluationExecutionCollaborators({
       database: infrastructure.database,
       traces: dependencies.traces,
+      monitors: infrastructure.monitors,
       workflows,
       models: infrastructure.models,
       featureFlags: infrastructure.featureFlags,

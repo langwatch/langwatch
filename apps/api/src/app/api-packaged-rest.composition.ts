@@ -2,8 +2,7 @@
  * The packaged REST families' collaborators, composed from this process's own graph.
  */
 import { TraceContentExtractionService } from "@langwatch/trace-server";
-import { AgentApp } from "@langwatch/agent-server";
-import type { ApiKeyService } from "@langwatch/api-key-contract";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type {
   AppRestManagementAuditPort,
   AppRestRbacVocabulary,
@@ -73,7 +72,7 @@ import type {
 } from "../app-rest/app-rest.packaged-families.ts";
 import { ApiPackagedRestAbsenceReport } from "../app-rest/app-rest.packaged-families.ts";
 import type { ApiConnectedAgentsComposition } from "./api-connected-agents.composition.ts";
-import type { AgentService } from "@langwatch/agent-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectService } from "@langwatch/project-contract";
@@ -84,9 +83,10 @@ import { requestTraceIds } from "@langwatch/api/rest";
 
 /** What the packaged families are composed from, all of it already open. */
 export type ApiPackagedRestCompositionOptions = Readonly<{
-  agents: AgentService | undefined;
+  agents: AgentApi | undefined;
   /** The connected-agent transport (ADR-128), for `/api/v1/agents`'s connect and call routes. */
   connectedAgents: ApiConnectedAgentsComposition | undefined;
+  relayMaxPayloadMb?: number;
   scenario: ComposedScenarioFeature;
   analytics: ComposedAnalyticsFeature;
   authz: AuthzService;
@@ -106,9 +106,12 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
   automation: ComposedAutomationFeature;
   codingAgent: ComposedCodingAgentFeature;
   enterprise: ComposedEnterpriseFeature;
-  dataset: ComposedDatasetFeature;
-  evaluator: ComposedEvaluatorFeature;
-  monitor: ComposedMonitorFeature;
+  /** A project's datasets, where this process installed the feature. */
+  dataset: ComposedDatasetFeature | undefined;
+  /** A project's evaluators, where this process composed the feature. */
+  evaluator: ComposedEvaluatorFeature | undefined;
+  /** The monitors a project runs, where this process installed the feature. */
+  monitor: ComposedMonitorFeature | undefined;
   /** A project's dashboards and the graphs on them, where one was installed. */
   dashboard: ComposedDashboardFeature | undefined;
   /** The process's own error envelope, which every declared family answers in. */
@@ -128,7 +131,7 @@ export type ApiPackagedRestCompositionOptions = Readonly<{
    */
   traceIngest: ApiTraceIngestComposition | undefined;
   /** The credential pair and the project directory every family resolves through. */
-  apiKeys: ApiKeyService;
+  apiKeys: ApiKeyApi;
   organizations: OrganizationService;
   projects: ProjectService | undefined;
   /** The provider gateway the two model families read, where one was composed. */
@@ -175,9 +178,14 @@ export function composeApiPackagedRest(
   return {
     services: {
       ...(agentCache ? { agentCache: () => agentCache } : {}),
-      ...(options.agents ? { agents: agentAppFrom(options.agents) } : {}),
+      ...(options.agents ? { agents: () => options.agents! } : {}),
       ...(options.connectedAgents
-        ? { agentsV1: agentsV1ConnectedFrom(options.connectedAgents) }
+        ? {
+            agentsV1: () => ({
+              connect: { relayMaxPayloadMb: options.relayMaxPayloadMb },
+              call: { relayMaxPayloadMb: options.relayMaxPayloadMb },
+            }),
+          }
         : {}),
       apiKeys: () => options.apiKeys,
       ...(options.automation.service ? { automation: () => options.automation.service! } : {}),
@@ -200,8 +208,8 @@ export function composeApiPackagedRest(
         },
       }),
       ...(options.dashboard ? { dashboard: options.dashboard.restServices.dashboard } : {}),
-      datasets: () => options.dataset.app,
-      evaluators: () => options.evaluator.app,
+      ...(options.dataset ? { datasets: () => options.dataset!.app } : {}),
+      ...(options.evaluator ? { evaluators: options.evaluator.restServices.evaluators } : {}),
       permissions: () => options.authz,
       ...(options.experiment.experiments ? { experiments: () => options.experiment.app } : {}),
       governance: () => options.enterpriseGovernance.governanceApp,
@@ -212,7 +220,7 @@ export function composeApiPackagedRest(
         : {}),
       organizations: () => options.organizations,
       ...(options.projects ? { projects: () => options.projects! } : {}),
-      monitors: options.monitor.restServices.monitors,
+      ...(options.monitor ? { monitors: options.monitor.restServices.monitors } : {}),
       storedObjects: () => options.storedObject.app,
       // The SAME application `/api/files` reads through, in the shape the
       // avatar family takes. Its row carries the owner kind, which is what
@@ -342,36 +350,6 @@ export class ApiTraceMediaStore extends TraceMediaStorePort {
   }): Promise<{ id: string; mediaType: string; isDuplicate: boolean }> {
     return this.store.storeFromBytes(input);
   }
-}
-
-/** The agent application over the service this process already resolved. */
-function agentAppFrom(agents: AgentService): () => AgentApp {
-  const app = AgentApp.create({ agents });
-  return () => app;
-}
-
-/**
- * The `/api/v1/agents` family's connected-agent deps, over the SAME composition the
- * WebSocket gateway and the long-poll transport run on — a relay dispatched through this
- * door and one delivered over the socket read one runtime.
- */
-function agentsV1ConnectedFrom(connectedAgents: ApiConnectedAgentsComposition) {
-  return () => ({
-    connectedRuntime: () => connectedAgents.runtime,
-    connect: {
-      transport: () => connectedAgents.longPoll,
-      ...(connectedAgents.relayMaxPayloadMb !== undefined
-        ? { relayMaxPayloadMb: connectedAgents.relayMaxPayloadMb }
-        : {}),
-    },
-    call: {
-      runtime: () => connectedAgents.runtime,
-      assertRunnable: connectedAgents.assertRunnable,
-      ...(connectedAgents.relayMaxPayloadMb !== undefined
-        ? { relayMaxPayloadMb: connectedAgents.relayMaxPayloadMb }
-        : {}),
-    },
-  });
 }
 
 /**

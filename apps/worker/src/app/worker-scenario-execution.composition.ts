@@ -6,8 +6,8 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { AgentApi } from "@langwatch/agent-contract";
-import { PostgresDatasetAdapter } from "@langwatch/dataset-server";
+import { AgentApi } from "@langwatch/agent-contract";
+import { createWorkerDatasetApp } from "./worker-dataset-normalization.composition.ts";
 import type { DatasetService } from "@langwatch/dataset-contract";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
 import { generate } from "@langwatch/ksuid";
@@ -15,10 +15,12 @@ import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaConnection } from "@langwatch/prisma-client";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { ProjectApi } from "@langwatch/project-contract";
 import { PostgresPromptAdapter, PromptApp } from "@langwatch/prompt-server";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { SimulationService, ScenarioService, ScenarioApi } from "@langwatch/scenario-contract";
+import { ScenarioApi } from "@langwatch/scenario-contract";
+import type { SimulationService, ScenarioService } from "@langwatch/scenario-contract";
+import { PromptApi } from "@langwatch/prompt-contract";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
@@ -41,7 +43,7 @@ import {
   type ScenarioEgressPolicy,
 } from "@langwatch/scenario-server";
 import { AesGcmSecretEncryptionAdapter, secretServer } from "@langwatch/secret-server";
-import { SuiteApp, SuiteExecutionPort } from "@langwatch/suite-server";
+import { suiteServer, SuiteExecutionPort } from "@langwatch/suite-server";
 import type { TraceApi } from "@langwatch/trace-contract";
 import {
   ContractWorkflowDslMigrationAdapter,
@@ -249,25 +251,29 @@ export async function createWorkerScenarioExecutionGraph(input: {
   const agents = input.agents;
   const promptApp = PromptApp.create({ prompts, projects: deps.projects });
 
-  const suites = SuiteApp.create({
-    dependencies: {
-      agents,
-      prompts: promptApp,
-      scenarios: input.scenarioApi,
-      projects: deps.projects,
-    },
-    infrastructure: {
-      database: prisma,
-      resolveClickHouseClient: deps.resolveClickHouseClient,
-      defaultRetentionDays: deps.defaultRetentionDays,
-      execution: new WorkerSuiteStartRefusal(deps.config.serviceName),
-      generateId: () => `suite_${nanoid()}`,
-    },
-    config: void 0,
-    resources: input.resources,
-  });
+  // The suite application, over the feature's own repositories. This process
+  // starts no run — the refusal below says so by name — but it reads the plans
+  // and the run projection a scenario child reports against.
+  const suiteRuntime = await createApp({ name: "langwatch-worker-suite" })
+    .withPersistence("postgres", { prisma })
+    .withInfrastructure({})
+    .withProvided(ScenarioApi, input.scenarioApi)
+    .withProvided(AgentApi, agents)
+    .withProvided(PromptApi, promptApp)
+    .withProvided(ProjectApi, deps.projects)
+    .withFeature(suiteServer, {
+      infrastructure: {
+        resolveClickHouseClient: deps.resolveClickHouseClient,
+        defaultRetentionDays: deps.defaultRetentionDays,
+        execution: new WorkerSuiteStartRefusal(deps.config.serviceName),
+        generateId: () => `suite_${nanoid()}`,
+      },
+    })
+    .boot({ role: "worker" });
+  input.resources.own("worker scenario suites", () => suiteRuntime.stop());
+  const suites = suiteRuntime.feature(suiteServer).provided;
 
-  const datasets = PostgresDatasetAdapter.create({ database: prisma }).build();
+  const datasets = await createWorkerDatasetApp({ database: prisma, resources: input.resources });
   const nlpRuntime = HttpWorkflowNlpRuntimeAdapter.create({
     serviceUrl: deps.nlpServiceUrl,
     staging: deps.payloadStaging,

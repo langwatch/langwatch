@@ -4,11 +4,7 @@ import {
   type ModelCostCatalogDatabase,
   type ModelCostCatalogService,
 } from "@langwatch/model-provider-server";
-import {
-  PostgresMonitorCatalogAdapter,
-  type MonitorCatalogDatabase,
-  type MonitorCatalogService,
-} from "@langwatch/monitor-server";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
   PostgresProjectMetadataAdapter,
   type ProjectDiagnosticsPort,
@@ -49,7 +45,7 @@ import {
  *                                   updateMetadata, resolveOrgAdmin
  *     DataPrivacyResolutionPort     getResolvedForProject
  *     ModelCostCatalogService       listCosts
- *     MonitorCatalogService         getEnabledOnMessageMonitors
+ *     MonitorApi                    getEnabledOnMessageMonitors
  *
  * Eight operations over three Prisma models and one booted application. Nothing
  * here opens a connection, reads an environment or chooses a gateway.
@@ -77,6 +73,12 @@ export function createWorkerTraceCapabilityServices(options: {
    * process has, and a second would answer a different policy for one project.
    */
   dataPrivacy: DataPrivacyResolutionPort;
+  /**
+   * The monitors enabled on every message. Taken rather than built: the ONE
+   * monitor application this process installs answers the same listing the
+   * evaluation trigger reads, and a second reading could disagree with it.
+   */
+  monitors: MonitorApi;
 }): WorkerTraceCapabilityServices {
   const projects = PostgresProjectMetadataAdapter.create({
     database: options.database,
@@ -90,27 +92,24 @@ export function createWorkerTraceCapabilityServices(options: {
       database: options.database,
       projects,
     }).build(),
-    monitors: PostgresMonitorCatalogAdapter.create({
-      database: options.database,
-    }).build(),
+    monitors: options.monitors,
   };
 }
 
 /**
- * The four Prisma models the record path reads, and nothing else in the client.
+ * The Prisma models the record path reads, and nothing else in the client.
  *
  * Each half is the feature's own declaration rather than a list repeated here,
  * so a model a feature starts reading arrives at this seam by typecheck rather
- * than by review.
+ * than by review. The monitor listing is not here: it is answered by the
+ * monitor application, over that feature's own repositories.
  */
-export type WorkerTraceCapabilityDatabase = ProjectMetadataDatabase &
-  ModelCostCatalogDatabase &
-  MonitorCatalogDatabase;
+export type WorkerTraceCapabilityDatabase = ProjectMetadataDatabase & ModelCostCatalogDatabase;
 
 /** The four read-side capability services, each the feature's own. */
 export type WorkerTraceCapabilityServices = Readonly<{
   projects: ProjectMetadataService;
   dataPrivacy: DataPrivacyResolutionPort;
   modelCosts: ModelCostCatalogService;
-  monitors: MonitorCatalogService;
+  monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;
 }>;

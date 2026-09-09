@@ -25,7 +25,6 @@ import {
   type OpsEventExplorer,
   type OpsProcessExplorer,
   type OpsReplayRunner,
-  type OpsTrpcPorts,
 } from "@langwatch/ops-server";
 import type { ProjectService } from "@langwatch/project-contract";
 import type { UserService } from "@langwatch/user-contract";
@@ -35,10 +34,6 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiAuditPort } from "../../api-request.policy.ts";
-import { createOpsTrpcRouter } from "./ops-trpc.mount.ts";
-import { opsPolicyKit } from "./ops-policy-kit.ts";
-
-const OPS_EVENT_LOG_LOOKBACK_DAYS = 365;
 
 /** The other features' services the operator surface reaches, named one by one. */
 export type OpsPeers = Readonly<{
@@ -138,38 +133,16 @@ export function composeOpsFeature(options: {
   if (!collaborators.redis) options.report?.absent("ops-snapshot");
   const app = composeOps(collaborators, collaborators.logger);
 
-  return {
-    app,
-    router: (mount) =>
-      createOpsTrpcRouter({
-        root: mount.root,
-        protectedProcedure: mount.protectedProcedure,
-        policy: opsPolicyKit(mount.middlewares, composeOpsCheck(app)),
-        ports: composeOpsPorts(),
-        validateOutput: mount.validateOutput,
-      }),
-  };
+  return { app };
 }
 
 /**
- * The operator surface on a process that composed no graph to run it over. The namespace
- * still mounts and the staff check still runs, so `ctx.app.ops` is never undefined and no
- * other surface has to branch on it.
+ * The operator surface on a process that composed no graph to run it over. The
+ * staff check still runs, so `ctx.app.ops` is never undefined and no other
+ * surface has to branch on it.
  */
 export function refusingOpsFeature(): ComposedOpsFeature {
-  const app = refusingOps<OpsApp>();
-
-  return {
-    app,
-    router: (mount) =>
-      createOpsTrpcRouter({
-        root: mount.root,
-        protectedProcedure: mount.protectedProcedure,
-        policy: opsPolicyKit(mount.middlewares, composeOpsCheck(app)),
-        ports: composeOpsPorts(),
-        validateOutput: mount.validateOutput,
-      }),
-  };
+  return { app: refusingOps<OpsApp>() };
 }
 
 /** One operator application, refused by name on every member. */
@@ -361,30 +334,6 @@ class ApiOpsAuditSink extends AdminAuditSink {
     }
     await this.audit.record(entry as unknown as Parameters<ApiAuditPort["record"]>[0]);
   }
-}
-
-/**
- * The four operator ports, each answering for the PROCESS rather than for the operations
- * service.
- */
-function composeOpsPorts(): OpsTrpcPorts {
-  return {
-    // An explicitly empty registry, not a refusal: this process genuinely
-    // registers no projections and no subscribers, so "none" is the true
-    // answer rather than a missing one.
-    listPipelineRegistrations: () => ({ projections: [], eventSubscribers: [] }),
-    getEventLogSearchWindow: () => ({
-      searchLookbackDays: OPS_EVENT_LOG_LOOKBACK_DAYS,
-      // Null is "we cannot say", which is the honest answer for a process that
-      // reads no table TTL configuration.
-      hotTierDays: null,
-      hotTierEnvVar: null,
-    }),
-    tryGetGrafanaLinkConfig: () => null,
-    systemMigrations: unavailableOperatorRuntime<OpsTrpcPorts["systemMigrations"]>(
-      "The system-migrations runner",
-    ),
-  };
 }
 
 /**

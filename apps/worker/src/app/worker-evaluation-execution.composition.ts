@@ -2,6 +2,7 @@ import { AZURE_SAFETY_PROVIDER_KEY } from "@langwatch/evaluation-contract";
 import {
   EvaluationAzureSafetyCredentialsPort,
   EvaluationInputsOffloadPort,
+  EvaluationMonitorLookupPort,
   type EvaluationInputsOffloadService,
   EvaluationSettingsRecoveryPort,
   EvaluationSpanDigestPort,
@@ -11,7 +12,7 @@ import {
   EvaluationWorkflowExecutorPort,
   HttpLangevalsEvaluatorAdapter,
   OtelEvaluationExecutionMetricsAdapter,
-  PrismaEvaluationCostRecorderAdapter,
+  EvaluationCostService,
 } from "@langwatch/evaluation-server";
 import {
   NlpEvaluatorCodeExecutionAdapter,
@@ -20,7 +21,20 @@ import {
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { getProjectModelProviders } from "@langwatch/model-provider-server";
-import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { PrismaEvaluationCostRepository } from "@langwatch/evaluation-server/composition/evaluation-cost";
+import type {
+  MonitorApi,
+  MonitorIdInput,
+  MonitorWithEvaluator,
+} from "@langwatch/monitor-contract";
+import {
+  monitorServer,
+  MonitorEvaluatorPort,
+  MonitorPerformancePort,
+  MonitorReplicationPort,
+} from "@langwatch/monitor-server";
+import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { EvaluationTraceReadInput, Span, TraceApi } from "@langwatch/trace-contract";
 import { TraceReadableSpanService } from "@langwatch/trace-server";
@@ -47,6 +61,8 @@ const LANGEVALS_TIMEOUT_MS = 5 * 60 * 1000;
 export function createWorkerEvaluationExecutionCollaborators(input: {
   database: PrismaClient;
   traces: TraceApi;
+  /** The ONE monitor application this process installed. */
+  monitors: MonitorApi;
   workflows: WorkerEvaluationWorkflows;
   models: WorkerModelProviders;
   featureFlags: FeatureFlagApi;
@@ -67,14 +83,9 @@ export function createWorkerEvaluationExecutionCollaborators(input: {
     codeExecution: NlpEvaluatorCodeExecutionAdapter.create(input.workflows.nlpRuntime),
     generateId: nanoid,
   });
-  const monitors = PostgresMonitorAdapter.create({
-    database: input.database,
-    evaluators,
-    generateId: nanoid,
-  });
 
   return {
-    monitors,
+    monitors: new WorkerEvaluationMonitorLookup(input.monitors),
     evidence: WorkerEvaluationTraceEvidence.create(input.traces),
     azureSafetyCredentials,
     settingsRecovery: WorkerEvaluationSettingsRecovery.create(input.featureFlags),
@@ -83,7 +94,9 @@ export function createWorkerEvaluationExecutionCollaborators(input: {
       flags: input.featureFlags,
     }),
     inputResolution: inputs,
-    costs: PrismaEvaluationCostRecorderAdapter.create(input.database),
+    costs: EvaluationCostService.create({
+      repository: PrismaEvaluationCostRepository.create({ prisma: input.database }),
+    }),
     engine: {
       traceService: traceReads,
       spanDigest: WorkerEvaluationSpanDigest.create(),
@@ -107,6 +120,82 @@ export function createWorkerEvaluationExecutionCollaborators(input: {
       telemetry,
     },
   };
+}
+
+/**
+ * The monitor application, installed for the ONE read Evaluation's execution
+ * makes: the monitor a queued command names.
+ *
+ * The worker composes no evaluator directory, no seven-day trend and no
+ * replication, so the operations that read them refuse by name. `findById`,
+ * which is the only one this process calls, answers from the monitor rows.
+ */
+export async function createWorkerMonitorApp(options: {
+  database: PrismaClient;
+  permissions: AuthzApi;
+  resources: ResourceOwnership;
+}): Promise<MonitorApi> {
+  const runtime = await createApp({ name: "langwatch-worker-monitor" })
+    .withPersistence("postgres", { prisma: options.database })
+    .withInfrastructure({})
+    .withProvided(AuthzApi, options.permissions)
+    .withFeature(monitorServer, {
+      infrastructure: {
+        evaluators: new UncomposedMonitorEvaluators(),
+        performance: new UncomposedMonitorPerformance(),
+        replication: new UncomposedMonitorReplication(),
+        generateId: () => `monitor_${nanoid()}`,
+      },
+    })
+    .boot({ role: "worker" });
+
+  options.resources.own("worker monitor application", () => runtime.stop());
+
+  return runtime.feature(monitorServer).provided;
+}
+
+/** A monitor read this process makes, over the one monitor application. */
+class WorkerEvaluationMonitorLookup extends EvaluationMonitorLookupPort {
+  constructor(private readonly monitors: MonitorApi) {
+    super();
+  }
+
+  async tryGetMonitorById(input: MonitorIdInput): Promise<MonitorWithEvaluator | null> {
+    return (await this.monitors.findById(input)) ?? null;
+  }
+}
+
+const uncomposedInWorker = (capability: string): Error =>
+  new Error(`The worker composed no ${capability}, so this monitor operation cannot answer.`);
+
+class UncomposedMonitorEvaluators extends MonitorEvaluatorPort {
+  getById(): Promise<never> {
+    return Promise.reject(uncomposedInWorker("evaluator directory"));
+  }
+
+  archive(): Promise<never> {
+    return Promise.reject(uncomposedInWorker("evaluator directory"));
+  }
+}
+
+class UncomposedMonitorPerformance extends MonitorPerformancePort {
+  getMonitorPerformance(): Promise<never> {
+    return Promise.reject(uncomposedInWorker("online-evaluation trend"));
+  }
+
+  previousPeriodStartMs(): number {
+    throw uncomposedInWorker("online-evaluation trend");
+  }
+}
+
+class UncomposedMonitorReplication extends MonitorReplicationPort {
+  copyEvaluatorToProject(): Promise<never> {
+    return Promise.reject(uncomposedInWorker("evaluator replication"));
+  }
+
+  deleteReplicatedWorkflow(): Promise<never> {
+    return Promise.reject(uncomposedInWorker("evaluator replication"));
+  }
 }
 
 class WorkerEvaluationAzureSafetyCredentials extends EvaluationAzureSafetyCredentialsPort {

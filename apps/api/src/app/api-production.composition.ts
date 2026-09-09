@@ -1,5 +1,5 @@
 import { EnterpriseApiAuditLog, EnterpriseApiSso } from "@langwatch/enterprise-api";
-import { EvaluatorApp } from "@langwatch/evaluator-server";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import {
   createApp,
@@ -72,15 +72,10 @@ import { ApiConnectedAgentsComposition } from "./api-connected-agents.compositio
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import type { AgentInfrastructure } from "@langwatch/agent-server";
 import { ApiUpgradeRouter } from "../api-upgrade-router.ts";
-import {
-  composeDatasetFeature,
-  composeDatasetService,
-  refusingDatasetFeature,
-} from "../features/dataset/dataset.composition.ts";
+import { installApiDataset } from "../features/dataset/dataset.composition.ts";
 import {
   composeEvaluatorFeature,
   composeEvaluatorService,
-  refusingEvaluatorFeature,
 } from "../features/evaluator/evaluator.composition.ts";
 import {
   composePromptFeature,
@@ -163,10 +158,8 @@ import {
 import { installApiRole } from "../features/role/role.composition.ts";
 import { installApiDataRetention } from "../features/data-retention/data-retention.composition.ts";
 import {
-  composeMonitorFeature,
-  composeMonitorService,
-  LoggedApiMonitorAbsence,
-  refusingMonitorFeature,
+  installApiMonitor,
+  type MonitorWorkflowReplication,
 } from "../features/monitor/monitor.composition.ts";
 import {
   DeferredPayloadStagingAdapter,
@@ -232,14 +225,12 @@ import {
 import { canonicalErrorFor } from "./api-canonical-error.ts";
 import { PostgresGithubAdapter } from "@langwatch/github-server";
 import type { GithubService } from "@langwatch/github-contract";
-import { PostgresMonitorAdapter } from "@langwatch/monitor-server";
-import type { DatasetService } from "@langwatch/dataset-contract";
-import type { MonitorService } from "@langwatch/monitor-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import { ExperimentApi } from "@langwatch/experiment-contract";
 import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import { EvaluationNameAutoslugService } from "@langwatch/evaluation-server";
 
 import { createPlatformUrlBuilder } from "./api-rest-ports.ts";
-import { nanoid } from "nanoid";
 import { composeHttpProxyFeature } from "../features/agent/http-proxy.composition.ts";
 import type { WorkflowStudioDispatchService } from "@langwatch/workflow-server";
 import {
@@ -621,7 +612,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   private composedTenancy: ApiTenancyComposition | undefined;
   private composedAgents: ApiAgentComposition | undefined;
   private agentApi: AgentApi | undefined;
-  private evaluatorApi: EvaluatorApp | undefined;
+  private evaluatorApi: EvaluatorApi | undefined;
   private agentRelayMaxPayloadMb: number | undefined;
   private readonly agentClients = new LocalFeatureApis();
   private composedConnectedAgents: ApiConnectedAgentsComposition | undefined;
@@ -657,8 +648,16 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * agent feature installs, and this one when the tenant half has composed.
    */
   private readonly deferredApis = new LocalFeatureApis();
-  private composedDataset!: ComposedDatasetFeature;
-  private composedEvaluator!: ComposedEvaluatorFeature;
+  /**
+   * A project's datasets, or none: a process that opened no graph has no rows
+   * to read and mounts no dataset family.
+   */
+  private composedDataset: ComposedDatasetFeature | undefined;
+  /**
+   * A project's evaluators, or none: a process that opened no graph has no
+   * evaluator to publish and mounts no evaluator family.
+   */
+  private composedEvaluator: ComposedEvaluatorFeature | undefined;
   private composedPrompt!: ComposedPromptFeature;
   private composedAuthFeature!: ComposedAuthFeature;
   private composedUser!: ComposedUserFeature;
@@ -683,9 +682,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * service, the ONE evaluator service, and the monitor service an experiment upserts through.
    */
   private composedWorkflowRuntime: ApiWorkflowRuntime | undefined;
-  private composedDatasets: DatasetService | undefined;
+  private composedDatasets: DatasetApi | undefined;
   private composedEvaluators: EvaluatorService | undefined;
-  private composedExecutionMonitors: MonitorService | undefined;
   private composedWorkflow!: ComposedWorkflowFeature;
   private composedExperiment!: ComposedExperimentFeature;
   /**
@@ -720,7 +718,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    * refusing twin: a process with no database bounds nothing.
    */
   private composedDataRetention: ComposedDataRetentionFeature | undefined;
-  private composedMonitor!: ComposedMonitorFeature;
+  /**
+   * The monitor surface, or none: a process that composed no graph has no
+   * evaluator for a monitor to run, and mounts no monitor family.
+   */
+  private composedMonitor: ComposedMonitorFeature | undefined;
   private composedStoredObject!: ComposedStoredObjectFeature;
   /**
    * The operator's Azure spool assertion, read once with the rest of the
@@ -795,7 +797,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
    */
   private composedEncryption: SecretEncryptionPort | undefined;
   private composedGithub: GithubService | undefined;
-  private composedMonitors: MonitorService | undefined;
   private composedModelProviders: ModelProviderService | undefined;
   private composedPlanProvider: PlanProvider | undefined;
   private composedPlanSources: EntitlementServiceOptions | undefined;
@@ -1042,8 +1043,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         ? await installApiDataPrivacy({
             infrastructure,
             peers: {
-              projects: tenancy.projects,
-              organizations: tenancy.organizations,
+              // The two directories are referenced rather than passed: the
+              // tenant half installs them below, and a privacy read only ever
+              // resolves a scope once a request is in flight.
+              projects: this.deferredApis.reference(ProjectApi),
+              organizations: this.deferredApis.reference(OrganizationApi),
               // The SAME permission answers the declared check on the same
               // procedure asks; a second AuthZ here would be a second answer.
               permissions: this.composedAuthz.app,
@@ -1083,7 +1087,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // workflow service serves all of them plus the evaluator service built
     // over it, and the re-score reports through a PRODUCER-only registration
     // of the same pipeline the worker drains.
-    this.composeExecutionFeatures(
+    await this.composeExecutionFeatures(
       options,
       agents,
       encryption,
@@ -1248,27 +1252,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // the projects a scheduled job is scoped to. It used to ride inside the agent half, which
     // cost every operator surface whenever a scenario collaborator was missing. A project's
     // datasets, its evaluators and its prompt library.
-    this.composedDataset =
-      infrastructure && this.composedDatasets
-        ? composeDatasetFeature({
-            infrastructure,
-            peers: { experimentLookup: this.composedExperiment.experimentLookup },
-          })
-        : refusingDatasetFeature();
-    this.composedEvaluator =
-      infrastructure && this.composedEvaluators && this.evaluatorApi
-        ? composeEvaluatorFeature({
-            infrastructure,
-            app: this.evaluatorApi,
-            peers: {
-              evaluators: this.composedEvaluators,
-              workflows: this.composedWorkflow.app,
-              ...(this.composedModelProviders
-                ? { modelProviders: this.composedModelProviders }
-                : {}),
-            },
-          })
-        : refusingEvaluatorFeature();
     this.composedPrompt =
       infrastructure && directory
         ? composePromptFeature({
@@ -1281,9 +1264,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
             },
           })
         : refusingPromptFeature();
-    // After the evaluator feature, whose replication ports a monitor copy
-    // carries: one answer to what copying an evaluator does to the graph.
-    this.composedMonitor = this.composeMonitor(options);
     this.composedOps = this.composeOps(options, infrastructure, directory);
     // The support inbox the back office reads over tRPC is not composed: its
     // transport is unconverted, and the feature had no other door. The public
@@ -2270,9 +2250,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       automation: this.composedAutomation,
       codingAgent: this.composedCodingAgent,
       enterprise: this.composedEnterprise,
-      dataset: this.composedDataset,
-      evaluator: this.composedEvaluator,
-      monitor: this.composedMonitor,
+      ...(this.composedDataset ? { dataset: this.composedDataset } : {}),
+      ...(this.composedEvaluator ? { evaluator: this.composedEvaluator } : {}),
+      ...(this.composedMonitor ? { monitor: this.composedMonitor } : {}),
       dashboard: this.composedDashboard,
       legacyErrors: ApiRestObservabilityComposition.create().legacyErrorHandler,
       storedObject: this.composedStoredObject,
@@ -2362,6 +2342,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     })) {
       rest.route("/", processRestApp);
     }
+    // `/api/dataset`, declared by the dataset module and bound to this
+    // process's project-key door. Absent on a process that installed no
+    // dataset feature, which has no rows for the family to answer over.
+    if (this.composedDataset) rest.route("/", this.composedDataset.rest);
     // `/api/secret` and `/api/secrets`, each with its `/api/v1` twin. Nothing
     // is mounted on a process that installed no secret feature: a door over a
     // store it cannot decrypt is worse than no door.
@@ -2583,7 +2567,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     if (!composition || !database || !projects) return undefined;
 
     const modelProviders = this.composedModelProviders;
-    const monitors = this.composedMonitors;
+    const monitors = this.composedMonitor?.app;
     const spend = this.composedGatewaySpendPipeline;
     // The SAME runtime the legacy evaluate doors and the studio's re-score run
     // on. A guardrail and a monitor scoring the same evaluator two ways is
@@ -3211,13 +3195,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     tenancy: ApiResolvedTenancy,
   ): Promise<void> {
     const database = this.composedDatabase?.connection;
-    const projects = this.composedTenancy?.projects;
+    const composedTenancy = this.composedTenancy;
+    const projects = composedTenancy?.projects;
     const processName = options.config.serviceName;
     const personMail = this.resolvePersonMail();
     // A host that injected its own api-key and organization pair composed no
     // tenancy here, so it holds the collaborator set whole and hands it in
     // rather than having these features built for it.
-    if (!database || !projects) {
+    if (!database || !projects || !composedTenancy) {
       this.composedAuthFeature = refusingAuthFeature(processName);
       this.composedUser = refusingUserFeature(processName);
       this.composedApiKey = refusingApiKeyFeature();
@@ -3263,7 +3248,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
 
     this.composedApiKey = composeApiKeyFeature({
       audit: this.resolveAudit(),
-      app: tenancy.apiKeyApp,
+      // The credential application this process composed, which is the SAME
+      // object `tenancy.apiKeys` names: one answer to what a key is.
+      app: composedTenancy.apiKeyApp,
     });
   }
 
@@ -3316,26 +3303,29 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   }
 
   /**
-   * The monitor surface, over this process's own graph. Two peers and nothing else: the monitor
-   * and evaluator services the execution half composed, and the evaluator replication the
-   * product-group half built over this process's workflow application.
+   * The monitor surface, over this process's own graph, or none where the
+   * execution half opened no graph for a monitor to run an evaluator on.
+   *
+   * The evaluator-workflow replication a copy carries is stranded on the
+   * evaluator feature's own graph, so copying a monitor refuses by name while
+   * every other monitor read and write answers for real.
    */
-  private composeMonitor(options: ApiRuntimeCompositionOptions): ComposedMonitorFeature {
-    const monitors = this.composedExecutionMonitors;
+  private async installMonitor(
+    options: ApiRuntimeCompositionOptions,
+    infrastructure: ApiTrpcInfrastructure | undefined,
+  ): Promise<ComposedMonitorFeature | undefined> {
     const evaluators = this.composedEvaluators;
-    if (!monitors || !evaluators) return refusingMonitorFeature();
+    const permissions = this.composedAuthz?.app;
+    if (!infrastructure || !evaluators || !permissions) return undefined;
 
-    return composeMonitorFeature({
-      peers: {
-        monitors,
-        evaluators,
-        // The evaluator feature's own ports: a monitor copy carries its
-        // evaluator and that evaluator's workflow with it, and a second
-        // replication would be a second answer to what copying one does.
-        evaluatorReplication: this.composedEvaluator.ports,
-      },
+    createLogger(options.config.serviceName).warn(
+      "API process composed no evaluator workflow replication: copying a monitor to another project refuses by name, and every other monitor read and write answers.",
+    );
+
+    return installApiMonitor({
+      infrastructure,
+      peers: { permissions, evaluators, workflowReplication: unreplicatedEvaluatorWorkflows() },
       resolveClickHouseClient: this.composedClickHouse?.resolveClient ?? null,
-      report: LoggedApiMonitorAbsence.create(createLogger(options.config.serviceName)),
     });
   }
 
@@ -3779,7 +3769,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       infrastructure,
       peers: {
         projects: tenancy.projects,
-        monitors: this.resolveMonitors(database.client, evaluators),
+        // The ONE monitor application the execution half installed: a trigger
+        // names the monitors the monitor page lists, not a second reading.
+        monitors: this.composedMonitor?.app,
         encryption,
         // The SAME Redis the queue owns, which the worker spends the
         // automation persist ceiling against.
@@ -3843,7 +3835,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
         datasets: this.composedDatasets,
         workflows: this.composedWorkflow.service,
         experiments: this.composedExperiment.experiments,
-        monitors: this.composedMonitors,
+        monitors: this.composedMonitor?.app,
         evaluators: this.composedEvaluators,
         agents: this.agentApi,
         simulations: this.composedScenario.simulations,
@@ -4044,14 +4036,14 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       // together: a process holding none of them composes a refusing gateway,
       // and only the gateway's own six namespaces are affected.
       peers:
-        database && tenancy && evaluators
+        database && tenancy && evaluators && this.composedMonitor
           ? {
               projects: tenancy.projects,
               evaluators,
-              // The SAME monitor directory the automation application and the
-              // monitor surface read: a guardrail attachment and the monitor
+              // The SAME monitor application the automation half and the
+              // monitor family read: a guardrail attachment and the monitor
               // page it points at must agree about what one runs.
-              monitors: this.resolveMonitors(database.client, evaluators),
+              monitors: this.composedMonitor.app,
             }
           : undefined,
       // The SAME ClickHouse the charted reads and the traces run on: the
@@ -4079,22 +4071,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const clickhouse = this.composedClickHouse;
     if (!clickhouse) return null;
     return { resolve: (tenantId: string) => clickhouse.resolveClient(tenantId) };
-  }
-
-  /**
-   * The monitor directory, memoized.
-   */
-  private resolveMonitors(
-    prisma: PrismaConnection["client"],
-    evaluators: EvaluatorService,
-  ): MonitorService {
-    if (this.composedMonitors) return this.composedMonitors;
-    this.composedMonitors = PostgresMonitorAdapter.create({
-      database: prisma,
-      evaluators,
-      generateId: () => nanoid(),
-    });
-    return this.composedMonitors;
   }
 
   /**
@@ -4315,25 +4291,30 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   /**
    * Composes the execution half of the collaborator set over this process's own graph.
    */
-  private composeExecutionFeatures(
+  private async composeExecutionFeatures(
     options: ApiRuntimeCompositionOptions,
     agents: AgentApi | undefined,
     encryption: SecretEncryptionPort | undefined,
     tenancy: ApiResolvedTenancy,
     queueInfrastructure: ApiQueueInfrastructure | undefined,
     infrastructure: ApiTrpcInfrastructure | undefined,
-  ): void {
+  ): Promise<void> {
     const database = this.composedDatabase?.connection;
     const modelProviders = this.resolveModelProviders(options, encryption);
     // Held so the product-group half reads the SAME gateway rather than
     // composing a second: a stored prompt version's model reference and a
     // studio node's model must resolve to one provider, not to two.
     this.composedModelProviders = modelProviders;
-    if (!database || !agents || !modelProviders || !infrastructure) {
+    // The grants the dataset and monitor applications authorize a second
+    // project's read with. Named in the guard rather than assumed: both install
+    // over it, and neither holds a second answer to who may read what.
+    const permissions = this.composedAuthz?.app;
+    if (!database || !agents || !modelProviders || !infrastructure || !permissions) {
       LoggedApiExecutionAbsence.create(createLogger(options.config.serviceName)).absent({
         database: Boolean(database),
         agents: Boolean(agents),
         modelProviders: Boolean(modelProviders),
+        permissions: Boolean(permissions),
       });
       this.composedWorkflow = refusingWorkflowFeature();
       this.composedExperiment = refusingExperimentFeature();
@@ -4343,7 +4324,25 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // The order below is the graph's own: a dataset is read by the studio, the
     // studio's service is what an evaluator publishes through, an evaluator is
     // what a monitor runs, and an experiment reaches all four.
-    const datasets = composeDatasetService({ infrastructure });
+    // The experiment a dataset borrows a name from is bound below rather than
+    // passed: the experiment feature stands on the datasets this line opens, so
+    // the two are one graph read in both directions.
+    this.deferredApis.declare(ExperimentApi);
+    this.composedDataset = await installApiDataset({
+      prisma: infrastructure.prisma,
+      peers: { experiments: this.deferredApis.reference(ExperimentApi), permissions },
+      infrastructure: {},
+      // `/api/dataset` answers through the SAME project-key door every other
+      // declared family on this process opens.
+      rest: {
+        credential: (input) => this.composedHandlerCredentials.authenticate(input),
+        platformUrl: createPlatformUrlBuilder(
+          options.config.infrastructure.execution.publicBaseUrl,
+        ),
+        errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
+      },
+    });
+    const datasets = this.composedDataset.app;
     this.composedDatasets = datasets;
     const workflowRuntime = composeWorkflowRuntime({
       infrastructure,
@@ -4363,9 +4362,25 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       peers: { workflows: workflowRuntime.workflows, nlpRuntime: workflowRuntime.nlpRuntime },
     });
     this.composedEvaluators = evaluators;
-    this.evaluatorApi = EvaluatorApp.create({ evaluators, modelProviders });
-    const monitors = composeMonitorService({ infrastructure, peers: { evaluators } });
-    this.composedExecutionMonitors = monitors;
+    // The ONE evaluator application: `evaluators.*`, `/api/evaluators` and the
+    // studio all read it. Its workflow peer is read late, because the workflow
+    // application takes this application as a peer of its own.
+    this.composedEvaluator = composeEvaluatorFeature({
+      infrastructure,
+      peers: {
+        evaluators,
+        workflows: () => this.composedWorkflow.app,
+        modelProviders,
+        permissions,
+      },
+    });
+    this.evaluatorApi = this.composedEvaluator.app;
+    // The monitor application, installed HERE because the evaluator service a
+    // monitor runs opens on the line above. The experiment wizard, the
+    // automation half and the gateway all read THIS one, so a guardrail
+    // attachment and the monitor page it points at cannot disagree.
+    this.composedMonitor = await this.installMonitor(options, infrastructure);
+    const monitors = this.composedMonitor?.app;
 
     this.composedStudioDispatch =
       this.options.studioDispatch ??
@@ -4439,6 +4454,9 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       broadcast: this.composedBroadcast,
       runReport: LoggedApiExperimentRunAbsence.create(createLogger(options.config.serviceName)),
     });
+    // The reference the dataset application resolves a borrowed name through,
+    // bound now that the experiment half is open.
+    this.deferredApis.bind(ExperimentApi, this.composedExperiment.app);
   }
 
   /**
@@ -4636,11 +4654,17 @@ export class LoggedApiExecutionAbsence {
 
   private constructor(private readonly logger: Pick<Logger, "info">) {}
 
-  absent(present: { database: boolean; agents: boolean; modelProviders: boolean }): void {
+  absent(present: {
+    database: boolean;
+    agents: boolean;
+    modelProviders: boolean;
+    permissions?: boolean;
+  }): void {
     const missing = [
       present.database ? undefined : "a database",
       present.agents ? undefined : "an agent service",
       present.modelProviders ? undefined : "a model gateway",
+      present.permissions === false ? "a grants service" : undefined,
     ].filter((entry): entry is string => entry !== undefined);
     if (missing.length === 0) return;
     this.logger.info(
@@ -4905,6 +4929,22 @@ class ApiTraceSpanIngestAdapter extends TraceSpanIngestPort {
   recordSpan(data: RecordSpanCommandData): Promise<void> {
     return this.commands.recordSpan(data);
   }
+}
+
+/**
+ * Copying an evaluator's workflow, on a process that composed no replication of
+ * the graph behind it. Both members refuse by name: a copy that silently made a
+ * monitor without its workflow would be a structurally broken replica.
+ */
+function unreplicatedEvaluatorWorkflows(): MonitorWorkflowReplication {
+  const refuse = (): Promise<never> =>
+    Promise.reject(
+      new ApiEvaluationUnavailableError(
+        "evaluator workflow replication, so a monitor cannot be copied to another project",
+      ),
+    );
+
+  return { replicateEvaluatorWorkflow: refuse, deleteReplicatedWorkflow: refuse };
 }
 
 /**

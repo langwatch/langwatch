@@ -1,20 +1,22 @@
 import { S3Client } from "@aws-sdk/client-s3";
 import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
 import {
+  type DatasetApi,
   DatasetNormalizationWorkerPort,
   type DatasetNormalizationSender,
   type DatasetNormalizePayload,
-  type DatasetService,
 } from "@langwatch/dataset-contract";
+import { createApp, type ResourceOwnership } from "@langwatch/runtime-composition";
 import {
   AzureDatasetStorageAdapter,
+  DatasetApp,
+  datasetServer,
   DatasetAzureConfigResolverPort,
   DatasetNormalizationService,
   DatasetNormalizeAdapter,
   DatasetS3ClientResolverPort,
   DatasetStorageResolverPort,
   LocalDatasetStorageAdapter,
-  PostgresDatasetAdapter,
   S3DatasetStorageAdapter,
   type DatasetAzureConfig,
   type DatasetS3ClientLease,
@@ -67,17 +69,47 @@ export type WorkerDatasetObjectStorage = {
 };
 
 /**
- * Dataset's own service, composed for the ONE write a background process
- * makes: an automation appending a matched trace's mapped rows.
+ * Dataset's own application, installed once for the background reads and
+ * writes this process makes: an automation appending a matched trace's mapped
+ * rows, and the studio datasets an evaluation run materialises.
+ *
+ * The worker composes no experiment directory and no grants service, so the
+ * two operations that read them — borrowing an experiment's name, and copying
+ * a dataset into a second project — refuse by name rather than answering.
  */
-export function createWorkerDatasetWrites(options: {
+export async function createWorkerDatasetApp(options: {
   database: PrismaClient;
-  storage: WorkerDatasetObjectStorage;
-}): DatasetService {
-  return PostgresDatasetAdapter.create({
-    database: options.database,
-    storageResolver: new WorkerDatasetStorageResolver(options.storage),
-  }).build();
+  /** Absent where the caller reads rows only: a chunk read then has no store. */
+  storage?: WorkerDatasetObjectStorage | undefined;
+  resources: ResourceOwnership;
+}): Promise<DatasetApi> {
+  const storage = options.storage;
+  const runtime = await createApp({ name: "langwatch-worker-dataset" })
+    .withPersistence("postgres", { prisma: options.database })
+    .withInfrastructure({})
+    // Named through the application's own declaration: the worker provides
+    // neither, and this is the one place that says so.
+    .withProvided(DatasetApp.dependencies.experiments, uncomposed("experiment directory"))
+    .withProvided(DatasetApp.dependencies.permissions, uncomposed("grants service"))
+    .withFeature(datasetServer, {
+      infrastructure: storage
+        ? { storageResolver: new WorkerDatasetStorageResolver(storage) }
+        : {},
+    })
+    .boot({ role: "worker" });
+
+  options.resources.own("worker dataset application", () => runtime.stop());
+
+  return runtime.feature(datasetServer).provided;
+}
+
+/** A directory this process does not compose, refused by name on every member. */
+function uncomposed<T extends object>(capability: string): T {
+  return new Proxy({} as T, {
+    get: (_target, member) => (): never => {
+      throw new Error(`The worker composed no ${capability}, so ${String(member)} cannot answer.`);
+    },
+  });
 }
 
 class WorkerDatasetNormalizationAdapter extends DatasetNormalizationWorkerPort {
