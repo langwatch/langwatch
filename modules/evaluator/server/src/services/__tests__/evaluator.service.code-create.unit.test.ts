@@ -5,7 +5,8 @@ import type {
   EvaluatorRepository,
   PersistEvaluatorInput,
 } from "../../repositories/evaluator.repository.ts";
-import type { EvaluatorCodeExecutionPort } from "../../ports/evaluator.port.ts";
+import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";
+import { EvaluatorHistoryService } from "../evaluator-history.service.ts";
 
 /** The wire form of a config: what the repository row holds once persisted. */
 function persistedConfig(config: PersistEvaluatorInput["config"]): Evaluator["config"] {
@@ -61,11 +62,17 @@ function buildService() {
   } as unknown as EvaluatorRepository;
 
   const workflows = {} as never;
-  const codeExecution = {} as EvaluatorCodeExecutionPort;
+  const codeExecution: EvaluatorCodeExecution = {
+    execute: () => Promise.reject(new Error("no code evaluator runs in this case")),
+  };
 
   return EvaluatorService.create({
     repository,
     workflows,
+    history: EvaluatorHistoryService.create({
+      auditLog: { record: async () => void 0, listEntityHistory: async () => [] },
+      actors: { findByIds: async () => [] },
+    }),
     codeExecution,
     generateId: () => "generated-id",
   });

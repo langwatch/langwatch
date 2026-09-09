@@ -1,4 +1,4 @@
-import type { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import {
   BetterAuthAnnouncementsPort,
   BetterAuthFederationPort,
@@ -481,7 +481,7 @@ export type ApiBetterAuthCompositionOptions = Readonly<{
   /** The typed client every database hook reads and writes through. */
   database: PrismaClient;
   /** The Auth service whose sessions this instance mints and revokes. */
-  auth: AuthService;
+  auth: BrowserSessionApi;
   /** The same user directory the rest of this process serves from. */
   users: UserApi;
   /** Better Auth's session cache lives here when this process has a Redis. */

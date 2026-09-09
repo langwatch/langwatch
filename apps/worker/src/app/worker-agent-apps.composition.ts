@@ -1,12 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { AgentApi, MAX_CALL_TIMEOUT_MS } from "@langwatch/agent-contract";
-import {
-  EvaluatorApp,
-  NlpEvaluatorCodeExecutionAdapter,
-  PostgresEvaluatorAdapter,
-  PrismaEvaluatorAuditLogAdapter,
-} from "@langwatch/evaluator-server";
-import { nanoid } from "nanoid";
 import { BroadcastAdapter } from "@langwatch/presence-server";
 import { LocalFeatureApis, type ResourceScope } from "@langwatch/runtime-composition";
 import { ScenarioApi, type SimulationService } from "@langwatch/scenario-contract";
@@ -29,6 +22,7 @@ import {
   WorkflowApp,
 } from "@langwatch/workflow-server";
 import { installWorkerAgent } from "./worker-agent.composition.ts";
+import { installWorkerEvaluator } from "./worker-evaluator.composition.ts";
 import type { WorkerFoundationApps } from "./worker-foundation-apps.composition.ts";
 import {
   createWorkerScenarioExecution,
@@ -110,18 +104,16 @@ export async function createWorkerAgentApps(options: {
       resolveClient: options.resolveClickHouseClient,
     }),
   });
-  const evaluators = EvaluatorApp.create({
-    evaluators: PostgresEvaluatorAdapter.create({
-      database,
-      workflows: graph.workflows,
-      auditLog: PrismaEvaluatorAuditLogAdapter.create({
-        database,
-        auditLog: foundation.auditLog,
-      }),
-      codeExecution: NlpEvaluatorCodeExecutionAdapter.create(graph.nlpRuntime),
-      generateId: () => nanoid(),
-    }),
+  const evaluators = await installWorkerEvaluator({
+    database,
+    permissions: foundation.tenancy.authorization,
+    auditLog: foundation.auditLog,
+    users: foundation.users,
+    workflows: graph.workflows,
+    nlpRuntime: graph.nlpRuntime,
     modelProviders: prerequisites.modelProviders,
+    resources,
+    name: "worker agent evaluator application",
   });
   const workflows = WorkflowApp.create({
     infrastructure: {

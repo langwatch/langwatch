@@ -14,7 +14,7 @@ import type {
 } from "@langwatch/api/rest";
 import type { AutomationApp } from "@langwatch/automation-server";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
-import type { CodingAgentApp } from "@langwatch/coding-agent-server";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApp, DatasetDirectUploadAuthorizer } from "@langwatch/dataset-server";
 import type { GovernanceApp, ScimApi, WebhookApp } from "@langwatch/enterprise-api";
@@ -77,7 +77,7 @@ export type ApiPackagedRestServices = Readonly<{
   /** Fan-out to every browser watching one tenant. */
   broadcast?: (() => AppRestBroadcast) | undefined;
   /** The coding-agent reads, plus the cross-project cuts they answer over. */
-  codingAgents?: (() => CodingAgentApp) | undefined;
+  codingAgents?: (() => CodingAgentApi) | undefined;
   dashboard?: (() => DashboardApi) | undefined;
   datasets?: (() => DatasetApp) | undefined;
   evaluators?: (() => EvaluatorApp) | undefined;

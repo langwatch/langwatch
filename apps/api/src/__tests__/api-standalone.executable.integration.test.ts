@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { AuthzService } from "@langwatch/authz-contract";
 import { configureLogger, createLogger } from "@langwatch/observability";
@@ -270,7 +270,7 @@ class HostAuthComposition extends ApiAuthSessionCompositionPort {
   }
 }
 
-class HostAuthService extends AuthService {
+class HostAuthService implements BrowserSessionApi {
   async tryResolveBrowserSession() {
     return null;
   }

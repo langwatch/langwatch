@@ -4,7 +4,7 @@
  * Auth0 intake from. One installation, four declared doors.
  */
 import type { AppRestManagementAuditPort } from "@langwatch/api/rest";
-import type { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   PostgresScimAdapter,
@@ -61,7 +61,7 @@ export type ApiScimCompositionOptions = Readonly<{
   /** The user directory the members screen and the invitation write through. */
   users: UserApi | undefined;
   /** The session boundary a SCIM-managed email change severs. */
-  auth: AuthService | undefined;
+  auth: BrowserSessionApi | undefined;
   /** Enterprise governance's department owner, and this family's whole gate. */
   governance: GovernanceService | undefined;
   /** The ONE plan provider every Enterprise gate on this process reads. */

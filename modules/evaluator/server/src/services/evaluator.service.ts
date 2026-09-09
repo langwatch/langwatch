@@ -29,8 +29,9 @@ import {
   type NativeEvaluatorExecutionInput,
 } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
-import type { EvaluatorAuditLogPort, EvaluatorCodeExecutionPort } from "../ports/evaluator.port.ts";
 import type { EvaluatorRepository } from "../repositories/evaluator.repository.ts";
+import type { EvaluatorCodeExecution } from "./evaluator-code-execution.service.ts";
+import type { EvaluatorHistoryService } from "./evaluator-history.service.ts";
 import { EvaluatorCodeService } from "./evaluator-code.service.ts";
 import { EvaluatorNativeService } from "./evaluator-native.service.ts";
 import { EvaluatorExecutionService } from "./evaluator-execution.service.ts";
@@ -38,9 +39,10 @@ import { EvaluatorExecutionService } from "./evaluator-execution.service.ts";
 export type EvaluatorServiceOptions = {
   repository: EvaluatorRepository;
   workflows: WorkflowService;
-  auditLog?: EvaluatorAuditLogPort;
+  /** The trail one evaluator's change history is read off. */
+  history: EvaluatorHistoryService;
   fallbackModels?: { defaultModel: string; embeddingsModel: string };
-  codeExecution: EvaluatorCodeExecutionPort;
+  codeExecution: EvaluatorCodeExecution;
   generateId: () => string;
 };
 
@@ -399,28 +401,10 @@ export class EvaluatorService extends EvaluatorServiceContract {
     return { copy, source };
   }
 
-  async getHistory(input: {
+  getHistory(input: {
     evaluatorId: string;
     projectId: string;
   }): Promise<EvaluatorHistoryEntry[]> {
-    if (!this.options.auditLog) {
-      return [];
-    }
-
-    const logs = await this.options.auditLog.history({ ...input, limit: 100 });
-    const users = await this.options.auditLog.users({
-      userIds: [
-        ...new Set(logs.map((log) => log.userId).filter((id): id is string => Boolean(id))),
-      ],
-    });
-    const usersById = new Map(users.map((user) => [user.id, user]));
-
-    return logs.map((log) => ({
-      id: log.id,
-      action: log.action,
-      createdAt: log.createdAt,
-      args: log.args,
-      user: log.userId ? (usersById.get(log.userId) ?? null) : null,
-    }));
+    return this.options.history.listForEvaluator(input);
   }
 }

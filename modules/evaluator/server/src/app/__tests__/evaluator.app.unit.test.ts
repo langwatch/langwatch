@@ -1,20 +1,21 @@
 /**
  * @vitest-environment node
  */
-import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   newEvaluatorId,
   type Evaluator,
-  type EvaluatorService,
   type EvaluatorWithFields,
 } from "@langwatch/evaluator-contract";
-import type { EvaluatorGraphPort } from "../../ports/evaluator.port.ts";
 import {
   ModelNotConfiguredError,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
 import { describe, expect, it, vi } from "vitest";
-import { EvaluatorApp } from "../evaluator.app.ts";
+import {
+  createEvaluatorTestApp,
+  testModelResolution,
+  type EvaluatorRuntimeStubs,
+} from "./evaluator.fixture.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -40,45 +41,30 @@ const runnableCode = {
   outputs: [{ identifier: "passed", type: "bool" }],
 };
 
+/**
+ * The application over the six runtime answers these cases put in front of it.
+ * Neither the permission service nor the graph is reached: the cases exercise
+ * the model resolution and the id-or-slug lookup.
+ */
 function harness({
   evaluators = {},
   modelProviders = {},
 }: {
-  evaluators?: Record<string, unknown>;
-  modelProviders?: Record<string, unknown>;
+  evaluators?: EvaluatorRuntimeStubs;
+  modelProviders?: Partial<ModelProviderService>;
 } = {}) {
-  const evaluatorService = {
-    tryGetByIdWithFields: vi.fn(async () => withFields),
-    getByIdWithFields: vi.fn(async () => withFields),
-    tryGetBySlug: vi.fn(async () => evaluator),
-    create: vi.fn(async () => evaluator),
-    createWithDefaults: vi.fn(async () => evaluator),
-    update: vi.fn(async () => evaluator),
-    ...evaluators,
-  } as unknown as EvaluatorService;
-
-  const modelProviderService = {
-    resolveModelForFeature: vi.fn(async ({ featureKey }: { featureKey: string }) => ({
-      model:
-        featureKey === "evaluator.create_default"
-          ? "anthropic/claude-sonnet-4-5"
-          : "openai/text-embedding-3-large",
-    })),
-    ...modelProviders,
-  } as unknown as ModelProviderService;
-
-  return {
-    evaluators: evaluatorService,
-    modelProviders: modelProviderService,
-    app: EvaluatorApp.create({
-      evaluators: evaluatorService,
-      modelProviders: modelProviderService,
-      // Neither reached by the cases below: they exercise the model resolution
-      // and the id-or-slug lookup, which ask no permission and touch no graph.
-      permissions: {} as AuthzApi,
-      graph: {} as EvaluatorGraphPort,
-    }),
-  };
+  return createEvaluatorTestApp({
+    evaluators: {
+      tryGetByIdWithFields: vi.fn(async () => withFields),
+      getByIdWithFields: vi.fn(async () => withFields),
+      tryGetBySlug: vi.fn(async () => evaluator),
+      create: vi.fn(async () => evaluator),
+      createWithDefaults: vi.fn(async () => evaluator),
+      update: vi.fn(async () => evaluator),
+      ...evaluators,
+    },
+    modelProviders,
+  });
 }
 
 /** The single argument a stubbed method was called with. */
@@ -208,7 +194,7 @@ describe("EvaluatorApp", () => {
                 "project-1",
               );
             }
-            return { model: "anthropic/claude-sonnet-4-5" };
+            return testModelResolution(featureKey, "anthropic/claude-sonnet-4-5");
           }),
         },
       });
@@ -237,7 +223,7 @@ describe("EvaluatorApp", () => {
                 "project-1",
               );
             }
-            return { model: "anthropic/claude-sonnet-4-5" };
+            return testModelResolution(featureKey, "anthropic/claude-sonnet-4-5");
           }),
         },
       });
@@ -276,7 +262,7 @@ describe("EvaluatorApp", () => {
                 "project-1",
               );
             }
-            return { model: "anthropic/claude-sonnet-4-5" };
+            return testModelResolution(featureKey, "anthropic/claude-sonnet-4-5");
           }),
         },
       });
@@ -311,7 +297,7 @@ describe("EvaluatorApp", () => {
                 "project-1",
               );
             }
-            return { model: "anthropic/claude-sonnet-4-5" };
+            return testModelResolution(featureKey, "anthropic/claude-sonnet-4-5");
           }),
         },
       });
@@ -358,7 +344,7 @@ describe("EvaluatorApp", () => {
             if (featureKey === "analytics.topic_clustering_embeddings") {
               throw new Error("the model provider registry is unreachable");
             }
-            return { model: "anthropic/claude-sonnet-4-5" };
+            return testModelResolution(featureKey, "anthropic/claude-sonnet-4-5");
           }),
         },
       });

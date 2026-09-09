@@ -118,7 +118,7 @@ export async function createWorkerFoundationApps(options: {
     tenancy: {
       projects: runtime.module((await import("@langwatch/project-server")).projectServer).provided,
       organizations: runtime.module(
-        (await import("@langwatch/organization-server")).organizationFeature,
+        (await import("@langwatch/organization-server")).organizationServer,
       ).provided,
       authorization: runtime.module((await import("@langwatch/authz-server")).authzServer).provided,
       apiKeys: runtime.module((await import("@langwatch/api-key-server")).apiKeyServer).provided,

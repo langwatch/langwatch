@@ -8,8 +8,9 @@ import {
 } from "@langwatch/evaluator-contract";
 import type { WorkflowService } from "@langwatch/workflow-contract";
 import type { EvaluatorRepository } from "../../repositories/evaluator.repository.ts";
-import { EvaluatorCodeExecutionPort } from "../evaluator.port.ts";
-import { EvaluatorService } from "../../services/evaluator.service.ts";
+import type { EvaluatorCodeExecution } from "../evaluator-code-execution.service.ts";
+import { EvaluatorHistoryService } from "../evaluator-history.service.ts";
+import { EvaluatorService } from "../evaluator.service.ts";
 
 const baseEvaluator: Evaluator = {
   id: "e1",
@@ -63,23 +64,21 @@ function service(
   options: {
     repository?: EvaluatorRepository;
     workflows?: WorkflowService;
-    codeExecution?: EvaluatorCodeExecutionPort;
+    codeExecution?: EvaluatorCodeExecution;
   } = {},
 ): EvaluatorService {
   return EvaluatorService.create({
     repository: options.repository ?? repository(),
     workflows: options.workflows ?? workflows(),
-    codeExecution:
-      options.codeExecution ??
-      new (class extends EvaluatorCodeExecutionPort {
-        async execute() {
-          return {
-            ok: true,
-            statusText: "OK",
-            body: { status: "success", result: {} },
-          };
-        }
-      })(),
+    history: EvaluatorHistoryService.create({
+      auditLog: { record: async () => void 0, listEntityHistory: async () => [] },
+      actors: { findByIds: async () => [] },
+    }),
+    codeExecution: options.codeExecution ?? {
+      async execute() {
+        return { ok: true, statusText: "OK", body: { status: "success", result: {} } };
+      },
+    },
     generateId: () => "test",
   });
 }
@@ -105,9 +104,7 @@ describe("EvaluatorService", () => {
         ),
       }),
       workflows: workflows({ enrichStudioEvent: vi.fn(({ event }) => event) }),
-      codeExecution: new (class extends EvaluatorCodeExecutionPort {
-        execute = execute;
-      })(),
+      codeExecution: { execute },
     });
 
     await expect(
@@ -134,7 +131,7 @@ describe("EvaluatorService", () => {
         ),
       }),
       workflows: workflows({ enrichStudioEvent: vi.fn(({ event }) => event) }),
-      codeExecution: new (class extends EvaluatorCodeExecutionPort {
+      codeExecution: {
         async execute() {
           return {
             ok: true,
@@ -147,8 +144,8 @@ describe("EvaluatorService", () => {
               },
             },
           };
-        }
-      })(),
+        },
+      },
     });
 
     await expect(

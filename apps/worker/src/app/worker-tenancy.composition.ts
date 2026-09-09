@@ -25,7 +25,7 @@ import {
   OrganizationSettingsSecretPort,
   PersonalWorkspaceDiagnosticsAdapter,
   PersonalWorkspaceIdentityAdapter,
-  organizationFeature,
+  organizationServer,
   TeamIdentityAdapter,
 } from "@langwatch/organization-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
@@ -86,7 +86,7 @@ export function installWorkerTenancy<Infrastructure>(
     .withModule(authzServer, {
       infrastructure: { database, redis: options.redis, ...options.authz },
     })
-    .withModule(organizationFeature, {
+    .withModule(organizationServer, {
       infrastructure: {
         database,
         identities: PersonalWorkspaceIdentityAdapter.create(),

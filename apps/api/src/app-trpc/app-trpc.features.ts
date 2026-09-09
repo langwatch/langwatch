@@ -210,11 +210,9 @@ function requireSaasBilling(ctx: ApiTrpcContext): BillingSubscriptionApi {
   if (subscription) return subscription;
 
   return new Proxy({} as BillingSubscriptionApi, {
-    get:
-      () =>
-      (): never => {
-        throw new ApiBillingUnavailableError();
-      },
+    get: () => (): never => {
+      throw new ApiBillingUnavailableError();
+    },
     has: () => true,
   });
 }

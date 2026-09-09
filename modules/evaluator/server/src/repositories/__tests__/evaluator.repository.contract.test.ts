@@ -14,6 +14,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createLogger } from "@langwatch/observability";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -217,7 +218,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:test:evaluator-repository"),
+    }).connect(
       PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
     )
   : null;

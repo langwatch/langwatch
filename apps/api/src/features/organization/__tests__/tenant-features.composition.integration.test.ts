@@ -211,7 +211,7 @@ async function composeApplication() {
     },
   });
 
-  const codingAgentFeature = composeCodingAgentFeature({
+  const codingAgentFeature = await composeCodingAgentFeature({
     infrastructure,
     defaultRetentionDays: 90,
     peers: {

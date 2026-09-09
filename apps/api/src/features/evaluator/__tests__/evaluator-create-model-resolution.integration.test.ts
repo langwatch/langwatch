@@ -12,8 +12,11 @@ import {
   PostgresAuthzAdapter,
 } from "@langwatch/authz-server";
 import { bindRestMiddleware, createRestRuntime, projectRestFacts } from "@langwatch/api/rest";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import { EvaluatorApp, EvaluatorGraphPort, createEvaluatorRest } from "@langwatch/evaluator-server";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzApi, AuthzService } from "@langwatch/authz-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createEvaluatorRest, type EvaluatorGraph } from "@langwatch/evaluator-server";
 import { HandledError } from "@langwatch/handled-error";
 import { expandLatestAlias } from "@langwatch/model-provider-contract";
 import {
@@ -31,6 +34,9 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createLogger } from "@langwatch/observability";
+import type { UserApi } from "@langwatch/user-contract";
+import type { WorkflowApp } from "@langwatch/workflow-server";
 import { ProjectCredentialsAdapter } from "@langwatch/project-server";
 import { createPrismaProjectApi } from "../../../app/__tests__/support/prisma-project-api.ts";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -45,7 +51,7 @@ import {
   RestAuthWorld,
   type RestAuthProject,
 } from "../../../app-rest/__tests__/support/rest-auth.world.ts";
-import { composeEvaluatorService } from "../evaluator.composition.ts";
+import { installApiEvaluator } from "../evaluator.composition.ts";
 
 /** The tenancy middleware fences production reads; a fixture seeds across it. */
 class AllowTestQueries extends PrismaQueryGuard {
@@ -67,7 +73,10 @@ class UnreadSettingsSecrets extends OrganizationSettingsSecretPort {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:test:evaluator-model-resolution"),
+    }).connect(
       PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
     )
   : null;
@@ -131,8 +140,8 @@ function unreachedPermissions(): AuthzApi {
 }
 
 /** A catalogue evaluator has no workflow and no monitors to reach for. */
-function unreachedGraph(): EvaluatorGraphPort {
-  return new Proxy({} as EvaluatorGraphPort, {
+function unreachedGraph(): EvaluatorGraph {
+  return new Proxy({} as EvaluatorGraph, {
     get: (_target, property) => () => {
       throw new Error(`graph.${String(property)} is not reachable from an evaluator create`);
     },
@@ -140,7 +149,27 @@ function unreachedGraph(): EvaluatorGraphPort {
   });
 }
 
-function mountEvaluatorsFamily() {
+/** A create writes no history row, so the directory is never read. */
+function unreachedUsers(): UserApi {
+  return new Proxy({} as UserApi, {
+    get: (_target, property) => () => {
+      throw new Error(`users.${String(property)} is not reachable from an evaluator create`);
+    },
+    has: () => true,
+  });
+}
+
+/** The workflow application a replication would copy through; no copy runs here. */
+function unreachedWorkflowApp(): WorkflowApp {
+  return new Proxy({} as WorkflowApp, {
+    get: (_target, property) => () => {
+      throw new Error(`workflows.${String(property)} is not reachable from an evaluator create`);
+    },
+    has: () => true,
+  });
+}
+
+async function mountEvaluatorsFamily() {
   const bindingIds = KsuidAuthzBindingIdAdapter.create();
   const authz = PostgresAuthzAdapter.create({
     database: prisma,
@@ -181,19 +210,32 @@ function mountEvaluatorsFamily() {
     processName: "langwatch-api-test",
   });
 
-  const evaluators = composeEvaluatorService({
-    infrastructure: { prisma } as Parameters<typeof composeEvaluatorService>[0]["infrastructure"],
-    peers: { workflows: unreachedWorkflows(), nlpRuntime: unreachedNlpRuntime() },
+  // A create asks nobody's permission in another project, reads no workflow
+  // and writes no history row: this scenario is the model cascade and nothing
+  // else, so every other collaborator refuses by name.
+  const installed = await installApiEvaluator({
+    infrastructure: {
+      prisma,
+      authz: createApiFixture<AuthzService>(),
+      plans: { getActivePlan: async () => ({ type: "FREE" }) as never },
+      featureFlags: createApiFixture<FeatureFlagApi>(),
+      saasBilling: false,
+      audit: undefined,
+      auditLog: createApiFixture<AuditLogApi>({
+        record: async () => void 0,
+        listEntityHistory: async () => [],
+      }),
+    },
+    peers: {
+      workflows: unreachedWorkflows(),
+      nlpRuntime: unreachedNlpRuntime(),
+      workflowApp: unreachedWorkflowApp,
+      modelProviders,
+      permissions: unreachedPermissions(),
+      users: unreachedUsers(),
+    },
   });
-
-  const app = EvaluatorApp.create({
-    evaluators,
-    modelProviders,
-    // A create asks nobody's permission in another project and reads no
-    // workflow: this scenario is the model cascade and nothing else.
-    permissions: unreachedPermissions(),
-    graph: unreachedGraph(),
-  });
+  const app = installed.app;
 
   const runtime = createRestRuntime({
     identity: {
@@ -228,7 +270,7 @@ const describeWithDatabase = describe.skipIf(connection === null);
 describeWithDatabase(
   "given an organization whose default models carry DEFAULT and FAST but no EMBEDDINGS",
   () => {
-    let family: ReturnType<typeof mountEvaluatorsFamily>;
+    let family: Awaited<ReturnType<typeof mountEvaluatorsFamily>>;
 
     const post = (body: unknown) =>
       family.request("/api/evaluators", {
@@ -277,7 +319,7 @@ describeWithDatabase(
         },
       });
 
-      family = mountEvaluatorsFamily();
+      family = await mountEvaluatorsFamily();
     });
 
     afterAll(async () => {

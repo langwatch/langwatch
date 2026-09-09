@@ -20,10 +20,13 @@ import { ApiAuditPort } from "../../../api-request.policy.ts";
 import { ApiApplication } from "../../../api.application.ts";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
+import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import { composeApiModelProviders } from "../../../app/api-model-provider.composition.ts";
 import { composeDatasetService } from "../../dataset/dataset.composition.ts";
-import { composeEvaluatorService } from "../../evaluator/evaluator.composition.ts";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { UserApi } from "@langwatch/user-contract";
+import { installApiEvaluator } from "../../evaluator/evaluator.composition.ts";
 import { composeMonitorService } from "../../monitor/monitor.composition.ts";
 import { composeEvaluationFeature } from "../../evaluation/evaluation.composition.ts";
 import { composeExperimentFeature } from "../../experiment/experiment.composition.ts";
@@ -273,10 +276,10 @@ function testProjects(): ProjectApi {
     team: { id: "team-1", name: "Core", organizationId: "org-1" },
   } as unknown as ProjectWithTeam;
 
-  return {
+  return new TestProjectApi({
     getWithTeam: async () => project,
     tryGetWithTeam: async () => project,
-  } as unknown as ProjectApi;
+  });
 }
 
 function testOrganizations(): OrganizationService {
@@ -317,7 +320,7 @@ function testModelGateway(prisma: PrismaClient) {
   });
 }
 
-function composeApplication(
+async function composeApplication(
   options: {
     eventing?: boolean;
     realModelGateway?: boolean;
@@ -353,15 +356,26 @@ function composeApplication(
     secretDecryptor: { decrypt: (value) => `decrypted:${value}` },
     payloadStaging: AbsentPayloadStagingAdapter.create(),
   });
-  const evaluators = composeEvaluatorService({
+  // The evaluator module, installed exactly as the process installs it. Its
+  // workflow application is read late, because the workflow feature takes this
+  // module's runtime as a peer of its own.
+  const evaluator = await installApiEvaluator({
     infrastructure,
-    peers: { workflows: runtime.workflows, nlpRuntime: runtime.nlpRuntime },
+    peers: {
+      workflows: runtime.workflows,
+      nlpRuntime: runtime.nlpRuntime,
+      workflowApp: () => workflow.app,
+      modelProviders,
+      permissions: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
+      users: createApiFixture<UserApi>(),
+    },
   });
+  const evaluators = evaluator.evaluators;
   const monitors = composeMonitorService({ infrastructure, peers: { evaluators } });
   const workflow = composeWorkflowFeature({
     infrastructure,
     runtime,
-    peers: { datasets, evaluators, modelProviders },
+    peers: { datasets, evaluators: evaluator.app, modelProviders },
   });
   const evaluation = composeEvaluationFeature({
     infrastructure,
@@ -456,8 +470,8 @@ async function mutateTrpc(
 }
 
 describe("given the execution features composed over this process's own graph", () => {
-  it("satisfies the record's typed obligation, so the namespaces mount", () => {
-    const { application } = composeApplication();
+  it("satisfies the record's typed obligation, so the namespaces mount", async () => {
+    const { application } = await composeApplication();
 
     const mounted = Object.keys(
       (application.trpc as unknown as { _def: { record: Record<string, unknown> } })._def.record,
@@ -471,7 +485,7 @@ describe("given the execution features composed over this process's own graph", 
 
   describe("when a workflow read is called through the real /api/trpc handler", () => {
     it("answers from the real WorkflowApp over the packaged Prisma repository", async () => {
-      const { application, prisma } = composeApplication();
+      const { application, prisma } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "workflow.getById", {
         projectId: "project-1",
@@ -494,7 +508,7 @@ describe("given the execution features composed over this process's own graph", 
 
   describe("when an experiments read is called through the real /api/trpc handler", () => {
     it("answers from the real ExperimentApp over the packaged Postgres adapter", async () => {
-      const { application, prisma } = composeApplication();
+      const { application, prisma } = await composeApplication();
 
       const { status, body } = await callTrpc(application, "experiments.getAllByProjectId", {
         projectId: "project-1",
@@ -513,8 +527,8 @@ describe("given the execution features composed over this process's own graph", 
   });
 
   describe("when a trace is re-scored through the real /api/trpc handler", () => {
-    it("registers the packaged evaluation pipeline as a producer", () => {
-      const { eventing } = composeApplication();
+    it("registers the packaged evaluation pipeline as a producer", async () => {
+      const { eventing } = await composeApplication();
 
       // Two producer registrations, because two things here send commands:
       // the re-score, and the workbench run loop beside it.
@@ -539,7 +553,7 @@ describe("given the execution features composed over this process's own graph", 
 
     it("reports the result onto the pipeline with the score the evaluator returned", async () => {
       const { application, eventing, runEvaluationForTrace, trackEvaluationRan } =
-        composeApplication();
+        await composeApplication();
 
       const { status } = await mutateTrpc(application, "evaluations.runEvaluation", {
         projectId: "project-1",
@@ -573,7 +587,7 @@ describe("given the execution features composed over this process's own graph", 
      * The whole point of this file, one call deeper.
      */
     it("resolves the project's default model through the real gateway", async () => {
-      const { application, prisma } = composeApplication({ realModelGateway: true });
+      const { application, prisma } = await composeApplication({ realModelGateway: true });
 
       const { status } = await mutateTrpc(application, "workflow.create", {
         projectId: "project-1",
@@ -602,7 +616,7 @@ describe("given the execution features composed over this process's own graph", 
      * The discriminator for the assertion above.
      */
     it("falls back to the registry flagship when the project configured none", async () => {
-      const { application, prisma } = composeApplication({
+      const { application, prisma } = await composeApplication({
         realModelGateway: true,
         modelDefaults: [],
       });
@@ -625,7 +639,7 @@ describe("given the execution features composed over this process's own graph", 
 
   describe("when the process composed no command queue", () => {
     it("still mounts the namespaces, and reporting an evaluation refuses at the call", async () => {
-      const { application, eventing } = composeApplication({ eventing: false });
+      const { application, eventing } = await composeApplication({ eventing: false });
 
       const { status } = await mutateTrpc(application, "evaluations.runEvaluation", {
         projectId: "project-1",

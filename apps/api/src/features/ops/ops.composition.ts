@@ -2,7 +2,7 @@
  * The operator back office, composed as its own feature.
  */
 import { declareAuthzMiddleware, type AuthzPermission } from "@langwatch/authz-contract";
-import type { AuthService } from "@langwatch/auth-contract";
+import type { AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import type { EventSourcing } from "@langwatch/eventing";
 import { PrismaProcessStore, PrismaScheduledJobStore } from "@langwatch/eventing/server";
 import { HandledError } from "@langwatch/handled-error";
@@ -46,7 +46,7 @@ export type OpsPeers = Readonly<{
   /** The people a back-office read names, and the impersonation subject. */
   users: UserApi;
   /** The browser session an impersonation is started and stopped against. */
-  auth: AuthService;
+  auth: AuthApiContract;
   /** The projects a scheduled job and a back-office row are scoped to. */
   projects: ProjectApi;
   /** The credentials a filed report is linked to a project through. */
@@ -61,7 +61,7 @@ export type OpsFeatureCollaborators = Readonly<{
   /** The shared audit log every operator act is recorded on. */
   auditLog: ApiTrpcInfrastructure["auditLog"];
   users: UserApi;
-  auth: AuthService;
+  auth: AuthApiContract;
   projects: ProjectApi;
   apiKeys: ApiKeyApi;
   /** The deployment's operator allow-list, matched on a person's email. */

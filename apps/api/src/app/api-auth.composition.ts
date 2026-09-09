@@ -1,4 +1,4 @@
-import type { AuthService, VerifiedBrowserSession } from "@langwatch/auth-contract";
+import type { BrowserSessionApi, VerifiedBrowserSession } from "@langwatch/auth-contract";
 import type { SignUpVerificationPort } from "@langwatch/auth-server";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { IdentityEventingPort } from "@langwatch/identity-server";
@@ -89,7 +89,7 @@ export class BetterAuthBrowserSessionTransportAdapter extends ApiBrowserSessionT
 }
 
 export type ApiAuthSessionDependencies = Readonly<{
-  auth: AuthService;
+  auth: BrowserSessionApi;
   sessions: ApiBrowserSessionTransportPort;
   /**
    * The user directory the Auth service already resolves a signed-in person
@@ -117,7 +117,7 @@ export type ApiAuthCompositionOptions = {
    * built: it is one half of the cycle the runtime already resolved, and a
    * second adapter here would revoke sessions the other half never saw.
    */
-  auth: AuthService;
+  auth: BrowserSessionApi;
   /**
    * The same user graph in the shape Better Auth's passkey ceremony, SCIM and
    * the back office still name it. One directory behind all three.
@@ -233,7 +233,7 @@ export class ApiAuthComposition extends ApiAuthSessionCompositionPort {
   }: {
     options: ApiAuthCompositionOptions;
     database: PrismaConnection["client"];
-    auth: AuthService;
+    auth: BrowserSessionApi;
     users: UserApi;
   }): ApiComposedBetterAuth {
     const configuration = options.browserSession;
@@ -290,7 +290,7 @@ export class AuthSessionApiAuthenticationAdapter extends ApiAuthenticationPort {
   }
 
   private constructor(
-    private readonly auth: AuthService,
+    private readonly auth: BrowserSessionApi,
     private readonly sessions: ApiBrowserSessionTransportPort,
   ) {
     super();

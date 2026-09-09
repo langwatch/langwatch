@@ -14,10 +14,6 @@ import {
   OtelEvaluationExecutionMetricsAdapter,
   EvaluationCostService,
 } from "@langwatch/evaluation-server";
-import {
-  NlpEvaluatorCodeExecutionAdapter,
-  PostgresEvaluatorAdapter,
-} from "@langwatch/evaluator-server";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import { getProjectModelProviders } from "@langwatch/model-provider-server";
@@ -35,7 +31,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { EvaluationTraceReadInput, Span, TraceApi } from "@langwatch/trace-contract";
 import { TraceReadableSpanService } from "@langwatch/trace-server";
 import { WorkflowEvaluationAdapter } from "@langwatch/evaluation-server/workflow-evaluation";
-import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import type { EvaluatorService, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { nanoid } from "nanoid";
 import {
   createWorkerEvaluationInputsOffload,
@@ -59,6 +55,8 @@ export function createWorkerEvaluationExecutionCollaborators(input: {
   traces: TraceApi;
   /** The ONE monitor application this process installed. */
   monitors: MonitorApi;
+  /** The ONE evaluator runtime this process installed. */
+  evaluators: EvaluatorService;
   workflows: WorkerEvaluationWorkflows;
   models: WorkerModelProviders;
   featureFlags: FeatureFlagApi;
@@ -73,13 +71,6 @@ export function createWorkerEvaluationExecutionCollaborators(input: {
     modelProviders: input.models.modelProviders,
   });
   const telemetry = OtelEvaluationExecutionMetricsAdapter.create();
-  const evaluators = PostgresEvaluatorAdapter.create({
-    database: input.database,
-    workflows: input.workflows.workflows,
-    codeExecution: NlpEvaluatorCodeExecutionAdapter.create(input.workflows.nlpRuntime),
-    generateId: nanoid,
-  });
-
   return {
     monitors: new WorkerEvaluationMonitorLookup(input.monitors),
     evidence: WorkerEvaluationTraceEvidence.create(input.traces),
@@ -110,7 +101,7 @@ export function createWorkerEvaluationExecutionCollaborators(input: {
         telemetry,
       }),
       workflows: input.workflows.workflows,
-      evaluators,
+      evaluators: input.evaluators,
       workflowExecutor: WorkerEvaluationWorkflowExecutor.create(input.workflows),
       installEnvironment: input.environment,
       telemetry,

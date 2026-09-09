@@ -123,31 +123,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "auth|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "auth|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "auth|no-installer",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "auth|persistence-adapter",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "auth|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "auth|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "auth|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {
@@ -223,10 +199,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "coding-agent|installer-not-booted",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "coding-agent|nested-web-entry",
       "measured": "2026-09-08"
     },
@@ -248,14 +220,6 @@
     },
     {
       "key": "evaluator|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "evaluator|no-installer",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "evaluator|persistence-adapter",
       "measured": "2026-09-08"
     },
     {
@@ -532,10 +496,6 @@
     },
     {
       "key": "organization|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "organization|installer-not-booted",
       "measured": "2026-09-08"
     },
     {

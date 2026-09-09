@@ -161,7 +161,7 @@ export class CodingAgentApp implements CodingAgentApi {
       permissions: infrastructure.scopePermissions,
     });
     const scope: CodingAgentScopePorts = {
-      tryResolveOrganizationForProject: async (projectId) => {
+      findOrganizationForProject: async (projectId: string) => {
         try {
           return await dependencies.projects.getOrganizationId(projectId);
         } catch {

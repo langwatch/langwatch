@@ -41,7 +41,10 @@ export {
   type SseSubscriptionPorts,
 } from "./app-trpc.sse.ts";
 export { createAppTrpcFeatures, type AppTrpcFeatureRecord } from "./app-trpc.features.ts";
-export { ApiTrpcCollaboratorsAbsence, type ApiTrpcCollaborators } from "./app-trpc.collaborators.ts";
+export {
+  ApiTrpcCollaboratorsAbsence,
+  type ApiTrpcCollaborators,
+} from "./app-trpc.collaborators.ts";
 export type {
   ApiTrpcFeatureApplication,
   ApiTrpcPortsContext,
@@ -49,10 +52,7 @@ export type {
   ApiTrpcSessionUser,
 } from "./app-trpc.context.ts";
 export { createApiTrpcPolicy, type ApiTrpcPolicyPorts } from "./app-trpc.policy.ts";
-export {
-  createOrganizationTrpcRouter,
-  createPersonalWorkspaceFeaturesTrpcRouter,
-} from "../features/organization/organization-trpc.mount.ts";
+export { createOrganizationTrpcRouters } from "../features/organization/organization-trpc.mount.ts";
 export {
   createAnalyticsTrpcRouter,
   createLangWatchQLTrpcRouter,

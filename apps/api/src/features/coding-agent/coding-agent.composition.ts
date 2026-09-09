@@ -4,10 +4,10 @@
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
-  CodingAgentApp,
   CodingAgentBillingPolicyPort,
   CodingAgentCallerScopeDirectoryPort,
   CodingAgentScopePermissionsPort,
+  codingAgentServer,
   type CodingAgentClickHousePort,
   type CodingAgentScopeCaller,
   type CodingAgentScopePermission,
@@ -16,22 +16,24 @@ import {
   type CodingAgentViewerVisibility,
   type CodingAgentViewerVisibilityPort,
 } from "@langwatch/coding-agent-server";
-import type { GithubService } from "@langwatch/github-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import { GithubApi } from "@langwatch/github-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ProjectApi } from "@langwatch/project-contract";
+import { createApp } from "@langwatch/runtime-composition";
 
 import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ApiViewerProtectionsPort } from "../trace/trace-viewer-protections.ts";
 import { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount.ts";
+import type { ComposedCodingAgentFeature } from "./coding-agent.composition.types.ts";
 
 /** The other services and stores one project's coding agents are read over. */
 export type CodingAgentPeers = Readonly<{
   /** The project directory the tenancy graph composed. */
   projects: ProjectApi;
   /** The GitHub App this deployment registered, blank where it registered none. */
-  github: GithubService;
+  github: GithubApi;
   /** This process's ClickHouse, where the sessions are projected. */
   clickHouse: CodingAgentClickHousePort | null;
   /** The protections resolver, where the deployment composed one. */
@@ -43,18 +45,39 @@ export type CodingAgentAudit = Readonly<{
   record(event: { actorId: string; path: string; input: unknown; error: unknown }): Promise<void>;
 }>;
 
-import type { ComposedCodingAgentFeature } from "./coding-agent.composition.types.ts";
-
-/** Composes `codingAgents.*` over this process's own graph. */
-export function composeCodingAgentFeature(options: {
+/**
+ * Installs `codingAgents.*` over this process's own graph: `defineModule("coding-agent")`
+ * booted through the same `createApp().withModule().boot()` path every other module
+ * boots through, rather than a hand-built `CodingAgentApp.create(...)` call.
+ */
+export async function composeCodingAgentFeature(options: {
   infrastructure: ApiTrpcInfrastructure;
   peers: CodingAgentPeers;
   /** The retention a projected session is stamped with, from the process's config. */
   defaultRetentionDays: number;
   /** The trail every read that names people is recorded on, where composed. */
   audit?: CodingAgentAudit | undefined;
-}): ComposedCodingAgentFeature {
-  const app = composeCodingAgentApp(options);
+}): Promise<ComposedCodingAgentFeature> {
+  const { peers } = options;
+
+  const runtime = await createApp({ name: "langwatch-api" })
+    .withInfrastructure({})
+    .withProvided(ProjectApi, peers.projects)
+    .withProvided(GithubApi, peers.github)
+    .withModule(codingAgentServer, {
+      infrastructure: {
+        clickHouse: peers.clickHouse,
+        defaultTraceRetentionDays: options.defaultRetentionDays,
+        billing: new ApiCodingAgentBilling(),
+        scopeDirectory: new ApiCodingAgentScopeDirectory(options.infrastructure.prisma),
+        scopePermissions: new ApiCodingAgentScopePermissions(options.infrastructure.authz),
+        visibility: apiCodingAgentVisibility(peers.viewerProtections),
+        audit: apiCodingAgentAudit(options.audit),
+      },
+    })
+    .boot({ role: "api" });
+
+  const app = runtime.module(codingAgentServer).provided;
 
   return { app, service: app, router: (mount) => createCodingAgentTrpcRouter(mount.runtime) };
 }
@@ -69,36 +92,9 @@ export function refusingCodingAgentFeature(): ComposedCodingAgentFeature {
   const refuseEvery = <T>(): T => new Proxy({}, { get: () => refuse, has: () => true }) as T;
 
   return {
-    app: refuseEvery<CodingAgentApp>(),
+    app: refuseEvery<CodingAgentApi>(),
     router: (mount) => createCodingAgentTrpcRouter(mount.runtime),
   };
-}
-
-/**
- * The coding-agent application, over this process's own ClickHouse and the
- * GitHub App it was configured with.
- */
-function composeCodingAgentApp(options: {
-  infrastructure: ApiTrpcInfrastructure;
-  peers: CodingAgentPeers;
-  defaultRetentionDays: number;
-  audit?: CodingAgentAudit | undefined;
-}): CodingAgentApp {
-  const { peers } = options;
-  return CodingAgentApp.create({
-    dependencies: { github: peers.github, projects: peers.projects },
-    infrastructure: {
-      clickHouse: peers.clickHouse,
-      defaultTraceRetentionDays: options.defaultRetentionDays,
-      billing: new ApiCodingAgentBilling(),
-      scopeDirectory: new ApiCodingAgentScopeDirectory(options.infrastructure.prisma),
-      scopePermissions: new ApiCodingAgentScopePermissions(options.infrastructure.authz),
-      visibility: apiCodingAgentVisibility(peers.viewerProtections),
-      audit: apiCodingAgentAudit(options.audit),
-    },
-    config: undefined,
-    resources: new ResourceScope(),
-  });
 }
 
 /**

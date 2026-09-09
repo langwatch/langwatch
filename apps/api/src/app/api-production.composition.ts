@@ -68,10 +68,7 @@ import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import type { AgentInfrastructure } from "@langwatch/agent-server";
 import { ApiUpgradeRouter } from "../api-upgrade-router.ts";
 import { installApiDataset } from "../features/dataset/dataset.composition.ts";
-import {
-  composeEvaluatorFeature,
-  composeEvaluatorService,
-} from "../features/evaluator/evaluator.composition.ts";
+import { installApiEvaluator } from "../features/evaluator/evaluator.composition.ts";
 import {
   composePromptFeature,
   refusingPromptFeature,
@@ -85,7 +82,6 @@ import {
 } from "../features/analytics/analytics.composition.ts";
 import {
   composeAuthFeature,
-  refusingAuthFeature,
   resolvePersonDeploymentFacts,
   type ApiPersonDeploymentFacts,
 } from "../features/auth/auth.composition.ts";
@@ -161,7 +157,7 @@ import {
 } from "../features/stored-object/stored-object.composition.ts";
 import {
   ApiOrganizationSeatLicense,
-  composeOrganizationFeature,
+  installApiOrganization,
   refusingOrganizationFeature,
   type ApiOrganizationInvitePort,
 } from "../features/organization/organization.composition.ts";
@@ -3249,7 +3245,6 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const composedTenancy = this.composedTenancy;
     const projects = composedTenancy?.projects;
     const processName = options.config.serviceName;
-    const personMail = this.resolvePersonMail();
     // The credential application this process serves from, injected by a host or
     // installed here. It is the SAME object every REST door authenticates a
     // caller through, so this surface never has a second answer to what a key is
@@ -3262,28 +3257,18 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // tenancy here, so it holds the collaborator set whole and hands it in
     // rather than having these features built for it.
     if (!database || !projects || !composedTenancy) {
-      this.composedAuthFeature = refusingAuthFeature(processName);
       this.composedUser = refusingUserFeature(processName);
+      this.composedAuthFeature = composeAuthFeature(this.composedUser.auth);
       return;
     }
 
     // The signed-in person's own graph, installed here or already installed by
     // the browser-session boundary: `installUser` memoises, so both callers
-    // reach ONE user application and one browser-session service.
+    // reach ONE user application and one browser-session service. Auth installs
+    // on that same runtime, so this line binds the application that install
+    // already built rather than composing a second signed-out door.
     this.composedUser = await this.installUser(options, tenancy);
-
-    this.composedAuthFeature = composeAuthFeature({
-      prisma: database.client,
-      // The SAME user application the browser-session boundary reads through:
-      // a second directory is a second answer to who somebody is.
-      peers: { users: this.composedUser.app },
-      // The SAME counter the public REST surface meters through, so a budget
-      // cannot be spent twice by asking on two paths.
-      rateLimit: (request) => this.rateLimiter.consume(request),
-      deployment: this.personDeployment(options),
-      ...(personMail ? { mail: personMail } : {}),
-      processName,
-    });
+    this.composedAuthFeature = composeAuthFeature(this.composedUser.auth);
   }
 
   /**
@@ -3695,13 +3680,15 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // already composed. All of it or none — a process holding part of it would
     // let somebody be admitted by one door and be invisible to the next.
     const grants = this.composedAuthz?.grants;
+    const permissions = this.composedAuthz?.app;
     const session = this.composedAuth?.compose();
     const membership =
-      grants && session
+      grants && session && permissions
         ? {
             organizations: tenancy.organizations,
             projects: tenancy.projects,
             grants,
+            permissions,
             auth: session.auth,
             // The SAME application `user.*` answers from: a second would
             // provision a personal workspace for somebody the /me screens do
@@ -3715,7 +3702,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           }
         : undefined;
 
-    this.composedOrganization = composeOrganizationFeature({
+    this.composedOrganization = await installApiOrganization({
       infrastructure,
       peers: {
         encryption,
@@ -3755,7 +3742,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       },
     });
 
-    this.composedCodingAgent = composeCodingAgentFeature({
+    this.composedCodingAgent = await composeCodingAgentFeature({
       infrastructure,
       defaultRetentionDays: options.config.platformDefaultRetentionDays,
       // The SAME trail every other completed mutation on this process is
@@ -4370,23 +4357,22 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
       ),
     });
     this.composedWorkflowRuntime = workflowRuntime;
-    const evaluators = composeEvaluatorService({
-      infrastructure,
-      peers: { workflows: workflowRuntime.workflows, nlpRuntime: workflowRuntime.nlpRuntime },
-    });
-    this.composedEvaluators = evaluators;
     // The ONE evaluator application: `evaluators.*`, `/api/evaluators` and the
     // studio all read it. Its workflow peer is read late, because the workflow
     // application takes this application as a peer of its own.
-    this.composedEvaluator = composeEvaluatorFeature({
+    this.composedEvaluator = await installApiEvaluator({
       infrastructure,
       peers: {
-        evaluators,
-        workflows: () => this.composedWorkflow.app,
+        workflows: workflowRuntime.workflows,
+        nlpRuntime: workflowRuntime.nlpRuntime,
+        workflowApp: () => this.composedWorkflow.app,
         modelProviders,
         permissions,
+        users: this.composedUser.app,
       },
     });
+    const evaluators = this.composedEvaluator.evaluators;
+    this.composedEvaluators = evaluators;
     this.evaluatorApi = this.composedEvaluator.app;
     // The monitor application, installed HERE because the evaluator service a
     // monitor runs opens on the line above. The experiment wizard, the

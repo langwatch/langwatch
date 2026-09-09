@@ -133,7 +133,7 @@ export class CodingAgentTraceSessionClickHouseRepository implements TraceSession
       tenantId,
       traceId: first.TraceId,
       sessionId: first.SessionId,
-      occurredAtMs: toEpochMs(first.OccurredAt),
+      occurredAtMs: parseClickHouseDateTimeMs(first.OccurredAt),
     };
   }
 }

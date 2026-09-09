@@ -1,7 +1,7 @@
 /**
  * The operator back office, composed as its own feature by the API process.
  */
-import type { AuthService } from "@langwatch/auth-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
 import type {
   AuthzGetDecisionInput,
   AuthzScopeLineageResult,
@@ -100,7 +100,7 @@ async function composeOperatorApp(
     infrastructure,
     peers: {
       users: stub<UserApi>("users"),
-      auth: stub<AuthService>("auth"),
+      auth: stub<AuthApi>("auth"),
       projects: stub<ProjectApi>("projects"),
       apiKeys: createApiFixture<ApiKeyApi>(),
     },

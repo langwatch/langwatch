@@ -1,5 +1,5 @@
 /** Kept separate from the composition so importing the router/app type never pulls in adapters. */
-import type { CodingAgentApp } from "@langwatch/coding-agent-server";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { ApiTrpcContext, ApiTrpcFeatureMount } from "../../api.application.ts";
 import type { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount.ts";
 
@@ -7,10 +7,10 @@ import type { createCodingAgentTrpcRouter } from "./coding-agent-trpc.mount.ts";
 export type ComposedCodingAgentFeature = Readonly<{
   router(mount: ApiTrpcFeatureMount): ReturnType<typeof createCodingAgentTrpcRouter<ApiTrpcContext>>;
   /** For `ctx.app.codingAgentApp`. */
-  app: CodingAgentApp;
+  app: CodingAgentApi;
   /**
    * The same application, where this process composed one, for the packaged coding-agent
    * REST family.
    */
-  service?: CodingAgentApp | undefined;
+  service?: CodingAgentApi | undefined;
 }>;

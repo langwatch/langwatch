@@ -11,7 +11,7 @@ import type { SuiteApi } from "@langwatch/suite-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AutomationApp } from "@langwatch/automation-server";
-import type { CodingAgentApp } from "@langwatch/coding-agent-server";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type {
   BillingCurrencyApi,
@@ -34,7 +34,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApp } from "@langwatch/dataset-server";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { EvaluatorApp } from "@langwatch/evaluator-server";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApp } from "@langwatch/experiment-server";
 import type { OrganizationApp } from "@langwatch/organization-server";
 import type { PresenceApi } from "@langwatch/presence-contract";
@@ -68,7 +68,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
    */
   automation: AutomationApp;
   /** What the coding agents did inside a project, as the read surfaces ask it. */
-  codingAgentApp: CodingAgentApp;
+  codingAgentApp: CodingAgentApi;
   /** What the caller may do at one scope, as `authz.*` reports it back to them. */
   authzApp: AuthzApi;
   broadcast: PresenceEmitterPort;
@@ -89,7 +89,7 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * The evaluators a project defines, and the model defaults one created
    * without a named model falls back to.
    */
-  evaluatorApp: EvaluatorApp;
+  evaluatorApp: EvaluatorApi;
   /**
    * This deployment's flag store. Read by `featureFlag.*` and, through it, by
    * every rollout gate the browser asks about.

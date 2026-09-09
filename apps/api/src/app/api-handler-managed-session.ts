@@ -11,7 +11,7 @@
  * would change the wire on endpoints the studio, the playground and the
  * dataset generator call.
  *
- * It resolves through the SAME Better Auth transport and the SAME `AuthService`
+ * It resolves through the SAME Better Auth transport and the SAME `BrowserSessionApi`
  * the process's tRPC boundary authenticates on, and checks the permission
  * through the SAME `AuthzService`, so the two doors cannot decide differently
  * about a person.
@@ -21,7 +21,7 @@
  * a resolver that answers null, because a door that refuses every signed-in
  * person is worse than one that is honestly not there.
  */
-import type { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 
 import type { ApiBrowserSessionTransportPort } from "./api-auth.composition.ts";
@@ -43,7 +43,7 @@ export type ApiHandlerManagedSessionPort = Readonly<{
 
 export class ApiHandlerManagedSession implements ApiHandlerManagedSessionPort {
   static create(options: {
-    auth: AuthService;
+    auth: BrowserSessionApi;
     sessions: ApiBrowserSessionTransportPort;
     authz: AuthzService;
   }): ApiHandlerManagedSession {
@@ -51,7 +51,7 @@ export class ApiHandlerManagedSession implements ApiHandlerManagedSessionPort {
   }
 
   private constructor(
-    private readonly auth: AuthService,
+    private readonly auth: BrowserSessionApi,
     private readonly sessions: ApiBrowserSessionTransportPort,
     private readonly authz: AuthzService,
   ) {}

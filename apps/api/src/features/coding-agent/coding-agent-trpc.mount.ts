@@ -4,11 +4,12 @@
  * the declaration names, so nothing is decided here.
  */
 import type { TrpcRuntime } from "@langwatch/api/trpc";
-import { codingAgentTrpcTransport, type CodingAgentApp } from "@langwatch/coding-agent-server";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import { codingAgentTrpcTransport } from "@langwatch/coding-agent-server";
 
 /** The one slice of the process context this namespace reads. */
 export interface CodingAgentHostContext {
-  app: Readonly<{ codingAgentApp: CodingAgentApp }>;
+  app: Readonly<{ codingAgentApp: CodingAgentApi }>;
 }
 
 /** Mounts `codingAgents.*` on the app process's tRPC root. */

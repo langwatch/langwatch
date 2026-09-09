@@ -1,9 +1,10 @@
 /**
- * The evaluator feature's application: what both of its doors call — the
+ * The evaluator module's application: what both of its doors call - the
  * `/api/evaluators` REST family and the `evaluators.*` tRPC namespace. Every
  * rule either door used to hold is a method here, and a caller arrives as
  * `actorId`, never read from a session or a request.
  */
+import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import {
   AVAILABLE_EVALUATORS,
@@ -31,35 +32,148 @@ import {
   ModelNotConfiguredError,
   type ModelProviderService,
 } from "@langwatch/model-provider-contract";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { WorkflowService } from "@langwatch/workflow-contract";
 
-import type { EvaluatorGraphPort } from "../ports/evaluator.port.ts";
+import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
+import {
+  EvaluatorCodeExecutionService,
+  type EvaluatorNlpDispatcher,
+} from "../services/evaluator-code-execution.service.ts";
+import {
+  EvaluatorHistoryService,
+  type EvaluatorActorDirectory,
+} from "../services/evaluator-history.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
+import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
 
-/** What the process composes this feature's application from. */
-export interface EvaluatorAppDependencies {
-  evaluators: EvaluatorService;
+/**
+ * The workflow and monitor rows an evaluator is entangled with. Both belong to
+ * other modules, so the process reads and writes them; this module only says
+ * what it needs of them.
+ */
+export interface EvaluatorGraph {
+  /** The evaluator's linked workflow, scoped to the project and not archived. */
+  findLinkedWorkflow(
+    input: Readonly<{ workflowId: string; projectId: string }>,
+  ): Promise<{ id: string; name: string } | null>;
+  /** The monitors in the project that run this evaluator. */
+  findMonitorsUsingEvaluator(
+    input: Readonly<{ evaluatorId: string; projectId: string }>,
+  ): Promise<{ id: string; name: string }[]>;
+  /** Hard-deletes those monitors, and answers how many went. */
+  deleteMonitorsUsingEvaluator(
+    input: Readonly<{ evaluatorId: string; projectId: string }>,
+  ): Promise<{ count: number }>;
+  /** Archives the evaluator's linked workflow. */
+  archiveLinkedWorkflow(
+    input: Readonly<{ workflowId: string; projectId: string }>,
+  ): Promise<{ id: string }>;
+  /** Clones a workflow evaluator's workflow into the target project. */
+  replicateEvaluatorWorkflow(
+    input: Readonly<{
+      workflowId: string;
+      sourceProjectId: string;
+      targetProjectId: string;
+      actorId: string;
+    }>,
+  ): Promise<string>;
+  /** Removes a workflow a replication created, when the evaluator insert fails. */
+  deleteReplicatedWorkflow(
+    input: Readonly<{ workflowId: string; projectId: string }>,
+  ): Promise<void>;
+}
+
+/**
+ * Ports the process supplies. `workflows` and `modelProviders` still carry a
+ * peer module's own service rather than its API token, because `WorkflowApi`
+ * publishes neither `getFields` nor `enrichStudioEvent` and `ModelProviderApi`
+ * is a strict superset of the service the api composes. `graph` and `actors`
+ * are rows no module's api publishes yet. Narrowing the four onto tokens is
+ * the peer-narrowing wave, not this one.
+ */
+export interface EvaluatorAppInfrastructure {
+  /** The workflow rows an evaluator's fields, its guard and its run read. */
+  workflows: WorkflowService;
+  /** Who made each change the history panel lists. */
+  actors: EvaluatorActorDirectory;
+  /** The workflow and monitor rows an evaluator is entangled with. */
+  graph: EvaluatorGraph;
+  /** Where a code evaluator's one-node Studio graph runs. */
+  nlp: EvaluatorNlpDispatcher;
   /**
    * Resolves the project's default and embeddings models. Only the REST door
    * creates an evaluator without naming them, but the rule for what happens
-   * then belongs to the feature, not to that door.
+   * then belongs to the module, not to that door.
    */
   modelProviders: ModelProviderService;
-  /** Answers whether the caller may act in a project that is not the request's. */
-  permissions: AuthzApi;
-  /** The workflow and monitor rows an evaluator is entangled with. */
-  graph: EvaluatorGraphPort;
+  /** The models a deployment falls back to when a project configured none. */
+  fallbackModels?: Readonly<{ defaultModel: string; embeddingsModel: string }> | undefined;
+  /** Mints the ephemeral studio ids a code evaluator's run is traced under. */
+  generateId: () => string;
 }
+
+type EvaluatorSetup = FeatureSetup<
+  typeof EvaluatorApp.dependencies,
+  EvaluatorAppInfrastructure,
+  undefined,
+  EvaluatorRepositories
+>;
+
+/** What the app is built from, once the setup has assembled it. */
+type EvaluatorAppParts = Readonly<{
+  evaluators: EvaluatorService;
+  modelProviders: ModelProviderService;
+  permissions: AuthzApi;
+  graph: EvaluatorGraph;
+}>;
 
 export class EvaluatorApp implements EvaluatorApi {
   static readonly contract = EvaluatorApi;
-  static create(dependencies: EvaluatorAppDependencies): EvaluatorApp {
-    return new EvaluatorApp(dependencies);
+  static readonly dependencies = {
+    /** Answers whether the caller may act in a project that is not the request's. */
+    permissions: AuthzApi,
+    /** The trail one evaluator's change history is read off. */
+    auditLog: AuditLogApi,
+  };
+
+  static create(setup: EvaluatorSetup): EvaluatorApp {
+    const { dependencies, infrastructure, repositories } = setup;
+
+    return new EvaluatorApp({
+      evaluators: EvaluatorRuntimeService.create({
+        repository: repositories.evaluators,
+        workflows: infrastructure.workflows,
+        history: EvaluatorHistoryService.create({
+          auditLog: dependencies.auditLog,
+          actors: infrastructure.actors,
+        }),
+        ...(infrastructure.fallbackModels
+          ? { fallbackModels: infrastructure.fallbackModels }
+          : {}),
+        codeExecution: EvaluatorCodeExecutionService.create(infrastructure.nlp),
+        generateId: infrastructure.generateId,
+      }),
+      modelProviders: infrastructure.modelProviders,
+      permissions: dependencies.permissions,
+      graph: infrastructure.graph,
+    });
   }
 
-  #dependencies: EvaluatorAppDependencies;
+  #dependencies: EvaluatorAppParts;
 
-  private constructor(dependencies: EvaluatorAppDependencies) {
+  private constructor(dependencies: EvaluatorAppParts) {
     this.#dependencies = dependencies;
+  }
+
+  /**
+   * The evaluator runtime: the reads, the execution and the copy lineage the
+   * studio, the monitor half, the experiment wizard and the evaluation engine
+   * all run an evaluator through. Published so every process reaches the ONE
+   * built over this module's repositories.
+   */
+  getRuntime(): EvaluatorService {
+    return this.#dependencies.evaluators;
   }
 
   // ── Reads ─────────────────────────────────────────────────────────────────
@@ -320,7 +434,7 @@ export class EvaluatorApp implements EvaluatorApi {
   }
 
   /**
-   * Pushes the source evaluator's config onto the named replicas — but only
+   * Pushes the source evaluator's config onto the named replicas, but only
    * into the projects the caller may write, which the service is told rather
    * than left to assume.
    */

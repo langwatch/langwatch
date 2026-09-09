@@ -16,8 +16,8 @@ import {
   type StudioClientEvent,
   type WorkflowService,
 } from "@langwatch/workflow-contract";
-import type { EvaluatorCodeExecutionPort } from "../ports/evaluator.port.ts";
 import type { EvaluatorRepository } from "../repositories/evaluator.repository.ts";
+import type { EvaluatorCodeExecution } from "./evaluator-code-execution.service.ts";
 
 const outputFields: Field[] = codeEvaluatorOutputFields.map((field) => ({
   ...field,
@@ -34,7 +34,7 @@ export class EvaluatorCodeService {
   static create(options: {
     repository: EvaluatorRepository;
     workflows: WorkflowService;
-    codeExecution: EvaluatorCodeExecutionPort;
+    codeExecution: EvaluatorCodeExecution;
     generateId: () => string;
   }): EvaluatorCodeService {
     return new EvaluatorCodeService(options);
@@ -44,7 +44,7 @@ export class EvaluatorCodeService {
     private readonly options: {
       repository: EvaluatorRepository;
       workflows: WorkflowService;
-      codeExecution: EvaluatorCodeExecutionPort;
+      codeExecution: EvaluatorCodeExecution;
       generateId: () => string;
     },
   ) {}

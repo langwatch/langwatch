@@ -2,6 +2,7 @@ import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluatorService } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ModelProviderService } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -24,7 +25,7 @@ import type { WorkerModelProviders } from "./worker-model-provider.composition.t
 import type { WorkerObjectStorage } from "./worker-object-storage.composition.ts";
 import {
   createWorkerEvaluationApp,
-  createWorkerEvaluationWorkflows,
+  type WorkerEvaluationWorkflows,
 } from "./worker-evaluation-app.composition.ts";
 import { createWorkerEvaluationExecutionCollaborators } from "./worker-evaluation-execution.composition.ts";
 import {
@@ -34,6 +35,10 @@ import {
 
 export type WorkerEvaluationInfrastructure = Readonly<{
   database: PrismaClient;
+  /** The ONE workflow graph this process installed, and the engine behind it. */
+  workflows: WorkerEvaluationWorkflows;
+  /** The ONE evaluator runtime this process installed. */
+  evaluators: EvaluatorService;
   /** The ONE dataset application this process installed. */
   datasets: DatasetApi;
   /** The ONE monitor application this process installed. */
@@ -90,18 +95,12 @@ const workerEvaluationApp = {
     WorkerEvaluationInfrastructure,
     undefined
   >) {
-    const workflows = createWorkerEvaluationWorkflows({
-      database: infrastructure.database,
-      datasets: infrastructure.datasets,
-      modelProviders: infrastructure.modelProviders,
-      secretDecryptor: infrastructure.secretDecryptor,
-      nlpServiceUrl: infrastructure.nlpServiceUrl,
-      payloadStaging: infrastructure.payloadStaging,
-    });
+    const workflows = infrastructure.workflows;
     const execution = createWorkerEvaluationExecutionCollaborators({
       database: infrastructure.database,
       traces: dependencies.traces,
       monitors: infrastructure.monitors,
+      evaluators: infrastructure.evaluators,
       workflows,
       models: infrastructure.models,
       featureFlags: infrastructure.featureFlags,

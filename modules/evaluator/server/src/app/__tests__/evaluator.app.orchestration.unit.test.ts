@@ -6,13 +6,16 @@
  * per-project filtering every replication path applies. These rules used to
  * live in the tRPC class, so the assertions are on their stable error codes.
  */
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { Evaluator, EvaluatorService } from "@langwatch/evaluator-contract";
-import type { ModelProviderService } from "@langwatch/model-provider-contract";
+import type { Evaluator } from "@langwatch/evaluator-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { EvaluatorGraphPort } from "../../ports/evaluator.port.ts";
-import { EvaluatorApp } from "../evaluator.app.ts";
+import type { EvaluatorGraph } from "../evaluator.app.ts";
+import {
+  createEvaluatorTestApp,
+  testEvaluatorGraph,
+  testEvaluatorPermissions,
+  type EvaluatorRuntimeStubs,
+} from "./evaluator.fixture.ts";
 
 const anEvaluator: Evaluator = {
   id: "evaluator-1",
@@ -28,46 +31,24 @@ const anEvaluator: Evaluator = {
   updatedAt: new Date(),
 };
 
-type Graph = { [Key in keyof EvaluatorGraphPort]: EvaluatorGraphPort[Key] };
-
-function graph(overrides: Partial<Graph> = {}): Graph {
-  return {
-    findLinkedWorkflow: vi.fn(async () => ({ id: "workflow-1", name: "Judge" })),
-    findMonitorsUsingEvaluator: vi.fn(async () => []),
-    deleteMonitorsUsingEvaluator: vi.fn(async () => ({ count: 0 })),
-    archiveLinkedWorkflow: vi.fn(async () => ({ id: "workflow-1" })),
-    replicateEvaluatorWorkflow: vi.fn(async () => "workflow-2"),
-    deleteReplicatedWorkflow: vi.fn(async () => void 0),
-    ...overrides,
-  };
-}
+const graph = testEvaluatorGraph;
 
 function anApp(options: {
-  evaluators?: Partial<EvaluatorService>;
+  evaluators?: EvaluatorRuntimeStubs;
   permits?: (projectId: string) => boolean;
-  ports?: Graph;
+  ports?: EvaluatorGraph;
 }) {
   const ports = options.ports ?? graph();
-  const permits = options.permits ?? (() => true);
-  const permissions = {
-    hasPermission: vi.fn(async (check: { projectId?: string }) => permits(check.projectId ?? "")),
-  } as unknown as AuthzApi;
-
-  return {
-    ports,
+  const permissions = testEvaluatorPermissions(options.permits ?? (() => true));
+  const composed = createEvaluatorTestApp({
+    // No workflow answers for an evaluator unless a case says one does: every
+    // create names a workflow the project has not used before.
+    evaluators: { tryGetByWorkflow: async () => null, ...options.evaluators },
     permissions,
-    app: EvaluatorApp.create({
-      // No workflow answers for an evaluator unless a case says one does: every
-      // create names a workflow the project has not used before.
-      evaluators: {
-        tryGetByWorkflow: async () => null,
-        ...options.evaluators,
-      } as EvaluatorService,
-      modelProviders: {} as ModelProviderService,
-      permissions,
-      graph: ports as EvaluatorGraphPort,
-    }),
-  };
+    graph: ports,
+  });
+
+  return { ports, permissions, app: composed.app };
 }
 
 describe("given a code evaluator that arrives without its program", () => {

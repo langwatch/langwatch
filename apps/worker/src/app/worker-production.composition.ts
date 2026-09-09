@@ -258,6 +258,8 @@ import {
   type WorkerScenarioExecutionAbsenceReportPort,
 } from "./worker-scenario-execution.composition.ts";
 import { createWorkerAgentApps } from "./worker-agent-apps.composition.ts";
+import { createWorkerEvaluationWorkflows } from "./worker-evaluation-app.composition.ts";
+import { installWorkerEvaluator } from "./worker-evaluator.composition.ts";
 import {
   createWorkerGatewaySpend,
   WorkerGatewaySpendAbsenceReportPort,
@@ -1227,6 +1229,34 @@ export class WorkerProductionComposition {
       graphActivity: graphActivity ?? new AbsentEvaluationGraphActivity(),
       triggerMatches: automation.triggerMatches,
     };
+    // The workflow graph a queued evaluation runs on, and the ONE evaluator
+    // runtime over it: the resolve, the code run and the native augmentation
+    // all reach this install rather than one per collaborator.
+    const evaluationWorkflows =
+      options.connection && modelProviders && datasets
+        ? createWorkerEvaluationWorkflows({
+            database: options.connection.client,
+            datasets,
+            modelProviders: modelProviders.modelProviders,
+            secretDecryptor: resolveWorkerStoredSecretCipher(options.config),
+            nlpServiceUrl: options.config.infrastructure.modelProvider.nlpServiceUrl,
+            payloadStaging: objectStorage.payloadStaging,
+          })
+        : void 0;
+    const evaluationEvaluators =
+      foundation && options.connection && modelProviders && options.resources && evaluationWorkflows
+        ? await installWorkerEvaluator({
+            database: options.connection.client,
+            permissions: foundation.tenancy.authorization,
+            auditLog: foundation.auditLog,
+            users: foundation.users,
+            workflows: evaluationWorkflows.workflows,
+            nlpRuntime: evaluationWorkflows.nlpRuntime,
+            modelProviders: modelProviders.modelProviders,
+            resources: options.resources,
+            name: "worker evaluation evaluator application",
+          })
+        : void 0;
     const observabilityApps =
       foundation &&
       options.connection &&
@@ -1236,7 +1266,9 @@ export class WorkerProductionComposition {
       options.resources &&
       evaluationAnalytics &&
       datasets &&
-      monitors
+      monitors &&
+      evaluationWorkflows &&
+      evaluationEvaluators
         ? await createWorkerObservabilityApps({
             connection: options.connection,
             config: options.config,
@@ -1262,6 +1294,8 @@ export class WorkerProductionComposition {
             commands: traceCommands,
             evaluation: {
               database: options.connection.client,
+              workflows: evaluationWorkflows,
+              evaluators: evaluationEvaluators.getRuntime(),
               datasets,
               monitors,
               modelProviders: modelProviders.modelProviders,

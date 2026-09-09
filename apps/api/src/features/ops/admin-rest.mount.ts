@@ -1,7 +1,7 @@
 /**
  * The back office's collaborators, composed from this process's own graph.
  */
-import type { AuthService } from "@langwatch/auth-contract";
+import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { AdminRestPorts, OpsApp } from "@langwatch/ops-server";
 
 import type { ApiBrowserSessionTransportPort } from "../../app/api-auth.composition.ts";
@@ -14,7 +14,7 @@ export type ApiAdminRestOptions = Readonly<{
    * where it composed one. The SAME pair every other session door reads, so
    * two doors cannot decide differently about who somebody is.
    */
-  session: Readonly<{ auth: AuthService; sessions: ApiBrowserSessionTransportPort }> | undefined;
+  session: Readonly<{ auth: BrowserSessionApi; sessions: ApiBrowserSessionTransportPort }> | undefined;
 }>;
 
 /** The back office's ports, or none where either half is missing. */

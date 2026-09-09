@@ -14,6 +14,7 @@ import {
 import type { PresenceEmitterPort } from "@langwatch/presence-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { TestProjectApi } from "../../../app/__tests__/support/test-project-api.ts";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -99,7 +100,7 @@ function composedTurns(redis: RedisConnection | null): LangyTurnTechnicalPorts {
       audit: undefined,
       auditLog: createApiFixture<AuditLogApi>(),
     },
-    peers: { projects: {} as unknown as ProjectApi },
+    peers: { projects: new TestProjectApi() },
     commands: {} as unknown as LangyConversationCommands,
     redis,
     publicBaseUrl: undefined,

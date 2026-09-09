@@ -7,6 +7,8 @@
  * `actorId` — never read from a session or a request.
  */
 import { moduleApi } from "@langwatch/runtime-composition";
+import type { CodeEvaluatorExecutionInput } from "./code-evaluator.ts";
+import type { EvaluatorIdOrSlugInput, ResolvedEvaluatorExecution } from "./evaluator-execution.ts";
 import type {
   EvaluatorCascadeArchive,
   EvaluatorCopy,
@@ -16,8 +18,8 @@ import type {
   EvaluatorSyncFromSourceResult,
   EvaluatorWorkflowFields,
 } from "./evaluator.schemas.ts";
-import type { EvaluatorCreateInput, EvaluatorUpdateInput } from "./evaluator.service.ts";
 import type { Evaluator, EvaluatorConfig, EvaluatorWithFields } from "./evaluator.ts";
+import type { SingleEvaluationResult } from "./evaluators.generated.ts";
 
 /** One evaluator inside one project. */
 export type EvaluatorScope = Readonly<{ id: string; projectId: string }>;
@@ -25,7 +27,48 @@ export type EvaluatorScope = Readonly<{ id: string; projectId: string }>;
 /** One evaluator addressed under the field name the lineage procedures publish. */
 export type EvaluatorLineageScope = Readonly<{ evaluatorId: string; projectId: string }>;
 
+export type EvaluatorCreateInput = {
+  id: string;
+  projectId: string;
+  name: string;
+  slug?: string;
+  type: "evaluator" | "code" | "workflow";
+  config: EvaluatorConfig;
+  workflowId?: string;
+  copiedFromEvaluatorId?: string;
+  resolved?: { defaultModel?: string | null; embeddingsModel?: string | null };
+};
+export type EvaluatorUpdateInput = {
+  id: string;
+  projectId: string;
+  data: Partial<Pick<Evaluator, "name" | "type" | "workflowId">> & {
+    config?: EvaluatorConfig;
+  };
+};
+
+export type NativeEvaluatorExecutionInput = {
+  evaluatorType: string;
+  data: Record<string, unknown>;
+};
+
+export type EvaluatorResultAugmentationInput = {
+  evaluatorType: string;
+  mappedData: Record<string, unknown>;
+  settings: Record<string, unknown> | undefined;
+  droppedCategories: string[];
+  result: SingleEvaluationResult;
+};
+
 export interface EvaluatorApi {
+  /** Runs a code evaluator's program in the process's own code sandbox. */
+  executeCode(input: CodeEvaluatorExecutionInput): Promise<SingleEvaluationResult>;
+  /** Runs a native evaluator through the NLP engine. */
+  executeNative(input: NativeEvaluatorExecutionInput): Promise<SingleEvaluationResult>;
+  /** Reshapes a native evaluator's raw result onto mapped data and dropped categories. */
+  augmentResult(input: EvaluatorResultAugmentationInput): SingleEvaluationResult;
+  /** Resolves an evaluator by id or slug into what running it needs. */
+  resolveForExecution(input: EvaluatorIdOrSlugInput): Promise<ResolvedEvaluatorExecution>;
+
   /** Every evaluator in the project. */
   getAll(input: { projectId: string }): Promise<Evaluator[]>;
   /** Every evaluator in the project, with its computed input and output fields. */
@@ -40,6 +83,8 @@ export interface EvaluatorApi {
   findByIdWithFields(input: EvaluatorScope): Promise<EvaluatorWithFields | undefined>;
   /** One evaluator by its project-unique slug, or `undefined`. */
   findBySlug(input: { slug: string; projectId: string }): Promise<Evaluator | undefined>;
+  /** One evaluator by its project-unique slug. Throws `EvaluatorNotFoundError` when none matches. */
+  getBySlug(input: { slug: string; projectId: string }): Promise<Evaluator>;
   /** One evaluator the way the public API addresses it: by id, failing that by slug. */
   findByIdOrSlugWithFields(input: {
     idOrSlug: string;
