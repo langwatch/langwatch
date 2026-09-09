@@ -5,18 +5,15 @@
 // schema boundary live at `@langwatch/api` and are NOT re-exported from here: a
 // consumer imports each from the entry point that owns it.
 
+// The addressing half: the version vocabulary a family serves at, the
+// `/api/v1` alias every `/api` family answers under, and the static generation
+// a hand-mounted transport negotiates.
 export {
-  allRegisteredRoutes,
   API_VERSION_HEADER,
   assertVersionLabel,
   canonicalV1Path,
-  createRestRuntime,
-  defineRestRouter,
-  getRoutePolicy,
   isDateVersion,
   MANAGEMENT_API_VERSION,
-  projectRestFacts,
-  registerRoutePolicy,
   RestVersionSelector,
   restVersionSelectorMiddleware,
   undescribedStack,
@@ -24,18 +21,27 @@ export {
   VERSION_LATEST,
   VERSION_PREVIEW,
   type DateVersion,
-  type FeatureApiWitness,
   type HttpMethod,
   type MountableRestApp,
-  type RegisteredRoute,
   type RestAddressing,
   type RestAddressingOptions,
-  type RestCaller,
+  type RestVersionSelection,
+  type RestVersionSelectorMiddlewareOptions,
+  type RestVersionSelectorOptions,
+  type RestVersionSource,
+  type VersionLabel,
+  type VersionStatus,
+} from "./addressing.ts";
+
+// The declaration half: one complete declaration per route, and the vocabulary
+// a route states its sources, its answers and its door with.
+export {
+  defineRestRouter,
+  projectRestFacts,
+  type FeatureApiWitness,
   type RestDeprecation,
-  type RestDeprecationLogPort,
   type RestDoorCredential,
   type RestMethodName,
-  type RestMountOptions,
   type RestMultipartDeclared,
   type RestPermissionTarget,
   type RestRawAnswer,
@@ -47,28 +53,28 @@ export {
   type RestRawResponse,
   type RestRawResult,
   type RestRouteAnswers,
-  type RestRuntime,
-  type RestRuntimePorts,
   type RestTransportDeclaration,
   type RestTransportDocs,
   type RestTransportRoute,
-  type RestVersionSelection,
-  type RestVersionSelectorMiddlewareOptions,
-  type RestVersionSelectorOptions,
-  type RestVersionSource,
-  type VersionLabel,
-  type VersionStatus,
+} from "./declaration.ts";
+
+// The runtime half: the ports a process fills, and the mount that puts a
+// family's declaration behind the one execution path.
+export {
+  createRestRuntime,
+  type RestCaller,
+  type RestDeprecationLogPort,
+  type RestMountOptions,
+  type RestRuntime,
+  type RestRuntimePorts,
 } from "./runtime.ts";
 
 // The request half: the validator that fails the way the boundary fails, the
 // wire-size cap nine ingestion families apply, the tracer and request logger,
 // the declared middleware facts, SSE, and `Idempotency-Key` with its ledger.
+// The `Idempotency-Key` half: the header and its bounds, the declared
+// parameter and replay marker, and the receipt ledger a create replays from.
 export {
-  bindRestHeader,
-  bindRestMiddleware,
-  bodyLimit,
-  createSSEResponse,
-  defineRestMiddleware,
   HEARTBEAT_INTERVAL_MS,
   IDEMPOTENCY_KEY_HEADER,
   IdempotencyConflictError,
@@ -78,24 +84,13 @@ export {
   idempotentJson,
   idempotentReplayHeaders,
   isClaimAbandoned,
-  loggerMiddleware,
   MAX_KEY_LENGTH,
   MIN_KEY_LENGTH,
-  multipartMiddleware,
   readIdempotencyKey,
   RECEIPT_TTL_MS,
-  RequestValidationError,
-  requestValidationErrorFrom,
-  restCacheKey,
-  restRateLimitKey,
   serializeResponseBody,
   TAKEOVER_AFTER_MS,
-  tracerMiddleware,
-  validator,
   withIdempotency,
-  type AppRestBroadcast,
-  type BodyLimitOptions,
-  type FieldViolation,
   type IdempotencyConflictReason,
   type IdempotencyReceiptCreateInput,
   type IdempotencyReceiptPersistence,
@@ -106,6 +101,26 @@ export {
   type IdempotentOutcome,
   type IdempotentReplayed,
   type IdempotentRunner,
+  type WithIdempotencyParams,
+} from "./idempotency.ts";
+
+export {
+  bindRestHeader,
+  bindRestMiddleware,
+  bodyLimit,
+  createSSEResponse,
+  defineRestMiddleware,
+  loggerMiddleware,
+  multipartMiddleware,
+  RequestValidationError,
+  requestValidationErrorFrom,
+  restCacheKey,
+  restRateLimitKey,
+  tracerMiddleware,
+  validator,
+  type AppRestBroadcast,
+  type BodyLimitOptions,
+  type FieldViolation,
   type RestCachePolicy,
   type RestMultipart,
   type RestMultipartFile,
@@ -115,7 +130,6 @@ export {
   type RestTransportMiddlewareBinding,
   type SSEHandler,
   type TypedSSEStream,
-  type WithIdempotencyParams,
 } from "./request.ts";
 
 // The credential half: the project and credential a door resolves, the
@@ -225,12 +239,15 @@ export { generateSpecs as generateApiSpecs, resolver } from "hono-openapi";
 // cross-check that every mounted route declared a policy, the refusal
 // fingerprint, the shared-secret comparison and the management audit.
 export {
+  allRegisteredRoutes,
   assertEveryRouteDeclared,
   collectAuthDiagnostics,
   emitManagementAudit,
   familyFromBasePath,
+  getRoutePolicy,
   isInternalSecretValid,
   managementActor,
+  registerRoutePolicy,
   undeclaredRoutes,
   type ApiErrorEnvelope,
   type AppRestManagementAuditPort,
@@ -238,6 +255,7 @@ export {
   type AppRestSecurityPorts,
   type AuthDiagnostics,
   type MountedRouteTable,
+  type RegisteredRoute,
   type RestApiServicePorts,
 } from "./security.ts";
 

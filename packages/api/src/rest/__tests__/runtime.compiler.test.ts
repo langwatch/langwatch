@@ -16,7 +16,7 @@ it("accepts the fluent annotation REST router and rejects a body from an implici
   const rejected = join(directory, "rejected.ts");
   const mismatchedParams = join(directory, "mismatched-params.ts");
   const unpermitted = join(directory, "unpermitted.ts");
-  const transport = join(process.cwd(), "src/rest/runtime.ts");
+  const transport = join(process.cwd(), "src/rest/declaration.ts");
 
   writeFileSync(
     accepted,
@@ -111,7 +111,7 @@ it("infers trailing middleware arguments and rejects wrong facts and responses",
     fixture,
     `import { z } from "zod";
 import { featureApi } from "@langwatch/runtime-composition";
-import { defineRestRouter } from "../src/rest/runtime.ts";
+import { defineRestRouter } from "../src/rest/declaration.ts";
 import { defineRestMiddleware } from "../src/rest/request.ts";
 const api = featureApi<object>("annotation");
 const facts = defineRestMiddleware("caller", z.object({ userId: z.string() }));
@@ -171,7 +171,7 @@ it("types the handler's scope from the declared credential, and refuses a door w
     fixture,
     `import { z } from "zod";
 import { featureApi } from "@langwatch/runtime-composition";
-import { defineRestRouter } from "../src/rest/runtime.ts";
+import { defineRestRouter } from "../src/rest/declaration.ts";
 const api = featureApi<object>("role");
 const tier = z.object({ tier: z.literal("organization") });
 defineRestRouter(api).withNamespace("roles").withVersion("2026-09-08")
@@ -222,7 +222,7 @@ it("types the handler's answer from the statuses the declaration named", () => {
     fixture,
     `import { z } from "zod";
 import { featureApi } from "@langwatch/runtime-composition";
-import { defineRestRouter } from "../src/rest/runtime.ts";
+import { defineRestRouter } from "../src/rest/declaration.ts";
 const api = featureApi<object>("platform-health");
 const report = z.object({ status: z.string() });
 const route = () => defineRestRouter(api).withNamespace("platform-health").withVersion("2026-09-08")

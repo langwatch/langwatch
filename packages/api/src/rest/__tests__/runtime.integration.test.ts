@@ -21,6 +21,7 @@ import {
   securityRequirement,
 } from "../../access/access.ts";
 import { createErrorHandler, PayloadTooLargeError } from "../../errors.ts";
+import { defineRestRouter, projectRestFacts } from "../declaration.ts";
 import {
   documentedResponses,
   restRouteDocumentation,
@@ -28,13 +29,8 @@ import {
 } from "../openapi.ts";
 import { declined } from "../response.ts";
 import { bindRestHeader, bindRestMiddleware, defineRestMiddleware } from "../request.ts";
-import {
-  createRestRuntime,
-  defineRestRouter,
-  getRoutePolicy,
-  projectRestFacts,
-  type RestDeprecationLogPort,
-} from "../runtime.ts";
+import { createRestRuntime, type RestDeprecationLogPort } from "../runtime.ts";
+import { getRoutePolicy } from "../security.ts";
 
 const SPEC_OPTIONS = { excludeStaticFile: false } as const;
 const VERSION = "2026-09-08";

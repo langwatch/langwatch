@@ -16,18 +16,17 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
-  bodyLimit,
   IdempotencyLedger,
   isClaimAbandoned,
   RECEIPT_TTL_MS,
   TAKEOVER_AFTER_MS,
-  validator as zValidator,
   type IdempotencyReceiptCreateInput,
   type IdempotencyReceiptPersistence,
   type IdempotencyReceiptRecord,
   type IdempotencyReceiptUpdateInput,
   type IdempotencyResponseCipher,
-} from "../request.ts";
+} from "../idempotency.ts";
+import { bodyLimit, validator as zValidator } from "../request.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The request validator, end to end through a real Hono app.

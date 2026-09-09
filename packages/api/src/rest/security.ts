@@ -1,17 +1,18 @@
 /**
  * The process security kernel a REST door composes: the ports one process fills
- * for its own doors, the cross-check that every mounted route declared a
- * policy, the fingerprint a credential refusal is logged with, the one
- * shared-secret comparison, the management surface's audit emission, and the
- * permission vocabulary custom roles are built from.
+ * for its own doors, the process-wide route-policy registry and the cross-check
+ * that every mounted route declared a policy, the fingerprint a credential
+ * refusal is logged with, the one shared-secret comparison, the management
+ * surface's audit emission, and the permission vocabulary custom roles are
+ * built from.
  */
 import { timingSafeEqual } from "node:crypto";
 
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Context, ErrorHandler, Hono, MiddlewareHandler } from "hono";
 
-import type { IdempotentRunner } from "./request.ts";
-import type { RegisteredRoute } from "./runtime.ts";
+import type { AccessPolicy, CredentialClass } from "../access-policy.ts";
+import type { IdempotentRunner } from "./idempotency.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Everything a REST door needs from the process it runs in.
@@ -117,6 +118,66 @@ export function familyFromBasePath(basePath: string): string {
       .replace(/\/+$/, "")
       .replace(/\//g, "-") || "api"
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The process-wide route-policy registry.
+//
+// Populated as each family mounts. The router-introspection guard cross-checks
+// the composed router against it, so any mounted route lacking a declared
+// policy — even one that bypassed the runtime — fails CI.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface RegisteredRoute {
+  readonly method: string;
+  readonly path: string;
+  readonly policy: AccessPolicy;
+  readonly family: string;
+  /**
+   * Which credential an API consumer sends here. Derived by the runtime from
+   * the mount and the route, so a route cannot claim a credential class
+   * nothing enforces. Read by the OpenAPI generator to stamp each operation's
+   * `security`.
+   */
+  readonly credentialClass: CredentialClass;
+  /**
+   * The `/api/v1` path this same route also answers at. One logical route with
+   * two addresses, so an authorization audit and the document's drift guard
+   * count it once and still recognise the canonical published URL.
+   */
+  readonly canonicalPath?: string;
+  /**
+   * True when this mount answers 410 Gone for a withdrawn endpoint. No handler
+   * stands behind it, so the route-coverage gate accounts for it by shape.
+   */
+  readonly withdrawn?: boolean;
+  /**
+   * True for the catch-alls that 404 an unknown version namespace. Real routes
+   * in the table, and undocumentable for the same reason a tombstone is.
+   */
+  readonly isNamespaceGuard?: boolean;
+}
+
+const registry = new Map<string, RegisteredRoute>();
+
+function registryKey(method: string, path: string): string {
+  return `${method.toUpperCase()} ${path}`;
+}
+
+/** Record (or overwrite, idempotently) the policy for a (method, path). */
+export function registerRoutePolicy(route: RegisteredRoute): void {
+  registry.set(registryKey(route.method, route.path), {
+    ...route,
+    method: route.method.toUpperCase(),
+  });
+}
+
+export function getRoutePolicy(method: string, path: string): RegisteredRoute | undefined {
+  return registry.get(registryKey(method, path));
+}
+
+export function allRegisteredRoutes(): RegisteredRoute[] {
+  return [...registry.values()];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

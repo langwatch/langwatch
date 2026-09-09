@@ -12,9 +12,9 @@ import { z, type ZodType } from "zod";
 
 import type { CredentialClass } from "../access-policy.ts";
 import { securityRequirement } from "../access/access.ts";
+import type { RestDeprecation, RestDoorCredential, RestTransportRoute } from "./declaration.ts";
 import type { RestMultipart } from "./request.ts";
 import type { EndpointDocs, RouteResponse } from "./response.ts";
-import type { RestDeprecation, RestDoorCredential, RestTransportRoute } from "./runtime.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // What a declared REST route publishes: its operation id and the answer the

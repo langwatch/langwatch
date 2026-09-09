@@ -11,19 +11,18 @@ import { z } from "zod";
 import { anyAuthenticated, publicRoute } from "../../access/access.ts";
 import { ApiVersionConflictError, InvalidApiVersionError } from "../../errors.ts";
 import {
+  API_VERSION_HEADER,
+  RestVersionSelector,
+  restVersionSelectorMiddleware,
+} from "../addressing.ts";
+import { defineRestRouter, projectRestFacts } from "../declaration.ts";
+import {
   bindRestHeader,
   bindRestMiddleware,
   defineRestMiddleware,
   type RestTransportMiddlewareBinding,
 } from "../request.ts";
-import {
-  API_VERSION_HEADER,
-  createRestRuntime,
-  defineRestRouter,
-  projectRestFacts,
-  RestVersionSelector,
-  restVersionSelectorMiddleware,
-} from "../runtime.ts";
+import { createRestRuntime } from "../runtime.ts";
 
 describe("defineRestRouter", () => {
   /** @scenario "A REST endpoint is one complete declaration in the server" */

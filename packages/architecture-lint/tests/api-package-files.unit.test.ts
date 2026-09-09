@@ -25,10 +25,13 @@ const TARGET_FILES = new Set([
   "access/access.ts",
   "contract/index.ts",
   "contract/trpc-contract.ts",
-  // Nine transport files. Anything else under rest/ or trpc/ is a regression.
+  // Fourteen transport files. Anything else under rest/ or trpc/ is a regression.
   "rest/index.ts",
+  "rest/addressing.ts",
+  "rest/declaration.ts",
   "rest/runtime.ts",
   "rest/request.ts",
+  "rest/idempotency.ts",
   "rest/credential.ts",
   "rest/response.ts",
   "rest/openapi.ts",
