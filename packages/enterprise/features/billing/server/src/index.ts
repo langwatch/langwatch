@@ -1,5 +1,22 @@
-// The two tRPC transports are not exported: they still name the deleted legacy
-// builder.
+/**
+ * The three declared transports, and the facts two of them ask the process to
+ * resolve. A mount binds a fact; nothing else may.
+ */
+export {
+  BillingStripeWebhookApi,
+  billingStripeWebhookRest,
+} from "./transport/billing-stripe-webhook.rest.ts";
+export {
+  BillingCurrencyApi,
+  currencyRequestHeadersFact,
+  currencyTrpcTransport,
+} from "./transport/currency.trpc.ts";
+export {
+  billingCallerEmailFact,
+  BillingSubscriptionApi,
+  subscriptionTrpcTransport,
+  type BillingSubscriber,
+} from "./transport/subscription.trpc.ts";
 export { StripeErrorAdapter } from "./adapters/stripe-error.stripe-error.adapter.ts";
 export {
   ClickHouseBillingAdapter,
@@ -200,10 +217,6 @@ export { NurturingSignupIdentificationService } from "./services/nurturing-signu
 export { NurturingSsoAutoAddService } from "./services/nurturing-sso-auto-add.service.ts";
 export { NurturingSubscriptionSyncService } from "./services/nurturing-subscription-sync.service.ts";
 export { NurturingUserSyncService } from "./services/nurturing-user-sync.service.ts";
-export {
-  createStripeWebhookRestApp,
-  type StripeWebhookRestPorts,
-} from "./transport/api-rest/stripe-webhook.api.ts";
 export {
   runTieredFreeToSeatEventMigration,
   TieredFreeToSeatEventMigrateTask,

@@ -2194,6 +2194,9 @@ importers:
 
   packages/enterprise/features/billing/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../config
@@ -2276,6 +2279,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../../prisma-client
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../../runtime-composition
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../../../features/scenario/contract
@@ -6503,6 +6509,9 @@ importers:
 
   packages/features/github/contract:
     dependencies:
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../api
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../config
