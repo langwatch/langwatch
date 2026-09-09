@@ -20,6 +20,19 @@ type LaneRow = Awaited<
   ReturnType<GovernanceCostRollupClickHouseRepository["sumDaysByLane"]>
 >[number];
 
+/**
+ * One currency's window total for a lane, as the per-currency read answers it.
+ *
+ * Not yet implemented: `sumWindowByCurrency` on the rollup repository. It is
+ * the read the per-currency lines are built from — the money in the currency
+ * each cell was BILLED in, which the table has stored on every row since the
+ * summary was built (`AmountNanoMinor`) and no aggregate read has ever asked
+ * for.
+ */
+type CurrencyRow = Awaited<
+  ReturnType<GovernanceCostRollupClickHouseRepository["sumWindowByCurrency"]>
+>[number];
+
 /** One ingestion source, as the stale-source read selects it. */
 type SourceRow = {
   name: string;
@@ -106,12 +119,36 @@ function createService(deps: {
 function rollupReturning({
   rows = [],
   hasSourceRows = false,
+  currencies,
 }: {
   rows?: LaneRow[];
   hasSourceRows?: boolean;
+  /**
+   * What the per-currency read answers for the billed lane. Defaults to the
+   * one US dollar line the pulled rows add up to, which is what every test
+   * that says nothing about currency means: all of this money was billed in
+   * dollars.
+   */
+  currencies?: CurrencyRow[];
 } = {}) {
+  const pulled = rows.filter((row) => row.costSource === "pulled");
   return {
     sumDaysByLane: vi.fn().mockResolvedValue(rows),
+    sumWindowByCurrency: vi.fn().mockResolvedValue(
+      currencies ?? [
+        {
+          currencyCode: "USD",
+          amountNanoMinor: pulled.reduce(
+            (sum, row) => sum + (row.amountNanoUsd ?? 0),
+            0,
+          ),
+          cellsWithoutAmount: pulled.reduce(
+            (count, row) => count + row.cellsWithoutAmount,
+            0,
+          ),
+        },
+      ],
+    ),
     sumWindowByProvider: vi.fn().mockResolvedValue(
       rows
         .filter((row) => row.costSource === "pulled")
@@ -141,6 +178,14 @@ function laneRow(
     previousAmountNanoUsd: null,
     cellsWithoutPreviousAmount: 0,
     lastObservedAt: 0,
+    // Not yet implemented: the day's figures split by the currency they were
+    // billed in, each with what that currency held immediately before the
+    // day's latest revision, and its own count of cells holding no earlier
+    // amount. That count is per line rather than per day because the prior
+    // figure is: a day billed in two currencies has two of each, and there is
+    // no single number covering both. Empty by default, which is what every
+    // test that says nothing about currency means.
+    byCurrency: [],
     ...overrides,
   };
 }
@@ -293,8 +338,12 @@ describe("GovernanceCostService.summary", () => {
             // carries neither §15 marker. Asserted exactly rather than by
             // `toMatchObject` so a marker appearing from nowhere fails here.
             billedRevisedAt: null,
-            billedPreviousUsd: null,
             billedProvisional: false,
+            // The day holds dollars and nothing else, and has never been
+            // revised, so the one line names no earlier amount.
+            billedByCurrency: [
+              { currencyCode: "USD", amount: 12, previousAmount: null },
+            ],
           },
         ]);
       });
@@ -357,7 +406,12 @@ describe("GovernanceCostService.summary", () => {
   describe("given a lane mixing dollar usage with usage billed elsewhere", () => {
     describe("when requesting the summary", () => {
       /** @scenario "A lane with usage we cannot state in US dollars holds no total" */
-      it("withholds the total rather than offering the dollar part of it", async () => {
+      it("withholds the dollar figure over an unpriced cell and totals the euros on their own line", async () => {
+        // One figure, not two. The lane's per-currency lines REPLACE the
+        // single dollar total, and the US dollar line among them IS that
+        // total. What withholds it is a cell we hold no amount for AT ALL —
+        // not a cell the provider priced in euros, which is money we can
+        // state perfectly well and state on its own line.
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: rollupReturning({
@@ -372,8 +426,22 @@ describe("GovernanceCostService.summary", () => {
                 costSource: "pulled",
                 amountNanoUsd: null,
                 cellsWithoutAmount: 1,
-                currenciesWithoutUsdAmount: ["EUR"],
               }),
+            ],
+            currencies: [
+              // The dollar line: 100 stated, one cell holding nothing.
+              {
+                currencyCode: "USD",
+                amountNanoMinor: 100 * NANO,
+                cellsWithoutAmount: 1,
+              },
+              // Euros the provider DID state. Its own line, and no part of it
+              // belongs to the dollar figure.
+              {
+                currencyCode: "EUR",
+                amountNanoMinor: 40 * NANO,
+                cellsWithoutAmount: 0,
+              },
             ],
           }),
         });
@@ -389,28 +457,58 @@ describe("GovernanceCostService.summary", () => {
         expect(result.billed.amountUsd).toBeNull();
         expect(result.billed.amountUsd).not.toBe(100);
         expect(result.billed.cellsWithoutAmount).toBe(1);
-        expect(result.billed.currenciesWithoutUsdAmount).toEqual(["EUR"]);
+
+        const dollars = result.billed.currencyTotals.find(
+          (total) => total.currencyCode === "USD",
+        );
+        // ONE figure: the dollar line and the lane headline are the same
+        // number, so a screen cannot show a withheld total beside a stated
+        // one for the same money.
+        expect(dollars?.amount).toBe(result.billed.amountUsd);
+        expect(dollars?.cellsWithoutAmount).toBe(1);
+
+        const euros = result.billed.currencyTotals.find(
+          (total) => total.currencyCode === "EUR",
+        );
+        // Priced euros are not collateral damage: they keep their own total
+        // even while the dollar line beside them is withheld.
+        expect(euros?.amount).toBe(40);
+        expect(euros?.cellsWithoutAmount).toBe(0);
+        // And no line anywhere adds the two together.
+        expect(
+          result.billed.currencyTotals.map((total) => total.amount),
+        ).not.toContain(140);
       });
 
       /** @scenario "A day mixing stated and unstated amounts holds no figure for that lane" */
-      it("gaps the mixed day for that lane and leaves the other lane alone", async () => {
+      it("gaps the day over an amount it holds none of, keeps it over priced euros, and says what the figure leaves out", async () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: rollupReturning({
             rows: [
-              // A day the lane DID price part of: the partial figure exists and
-              // is exactly what must not be plotted.
+              // A day the lane DID price part of, beside two cells holding no
+              // amount in any currency: the partial figure exists and is
+              // exactly what must not be plotted.
               laneRow({
                 day: "2026-08-01",
                 costSource: "pulled",
                 amountNanoUsd: 60 * NANO,
                 cellsWithoutAmount: 2,
-                currenciesWithoutUsdAmount: ["EUR"],
               }),
               laneRow({
                 day: "2026-08-01",
                 costSource: "gateway",
                 amountNanoUsd: 7 * NANO,
+              }),
+              // The same shape of day under the new rule: every cell carries
+              // an amount, some of them in euros. The dollar figure is real
+              // and stands, and the day says the euros are not in it.
+              laneRow({
+                day: "2026-08-02",
+                costSource: "pulled",
+                amountNanoUsd: 60 * NANO,
+                cellsWithoutAmount: 0,
+                currenciesWithoutUsdAmount: ["EUR"],
               }),
             ],
           }),
@@ -419,7 +517,7 @@ describe("GovernanceCostService.summary", () => {
         const result = await service.summary({
           organizationId: "org-1",
           windowDays: 30,
-          now: new Date("2026-08-01T12:00:00.000Z"),
+          now: new Date("2026-08-02T12:00:00.000Z"),
         });
 
         const day = result.series[0]!;
@@ -431,6 +529,218 @@ describe("GovernanceCostService.summary", () => {
         // would pass against an implementation that blanks the whole day.
         expect(day.gatewayUsd).toBe(7);
         expect(day.gatewayCellsWithoutAmount).toBe(0);
+
+        const withEuros = result.series[1]!;
+        expect(withEuros.day).toBe("2026-08-02");
+        // Priced euros beside priced dollars is not a mixed day any more: the
+        // dollar figure states every dollar spent, so gapping it here would
+        // hide money we can stand behind.
+        expect(withEuros.billedUsd).toBe(60);
+        expect(withEuros.billedCellsWithoutAmount).toBe(0);
+        // But the figure is not the whole day, so the day has to say which
+        // money it leaves out — otherwise the bar reads as the day's total.
+        expect(withEuros.billedCurrenciesWithoutUsdAmount).toEqual(["EUR"]);
+      });
+    });
+  });
+
+  describe("given a window billed in more than one currency", () => {
+    describe("when the window totals are read", () => {
+      /** @scenario "A currency nobody converted still totals in the currency it was billed in" */
+      it("gives the euros a total of their own and leaves the dollar figure where it was", async () => {
+        // The amount in the provider's own currency has been stored on every
+        // row since the summary was built and has never been read by any
+        // total. An empty dollar column is not the same as there being no
+        // money, and no rate is applied to make one out of the other.
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1"),
+          costRollup: rollupReturning({
+            rows: [
+              laneRow({
+                day: "2026-08-01",
+                costSource: "pulled",
+                amountNanoUsd: 100 * NANO,
+              }),
+            ],
+            currencies: [
+              {
+                currencyCode: "USD",
+                amountNanoMinor: 100 * NANO,
+                cellsWithoutAmount: 0,
+              },
+              {
+                currencyCode: "EUR",
+                amountNanoMinor: 40 * NANO,
+                cellsWithoutAmount: 0,
+              },
+            ],
+          }),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+          now: new Date("2026-08-01T12:00:00.000Z"),
+        });
+
+        const euros = result.billed.currencyTotals.find(
+          (total) => total.currencyCode === "EUR",
+        );
+        expect(euros?.amount).toBe(40);
+
+        // Unchanged by the euros beside it: not summed with them, and not
+        // withheld because of them.
+        expect(result.billed.amountUsd).toBe(100);
+        expect(result.billed.amountUsd).not.toBe(140);
+      });
+
+      /** @scenario "A currency total is withheld when part of what it covers holds no amount" */
+      it("withholds the euro total when part of what it covers holds no amount and says so", async () => {
+        // Zero and "no amount at all" are written the same way in the
+        // provider-currency figure, so the parts holding nothing are counted
+        // separately. Without that count a day nobody ever priced charts as a
+        // genuine nothing in the provider's own currency.
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1"),
+          costRollup: rollupReturning({
+            rows: [
+              laneRow({
+                day: "2026-08-01",
+                costSource: "pulled",
+                amountNanoUsd: 100 * NANO,
+              }),
+            ],
+            currencies: [
+              {
+                currencyCode: "USD",
+                amountNanoMinor: 100 * NANO,
+                cellsWithoutAmount: 0,
+              },
+              {
+                currencyCode: "EUR",
+                amountNanoMinor: 40 * NANO,
+                cellsWithoutAmount: 1,
+              },
+            ],
+          }),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+          now: new Date("2026-08-01T12:00:00.000Z"),
+        });
+
+        const euros = result.billed.currencyTotals.find(
+          (total) => total.currencyCode === "EUR",
+        );
+        // The defect this exists to catch is 40 — the priced part of the euro
+        // spend, offered under a label that reads as all of it.
+        expect(euros?.amount).toBeNull();
+        expect(euros?.amount).not.toBe(40);
+        // What the line says instead: part of what it covers is unpriced.
+        expect(euros?.cellsWithoutAmount).toBe(1);
+        // The dollar line covers different cells and is untouched by it.
+        expect(result.billed.amountUsd).toBe(100);
+      });
+    });
+  });
+
+  describe("given a day whose bill was reissued in another currency", () => {
+    describe("when the cost screen reads that day", () => {
+      /** @scenario "A bill reissued in another currency reads as a revision, not as new spend" */
+      it("names what each currency held before the reissue and sums none of them together", async () => {
+        // A day's prior total is the sum of each cell's amount as it stood
+        // IMMEDIATELY BEFORE that day's latest revision. Three buckets, not
+        // two: a cell the revision revised contributes what it held before, a
+        // cell the revision CREATED contributes nothing because it did not
+        // exist yet, and an untouched cell contributes what it holds now.
+        // Discriminating on "was revised" instead puts the created cell in the
+        // untouched bucket, where it adds its new amount on top of the old
+        // cell's prior one and the day claims it previously held about twice
+        // what it did.
+        //
+        // Per currency, always. A reissue from one currency to another is
+        // precisely a day holding two of them, so there is no single prior
+        // figure for it: the day reads as having held dollars and now holding
+        // euros, never as having held their sum.
+        const revisedAtSeconds = Math.floor(
+          Date.parse("2026-01-15T09:00:00.000Z") / 1000,
+        );
+        const service = createService({
+          prisma: prismaWithGovProject("gov-1"),
+          costRollup: rollupReturning({
+            rows: [
+              laneRow({
+                day: "2026-01-15",
+                costSource: "pulled",
+                // The dollar cell was retracted to a stated zero, not removed:
+                // a retraction is knowledge, not absence.
+                amountNanoUsd: 0,
+                cellsWithoutAmount: 0,
+                revisedAt: revisedAtSeconds,
+                previousAmountNanoUsd: 12 * NANO,
+                cellsWithoutPreviousAmount: 0,
+                byCurrency: [
+                  {
+                    currencyCode: "USD",
+                    amountNanoMinor: 0,
+                    previousAmountNanoMinor: 12 * NANO,
+                    cellsWithoutAmount: 0,
+                    cellsWithoutPreviousAmount: 0,
+                  },
+                  {
+                    currencyCode: "EUR",
+                    // The cell this reissue created. It holds the money now
+                    // and held nothing at all before the revision. Nothing
+                    // about it is unknown, so it withholds nothing — it names
+                    // no earlier amount because there was none, which is a
+                    // different thing from us not knowing one.
+                    amountNanoMinor: 10 * NANO,
+                    previousAmountNanoMinor: null,
+                    cellsWithoutAmount: 0,
+                    cellsWithoutPreviousAmount: 0,
+                  },
+                ],
+              }),
+            ],
+          }),
+        });
+
+        const result = await service.summary({
+          organizationId: "org-1",
+          windowDays: 30,
+          now: new Date("2026-01-15T12:00:00.000Z"),
+        });
+
+        const day = result.series[0]!;
+        expect(day.day).toBe("2026-01-15");
+        // The first Then: a currency change is the provider correcting one
+        // charge, not a second charge arriving.
+        expect(day.billedRevisedAt).toBe(revisedAtSeconds * 1000);
+
+        const dollars = day.billedByCurrency.find(
+          (line) => line.currencyCode === "USD",
+        );
+        const euros = day.billedByCurrency.find(
+          (line) => line.currencyCode === "EUR",
+        );
+
+        // The second Then: what it held before, in the currency it held it in.
+        expect(dollars?.previousAmount).toBe(12);
+        expect(dollars?.amount).toBe(0);
+        // The created cell names no earlier figure, because before the
+        // revision there was nothing there to name.
+        expect(euros?.previousAmount).toBeNull();
+        expect(euros?.amount).toBe(10);
+
+        // The defect the three buckets exist to prevent: 22 is the created
+        // cell's new amount added on top of the retracted cell's prior one,
+        // which is a figure the day never held.
+        expect(dollars?.previousAmount).not.toBe(22);
+        expect(
+          day.billedByCurrency.map((line) => line.previousAmount),
+        ).not.toContain(22);
       });
     });
   });
@@ -1174,7 +1484,13 @@ describe("GovernanceCostService.summary trust markers", () => {
       // Providers restate inside the same thirty days the settling window
       // covers, so the both-true day is the common case, not an edge one.
       expect(day?.billedRevisedAt).toBe(Date.parse("2026-08-29T04:00:00.000Z"));
-      expect(day?.billedPreviousUsd).toBe(12);
+      // What it held before, on the dollar line rather than as a figure of the
+      // day's own. A day holds one earlier amount per currency and there is no
+      // single number that covers a day billed in more than one.
+      expect(
+        day?.billedByCurrency.find((line) => line.currencyCode === "USD")
+          ?.previousAmount,
+      ).toBe(12);
       expect(day?.billedProvisional).toBe(true);
     });
   });
@@ -1210,13 +1526,28 @@ describe("GovernanceCostService.summary trust markers", () => {
           previousAmountNanoUsd: 12 * NANO,
           cellsWithoutPreviousAmount: 1,
           lastObservedAt: seconds("2026-08-30T04:00:00.000Z"),
+          byCurrency: [
+            {
+              currencyCode: "USD",
+              amountNanoMinor: 9 * NANO,
+              previousAmountNanoMinor: 12 * NANO,
+              cellsWithoutAmount: 0,
+              // Part of what the dollar line covered held no earlier amount,
+              // so the line has no earlier figure to give.
+              cellsWithoutPreviousAmount: 1,
+            },
+          ],
         }),
       ]);
 
       // A partial earlier figure reads as the whole one, which is the same lie
-      // the lane total already refuses to tell.
+      // the lane total already refuses to tell. The rule follows the figure
+      // onto the line it now lives on.
       expect(day?.billedRevisedAt).not.toBeNull();
-      expect(day?.billedPreviousUsd).toBeNull();
+      expect(
+        day?.billedByCurrency.find((line) => line.currencyCode === "USD")
+          ?.previousAmount,
+      ).toBeNull();
     });
   });
 

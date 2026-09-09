@@ -21,6 +21,23 @@ export const GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST = "2026-08-28";
 export const GOVERNANCE_COST_ROLLUP_TABLE = "governance_cost_rollup_1d";
 
 /**
+ * Where each restatement key currently sits (challenge settlement 9).
+ *
+ * One row per (tenant, restatement key), carrying the cell the key was first
+ * filed under. The puller reads it before writing an observation: a key that
+ * turns up under a different cell is a REISSUE of the charge already recorded
+ * there, and the old cell has to be retracted or the day carries the one bill
+ * twice.
+ *
+ * It is written by the rollup store in the same write as the cell and derived
+ * from the same event, so a rebuild from history reproduces it. Held only in
+ * memory it would be lost by every restart; looked for by scanning the day it
+ * would mean reading every row of that day on every correction.
+ */
+export const GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE =
+  "governance_cost_rollup_restatement_index";
+
+/**
  * Which lane the money came from.
  *
  * The trace lane is RESERVED and excluded from wave 1: ADR-128 keeps trace

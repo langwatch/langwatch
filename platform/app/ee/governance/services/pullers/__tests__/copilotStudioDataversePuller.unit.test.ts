@@ -1445,3 +1445,38 @@ describe("given an Azure bill that does not fit in one reply", () => {
     });
   });
 });
+
+describe("given a source reading a period of conversations", () => {
+  describe("when it asks the environment for a page", () => {
+    /**
+     * Naming a row count without stating it as a preference leaves this
+     * provider free to answer with its own far larger page, so the limit on
+     * how many pages one run may take bounds a much bigger read than intended.
+     *
+     * The header is Dataverse's own way of asking: `Prefer:
+     * odata.maxpagesize=<n>`, and it has to agree with the row count already
+     * in the query, which is why both are read off the same call here.
+     */
+    /** @scenario "The conversation read asks the provider for the page size it intends to read" */
+    it("states the page size it wants as a preference the provider will honour", async () => {
+      const adapter = await newAdapter();
+      queueSignInAndBots();
+      responseQueue.push({ status: 200, body: { value: [transcriptRow()] } });
+
+      await adapter.runOnce(
+        { cursor: null, credentials: CREDENTIALS },
+        adapter.validateConfig(CONFIG),
+      );
+
+      const call = transcriptCall();
+      const requested = new URL(call.url).searchParams.get("$top");
+      expect(requested).not.toBeNull();
+      const headers = (call.init?.headers ?? {}) as Record<string, string>;
+      const preference = Object.entries(headers).find(
+        ([name]) => name.toLowerCase() === "prefer",
+      )?.[1];
+
+      expect(preference).toBe(`odata.maxpagesize=${requested}`);
+    });
+  });
+});

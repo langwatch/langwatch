@@ -142,3 +142,83 @@ Feature: Daily cost rollup that can always be rebuilt and never lies
     # Exposed as a gauge per lane; the assertion is the computed value,
     # not a threshold or an alert.
     Then it reports how far the summary is behind
+
+  # --- A correction that moves the day to a different cell ---
+  # A correction usually lands on the same day under the same provider,
+  # model and currency, and replaces the figure in place. When the provider
+  # reissues the same charge under a different currency it lands somewhere
+  # else instead, and the first version is left behind holding its money
+  # with nothing to say it was superseded. Both are then live, and a total
+  # across the day carries the same bill twice.
+  #
+  # This covers only the things a charge is deliberately not identified by:
+  # the currency it was billed in, the agent it was attributed to, and the
+  # spender the provider named. A charge arriving under a different model
+  # or a different provider is a different charge as far as anything here
+  # can tell, so it is not retracted, and that gap is stated rather than
+  # papered over - a day holding several models is the ordinary case, so
+  # retracting on a model change would zero genuine spend.
+
+  @unit
+  Scenario: A correction that arrives under a different currency retracts what it replaces
+    Given a day summarized from a bill issued in one currency
+    When the provider reissues that same bill in another currency
+    Then an event retracts the amount held under the first currency
+    And the day holds the reissued amount under the second currency only
+    # Retracted by an event rather than by editing or deleting the earlier
+    # row: the summary is a consequence of the event history, so a fix that
+    # only reaches storage is undone by the next rebuild.
+
+  @unit
+  Scenario: A correction that arrives against a different spender retracts what it replaces
+    Given a day summarized from a charge the provider attributed to one spender
+    When the provider reissues that same charge against another spender
+    Then an event retracts the amount held against the first spender
+    And the day holds the reissued amount against the second spender only
+    # The same defect, reached by a different door. Fixing only the
+    # currency case leaves this one and the agent one open behind it.
+
+  @integration
+  Scenario: A day whose bill changed currency is never counted under both
+    Given a day summarized from a bill issued in one currency
+    When the provider reissues that same bill in another currency
+    And the day is read across every currency it holds
+    Then the first currency contributes nothing to the day
+    And no total holds both versions of the one bill
+
+  @integration
+  Scenario: A retraction is dated to the day it corrects
+    Given a day summarized from a bill issued in one currency
+    When the provider reissues that same bill in another currency
+    And the daily check re-derives that day from its recorded history
+    Then the check sees the retraction
+    And the day is not reported as disagreeing with its own history
+    # The check re-derives a day from the events that fall inside that day.
+    # A retraction dated when the correction arrived rather than when the
+    # charge happened is never read by it, so the day would be reported as
+    # drifting for as long as it is kept.
+
+  @integration
+  Scenario: A correction still retracts its earlier version after the summary is rebuilt
+    Given a day summarized from a bill issued in one currency
+    And the summary rebuilt from its recorded history
+    When the provider reissues that same bill in another currency
+    Then the amount held under the first currency is retracted
+    And the day holds the reissued amount only
+    # Where a charge landed the first time is written down beside the
+    # summary as it is built, out of the same events, so a rebuild
+    # reproduces it. Held only in memory it would be lost by every
+    # restart, and looked for by searching the day it would mean reading
+    # every row of that day on every correction.
+
+  @integration
+  Scenario: A cell priced in another currency is not a cell we hold no amount for
+    Given a day holding one cell priced in dollars, one priced in euros, and one holding no amount at all
+    When the day's totals are read
+    Then exactly one cell is counted as holding no amount
+    And the cell priced in euros is not counted among them
+    # Two different absences. A euro cell holds a figure; what it does not
+    # hold is a DOLLAR figure, and the euro line is where that figure is
+    # shown. Counting it as unpriced withholds the dollar total of every day
+    # that touches a foreign bill, and tells the reader we hold no figure for
+    # money we hold a perfectly good figure for.

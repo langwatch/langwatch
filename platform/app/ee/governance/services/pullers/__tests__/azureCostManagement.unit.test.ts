@@ -11,13 +11,24 @@
  * cannot be assumed, and every amount is a JSON float.
  *
  * Spec: specs/ai-governance/puller-framework/copilot-studio-dataverse.feature
+ * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-128 §3.
  */
 import { describe, expect, it } from "vitest";
 
 import {
+  // Not yet implemented: the meter-category filter, the verdict a filtered
+  // read that named nothing produces, and the span a given-up window leaves
+  // behind. Imported from where they will live so the binding fails loudly
+  // rather than silently testing nothing.
+  AZURE_AI_METER_CATEGORIES,
   AZURE_COST_REREAD_DAYS,
+  AZURE_NO_AI_METERS,
+  // Not yet implemented: a verdict code for a reply that could not be parsed,
+  // kept distinct from a reply that parsed and named no AI meters.
+  AZURE_REPLY_UNREADABLE,
   azureCostReadIsDue,
+  azureCostReadVerdict,
   azureCostReadWindow,
   azureCostRequestBody,
   nextAzureCostCursor,
@@ -397,6 +408,192 @@ describe("reading an Azure Cost Management daily reply", () => {
           outcome: "held",
         }).readAtMs,
       ).toBe(NOW_MS);
+    });
+  });
+});
+
+/**
+ * Which lines of the bill this source is asking about at all.
+ *
+ * A subscription bills AI services beside load balancers, storage and
+ * everything else the environment runs on. Asking for the whole bill and
+ * recording all of it as AI cost is how unrelated infrastructure ends up in a
+ * customer's AI spend; asking only for the AI categories is what stops it, and
+ * it also removes the accident that used to keep an empty answer honest.
+ */
+describe("given a subscription billing both AI services and unrelated infrastructure", () => {
+  describe("when the bill is read", () => {
+    /** @scenario "The cloud bill is asked only for the lines that carry AI spend" */
+    it("asks only for the categories that carry AI spend", () => {
+      const body = azureCostRequestBody({
+        fromDay: "2026-01-09",
+        toDay: "2026-01-15",
+      });
+
+      // The list is exact and exported once, so the request and the read
+      // cannot drift into disagreeing about what counts as AI spend.
+      expect(AZURE_AI_METER_CATEGORIES).toEqual([
+        "Foundry Models",
+        "Copilot Studio",
+        "Cognitive Services",
+      ]);
+      expect(JSON.stringify(body.dataset)).toContain("MeterCategory");
+      for (const category of AZURE_AI_METER_CATEGORIES) {
+        expect(JSON.stringify(body.dataset)).toContain(category);
+      }
+    });
+
+    /** @scenario "The cloud bill is asked only for the lines that carry AI spend" */
+    it("does not record an unrelated infrastructure line as AI cost", () => {
+      const read = readAzureCostRows({
+        response: replyOf({
+          columns: [
+            "UsageDate",
+            "Cost",
+            "CostUSD",
+            "Currency",
+            "MeterCategory",
+          ],
+          rows: [
+            [20260115, 4.5, 4.5, "USD", "Foundry Models"],
+            [20260115, 99.0, 99.0, "USD", "Load Balancer"],
+          ],
+        }),
+      });
+
+      // Belt and braces on top of the request filter: a category outside the
+      // list is not a row anything failed to read, so it is dropped without
+      // being counted as unreadable.
+      expect(read.days.map((day) => day.meterCategory)).toEqual([
+        "Foundry Models",
+      ]);
+      expect(read.unreadableRows).toBe(0);
+    });
+  });
+});
+
+describe("given a subscription whose bill is asked only for the AI categories", () => {
+  describe("when the provider answers with no lines", () => {
+    /** @scenario "A bill read that comes back with no AI lines at all is an error" */
+    it("fails the run saying no AI lines were found, rather than pricing the day", () => {
+      const read = readAzureCostRows({
+        response: replyOf({
+          columns: [
+            "UsageDate",
+            "Cost",
+            "CostUSD",
+            "Currency",
+            "MeterCategory",
+          ],
+          rows: [],
+        }),
+      });
+      const verdict = azureCostReadVerdict({ read });
+
+      expect(verdict).toEqual({
+        outcome: "failed",
+        code: AZURE_NO_AI_METERS,
+        retryable: false,
+      });
+      // Before the filter an empty answer was impossible on a live
+      // subscription, so it was recorded as a day that was priced — walking
+      // the read position forward over money nobody ever saw. Never "priced"
+      // is what keeps the position where it was.
+      expect(verdict.outcome).not.toBe("priced");
+    });
+
+    /** @scenario "A bill read that comes back with no AI lines at all is an error" */
+    it("says the reply could not be read when it was malformed, and does not blame the meters", () => {
+      // The third arm, and the one that matters most to a customer. A reply
+      // nobody could parse is evidence about the reply, not about the Azure
+      // subscription. Calling it "no AI meters" would send someone hunting
+      // through their meter list for an absence that is probably not there,
+      // and it would do so on the strength of a parse failure.
+      const read = readAzureCostRows({ response: { error: "unauthorized" } });
+
+      // Guards the premise: this reply really is the malformed kind, not the
+      // empty-but-real kind the shipped test above keeps separate.
+      expect(read.malformed).toBe(true);
+
+      const verdict = azureCostReadVerdict({ read });
+
+      // Held, not failed-and-done: the window stays open so a later run can
+      // read it properly, exactly as an unarrived bill does.
+      expect(verdict.outcome).toBe("held");
+      expect(verdict.code).toBe(AZURE_REPLY_UNREADABLE);
+      // The two things it must never say.
+      expect(verdict.code).not.toBe(AZURE_NO_AI_METERS);
+      expect(verdict.outcome).not.toBe("priced");
+    });
+
+    /** @scenario "A bill read that comes back with no AI lines at all is an error" */
+    it("still prices a read that did name AI lines", () => {
+      // The arm from the far side: without it the rule above is satisfied by
+      // a verdict that fails every read.
+      const read = readAzureCostRows({
+        response: replyOf({
+          columns: [
+            "UsageDate",
+            "Cost",
+            "CostUSD",
+            "Currency",
+            "MeterCategory",
+          ],
+          rows: [[20260115, 4.5, 4.5, "USD", "Foundry Models"]],
+        }),
+      });
+
+      expect(azureCostReadVerdict({ read }).outcome).toBe("priced");
+    });
+  });
+});
+
+describe("given a window held as long as it is allowed for a bill that never arrived", () => {
+  describe("when the source gives up and moves on to a more recent period", () => {
+    /** @scenario "Days a bill was never priced for are remembered as never read" */
+    it("hands back the abandoned days so they join the period reported as unpriced", () => {
+      const nowMs = Date.parse("2026-01-15T09:00:00.000Z");
+      const next = nextAzureCostCursor({
+        nowMs,
+        previous: {
+          pricedThroughDay: "2025-12-01",
+          heldSinceMs: nowMs - 8 * 24 * 60 * 60 * 1000,
+        },
+        outcome: "held",
+      });
+
+      // The days between the last one priced and the one the source jumps to
+      // were never read. They belong in the window a reader is already shown
+      // as unknown rather than zero — not in a field nothing renders, and
+      // never as days that cost nothing.
+      const reported = next as typeof next & {
+        abandonedSpan?: { fromDay: string; toDay: string } | null;
+      };
+      expect(next.pricedThroughDay).toBe("2026-01-08");
+      expect(reported.abandonedSpan).toEqual({
+        fromDay: "2025-12-02",
+        toDay: "2026-01-08",
+      });
+    });
+
+    /** @scenario "Days a bill was never priced for are remembered as never read" */
+    it("abandons nothing on a run that priced its window or merely held it", () => {
+      // The arm from the far side: a span reported on every outcome would
+      // widen the unpriced window on runs that read the bill perfectly well.
+      const nowMs = Date.parse("2026-01-15T09:00:00.000Z");
+      const priced = nextAzureCostCursor({
+        nowMs,
+        previous: { pricedThroughDay: "2026-01-10", heldSinceMs: null },
+        outcome: "priced",
+      }) as { abandonedSpan?: unknown };
+      const held = nextAzureCostCursor({
+        nowMs,
+        previous: { pricedThroughDay: "2026-01-10", heldSinceMs: null },
+        outcome: "held",
+      }) as { abandonedSpan?: unknown };
+
+      expect(priced.abandonedSpan ?? null).toBe(null);
+      expect(held.abandonedSpan ?? null).toBe(null);
     });
   });
 });

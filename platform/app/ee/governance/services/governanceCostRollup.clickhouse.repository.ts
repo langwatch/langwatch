@@ -6,6 +6,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+  GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE,
   GOVERNANCE_COST_ROLLUP_TABLE,
   GOVERNANCE_COST_SOURCE,
 } from "../projections/governanceCostRollup.constants";
@@ -48,6 +49,24 @@ export interface GovernanceCostRollupRow {
   AppliedEventIds: string[];
   CreatedAt: number;
   LastEventOccurredAt: number;
+  EventTimestamp: number;
+}
+
+/**
+ * One row of `governance_cost_rollup_restatement_index`: which cell a
+ * restatement key sits in.
+ */
+export interface GovernanceCostRollupRestatementIndexRow {
+  TenantId: string;
+  RestatementKey: string;
+  Day: string;
+  CostSource: string;
+  IngestionSourceId: string;
+  Provider: string;
+  Model: string;
+  AgentId: string;
+  CurrencyCode: string;
+  RawActorId: string;
   EventTimestamp: number;
 }
 
@@ -160,6 +179,23 @@ function str(value: unknown): string {
  */
 const UNPRICED_CURRENCY_SAMPLE_LIMIT = 8;
 
+/**
+ * The restatement keys one cell holds, read back out of its item map.
+ *
+ * Defensive about the parse even though the row was just projected from state:
+ * the cell itself is already written by the time this is asked, and refusing
+ * to index it is a far smaller fault than throwing away a write that landed.
+ */
+function restatementKeysOf(pulledItemsJson: string): string[] {
+  if (!pulledItemsJson) return [];
+  try {
+    const parsed: unknown = JSON.parse(pulledItemsJson);
+    return parsed && typeof parsed === "object" ? Object.keys(parsed) : [];
+  } catch {
+    return [];
+  }
+}
+
 /** An Array(String) column, defensive about a shape the driver did not give. */
 function strArray(value: unknown): string[] {
   return Array.isArray(value) ? (value as string[]) : [];
@@ -211,6 +247,103 @@ export class GovernanceCostRollupClickHouseRepository {
       );
       throw error;
     }
+    await this.recordRestatementKeys({ client, row });
+  }
+
+  /**
+   * Files every restatement key this cell holds under the cell it landed in,
+   * for the keys not already on record.
+   *
+   * WHERE A KEY FIRST LANDED, not where it sits now, and that is the contract
+   * rather than an accident of the implementation. The reissue this index
+   * exists to catch is recognised by the key turning up somewhere OTHER than
+   * the cell recorded here, so a record that followed the key to each new cell
+   * would agree with every reissue and catch none of them.
+   *
+   * The consequence is stated rather than hidden: a charge reissued a SECOND
+   * time is compared against its original cell, which the first correction
+   * already retracted, so the second-to-last version is left live. This batch
+   * ships the single key move; the repair primitive for a day already recorded
+   * wrong is the retraction event itself, and driving one by hand is the next
+   * item rather than part of this.
+   *
+   * Written after the cell rather than before it: an index row naming a cell
+   * that failed to write would send the next correction at a cell holding
+   * nothing.
+   */
+  private async recordRestatementKeys({
+    client,
+    row,
+  }: {
+    client: ClickHouseClient;
+    row: GovernanceCostRollupRow;
+  }): Promise<void> {
+    const keys = restatementKeysOf(row.PulledItemsJson);
+    // The gateway lane has none, so its write costs nothing extra at all.
+    if (keys.length === 0) return;
+
+    const recorded = await this.findRecordedRestatementKeys({
+      client,
+      tenantId: row.TenantId,
+      keys,
+    });
+    const unrecorded = keys.filter((key) => !recorded.has(key));
+    if (unrecorded.length === 0) return;
+
+    const values: GovernanceCostRollupRestatementIndexRow[] = unrecorded.map(
+      (key) => ({
+        TenantId: row.TenantId,
+        RestatementKey: key,
+        Day: row.Day,
+        CostSource: row.CostSource,
+        IngestionSourceId: row.IngestionSourceId,
+        Provider: row.Provider,
+        Model: row.Model,
+        AgentId: row.AgentId,
+        CurrencyCode: row.CurrencyCode,
+        RawActorId: row.RawActorId,
+        EventTimestamp: row.EventTimestamp,
+      }),
+    );
+
+    try {
+      await client.insert({
+        table: GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE,
+        values,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+      });
+    } catch (error) {
+      logger.error(
+        { error, tenantId: row.TenantId, day: row.Day },
+        "Failed to insert governance_cost_rollup_restatement_index rows",
+      );
+      throw error;
+    }
+  }
+
+  /** Which of these keys this tenant has already filed somewhere. */
+  private async findRecordedRestatementKeys({
+    client,
+    tenantId,
+    keys,
+  }: {
+    client: ClickHouseClient;
+    tenantId: string;
+    keys: string[];
+  }): Promise<Set<string>> {
+    const result = await client.query({
+      query: `
+        SELECT DISTINCT RestatementKey
+        FROM ${GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE}
+        WHERE TenantId = {tenantid:String}
+          AND RestatementKey IN {keys:Array(String)}
+      `,
+      query_params: { tenantid: tenantId, keys },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{ RestatementKey?: unknown }>;
+    return new Set(rows.map((r) => str(r.RestatementKey)));
   }
 
   /**

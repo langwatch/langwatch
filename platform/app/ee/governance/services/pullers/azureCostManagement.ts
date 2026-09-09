@@ -62,6 +62,30 @@ import type { NormalizedPullEvent } from "./pullerAdapter";
  */
 export const AZURE_COST_REREAD_DAYS = 7;
 
+/**
+ * The meter categories this source treats as AI spend.
+ *
+ * A subscription bills Foundry Models beside load balancers, storage and
+ * everything else the environment runs on, and the captured reply is mostly
+ * the latter: 44 rows, of which the AI lines are a handful. Recording the
+ * whole bill as AI spend puts a customer's networking bill in their AI
+ * budget, which is a wrong number that looks entirely plausible.
+ *
+ * Exported and used once by the request builder so the ask and any reader of
+ * the answer cannot drift into disagreeing about what counts as AI spend.
+ *
+ * Naming categories rather than meters: the category is the finest grain
+ * Azure publishes a daily total at, and it is the grain the grouping below
+ * already uses. A new Foundry meter arrives inside a category already named
+ * here; a whole new category is the case that needs this list edited, and
+ * that is a rarer and more visible event than a new meter.
+ */
+export const AZURE_AI_METER_CATEGORIES = [
+  "Foundry Models",
+  "Copilot Studio",
+  "Cognitive Services",
+] as const;
+
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -358,6 +382,16 @@ export function azureCostRequestBody({
         totalCostUSD: { name: "CostUSD", function: "Sum" },
       },
       grouping: [{ type: "Dimension", name: "MeterCategory" }],
+      // Asked for at the provider, not filtered on the way back, so the rows
+      // that arrive are the rows that matter and the page walk is not spent
+      // carrying a subscription's whole infrastructure bill across the wire.
+      filter: {
+        dimensions: {
+          name: "MeterCategory",
+          operator: "In",
+          values: [...AZURE_AI_METER_CATEGORIES],
+        },
+      },
     },
   } as const;
 }
@@ -443,6 +477,79 @@ export function readAzureCostRows({
   }
 
   return { days, unreadableRows, nextLink, malformed: false };
+}
+
+/**
+ * The bill was read and it named no AI lines at all.
+ *
+ * Only reachable because the request now asks for the AI categories and
+ * nothing else: before that filter existed a live subscription always
+ * answered with SOMETHING, so an empty answer could be treated as "this
+ * window cost nothing" and quietly get away with it. Now an empty answer
+ * means one of the two things that are actually wrong -- the categories the
+ * customer bills AI under are not the ones named here, or the credential
+ * reads a scope with no AI spend in it -- and neither is a day worth pricing.
+ *
+ * Not retryable: the next run asks the identical question of the identical
+ * subscription and gets the identical answer. Retrying spends quota to be
+ * told the same thing.
+ */
+export const AZURE_NO_AI_METERS = "azure_no_ai_meters" as const;
+
+/**
+ * The reply could not be read, which is evidence about the reply and not
+ * about the customer's meters.
+ *
+ * Kept apart from `AZURE_NO_AI_METERS` deliberately. Reporting "no AI meters"
+ * for a body nobody could parse would tell a customer something false about
+ * their Azure setup and send them hunting through their meter list for an
+ * absence that is probably not there -- on the strength of a parse failure.
+ * So this holds the window instead: a reply we could not read says nothing
+ * about whether the window can be read later, exactly as an unarrived bill
+ * does.
+ */
+export const AZURE_REPLY_UNREADABLE = "azure_reply_unreadable" as const;
+
+/**
+ * What one cost read amounts to, before the cursor is moved.
+ *
+ * Three outcomes, and `code`/`retryable` are optional rather than split into
+ * a discriminated union because callers read `outcome` first and the field is
+ * only meaningful on the two that are not `priced`.
+ */
+export interface AzureCostReadVerdict {
+  outcome: "priced" | "held" | "failed";
+  code?: typeof AZURE_NO_AI_METERS | typeof AZURE_REPLY_UNREADABLE;
+  retryable?: boolean;
+}
+
+/**
+ * What a read amounts to: money to record, a window to hold, or a failure.
+ *
+ * Pure, and separate from the cursor rule below, because the two answer
+ * different questions: this one says what the reply WAS, and
+ * `nextAzureCostCursor` says where that leaves the read position.
+ */
+export function azureCostReadVerdict({
+  read,
+}: {
+  read: AzureCostRead;
+}): AzureCostReadVerdict {
+  if (read.malformed) {
+    return { outcome: "held", code: AZURE_REPLY_UNREADABLE };
+  }
+
+  if (read.days.length === 0) {
+    // Rows arrived and none of them could be read. The reply was not the
+    // empty-but-real kind, so blaming the meters would be the same false
+    // statement the malformed branch above refuses to make.
+    if (read.unreadableRows > 0) {
+      return { outcome: "held", code: AZURE_REPLY_UNREADABLE };
+    }
+    return { outcome: "failed", code: AZURE_NO_AI_METERS, retryable: false };
+  }
+
+  return { outcome: "priced" };
 }
 
 /** The verb these events carry, so a reader can tell them from a conversation. */
@@ -554,12 +661,27 @@ export function nextAzureCostCursor({
   pricedThroughDay: string | null;
   heldSinceMs: number | null;
   readAtMs: number;
+  /**
+   * The days this run walked past without ever pricing them, inclusive.
+   *
+   * Non-null ONLY on the give-up branch. A run that priced its window or is
+   * still holding it has abandoned nothing, and a span reported on every
+   * outcome would widen the unpriced window on runs that read the bill
+   * perfectly well.
+   *
+   * Handed back rather than stored. The caller merges it into the unpriced
+   * window the source already keeps (widen-only), which is the window a
+   * reader is shown as unknown rather than zero. Persisting it as a field of
+   * its own would be a second answer to a question that already has one.
+   */
+  abandonedSpan: { fromDay: string; toDay: string } | null;
 } {
   if (outcome === "priced") {
     return {
       pricedThroughDay: utcDay(nowMs),
       heldSinceMs: null,
       readAtMs: nowMs,
+      abandonedSpan: null,
     };
   }
 
@@ -569,15 +691,31 @@ export function nextAzureCostCursor({
       pricedThroughDay: previous.pricedThroughDay,
       heldSinceMs,
       readAtMs: nowMs,
+      abandonedSpan: null,
     };
   }
 
   // Give up: mark the day BEFORE the trailing window's own start as priced, so
   // the next run asks about the last seven days and the ask stops widening.
   const trailingStartMs = nowMs - (AZURE_COST_REREAD_DAYS - 1) * ONE_DAY_MS;
+  const pricedThroughDay = utcDay(trailingStartMs - ONE_DAY_MS);
   return {
-    pricedThroughDay: utcDay(trailingStartMs - ONE_DAY_MS),
+    pricedThroughDay,
     heldSinceMs: null,
     readAtMs: nowMs,
+    // From the day after the last one actually priced, through the day the
+    // source is now jumping to. Null when nothing was ever priced: there is
+    // no first abandoned day to name, and the whole history before this is
+    // already unknown for want of a read.
+    abandonedSpan:
+      previous.pricedThroughDay === null
+        ? null
+        : {
+            fromDay: utcDay(
+              Date.parse(`${previous.pricedThroughDay}T00:00:00.000Z`) +
+                ONE_DAY_MS,
+            ),
+            toDay: pricedThroughDay,
+          },
   };
 }

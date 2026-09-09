@@ -11,6 +11,17 @@ import { buildIngestionSourceMirror } from "./ingestionSourceMirror";
 type Row = Prisma.IngestionPullRunProjectionGetPayload<object>;
 const INGESTION_PULL_RUN_KSUID_RESOURCE = "ingpullrun";
 
+/**
+ * The column is a plain string so that the log outlives the vocabulary: a row
+ * carrying a word this build has never heard of reads as unknown rather than
+ * being forced into one of the two it does know.
+ */
+function completenessOf(
+  stored: string | null,
+): IngestionPullRunStatusData["LastRunCompleteness"] {
+  return stored === "complete" || stored === "truncated" ? stored : null;
+}
+
 function fromRow(row: Row): StoredProjection<IngestionPullRunStatusData> {
   const {
     id: _id,
@@ -23,7 +34,12 @@ function fromRow(row: Row): StoredProjection<IngestionPullRunStatusData> {
     ...state
   } = row;
   return {
-    state: { ...state, SourceId: sourceId, LastEventOccurredAt: OccurredAt },
+    state: {
+      ...state,
+      LastRunCompleteness: completenessOf(state.LastRunCompleteness),
+      SourceId: sourceId,
+      LastEventOccurredAt: OccurredAt,
+    },
     cursor: { acceptedAt: AcceptedAt, eventId: LastEventId },
     occurredAt: OccurredAt,
     createdAt: state.CreatedAt,

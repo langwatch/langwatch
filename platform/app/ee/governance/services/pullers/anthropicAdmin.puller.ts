@@ -184,19 +184,76 @@ function queryIdentity(config: AnthropicAdminPullConfig): string {
     : `cost:${COST_REPORT_BUCKET_WIDTH}:${COST_GROUP_BY.join(",")}:${config.startingAt ?? ""}`;
 }
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+/**
+ * How far behind its own watermark a COST read starts again.
+ *
+ * Anthropic keeps correcting a day's cost for a while after the day ends, and
+ * a read that only ever moved forward held the FIRST figure it ever saw for a
+ * day as the last one it would ever hold. That figure disagreed with the
+ * provider's own console inside a week, and nothing in the pipeline could ever
+ * notice: a day nobody re-reads is a day nobody can correct.
+ *
+ * Three days, the same margin the sibling OpenAI connection already pays, and
+ * it costs the same single request per run — the window is wider, not the
+ * number of asks. Re-reading is only safe because a cost restatement REPLACES:
+ * the same day and group produce the same restatement key on every run, so a
+ * corrected figure lands ON the earlier one rather than beside it. Usage rows
+ * carry no such promise, which is why this is applied to cost alone.
+ */
+const COST_RESTATEMENT_LOOKBACK_DAYS = 3;
+
+/**
+ * Where a run ASKS from, given where it had got to.
+ *
+ * Never before the day the connection was told to begin at — a look-back that
+ * reached past it would ask about a period the customer did not connect us
+ * for — and never forward of the watermark itself, which would skip days.
+ *
+ * Kept apart from the position that gets SAVED. Reading from further back is
+ * the whole point; recording that we had only got that far is the defect it
+ * would otherwise introduce.
+ */
+function costRequestStart({
+  stored,
+  config,
+}: {
+  stored: string;
+  config: AnthropicAdminPullConfig;
+}): string {
+  const storedMs = Date.parse(stored);
+  if (Number.isNaN(storedMs)) return stored;
+
+  const configuredStart = config.startingAt ?? defaultStartingAt("cost");
+  const floorMs = Date.parse(configuredStart);
+  const lookedBackMs = storedMs - COST_RESTATEMENT_LOOKBACK_DAYS * MS_PER_DAY;
+  const notBeforeConfigured = Number.isNaN(floorMs)
+    ? lookedBackMs
+    : Math.max(lookedBackMs, floorMs);
+  return new Date(Math.min(notBeforeConfigured, storedMs)).toISOString();
+}
+
 function parseCursor({
   cursor,
   config,
 }: {
   cursor: string | null;
   config: AnthropicAdminPullConfig;
-}): Pick<z.infer<typeof cursorSchema>, "startingAt" | "page" | "watermark"> {
+}): ParsedCursor {
   if (cursor) {
     try {
       const parsed = cursorSchema.parse(JSON.parse(cursor));
       if (parsed.query === queryIdentity(config)) {
         return {
           startingAt: parsed.startingAt,
+          // Mid-window, with a page token in hand, the ask must stay exactly
+          // what that token was minted against or the provider refuses it.
+          // Only a drained cursor gets the look-back.
+          requestStart:
+            config.report === "cost" && parsed.page === null
+              ? costRequestStart({ stored: parsed.startingAt, config })
+              : parsed.startingAt,
           page: parsed.page,
           watermark: parsed.watermark,
         };
@@ -213,11 +270,27 @@ function parseCursor({
       );
     }
   }
-  return {
-    startingAt: config.startingAt ?? defaultStartingAt(config.report),
-    page: null,
-    watermark: null,
-  };
+  const fresh = config.startingAt ?? defaultStartingAt(config.report);
+  // No look-back on a first run: there is nothing behind the configured start
+  // to look back at, and the floor would return this same instant anyway.
+  return { startingAt: fresh, requestStart: fresh, page: null, watermark: null };
+}
+
+/**
+ * A parsed cursor, and the two starts it implies.
+ *
+ * `startingAt` is the position ON RECORD — where the source has got to, and
+ * the value a cut-off run writes back. `requestStart` is the instant this run
+ * ASKS from, which for a drained cost cursor sits a few days behind it. They
+ * were one field until a cost read started looking back, and collapsing them
+ * again is what walks the saved position backwards on every run.
+ */
+interface ParsedCursor
+  extends Pick<
+    z.infer<typeof cursorSchema>,
+    "startingAt" | "page" | "watermark"
+  > {
+  requestStart: string;
 }
 
 /**
@@ -231,7 +304,7 @@ function staleCursorRestart({
 }: {
   parsed: z.infer<typeof cursorSchema>;
   config: AnthropicAdminPullConfig;
-}): Pick<z.infer<typeof cursorSchema>, "startingAt" | "page" | "watermark"> {
+}): ParsedCursor {
   if (config.report === "usage") {
     // No rewind: usage identity is not stable across a query change, so
     // re-reading history would duplicate spend rather than restate it.
@@ -250,9 +323,11 @@ function staleCursorRestart({
     const resumeFrom = [parsed.watermark, parsed.startingAt].find(
       (candidate) => candidate !== null && !Number.isNaN(Date.parse(candidate)),
     );
+    const usageRestart =
+      resumeFrom ?? config.startingAt ?? defaultStartingAt(config.report);
     return {
-      startingAt:
-        resumeFrom ?? config.startingAt ?? defaultStartingAt(config.report),
+      startingAt: usageRestart,
+      requestStart: usageRestart,
       page: null,
       watermark: null,
     };
@@ -272,7 +347,14 @@ function staleCursorRestart({
     Number.isNaN(watermarkMs) || Date.parse(configuredStart) <= watermarkMs
       ? configuredStart
       : parsed.startingAt;
-  return { startingAt: rewoundStart, page: null, watermark: null };
+  // A rewind has already reached back as far as it means to, so no look-back
+  // is stacked on top of it.
+  return {
+    startingAt: rewoundStart,
+    requestStart: rewoundStart,
+    page: null,
+    watermark: null,
+  };
 }
 
 function encodeCursor({

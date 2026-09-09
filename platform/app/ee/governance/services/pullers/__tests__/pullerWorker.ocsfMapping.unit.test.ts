@@ -11,10 +11,12 @@
  * email column.
  *
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
+ * Spec: specs/governance/pulled-usage-cost-reporting.feature
  */
 import { describe, expect, it } from "vitest";
 
 import { mapToOcsfRow, ocsfActorFields } from "../ocsfPullEventMapping";
+import { PULLED_USAGE_HINT_KEY } from "../pulledUsageRecord";
 import type { NormalizedPullEvent } from "../pullerAdapter";
 
 const baseEvent: NormalizedPullEvent = {
@@ -198,6 +200,119 @@ describe("given the actor-field placement rule on its own", () => {
         actorEmail: "",
         actorUserId: "Dana Hoffman <dana@acme.test>",
       });
+    });
+  });
+});
+
+/**
+ * What the SIEM export says about money.
+ *
+ * The extension's amount key is read here rather than the whole extension,
+ * because the two rules below are about the SHAPE of that pair: an amount and
+ * the currency it is denominated in, side by side, neither of them buried in
+ * the adapter's own bag of hint fields.
+ *
+ * The names asserted (`cost_amount`, `cost_currency`) are this binding's
+ * choice; the settlement fixes the rule and not the spelling. Change them
+ * together with the mapper if the implementer prefers others.
+ */
+function moneyOf(rawOcsfJson: string): Record<string, unknown> {
+  return (
+    JSON.parse(rawOcsfJson) as {
+      metadata: { extension: Record<string, unknown> };
+    }
+  ).metadata.extension;
+}
+
+/** A euro-billed daily bill, as the Azure adapter hands one over. */
+function euroBillEvent(
+  overrides: Partial<NormalizedPullEvent> = {},
+): NormalizedPullEvent {
+  return {
+    source_event_id: "azure_cost:sub_test:2026-01-15:Foundry Models",
+    event_timestamp: "2026-01-15T00:00:00.000Z",
+    actor: "",
+    action: "cost_report",
+    target: "Foundry Models",
+    // The offence this scenario is about: a euro figure sitting in a field
+    // whose name says dollars, because the canonical event predates
+    // currencies.
+    cost_usd: "0",
+    tokens_input: 0,
+    tokens_output: 0,
+    raw_payload: "{}",
+    extra: {
+      subscriptionId: "sub_test",
+      [PULLED_USAGE_HINT_KEY]: {
+        costBasis: "provider_reported",
+        costStatus: "exact",
+        dimensions: { granularity: "1d", meterCategory: "Foundry Models" },
+        costUsd: "12.34",
+        currency: "EUR",
+        costUsdBiller: "13.50",
+        model: "Foundry Models",
+      },
+    },
+    ...overrides,
+  };
+}
+
+function mapBill(event: NormalizedPullEvent) {
+  return mapToOcsfRow({
+    event,
+    tenantId: "gov-proj-1",
+    ingestionSourceId: "src_a",
+    sourceType: "copilot_studio_dataverse",
+  });
+}
+
+describe("given a pulled record a provider billed in its own currency", () => {
+  describe("when the record is prepared for export", () => {
+    /** @scenario "An exported usage record names the currency beside its amount" */
+    it("carries the amount and its currency side by side, under no dollar name", () => {
+      const money = moneyOf(mapBill(euroBillEvent()).rawOcsfJson);
+
+      // The pair, at the top of the extension where a reader taking the
+      // export at face value will find it — not folded inside the adapter's
+      // own hint, which is where the currency used to be the only copy.
+      expect(money.cost_amount).toBe("12.34");
+      expect(money.cost_currency).toBe("EUR");
+      // And the amount does not travel under a name that says dollars. A
+      // reader that keys on `cost_usd` must not be handed euros by it.
+      expect(money.cost_usd).not.toBe("12.34");
+    });
+  });
+});
+
+describe("given a day whose cost was read once and exported", () => {
+  describe("when a later read reports a different figure for that same day", () => {
+    /** @scenario "A cost row read again replaces the record it already exported" */
+    it("exports the newer figure under the identity the first read used", () => {
+      const first = mapBill(euroBillEvent());
+      const corrected = mapBill(
+        euroBillEvent({
+          extra: {
+            subscriptionId: "sub_test",
+            [PULLED_USAGE_HINT_KEY]: {
+              costBasis: "provider_reported",
+              costStatus: "exact",
+              dimensions: {
+                granularity: "1d",
+                meterCategory: "Foundry Models",
+              },
+              costUsd: "19.99",
+              currency: "EUR",
+              costUsdBiller: "21.80",
+              model: "Foundry Models",
+            },
+          },
+        }),
+      );
+
+      // One id, so the export table replaces rather than appends: no second
+      // record is added for the same day.
+      expect(corrected.eventId).toBe(first.eventId);
+      expect(moneyOf(corrected.rawOcsfJson).cost_amount).toBe("19.99");
     });
   });
 });

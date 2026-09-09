@@ -201,4 +201,75 @@ export const PulledUsageObservedEventSchema = EventSchema.extend({
 export type PulledUsageObservedEvent = z.infer<
   typeof PulledUsageObservedEventSchema
 >;
-export type PulledUsageProcessingEvent = PulledUsageObservedEvent;
+
+/**
+ * `PulledUsageRetracted` — withdraws what one restatement key holds in the
+ * cell it currently sits in (challenge settlement 9).
+ *
+ * The restatement key deliberately excludes the currency, the agent and the
+ * spender, so a provider reissuing the same charge under any of those files it
+ * in a DIFFERENT rollup cell. The first version is then left behind holding
+ * its money with nothing to say it was superseded, and a total across the day
+ * carries the one bill twice. This is what says so.
+ *
+ * It carries the RETRACTED cell's dimensions, not the reissued one's: the
+ * dimensions are the cell's address, so a retraction routed by the new
+ * currency would empty the wrong cell and leave both versions live.
+ *
+ * `occurredAtMs` is the day the retraction CORRECTS, never the day the
+ * correction arrived. The daily comparator re-derives a day from the events
+ * falling inside it, so a retraction dated to its own arrival is never read
+ * for the day it fixes, and that day is reported as drifting for as long as it
+ * is kept.
+ *
+ * `costNanoMinor` is stated as zero rather than omitted, and that is
+ * load-bearing rather than decoration. Nothing parses these events on the read
+ * path: the fold and the comparator read the data object directly through
+ * `readPulledUsageMoney`, which falls back to reading the amount out of
+ * `costNanoUsd` in dollars when `costNanoMinor` is absent. A retraction that
+ * omitted it would therefore address the DOLLAR cell and leave the euro one
+ * live.
+ */
+export const pulledUsageRetractedEventDataSchema = z.object({
+  /** The dimension-only identity of the item being withdrawn. */
+  restatementKey: z.string().min(1),
+  /** Which provider record this came from, e.g. `anthropic_admin`. */
+  source: z.string().min(1),
+  /** The ingestion source's id — the row that owns the attribution. */
+  ingestionSourceId: z.string().min(1),
+  organizationId: z.string().min(1),
+  model: z.string(),
+
+  /** Zero, always. See the header for why it is stated rather than omitted. */
+  costNanoMinor: z.number().int(),
+  /** The currency of the cell being retracted — part of that cell's address. */
+  currencyCode: z.string().length(3).default("USD"),
+  costNanoUsd: z.number().int().nullable().default(null),
+  /** The spender of the cell being retracted — part of that cell's address. */
+  rawActorId: z.string().default(""),
+  /** The agent of the cell being retracted — part of that cell's address. */
+  agentId: z.string().default(""),
+
+  /** The business bucket of the day this CORRECTS, epoch ms. */
+  occurredAtMs: z.number().int().positive(),
+  /** When the correction was pulled, epoch ms. The ordering field. */
+  observedAtMs: z.number().int().positive(),
+});
+
+export type PulledUsageRetractedEventData = z.infer<
+  typeof pulledUsageRetractedEventDataSchema
+>;
+
+export const PulledUsageRetractedEventSchema = EventSchema.extend({
+  type: z.literal(PULLED_USAGE_EVENT_TYPES.RETRACTED),
+  version: z.literal(PULLED_USAGE_EVENT_VERSIONS.RETRACTED),
+  data: pulledUsageRetractedEventDataSchema,
+});
+
+export type PulledUsageRetractedEvent = z.infer<
+  typeof PulledUsageRetractedEventSchema
+>;
+
+export type PulledUsageProcessingEvent =
+  | PulledUsageObservedEvent
+  | PulledUsageRetractedEvent;

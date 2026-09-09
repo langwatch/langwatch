@@ -88,7 +88,7 @@ vi.mock("~/utils/api", () => {
               billedCellsWithoutAmount: 0,
               gatewayCellsWithoutAmount: 0,
               billedRevisedAt: null,
-              billedPreviousUsd: null,
+              billedByCurrency: [],
               billedProvisional: false,
             },
             {
@@ -98,7 +98,7 @@ vi.mock("~/utils/api", () => {
               billedCellsWithoutAmount: 0,
               gatewayCellsWithoutAmount: 0,
               billedRevisedAt: null,
-              billedPreviousUsd: null,
+              billedByCurrency: [],
               billedProvisional: false,
             },
           ],

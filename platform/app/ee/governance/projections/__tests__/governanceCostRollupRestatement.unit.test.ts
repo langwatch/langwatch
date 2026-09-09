@@ -23,6 +23,7 @@ import {
 } from "../governanceCostRollup.constants";
 import {
   GovernanceCostRollupFoldProjection,
+  governanceCostRollupKey,
   type GovernanceCostRollupState,
   governanceCostRollupTotals,
 } from "../governanceCostRollup.foldProjection";
@@ -50,6 +51,7 @@ function observedEvent({
   currencyCode = GOVERNANCE_COST_CURRENCY_USD,
   costNanoUsd = null,
   occurredAtMs = DAY_MS,
+  rawActorId = "",
   id = `evt-pulled-${observedAtMs}-${restatementKey}`,
 }: {
   costNanoMinor: number;
@@ -58,6 +60,7 @@ function observedEvent({
   currencyCode?: string;
   costNanoUsd?: number | null;
   occurredAtMs?: number;
+  rawActorId?: string;
   id?: string;
 }) {
   return {
@@ -82,6 +85,7 @@ function observedEvent({
       costNanoMinor,
       currencyCode,
       costNanoUsd,
+      rawActorId,
       rateVersion: "registry@2026-08-01",
       costBasis: "computed",
       costStatus: "estimate",
@@ -136,6 +140,62 @@ function confirmedEvent({
       rate_version: "registry@2026-08-01",
       duration_ms: 120,
       cost_nano_usd: costNanoUsd,
+    },
+  } as never;
+}
+
+/**
+ * The event that withdraws what one restatement key holds in the cell it is
+ * currently filed under.
+ *
+ * Not yet implemented: `lw.obs.pulled_usage.retracted`. The puller worker
+ * emits it at ingest, before the observation for the new cell, when the
+ * restatement index says this key already sits somewhere else (settlement 9).
+ * Built inline as a plain object because the schema does not carry the type
+ * yet - the field names here are the ones the implementer must add.
+ *
+ * `costNanoMinor` is spelled out even though a retraction carries no money:
+ * the cell a rollup event addresses is derived through `readPulledUsageMoney`,
+ * which falls back to dollars for an event with no `costNanoMinor` at all - so
+ * a retraction that omitted it would address the DOLLAR cell and leave the
+ * euro one holding its money.
+ */
+function retractionEvent({
+  observedAtMs,
+  restatementKey = "bucket-hash",
+  currencyCode = GOVERNANCE_COST_CURRENCY_USD,
+  rawActorId = "",
+  occurredAtMs = DAY_MS,
+  id = `evt-retracted-${observedAtMs}-${restatementKey}`,
+}: {
+  observedAtMs: number;
+  restatementKey?: string;
+  currencyCode?: string;
+  rawActorId?: string;
+  occurredAtMs?: number;
+  id?: string;
+}) {
+  return {
+    id,
+    type: "lw.obs.pulled_usage.retracted",
+    tenantId: TENANT,
+    aggregateId: restatementKey,
+    occurredAt: occurredAtMs,
+    data: {
+      restatementKey,
+      source: "anthropic_admin",
+      ingestionSourceId: "src_1",
+      organizationId: "org_acme",
+      model: "anthropic/claude-sonnet-5",
+      costNanoMinor: 0,
+      currencyCode,
+      costNanoUsd: null,
+      rawActorId,
+      // The day the retraction CORRECTS, not the day the correction arrived.
+      // The comparator re-derives a day from the events falling inside it, so
+      // a retraction dated to its own arrival is never read by it.
+      occurredAtMs,
+      observedAtMs,
     },
   } as never;
 }
@@ -527,6 +587,99 @@ describe("the markers through storage", () => {
 
       expect(backfilled.revisedAt).toBe(null);
       expect(backfilled.lastObservedAt).toBe(0);
+    });
+  });
+});
+
+describe("a correction that lands in a different cell", () => {
+  // The dimensions a charge is deliberately NOT identified by. A correction
+  // arriving under one of these lands in a cell of its own, leaving the first
+  // version behind holding its money with nothing to say it was superseded -
+  // and a total across the day then carries the same bill twice.
+  const BILLED = 10_000_000_000;
+  const REISSUED = 11_000_000_000;
+
+  describe("when the provider reissues the same bill in another currency", () => {
+    /** @scenario "A correction that arrives under a different currency retracts what it replaces" */
+    it("empties the cell the first currency held and leaves the money in the second", () => {
+      const inEuros = observedEvent({
+        costNanoMinor: BILLED,
+        currencyCode: "EUR",
+        observedAtMs: FIRST_PULL,
+        id: "evt-pulled-eur",
+      });
+      const retraction = retractionEvent({
+        currencyCode: "EUR",
+        observedAtMs: SECOND_PULL,
+      });
+      const inDollars = observedEvent({
+        costNanoMinor: REISSUED,
+        currencyCode: GOVERNANCE_COST_CURRENCY_USD,
+        observedAtMs: SECOND_PULL,
+        id: "evt-pulled-usd",
+      });
+
+      const retracted = fold([inEuros, retraction]);
+      const reissued = fold([inDollars]);
+
+      // Retracted by an EVENT rather than by editing the earlier row: the
+      // summary is a consequence of the event history, so a fix that only
+      // reaches storage is undone by the next rebuild.
+      expect(governanceCostRollupTotals(retracted).amountNanoMinor).toBe(0);
+      expect(retracted.revisionCount).toBe(1);
+      expect(retracted.lastObservedAt).toBe(SECOND_PULL);
+      expect(governanceCostRollupTotals(reissued).amountNanoMinor).toBe(
+        REISSUED,
+      );
+
+      // The retraction has to ADDRESS the cell it retracts. Currency is part
+      // of the key, so a retraction routed by the reissued currency would
+      // empty the wrong cell and leave both versions live.
+      expect(governanceCostRollupKey(retraction)).toBe(
+        governanceCostRollupKey(inEuros),
+      );
+      expect(governanceCostRollupKey(inDollars)).not.toBe(
+        governanceCostRollupKey(inEuros),
+      );
+    });
+  });
+
+  describe("when the provider reissues the same charge against another spender", () => {
+    /** @scenario "A correction that arrives against a different spender retracts what it replaces" */
+    it("empties the cell the first spender held and leaves the money against the second", () => {
+      const againstFirst = observedEvent({
+        costNanoMinor: BILLED,
+        rawActorId: "user_ada",
+        observedAtMs: FIRST_PULL,
+        id: "evt-pulled-ada",
+      });
+      const retraction = retractionEvent({
+        rawActorId: "user_ada",
+        observedAtMs: SECOND_PULL,
+      });
+      const againstSecond = observedEvent({
+        costNanoMinor: REISSUED,
+        rawActorId: "user_grace",
+        observedAtMs: SECOND_PULL,
+        id: "evt-pulled-grace",
+      });
+
+      const retracted = fold([againstFirst, retraction]);
+      const reissued = fold([againstSecond]);
+
+      // The same defect reached by a different door: fixing only the currency
+      // case leaves this one and the agent one open behind it.
+      expect(governanceCostRollupTotals(retracted).amountNanoUsd).toBe(0);
+      expect(retracted.revisionCount).toBe(1);
+      expect(retracted.lastObservedAt).toBe(SECOND_PULL);
+      expect(governanceCostRollupTotals(reissued).amountNanoUsd).toBe(REISSUED);
+
+      expect(governanceCostRollupKey(retraction)).toBe(
+        governanceCostRollupKey(againstFirst),
+      );
+      expect(governanceCostRollupKey(againstSecond)).not.toBe(
+        governanceCostRollupKey(againstFirst),
+      );
     });
   });
 });

@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { deriveSourceHealth } from "@ee/governance/services/pullers/sourceHealth";
-import { CircleAlert, CircleCheck, CircleDashed, CircleX } from "lucide-react";
+import {
+  deriveSourceHealth,
+  type RunCompleteness,
+} from "@ee/governance/services/pullers/sourceHealth";
+import {
+  CircleAlert,
+  CircleCheck,
+  CircleDashed,
+  CircleDotDashed,
+  CircleX,
+} from "lucide-react";
 
 /**
  * Health is derived at read time from the failure count below, so it only
@@ -65,19 +74,40 @@ export const SOURCE_UNHEALTHY_META: SourceBadge = {
   color: "red.500",
 };
 
+/**
+ * A source whose last run stopped before it had read everything.
+ *
+ * A third answer, because the other two are both wrong about it. It is not
+ * failing -- a page limit and a deadline end a run with nothing to report as
+ * an error -- and it is not active in the sense a reader takes from the green
+ * check, which they read as "the numbers below are the whole picture".
+ */
+export const SOURCE_PARTIAL_META: SourceBadge = {
+  icon: CircleDotDashed,
+  label: "Partly collected",
+  color: "amber.500",
+};
+
 export function sourceBadge({
   status,
   errorCount,
+  completeness,
 }: {
   status: string;
   errorCount: number;
+  /** Whether the last run drained the period it was asked for, when known. */
+  completeness?: RunCompleteness | null;
 }): SourceBadge {
   // Checked before health: a source nobody asked to run cannot be failing to
   // run, so its configured state is the honest badge.
   if (status === "disabled") return SOURCE_STATUS_META.disabled!;
+  // Failing outranks partly collected. A source doing both is one an admin
+  // has to go and fix, and a run that stopped early is the milder half of
+  // that news -- shown on its own it reads as a source that is working.
   if (deriveSourceHealth({ consecutiveFailures: errorCount }) === "unhealthy") {
     return SOURCE_UNHEALTHY_META;
   }
+  if (completeness === "truncated") return SOURCE_PARTIAL_META;
   return SOURCE_STATUS_META[status] ?? SOURCE_STATUS_META.awaiting_first_event!;
 }
 

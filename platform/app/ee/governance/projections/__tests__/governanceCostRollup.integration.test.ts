@@ -159,9 +159,87 @@ function observed({
   };
 }
 
+/**
+ * The event that withdraws what one restatement key holds in the cell it is
+ * currently filed under.
+ *
+ * Not yet implemented: `lw.obs.pulled_usage.retracted`, emitted by the puller
+ * worker at ingest - before the observation for the new cell - when the
+ * restatement index says the key already sits somewhere else (settlement 9).
+ * Built inline as a plain object because the schema does not carry the type
+ * yet; these field names are the ones the implementer must add.
+ */
+function retracted({
+  currencyCode = "USD",
+  observedAtMs,
+  restatementKey = "bucket-hash",
+  rawActorId = "",
+  id = nanoid(),
+}: {
+  currencyCode?: string;
+  observedAtMs: number;
+  restatementKey?: string;
+  rawActorId?: string;
+  id?: string;
+}) {
+  return {
+    id,
+    type: "lw.obs.pulled_usage.retracted",
+    tenantId,
+    aggregateId: restatementKey,
+    occurredAt: DAY_MS,
+    data: {
+      restatementKey,
+      source: "anthropic_admin",
+      ingestionSourceId: "src_1",
+      organizationId: "org_acme",
+      model: "anthropic/claude-sonnet-5",
+      // Spelled out even though a retraction carries no money: the cell an
+      // event addresses is derived through `readPulledUsageMoney`, which falls
+      // back to dollars when `costNanoMinor` is absent - so a retraction
+      // omitting it would empty the DOLLAR cell and leave the euro one live.
+      costNanoMinor: 0,
+      currencyCode,
+      costNanoUsd: null,
+      rawActorId,
+      // The day this CORRECTS, not the day the correction arrived.
+      occurredAtMs: DAY_MS,
+      observedAtMs,
+    },
+  };
+}
+
+/**
+ * Not yet implemented: ClickHouse migration `00094` creates
+ * `governance_cost_rollup_restatement_index`, a
+ * `ReplacingMergeTree(EventTimestamp)` ordered by `(TenantId, RestatementKey)`
+ * that records the cell each key is filed under. Named here on purpose - the
+ * table does not exist, so every read of it is red.
+ */
+const RESTATEMENT_INDEX_TABLE = "governance_cost_rollup_restatement_index";
+
+/** Where each of one tenant's restatement keys is currently filed. */
+async function restatementIndexRows(
+  forTenant: string,
+): Promise<Array<Record<string, unknown>>> {
+  const result = await ch.query({
+    query: `
+      SELECT RestatementKey, Day, CurrencyCode, RawActorId
+      FROM ${RESTATEMENT_INDEX_TABLE}
+      WHERE TenantId = {tenantid:String}
+    `,
+    query_params: { tenantid: forTenant },
+    format: "JSONEachRow",
+  });
+  return (await result.json()) as Array<Record<string, unknown>>;
+}
+
 /** Folds an event through the real executor, so redelivery dedup is exercised. */
 async function foldThroughExecutor(
-  event: ReturnType<typeof confirmed> | ReturnType<typeof observed>,
+  event:
+    | ReturnType<typeof confirmed>
+    | ReturnType<typeof observed>
+    | ReturnType<typeof retracted>,
   { deliveryAttempt = 1 }: { deliveryAttempt?: number } = {},
 ): Promise<void> {
   const projection = new GovernanceCostRollupFoldProjection({ store });
@@ -896,6 +974,135 @@ describe("governance cost rollup", () => {
       expect(cells.some((cell) => cell.CostSource.includes("trace"))).toBe(
         false,
       );
+    });
+  });
+
+  describe("given a day summarized from a bill issued in one currency", () => {
+    const BILLED = 10_000_000_000;
+    const REISSUED = 11_000_000_000;
+    const FIRST_PULL = Date.parse("2026-08-02T04:00:00.000Z");
+    const SECOND_PULL = Date.parse("2026-08-05T04:00:00.000Z");
+
+    /** @scenario "A day whose bill changed currency is never counted under both" */
+    it("holds the day under the second currency only", async () => {
+      // Named first so the failure says what is missing. The fold has no
+      // branch for this event type yet, so `dimensionsOf` falls through to the
+      // gateway shape and dies on `utcDayOf(undefined)` before any assertion
+      // about money is reached.
+      expect(() =>
+        governanceCostRollupKey(
+          retracted({ currencyCode: "EUR", observedAtMs: SECOND_PULL }) as never,
+        ),
+      ).not.toThrow();
+
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: BILLED,
+          currencyCode: "EUR",
+          observedAtMs: FIRST_PULL,
+        }),
+      );
+      await foldThroughExecutor(
+        retracted({ currencyCode: "EUR", observedAtMs: SECOND_PULL }),
+      );
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: REISSUED,
+          currencyCode: "USD",
+          observedAtMs: SECOND_PULL,
+        }),
+      );
+
+      const cells = await repo.findCellsForDay({ tenantId, day: DAY });
+      const byCurrency = new Map(
+        cells.map((cell) => [cell.CurrencyCode, cell.AmountNanoMinor]),
+      );
+
+      // The first currency is still a row - the day really was billed in it
+      // once, and the history says so - but it contributes nothing.
+      expect(byCurrency.get("EUR")).toBe(0);
+      expect(byCurrency.get("USD")).toBe(REISSUED);
+      // Read across every currency the day holds, the one bill is counted
+      // once. Left un-retracted, both versions are live and this is
+      // BILLED + REISSUED.
+      expect(
+        cells.reduce((total, cell) => total + cell.AmountNanoMinor, 0),
+      ).toBe(REISSUED);
+    });
+  });
+
+  describe("given a day summarized in one currency and then rebuilt from history", () => {
+    const BILLED = 10_000_000_000;
+    const REISSUED = 11_000_000_000;
+    const FIRST_PULL = Date.parse("2026-08-02T04:00:00.000Z");
+    const SECOND_PULL = Date.parse("2026-08-05T04:00:00.000Z");
+
+    /** @scenario "A correction still retracts its earlier version after the summary is rebuilt" */
+    it("still retracts the earlier version once the correction arrives", async () => {
+      // Named first so the failure says what is missing. The fold has no
+      // branch for this event type yet, so `dimensionsOf` falls through to the
+      // gateway shape and dies on `utcDayOf(undefined)` before any assertion
+      // about money is reached.
+      expect(() =>
+        governanceCostRollupKey(
+          retracted({ currencyCode: "EUR", observedAtMs: SECOND_PULL }) as never,
+        ),
+      ).not.toThrow();
+
+      const history = [
+        observed({
+          costNanoMinor: BILLED,
+          currencyCode: "EUR",
+          observedAtMs: FIRST_PULL,
+        }),
+      ];
+      for (const event of history) await foldThroughExecutor(event);
+
+      // The rebuild: the same history replayed into a fresh tenant, which is
+      // what a replay of the log does.
+      const rebuiltTenant = `${tenantId}-rebuilt`;
+      const previousTenant = tenantId;
+      tenantId = rebuiltTenant;
+      for (const event of history) {
+        await foldThroughExecutor({ ...event, tenantId: rebuiltTenant });
+      }
+
+      // The correction arrives AFTER the rebuild, so the only way it can find
+      // the euro cell is from something the rebuild itself reproduced.
+      await foldThroughExecutor(
+        retracted({ currencyCode: "EUR", observedAtMs: SECOND_PULL }),
+      );
+      await foldThroughExecutor(
+        observed({
+          costNanoMinor: REISSUED,
+          currencyCode: "USD",
+          observedAtMs: SECOND_PULL,
+        }),
+      );
+
+      const cells = await repo.findCellsForDay({
+        tenantId: rebuiltTenant,
+        day: DAY,
+      });
+      tenantId = previousTenant;
+
+      const byCurrency = new Map(
+        cells.map((cell) => [cell.CurrencyCode, cell.AmountNanoMinor]),
+      );
+      expect(byCurrency.get("EUR")).toBe(0);
+      expect(byCurrency.get("USD")).toBe(REISSUED);
+
+      // Where the charge landed the first time is written down beside the
+      // summary as it is built, out of the same events. Held only in memory it
+      // would be lost by every restart, and looked for by searching the day it
+      // would mean reading every row of that day on every correction.
+      expect(await restatementIndexRows(rebuiltTenant)).toEqual([
+        expect.objectContaining({
+          RestatementKey: "bucket-hash",
+          Day: DAY,
+          CurrencyCode: "EUR",
+        }),
+      ]);
     });
   });
 });
