@@ -17,7 +17,10 @@ import {
   type RestTransportDeclaration,
   type RestTransportMiddlewareBinding,
 } from "@langwatch/api/rest";
-import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import type {
+  ResolvedApiKeyCredential,
+  ResolvedOrganizationApiKeyToken,
+} from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -42,11 +45,28 @@ export type ApiHandlerManagedCredentialPort = (input: {
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>
 >;
 
+/**
+ * The organization credential a family resolves through. The resolved token
+ * travels with the answer because the api-keys family asks a SECOND question
+ * of the KEY as well as of the member holding it.
+ */
+export type ApiOrganizationCredentialPort = (input: {
+  request: Request;
+  permission: AuthzPermission;
+}) => Promise<
+  | Readonly<{
+      ok: true;
+      resolved: ResolvedOrganizationApiKeyToken;
+      markUsed: () => void;
+    }>
+  | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>
+>;
+
 /** Every door a REST declaration may name, opened by this process or not. */
 export type ApiRestDoor = RestDoorCredential | "public";
 
 /**
- * Which doors this process opens. The four it does not are named rather than
+ * Which doors this process opens. The three it does not are named rather than
  * omitted: a declaration reaching for one is refused at MOUNT, by door name,
  * instead of reaching a request that resolves nobody.
  */
@@ -54,7 +74,7 @@ const OPENED_DOORS = {
   projectKey: true,
   session: true,
   public: true,
-  organizationKey: false,
+  organizationKey: true,
   internalSecret: false,
   scimToken: false,
   instanceAdminKey: false,
@@ -76,6 +96,11 @@ export type ApiRestBrowserCaller = Readonly<{
 export type ApiRestRuntimePorts = Readonly<{
   /** Resolves a project API key and enforces one permission as a key ceiling. */
   projectCredential: ApiHandlerManagedCredentialPort;
+  /**
+   * Resolves an organization API key and enforces one permission at
+   * organization scope.
+   */
+  organizationCredential: ApiOrganizationCredentialPort;
   /** The envelope a family answers a refusal in unless it names its own. */
   errors: RestErrorHandler;
   /**
@@ -110,6 +135,8 @@ export interface ApiRestRuntime {
   ): MountableRestApp;
   /** What the project door resolved for the request in hand. */
   projectCredentialOf(request: Request): ResolvedApiKeyCredential;
+  /** What the organization door resolved for the request in hand. */
+  organizationCredentialOf(request: Request): ResolvedOrganizationApiKeyToken;
   /** What the byte door's verifier left on the request in hand. */
   browserCallerOf(request: Request): ApiRestBrowserCaller;
 }
@@ -132,6 +159,7 @@ export class ApiRestCredentialRefusal extends Error {
 /** Builds this process's door table, once. */
 export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime {
   const resolved = new WeakMap<Request, ResolvedApiKeyCredential>();
+  const organizations = new WeakMap<Request, ResolvedOrganizationApiKeyToken>();
   const browserCallers = new WeakMap<Request, ApiRestBrowserCaller>();
   const stores = {
     ...(ports.rateLimiter ? { rateLimiter: ports.rateLimiter } : {}),
@@ -153,6 +181,29 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
           return {
             actor: actorOf(credential.resolved),
             scope: { tier: "project", id: credential.project.id },
+            markUsed: credential.markUsed,
+          };
+        },
+      },
+      ...stores,
+    }),
+    // Every organization-scoped family: the key is resolved once, its refusal
+    // is rendered once, and the credential a second question is asked about is
+    // kept against the request the declaration is handed.
+    organizationKey: createRestRuntime({
+      identity: {
+        authenticate: async ({ request, permission }): Promise<RestCaller> => {
+          const credential = await ports.organizationCredential({ request, permission });
+          if (!credential.ok) {
+            throw new ApiRestCredentialRefusal(credential.status, credential.body);
+          }
+          organizations.set(request, credential.resolved);
+
+          return {
+            actor: credential.resolved.userId
+              ? { type: "user", id: credential.resolved.userId }
+              : null,
+            scope: { tier: "organization", id: credential.resolved.organizationId },
             markUsed: credential.markUsed,
           };
         },
@@ -191,6 +242,7 @@ export function createApiRestRuntime(ports: ApiRestRuntimePorts): ApiRestRuntime
 
   return {
     projectCredentialOf: (request) => projectCredentialOf(resolved, request),
+    organizationCredentialOf: (request) => organizationCredentialOf(organizations, request),
     browserCallerOf: (request) => browserCallers.get(request) ?? {},
     mount: (declaration, app, options = {}) => {
       const door = openDoorFor(declaration, verifier !== null);
@@ -277,6 +329,19 @@ function projectCredentialOf(
 ): ResolvedApiKeyCredential {
   const credential = resolved.get(request);
   if (!credential) throw new Error("The project door resolved no credential for this request");
+
+  return credential;
+}
+
+/** The credential the organization door resolved, or the wiring bug that it did not. */
+function organizationCredentialOf(
+  organizations: WeakMap<Request, ResolvedOrganizationApiKeyToken>,
+  request: Request,
+): ResolvedOrganizationApiKeyToken {
+  const credential = organizations.get(request);
+  if (!credential) {
+    throw new Error("The organization door resolved no credential for this request");
+  }
 
   return credential;
 }

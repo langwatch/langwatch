@@ -182,6 +182,9 @@ export function mountRestFamily(options: {
     projectCredential: () => {
       throw new Error("These families authenticate through the framework chain.");
     },
+    organizationCredential: () => {
+      throw new Error("These families authenticate through the framework chain.");
+    },
     errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
     ...(ports.dualAuth ? { dualCredential: ports.dualAuth } : {}),
   });

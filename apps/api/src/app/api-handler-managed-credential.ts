@@ -1,16 +1,33 @@
 /**
- * The project credential, resolved for a family that answers its own refusals. Most REST
- * families let the framework authenticate them: the chain resolves the credential, checks
- * the permission, and renders a refusal in whichever envelope the family declared.
+ * The two credentials a family that answers its own refusals resolves through:
+ * the project door every SDK key arrives at, and the organization door the
+ * management surfaces answer behind.
  */
-import { type ApiKeyApi, type ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import {
+  type ApiKeyApi,
+  type ResolvedApiKeyCredential,
+  type ResolvedOrganizationApiKeyToken,
+} from "@langwatch/api-key-contract";
 import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
+import {
+  OrganizationNotFoundError,
+  type OrganizationService,
+} from "@langwatch/organization-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
+import {
+  ApiOrganizationCredentialClassMismatchError,
+  ApiOrganizationInvalidCredentialsError,
+  ApiOrganizationAuthenticationUnavailableError,
+  ApiOrganizationMissingCredentialsError,
+  ApiOrganizationNotFoundForCredentialError,
+  ApiOrganizationPermissionError,
+} from "../api-rest.security.ts";
 import { apiKeyCeilingRefusal } from "./api-key-ceiling-refusal.ts";
 import { extractApiKeyRequestCredentials } from "./api-key-request-credentials.ts";
+import { legacyErrorBody } from "./api-rest-observability.composition.ts";
 
 /** What a resolved credential gives a handler, or what a refused one answers. */
 export type HandlerManagedCredential =
@@ -18,6 +35,15 @@ export type HandlerManagedCredential =
       ok: true;
       project: ResolvedApiKeyCredential["project"];
       resolved: ResolvedApiKeyCredential;
+      markUsed: () => void;
+    }>
+  | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
+
+/** The same, for the organization door, which names no project. */
+export type OrganizationManagedCredential =
+  | Readonly<{
+      ok: true;
+      resolved: ResolvedOrganizationApiKeyToken;
       markUsed: () => void;
     }>
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
@@ -36,11 +62,14 @@ export class ApiHandlerManagedCredentials {
   static create(options: {
     apiKeys: ApiKeyApi;
     authz: AuthzService;
+    /** The directory a resolved organization credential is checked against. */
+    organizations: Pick<OrganizationService, "getSettings">;
     logger?: Pick<Logger, "error">;
   }): ApiHandlerManagedCredentials {
     return new ApiHandlerManagedCredentials(
       options.apiKeys,
       options.authz,
+      options.organizations,
       options.logger ?? createLogger("langwatch:api:handler-managed-credential"),
     );
   }
@@ -48,8 +77,95 @@ export class ApiHandlerManagedCredentials {
   private constructor(
     private readonly apiKeys: ApiKeyApi,
     private readonly authz: AuthzService,
+    private readonly organizations: Pick<OrganizationService, "getSettings">,
     private readonly logger: Pick<Logger, "error">,
   ) {}
+
+  /**
+   * Resolve the request's ORGANIZATION credential and enforce one permission at
+   * organization scope. A project key presented here is told so by name rather
+   * than refused as invalid: the two are different mistakes to make.
+   */
+  async authenticateOrganization(input: {
+    request: Request;
+    permission: AuthzPermission;
+  }): Promise<OrganizationManagedCredential> {
+    const credentials = extractApiKeyRequestCredentials(input.request);
+    if (!credentials) return refusal(new ApiOrganizationMissingCredentialsError());
+
+    const resolution = await this.resolveOrganization(credentials.token);
+    if (!resolution.ok) return refusal(resolution.error);
+
+    const resolved = resolution.resolved;
+    const known = await this.organizationExists(resolved.organizationId);
+    if (!known.ok) return refusal(known.error);
+
+    const allowed = await this.authz.hasApiKeyPermission({
+      apiKeyId: resolved.apiKeyId,
+      userId: resolved.userId,
+      organizationId: resolved.organizationId,
+      scope: { type: "org", id: resolved.organizationId },
+      permission: input.permission,
+    });
+    if (!allowed) return refusal(new ApiOrganizationPermissionError(input.permission));
+
+    return {
+      ok: true,
+      resolved,
+      markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
+    };
+  }
+
+  /** The organization credential the token stands for, or the refusal it earns. */
+  private async resolveOrganization(
+    token: string,
+  ): Promise<
+    | Readonly<{ ok: true; resolved: ResolvedOrganizationApiKeyToken }>
+    | Readonly<{ ok: false; error: HandledError }>
+  > {
+    try {
+      const resolution = await this.apiKeys.resolveOrganizationToken({ token });
+
+      if (resolution.ok) return { ok: true, resolved: resolution.resolved };
+
+      return {
+        ok: false,
+        error:
+          resolution.reason === "wrong_credential_class"
+            ? new ApiOrganizationCredentialClassMismatchError()
+            : new ApiOrganizationInvalidCredentialsError(),
+      };
+    } catch (error) {
+      this.logger.error({ error }, "Organization credential resolution failed");
+
+      return { ok: false, error: new ApiOrganizationAuthenticationUnavailableError() };
+    }
+  }
+
+  /**
+   * A deleted organization is an expected refusal and stays quiet; any other
+   * failure is the lookup itself breaking, and the answer the caller receives
+   * carries none of the cause, so it is logged here or lost.
+   */
+  private async organizationExists(
+    organizationId: string,
+  ): Promise<Readonly<{ ok: true }> | Readonly<{ ok: false; error: HandledError }>> {
+    try {
+      await this.organizations.getSettings({ organizationId });
+
+      return { ok: true };
+    } catch (error) {
+      if (error instanceof OrganizationNotFoundError) {
+        return { ok: false, error: new ApiOrganizationNotFoundForCredentialError() };
+      }
+      this.logger.error(
+        { error, organizationId },
+        "Organization lookup failed while authenticating an organization credential",
+      );
+
+      return { ok: false, error: new ApiOrganizationAuthenticationUnavailableError() };
+    }
+  }
 
   /**
    * Resolve the request's project credential and enforce one permission as an API-key
@@ -132,6 +248,15 @@ export class ApiHandlerManagedCredentials {
       permission,
     });
   }
+}
+
+/** One refused credential, in the flat body the process's own boundary writes. */
+function refusal(error: HandledError): OrganizationManagedCredential {
+  return {
+    ok: false,
+    status: error.httpStatus as ContentfulStatusCode,
+    body: legacyErrorBody(error),
+  };
 }
 
 /**

@@ -6,13 +6,16 @@
 import { createErrorHandler } from "@langwatch/api";
 import type { MountableRestApp } from "@langwatch/api/rest";
 import { createDatasetErrorHandler, createDatasetRest } from "@langwatch/dataset-server";
+import { billingStripeWebhookRest } from "@langwatch/enterprise-billing-server";
 import { createEvaluatorRest } from "@langwatch/evaluator-server";
 import { createMonitorsRest } from "@langwatch/monitor-server";
 import type { Logger } from "@langwatch/observability";
 import { secretRest, secretsAliasRest } from "@langwatch/secret-server";
 
 import { mountAnnotationRest } from "../features/annotation/annotation-rest.mount.ts";
+import { mountApiKeyRest } from "../features/api-key/api-key-rest.mount.ts";
 import { mountDashboardRest } from "../features/dashboard/dashboard-rest.mount.ts";
+import { mountGithubInstallRest } from "../features/github/github-rest.mount.ts";
 import { apiDiscoveryRest } from "../features/discovery/api-discovery.rest.ts";
 import { gatewayOpenApiRest } from "../features/discovery/gateway-openapi.rest.ts";
 import { rootDiscoveryRest } from "../features/discovery/root-discovery.rest.ts";
@@ -170,8 +173,16 @@ export const API_REST_DOORS = [
   { family: "cron", owner: "process", paths: ["/api/cron/*"] },
   {
     family: "github",
-    owner: "process",
-    paths: ["/api/github/install", "/api/github/setup", "/api/github/webhook"],
+    owner: "module",
+    paths: [
+      "/api/github/install",
+      "/api/github/setup",
+      "/api/github/webhook",
+      "/api/github-langy/setup",
+      "/api/github-langy/webhook",
+    ],
+    mount: ({ runtime, ports }: ApiRestDoorContext) =>
+      ports.github ? [mountGithubInstallRest(runtime, ports.github)] : null,
   },
   {
     family: "langy",
@@ -355,8 +366,26 @@ export const API_REST_DOORS = [
   },
   { family: "gateway-internal", owner: "module", paths: ["/api/internal/gateway/*"] },
   { family: "elevenlabs-webhook", owner: "module", paths: ["/api/elevenlabs/webhook"] },
-  { family: "api-keys", owner: "module", paths: ["/api/v1/api-keys"] },
-  { family: "billing-webhook", owner: "module", paths: ["/api/webhooks/stripe"] },
+  {
+    family: "api-keys",
+    owner: "module",
+    paths: ["/api/api-keys", "/api/v1/api-keys"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const apiKeys = packaged?.services.apiKeys;
+      if (!apiKeys) return null;
+
+      return [mountApiKeyRest(runtime, { apiKeys, audit: packaged.ports.managementAudit })];
+    },
+  },
+  {
+    family: "billing-webhook",
+    owner: "module",
+    paths: ["/api/webhooks/stripe", "/api/v1/webhooks/stripe"],
+    mount: ({ runtime, services }: ApiRestDoorContext) =>
+      services.billingWebhook
+        ? [runtime.mount(billingStripeWebhookRest.router(), services.billingWebhook)]
+        : null,
+  },
   { family: "sse-subscriptions", owner: "process", paths: ["/api/sse/*"] },
 ] as const satisfies readonly ApiRestDoorEntry[];
 

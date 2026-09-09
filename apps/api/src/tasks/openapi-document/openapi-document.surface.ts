@@ -136,6 +136,7 @@ function processServices(): ApiRestServices {
     // would add a family to the document the previous surface never carried.
     secrets: refuse("The secret store"),
     suites: refuse("The suite application"),
+    billingWebhook: refuse("The payment provider callback"),
     analytics: refuse("Analytics"),
     langWatchQL: {
       collaborators: opaque(),
@@ -288,6 +289,7 @@ export function composeOpenApiDocumentSurface(): OpenApiDocumentSurface {
   ];
   const runtime = createApiRestRuntime({
     projectCredential: refuse("The project credential door"),
+    organizationCredential: refuse("The organization credential door"),
     errors: refuse("Error rendering") as never,
     dualCredential: noopMiddleware,
   });

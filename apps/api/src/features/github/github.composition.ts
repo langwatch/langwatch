@@ -4,13 +4,40 @@
  * coding agents opened.
  */
 import type { GithubApi } from "@langwatch/github-contract";
+import { githubTrpcTransport } from "@langwatch/github-server";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-// `github.*` is not built here: its tRPC transport is unconverted, so this file
-// keeps only the refusing `ctx.app.github` slice.
+import type { ApiTrpcFeatureMount } from "../../api.application.ts";
+import type { ApiTrpcInfrastructure } from "../../platform/infrastructure/api-trpc.infrastructure.ts";
 
 const logger = createLogger("langwatch:api:github");
+
+/** Builds `github.*` on this process's root, over this process's own graph. */
+export function composeGithubTrpcRouter(options: {
+  mount: ApiTrpcFeatureMount;
+  infrastructure: ApiTrpcInfrastructure;
+}) {
+  const { infrastructure } = options;
+
+  return options.mount.runtime.mount(githubTrpcTransport, (ctx) => ({
+    github: (): GithubApi => ctx.app.github,
+    // The organization is derived from the project through the coding-agent
+    // directory, which is the one application that already answers it, so the
+    // live pull-request read and its linkage cannot disagree about the tenant.
+    findOrganizationForProject: (projectId) =>
+      ctx.app.codingAgentApp.tryResolveOrganizationForProject(projectId),
+    recordAudit: async (entry) => {
+      await infrastructure.audit?.record({
+        actorId: entry.userId,
+        path: entry.action,
+        input: { organizationId: entry.organizationId, ...entry.args },
+        error: null,
+      });
+      logger.debug({ action: entry.action }, "recorded a GitHub connection command");
+    },
+  }));
+}
 
 /** A capability this deployment did not compose, refused by name. */
 class ApiCapabilityUnavailableError extends HandledError {

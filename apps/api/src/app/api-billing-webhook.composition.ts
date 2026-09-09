@@ -22,6 +22,7 @@ import {
   BillingSubscriptionNotifierPort,
   BillingSubscriptionService,
   BillingWebhookHostPort,
+  CurrencyService,
   CustomerService,
   EEWebhookService,
   LicenseGenerator,
@@ -39,7 +40,8 @@ import {
   StripeErrorAdapter,
   SubscriptionItemCalculatorService,
   createBillingStripeClient,
-  createStripeWebhookRestApp,
+  type BillingStripeWebhookApi,
+  type BillingSubscriptionApi,
   type GeneratedLicense,
   type InviteApprover,
   type LicenseEmailDelivery,
@@ -50,7 +52,6 @@ import {
   LicenseGenerationService,
   NodeLicenseCryptographyAdapter,
 } from "@langwatch/enterprise-licensing-server";
-import type { AppRestSecurity, MountableRestApp } from "@langwatch/api/rest";
 import { sendLicenseEmail } from "@langwatch/mail";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationService } from "@langwatch/organization-contract";
@@ -68,19 +69,16 @@ const LICENSE_PLAN_TYPE = "GROWTH";
 
 export type ApiBillingWebhookComposition = Readonly<{
   /**
-   * `POST /api/webhooks/stripe`, mounted whether or not this deployment bills.
-   *
-   * A function because the door is built from the process's own credential
-   * resolution, which is opened AFTER the tRPC application this composition
-   * also fills — one composition, read at both moments.
+   * What `POST /api/webhooks/stripe` asks of this deployment. Always answered:
+   * the door is mounted everywhere and reports 404 where nothing dispatches.
    */
-  rest(security: AppRestSecurity): MountableRestApp;
+  webhook: BillingStripeWebhookApi;
   /**
-   * The two slices `subscription.*` reads off `ctx.app`. Empty where this
-   * deployment composed no Stripe, which is what makes the surface say so
-   * plainly instead of pretending to bill.
+   * The two slices `currency.*` and `subscription.*` read off `ctx.app`. The
+   * subscription half is absent where this deployment composed no Stripe, which
+   * is what makes the surface say so plainly instead of pretending to bill.
    */
-  application: Pick<ApiTrpcFeatureApplication, "subscription" | "billingCustomer">;
+  application: Pick<ApiTrpcFeatureApplication, "billingCurrency" | "billingSubscription">;
   /**
    * Raises the seat line on a live seat-priced subscription when membership
    * changes. Absent without Stripe.
@@ -115,30 +113,57 @@ export function composeApiBillingWebhook(
   options: ApiBillingWebhookOptions,
 ): ApiBillingWebhookComposition {
   const composed = composeBillingWriteHalf(options);
+  const currencies = CurrencyService.create();
 
   return {
-    rest: (security) =>
-      createStripeWebhookRestApp({
-        security,
-        ports: {
-          webhooks: () => composed?.webhooks ?? null,
-          constructEvent: ({ rawBody, signature }) => {
-            if (!composed) {
-              throw new Error("This deployment composed no Stripe client");
-            }
-            return composed.stripe.webhooks.constructEvent(
-              rawBody,
-              signature,
-              options.billing?.stripeWebhookSecret ?? "",
-            );
-          },
-          signingSecret: () => options.billing?.stripeWebhookSecret,
-        },
-      }),
-    application: composed
-      ? { subscription: composed.subscription, billingCustomer: composed.customers }
-      : {},
+    webhook: {
+      dispatchesEvents: () => composed !== undefined,
+      signingSecret: () => options.billing?.stripeWebhookSecret,
+      constructEvent: ({ rawBody, signature }) => {
+        if (!composed) throw new Error("This deployment composed no Stripe client");
+
+        return composed.stripe.webhooks.constructEvent(
+          Buffer.from(rawBody),
+          signature,
+          options.billing?.stripeWebhookSecret ?? "",
+        );
+      },
+      handleEvent: (event) => {
+        if (!composed) throw new Error("This deployment composed no Stripe client");
+
+        return composed.webhooks.handleEvent(event);
+      },
+    },
+    application: {
+      billingCurrency: { detectCurrency: (request) => currencies.detect(request) },
+      ...(composed
+        ? { billingSubscription: billingSubscriptionOf(composed) }
+        : {}),
+    },
     seatSync: composed?.seatSync,
+  };
+}
+
+/**
+ * `subscription.*`'s one application, assembled from the two services behind
+ * it: the provider customer a checkout is opened for, and the subscription that
+ * checkout creates or raises.
+ */
+function billingSubscriptionOf(composed: ComposedBillingWriteHalf): BillingSubscriptionApi {
+  const { customers, subscription } = composed;
+
+  return {
+    getOrCreateCustomerId: (input) => customers.getOrCreateCustomerId(input),
+    updateSubscriptionItems: (input) => subscription.updateSubscriptionItems(input),
+    createOrUpdateSubscription: (input) => subscription.createOrUpdateSubscription(input),
+    createBillingPortalSession: (input) => subscription.createBillingPortalSession(input),
+    findLastNonCancelledSubscription: (input) =>
+      subscription.tryGetLastNonCancelledSubscription(input.organizationId),
+    previewProration: (input) => subscription.previewProration(input),
+    notifyProspective: (input) => subscription.notifyProspective(input),
+    createSubscriptionWithInvites: (input) =>
+      subscription.createSubscriptionWithInvites({ ...input, invites: [...input.invites] }),
+    listInvoices: (input) => subscription.listInvoices(input),
   };
 }
 

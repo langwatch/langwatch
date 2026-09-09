@@ -3,13 +3,13 @@
  * API process mounts, over fakes at every port. The guard chain is what is pinned,
  * because every link of it is a cross-tenant control.
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
-import { GithubInstallationNotFromFlowError } from "@langwatch/github-contract";
-import { createGithubRestApp, type GithubRestPorts } from "@langwatch/github-server";
+import { GithubInstallationNotFromFlowError, type GithubApi } from "@langwatch/github-contract";
+import type { GithubInstallApi } from "@langwatch/github-server";
 import { createHmac } from "crypto";
-import { Hono, type ErrorHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
+import { openTestRestDoors } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 import { composeApiGithubRest } from "../github-rest.mount.ts";
 
 const WEBHOOK_SECRET = "webhook-secret";
@@ -305,7 +305,7 @@ function githubWorld(
     webhookEvents,
     appliedPullRequestEvents,
     sessionReads: 0,
-    ports: undefined as unknown as GithubRestPorts,
+    installApi: undefined as unknown as GithubInstallApi,
   };
 
   const service = {
@@ -347,63 +347,48 @@ function githubWorld(
     },
   };
 
-  world.ports = {
-    github: () => service as never,
+  const composed = composeApiGithubRest({
+    github: service as unknown as GithubApi,
     session: async () => {
       world.sessionReads += 1;
       const actor = "session" in options ? options.session : { id: "user_1" };
-      return actor ? { user: { id: actor.id } } : null;
+      return actor ? { id: actor.id } : null;
     },
-    canManageOrganization: async ({ organizationId }) => {
-      permissionProbes.push(organizationId);
-      return options.canManage ?? true;
-    },
-    audit: async (entry) => {
-      audited.push({
-        userId: entry.userId,
-        organizationId: entry.organizationId,
-        action: entry.action,
-      });
-    },
-  };
+    authz: {
+      hasPermission: async ({ organizationId }: { organizationId: string }) => {
+        permissionProbes.push(organizationId);
+        return options.canManage ?? true;
+      },
+    } as never,
+    audit: {
+      record: async (entry: {
+        actorId: string | null;
+        path: string;
+        input: Record<string, unknown>;
+      }) => {
+        audited.push({
+          userId: entry.actorId ?? "",
+          organizationId: String(entry.input.organizationId),
+          action: entry.path,
+        });
+      },
+    } as never,
+  });
+  if (!composed) throw new Error("The GitHub family composed nothing for this world.");
+  world.installApi = composed;
+
   return world;
 }
 
+/** The family as the process mounts it: through the door registry, and no other way. */
 function mount(world: ReturnType<typeof githubWorld>) {
-  const hono = new Hono().route(
-    "/",
-    createGithubRestApp({ security: passThroughSecurity(), ports: world.ports }),
-  );
+  const hono = new Hono();
+  for (const door of openTestRestDoors({ ports: { github: world.installApi } })) {
+    hono.route("/", door);
+  }
+
   return {
     fetch: (path: string, init?: RequestInit) =>
       hono.fetch(new Request(`http://api.test${path}`, init)),
   };
-}
-
-/** A failure here must be legible rather than swallowed into a generic 500. */
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("This family resolves its own credential.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
 }

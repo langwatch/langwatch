@@ -11,7 +11,11 @@ import {
   type ApiRestAbsenceReport,
   type ApiRestDoorContext,
 } from "../../api-rest.doors.ts";
-import { createApiRestRuntime, type ApiRestRuntime } from "../../api-rest.runtime.ts";
+import {
+  createApiRestRuntime,
+  type ApiOrganizationCredentialPort,
+  type ApiRestRuntime,
+} from "../../api-rest.runtime.ts";
 import type { ApiPackagedRestCollaborators } from "../../api-rest.packaged-services.ts";
 import type { ApiRestPorts, ApiRestServices } from "../../api-rest.services.ts";
 
@@ -25,6 +29,9 @@ export function openTestRestRuntime(): ApiRestRuntime {
     projectCredential: () => {
       throw new Error("This suite composed no project credential door.");
     },
+    organizationCredential: () => {
+      throw new Error("This suite composed no organization credential door.");
+    },
     errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
   });
 }
@@ -35,6 +42,8 @@ export function openTestRestDoors(options: {
   ports?: Partial<ApiRestPorts> | undefined;
   packaged?: ApiPackagedRestCollaborators | undefined;
   absence?: ApiRestAbsenceReport | undefined;
+  /** The organization door, for a suite driving a family that answers behind one. */
+  organizationCredential?: ApiOrganizationCredentialPort | undefined;
 }): MountableRestApp[] {
   const errors = ApiRestObservabilityComposition.create().legacyErrorHandler;
   const dualCredential = options.packaged?.ports.dualAuth;
@@ -51,6 +60,11 @@ export function openTestRestDoors(options: {
   const context: ApiRestDoorContext = {
     runtime: createApiRestRuntime({
       projectCredential: (input) => ports.handlerManagedCredential(input),
+      organizationCredential:
+        options.organizationCredential ??
+        (() => {
+          throw new Error("This suite composed no organization credential door.");
+        }),
       errors,
       ...(dualCredential ? { dualCredential } : {}),
     }),

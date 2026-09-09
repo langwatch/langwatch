@@ -3,30 +3,24 @@
  * application, the backfill, and the branch demand that marks a project.
  * @see specs/coding-agent/project-menu-links.feature
  */
-import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";
 import {
-  CodingAgentApp,
   CodingAgentClockPort,
   CodingAgentPullRequestMappingBackfillService,
 } from "@langwatch/coding-agent-server";
 import type { CodingAgentSessionReads } from "@langwatch/coding-agent-server";
-import {
-  CodingAgentService,
-  type CodingAgentPullRequestMappingBackfillInput,
-  type CodingAgentSession,
-} from "@langwatch/coding-agent-contract";
+import type { CodingAgentSession } from "@langwatch/coding-agent-contract";
 import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
 import { GithubService, type GithubAppConfig } from "@langwatch/github-contract";
 import {
-  createGithubRestApp,
   GithubBranchDemandService,
   GithubHostPort,
   GithubProjectActivityPort,
   type BranchMappingRequest,
 } from "@langwatch/github-server";
-import { Hono, type ErrorHandler } from "hono";
+import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
+import { openTestRestDoors } from "../../../app-rest/__tests__/support/rest-doors.harness.ts";
 import { composeApiGithubRest } from "../github-rest.mount.ts";
 
 const ORGANIZATION_ID = "org_1";
@@ -159,29 +153,26 @@ function installWorld(options: {
     clock: new TestClock(),
   });
 
-  const codingAgents = CodingAgentApp.create({
-    codingAgents: new BackfillOnlyCodingAgents(backfill),
-    github,
-    scope: {
-      tryResolveOrganizationForProject: () => Promise.resolve(ORGANIZATION_ID),
-      resolveCallerProjectScope: () =>
-        Promise.reject(new Error("This world reads no cross-project scope.")),
-    },
-  });
+  // The one operation the install follow-up calls, which is all the family's
+  // option names: a whole coding-agent application here would stand up a
+  // ClickHouse projection nothing in this flow reads.
+  const codingAgents = {
+    backfillPullRequestMappings: (input: { organizationId: string }) => backfill.backfill(input),
+  };
 
-  const ports = composeApiGithubRest({
+  const installApi = composeApiGithubRest({
     github,
     session: () => Promise.resolve({ id: USER_ID }),
     authz: { hasPermission: () => Promise.resolve(true) } as never,
     audit: undefined,
     codingAgents,
   });
-  if (!ports) throw new Error("The GitHub family composed nothing for this world.");
+  if (!installApi) throw new Error("The GitHub family composed nothing for this world.");
 
-  const hono = new Hono().route(
-    "/",
-    createGithubRestApp({ security: passThroughSecurity(), ports }),
-  );
+  const hono = new Hono();
+  for (const door of openTestRestDoors({ ports: { github: installApi } })) {
+    hono.route("/", door);
+  }
 
   return {
     projectActivity,
@@ -228,61 +219,6 @@ class TestGithubHost extends GithubHostPort {
 
   normalize(repositoryHost: string): string {
     return repositoryHost.toLowerCase();
-  }
-}
-
-/** The coding-agent contract holding only the install follow-up. */
-class BackfillOnlyCodingAgents extends CodingAgentService {
-  constructor(private readonly backfill: CodingAgentPullRequestMappingBackfillService) {
-    super();
-  }
-
-  backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void> {
-    return this.backfill.backfill(input);
-  }
-
-  private unread(): Promise<never> {
-    return Promise.reject(new Error("This world reads only the install follow-up."));
-  }
-
-  getSessionEvents(): Promise<never> {
-    return this.unread();
-  }
-
-  tryGetBySessionId(): Promise<never> {
-    return this.unread();
-  }
-
-  tryGetSessionForTrace(): Promise<never> {
-    return this.unread();
-  }
-
-  listRecent(): Promise<never> {
-    return this.unread();
-  }
-
-  getUsageTotals(): Promise<never> {
-    return this.unread();
-  }
-
-  listForProject(): Promise<never> {
-    return this.unread();
-  }
-
-  linkTraceSessionsToPullRequests(): Promise<never> {
-    return this.unread();
-  }
-
-  getPullRequestUsage(): Promise<never> {
-    return this.unread();
-  }
-
-  getPullRequestDetail(): Promise<never> {
-    return this.unread();
-  }
-
-  getForPersonalProject(): Promise<never> {
-    return this.unread();
   }
 }
 
@@ -424,32 +360,4 @@ class TestGithubService extends GithubService {
   pruneStaleBranchLinkage(): Promise<never> {
     return this.unread();
   }
-}
-
-/** A failure here must be legible rather than swallowed into a generic 500. */
-const renderUnexpected: ErrorHandler = (error, c) => c.json({ error: String(error) }, 500);
-
-function passThroughSecurity(): AppRestSecurity {
-  const noop = async (_c: unknown, next: () => Promise<void>) => {
-    await next();
-  };
-  const unreachable = () => {
-    throw new Error("This family resolves its own credential.");
-  };
-  return createAppRestSecurity({
-    appContext: noop,
-    requestLogger: () => noop,
-    requestTracer: () => noop,
-    legacyErrorHandler: renderUnexpected,
-    canonicalErrorHandler: renderUnexpected,
-    authenticateProject: unreachable,
-    authorizeProjectPermission: unreachable,
-    authorizeApiKeyCeiling: unreachable,
-    authenticateOrganization: unreachable,
-    authorizeOrganizationPermission: unreachable,
-    authorizeRouteTeamPermission: unreachable,
-    authorizeRouteProjectPermission: unreachable,
-    authenticateOrganizationThrowing: noop,
-    authorizeOrganizationPermissionThrowing: unreachable,
-  } as never);
 }

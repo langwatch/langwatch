@@ -12,7 +12,8 @@ import type {
 
 import type { AdminRestPorts, BugReportRestPorts } from "@langwatch/ops-server";
 import type { UnsubscribeRestPorts } from "@langwatch/automation-server";
-import type { GithubRestPorts } from "@langwatch/github-server";
+import type { GithubInstallApi } from "@langwatch/github-server";
+import type { BillingStripeWebhookApi } from "@langwatch/enterprise-billing-server";
 import type { AuthCliDeviceFlowRestPorts, AuthRestPorts } from "@langwatch/auth-server";
 import type {
   GovernanceCliRestPorts,
@@ -199,6 +200,12 @@ export type ApiRestServices = Readonly<{
   /** The rows `/api/dataset` reads and writes, or none. */
   datasets?: (() => DatasetApi) | undefined;
   /**
+   * What `POST /api/webhooks/stripe` asks of this deployment. Composed
+   * wherever billing is, billing or not: the door answers 404 rather than
+   * appearing and disappearing with a credential.
+   */
+  billingWebhook?: (() => BillingStripeWebhookApi) | undefined;
+  /**
    * The stored credentials `/api/secret` and `/api/secrets` answer over, or
    * none: a door over a store this process cannot decrypt is worse than no door.
    */
@@ -269,9 +276,9 @@ export type ApiRestPorts = Readonly<{
    */
   langy?: ApiLangyRestComposition | undefined;
   /**
-   * The GitHub App installation flow's collaborators, or none.
+   * The GitHub App installation flow's application, or none.
    */
-  github?: GithubRestPorts | undefined;
+  github?: GithubInstallApi | undefined;
   /**
    * The RFC 8628 CLI device grant's collaborators, or none.
    */

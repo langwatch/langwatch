@@ -392,7 +392,7 @@ import type {
   GovernanceIngestRestPorts,
   GovernanceIngestTraceCollectionPort,
 } from "@langwatch/enterprise-governance-server";
-import type { GithubRestPorts } from "@langwatch/github-server";
+import type { GithubInstallApi } from "@langwatch/github-server";
 import type { FilesRateLimiter } from "@langwatch/stored-object-server";
 import type { ComposedDatasetFeature } from "../features/dataset/dataset.composition.types.ts";
 import type { ComposedEvaluatorFeature } from "../features/evaluator/evaluator.composition.types.ts";
@@ -935,6 +935,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     this.composedHandlerCredentials = ApiHandlerManagedCredentials.create({
       apiKeys: tenancy.apiKeys,
       authz,
+      organizations: tenancy.organizations,
     });
     // The deployment's rollout flags, over the three directories a
     // tenant-targeted read is authorized against. Installed here, and the
@@ -2190,6 +2191,8 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     // resolved once for the whole process rather than once per family.
     const restRuntime = createApiRestRuntime({
       projectCredential: (input) => handlerManagedCredentials.authenticate(input),
+      organizationCredential: (input) =>
+        handlerManagedCredentials.authenticateOrganization(input),
       errors: ApiRestObservabilityComposition.create().legacyErrorHandler,
       ...(packaged.ports.dualAuth ? { dualCredential: packaged.ports.dualAuth } : {}),
     });
@@ -2238,6 +2241,11 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
           ...(platformHealth ? { platformHealth: () => platformHealth } : {}),
           ...(secrets ? { secrets: () => secrets } : {}),
           suites: () => suites,
+          // Mounted on every deployment, exactly as the retired platform
+          // application mounted it: one that bills through nobody answers 404
+          // there rather than serving a path that appears and disappears with
+          // a credential.
+          billingWebhook: () => this.composedBillingWebhook.webhook,
         },
         ports: {
           handlerManagedCredential: (input) => handlerManagedCredentials.authenticate(input),
@@ -2494,6 +2502,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     const credentials = ApiHandlerManagedCredentials.create({
       apiKeys: tenancy.apiKeys,
       authz,
+      organizations: tenancy.organizations,
     });
     return composeApiLangyRest({
       langy: this.composedLangy.app,
@@ -2766,7 +2775,7 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
   /**
    * The GitHub App installation door's collaborators, or none. The session is the gate.
    */
-  private composeGithubRest(authz: AuthzService): GithubRestPorts | undefined {
+  private composeGithubRest(authz: AuthzService): GithubInstallApi | undefined {
     const auth = this.composedAuth?.compose();
     return composeApiGithubRest({
       github: this.composedGithub,

@@ -1,7 +1,7 @@
 /**
  * Every tRPC surface this package owns, mounted on one process's root.
  */
-import type { ApiTrpcFeatureMount } from "../api.application.ts";
+import type { ApiTrpcContext, ApiTrpcFeatureMount } from "../api.application.ts";
 import type { ApiTrpcInfrastructure } from "../platform/infrastructure/api-trpc.infrastructure.ts";
 import type { ComposedApiFeatures } from "./app-trpc.composed.ts";
 
@@ -16,7 +16,15 @@ import {
   createLicenseEnforcementTrpcRouter,
   createLicenseTrpcRouter,
 } from "../features/enterprise/licensing-trpc.mount.ts";
-import { createEnterpriseBillingTrpcRouters } from "../features/enterprise/enterprise-billing-trpc.mount.ts";
+import { bindTrpcFact } from "@langwatch/api/trpc";
+import {
+  billingCallerEmailFact,
+  currencyRequestHeadersFact,
+  currencyTrpcTransport,
+  subscriptionTrpcTransport,
+  type BillingSubscriptionApi,
+} from "@langwatch/enterprise-billing-server";
+import { HandledError } from "@langwatch/handled-error";
 import { createEnterpriseGovernanceTrpcRouters } from "../features/enterprise/enterprise-governance-trpc.mount.ts";
 import { composeGovernanceHomeTrpcRouter } from "../features/enterprise/governance-home.composition.ts";
 
@@ -57,10 +65,6 @@ export function createAppTrpcFeatures(options: {
   const authRouters = composed.auth.routers(mount);
   const userRouters = composed.user.routers(mount);
   const membershipRouters = composed.organization.routers(mount);
-  const billing = createEnterpriseBillingTrpcRouters({
-    ...mount,
-    saasBilling: infrastructure.saasBilling,
-  });
   // `personalDashboard` is not a namespace of its own: `user:` below merges
   // it into `user.*`, which is the name the /me page and the CLI call it by.
   const { personalDashboard } = governance;
@@ -167,12 +171,16 @@ export function createAppTrpcFeatures(options: {
       governance.governance,
       composeGovernanceHomeTrpcRouter({ mount, infrastructure }),
     ),
-    // The two Enterprise billing surfaces — one entry per namespace, straight
-    // off `createEnterpriseBillingTrpcRouters`. Both are mounted either way:
-    // `saasBilling` false serves the empty router of the same served type
-    // rather than dropping the namespace.
-    currency: billing.currency,
-    subscription: billing.subscription,
+    // The two Enterprise billing surfaces. Both are mounted on every
+    // deployment: the quoted currency is public reference data, and a
+    // deployment that composed no payment provider refuses `subscription.*` by
+    // name rather than dropping the namespace out from under its client.
+    currency: mount.runtime.mount(currencyTrpcTransport, (ctx) => ctx.app.billingCurrency, {
+      facts: [bindTrpcFact(currencyRequestHeadersFact, (ctx) => ctx.req?.headers ?? null)],
+    }),
+    subscription: mount.runtime.mount(subscriptionTrpcTransport, requireSaasBilling, {
+      facts: [bindTrpcFact(billingCallerEmailFact, (ctx) => ctx.session?.user.email ?? null)],
+    }),
     // One wire namespace assembled from two features, exactly as the client has always called it: the charted
     // reads at `analytics.*`, the workbench at `analytics.lwql`, and the DASHBOARD's saved charts at
     // `analytics.savedWorkbenchCharts`. Merged here rather than at either caller so the whole namespace is one
@@ -287,3 +295,35 @@ export function createAppTrpcFeatures(options: {
  * The record {@link createAppTrpcFeatures} returns, at THIS process's mount.
  */
 export type AppTrpcFeatureRecord = ReturnType<typeof createAppTrpcFeatures>;
+
+/**
+ * `subscription.*` on a deployment that composed no payment provider. The
+ * namespace is mounted either way, so a client's inferred types never depend on
+ * the deployment; every procedure then refuses by name instead of billing.
+ */
+class ApiBillingUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super("service_unavailable", "This deployment does not bill through a payment provider.", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ApiBillingUnavailableError";
+  }
+}
+
+/** The billing application, or the refusal a deployment without one answers. */
+function requireSaasBilling(ctx: ApiTrpcContext): BillingSubscriptionApi {
+  const subscription = ctx.app.billingSubscription;
+  if (subscription) return subscription;
+
+  return new Proxy({} as BillingSubscriptionApi, {
+    get:
+      () =>
+      (): never => {
+        throw new ApiBillingUnavailableError();
+      },
+    has: () => true,
+  });
+}

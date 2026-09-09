@@ -14,6 +14,11 @@ import type { AutomationApp } from "@langwatch/automation-server";
 import type { CodingAgentApp } from "@langwatch/coding-agent-server";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type {
+  BillingCurrencyApi,
+  BillingSubscriptionApi,
+  CurrencyRequest,
+} from "@langwatch/enterprise-billing-server";
+import type {
   EnterpriseTrpcContext,
   SsoApi,
   GovernanceApp,
@@ -90,6 +95,16 @@ export type ApiTrpcFeatureApplication = Readonly<{
    * every rollout gate the browser asks about.
    */
   featureFlag: FeatureFlagApi;
+  /**
+   * Which of the two currencies a reader's prices are quoted in. Composed
+   * everywhere: the rule reads headers and names no tenant.
+   */
+  billingCurrency: BillingCurrencyApi;
+  /**
+   * The paid plan an organization is on, and the checkout that changes it.
+   * Absent where this deployment composed no payment provider.
+   */
+  billingSubscription?: BillingSubscriptionApi | undefined;
   /**
    * The AI Gateway's one application, as all six core gateway surfaces reach it.
    */
@@ -247,9 +262,11 @@ export type ApiTrpcFeatureApplication = Readonly<{
   EnterpriseTrpcContext["app"];
 
 /**
- * The request member the two SaaS-only billing surfaces read.
+ * The request member the quoted-currency surface reads. The headers a CDN
+ * injected are the whole of what its answer is decided from, and they are the
+ * PROCESS's to hand over — a module cannot name the transport it arrived on.
  */
-export type ApiTrpcEnterpriseRequest = Pick<EnterpriseTrpcContext, "req">;
+export type ApiTrpcEnterpriseRequest = Readonly<{ req: CurrencyRequest | undefined }>;
 
 /**
  * The signed-in person, as the surfaces that render them read it.

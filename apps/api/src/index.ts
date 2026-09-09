@@ -211,7 +211,6 @@ export {
   workbenchStateSchema,
   workbenchVersionProbeResponseSchema,
 } from "@langwatch/experiment-server";
-export { createApiKeysRestApp } from "@langwatch/api-key-server";
 export {
   FILE_VIEW_PERMISSIONS,
   isPermissionDenial,
