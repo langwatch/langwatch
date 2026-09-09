@@ -22,9 +22,10 @@
  * `findX` / `runX` (see this module's repositories/ files).
  */
 
+import { ValidationError } from "@langwatch/handled-error";
 import { createHash } from "crypto";
 import { getLangWatchTracer } from "langwatch";
-import type { TimeseriesInputType } from "~/server/analytics/registry";
+import { getMetric, type TimeseriesInputType } from "~/server/analytics/registry";
 import type {
   AnalyticsBackend,
   FeedbacksResult,
@@ -110,6 +111,36 @@ export class AnalyticsService {
       "AnalyticsService.getTimeseries",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
+        // Reject a series whose aggregation its metric does not declare
+        // BEFORE any routing or repository call — a query builder has no
+        // way to refuse an aggregation, it just emits SQL for it, and
+        // ClickHouse is the only thing left to say no (see #8009: "sum" on
+        // evaluation_runs, a String column, crashes with a raw type error).
+        for (const series of input.series) {
+          const metric = getMetric(series.metric) as
+            | ReturnType<typeof getMetric>
+            | undefined;
+          if (!metric) {
+            throw new ValidationError(
+              `Metric "${series.metric}" is not defined in the analytics registry`,
+              { meta: { metric: series.metric } },
+            );
+          }
+          if (!metric.allowedAggregations.includes(series.aggregation)) {
+            throw new ValidationError(
+              `Metric "${series.metric}" does not support aggregation "${series.aggregation}" ` +
+                `(allowed: ${metric.allowedAggregations.join(", ")})`,
+              {
+                meta: {
+                  metric: series.metric,
+                  aggregation: series.aggregation,
+                  allowedAggregations: metric.allowedAggregations,
+                },
+              },
+            );
+          }
+        }
+
         const hash = createHash("sha256")
           // `options` is part of the cache identity, not a side channel: a
           // bounded read and an unbounded one are different questions, and a
