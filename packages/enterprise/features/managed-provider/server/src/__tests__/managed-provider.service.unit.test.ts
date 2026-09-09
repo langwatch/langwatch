@@ -39,6 +39,18 @@ class Projects extends ProjectService {
     return "org_1";
   }
 
+  updateSettings(): never {
+    throw new Error("Not used by this test");
+  }
+
+  regenerateLegacyProjectKey(): never {
+    throw new Error("Not used by this test");
+  }
+
+  requestTopicClustering(): never {
+    throw new Error("Not used by this test");
+  }
+
   tryGetIdentity(): never {
     throw new Error("Not used by this test");
   }

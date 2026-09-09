@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { featureApi } from "@langwatch/runtime-composition";
 
 export const MANAGED_PROVIDER_FEATURE_ID = "managed-provider" as const;
 
@@ -26,9 +27,19 @@ export type BuildManagedProviderParametersInput = {
   modelProvider: ManagedModelProvider;
 };
 
-export abstract class ManagedProviderService {
-  abstract isManagedProvider(input: { organizationId: string; provider: string }): boolean;
+export interface ManagedProviderApi {
+  isManagedProvider(input: { organizationId: string; provider: string }): boolean;
 
+  buildLitellmParameters(
+    input: BuildManagedProviderParametersInput,
+  ): Promise<Record<string, string>>;
+}
+
+export const ManagedProviderApi = featureApi<ManagedProviderApi>(MANAGED_PROVIDER_FEATURE_ID);
+
+/** Compatibility type for service-level tests and existing package callers. */
+export abstract class ManagedProviderService implements ManagedProviderApi {
+  abstract isManagedProvider(input: { organizationId: string; provider: string }): boolean;
   abstract buildLitellmParameters(
     input: BuildManagedProviderParametersInput,
   ): Promise<Record<string, string>>;

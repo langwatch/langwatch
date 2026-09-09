@@ -2,7 +2,7 @@ import {
   type BuildManagedProviderParametersInput,
   ManagedProviderService as ManagedProviderServiceContract,
 } from "@langwatch/enterprise-managed-provider-contract";
-import type { ProjectService } from "@langwatch/project-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { ManagedProviderConfigurationPort } from "../ports/managed-provider-configuration.port.ts";
 import type { ManagedProviderCredentialsPort } from "../ports/managed-provider-credentials.port.ts";
 
@@ -11,7 +11,7 @@ export class ManagedProviderService extends ManagedProviderServiceContract {
 
   private constructor(
     private readonly configuration: ManagedProviderConfigurationPort,
-    private readonly projects: ProjectService,
+    private readonly projects: ProjectApi,
     private readonly credentials: ManagedProviderCredentialsPort,
   ) {
     super();
@@ -19,7 +19,7 @@ export class ManagedProviderService extends ManagedProviderServiceContract {
 
   static create(options: {
     configuration: ManagedProviderConfigurationPort;
-    projects: ProjectService;
+    projects: ProjectApi;
     credentials: ManagedProviderCredentialsPort;
   }): ManagedProviderService {
     return new ManagedProviderService(options.configuration, options.projects, options.credentials);
