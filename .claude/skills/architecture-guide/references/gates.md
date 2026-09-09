@@ -13,6 +13,12 @@ pnpm --filter @langwatch/<pkg> test:integration           # only packages whose 
 pnpm --filter @langwatch/<pkg> typecheck                  # the package's own tsconfig
 ```
 
+A rename or repoint has its own ladder, `.claude/skills/module/references/remap.md`: grep
+every occurrence first, the package suites before and after, the package `typecheck`
+and the `typecheck` of every workspace package that depends on it
+(`pnpm --filter "...@langwatch/<pkg>" --filter "!@langwatch/platform-api" --filter "!@langwatch/worker" --filter "!@langwatch/ui" typecheck`),
+the lint count for the rule you serve, and a last grep that prints nothing. Paste each.
+
 Every workspace package declares `typecheck`, `test` and `test:unit`. Use the script, not
 `exec tsc -p tsconfig.json`: the script names the right project, and the bin shim queues a
 whole-tree `tsc` reached any other way. Package names: `@langwatch/<f>-contract`,

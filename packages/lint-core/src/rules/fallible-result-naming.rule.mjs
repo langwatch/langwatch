@@ -1,6 +1,9 @@
 import { defineRule } from "../define-rule.mjs";
 
-const FALLIBLE_RESULT_MODULE = /\.(?:api|app|service|port|repository|store)\.ts$/;
+// Every source file of a module answers the same way: a lookup that may find
+// nothing is `find*`, and nothing hedges with `try`. Tests and fixtures are
+// the only files outside the rule.
+const FALLIBLE_RESULT_MODULE = /^src\/(?!.*__tests__\/)(?!.*\.fixture\.ts$)(?!.*\.test\.ts$).*\.ts$/;
 
 function promiseTypeArgument(node) {
   if (node.type !== "TSTypeReference") return undefined;

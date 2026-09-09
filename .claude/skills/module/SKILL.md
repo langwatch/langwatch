@@ -28,6 +28,7 @@ the reference every task below copies.
 | Booting an already-built module's installer into a process, mounting a namespace/family, registering it in `apps/ui`/`apps/worker`/`apps/tasks` | `references/wire.md` |
 | Relocating code (a service, a screen, a test, a whole family) into its owning module | `references/move.md` |
 | Publishing one piece of a module's web package (a component, a store, a host provider) for a *different* module to mount | `references/web-surface.md` |
+| Renaming members, repointing imports at a moved export, deriving a web procedure map from a contract, or following an interface with a test double: no behaviour change, tool-proven | `references/remap.md` |
 
 A request often spans two: extending a module with a new REST route that nobody mounts
 yet is `extend.md` for the route and `wire.md` for the family. Say which reference covered
