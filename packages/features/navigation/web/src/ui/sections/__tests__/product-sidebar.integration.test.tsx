@@ -8,7 +8,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-let pendingAnnotationsCount: { data?: number } = {};
+let pendingAnnotationsCount: { data?: { count: number } } = {};
 let personalWorkspaceFeatures: { data?: Record<string, boolean> } = {};
 let usage: { data?: unknown } = {};
 
@@ -168,7 +168,7 @@ async function appendChildAndAwaitMutation(region: HTMLElement) {
 }
 
 beforeEach(() => {
-  pendingAnnotationsCount = { data: 0 };
+  pendingAnnotationsCount = { data: { count: 0 } };
   personalWorkspaceFeatures = { data: {} };
   usage = {
     data: {

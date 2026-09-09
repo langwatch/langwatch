@@ -81,7 +81,7 @@ export const MainMenuSections = function MainMenuSections({
       />
 
       <ObserveSection {...sectionProps} codingAgentLinks={codingAgentLinks} />
-      <TestSection {...sectionProps} pendingAnnotationCount={pendingItemsCount.data} />
+      <TestSection {...sectionProps} pendingAnnotationCount={pendingItemsCount.data?.count} />
       <BuildSection {...sectionProps} canSeeAutomations={host.hasPermission("triggers:view")} />
     </>
   );

@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
-    annotation: { getPendingItemsCount: { useQuery: () => ({ data: 0 }) } },
+    annotation: { getPendingItemsCount: { useQuery: () => ({ data: { count: 0 } }) } },
   },
 }));
 

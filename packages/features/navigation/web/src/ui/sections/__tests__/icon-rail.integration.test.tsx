@@ -19,7 +19,7 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
         }),
       },
     },
-    annotation: { getPendingItemsCount: { useQuery: () => ({ data: 0 }) } },
+    annotation: { getPendingItemsCount: { useQuery: () => ({ data: { count: 0 } }) } },
     personalWorkspaceFeatures: { get: { useQuery: () => ({ data: {} }) } },
     limits: { getUsage: { useQuery: () => ({ data: undefined }) } },
     ops: { getBadgeCounts: { useQuery: () => ({}) } },
