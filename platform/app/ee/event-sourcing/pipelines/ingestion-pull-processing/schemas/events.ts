@@ -127,6 +127,26 @@ export const ingestionPullRunFailedEventDataSchema = sourceEnvelope.extend({
   error: z.string(),
   errorCode: z.string(),
   retryable: z.boolean(),
+  /**
+   * How long the provider asked to be left alone, in milliseconds, when it
+   * said so. Read off the answer, never chosen by us.
+   *
+   * It rides on the run that received it so the wait outlives that run: the
+   * connection reads it back and holds every later attempt, including the
+   * replacement of an abandoned run, which is the whole point. Nullable for a
+   * provider that named no wait, and optional because the log is append-only
+   * and every failure written before this existed carries no such key.
+   */
+  retryAfterMs: z.number().nullable().optional(),
+  /**
+   * The run that took this one's place, when this run ended because it was
+   * replaced rather than because the provider refused it.
+   *
+   * Present only on an abandonment. Without it the history says a run stopped
+   * and cannot say what continued the work, which is the difference between a
+   * source that gave up and a source that is still reading.
+   */
+  replacedByRunId: z.string().optional(),
 });
 export type IngestionPullRunFailedEventData = z.infer<
   typeof ingestionPullRunFailedEventDataSchema

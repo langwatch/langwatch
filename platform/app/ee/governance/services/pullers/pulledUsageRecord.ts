@@ -20,7 +20,10 @@ import {
   PULLED_USAGE_COST_STATUS,
 } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/constants";
 import type { PulledUsageObservedEventData } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
-import { pricePulledUsage } from "@ee/event-sourcing/pipelines/pulled-usage-processing/services/pulled-usage-pricing.service";
+import {
+  type PulledUsageQuantities,
+  pricePulledUsage,
+} from "@ee/event-sourcing/pipelines/pulled-usage-processing/services/pulled-usage-pricing.service";
 import { z } from "zod";
 
 import { actorForPulledDay } from "../logic/pulledActorNaming";
@@ -162,6 +165,56 @@ function restatementKeyFor({
 }
 
 /**
+ * Prices one item on the basis its hint declares, or answers that it cannot.
+ *
+ * Two bases and one refusal. A computed item is priced from its model and its
+ * quantities. A provider-reported one is priced from the amount the provider
+ * actually reported — and null when there is no such amount anywhere, which is
+ * the refusal: an amountless provider-reported item is not a free item, it is
+ * one we hold no price for, and recording it at zero would put a confident
+ * wrong number into a total nothing later corrects.
+ *
+ * The reported amount has three homes, read in falling order of precision. The
+ * hint's own string is the exact one the adapter kept, so no digit is lost to
+ * the float `cost_usd` had to be to fit the canonical event shape. Then the
+ * event's billed amount, which arrived beside the currency that names it. Only
+ * last the dollar field, which since it became optional means DOLLARS or
+ * nothing, never a stand-in for an amount in another currency.
+ */
+function priceOnDeclaredBasis({
+  hint,
+  event,
+  model,
+  quantities,
+}: {
+  hint: z.infer<typeof pulledUsageHintSchema>;
+  event: NormalizedPullEvent;
+  model: string;
+  quantities: PulledUsageQuantities;
+}): ReturnType<typeof pricePulledUsage> | null {
+  if (hint.costBasis !== PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED) {
+    return pricePulledUsage({
+      basis: PULLED_USAGE_COST_BASIS.COMPUTED,
+      model,
+      quantities,
+    });
+  }
+
+  const reportedAmount =
+    hint.costUsd ?? event.cost_amount ?? event.cost_usd ?? null;
+  if (reportedAmount === null) return null;
+
+  return pricePulledUsage({
+    basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
+    costUsd: reportedAmount,
+    currencyCode: hint.currency ?? event.cost_currency,
+    costUsdBiller: hint.costUsdBiller,
+    // Present by the schema's own refinement on this branch.
+    costStatus: hint.costStatus!,
+  });
+}
+
+/**
  * Turns one adapter event into the record the `RecordPulledUsage` command
  * takes, or null when the event carries no usage to price.
  *
@@ -208,23 +261,12 @@ export function buildPulledUsageRecord({
   };
   const model = hint.model ?? event.target;
 
-  const priced =
-    hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED
-      ? pricePulledUsage({
-          basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
-          // The string when the adapter kept one, so no digit is lost to the
-          // float `cost_usd` had to be to fit the canonical event shape.
-          costUsd: hint.costUsd ?? event.cost_usd,
-          currencyCode: hint.currency,
-          costUsdBiller: hint.costUsdBiller,
-          // Present by the schema's own refinement on this branch.
-          costStatus: hint.costStatus!,
-        })
-      : pricePulledUsage({
-          basis: PULLED_USAGE_COST_BASIS.COMPUTED,
-          model,
-          quantities,
-        });
+  const priced = priceOnDeclaredBasis({ hint, event, model, quantities });
+
+  // A provider-reported item with no amount anywhere is not a free item, it is
+  // an item we hold no price for. Recording it at zero would put a confident
+  // wrong number in a total that nothing later corrects.
+  if (priced === null) return null;
 
   return {
     itemKey: event.source_event_id,

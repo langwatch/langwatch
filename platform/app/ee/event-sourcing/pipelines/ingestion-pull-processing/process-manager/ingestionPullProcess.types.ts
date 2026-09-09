@@ -23,6 +23,17 @@ export const ingestionPullRunIntentSchema = z.object({
   runId: z.string(),
   scheduledFor: z.number(),
   cursor: z.string().nullable(),
+  /**
+   * The run this one is replacing, when it starts by taking over from a run
+   * that outlived its allowance.
+   *
+   * Carried on the intent rather than recorded by the process, because only
+   * one of them may write: a process handler emits intents and the executor
+   * owns the commands. The executor knows both ids, so it can record the
+   * abandonment naming its replacement, which a separate intent could not do
+   * without inventing a second way for a run to end.
+   */
+  abandonedRunId: z.string().optional(),
 });
 export type IngestionPullRunIntent = z.infer<
   typeof ingestionPullRunIntentSchema
@@ -91,6 +102,19 @@ export interface IngestionPullProcessState {
     requestId: string;
     startedAt: number;
   } | null;
+  /**
+   * The instant this connection may ask its provider again, epoch ms, when a
+   * provider has asked it to wait.
+   *
+   * On the connection rather than on the run that was told, which is the
+   * whole correction: a run replaced mid-wait used to take the wait with it,
+   * and its replacement went straight back to a provider that had just said
+   * no. Held here, the wait outlives the attempt that received it.
+   *
+   * Absent on every state written before cooldowns existed, so readers treat
+   * absence as "no wait" — right for that history, where none was recorded.
+   */
+  cooldownUntil?: number | null;
 }
 
 /**
@@ -113,6 +137,26 @@ export const ingestionPullProcessEventViewSchema = z.object({
    * "no request" is right for that history — there were no requests to name.
    */
   requestId: z.string().nullable().default(null),
+  /**
+   * A length of time a provider asked for, in milliseconds — never a payload,
+   * and never a figure of ours. Defaulted to null for the same reason
+   * `requestId` is: events written before cooldowns existed carry no such key,
+   * and no key means no wait was named.
+   *
+   * Deliberately NOT validated as positive or bounded here. The view's job is
+   * to carry what the event said across the content boundary; deciding that a
+   * provider's answer is unreadable, or too long to honour, belongs to the one
+   * place that turns it into an instant, so there is one rule and not two.
+   *
+   * `catch` rather than a bare parse, and it is the whole scenario: this value
+   * originates in a provider's answer, and a strange one used to be handed
+   * straight to the part that works out the next run, which rejects what it
+   * cannot read. Evolve re-runs a committed event on every retry, so throwing
+   * here would poison the subscriber forever — one provider answering strangely
+   * would stop every scheduled connection, not the one it answered. Anything
+   * unreadable degrades to no wait at all.
+   */
+  retryAfterMs: z.number().nullable().catch(null),
 });
 export type IngestionPullProcessEventView = z.infer<
   typeof ingestionPullProcessEventViewSchema

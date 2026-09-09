@@ -1480,3 +1480,85 @@ describe("given a source reading a period of conversations", () => {
     });
   });
 });
+
+/**
+ * Which lines of the bill become recorded AI cost.
+ *
+ * Asserted HERE, at the step that decides, rather than against the parser or
+ * the event builder one layer down. `readAzureCostRows` records faithfully
+ * what Azure said and `azureCostEvents` promises exactly one event per day the
+ * reply named; a category filter inside either would falsify a stated
+ * contract, and inside the parser it would turn a reader into a policy engine.
+ *
+ * The recording step is reached directly, the same way the page walk above is.
+ * Driving a whole run would need a cursor and a write path, neither of which
+ * this is about, and both of which would hide the property behind their own
+ * failures.
+ */
+describe("given a subscription billing both AI services and unrelated infrastructure", () => {
+  interface CostRead {
+    readAzureCost(params: {
+      config: unknown;
+      options: unknown;
+      previous: {
+        pricedThroughDay: string | null;
+        heldSinceMs: number | null;
+        readAtMs: number | null;
+      };
+    }): Promise<{ events: Array<{ target: string }> }>;
+  }
+
+  /** A bill naming one AI line and one that is plainly not. */
+  function mixedBill() {
+    return {
+      properties: {
+        columns: [
+          { name: "UsageDate" },
+          { name: "Cost" },
+          { name: "CostUSD" },
+          { name: "Currency" },
+          { name: "MeterCategory" },
+        ],
+        rows: [
+          [20260115, 4.5, 4.5, "USD", "Foundry Models"],
+          [20260115, 99.0, 99.0, "USD", "Load Balancer"],
+        ],
+        nextLink: null,
+      },
+    };
+  }
+
+  describe("when the bill is read", () => {
+    /** @scenario "The cloud bill is asked only for the lines that carry AI spend" */
+    it("does not record an unrelated infrastructure line as AI cost", async () => {
+      const adapter = await newAdapter();
+      // The billing sign-in, then the bill itself.
+      responseQueue.push({ status: 200, body: { access_token: "token-xyz" } });
+      responseQueue.push({ status: 200, body: mixedBill() });
+
+      const read = await (adapter as unknown as CostRead).readAzureCost({
+        config: { ...CONFIG, azureSubscriptionId: "sub-1" },
+        options: {
+          cursor: null,
+          credentials: {
+            ...CREDENTIALS,
+            billingClientId: "billing-client-id",
+            billingClientSecret: "billing-client-secret",
+          },
+        },
+        // Never read before, so this run is due to ask.
+        previous: {
+          pricedThroughDay: null,
+          heldSinceMs: null,
+          readAtMs: null,
+        },
+      });
+
+      // Belt and braces on top of the request filter: Azure answered with a
+      // category outside the list, and it becomes no recorded cost at all.
+      expect(read.events.map((event) => event.target)).toEqual([
+        "Foundry Models",
+      ]);
+    });
+  });
+});

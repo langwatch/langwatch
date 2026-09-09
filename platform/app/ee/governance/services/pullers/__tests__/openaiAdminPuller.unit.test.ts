@@ -999,7 +999,10 @@ describe("given a provider that refuses to break a period down per key", () => {
         governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
-      expect(record?.costNanoUsd).toBeGreaterThan(0);
+      // The minor-units field, not the dollar-denominated one. That second
+      // field only ever holds the biller's own SEPARATE conversion, and
+      // OpenAI publishes none, so it is null on every provider-reported row.
+      expect(record?.costNanoMinor).toBeGreaterThan(0);
     });
 
     /**

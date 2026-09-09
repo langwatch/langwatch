@@ -528,6 +528,16 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
     let page = cursor.page;
     let watermark = cursor.watermark;
     let hasKeyGrouping = cursor.hasKeyGrouping;
+    /**
+     * Whether any page in THIS run came back without per-key attribution.
+     *
+     * The fallback itself is correct — the money survives it, undivided —
+     * but it left no trace, so a provider quietly widening what it refuses
+     * would cost every customer their attribution in silence. Read off this
+     * run's own pages rather than off the cursor: a window already being read
+     * undivided is not this run's news to report.
+     */
+    let lostKeyAttribution = false;
 
     /**
      * What an unfinished run persists as its resume point. With a page token
@@ -552,6 +562,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
             keyGroupingUpgrade: false,
           }),
           errorCount: 0,
+          ...runNotices(lostKeyAttribution),
         };
       }
 
@@ -567,6 +578,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         return { events, cursor: options.cursor, errorCount: 1 };
       }
       events.push(...read.events);
+      if (!read.hasKeyGrouping) lostKeyAttribution = true;
       hasKeyGrouping = read.hasKeyGrouping;
       watermark = laterOf(watermark, read.watermark);
 
@@ -582,6 +594,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
             }),
           ),
           errorCount: 0,
+          ...runNotices(lostKeyAttribution),
         };
       }
       page = read.nextPage;
@@ -602,6 +615,7 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
         keyGroupingUpgrade: false,
       }),
       errorCount: 0,
+      ...runNotices(lostKeyAttribution),
     };
   }
 
@@ -965,6 +979,30 @@ function drainCursor({
     hasKeyGrouping: true,
     keyGroupingUpgrade: !hasKeyGrouping,
   };
+}
+
+/**
+ * The run continued without per-key attribution, and said so.
+ *
+ * A code rather than a sentence: it is read by a source-health surface that
+ * owns its own wording, and it has to survive a trip through storage. A log
+ * line was the alternative and is not one — a reader looking at the source
+ * cannot be shown a log.
+ */
+export const PER_KEY_ATTRIBUTION_UNAVAILABLE =
+  "per_key_attribution_unavailable" as const;
+
+/**
+ * The notices field, or nothing at all.
+ *
+ * Absent rather than empty on a clean run, so a reader never has to tell an
+ * adapter that reported no notices from one that reports none because it does
+ * not know how.
+ */
+function runNotices(lostKeyAttribution: boolean): { notices?: string[] } {
+  return lostKeyAttribution
+    ? { notices: [PER_KEY_ATTRIBUTION_UNAVAILABLE] }
+    : {};
 }
 
 /** The later of two ISO instants, tolerating nulls and unparseable input. */

@@ -157,10 +157,16 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
         targetName: "gpt-5-mini",
       });
       expect(ensureGovProject).toHaveBeenCalledWith(expect.anything(), "org-1");
+      // Exact equality on purpose, and it stays exact. On a run outcome this
+      // is a guard against fields nobody meant to add: it is what fails the
+      // day something personal starts riding along to a sink. A new field is
+      // written down here deliberately or it does not travel.
       expect(outcome).toEqual({
         nextCursor: null,
         eventCount: 2,
         errorCount: 0,
+        completeness: "complete",
+        readThroughAt: expect.any(Date),
       });
       expect(sourceUpdate).not.toHaveBeenCalled();
     });

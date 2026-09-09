@@ -41,8 +41,13 @@
 
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
+import {
+  DispatchError,
+  parseRetryAfterMs,
+} from "~/server/event-sourcing/queues/dispatchError";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import {
+  AZURE_AI_METER_CATEGORIES,
   AZURE_COST_API_VERSION,
   AZURE_MANAGEMENT_HOST,
   azureCostEvents,
@@ -316,6 +321,12 @@ const storedCursorSchema = z.object({
   costHeldSinceMs: z.number().int().nonnegative().nullish(),
   /** When a run last asked Cost Management anything, however it answered. */
   costReadAtMs: z.number().int().nonnegative().nullish(),
+  /**
+   * The day the last month-deep cost read finished on. Absent on every
+   * position written before deep reads existed, which reads as never — so the
+   * first run after this ships goes a month back once, and then daily.
+   */
+  costDeepReadDay: z.string().nullish(),
   /** The last day the seat licences were reported for, `YYYY-MM-DD`. */
   seatsReportedThroughDay: z
     .string()
@@ -339,6 +350,8 @@ interface StoredCursor {
     pricedThroughDay: string | null;
     heldSinceMs: number | null;
     readAtMs: number | null;
+    /** The day the last deep read finished, or null if none ever has. */
+    deepReadDay: string | null;
   };
   seats: { reportedThroughDay: string | null; heldSinceMs: number | null };
   directory: { reportedThroughDay: string | null; heldSinceMs: number | null };
@@ -346,7 +359,12 @@ interface StoredCursor {
 
 const NO_CURSOR: StoredCursor = {
   transcript: null,
-  cost: { pricedThroughDay: null, heldSinceMs: null, readAtMs: null },
+  cost: {
+    pricedThroughDay: null,
+    heldSinceMs: null,
+    readAtMs: null,
+    deepReadDay: null,
+  },
   seats: { reportedThroughDay: null, heldSinceMs: null },
   directory: { reportedThroughDay: null, heldSinceMs: null },
 };
@@ -362,6 +380,7 @@ function sectionsOf(
       // Absent on every position written before the ask was recorded, which
       // reads as never asked and so asks at once.
       readAtMs: data.costReadAtMs ?? null,
+      deepReadDay: data.costDeepReadDay ?? null,
     },
     seats: {
       reportedThroughDay: data.seatsReportedThroughDay ?? null,
@@ -527,7 +546,10 @@ function positionMoved({
     // asked and found the same figure moves neither of the two above, and
     // dropping the record of the ask would leave the source due again on the
     // very next run.
-    next.cost.readAtMs !== previous.cost.readAtMs;
+    next.cost.readAtMs !== previous.cost.readAtMs ||
+    // A run that completed the month is movement even when it priced the same
+    // days: without this the day is never saved and every run goes deep.
+    next.cost.deepReadDay !== previous.cost.deepReadDay;
   const seatsMoved =
     next.seats.reportedThroughDay !== previous.seats.reportedThroughDay ||
     next.seats.heldSinceMs !== previous.seats.heldSinceMs;
@@ -545,6 +567,7 @@ function encodeCursor(cursor: StoredCursor): string {
     costPricedThroughDay: cursor.cost.pricedThroughDay,
     costHeldSinceMs: cursor.cost.heldSinceMs,
     costReadAtMs: cursor.cost.readAtMs,
+    costDeepReadDay: cursor.cost.deepReadDay,
     seatsReportedThroughDay: cursor.seats.reportedThroughDay,
     seatsHeldSinceMs: cursor.seats.heldSinceMs,
     directoryReportedThroughDay: cursor.directory.reportedThroughDay,
@@ -1086,6 +1109,7 @@ export class CopilotStudioDataversePuller
       pricedThroughDay: string | null;
       heldSinceMs: number | null;
       readAtMs: number | null;
+      deepReadDay: string | null;
     };
   }): Promise<{
     events: NormalizedPullEvent[];
@@ -1093,6 +1117,7 @@ export class CopilotStudioDataversePuller
       pricedThroughDay: string | null;
       heldSinceMs: number | null;
       readAtMs: number | null;
+      deepReadDay: string | null;
     };
   }> {
     const { config, options, previous } = params;
@@ -1123,7 +1148,13 @@ export class CopilotStudioDataversePuller
     }
     const held = () => ({
       events: [],
-      cost: nextAzureCostCursor({ nowMs, previous, outcome: "held" as const }),
+      cost: {
+        ...nextAzureCostCursor({ nowMs, previous, outcome: "held" as const }),
+        // A deep read that broke off wrote no day, so the day already held
+        // carries forward unchanged and the next run of this day still owes
+        // the month. That is the whole of "tried again on the next run".
+        deepReadDay: previous.deepReadDay,
+      },
     });
 
     try {
@@ -1143,6 +1174,7 @@ export class CopilotStudioDataversePuller
       const window = azureCostReadWindow({
         nowMs,
         pricedThroughDay: previous.pricedThroughDay,
+        deepReadDay: previous.deepReadDay,
       });
       const days = await this.fetchAzureCostPages({
         subscriptionId,
@@ -1152,9 +1184,39 @@ export class CopilotStudioDataversePuller
       });
       if (days === null) return held();
 
+      // Belt and braces over the request-side category filter, and it belongs
+      // HERE rather than one layer down. `azureCostEvents` promises in its own
+      // doc comment exactly one event per day the reply actually named, and
+      // `readAzureCostRows` promises a faithful record of what Azure said;
+      // dropping rows inside either falsifies a stated contract, and dropping
+      // them inside the parser is what turns a reader into a policy engine.
+      //
+      // This is the step that decides what BECOMES recorded cost, so the
+      // guard's whole intent survives: if Azure ignores the category filter on
+      // the request, the load balancer still never lands in anyone's AI spend.
+      // The ask and the answer are separate trust boundaries and each needs
+      // its own filter.
+      const aiDays = days.filter((day) =>
+        AZURE_AI_METER_CATEGORIES.some(
+          (category) => category === day.meterCategory,
+        ),
+      );
+
+      const priced = nextAzureCostCursor({
+        nowMs,
+        previous,
+        outcome: "priced",
+        wasDeepRead: window.deep,
+      });
       return {
-        events: azureCostEvents({ days, subscriptionId }),
-        cost: nextAzureCostCursor({ nowMs, previous, outcome: "priced" }),
+        events: azureCostEvents({ days: aiDays, subscriptionId }),
+        cost: {
+          ...priced,
+          // Merged rather than carried through the advance, which says only
+          // what THIS run established. An ordinary run establishes no deep
+          // read and keeps the day already held.
+          deepReadDay: priced.deepReadDay ?? previous.deepReadDay,
+        },
       };
     } catch (error) {
       logger.warn(
@@ -1712,7 +1774,21 @@ export class CopilotStudioDataversePuller
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const response = await ssrfSafeFetch(url, {
       method: "GET",
-      headers: dataverseHeaders(token),
+      headers: {
+        ...dataverseHeaders(token),
+        // Dataverse's own way of being asked for a page size. `$top` alone
+        // names a row count without stating it as a preference, and this
+        // provider stays free to answer with its own far larger page — so the
+        // cap on how many pages one run may take was bounding a much bigger
+        // read than intended.
+        //
+        // At the CALL SITE rather than inside `dataverseHeaders`, which is
+        // shared with a listing walk that pages differently. A page-size
+        // preference baked into the shared builder would silently apply to
+        // that walk too. It is written off `PAGE_SIZE`, the same constant the
+        // query's `$top` is built from, so the two cannot disagree.
+        Prefer: `odata.maxpagesize=${PAGE_SIZE}`,
+      },
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       // The header above carries the token minted from the customer's secret.
       // The helper follows up to ten redirects by default and re-sends
@@ -1720,6 +1796,20 @@ export class CopilotStudioDataversePuller
       followRedirects: false,
     });
 
+    if (response.status === 429) {
+      // The page walk stops here rather than asking for the next page. Both
+      // halves matter: one more request at a provider that has just asked for
+      // silence is the thing being paid for, and the wait it named is the
+      // thing that used to be dropped on the way out. Draining the body is
+      // housekeeping for the connection pool and must never replace the throw.
+      await response.body?.cancel().catch(() => void 0);
+      throw new DispatchError({
+        message:
+          "copilot studio dataverse puller: the environment asked for fewer requests (HTTP 429)",
+        retryable: true,
+        retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
+      });
+    }
     if (!response.ok) {
       throw new Error(
         `copilot studio dataverse puller: the environment refused the read (HTTP ${response.status})`,

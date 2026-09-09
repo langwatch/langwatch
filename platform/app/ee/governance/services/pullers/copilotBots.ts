@@ -37,12 +37,29 @@ import {
 const REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * How many agents one read will name. A tenant holds tens of them, not
- * thousands, so this is a ceiling rather than a page size and neither caller
- * follows a second page — the walk says so in the log, and the listing reports
- * what it read, because a truncated list of real agents beats a refusal.
+ * How many agents one read will name, across every page it follows.
+ *
+ * A ceiling on the whole walk rather than on one answer. It used to be both,
+ * because the read stopped at the first page: a tenant holding more agents
+ * than one page returns had the rest silently missing, and every one of them
+ * showed its provider identifier wherever a name was expected.
  */
 export const MAX_BOTS = 500;
+
+/**
+ * The page size this read asks for, stated as a preference the provider
+ * honours rather than a row count it is free to reinterpret.
+ */
+export const BOT_PAGE_SIZE = 100;
+
+/**
+ * How many pages one walk will follow before it stops and reports what it has.
+ *
+ * A bound on a link the provider controls. `MAX_BOTS` already stops a healthy
+ * tenant long before this; this stops a provider handing back a next-page link
+ * that never resolves to a last page.
+ */
+const MAX_BOT_PAGES = 20;
 
 /**
  * One row of the `bot` table, read once per run to put a name on each
@@ -109,38 +126,91 @@ export type CopilotBotsRead =
     }
   | { ok: false; refusal: AgentListingRefusal };
 
+/**
+ * Reads the bot table, following as many pages as the caller has use for.
+ *
+ * ONE walk with a bound, rather than a paging read beside a single-page one.
+ * The two callers genuinely differ and the difference is already written down
+ * in this file: the transcript walk wants names for the conversations it is
+ * about to map, where a truncated list of real agents beats a refusal and a
+ * second request buys almost nothing; the agent listing is the list itself,
+ * and an agent missing from it shows its provider identifier wherever a name
+ * belongs. Encoding that as a page bound keeps one implementation and lets
+ * each caller state what it needs.
+ */
+async function readBotPages(params: {
+  environmentUrl: string;
+  token: string;
+  signal?: AbortSignal;
+  maxPages: number;
+}): Promise<CopilotBotsRead> {
+  const { environmentUrl, token, signal, maxPages } = params;
+  const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${DATAVERSE_API_VERSION}/bots`;
+  const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
+
+  const rows: unknown[] = [];
+  // The provider's own link, followed verbatim. It carries the paging token
+  // and the original query, so rebuilding it here would be a second place for
+  // the two to disagree.
+  let next: string | null = `${base}?${query}`;
+  let pages = 0;
+
+  try {
+    while (next !== null && pages < maxPages && rows.length < MAX_BOTS) {
+      pages += 1;
+      const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+      const response = await ssrfSafeFetch(next, {
+        method: "GET",
+        headers: {
+          ...dataverseHeaders(token),
+          // Stated as a preference because this provider is free to answer a
+          // bare row count with a page of its own choosing, which would make
+          // the page bound above bound a much bigger read than intended.
+          Prefer: `odata.maxpagesize=${BOT_PAGE_SIZE}`,
+        },
+        signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+        // Same reasoning as the transcript read: this request carries the
+        // token, and a redirect would hand it to whoever answers.
+        followRedirects: false,
+      });
+
+      if (!response.ok) {
+        // A page that refuses mid-walk refuses the whole read. Returning the
+        // pages already in hand would report a partial list as a complete one,
+        // and the agents missing from it are exactly the ones that then show
+        // an identifier where a name belongs.
+        return { ok: false, refusal: refusalFromStatus(response.status) };
+      }
+      const page = odataPageSchema.parse(await response.json());
+      rows.push(...page.value);
+      next = page["@odata.nextLink"] ?? null;
+    }
+
+    return {
+      ok: true,
+      rows: rows.slice(0, MAX_BOTS),
+      // True when the walk stopped with the provider still offering more, or
+      // when one of this function's own bounds cut it short.
+      hasMorePages: next !== null || rows.length > MAX_BOTS,
+    };
+  } catch (error) {
+    return { ok: false, refusal: refusalFromThrown(error) };
+  }
+}
+
+/**
+ * The names the transcript walk needs, from one request.
+ *
+ * Deliberately one page. This read exists to put a name on the conversations
+ * a run is about to map, and a name it does not have costs that conversation
+ * a label, not the run. `hasMorePages` is how it says so.
+ */
 export async function readCopilotBots(params: {
   environmentUrl: string;
   token: string;
   signal?: AbortSignal;
 }): Promise<CopilotBotsRead> {
-  const { environmentUrl, token, signal } = params;
-  const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${DATAVERSE_API_VERSION}/bots`;
-  const query = `$select=${encodeURIComponent("botid,name,modifiedon")}&$top=${MAX_BOTS}`;
-  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-
-  try {
-    const response = await ssrfSafeFetch(`${base}?${query}`, {
-      method: "GET",
-      headers: dataverseHeaders(token),
-      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-      // Same reasoning as the transcript read: this request carries the
-      // token, and a redirect would hand it to whoever answers.
-      followRedirects: false,
-    });
-
-    if (!response.ok) {
-      return { ok: false, refusal: refusalFromStatus(response.status) };
-    }
-    const page = odataPageSchema.parse(await response.json());
-    return {
-      ok: true,
-      rows: page.value,
-      hasMorePages: Boolean(page["@odata.nextLink"]),
-    };
-  } catch (error) {
-    return { ok: false, refusal: refusalFromThrown(error) };
-  }
+  return await readBotPages({ ...params, maxPages: 1 });
 }
 
 /** Copilot Studio bots as `DiscoveredAgent` rows. */
@@ -184,7 +254,11 @@ export async function listCopilotAgents(params: {
   token: string;
   signal?: AbortSignal;
 }): Promise<AgentListing> {
-  const read = await readCopilotBots(params);
+  // Follows the provider's next-page link, unlike the transcript walk above.
+  // This IS the list: an agent it stops short of is not a missing label on one
+  // conversation, it is an agent that shows its provider identifier everywhere
+  // a name is expected.
+  const read = await readBotPages({ ...params, maxPages: MAX_BOT_PAGES });
   if (!read.ok) return agentsRefused(read.refusal);
   return agentsListed(
     copilotBotsAsAgents({

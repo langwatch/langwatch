@@ -312,6 +312,90 @@ describe("reading an Azure Cost Management daily reply", () => {
     });
   });
 
+  /**
+   * Spec: specs/governance/pulled-usage-cost-reporting.feature
+   *
+   * A month of corrections has to be picked up eventually, and reading a month
+   * on every run multiplies this connection's traffic by its cadence. The day
+   * of the last finished deep read rides in the connection's own cursor, so
+   * nothing new is scheduled to make this happen.
+   */
+  describe("the once-a-day reach back over a month", () => {
+    const NOW = Date.parse("2026-08-30T09:00:00.000Z");
+
+    /** @scenario "Once a day the cost read reaches a month back" */
+    it("looks a month back when the last deep read was on an earlier day", () => {
+      const window = azureCostReadWindow({
+        nowMs: NOW,
+        pricedThroughDay: "2026-08-29",
+        deepReadDay: "2026-08-29",
+      });
+
+      expect(window.fromDay).toBe("2026-08-01");
+      expect(window.deep).toBe(true);
+    });
+
+    /** @scenario "Once a day the cost read reaches a month back" */
+    it("keeps to a few days on the runs that follow it the same day", () => {
+      const window = azureCostReadWindow({
+        nowMs: NOW,
+        pricedThroughDay: "2026-08-29",
+        deepReadDay: "2026-08-30",
+      });
+
+      expect(window.fromDay).toBe("2026-08-24");
+      expect(window.deep).toBe(false);
+    });
+
+    /** @scenario "Once a day the cost read reaches a month back" */
+    it("records the day only once the deep read has finished", () => {
+      const priced = nextAzureCostCursor({
+        nowMs: NOW,
+        previous: { pricedThroughDay: "2026-08-29", heldSinceMs: null },
+        outcome: "priced",
+        wasDeepRead: true,
+      });
+
+      expect(priced.deepReadDay).toBe("2026-08-30");
+    });
+
+    /** @scenario "Once a day the cost read reaches a month back" */
+    it("records no day for a deep read that broke off, so the next run tries again", () => {
+      const heldRun = nextAzureCostCursor({
+        nowMs: NOW,
+        previous: { pricedThroughDay: "2026-08-29", heldSinceMs: null },
+        outcome: "held",
+        wasDeepRead: true,
+      });
+
+      // Absent, so the caller's merge keeps whatever day it already held and
+      // the next run of this day still sees the month as owed.
+      expect(heldRun.deepReadDay).toBeUndefined();
+    });
+
+    it("records no day for an ordinary run that priced its week", () => {
+      const priced = nextAzureCostCursor({
+        nowMs: NOW,
+        previous: { pricedThroughDay: "2026-08-29", heldSinceMs: null },
+        outcome: "priced",
+      });
+
+      expect(priced.deepReadDay).toBeUndefined();
+    });
+
+    it("leaves a caller that does not track deep reads on its trailing window", () => {
+      // Omitted is not "never done one": a function that widened every
+      // existing caller's ask by a month would be deciding that for them.
+      const window = azureCostReadWindow({
+        nowMs: NOW,
+        pricedThroughDay: "2026-08-29",
+      });
+
+      expect(window.deep).toBe(false);
+      expect(window.fromDay).toBe("2026-08-24");
+    });
+  });
+
   describe("the request a run sends", () => {
     /** @scenario "The daily bill is read as the currency the customer is billed in" */
     it("asks for both the billed amount and Microsoft's own dollar figure", () => {
@@ -443,8 +527,17 @@ describe("given a subscription billing both AI services and unrelated infrastruc
       }
     });
 
-    /** @scenario "The cloud bill is asked only for the lines that carry AI spend" */
-    it("does not record an unrelated infrastructure line as AI cost", () => {
+    /**
+     * The far side of the guard, and the reason it does not live here.
+     *
+     * The reader's one job is to record faithfully what Azure said, so a
+     * category outside the list is still a row it read: reported, and not
+     * counted as unreadable. Dropping it is a policy decision, and it is made
+     * one layer up at the call site that decides what becomes recorded cost —
+     * see `copilotStudioDataversePuller.unit.test.ts`, which binds the
+     * scenario's recording half.
+     */
+    it("reports a category outside the list rather than failing to read it", () => {
       const read = readAzureCostRows({
         response: replyOf({
           columns: [
@@ -461,11 +554,9 @@ describe("given a subscription billing both AI services and unrelated infrastruc
         }),
       });
 
-      // Belt and braces on top of the request filter: a category outside the
-      // list is not a row anything failed to read, so it is dropped without
-      // being counted as unreadable.
       expect(read.days.map((day) => day.meterCategory)).toEqual([
         "Foundry Models",
+        "Load Balancer",
       ]);
       expect(read.unreadableRows).toBe(0);
     });

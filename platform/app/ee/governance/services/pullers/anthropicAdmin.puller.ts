@@ -273,7 +273,12 @@ function parseCursor({
   const fresh = config.startingAt ?? defaultStartingAt(config.report);
   // No look-back on a first run: there is nothing behind the configured start
   // to look back at, and the floor would return this same instant anyway.
-  return { startingAt: fresh, requestStart: fresh, page: null, watermark: null };
+  return {
+    startingAt: fresh,
+    requestStart: fresh,
+    page: null,
+    watermark: null,
+  };
 }
 
 /**
@@ -843,7 +848,20 @@ export class AnthropicAdminPuller
     // that record is what lets a later identity mismatch resume near the
     // token instead of re-reading the window (see `cursorSchema`).
     const cursor = parseCursor({ cursor: options.cursor, config });
-    const startingAt = cursor.startingAt;
+    /**
+     * The instant this run ASKS from, which on a cost source is a few days
+     * behind the position on record so a late restatement is picked up.
+     *
+     * The look-back was being computed and then thrown away: every request
+     * went out at `cursor.startingAt`, so the repair window existed on paper
+     * and never once reached the provider.
+     */
+    const requestStart = cursor.requestStart;
+    /**
+     * The position ON RECORD — how far the source has actually got. The floor
+     * the saved cursor may never drop below, and NOT what this run asks from.
+     */
+    const positionOnRecord = cursor.startingAt;
     const query = queryIdentity(config);
     let page = cursor.page;
     let watermark = cursor.watermark;
@@ -869,12 +887,25 @@ export class AnthropicAdminPuller
         // so a deadline costs latency rather than a window.
         return {
           events,
-          cursor: encodeCursor({ startingAt, page, query, watermark }),
+          // The window start actually asked with, so the page token this run
+          // leaves behind is resumed against the same `starting_at` that
+          // minted it.
+          cursor: encodeCursor({
+            startingAt: requestStart,
+            page,
+            query,
+            watermark,
+          }),
           errorCount: 0,
         };
       }
 
-      const read = await this.readPage({ config, startingAt, page, options });
+      const read = await this.readPage({
+        config,
+        startingAt: requestStart,
+        page,
+        options,
+      });
       if (!read.ok) {
         // The unadvanced cursor is what makes the window get retried instead
         // of skipped. Never return a partial window as if it were complete.
@@ -892,7 +923,16 @@ export class AnthropicAdminPuller
         return {
           events,
           cursor: encodeCursor({
-            startingAt: newestEmitted ?? startingAt,
+            // Floored at the position on record. Without this floor a run
+            // that looked back and found nothing newer saves the day it
+            // looked back TO, and the source walks three days backwards on
+            // every run until it reaches the day it was first connected —
+            // re-reading and re-emitting the whole history on the way. An
+            // empty window, a credit, and a workspace somebody deleted all
+            // produce exactly that page. This is the floor the sibling
+            // connection already applies at its own drain.
+            startingAt:
+              laterInstant(newestEmitted, positionOnRecord) ?? positionOnRecord,
             page: null,
             query,
             watermark: null,
@@ -909,7 +949,14 @@ export class AnthropicAdminPuller
     );
     return {
       events,
-      cursor: encodeCursor({ startingAt, page, query, watermark }),
+      // As above: the start this run asked with, not the position on record,
+      // so the unfinished window resumes where its page token points.
+      cursor: encodeCursor({
+        startingAt: requestStart,
+        page,
+        query,
+        watermark,
+      }),
       errorCount: 0,
     };
   }

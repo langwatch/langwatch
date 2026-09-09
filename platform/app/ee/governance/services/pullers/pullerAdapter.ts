@@ -48,24 +48,21 @@ import { z } from "zod";
 const COST_USD_PATTERN = /^[+-]?\d*(?:\.\d*)?(?:[eE][+-]?\d+)?$/;
 
 /** Validates and stringifies a cost_usd value at the Zod boundary. */
-const costUsdSchema = z
-  .union([z.string(), z.number()])
-  .transform((v) => {
-    const s = String(v).trim();
-    if (s === "" || s === "0" || s === "0.0") return "0";
-    if (!COST_USD_PATTERN.test(s)) return "0";
-    // Finite, and nothing more. A negative figure is REAL money: a provider
-    // that refunds a day serves the credit in the same field a charge arrives
-    // in, and clamping it to zero would leave the charge it reverses standing
-    // on its own — the customer reads as having spent money they got back.
-    // The pattern above already permits the sign; this only rejects values
-    // that are not numbers at all, including the lone "-" and anything that
-    // overflows.
-    const n = Number(s);
-    if (!Number.isFinite(n)) return "0";
-    return s;
-  })
-  .default("0");
+const costUsdSchema = z.union([z.string(), z.number()]).transform((v) => {
+  const s = String(v).trim();
+  if (s === "" || s === "0" || s === "0.0") return "0";
+  if (!COST_USD_PATTERN.test(s)) return "0";
+  // Finite, and nothing more. A negative figure is REAL money: a provider
+  // that refunds a day serves the credit in the same field a charge arrives
+  // in, and clamping it to zero would leave the charge it reverses standing
+  // on its own — the customer reads as having spent money they got back.
+  // The pattern above already permits the sign; this only rejects values
+  // that are not numbers at all, including the lone "-" and anything that
+  // overflows.
+  const n = Number(s);
+  if (!Number.isFinite(n)) return "0";
+  return s;
+});
 
 /**
  * Canonical event shape produced by every adapter. Downstream code
@@ -91,10 +88,26 @@ export const normalizedPullEventSchema = z.object({
    *  figure, and it is carried rather than clamped. Validated against
    *  DECIMAL_PATTERN and checked finite at the parse boundary.
    *
-   *  Named `_usd` for the sources that predate currencies and is still the
-   *  provider's own currency; which currency that is travels on the
-   *  `pulled_usage` hint (`pulledUsageRecord.ts`), never here. */
-  cost_usd: costUsdSchema,
+   *  Named `_usd` for the sources that predate currencies, so it may only ever
+   *  hold DOLLARS. OPTIONAL, and absent is the honest answer for a day billed
+   *  in another currency that nobody converted: a "0" there would assert both
+   *  that the provider published a dollar figure and that the figure was
+   *  nothing, and it would land in a total as a real, wrong zero. There was a
+   *  `.default("0")` here that re-filled exactly that zero on any re-parse,
+   *  which is why absence had to be made real at the schema and not only at
+   *  the emitter. The amount in its own currency travels beside this, in
+   *  `cost_amount` / `cost_currency`. */
+  cost_usd: costUsdSchema.optional(),
+  /**
+   * The amount as the provider billed it, in the currency named beside it.
+   *
+   * Added because `cost_usd` can only honestly hold dollars, and a euro day
+   * still has to leave. Both fields travel together or neither does: an amount
+   * with no currency is the same guess this pair exists to remove.
+   */
+  cost_amount: z.string().optional(),
+  /** ISO 4217 code for `cost_amount`. Meaningless without it. */
+  cost_currency: z.string().optional(),
   /** Input tokens (0 if unknown). */
   tokens_input: z.number().nonnegative().int().default(0),
   /** Output tokens (0 if unknown). */
@@ -182,6 +195,37 @@ export interface PullResult {
    * with an unchanged cursor it fails the run.
    */
   errorCount: number;
+  /**
+   * Whether this run reached the end of what it set out to read.
+   *
+   * `"truncated"` means the run stopped at a limit — a page budget, a file
+   * count, a deadline — with more waiting. It is NOT a failure: the money and
+   * the events already gathered are kept, and `cursor` still advances over
+   * them. It exists because a run that stopped early and a run that drained
+   * the source currently leave through the same exit, so a source stuck
+   * half-read is indistinguishable from a source that is simply quiet.
+   *
+   * Optional: an adapter that says nothing is read as `"complete"`, which is
+   * what every adapter meant before the field existed.
+   */
+  completeness?: "complete" | "truncated";
+  /**
+   * The instant this run is known to have read up to, ISO 8601.
+   *
+   * Distinct from the instant the run finished, and that distinction is the
+   * whole point: the run clock advances on every attempt, so a source stuck
+   * re-reading the same half would look like progress. This value does not
+   * move until the read does.
+   */
+  readThroughAt?: string;
+  /**
+   * Stable codes for things the run continued through rather than failed on.
+   *
+   * A degradation a reader of the source needs to know about — "the money is
+   * here but nobody is attributed to it" — has to survive as data. A log line
+   * cannot be shown to someone looking at the source.
+   */
+  notices?: string[];
 }
 
 /**

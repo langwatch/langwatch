@@ -20,6 +20,10 @@ import { createLogger } from "@langwatch/observability";
 import { JSONPath } from "jsonpath-plus";
 import type { Response as FetchResponse } from "undici";
 import { z } from "zod";
+import {
+  DispatchError,
+  parseRetryAfterMs,
+} from "~/server/event-sourcing/queues/dispatchError";
 import { RedirectRefusedError, ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 import type {
@@ -88,6 +92,63 @@ const httpPollingConfigSchema = z.object({
 
 export type HttpPollingConfig = z.infer<typeof httpPollingConfigSchema>;
 
+/**
+ * Ends the request when the provider has asked for fewer of them, carrying the
+ * wait it named.
+ *
+ * A 429 used to fall into the generic 4xx branch and throw a plain Error. That
+ * ended the run correctly and dropped the one number saying when it is safe to
+ * come back, so the next run walked into the window this one was refused in.
+ * Returns for every other answer, including the ones that do retry.
+ */
+async function refuseIfRateLimited({
+  response,
+  url,
+}: {
+  response: FetchResponse;
+  url: string;
+}): Promise<void> {
+  if (response.status !== 429) return;
+  // Housekeeping so undici can pool the connection. It must never become the
+  // error that leaves this branch: an unguarded reject would propagate instead
+  // of the DispatchError, and a plain Error carries no wait.
+  await response.body?.cancel().catch(() => void 0);
+  throw new DispatchError({
+    message: `HTTP 429 ${response.statusText} (${url})`,
+    retryable: true,
+    retryAfterMs: parseRetryAfterMs(response.headers.get("retry-after")),
+  });
+}
+
+/**
+ * Lets a provider asking for silence out of the run, and lets every other
+ * failure fall through to be absorbed into an error count.
+ *
+ * The distinction is the whole point. An error count is a number on a screen;
+ * a wait is an instruction, and absorbing it strands it inside a run that then
+ * reports success, so the next run walks back into the window this one was
+ * refused in. Leaving by the error path is the only way it reaches the
+ * connection that has to honour it.
+ */
+function rethrowIfRateLimited({
+  error,
+  adapter,
+  url,
+}: {
+  error: unknown;
+  adapter: string;
+  url: string;
+}): void {
+  if (!(error instanceof DispatchError) || error.retryAfterMs === undefined) {
+    return;
+  }
+  logger.warn(
+    { adapter, url, retryAfterMs: error.retryAfterMs },
+    "HttpPollingPullerAdapter: provider asked for fewer requests; ending the run with its wait",
+  );
+  throw error;
+}
+
 export class HttpPollingPullerAdapter
   implements PullerAdapter<HttpPollingConfig>
 {
@@ -119,6 +180,8 @@ export class HttpPollingPullerAdapter
       try {
         response = await this.fetchPage({ config, cursor, options });
       } catch (error) {
+        // Rethrows a provider asking for silence and absorbs everything else.
+        rethrowIfRateLimited({ error, adapter: this.id, url: config.url });
         logger.error(
           {
             adapter: this.id,
@@ -205,6 +268,7 @@ export class HttpPollingPullerAdapter
           // reason; this one was the exception.
           followRedirects: false,
         });
+        await refuseIfRateLimited({ response, url });
         if (response.status >= 500) {
           // Retryable — fall through to the retry-delay branch
           lastError = new Error(
