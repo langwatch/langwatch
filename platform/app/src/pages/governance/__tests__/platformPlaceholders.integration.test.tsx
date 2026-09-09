@@ -410,20 +410,36 @@ describe("given a Platform screen a member can press things on", () => {
    * Signals is not scanned. Its two header actions are inert and are owned
    * by the page-header restyle, not by this file.
    */
-  const buttonTagsIn = (page: string) => {
+  const buttonTagsIn = (file: string) => {
     // Resolved from the package root (vitest's cwd), because under the
     // jsdom environment `import.meta.url` carries the served path, not the
     // filesystem one, and reading it silently misses the file.
-    const source = readFileSync(
-      join(process.cwd(), "src/pages/governance", page),
-      "utf-8",
+    const source = readFileSync(join(process.cwd(), file), "utf-8");
+    // Two element forms, because a control is not always a `<Button>`: the
+    // Insights rail's folders are `<chakra.button>`. Scanning for one form
+    // only is how five of this screen's controls went unchecked.
+    //
+    // The window, rather than a match to the tag's closing ">", is the point:
+    // an arrow handler contains ">" itself (`onClick={() => …}`), so a lazy
+    // match to the first ">" stops inside the very attribute being looked
+    // for. Each element start is taken with the text that follows it, up to
+    // the next element start, and `onClick=` is required somewhere in there.
+    const starts = [...source.matchAll(/<(?:Button|chakra\.button)\b/g)];
+    return starts.map((start, index) =>
+      source.slice(start.index, starts[index + 1]?.index ?? source.length),
     );
-    return source.match(/<Button\b[^>]*>/g) ?? [];
   };
 
   /** @scenario "Every control the Platform screens offer does something when pressed" */
   it("offers no control without a handler on Insights or Analytics", () => {
-    for (const page of ["insights.tsx", "analytics.tsx"]) {
+    for (const page of [
+      "src/pages/governance/insights.tsx",
+      "src/pages/governance/analytics.tsx",
+      // The rail is where the Insights folder controls actually live, and it
+      // is a component rather than the page file, so scanning the two pages
+      // alone left its five controls unread.
+      "src/components/governance/platform/InsightsRail.tsx",
+    ]) {
       const tags = buttonTagsIn(page);
       // The guard against a vacuous pass: a scan that matched nothing would
       // otherwise report every page clean, including a page of dead buttons.
@@ -437,8 +453,15 @@ describe("given a Platform screen a member can press things on", () => {
   /** @scenario "Every control the Platform screens offer does something when pressed" */
   it("offers exactly the controls the tests above press", () => {
     // The render-side half of the same guard: a control added later shows up
-    // here as an unexpected name, so it cannot slip in unpressed. Each name
-    // below is pressed by a test in this file.
+    // here as an unexpected name, so it cannot slip in unnoticed.
+    //
+    // Not all of them are pressed here, and the split is worth naming. "Set
+    // up data" and "Open Langy" are the page's own two controls and each is
+    // pressed with its result asserted by a test in this file. The five
+    // folder names above them come from the Insights rail, and what holds
+    // them is the scan above — extended to the rail's own file — plus this
+    // roster. Pressing them would assert the page's folder-selection state,
+    // which is not what this scenario is about.
     renderPage(InsightsPage);
     expect(
       screen
