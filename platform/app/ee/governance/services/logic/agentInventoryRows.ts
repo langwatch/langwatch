@@ -93,20 +93,6 @@ function daysSince({ at, now }: { at: Date; now: Date }): number {
 }
 
 /**
- * The key the two origins are compared on.
- *
- * Case and surrounding space only. Nothing stronger is available: a connected
- * agent's `identityKey` is built from the project, the name, the environment
- * and the registering credential's scope (`connected-agents/identity.ts`), and
- * none of that has a counterpart in a provider's own agent id. So the name is
- * the only signal, and the rule is kept narrow because the cost of a wrong
- * merge on an inventory page is an agent that is not on it.
- */
-function matchKey(name: string): string {
-  return name.trim().toLowerCase();
-}
-
-/**
  * A connected agent as a row.
  *
  * `lastSeenAt` fills "last active" and nothing else does. ADR-128 writes that
@@ -201,21 +187,31 @@ function discoveredRow({
 }
 
 /**
- * Both origins as one list, registered agents first.
+ * Both origins as one list, registered agents first, and NOTHING matched
+ * between them.
  *
- * Registered first because the dedup prefers them, so the order the reader
- * sees and the order the rule resolves ties in are the same order. The page
- * sorts on top of this anyway; what matters here is that it is stable.
+ * An agent registered from code and an agent a provider named become two rows
+ * even when they carry the same name, and that is the decision this function
+ * exists to hold. The only signal the two tables share is the name: a
+ * connected agent's `identityKey` is built from the project, the name, the
+ * environment and the registering credential's scope
+ * (`connected-agents/identity.ts`), and none of that has a counterpart in a
+ * provider's own agent id. So a merge here would rest on a string match with
+ * no corroborating evidence at all.
  *
- * A discovered agent whose name a registered agent already carries is dropped.
- * The registered record is the richer of the two (it has an owner, an
- * environment and a real registration date), and two rows for one agent would
- * double it in the fleet count and in the spend shares.
+ * The two ways of being wrong are not worth the same. A duplicate row is
+ * visible: a reader sees two similar names, works out the fleet is
+ * over-counted, and can go and check. A wrong merge is invisible: an agent
+ * that exists at a provider is absent from the one page whose job is to say
+ * what exists, and no reader can detect an absence. On an inventory,
+ * over-counting is a nuisance and under-counting is a lie.
  *
- * What this loses: the surviving row says `custom` and no longer says the
- * agent was also seen at a provider. `source` holds one value, so a row cannot
- * claim both origins without a wider shape. That is a gap in what the row can
- * express, not a claim that the provider sighting did not happen.
+ * The People screen keeps two providers naming the same address as two rows
+ * for the same reason (`governancePeopleScreen.service.ts`). Deciding that two
+ * records are one thing is a matching engine's job, with evidence behind it,
+ * and there is no such engine for agents.
+ *
+ * Registered first only so the order is stable. The page sorts on top of this.
  */
 export function buildAgentInventory({
   registered,
@@ -241,7 +237,6 @@ export function buildAgentInventory({
     }),
   );
 
-  const claimedNames = new Set(registered.map((agent) => matchKey(agent.name)));
   const unknownProviders = new Set<string>();
   const discoveredRows = discovered.flatMap((agent) => {
     const source = SOURCE_BY_PROVIDER[agent.provider];
@@ -249,7 +244,6 @@ export function buildAgentInventory({
       unknownProviders.add(agent.provider);
       return [];
     }
-    if (claimedNames.has(matchKey(agent.displayText))) return [];
     return [discoveredRow({ agent, source })];
   });
 
