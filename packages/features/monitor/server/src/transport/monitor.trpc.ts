@@ -18,17 +18,10 @@ export const monitorTrpcTransport = defineTrpcRouter(MonitorApi, monitorTrpc)
 
   /**
    * `evaluations:view` for the monitors, and `analytics:view` on top because
-   * the trend is the analytics page's own comparison window. The runtime
-   * declares no AND-composed check, so both are named here and the application
-   * proves the second.
+   * the trend is the analytics page's own comparison window.
    */
   .procedure("getPerformanceForProject")
-  .serviceAuthorized({
-    reason:
-      "reads a project's monitors and their evaluation results, so it needs evaluations:view and analytics:view together; the application checks both",
-    permissions: ["evaluations:view", "analytics:view"],
-    enforces: { projectId: "MonitorApp.performanceForProject checks both permissions" },
-  })
+  .withPermission(["evaluations:view", "analytics:view"])
   .handle(({ app, input, actor }) =>
     app.performanceForProject({
       projectId: input.projectId,

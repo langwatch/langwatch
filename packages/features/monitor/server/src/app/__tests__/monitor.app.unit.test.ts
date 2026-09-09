@@ -305,21 +305,6 @@ describe("MonitorApp", () => {
   });
 
   describe("when the seven-day trend is read", () => {
-    const trend = { projectId: "project-1", actor: { id: "user-1" } };
-
-    it("refuses a reader without analytics standing", async () => {
-      const hasProjectPermission = vi.fn(
-        async (input: { permission: string }) => input.permission !== "analytics:view",
-      );
-      const { app } = harness({
-        permissions: createApiFixture<AuthzApi>({ hasProjectPermission }),
-      });
-
-      await expect(app.performanceForProject(trend)).rejects.toMatchObject({
-        code: "project_permission_denied",
-      });
-    });
-
     it("answers nothing at all for a project with no monitors", async () => {
       const app = createMonitorTestApp();
 

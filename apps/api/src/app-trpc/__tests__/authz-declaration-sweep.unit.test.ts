@@ -162,6 +162,10 @@ function coveredScopeFields({
       return forPermission(declaration.permission, accepted, declaration.via);
     case "permission-any":
       return declaration.permissions.flatMap((permission) => forPermission(permission, accepted));
+    case "permission-all":
+      return declaration.permissions.flatMap((p) => forPermission(p, accepted));
+    case "public":
+      return [];
     // A custom or service-authorized middleware runs its OWN enforcement,
     // opaque to the sweep, so its permissions are trusted against the fields
     // that always arrive, and the fields it claims to enforce are covered the

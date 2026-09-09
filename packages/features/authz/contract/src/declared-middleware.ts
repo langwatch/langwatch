@@ -28,6 +28,7 @@ export type EnforcedScopeFields = Partial<Record<ScopeTierField, string>>;
 export type AuthzDeclaration =
   | { kind: "permission"; permission: AuthzPermission; via?: ScopeTierField }
   | { kind: "permission-any"; permissions: readonly AuthzPermission[] }
+  | { kind: "permission-all"; permissions: readonly AuthzPermission[]; via?: ScopeTierField }
   | { kind: "no-permission"; reason: string; allow?: Record<string, string> }
   | {
       kind: "service-authorized";
@@ -40,7 +41,8 @@ export type AuthzDeclaration =
       reason: string;
       permissions: readonly AuthzPermission[];
       enforces?: EnforcedScopeFields;
-    };
+    }
+  | { kind: "public"; reason: string };
 
 export type DeclaredAuthzMiddleware<M extends (params: never) => Promise<unknown>> = M & {
   [AUTHZ_DECLARATION]: AuthzDeclaration;

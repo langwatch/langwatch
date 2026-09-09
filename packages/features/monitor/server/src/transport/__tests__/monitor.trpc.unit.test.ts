@@ -9,7 +9,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   createMonitorTestApp,
@@ -232,10 +232,10 @@ describe("the monitors tRPC namespace", () => {
     });
 
     it("refuses a reader who may see evaluations but not analytics", async () => {
-      const hasProjectPermission = vi.fn(
-        async (input: { permission: string }) => input.permission !== "analytics:view",
-      );
-      const { caller } = mount({ seed: [seeded], hasProjectPermission });
+      const { caller } = mount({
+        seed: [seeded],
+        permits: (permission) => permission !== "analytics:view",
+      });
 
       await expect(
         caller.getPerformanceForProject({ projectId: PROJECT_ID }),

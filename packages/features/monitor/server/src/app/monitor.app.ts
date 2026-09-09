@@ -11,11 +11,7 @@
  * which status a refusal renders as. What a monitor IS, and what a write does
  * to one, is here.
  */
-import {
-  AuthzApi,
-  ProjectPermissionDeniedError,
-  type AuthzPermission,
-} from "@langwatch/authz-contract";
+import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
 import type { OnlineEvaluationPerformance } from "@langwatch/evaluation-contract";
 import {
   AVAILABLE_EVALUATORS,
@@ -234,14 +230,6 @@ export class MonitorApp implements MonitorApi {
   async performanceForProject(
     input: MonitorPerformanceInput,
   ): Promise<OnlineEvaluationPerformance[]> {
-    // Both, because the trend joins the two verticals and the transport
-    // runtime declares no AND-composed check for the procedure to carry.
-    await this.#assertPermitted({
-      actor: input.actor,
-      projectId: input.projectId,
-      permissions: ["evaluations:view", "analytics:view"],
-    });
-
     const monitors = await this.list({ projectId: input.projectId });
     if (monitors.length === 0) return [];
 
@@ -344,21 +332,6 @@ export class MonitorApp implements MonitorApi {
     const permitted = await this.#holds(input.actor, input.projectId, "evaluations:manage");
 
     if (!permitted) throw new MonitorSourceProjectForbiddenError(input.projectId);
-  }
-
-  /** Every permission a procedure named but the transport could not compose. */
-  async #assertPermitted(
-    input: Readonly<{
-      actor: Readonly<{ id: string }>;
-      projectId: string;
-      permissions: readonly AuthzPermission[];
-    }>,
-  ): Promise<void> {
-    for (const permission of input.permissions) {
-      const permitted = await this.#holds(input.actor, input.projectId, permission);
-
-      if (!permitted) throw new ProjectPermissionDeniedError(permission);
-    }
   }
 
   #holds(

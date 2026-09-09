@@ -122,6 +122,7 @@ export function createApiTrpcPolicy<
     declaredRuntime: createTrpcRuntime<TContext>({
       root: root as Parameters<typeof createTrpcRuntime<TContext>>[0]["root"],
       procedure: runtime.authProtectedProcedure,
+      anonymousProcedure: root.procedure,
       ports: runtimePorts(ports),
     }),
   };
