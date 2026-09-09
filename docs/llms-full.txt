@@ -99,7 +99,7 @@ Start with the area that matches what you are working on today. You can add the 
   />
   <Card
     title="Govern AI use across the company"
-    description="See every AI tool in use, who uses it, and set anomaly rules."
+    description="See every AI tool in use, who uses it, and what it costs."
     icon="shield-halved"
     href="/ai-governance/overview"
     arrow
@@ -10668,17 +10668,19 @@ Field by field: [Virtual keys API reference](/api-reference/gateway-virtual-keys
 
 ---
 title: Anomaly rules
-description: Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the detector evaluates today, what is preview-only, and how to write a working rule.
+description: What the anomaly detector evaluates, what a rule is made of, and why rules cannot be created in the app today.
 sidebarTitle: Anomaly rules
 ---
 
 <Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).</Info>
 
-<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>**Available on Enterprise plans.** See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
-Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3-audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/architecture) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+<Warning>**Anomaly rules cannot be created or edited in LangWatch today.** There is no page for them and no public API, so this page describes what the detector does with a rule and what a rule is made of, not something you can set up right now. Rules that already exist are still evaluated, and the alerts they raise still appear on `/governance`. To watch spend without a rule, use [Budgets](/ai-gateway/budgets), which enforce a hard limit and are available today.</Warning>
 
-This page documents what the detector evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3-audit-log-ingest). A rule is a definition the [event-sourcing detector](/ai-gateway/governance/architecture) evaluates against incoming events, producing an `AnomalyAlert` row when a violation is detected.
+
+This page documents what the detector evaluates and what is preview-only, so that a rule which looks "active" is not mistaken for one that fires.
 
 ## Rule-type coverage
 
@@ -10701,11 +10703,9 @@ If you need detection beyond `spend_spike` today, the recommended shape is one o
 - Stand up Prometheus + Grafana against the gateway metrics endpoint, see [Cookbook · Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) for the alert ruleset.
 - Hook your SIEM to the OTel trace stream LangWatch already emits per project.
 
-## Writing a working `spend_spike` rule
+## What a `spend_spike` rule is made of
 
-Open `/governance/anomaly-rules` → click **New anomaly rule**.
-
-Fields the detector reads:
+These are the fields the detector reads, listed so the shape of a rule is known. They are not steps to follow: no page or API accepts them today.
 
 | Field | Typical value | What it does |
 |-------|---------------|---------------|
@@ -10713,7 +10713,7 @@ Fields the detector reads:
 | **Severity** | `warning`, `critical` | Drives the `/governance` KPI breakdown (`anomalyBreakdown.{critical,warning,info}`) and downstream dispatch routing once C3 ships. |
 | **Rule type** | `spend_spike` | Pick exactly this, see coverage table above. |
 | **Scope** | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
-| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
+| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID is in the URL of the per-source detail page under the inventory. |
 | **Threshold config** | (JSON object, see below) | The detector's per-rule-type tuning knobs. |
 | **Destination config** | `{}` (today) | Reserved for future Slack, PagerDuty, SIEM dispatch, see Dispatch coverage below. |
 
@@ -10770,7 +10770,7 @@ C3 (in flight on the [governance platform](https://github.com/langwatch/langwatc
 
 Until C3 lands, leave destinationConfig empty (`{}`) and rely on the dashboard to surface alerts. A real Slack webhook set today is stored and never called, so alerts look wired when they are not.
 
-## Verify a rule is firing
+## Where an existing rule's alerts show up
 
 Two angles, same data:
 
@@ -10778,9 +10778,9 @@ Two angles, same data:
 
 **CLI**: `langwatch governance status` shows `hasAnomalyRules: true` once at least one rule exists. The `recentAnomalies` query is wired into the same `api.activityMonitor.recentAnomalies` tRPC procedure the dashboard reads.
 
-To verify it yourself, end to end:
+End to end, for an organization that already has a rule:
 
-1. Create a `spend_spike` rule scoped to your test IngestionSource with `minBaselineUsd: 0.001` (tiny floor) and `ratioVsBaseline: 1.5`.
+1. Start from a `spend_spike` rule scoped to your test IngestionSource with `minBaselineUsd: 0.001` (tiny floor) and `ratioVsBaseline: 1.5`.
 2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed), see [otel-generic, Test it now](/ai-governance/ingestion-sources/otel-generic#test-it-now-copy-paste-curl).
 3. Wait long enough for the baseline window to roll past the seed (default `windowSec: 86400` means 24h, so use the tighter values from the table above for fast iteration).
 4. Send a second event with `gen_ai.usage.cost_usd: 2.00` (the spike).
@@ -10829,9 +10829,10 @@ Both paths call into the same service-layer functions, there is no business-logi
 
 Governance resources expose the full CRUD set, `list`, `get`, `create`, `update`, `delete`, over Hono, the CLI, and the MCP server, except where the table below names a narrower verb set (`audit-log` is read-only, ingestion keys mint through their own route). The umbrella spec lists the resource set; each resource gets its own OpenAPI path group.
 
+Anomaly rules are not in the table: they have no REST surface and no authoring page, see [Anomaly rules](/ai-governance/anomaly-rules).
+
 | Resource | OpenAPI path group | Detail page |
 |---|---|---|
-| Anomaly rules | `/api/governance/anomaly-rules` | [Anomaly rules](/ai-governance/anomaly-rules) |
 | Audit log (read-only) | `/api/governance/audit-log` | [Audit log](/platform/audit-log) |
 | Gateway budgets | `/api/governance/gateway-budgets` | [Control plane](/ai-governance/control-plane) |
 | Ingestion sources | `/api/governance/ingestion-sources` | [Ingestion sources](/ai-governance/ingestion-sources) |
@@ -11568,7 +11569,9 @@ existing routes:
 | `/governance` | Daily-use **org governance home**: spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. |
 | `/me`, `/me/settings` | Daily-use **personal home**: your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
 | `/[project]/...` | LLMOps daily-use, traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
-| `/governance/ingestion-sources`, `/governance/anomaly-rules`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, write rules, publish routing policies. | The governance pages open on `governance:view` and `/gateway/routing-policies` on `routingPolicies:view`. Each write control needs the matching `:manage` grant (`ingestionSources:manage`, `anomalyRules:manage`, `routingPolicies:manage`) and is hidden without it. | Governance sub-routes, deliberately separate from daily-use surfaces. |
+| `/governance/ingestion-sources`, `/gateway/routing-policies` | Admin-authoring (CRUD), create, rotate, archive sources, publish routing policies. | The governance pages open on `governance:view` and `/gateway/routing-policies` on `routingPolicies:view`. Each write control needs the matching `:manage` grant (`ingestionSources:manage`, `routingPolicies:manage`) and is hidden without it. | Governance sub-routes, deliberately separate from daily-use surfaces. |
+
+Anomaly rules have no authoring surface: see [Anomaly rules](/ai-governance/anomaly-rules).
 
 The whole governance product sits at the top level, not under Settings.
 The daily home is `/governance`, and the create, rotate and archive tools
@@ -11920,8 +11923,8 @@ Governance sits behind a single fence on each surface:
 # FILE: ./ai-governance/getting-started-admin.mdx
 
 ---
-title: From zero to first detected anomaly (admin)
-description: A 30-minute admin walkthrough, publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, watch their first request land, and write the spend-spike rule that catches the next outlier. Each step links into the deeper admin docs.
+title: From zero to your first governed request (admin)
+description: A 30-minute admin walkthrough, publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, and watch their first request land. Each step links into the deeper admin docs.
 sidebarTitle: First 30 minutes (admin)
 ---
 
@@ -11930,7 +11933,7 @@ You are an org admin on a fresh LangWatch deployment. By the end of this page yo
 - Published a default [Routing Policy](/ai-gateway/governance/routing-policies) so developers can sign in via `langwatch login`.
 - Configured an [Ingestion Source](/ai-governance/ingestion-sources/index) that lands telemetry from your gateway (or any OTLP-compatible upstream) in the unified trace store.
 - Imported the [AI Tools Portal](/ai-governance/personal-portal/admin-catalog#starter-pack) starter pack so every developer's `/me` page renders a real catalog instead of an empty state.
-- Invited a colleague through `/settings/members`, watched their first request land in `/governance`, and written a [`spend_spike`](/ai-governance/anomaly-rules) rule that will alert when their daily spend doubles.
+- Invited a colleague through `/settings/members` and watched their first request land in `/governance`.
 
 If you are a developer trying to *use* the org as a developer (not configure it), jump to the [developer walkthrough](/ai-governance/getting-started-developer) instead.
 
@@ -12039,31 +12042,13 @@ The budget is enforced by the gateway data plane on every request. The audit log
 
 The deep reference for budget shape, fallback semantics, and the WARN response tag header lives in [Budgets](/ai-gateway/budgets).
 
-## Step 8: Write your first anomaly rule
+## Step 8: Watch what the budget does not catch
 
-Budgets enforce *at* the limit. [Anomaly rules](/ai-governance/anomaly-rules) detect *before* it, the patterns that precede a breach (spend spike, geo-mismatch, off-hours usage). The detector evaluates `spend_spike` rules live today; other rule types are preview-only (the [coverage table](/ai-governance/anomaly-rules#rule-type-coverage) marks which is which).
+A budget enforces *at* the limit. The patterns that precede a breach, a spend spike or a burst of off-hours usage, show up before it.
 
-Write a starter `spend_spike` rule:
+The anomaly detector covers the spend-spike case, and any alert it raises appears in **Recent anomalies** on `/governance`. Anomaly rules cannot be created in LangWatch today, so this step has no setup to do: see [Anomaly rules](/ai-governance/anomaly-rules) for what the detector evaluates and what a rule is made of.
 
-1. Navigate to **Governance → Anomaly Rules** (`/governance/anomaly-rules`).
-2. Click **+ New anomaly rule**.
-3. Fill in:
-   - **Name**: `Daily spend doubles vs last week`
-   - **Severity**: `warning`
-   - **Rule type**: `spend_spike`
-   - **Scope**: `organization`
-   - **Threshold config**:
-     ```json
-     {
-       "windowSec": 86400,
-       "baselineOffsetSec": 604800,
-       "ratioVsBaseline": 2.0,
-       "minBaselineUsd": 1.0
-     }
-     ```
-4. Click **Create rule**.
-
-The detector starts evaluating from the next ingest event. When today's 24h spend exceeds 2× last week's same-day baseline (and the baseline was at least \$1, to avoid noise on quiet days), the detector writes an `AnomalyAlert` row visible in `/governance` and surfaces it in the [`activityMonitor.recentAnomalies`](/ai-governance/anomaly-rules) procedure.
+In the meantime, [Budgets](/ai-gateway/budgets) are the control that is available today, and the `/governance` overview is where a spike is visible without one.
 
 ## Where to next
 
@@ -12112,7 +12097,7 @@ Before you start, your IT admin should already have:
 2. Published at least one default [Routing Policy](/ai-gateway/governance/routing-policies). If they haven't, the CLI fails with a `409 no_default_routing_policy` error, see the [CLI error catalog](/ai-governance/cli-debug#error-catalog) and ping your admin.
 3. Optionally: published an [AI Tools Portal](/ai-governance/personal-portal/overview) catalog (the card grid you'll see on `/me`). If they haven't, your `/me` page shows a "your IT team is still setting things up" empty state, you can still use the CLI directly.
 
-If any of those are missing your admin's first stop is [From zero to first detected anomaly](/ai-governance/getting-started-admin).
+If any of those are missing your admin's first stop is [From zero to your first governed request](/ai-governance/getting-started-admin).
 
 ## Step 1: Install the CLI
 
@@ -12288,7 +12273,7 @@ The list of `AnomalyAlert` rows in the window, sorted newest first. Each row sho
 - **Current vs baseline** values for spend-spike anomalies.
 - **Scope** (organization, source_type, source).
 
-Click a row to expand the AnomalyAlert detail (the rule definition that matched, the event window that triggered it, the per-actor breakdown). Click the rule name to navigate to the [anomaly-rule editor](/ai-governance/anomaly-rules).
+Click a row to expand the AnomalyAlert detail (the rule definition that matched, the event window that triggered it, the per-actor breakdown). The rules themselves cannot be edited in LangWatch today, see [Anomaly rules](/ai-governance/anomaly-rules).
 
 ## When the entry shows up
 
@@ -12330,7 +12315,6 @@ The dashboard is read-mostly, but every section deep-links into the admin-author
 - KPI strip → click "Total spend" KPI → drills into per-user breakdown table.
 - Spend over time chart → click a day → opens that day's per-user breakdown filtered to ±2 hours of the spike.
 - Ingestion-source health row → click into the per-source detail page.
-- Anomalies row → click the rule name → opens the [anomaly-rule editor](/ai-governance/anomaly-rules) at that rule.
 
 If the dashboard surfaces something you want to *act* on (rotate a key, edit a rule threshold, archive a source), follow the deep link into the corresponding admin-authoring page under `/governance/*`.
 
@@ -13821,7 +13805,7 @@ keywords: ai governance, ai inventory, ingestion sources, tool catalog, anomaly 
 
 AI Governance is the part of LangWatch where you administer the AI tools your company uses. It is for the platform or IT team that approves those tools and watches their use, and it gives every developer one page with the tools they may use and their own usage.
 
-The section is in the sidebar under **AI Governance**, with four pages: **Overview**, **Inventory**, **Anomaly Rules** and **People**. Opening them needs the `governance:view` permission, which an organization Admin holds. Each developer also has a personal home page at `/me`.
+The section is in the sidebar under **AI Governance**, with three pages: **Overview**, **Inventory** and **People**. Opening them needs the `governance:view` permission, which an organization Admin holds. Each developer also has a personal home page at `/me`.
 
 ## The overview page
 

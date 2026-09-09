@@ -63,7 +63,7 @@ The list of `AnomalyAlert` rows in the window, sorted newest first. Each row sho
 - **Current vs baseline** values for spend-spike anomalies.
 - **Scope** (organization, source_type, source).
 
-Click a row to expand the AnomalyAlert detail (the rule definition that matched, the event window that triggered it, the per-actor breakdown). Click the rule name to navigate to the [anomaly-rule editor](/ai-governance/anomaly-rules).
+Click a row to expand the AnomalyAlert detail (the rule definition that matched, the event window that triggered it, the per-actor breakdown). The rules themselves cannot be edited in LangWatch today, see [Anomaly rules](/ai-governance/anomaly-rules).
 
 ## When the entry shows up
 
@@ -105,7 +105,6 @@ The dashboard is read-mostly, but every section deep-links into the admin-author
 - KPI strip → click "Total spend" KPI → drills into per-user breakdown table.
 - Spend over time chart → click a day → opens that day's per-user breakdown filtered to ±2 hours of the spike.
 - Ingestion-source health row → click into the per-source detail page.
-- Anomalies row → click the rule name → opens the [anomaly-rule editor](/ai-governance/anomaly-rules) at that rule.
 
 If the dashboard surfaces something you want to *act* on (rotate a key, edit a rule threshold, archive a source), follow the deep link into the corresponding admin-authoring page under `/governance/*`.
 

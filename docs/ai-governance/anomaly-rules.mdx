@@ -1,16 +1,18 @@
 ---
 title: Anomaly rules
-description: Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the detector evaluates today, what is preview-only, and how to write a working rule.
+description: What the anomaly detector evaluates, what a rule is made of, and why rules cannot be created in the app today.
 sidebarTitle: Anomaly rules
 ---
 
 <Info>**Pairs with:** [AI Gateway → Budgets](/ai-gateway/budgets). Budgets enforce hard spend limits; anomaly rules detect patterns *before* a budget breach (spend-spike, geo-mismatch, off-hours).</Info>
 
-<Note>**Available on Enterprise plans.** Non-enterprise organizations see an upgrade card on `/governance/anomaly-rules` instead of the composer. See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
+<Note>**Available on Enterprise plans.** See [Open-core licensing](/ai-governance/open-core-licensing) for the full Apache 2.0, Enterprise split.</Note>
 
-Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3-audit-log-ingest). The composer at `/governance/anomaly-rules` accepts a rule definition and persists it; the [event-sourcing detector](/ai-gateway/governance/architecture) evaluates each rule against incoming events and produces an `AnomalyAlert` row when a violation is detected.
+<Warning>**Anomaly rules cannot be created or edited in LangWatch today.** There is no page for them and no public API, so this page describes what the detector does with a rule and what a rule is made of, not something you can set up right now. Rules that already exist are still evaluated, and the alerts they raise still appear on `/governance`. To watch spend without a rule, use [Budgets](/ai-gateway/budgets), which enforce a hard limit and are available today.</Warning>
 
-This page documents what the detector evaluates today and what is preview-only, so you don't author rules that look "active" in the list but never fire.
+Anomaly rules are the "Detect" layer of the [governance control plane](/ai-governance/control-plane#tier-3-audit-log-ingest). A rule is a definition the [event-sourcing detector](/ai-gateway/governance/architecture) evaluates against incoming events, producing an `AnomalyAlert` row when a violation is detected.
+
+This page documents what the detector evaluates and what is preview-only, so that a rule which looks "active" is not mistaken for one that fires.
 
 ## Rule-type coverage
 
@@ -33,11 +35,9 @@ If you need detection beyond `spend_spike` today, the recommended shape is one o
 - Stand up Prometheus + Grafana against the gateway metrics endpoint, see [Cookbook · Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) for the alert ruleset.
 - Hook your SIEM to the OTel trace stream LangWatch already emits per project.
 
-## Writing a working `spend_spike` rule
+## What a `spend_spike` rule is made of
 
-Open `/governance/anomaly-rules` → click **New anomaly rule**.
-
-Fields the detector reads:
+These are the fields the detector reads, listed so the shape of a rule is known. They are not steps to follow: no page or API accepts them today.
 
 | Field | Typical value | What it does |
 |-------|---------------|---------------|
@@ -45,7 +45,7 @@ Fields the detector reads:
 | **Severity** | `warning`, `critical` | Drives the `/governance` KPI breakdown (`anomalyBreakdown.{critical,warning,info}`) and downstream dispatch routing once C3 ships. |
 | **Rule type** | `spend_spike` | Pick exactly this, see coverage table above. |
 | **Scope** | `organization`, `source_type`, `source` | Filters which IngestionSources the rule applies to (see Scope coverage below). |
-| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID can be copied from `/governance/ingestion-sources/<id>` or the URL of the per-source detail page. |
+| **Scope ID** | (cuid) | Required when scope is `source_type` or `source`. The IngestionSource ID is in the URL of the per-source detail page under the inventory. |
 | **Threshold config** | (JSON object, see below) | The detector's per-rule-type tuning knobs. |
 | **Destination config** | `{}` (today) | Reserved for future Slack, PagerDuty, SIEM dispatch, see Dispatch coverage below. |
 
@@ -102,7 +102,7 @@ C3 (in flight on the [governance platform](https://github.com/langwatch/langwatc
 
 Until C3 lands, leave destinationConfig empty (`{}`) and rely on the dashboard to surface alerts. A real Slack webhook set today is stored and never called, so alerts look wired when they are not.
 
-## Verify a rule is firing
+## Where an existing rule's alerts show up
 
 Two angles, same data:
 
@@ -110,9 +110,9 @@ Two angles, same data:
 
 **CLI**: `langwatch governance status` shows `hasAnomalyRules: true` once at least one rule exists. The `recentAnomalies` query is wired into the same `api.activityMonitor.recentAnomalies` tRPC procedure the dashboard reads.
 
-To verify it yourself, end to end:
+End to end, for an organization that already has a rule:
 
-1. Create a `spend_spike` rule scoped to your test IngestionSource with `minBaselineUsd: 0.001` (tiny floor) and `ratioVsBaseline: 1.5`.
+1. Start from a `spend_spike` rule scoped to your test IngestionSource with `minBaselineUsd: 0.001` (tiny floor) and `ratioVsBaseline: 1.5`.
 2. Send one OTel event with `gen_ai.usage.cost_usd: 0.05` (baseline seed), see [otel-generic, Test it now](/ai-governance/ingestion-sources/otel-generic#test-it-now-copy-paste-curl).
 3. Wait long enough for the baseline window to roll past the seed (default `windowSec: 86400` means 24h, so use the tighter values from the table above for fast iteration).
 4. Send a second event with `gen_ai.usage.cost_usd: 2.00` (the spike).

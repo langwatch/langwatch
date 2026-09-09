@@ -511,7 +511,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [AI Governance](https://langwatch.ai/docs/ai-governance/overview.md): An inventory of every AI tool and source in the company, the people who use them, anomaly rules on their activity, and a personal home page for each developer.
 - [Your first 5 minutes (developer)](https://langwatch.ai/docs/ai-governance/getting-started-developer.md): A new-developer walkthrough, install the LangWatch CLI, sign in via your company SSO, land on /me, run your first request through the gateway, and read your spend back. Each step links into the deeper docs.
-- [From zero to first detected anomaly (admin)](https://langwatch.ai/docs/ai-governance/getting-started-admin.md): A 30-minute admin walkthrough, publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, watch their first request land, and write the spend-spike rule that catches the next outlier. Each step links into the deeper admin docs.
+- [From zero to your first governed request (admin)](https://langwatch.ai/docs/ai-governance/getting-started-admin.md): A 30-minute admin walkthrough, publish a routing policy, configure an ingestion source, import the AI Tools Portal starter pack, invite a developer, and watch their first request land. Each step links into the deeper admin docs.
 - [Open-core licensing](https://langwatch.ai/docs/ai-governance/open-core-licensing.md): LangWatch is open-core. The Apache 2.0 floor covers Personal Virtual Keys, the AI Tools Portal, Routing Policies, and CLI debugging. Multi-source ingestion, anomaly detection, OCSF, SIEM export, and extended retention require an Enterprise plan.
 
 ## Personal Portal
@@ -549,7 +549,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Detection
 
-- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): Define detection rules that fire AnomalyAlerts when activity-event traffic crosses a threshold, what the detector evaluates today, what is preview-only, and how to write a working rule.
+- [Anomaly rules](https://langwatch.ai/docs/ai-governance/anomaly-rules.md): What the anomaly detector evaluates, what a rule is made of, and why rules cannot be created in the app today.
 
 ## Compliance & Architecture
 
