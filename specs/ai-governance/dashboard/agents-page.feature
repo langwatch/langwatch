@@ -23,14 +23,20 @@ Feature: The AI Governance Agents page
   # to its words, so a reader who learned it on one governance screen finds it
   # here.
   #
-  # WHAT IS REAL HERE. Nothing on this page is measured yet. Every agents
-  # procedure the platform has is project-scoped (`agents.getAll`, permission
-  # `evaluations:view`); the governance section is organization-scoped, so
-  # reading one project's agents and labelling them as the organization's
-  # would be a lie told in the house typeface. Until an organization-wide read
-  # lands, the page issues no query at all: sample mode fills the empty page,
-  # and with sample mode off each pane says plainly that nothing has been
-  # detected.
+  # WHAT IS REAL HERE. The rows are real, and the figures on them are not yet.
+  # `governanceAgents.list` reads two organization-scoped tables: agents that
+  # registered themselves from code (ADR-128) and agents a connected provider
+  # was asked to list. Neither measures spend, request counts or health per
+  # agent, so a real row leaves those null and the page draws a dash with the
+  # reason on it.
+  #
+  # SAMPLE MODE IS AN EITHER-OR, NEVER A FALLBACK. With it on the page shows
+  # the invented set and says so; with it off it shows what the read returned,
+  # including an empty answer. An organization with no agents is never quietly
+  # filled with plausible ones: a reader cannot act on invented figures, and
+  # cannot tell they are invented if they arrived because the real answer was
+  # empty. The spinner and the failure alert are suppressed under sample mode
+  # for the same reason, which is the stance the Costs and People pages take.
   #
   # WHY REGISTERING IS A CODE SNIPPET AND NOT A FORM. ADR-128 makes a connected
   # agent register itself: the customer decorates the function that runs the
@@ -51,6 +57,92 @@ Feature: The AI Governance Agents page
   # Rulebook: specs/ai-governance/dashboard/governance-ui-controls.feature
   # ADR: dev/docs/adr/128-connected-agents.md
   # ---------------------------------------------------------------------------
+
+  # ===========================================================================
+  # What the page reads
+  # ---------------------------------------------------------------------------
+  # Two tables that never meet. A LangWatch-native agent registers itself from
+  # the process that runs it; a provider-side agent is found by asking the
+  # provider. An admin asking what runs against the organization means both.
+  #
+  # The union rule is deliberately narrow. Names are the only signal the two
+  # tables share, so an agent found under both origins is collapsed only on an
+  # exact name (ignoring case and surrounding space), and the registered record
+  # is the survivor because it is the one with an owner, an environment and a
+  # real registration date.
+  # ===========================================================================
+
+  @unit
+  Scenario: The list holds the agents we registered and the agents we found
+    Given the organization has registered a connected agent from code
+    And a connected provider has named an agent of its own
+    When the agents list is built
+    Then both agents are listed
+    And each says which of the two it came from
+
+  @unit
+  Scenario: An agent a provider named carries no owner and no environment
+    Given the only agents are ones a provider named
+    When the agents list is built
+    Then each is listed as unclaimed
+    And its environment reads as not declared
+    # The provider names a workspace or a tenant address, which is a place and
+    # not a deployment stage, so it never fills the environment column.
+
+  @unit
+  Scenario: A figure no read measures stays empty rather than becoming a zero
+    Given the agents list is built from real rows
+    Then no row claims a spend, a request count or a health state
+    And an agent a provider named claims no last-active time either
+    # The provider lists every agent it holds on every sync, so "last seen" is
+    # a fact about the sync and never about the agent being called.
+
+  @unit
+  Scenario: A registered agent is dated from when it registered
+    Given a connected agent registered ninety days ago and was last seen an hour ago
+    When the agents list is built
+    Then the row says it registered ninety days ago
+    And it says it was last active an hour ago
+    And it names the member who owns it
+
+  @unit
+  Scenario: An agent found under both origins is listed once
+    Given a connected agent and a provider agent share a name
+    When the agents list is built
+    Then the agent is listed once
+    And the listed row is the registered one
+
+  @unit
+  Scenario: An agent from a provider the page has no source for is left off
+    Given a provider agent whose provider has no source chip
+    When the agents list is built
+    Then it is not listed
+    And the provider is reported so somebody can add the chip
+    # Never filed under Custom: that word means registered with LangWatch, and
+    # borrowing it for "we could not tell" makes the source filter meaningless.
+
+  @integration
+  Scenario: An organization with no agents stays empty rather than filling with samples
+    Given the reader has turned sample data off
+    And the organization's agents read returns none
+    When a governance viewer opens the Agents page
+    Then no agent is listed
+    And the page renders its own empty state
+
+  @integration
+  Scenario: A read still in flight shows neither agents nor an empty state
+    Given the reader has turned sample data off
+    And the organization's agents read has not answered yet
+    When a governance viewer opens the Agents page
+    Then the pane shows that it is still loading
+    And it does not claim that no agent has registered
+
+  @integration
+  Scenario: A failed agents read says so instead of claiming there are no agents
+    Given the reader has turned sample data off
+    And the organization's agents read fails
+    When a governance viewer opens the Agents page
+    Then the page shows an alert saying the agents could not be loaded
 
   # ===========================================================================
   # Sample mode

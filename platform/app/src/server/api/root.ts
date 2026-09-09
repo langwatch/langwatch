@@ -3,6 +3,7 @@ import { aiToolsRouter } from "@ee/governance/routers/aiTools";
 import { anomalyRulesRouter } from "@ee/governance/routers/anomalyRules";
 import { departmentsRouter } from "@ee/governance/routers/departments";
 import { governanceRouter } from "@ee/governance/routers/governance";
+import { governanceAgentsRouter } from "@ee/governance/routers/governanceAgents";
 import { governanceCostRouter } from "@ee/governance/routers/governanceCost";
 import { governancePeopleRouter } from "@ee/governance/routers/governancePeople";
 import { ingestionKeyRouter } from "@ee/governance/routers/ingestionKey";
@@ -178,6 +179,7 @@ const coreRouters = {
   ingestionTemplates: ingestionTemplatesRouter,
   ingestionKey: ingestionKeyRouter,
   governance: governanceRouter,
+  governanceAgents: governanceAgentsRouter,
   governanceCost: governanceCostRouter,
   governancePeople: governancePeopleRouter,
   personalSessions: personalSessionsRouter,

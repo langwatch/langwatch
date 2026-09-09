@@ -1,4 +1,4 @@
-import { Heading, HStack, VStack } from "@chakra-ui/react";
+import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useSearchParams } from "react-router";
@@ -35,7 +35,10 @@ import {
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { HandledErrorAlert } from "~/features/errors";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 /**
  * The Agents page: what runs against the organization, as one list.
@@ -47,14 +50,25 @@ import { useDrawer } from "~/hooks/useDrawer";
  * and learn nothing from. With one pane left there is nothing to switch
  * between, so the tab strip went with it and the agents are the page.
  *
- * No organization-wide list exists yet. Every agents procedure the platform
- * has is project-scoped (`agents.getAll`, permission `evaluations:view`), and
- * the governance section is organization-scoped, so reading one project's
- * agents here and labelling them as the organization's would be a lie told in
- * the house typeface. The page therefore issues no query at all: with sample
- * mode off it is an honest empty state, and with it on the rows are invented
- * and say so, per row. When an organization-wide read lands it fills
- * `GovernanceAgentRow` and the list stops caring where the rows came from.
+ * THE ROWS ARE REAL NOW, from `governanceAgents.list`. It reads two tables at
+ * organization scope: agents that registered themselves from code (ADR-128)
+ * and agents a connected provider was asked to list. The page used to fetch
+ * nothing at all, because the only agents procedure the platform had was
+ * project-scoped (`agents.getAll`) and calling one project's agents the
+ * organization's would have been a lie told in the house typeface.
+ *
+ * Real rows carry no spend, no request count and no health, because no read
+ * measures those per agent yet. They arrive null and the list draws a dash
+ * with the reason on it, which is the same rendering the sample set's
+ * never-run agent already proved.
+ *
+ * SAMPLE MODE IS AN EITHER-OR, never a fallback. With it on the page shows the
+ * invented set and says so; with it off the page shows what the read returned,
+ * including nothing. A real empty result never quietly fills with samples: a
+ * reader cannot act on invented figures, and cannot tell they are invented if
+ * they arrived because the real answer was empty. For the same reason the
+ * spinner and the failure alert are suppressed while sample mode is on, which
+ * is the stance the inventory and people pages already take.
  *
  * THE LIST IS THE DEFAULT AND THE CARDS ARE THE OPTION. An admin arrives
  * asking what is running across the organization, which is a comparison; the
@@ -202,6 +216,42 @@ function AgentsEmptyState({
 }
 
 /**
+ * What the page reads, and what it shows given the reader's sample choice.
+ *
+ * Gathered here so the page body does not have to be read as a chain: the
+ * query depends on the organization, and which rows reach the list depends on
+ * the query and on the sample choice.
+ *
+ * The two never mix. Sample mode substitutes the invented set wholesale; it is
+ * never a fallback for a real read that came back empty or failed. An empty
+ * organization filling itself with plausible agents would be a page a reader
+ * cannot act on and cannot tell apart from one they can.
+ */
+function useAgentsScreen() {
+  const { organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const orgId = organization?.id ?? "";
+  const sample = useSampleMode();
+
+  const agents = api.governanceAgents.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+
+  return {
+    sample,
+    rows: sample.active ? SAMPLE_AGENT_ROWS : (agents.data ?? []),
+    // Both suppressed under sample mode, for the reason the people page
+    // suppresses its own: reporting that the real read is still running, or
+    // that it failed, beside a screen full of invented figures leaves the
+    // reader unable to act on either half.
+    isLoading: !sample.active && !!orgId && agents.isLoading,
+    error: sample.active ? null : agents.error,
+  };
+}
+
+/**
  * The agents, and whatever stands in for them.
  *
  * The filter row is deliberately NOT here. It belongs to the page header, one
@@ -215,6 +265,7 @@ function AgentsPane({
   filters,
   layout,
   sample,
+  isLoading,
   onRegister,
   onClearFilters,
 }: {
@@ -222,10 +273,21 @@ function AgentsPane({
   filters: AgentFilters;
   layout: AgentsLayout;
   sample: boolean;
+  isLoading: boolean;
   onRegister: () => void;
   onClearFilters: () => void;
 }) {
   const visible = applyAgentFilters(rows, filters);
+
+  // Ahead of both empty states, because "no agent has registered yet" is a
+  // claim about the organization and a read still in flight has not earned it.
+  if (isLoading) {
+    return (
+      <Box padding={6}>
+        <Spinner />
+      </Box>
+    );
+  }
 
   if (visible.length > 0) {
     return <AgentsList agents={visible} layout={layout} sample={sample} />;
@@ -255,9 +317,8 @@ function AgentsPage() {
   const { openDrawer } = useDrawer();
   const openRegister = () => openDrawer("addAgent");
   useAddAgentDeepLink();
-  const sample = useSampleMode();
+  const { sample, rows, isLoading, error } = useAgentsScreen();
   const { filters, setFilter, clearFilters } = useAgentFilters();
-  const rows = sample.active ? SAMPLE_AGENT_ROWS : [];
   // Gated on the unfiltered set, never the visible one: a reader who filters
   // down to nothing must still have the chip that gets them back. The layout
   // switch takes the same gate, because there is nothing to lay out either
@@ -303,6 +364,12 @@ function AgentsPage() {
             nothing here is real.
           </SampleDataBanner>
         )}
+        {/* Above the content rather than in place of it. A failed read leaves
+            the page with no rows, and the pane below already has a sentence
+            for that; what it cannot say is that the emptiness is a failure
+            rather than an answer. `useAgentsScreen` has already decided this
+            is null under sample mode. */}
+        <HandledErrorAlert error={error} fallbackTitle="Couldn't load agents" />
         {/* Under the banner, above the chips. Under the banner because every
             figure on it is invented while sample mode is on, and the banner is
             the page's one claim about the whole screen; above the chips
@@ -327,6 +394,7 @@ function AgentsPage() {
           filters={filters}
           layout={layout}
           sample={sample.active}
+          isLoading={isLoading}
           onRegister={openRegister}
           onClearFilters={clearFilters}
         />
