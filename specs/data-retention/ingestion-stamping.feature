@@ -33,12 +33,14 @@ Feature: Retention stamping at ingestion time
     Then the experiment_runs record has _retention_days = 91
     And the experiment_run_items record has _retention_days = 91
 
+  @unit
   Scenario: Event log rows use the workload's retention category
     When simulation and suite run events are recorded for this project
     Then their event_log records have _retention_days = 63
     When an experiment run event is recorded for this project
     Then its event_log record has _retention_days = 91
 
+  @unit
   Scenario: Security events are retained indefinitely
     When identity, MFA, SSO, join-request, SCIM, authorization, or virtual-key lifecycle events are recorded
     Then their event_log records have _retention_days = 0
@@ -49,6 +51,7 @@ Feature: Retention stamping at ingestion time
     Then identity, credential, SSO, SCIM, membership, and authorization projection stores are absent
     And explicit revocation, teardown, erasure, session expiry, and proof expiry remain unchanged
 
+  @unit
   Scenario: Non-security event families remain policy-bound
     When trace, log, metric, evaluation, Langy-conversation, topic-model, governance budget-crossing, gateway-spend, pulled-usage, ingestion-pull, automation-trigger, or coding-agent-fact events are recorded
     Then their event_log records use the traces retention category

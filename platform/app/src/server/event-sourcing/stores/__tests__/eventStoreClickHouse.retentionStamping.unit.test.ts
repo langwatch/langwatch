@@ -110,6 +110,7 @@ describe("EventStoreClickHouse retention stamping", () => {
   describe.each(
     indefiniteEventCases,
   )("when storing a %s security event", (_name, authAggregateType, authEventType) => {
+    /** @scenario "Security events are retained indefinitely" */
     it("stamps indefinite retention without consulting tenant policy", async () => {
       const resolver: RetentionPolicyResolver = {
         resolve: vi.fn().mockResolvedValue({
@@ -142,6 +143,7 @@ describe("EventStoreClickHouse retention stamping", () => {
   describe.each(
     categoryEventCases,
   )("when storing a %s event", (_name, eventAggregateType, eventType, expectedRetentionDays) => {
+    /** @scenario "Event log rows use the workload's retention category" */
     it("stamps retention from the aggregate's category", async () => {
       const resolver: RetentionPolicyResolver = {
         resolve: vi.fn().mockResolvedValue({
