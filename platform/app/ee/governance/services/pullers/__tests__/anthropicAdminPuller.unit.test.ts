@@ -946,6 +946,36 @@ describe("the Anthropic Admin puller", () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
+    it("still reports the rate-limit wait when draining the body fails", async () => {
+      // Cancelling the body is housekeeping for the connection pool. An
+      // already-errored stream rejects it, and unguarded that rejection leaves
+      // the 429 branch INSTEAD of the DispatchError — the caller's
+      // `instanceof DispatchError` guard then fails and the wait is gone. A
+      // real Response resolves cancel(), so the rejection has to be planted.
+      const response = new Response("private upstream payload", {
+        status: 429,
+        headers: { "retry-after": "120" },
+      });
+      Object.defineProperty(response, "body", {
+        value: {
+          cancel: () => Promise.reject(new Error("stream already errored")),
+        },
+      });
+      fetchMock.mockResolvedValue(response);
+
+      await expect(
+        new AnthropicAdminPuller().runOnce(RUN_OPTIONS, {
+          adapter: "anthropic_admin",
+          report: "cost",
+          bucketWidth: "1d",
+          schedule: "0 * * * *",
+        }),
+      ).rejects.toMatchObject({
+        message: "Anthropic rate limit exceeded (HTTP 429).",
+        retryAfterMs: 120_000,
+      });
+    });
+
     it("leaves the cursor where it was so the window is retried", async () => {
       fetchMock.mockRejectedValue(new Error("connection reset"));
 

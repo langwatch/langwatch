@@ -177,6 +177,30 @@ describe("given an OpenAI Admin cost source", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("still reports the rate-limit wait when draining the body fails", async () => {
+    // Same guard as the Anthropic puller's: a rejected cancel() must not
+    // escape in place of the DispatchError, or the provider's Retry-After
+    // never reaches the scheduler. A real Response resolves cancel(), so the
+    // rejection is planted here.
+    const response = new Response("private upstream payload", {
+      status: 429,
+      headers: { "retry-after": "120" },
+    });
+    Object.defineProperty(response, "body", {
+      value: {
+        cancel: () => Promise.reject(new Error("stream already errored")),
+      },
+    });
+    fetchMock.mockResolvedValue(response);
+
+    await expect(
+      new OpenAiAdminPuller().runOnce(RUN_OPTIONS, CONFIG),
+    ).rejects.toMatchObject({
+      message: "OpenAI rate limit exceeded (HTTP 429).",
+      retryAfterMs: 120_000,
+    });
+  });
+
   describe("when the provider reports a day's spend", () => {
     /** @scenario "A day's spend is recorded as the dollars the provider reported" */
     it("records the provider's dollars without converting them", async () => {

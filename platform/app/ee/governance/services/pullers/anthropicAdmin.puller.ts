@@ -814,7 +814,14 @@ export class AnthropicAdminPuller
       followRedirects: false,
     });
     if (response.status === 429) {
-      await response.body?.cancel();
+      // Draining the body keeps undici's connection poolable, but it is only
+      // housekeeping and must never become the error that leaves this branch:
+      // an unguarded reject would propagate INSTEAD of the DispatchError
+      // below, and a plain Error fails the `instanceof DispatchError` guard in
+      // the caller, so the run degrades to a generic failure and the outbox
+      // falls back to its default backoff — throwing away the one thing this
+      // branch exists to carry.
+      await response.body?.cancel().catch(() => void 0);
       throw new DispatchError({
         message: "Anthropic rate limit exceeded (HTTP 429).",
         retryable: true,

@@ -769,7 +769,10 @@ export class OpenAiAdminPuller implements PullerAdapter<OpenAiAdminPullConfig> {
       signal,
     });
     if (response.status === 429) {
-      await response.body?.cancel();
+      // Best-effort drain, for the reason spelled out in the Anthropic
+      // puller's matching branch: a rejected cancel must not replace the
+      // DispatchError, or the Retry-After never reaches the scheduler.
+      await response.body?.cancel().catch(() => void 0);
       throw new DispatchError({
         message: "OpenAI rate limit exceeded (HTTP 429).",
         retryable: true,
