@@ -5,7 +5,7 @@ import {
   ClickHouseTraceEventPayloadRepository,
   TraceSpanSpoolAdapter,
   TraceSpoolService,
-  type TracePayloadReaderPort,
+  type TracePayloadReaderRepository,
   type TraceClickHouseResolver,
   type TraceSpanSpoolPort,
 } from "@langwatch/trace-server";
@@ -33,7 +33,7 @@ import {
  *            └─ TraceSpoolStoragePort     command's own trusted ids, never
  *                 └─ stored objects       from the reference it carries
  *
- *     TracePayloadReaderPort            (trace-server declares it)
+ *     TracePayloadReaderRepository            (trace-server declares it)
  *       └─ event_log SELECT             TenantId first, EventId-derived
  *            └─ ClickHouse                partition window, absence -> null
  *
@@ -66,7 +66,7 @@ export function createWorkerTraceSpool(options: {
 /** The durable half: one offloaded field, recalled out of its own event_log row. */
 export function createWorkerTracePayloadReader(options: {
   resolveClickHouseClient: TraceClickHouseResolver;
-}): TracePayloadReaderPort {
+}): TracePayloadReaderRepository {
   return ClickHouseTraceEventPayloadRepository.createResolved({
     resolveClient: options.resolveClickHouseClient,
   });

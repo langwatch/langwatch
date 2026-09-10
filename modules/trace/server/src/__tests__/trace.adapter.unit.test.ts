@@ -1,8 +1,8 @@
 import {
-  TraceQueryFieldValuesPort,
-  TracePayloadReaderPort,
+  TraceQueryFieldValuesRepository,
+  TracePayloadReaderRepository,
   TraceFullIoPort,
-  TraceSummaryReaderPort,
+  TraceSummaryReaderRepository,
 } from "../index.ts";
 // From the port that defines them: an in-package test does not need the
 // package's public surface, and `index.ts` publishes what CONSUMERS import.
@@ -14,19 +14,19 @@ import { TestModelProviderService } from "../ports/__tests__/support/model-provi
 import { TestTraceQueryClassification } from "../ports/__tests__/support/query-classification.fake.ts";
 import { traceReadPorts } from "../ports/__tests__/support/trace-read-ports.fake.ts";
 
-class EmptyQueryFieldValues extends TraceQueryFieldValuesPort {
+class EmptyQueryFieldValues extends TraceQueryFieldValuesRepository {
   async list() {
     return { values: [] };
   }
 }
 
-class NullSummaryReader extends TraceSummaryReaderPort {
+class NullSummaryReaderRepository extends TraceSummaryReaderRepository {
   async tryGetSummary(): Promise<null> {
     return null;
   }
 }
 
-class EmptyPayloads extends TracePayloadReaderPort {
+class EmptyPayloads extends TracePayloadReaderRepository {
   async tryRead(): Promise<null> {
     return null;
   }
@@ -77,7 +77,7 @@ describe("TraceTreeComposition", () => {
       modelProviders: new TestModelProviderService(),
       queryFieldValues: new EmptyQueryFieldValues(),
       queryClassification: new TestTraceQueryClassification(),
-      summaryReader: new NullSummaryReader(),
+      summaryReader: new NullSummaryReaderRepository(),
       payloads: new EmptyPayloads(),
       fullIo: new EmptyFullIo(),
       ...traceReadPorts(),
@@ -110,7 +110,7 @@ describe("TraceTreeComposition", () => {
       modelProviders,
       queryFieldValues: new EmptyQueryFieldValues(),
       queryClassification: new TestTraceQueryClassification(),
-      summaryReader: new NullSummaryReader(),
+      summaryReader: new NullSummaryReaderRepository(),
       payloads: new EmptyPayloads(),
       fullIo: new EmptyFullIo(),
       ...traceReadPorts(),

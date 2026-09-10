@@ -1,7 +1,7 @@
 import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { TraceSpanStoragePort } from "../../repositories/span-storage-write.repository.ts";
+import { TraceSpanStorageRepository } from "../../repositories/span-storage-write.repository.ts";
 
 /**
  * Maps a pipeline NormalizedSpan to the app-layer SpanInsertData.
@@ -58,12 +58,12 @@ function toAppLayer(span: NormalizedSpan, retentionDays: number): SpanInsertData
  */
 export class SpanStorageStore implements AppendStore<NormalizedSpan> {
   private constructor(
-    private readonly storage: TraceSpanStoragePort,
+    private readonly storage: TraceSpanStorageRepository,
     private readonly defaultRetentionDays: number,
   ) {}
 
   static create(options: {
-    storage: TraceSpanStoragePort;
+    storage: TraceSpanStorageRepository;
     defaultRetentionDays: number;
   }): SpanStorageStore {
     return new SpanStorageStore(options.storage, options.defaultRetentionDays);

@@ -5,9 +5,9 @@ import {
 } from "@langwatch/trace-contract";
 import { TraceEventDerivationPort } from "./ports/trace-event-derivation.port.ts";
 import { TraceQueryClassificationPort } from "./ports/trace-query-classification.port.ts";
-import { TraceRecordPort } from "./repositories/read/trace-record.repository.ts";
-import { TraceSummaryReaderPort } from "./repositories/read/trace-summary-reader.repository.ts";
-import { TracePayloadReaderPort } from "./repositories/read/trace-payload-reader.repository.ts";
+import { TraceRecordRepository } from "./repositories/read/trace-record.repository.ts";
+import { TraceSummaryReaderRepository } from "./repositories/read/trace-summary-reader.repository.ts";
+import { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
 
 export { TraceCanonicalisationService } from "./services/canonicalisers/trace-canonicalisation.service.ts";
 export { SpanNormalizationPipelineService } from "./services/span/span-normalization.service.ts";
@@ -15,7 +15,7 @@ export { storedSpanReadBack } from "./repositories/clickhouse/__tests__/stored-s
 export { TraceSpanCostMatchingService } from "./services/span/trace-span-cost-matching.service.ts";
 export { ClickHouseTraceQuerySubqueryAdapter } from "./repositories/clickhouse/trace-query-subquery.clickhouse.adapter.ts";
 
-export class MissingTraceRecordPort extends TraceRecordPort {
+export class MissingTraceRecordRepository extends TraceRecordRepository {
   async getById(input: TraceByIdInput): Promise<never> {
     throw new TraceNotFoundError(input.traceId);
   }
@@ -27,7 +27,7 @@ export class EmptyTraceEventDerivationPort extends TraceEventDerivationPort {
   }
 }
 
-export class EmptyTraceSummaryReaderPort extends TraceSummaryReaderPort {
+export class EmptyTraceSummaryReaderRepository extends TraceSummaryReaderRepository {
   async tryGetSummary(): Promise<null> {
     return null;
   }
@@ -39,7 +39,7 @@ export class EmptyTraceQueryClassificationPort extends TraceQueryClassificationP
   }
 }
 
-export class EmptyTracePayloadReaderPort extends TracePayloadReaderPort {
+export class EmptyTracePayloadReaderRepository extends TracePayloadReaderRepository {
   async tryRead(): Promise<null> {
     return null;
   }

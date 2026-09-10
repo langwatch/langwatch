@@ -3,7 +3,7 @@ import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contrac
 /**
  * Every stored span of ONE trace, read back for a derivation.
  *
- * Declared separately from {@link TraceStoredSpanReaderPort}, which resolves a
+ * Declared separately from {@link TraceStoredSpanReaderRepository}, which resolves a
  * single span by its own identity on a redelivery path. This one answers a
  * whole trace, and the difference is not cosmetic: the result is multi-MB for a
  * large trace, so a consumer that asks per span instead of per trace turns one

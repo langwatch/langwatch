@@ -2,14 +2,14 @@ import type { SpanTreeNode, TraceFullRecord } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
-  TraceQueryFieldValuesPort,
+  TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
 } from "../../repositories/read/query-field-values.repository.ts";
 import { TracePort, type TraceSpanSummaryRecord, type TraceSpanPage } from "../trace.port.ts";
-import { TraceSummaryReaderPort } from "../../repositories/read/trace-summary-reader.repository.ts";
+import { TraceSummaryReaderRepository } from "../../repositories/read/trace-summary-reader.repository.ts";
 import { TraceService } from "../../services/support/trace.service.ts";
-import { TraceFullRecordPort } from "../../repositories/read/trace-full-record.repository.ts";
+import { TraceFullRecordRepository } from "../../repositories/read/trace-full-record.repository.ts";
 import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
 import { TestTraceQueryClassification } from "./support/query-classification.fake.ts";
 import { traceReadPorts } from "./support/trace-read-ports.fake.ts";
@@ -75,13 +75,13 @@ class FakeTraceRepository extends TracePort {
   }
 }
 
-class EmptyQueryFieldValues extends TraceQueryFieldValuesPort {
+class EmptyQueryFieldValues extends TraceQueryFieldValuesRepository {
   async list(): Promise<TraceQueryFieldValuesResult> {
     return { values: [] };
   }
 }
 
-class CapturingSummaryReader extends TraceSummaryReaderPort {
+class CapturingSummaryReader extends TraceSummaryReaderRepository {
   readonly calls: Array<{ tenantId: string; traceId: string }> = [];
 
   async tryGetSummary(input: { tenantId: string; traceId: string }): Promise<null> {
@@ -90,7 +90,7 @@ class CapturingSummaryReader extends TraceSummaryReaderPort {
   }
 }
 
-class FullRecords extends TraceFullRecordPort {
+class FullRecords extends TraceFullRecordRepository {
   readonly calls: string[] = [];
 
   async get(): Promise<TraceFullRecord> {
@@ -112,7 +112,7 @@ class FullRecords extends TraceFullRecordPort {
 
 const service = (
   rows: SpanTreeNode[] = [node],
-  queryFieldValues: TraceQueryFieldValuesPort = new EmptyQueryFieldValues(),
+  queryFieldValues: TraceQueryFieldValuesRepository = new EmptyQueryFieldValues(),
 ) =>
   TraceService.create({
     repository: new FakeTraceRepository(rows.map(record)),
@@ -123,7 +123,7 @@ const service = (
     ...traceReadPorts(),
   });
 
-class CharacterizedQueryFieldValues extends TraceQueryFieldValuesPort {
+class CharacterizedQueryFieldValues extends TraceQueryFieldValuesRepository {
   readonly calls: TraceQueryFieldValuesInput[] = [];
 
   async list(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult> {

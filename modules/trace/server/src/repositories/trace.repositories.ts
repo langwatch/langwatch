@@ -9,7 +9,7 @@ import type { TraceSummaryProjectionRepository } from "./projection/trace-summar
 import type { TraceEditOverlayRepository } from "./trace-edit-overlay.repository.ts";
 import type { SessionGroupsRepository } from "./session-groups.repository.ts";
 import type { TraceListRepository } from "@langwatch/trace-contract";
-import type { TracePayloadReaderPort } from "./read/trace-payload-reader.repository.ts";
+import type { TracePayloadReaderRepository } from "./read/trace-payload-reader.repository.ts";
 
 /**
  * The rows the trace module owns, chosen once at boot. One tier spans two
@@ -31,5 +31,5 @@ export interface TraceRepositories {
   readonly list: TraceListRepository;
   readonly sessionGroups: SessionGroupsRepository;
   /** Claim-check reads for fields the fold offloaded out of the summary. */
-  readonly eventPayloads: TracePayloadReaderPort;
+  readonly eventPayloads: TracePayloadReaderRepository;
 }

@@ -1,4 +1,4 @@
-import { TracePayloadReaderPort } from "../../read/trace-payload-reader.repository.ts";
+import { TracePayloadReaderRepository } from "../../read/trace-payload-reader.repository.ts";
 
 /**
  * The claim-check twin for a process with no ClickHouse.
@@ -10,7 +10,7 @@ import { TracePayloadReaderPort } from "../../read/trace-payload-reader.reposito
  * degrades a memory-backed read exactly the way a trace whose field fitted
  * inline does, instead of failing a read the process could still serve.
  */
-export class MemoryTracePayloadReaderRepository extends TracePayloadReaderPort {
+export class MemoryTracePayloadReaderRepository extends TracePayloadReaderRepository {
   static create(): MemoryTracePayloadReaderRepository {
     return new MemoryTracePayloadReaderRepository();
   }

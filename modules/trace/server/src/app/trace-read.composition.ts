@@ -27,7 +27,7 @@ import { TraceService as TraceLegacyReadService } from "../services/read/trace-l
 import { TraceListService } from "../services/read/trace-list-read.service.ts";
 import { TraceQueryClassificationAdapter } from "../adapters/trace-query-classification.adapter.ts";
 import {
-  TraceQueryFieldValuesPort,
+  TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
 } from "../repositories/read/query-field-values.repository.ts";
 import { TraceSummaryService } from "../services/read/trace-summary-read.service.ts";
@@ -180,7 +180,7 @@ export function composeTraceAppDependencies(
   };
 }
 
-class TraceReadQueryFieldValues extends TraceQueryFieldValuesPort {
+class TraceReadQueryFieldValues extends TraceQueryFieldValuesRepository {
   static create(listReader: TraceListService): TraceReadQueryFieldValues {
     return new TraceReadQueryFieldValues(listReader);
   }

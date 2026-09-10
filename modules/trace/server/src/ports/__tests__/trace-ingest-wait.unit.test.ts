@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { TraceQueryFieldValuesPort } from "../../repositories/read/query-field-values.repository.ts";
-import { TraceSummaryReaderPort } from "../../repositories/read/trace-summary-reader.repository.ts";
+import { TraceQueryFieldValuesRepository } from "../../repositories/read/query-field-values.repository.ts";
+import { TraceSummaryReaderRepository } from "../../repositories/read/trace-summary-reader.repository.ts";
 import {
   TracePort,
   type TraceIngestLagSample,
@@ -40,13 +40,13 @@ class IngestLagRepository extends TracePort {
   }
 }
 
-class EmptyQueryFields extends TraceQueryFieldValuesPort {
+class EmptyQueryFields extends TraceQueryFieldValuesRepository {
   list(): Promise<{ values: [] }> {
     return Promise.resolve({ values: [] });
   }
 }
 
-class NullSummaryReader extends TraceSummaryReaderPort {
+class NullSummaryReaderRepository extends TraceSummaryReaderRepository {
   async tryGetSummary(): Promise<null> {
     return null;
   }
@@ -58,7 +58,7 @@ function createService(repository: TracePort): TraceService {
     modelProviders: new TestModelProviderService(),
     queryFieldValues: new EmptyQueryFields(),
     queryClassification: new TestTraceQueryClassification(),
-    summaryReader: new NullSummaryReader(),
+    summaryReader: new NullSummaryReaderRepository(),
     ...traceReadPorts(),
   });
 }

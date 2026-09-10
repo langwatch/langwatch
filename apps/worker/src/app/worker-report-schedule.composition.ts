@@ -31,11 +31,8 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { TopicApi } from "@langwatch/topic-contract";
-import {
-  TraceListClickHouseRepository,
-  TraceListService,
-  TraceQueryClickHouseAdapter,
-} from "@langwatch/trace-server";
+import { TraceListService, TraceQueryClickHouseAdapter } from "@langwatch/trace-server";
+import type { TraceListRepository } from "@langwatch/trace-contract";
 import type { ReportTraceRow } from "@langwatch/automation-contract";
 import type { WorkerAutomationDeliveryComposition } from "./worker-automation-graph.composition.ts";
 import type { AutomationProjectIdentityPort } from "@langwatch/automation-server";
@@ -128,21 +125,25 @@ export class ComposedWorkerReportTraceList extends WorkerReportTraceListPort {
  * The trace reader a report lists through, composed over this process's own ClickHouse.
  */
 export function createWorkerReportTraceList(options: {
-  resolveClickHouseClient: Parameters<typeof TraceListClickHouseRepository.create>[0];
+  /** The list row the process's trace tier already holds. */
+  list: TraceListRepository;
+  /**
+   * The connection the evaluation runs behind a row are read on, and the retention default both
+   * halves floor at. The evaluation read is Evaluation's own repository, not a trace row.
+   */
+  resolveClickHouseClient: Parameters<typeof ClickHouseEvaluationRepository.create>[0]["resolveClient"];
   /** The event store's own retention default, so both read to the same day. */
   defaultRetentionDays: number;
   baseHost: string;
 }): WorkerReportTraceListPort {
   const evaluations = ClickHouseEvaluationRepository.create({
-    resolveClient: options.resolveClickHouseClient as unknown as Parameters<
-      typeof ClickHouseEvaluationRepository.create
-    >[0]["resolveClient"],
+    resolveClient: options.resolveClickHouseClient,
     retentionFloor: new ReportRetentionFloor(options.defaultRetentionDays),
   });
 
   return ComposedWorkerReportTraceList.create({
     traces: TraceListService.create({
-      repository: TraceListClickHouseRepository.create(options.resolveClickHouseClient),
+      repository: options.list,
       evaluations: Object.assign(
         refuseReportRead<EvaluationApi>("the evaluation runs behind a trace"),
         {

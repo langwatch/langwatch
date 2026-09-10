@@ -7,12 +7,12 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import { TraceClickHousePort, type TraceClickHouseResolver } from "../ports/clickhouse.port.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
-import { TraceQueryFieldValuesPort } from "../repositories/read/query-field-values.repository.ts";
+import { TraceQueryFieldValuesRepository } from "../repositories/read/query-field-values.repository.ts";
 import { TraceQueryClassificationPort } from "../ports/trace-query-classification.port.ts";
-import { TraceSummaryReaderPort } from "../repositories/read/trace-summary-reader.repository.ts";
-import { TraceRecordPort } from "../repositories/read/trace-record.repository.ts";
+import { TraceSummaryReaderRepository } from "../repositories/read/trace-summary-reader.repository.ts";
+import { TraceRecordRepository } from "../repositories/read/trace-record.repository.ts";
 import { TraceEventDerivationPort } from "../ports/trace-event-derivation.port.ts";
-import { TracePayloadReaderPort } from "../repositories/read/trace-payload-reader.repository.ts";
+import { TracePayloadReaderRepository } from "../repositories/read/trace-payload-reader.repository.ts";
 import { TraceFullIoPort } from "../ports/trace-full-io.port.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
 import { TraceService } from "../services/support/trace.service.ts";
@@ -20,12 +20,12 @@ import { TraceService } from "../services/support/trace.service.ts";
 export type TraceTreeCompositionOptions = {
   resolveClient: TraceClickHouseResolver;
   modelProviders: ModelProviderApi;
-  queryFieldValues: TraceQueryFieldValuesPort;
+  queryFieldValues: TraceQueryFieldValuesRepository;
   queryClassification?: TraceQueryClassificationPort;
-  summaryReader?: TraceSummaryReaderPort;
-  records?: TraceRecordPort;
+  summaryReader?: TraceSummaryReaderRepository;
+  records?: TraceRecordRepository;
   eventDerivation?: TraceEventDerivationPort;
-  payloads: TracePayloadReaderPort;
+  payloads: TracePayloadReaderRepository;
   fullIo: TraceFullIoPort;
 };
 
@@ -46,7 +46,7 @@ export class TraceTreeComposition {
       queryClassification:
         this.options.queryClassification ?? NullTraceQueryClassificationAdapter.create(),
       summaryReader: this.options.summaryReader ?? new NullTraceSummaryReader(),
-      records: this.options.records ?? new NullTraceRecordPort(),
+      records: this.options.records ?? new NullTraceRecordRepository(),
       eventDerivation: this.options.eventDerivation ?? new NullTraceEventDerivationPort(),
       fullRecords: ClickHouseTraceFullRecordRepository.create(
         clickhouse,
@@ -71,13 +71,13 @@ class ResolverTraceClickHousePort extends TraceClickHousePort {
   }
 }
 
-class NullTraceSummaryReader extends TraceSummaryReaderPort {
+class NullTraceSummaryReader extends TraceSummaryReaderRepository {
   async tryGetSummary(): Promise<null> {
     return null;
   }
 }
 
-class NullTraceRecordPort extends TraceRecordPort {
+class NullTraceRecordRepository extends TraceRecordRepository {
   async getById(input: TraceByIdInput): Promise<never> {
     throw new TraceNotFoundError(input.traceId);
   }

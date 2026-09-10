@@ -6,7 +6,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { TraceClickHousePort, type TraceClickHouseClient } from "../../../ports/clickhouse.port.ts";
-import { TracePayloadReaderPort } from "../../read/trace-payload-reader.repository.ts";
+import { TracePayloadReaderRepository } from "../../read/trace-payload-reader.repository.ts";
 import { TraceFullIoPort } from "../../../ports/trace-full-io.port.ts";
 import { ClickHouseTraceFullRecordRepository } from "../trace-full-record.repository.ts";
 
@@ -23,7 +23,7 @@ class ClientPort extends TraceClickHousePort {
   }
 }
 
-class Payloads extends TracePayloadReaderPort {
+class Payloads extends TracePayloadReaderRepository {
   readonly calls: Array<{ tenantId: string; traceId: string }> = [];
 
   constructor(private readonly value: string | null) {

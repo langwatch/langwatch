@@ -41,12 +41,12 @@ import {
 } from "@langwatch/trace-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import type { TraceQueryFieldValuesPort } from "../../repositories/read/query-field-values.repository.ts";
+import type { TraceQueryFieldValuesRepository } from "../../repositories/read/query-field-values.repository.ts";
 import type { TraceQueryClassificationPort } from "../../ports/trace-query-classification.port.ts";
-import type { TraceSummaryReaderPort } from "../../repositories/read/trace-summary-reader.repository.ts";
-import type { TraceRecordPort } from "../../repositories/read/trace-record.repository.ts";
+import type { TraceSummaryReaderRepository } from "../../repositories/read/trace-summary-reader.repository.ts";
+import type { TraceRecordRepository } from "../../repositories/read/trace-record.repository.ts";
 import type { TraceEventDerivationPort } from "../../ports/trace-event-derivation.port.ts";
-import type { TraceFullRecordPort } from "../../repositories/read/trace-full-record.repository.ts";
+import type { TraceFullRecordRepository } from "../../repositories/read/trace-full-record.repository.ts";
 import { TracePort, type TraceSpanSummaryRecord } from "../../ports/trace.port.ts";
 import { TraceQueryFieldCatalogueService } from "../facet/trace-query-field-catalogue.service.ts";
 import { nowInstant } from "@langwatch/time";
@@ -54,12 +54,12 @@ import { nowInstant } from "@langwatch/time";
 type TraceComposition = {
   repository: TracePort;
   modelProviders: ModelProviderApi;
-  queryFieldValues: TraceQueryFieldValuesPort;
+  queryFieldValues: TraceQueryFieldValuesRepository;
   queryClassification: TraceQueryClassificationPort;
-  summaryReader: TraceSummaryReaderPort;
-  records: TraceRecordPort;
+  summaryReader: TraceSummaryReaderRepository;
+  records: TraceRecordRepository;
   eventDerivation: TraceEventDerivationPort;
-  fullRecords: TraceFullRecordPort;
+  fullRecords: TraceFullRecordRepository;
 };
 
 const DEFAULT_INGEST_WAIT_MS = 30_000;

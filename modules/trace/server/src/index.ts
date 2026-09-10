@@ -12,6 +12,8 @@ export { TraceCanonicalisationService } from "./services/canonicalisers/trace-ca
  */
 export { TraceRetentionFloorService } from "./services/support/trace-retention-floor.service.ts";
 export { NullTraceListAdapter } from "./repositories/memory/null-trace-list.adapter.ts";
+export { traceRepositories } from "./repositories/trace-repositories.registry.ts";
+export type { TraceRepositories } from "./repositories/trace.repositories.ts";
 export {
   EventingTracePipelineAdapter,
   type EventingTracePipelineAdapterOptions,
@@ -88,12 +90,12 @@ export {
   TraceWindowedReadMetricsPort,
   type TraceWindowedReadOutcome,
 } from "./ports/trace-windowed-read-metrics.port.ts";
-export { TraceRecordPort } from "./repositories/read/trace-record.repository.ts";
+export { TraceRecordRepository } from "./repositories/read/trace-record.repository.ts";
 
-export { TracePayloadReaderPort } from "./repositories/read/trace-payload-reader.repository.ts";
+export { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
 export { TraceFullIoPort } from "./ports/trace-full-io.port.ts";
 export { TraceEventDerivationPort } from "./ports/trace-event-derivation.port.ts";
-export { TraceQueryFieldValuesPort } from "./repositories/read/query-field-values.repository.ts";
+export { TraceQueryFieldValuesRepository } from "./repositories/read/query-field-values.repository.ts";
 
 export { TraceQueryClassificationAdapter } from "./adapters/trace-query-classification.adapter.ts";
 export { TraceQueryClickHouseAdapter } from "./repositories/clickhouse/trace-query.clickhouse.adapter.ts";
@@ -108,7 +110,7 @@ export {
 export { ClickHouseSpanAttributeKeysFacetAdapter } from "./repositories/clickhouse/trace-facet-span-attribute-keys.clickhouse.adapter.ts";
 export { TraceQueryEvaluationAdapter } from "./adapters/trace-query-evaluation.adapter.ts";
 export type { FieldDef } from "@langwatch/trace-contract";
-export { TraceSummaryReaderPort } from "./repositories/read/trace-summary-reader.repository.ts";
+export { TraceSummaryReaderRepository } from "./repositories/read/trace-summary-reader.repository.ts";
 export {
   TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
@@ -123,9 +125,9 @@ export {
 } from "./ports/trace-span-preparation.port.ts";
 export { TraceSpanSpoolPort, type TraceSpanSpoolIdentity } from "./ports/trace-span-spool.port.ts";
 export { TraceSpanNormalizationPort } from "./ports/trace-span-normalization.port.ts";
-export { TraceSpanStoragePort } from "./repositories/span-storage-write.repository.ts";
+export { TraceSpanStorageRepository } from "./repositories/span-storage-write.repository.ts";
 export { TraceSpanStorageClickHouseRepository } from "./repositories/clickhouse/trace-span-storage.repository.ts";
-export { TraceStoredSpanReaderPort } from "./repositories/read/trace-stored-span-reader.repository.ts";
+export { TraceStoredSpanReaderRepository } from "./repositories/read/trace-stored-span-reader.repository.ts";
 export { TraceDerivationSpanReaderRepository } from "./repositories/read/trace-derivation-span-reader.repository.ts";
 export { TraceDerivationSpanClickHouseRepository } from "./repositories/clickhouse/trace-derivation-span.repository.ts";
 export { TraceEventDerivationService } from "./services/ingestion/trace-event-derivation.service.ts";

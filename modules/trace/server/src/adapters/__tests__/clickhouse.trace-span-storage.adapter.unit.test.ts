@@ -4,7 +4,7 @@ import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
 } from "../../ports/clickhouse.port.ts";
-import { TraceSpanStoragePort } from "../../repositories/span-storage-write.repository.ts";
+import { TraceSpanStorageRepository } from "../../repositories/span-storage-write.repository.ts";
 import { TraceSpanStorageClickHouseRepository } from "../../repositories/clickhouse/trace-span-storage.repository.ts";
 
 /**
@@ -74,7 +74,7 @@ describe("TraceSpanStorageClickHouseRepository", () => {
   describe("given a tenant-keyed ClickHouse client", () => {
     /** @scenario "A background process can build the whole write path from what it holds" */
     it("is the span-storage port the store consumes", () => {
-      expect(adapter().port).toBeInstanceOf(TraceSpanStoragePort);
+      expect(adapter().port).toBeInstanceOf(TraceSpanStorageRepository);
     });
 
     /** @scenario "The batch is one insert, not one insert per span" */

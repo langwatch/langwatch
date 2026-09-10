@@ -6,10 +6,10 @@ import {
   type TraceFullThreadReadInput,
 } from "@langwatch/trace-contract";
 import { TraceEventDerivationPort } from "../../trace-event-derivation.port.ts";
-import { TraceFullRecordPort } from "../../../repositories/read/trace-full-record.repository.ts";
-import { TraceRecordPort } from "../../../repositories/read/trace-record.repository.ts";
+import { TraceFullRecordRepository } from "../../../repositories/read/trace-full-record.repository.ts";
+import { TraceRecordRepository } from "../../../repositories/read/trace-record.repository.ts";
 
-class MissingTraceRecords extends TraceRecordPort {
+class MissingTraceRecords extends TraceRecordRepository {
   async getById(input: TraceByIdInput): Promise<never> {
     throw new TraceNotFoundError(input.traceId);
   }
@@ -21,7 +21,7 @@ class EmptyTraceEvents extends TraceEventDerivationPort {
   }
 }
 
-class MissingFullTraceRecords extends TraceFullRecordPort {
+class MissingFullTraceRecords extends TraceFullRecordRepository {
   async get(input: TraceFullReadInput): Promise<TraceFullRecord> {
     throw new TraceNotFoundError(input.traceId);
   }

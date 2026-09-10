@@ -171,6 +171,7 @@ import { ExperimentEventingAdapter } from "@langwatch/experiment-server";
 import {
   TraceStoredSpanReaderClickHouseRepository,
   TraceProcessingServerInstallerAdapter,
+  traceRepositories,
 } from "@langwatch/trace-server";
 import { createWorkerAnalytics } from "./worker-analytics.composition.ts";
 import {
@@ -1098,6 +1099,14 @@ export class WorkerProductionComposition {
       ...(automationAbsence ? { absence: automationAbsence } : {}),
     });
     const automationClock = new WorkerAutomationClock();
+    // The trace module's own rows, from the tier this process's substrates satisfy. Built here
+    // rather than inside the report calendar, so a second reader of a trace row asks the same
+    // registry rather than opening its own ClickHouse repository.
+    const traceRepositoryRows = traceRepositories.definitions.postgres.create({
+      prisma: traceDatabase,
+      clickhouse: options.eventing.resolveClickHouseClient,
+      defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+    });
     // Composed exactly when this process holds the typed client the calendar row lives in AND can
     // send: a report that came due on a process with no mail would claim its slot, render its data
     // and deliver nothing, which is strictly worse than a slot nobody claimed — the lease settles,
@@ -1118,10 +1127,8 @@ export class WorkerProductionComposition {
               defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
             }),
             traces: createWorkerReportTraceList({
-              resolveClickHouseClient: options.eventing
-                .resolveClickHouseClient as unknown as Parameters<
-                typeof createWorkerReportTraceList
-              >[0]["resolveClickHouseClient"],
+              list: traceRepositoryRows.list,
+              resolveClickHouseClient: options.eventing.resolveClickHouseClient,
               defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
               baseHost: mail.baseHost,
             }),

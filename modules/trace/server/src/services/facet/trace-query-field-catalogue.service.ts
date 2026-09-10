@@ -5,7 +5,7 @@ import {
   type TraceQueryFieldCatalogueInput,
 } from "@langwatch/trace-contract";
 
-import type { TraceQueryFieldValuesPort } from "../../repositories/read/query-field-values.repository.ts";
+import type { TraceQueryFieldValuesRepository } from "../../repositories/read/query-field-values.repository.ts";
 
 const DYNAMIC_VALUES_LIMIT = 20;
 const SAMPLES_SHOWN = 8;
@@ -20,9 +20,9 @@ function isCategoricalSearchField(field: SearchFieldMeta): field is CategoricalS
 }
 
 export class TraceQueryFieldCatalogueService {
-  private constructor(private readonly values: TraceQueryFieldValuesPort) {}
+  private constructor(private readonly values: TraceQueryFieldValuesRepository) {}
 
-  static create(values: TraceQueryFieldValuesPort): TraceQueryFieldCatalogueService {
+  static create(values: TraceQueryFieldValuesRepository): TraceQueryFieldCatalogueService {
     return new TraceQueryFieldCatalogueService(values);
   }
 

@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/trace-contract";
 import {
   SpanNormalizationPipelineService,
-  type TraceStoredSpanReaderPort,
+  type TraceStoredSpanReaderRepository,
 } from "@langwatch/trace-server";
 
 /**
@@ -19,14 +19,14 @@ import {
 export class WorkerCodingAgentTraceProcessingAdapter extends CodingAgentTraceProcessingPort {
   private constructor(
     private readonly normalization: SpanNormalizationPipelineService,
-    private readonly spans: TraceStoredSpanReaderPort,
+    private readonly spans: TraceStoredSpanReaderRepository,
   ) {
     super();
   }
 
   static create(options: {
     traceCanonicalisation: TraceCanonicalisationService;
-    spans: TraceStoredSpanReaderPort;
+    spans: TraceStoredSpanReaderRepository;
   }): WorkerCodingAgentTraceProcessingAdapter {
     return new WorkerCodingAgentTraceProcessingAdapter(
       SpanNormalizationPipelineService.create(options.traceCanonicalisation),

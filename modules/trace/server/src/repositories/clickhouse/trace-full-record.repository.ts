@@ -9,9 +9,9 @@ import {
 import { EventUtils } from "@langwatch/eventing";
 
 import type { TraceClickHouseClient, TraceClickHousePort } from "../../ports/clickhouse.port.ts";
-import { TraceFullRecordPort } from "../read/trace-full-record.repository.ts";
+import { TraceFullRecordRepository } from "../read/trace-full-record.repository.ts";
 import type { TraceFullIoPort } from "../../ports/trace-full-io.port.ts";
-import type { TracePayloadReaderPort } from "../read/trace-payload-reader.repository.ts";
+import type { TracePayloadReaderRepository } from "../read/trace-payload-reader.repository.ts";
 import {
   internalTraceFullReadProtections,
   TraceFullProtectionMapper,
@@ -44,10 +44,10 @@ type SummaryRow = {
 type PayloadReference = { traceId: string; eventId: string; field: string };
 
 /** Full-record reader with package-owned normalized mapping and bounded recall. */
-export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
+export class ClickHouseTraceFullRecordRepository extends TraceFullRecordRepository {
   private constructor(
     private readonly clickhouse: TraceClickHousePort,
-    private readonly payloads: TracePayloadReaderPort,
+    private readonly payloads: TracePayloadReaderRepository,
     private readonly io: TraceFullIoPort,
   ) {
     super();
@@ -55,7 +55,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordPort {
 
   static create(
     clickhouse: TraceClickHousePort,
-    payloads: TracePayloadReaderPort,
+    payloads: TracePayloadReaderRepository,
     io: TraceFullIoPort,
   ): ClickHouseTraceFullRecordRepository {
     return new ClickHouseTraceFullRecordRepository(clickhouse, payloads, io);

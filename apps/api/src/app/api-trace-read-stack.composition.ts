@@ -56,30 +56,19 @@ import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
   TraceAiQueryService,
-  LogRecordStorageClickHouseRepository,
   LogRecordStorageService,
-  NullLogRecordStorageRepository,
-  NullSessionGroupsRepository,
-  NullSpanStorageRepository,
-  NullTraceListAdapter,
-  NullTraceSummaryRepository,
-  SessionGroupsClickHouseRepository,
   SessionGroupsService,
-  SpanStorageClickHouseRepository,
   SpanStorageService,
   TraceCanonicalisationService,
   TraceLegacyReadClickHouseRepository,
   TraceEditOverlayService,
   TraceIOExtractionService,
-  TraceListClickHouseRepository,
   TraceListService,
   TraceLegacyReadService,
-  ClickHouseTraceExistenceRepository,
   TraceFullIoPort,
-  TracePayloadReaderPort,
+  TracePayloadReaderRepository,
   TraceQueryClassificationAdapter,
   TraceSpanIngestPort,
-  TraceSummaryClickHouseRepository,
   TraceSummaryService,
   traceMetadataUpdateSchema,
   VisibilityWindowService,
@@ -87,6 +76,9 @@ import {
   type TraceAppDependencies,
   TraceViewerProtectionService,
   TraceViewerReadService,
+  traceRepositories,
+  type TraceRepositories,
+  type TraceClickHouseWriteResolver,
 } from "@langwatch/trace-server";
 import type { TracesV2TrpcPorts } from "@langwatch/trace-server/api-trpc/traces-v2";
 import type { TracesTrpcPorts } from "@langwatch/trace-server/api-trpc/traces";
@@ -281,6 +273,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
   private readonly canonicalisation = TraceCanonicalisationService.create();
   private readonly protections: TraceViewerProtectionService;
   private readonly composed: TraceAppDependencies["traces"];
+  private readonly repositories: TraceRepositories;
   private readonly viewerService: TraceViewerService;
   private readonly dropPolicy = ContentDropPolicyService.create();
   private readonly preconditions = EvaluationPreconditionService.create();
@@ -298,6 +291,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
       fallbackVisibilityDays: FREE_VISIBILITY_DAYS,
       processName: options.processName,
     });
+    this.repositories = this.resolveRepositories();
     this.composed = this.composeReaders();
     this.viewerService = TraceViewerReadService.create({
       read: this.composed.read,
@@ -523,6 +517,24 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     };
   }
 
+  /**
+   * The trace module's own twelve rows, chosen once. A process that composed no ClickHouse takes
+   * the memory tier - the same answer the hand-built Null* stand-ins gave, from the module rather
+   * than from here. The reviewer correction is the exception: it lives in Postgres, which this
+   * process always holds, so it is bound to Prisma on both tiers.
+   */
+  private resolveRepositories(): TraceRepositories {
+    const resolve = this.options.resolveClickHouseClient;
+    const tier = resolve
+      ? traceRepositories.definitions.postgres.create({
+          prisma: this.options.prisma,
+          clickhouse: resolve as unknown as TraceClickHouseWriteResolver,
+          defaultRetentionDays: this.options.defaultRetentionDays,
+        })
+      : traceRepositories.definitions.memory.create();
+    return { ...tier, editOverlay: PrismaTraceEditOverlayRepository.create(this.options.prisma) };
+  }
+
   // -------------------------------------------------------------------------
   // The ten readers
   // -------------------------------------------------------------------------
@@ -530,7 +542,6 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
   private composeReaders(): TraceAppDependencies["traces"] {
     const options = this.options;
     const resolve = options.resolveClickHouseClient;
-    const enabled = resolve !== null;
 
     const blobStore = TraceBlobStoreService.create({
       // The v1 spool predates this deployment: a ref written before the
@@ -545,9 +556,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     const ioExtractionService = TraceIOExtractionService.create(this.canonicalisation);
     const blobResolutionDeps = { blobStore, ioExtractionService };
 
-    const spanStorageRepository = resolve
-      ? new SpanStorageClickHouseRepository(resolve as never)
-      : new NullSpanStorageRepository();
+    const spanStorageRepository = this.repositories.spanStorage;
 
     const read = TraceLegacyReadService.create({
       traceCanonicalisation: this.canonicalisation,
@@ -558,9 +567,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
         blobResolutionDeps,
         retentionResolver: options.dataRetention,
       }),
-      editOverlay: TraceEditOverlayService.create(
-        PrismaTraceEditOverlayRepository.create(options.prisma),
-      ),
+      editOverlay: TraceEditOverlayService.create(this.repositories.editOverlay),
       logRecordStorage: this.composeLogRecords(),
       // The SAME rule the list beside it follows: a composed capability where
       // the process has one, and a refusal by name where it does not. Left
@@ -569,25 +576,15 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
     });
 
     return {
-      existence: resolve
-        ? new ClickHouseTraceExistenceRepository(resolve as never)
-        : {
-            // An API process without trace storage has no ids to queue. This
-            // preserves the legacy empty-set answer for annotation workflows.
-            findExistingTraceIds: async () => [],
-          },
+      existence: this.repositories.existence,
       read: read as unknown as TraceAppDependencies["traces"]["read"],
       list: TraceListService.create({
-        repository: enabled
-          ? TraceListClickHouseRepository.create(resolve as never)
-          : NullTraceListAdapter.create(),
+        repository: this.repositories.list,
         evaluations: options.evaluations ?? this.refusingEvaluations(),
         topicService: options.topics,
       }) as unknown as TraceAppDependencies["traces"]["list"],
       sessionGroups: SessionGroupsService.create({
-        repository: resolve
-          ? new SessionGroupsClickHouseRepository(resolve as never)
-          : new NullSessionGroupsRepository(),
+        repository: this.repositories.sessionGroups,
         codingAgentSessions: options.codingAgents ?? this.refusingCodingAgents(),
         resolveOrganizationId: (projectId) => this.tryResolveOrganizationId(projectId),
       }) as unknown as TraceAppDependencies["traces"]["sessionGroups"],
@@ -596,20 +593,13 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
         blobResolutionDeps,
       }) as unknown as TraceAppDependencies["traces"]["spans"],
       summary: TraceSummaryService.create({
-        repository: resolve
-          ? TraceSummaryClickHouseRepository.create({
-              resolveClient: resolve as never,
-              defaultRetentionDays: this.options.defaultRetentionDays,
-            })
-          : new NullTraceSummaryRepository(),
+        repository: this.repositories.summary,
         fullResolutionDeps: { spanStorageRepository, ...blobResolutionDeps },
       }) as unknown as TraceAppDependencies["traces"]["summary"],
       tree: this.composeTree(),
       logRecords: this.composeLogRecords(),
       canonicalisation: this.canonicalisation,
-      editOverlay: TraceEditOverlayService.create(
-        PrismaTraceEditOverlayRepository.create(options.prisma),
-      ),
+      editOverlay: TraceEditOverlayService.create(this.repositories.editOverlay),
       changeTraceName: () => Promise.reject(this.refuse("the trace rename command")),
     } as TraceAppDependencies["traces"];
   }
@@ -646,11 +636,8 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
   }
 
   private composeLogRecords(): TraceAppDependencies["traces"]["logRecords"] {
-    const resolve = this.options.resolveClickHouseClient;
     return LogRecordStorageService.create({
-      repository: resolve
-        ? new LogRecordStorageClickHouseRepository(resolve as never)
-        : new NullLogRecordStorageRepository(),
+      repository: this.repositories.logRecords,
       // The CANONICAL LOG READ — `LogService.getLogsByTraceId` over the `log_records` table —
       // is the log feature's, and this process composes none.
       canonical: refuseAll((capability) => this.refuse(capability), "the canonical log read"),
@@ -758,16 +745,17 @@ class ApiTraceCapabilityUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
 
   constructor(processName: string, capability: string) {
-    super("service_unavailable", `${processName} has no ${capability}.`, {
+    super("service_unavailable", "This part of the product is not available on this deployment", {
       httpStatus: 503,
       fault: "platform",
+      meta: { process: processName, capability },
     });
     this.name = "ApiTraceCapabilityUnavailableError";
   }
 }
 
 /** An offloaded payload, on a process that resolves none. */
-class UnresolvedTracePayloadReader extends TracePayloadReaderPort {
+class UnresolvedTracePayloadReader extends TracePayloadReaderRepository {
   static create(): UnresolvedTracePayloadReader {
     return new UnresolvedTracePayloadReader();
   }
@@ -813,18 +801,6 @@ function tryActorId(ctx: unknown): string | undefined {
 }
 
 /**
- * What one caller may read of one project's captured content. Three independent sources, and
- * they are independent on purpose. Spend follows the caller's own PERMISSION — `cost:view`, the
-    super("service_unavailable", "This part of the product is not available on this deployment", {
-      httpStatus: 503,
-      fault: "platform",
-      meta: { process: processName, capability },
-    });
-    this.name = "ApiTraceCapabilityUnavailableError";
-  }
-}
-
-/**
  * A stand-in whose every member refuses by name.
  */
 function refuseAll<T>(refuse: (capability: string) => Error, capability: string): T {
@@ -838,5 +814,3 @@ function refuseAll<T>(refuse: (capability: string) => Error, capability: string)
     },
   ) as T;
 }
-
-/** The platform default retention, kept beside the composition that states it. */

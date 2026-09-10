@@ -2,8 +2,8 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { NormalizedSpan, SpanInsertData } from "@langwatch/trace-contract";
 import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
-import { TraceStoredSpanReaderPort } from "../read/trace-stored-span-reader.repository.ts";
-import { TraceSpanStoragePort } from "../span-storage-write.repository.ts";
+import { TraceStoredSpanReaderRepository } from "../read/trace-stored-span-reader.repository.ts";
+import { TraceSpanStorageRepository } from "../span-storage-write.repository.ts";
 import {
   type FullSpanRow,
   mapChRowToNormalized,
@@ -180,7 +180,7 @@ interface ClickHouseSpanRecord {
  * same one the event store already stamps its own rows with, so producer and
  * consumer cannot disagree about it.
  */
-export class TraceSpanStorageClickHouseRepository extends TraceSpanStoragePort {
+export class TraceSpanStorageClickHouseRepository extends TraceSpanStorageRepository {
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
@@ -434,7 +434,7 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStoragePort {
  * resolve nothing while looking correct. The two exist because the CAPABILITIES
  * differ - one is the ingestion hot path, the other a redelivery lookup.
  */
-export class TraceStoredSpanReaderClickHouseRepository extends TraceStoredSpanReaderPort {
+export class TraceStoredSpanReaderClickHouseRepository extends TraceStoredSpanReaderRepository {
   private constructor(private readonly repository: TraceSpanStorageClickHouseRepository) {
     super();
   }
