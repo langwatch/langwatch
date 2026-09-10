@@ -1037,10 +1037,18 @@ export class ActivityMonitorService {
 
     const source = await this.prisma.ingestionSource.findFirst({
       where: { id: input.sourceId, organizationId: input.organizationId },
-      select: { errorCount: true, lastSuccessAt: true },
+      select: {
+        errorCount: true,
+        lastSuccessAt: true,
+        // How far the run actually READ. A day the run never reached is not
+        // a day it collected, and reasoning from the run clock instead marks
+        // the whole window covered the moment any run finishes.
+        lastReadThroughAt: true,
+      },
     });
     const consecutiveFailures = source?.errorCount ?? 0;
     const lastSuccessfulPullMs = source?.lastSuccessAt?.getTime() ?? null;
+    const readThroughMs = source?.lastReadThroughAt?.getTime() ?? null;
 
     return {
       health: deriveSourceHealth({ consecutiveFailures }),
@@ -1050,7 +1058,11 @@ export class ActivityMonitorService {
         const dayStartMs = windowStart + i * dayMs;
         return {
           dayStartIso: new Date(dayStartMs).toISOString(),
-          covered: isDayCoveredByPull({ dayStartMs, lastSuccessfulPullMs }),
+          covered: isDayCoveredByPull({
+            dayStartMs,
+            lastSuccessfulPullMs,
+            readThroughMs,
+          }),
         };
       }),
     };

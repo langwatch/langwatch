@@ -10,7 +10,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { formatLaneUsd, seatPoolName } from "../costLaneFormat";
+import {
+  formatLaneCurrencyTotal,
+  formatLaneUsd,
+  seatPoolName,
+} from "../costLaneFormat";
 
 describe("formatLaneUsd", () => {
   it("groups a bill-sized amount and drops the cents", () => {
@@ -50,6 +54,75 @@ describe("formatLaneUsd", () => {
 
   it("shows a measured zero as a zero", () => {
     expect(formatLaneUsd(0)).toBe("$0.00");
+  });
+});
+
+/**
+ * The same three bands with the currency named instead of symbolised.
+ *
+ * Two totals sit on one card — the dollar headline and a line per other
+ * currency — and a card where they round differently is a card that says one
+ * of them is smaller than it is. So each band is pinned against its dollar
+ * twin above, at the same amounts.
+ */
+describe("formatLaneCurrencyTotal", () => {
+  it("groups a bill-sized amount and drops the cents, as the dollar figure does", () => {
+    expect(
+      formatLaneCurrencyTotal({ currencyCode: "EUR", amount: 227_999 }),
+    ).toBe("EUR 227,999");
+  });
+
+  it("keeps the cents on an amount small enough for them to be the figure", () => {
+    expect(
+      formatLaneCurrencyTotal({ currencyCode: "EUR", amount: 999.99 }),
+    ).toBe("EUR 999.99");
+    expect(formatLaneCurrencyTotal({ currencyCode: "EUR", amount: 1000 })).toBe(
+      "EUR 1,000",
+    );
+  });
+
+  it("keeps sub-unit precision below one, rather than rounding it to a zero", () => {
+    // The gateway lane's own scale. Rounded to cents this reads `EUR 0.00`,
+    // which says a currency nothing was spent in, beside a dollar figure of
+    // the same size reading `$0.000165`.
+    expect(
+      formatLaneCurrencyTotal({ currencyCode: "EUR", amount: 0.000165 }),
+    ).toBe("EUR 0.000165");
+    expect(
+      formatLaneCurrencyTotal({ currencyCode: "EUR", amount: 0.004 }),
+    ).toBe("EUR 0.004");
+  });
+
+  it("shows a measured zero as a zero, so a retracted amount can be stated", () => {
+    expect(formatLaneCurrencyTotal({ currencyCode: "EUR", amount: 0 })).toBe(
+      "EUR 0.00",
+    );
+  });
+
+  it("answers an em dash when no figure is held", () => {
+    expect(formatLaneCurrencyTotal({ currencyCode: "EUR", amount: null })).toBe(
+      "EUR —",
+    );
+  });
+
+  it("reads a refund with the sign out front", () => {
+    expect(
+      formatLaneCurrencyTotal({ currencyCode: "EUR", amount: -12.5 }),
+    ).toBe("EUR -12.50");
+  });
+
+  it("says so plainly when the read named no currency at all", () => {
+    expect(formatLaneCurrencyTotal({ currencyCode: "", amount: 40 })).toBe(
+      "No currency named 40.00",
+    );
+  });
+
+  it("carries no currency symbol, so the code is the only thing naming it", () => {
+    // A dollar sign left on by the sub-unit band would put two currencies on
+    // one line: `EUR $0.000165`.
+    expect(
+      formatLaneCurrencyTotal({ currencyCode: "EUR", amount: 0.000165 }),
+    ).not.toMatch(/\$/);
   });
 });
 

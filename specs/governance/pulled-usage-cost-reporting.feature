@@ -138,6 +138,23 @@ Feature: Pulled provider usage becomes visible, attributed cost
     # The event log is append-only history. A shape change that cannot read
     # what is already on it is a rebuild, not a migration.
 
+  @unit
+  Scenario: An exported usage record names the currency beside its amount
+    When a pulled record is prepared for export
+    Then the exported record carries the amount and the currency it was billed in
+    And the amount does not travel under a name that says dollars
+    # The currency reached the export only buried inside a bag of extra
+    # fields, while the amount sat at the top under a dollar name. A reader
+    # taking the export at face value read every provider as billing in
+    # dollars, which for one of them is already false.
+
+  @unit
+  Scenario: A bill the provider issued in euros is not exported as a dollar figure
+    Given a provider bill issued in euros
+    When that day is prepared for export
+    Then the euro amount is exported as euros
+    And the only dollar figure exported is one the provider itself published
+
   # --- Days read while cost recording was off ---
   # The pull cursor advances whether or not the money path is live, because
   # audit-only is a supported way to run a source. That makes the loss one-way:
@@ -195,3 +212,305 @@ Feature: Pulled provider usage becomes visible, attributed cost
     Then the source still remembers the whole window
     # Half a repair is not a repair, and narrowing the window would claim days
     # that were never re-priced.
+
+  @unit
+  Scenario: A cost read that stopped before its end leaves the window alone
+    Given a source that remembers an unpriced window
+    And an organization that is recording pulled cost again
+    When a run whose cost read stopped early prices a day at or before the start of that window
+    Then the source still remembers the whole window
+    # Clearing rests on one thing being true: a read that reached the earliest
+    # lost day reached every later one as well. That holds because a cost
+    # adapter re-reads a trailing window ending at today rather than resuming
+    # from where it stopped — and it stops holding the moment that read ends
+    # before its end. A read that hit its page limit or ran out of time
+    # reached the first lost day and an unknown number after it, and clearing
+    # on that evidence declares repaired a stretch of days nobody re-priced.
+    # The window is the only record that those days are missing, so clearing
+    # it wrongly is not recoverable by a later run.
+    #
+    # What is read here is the flag the run reports, and for every source that
+    # walks its own bill forward from the window start that flag is the cost
+    # read's own — set when the page limit or the clock cut the walk short
+    # with a page still in hand.
+    #
+    # One source is not covered and cannot be. It pulls conversations and
+    # money on separate cursors and reports the conversation walk, while its
+    # money half holds what it could not read inside a cursor the run never
+    # sees. There the flag errs safe — a cut-short conversation walk refuses
+    # to clear a window that was in fact repaired, which is the same "half a
+    # repair is not a repair" the rest of this file takes — and errs unsafe
+    # the other way, clearing on a whole conversation walk while money was
+    # held back. Closing that needs the money half to report, which it does
+    # not, so this scenario does not claim it.
+
+  # --- A read that stopped halfway is honest about where it stopped ---
+  # A read can end for three reasons that are not errors: it hit the number
+  # of pages one run may take, it ran out of time, or it failed after some
+  # pages had already been read. All three end with money already gathered
+  # and a period that was never finished. The collection state that follows
+  # from that is specified in specs/governance/ingestion-source-health.feature;
+  # what follows here is what happens to the money.
+
+  @unit
+  Scenario: A read that stops before the end keeps the money it already gathered
+    Given a period that needs more than one page to read
+    When the read stops early after some of them
+    Then the amounts already read are recorded
+    And the period is not recorded as read through to its end
+
+  @unit
+  Scenario: A read of a stored log that stops at its file limit says it stopped early
+    Given a store holding more log files than one run is allowed to read
+    When the read stops at that limit
+    Then the run reports that it stopped before the end
+    # The one source that used to hide its own limits: it ended a part read
+    # and a whole read through the same exit, so nothing above it could tell
+    # the two apart, and a source stuck on a fraction of its bucket read as
+    # healthy forever.
+
+  @integration
+  Scenario: Restarting after a read that stopped halfway does not record the spend twice
+    Given a read that recorded part of a period and then failed
+    When a later read covers that period again from the start
+    Then each day of the period counts once
+    And the recorded total is what the provider reported rather than twice it
+
+  # --- Reading back over a window a provider may still correct ---
+
+  @unit
+  Scenario: A cost read looks back a few days so a late correction is picked up
+    Given a source that has already read money up to a recent day
+    When the next cost read starts
+    Then it starts a few days earlier than the day it had reached
+    And it never starts before the day the connection was told to begin at
+    # This provider corrects money after the fact. Reading only forward
+    # meant the first figure we ever saw for a day was the last one we would
+    # ever hold, and it disagreed with the provider console within a week.
+    # A few days is what the sibling connection already does, and it costs
+    # one request.
+
+  @unit
+  Scenario: Once a day the cost read reaches a month back
+    Given a source whose last deep read was on an earlier day
+    When it makes its next scheduled run
+    Then that run looks a month back rather than a few days
+    And once that run finishes, the runs that follow it the same day look back a few days again
+    And a deep read that fails before it finishes is tried again on the next run
+    # A month of corrections has to be picked up eventually, and reading a
+    # month on every run multiplies this connection's traffic by its
+    # cadence. The day of the last deep read is remembered alongside the
+    # rest of the connection's state, so nothing new has to be scheduled to
+    # make it happen. It is remembered when the deep read finishes, not when
+    # it is asked for: a day whose deep read broke off has not been read.
+
+  @unit
+  Scenario: Looking back does not move the saved position backwards
+    Given a cost read that started earlier than the day it had reached
+    When that read finishes
+    Then the position it saves is never earlier than the one it started from
+    And the read after it does not look back again from the looked-back day
+    # Saving the looked-back day walks the source backwards on every run
+    # until it reaches the day it was first connected. An empty answer, a
+    # credit, and a workspace somebody deleted all produce exactly that.
+
+  @unit
+  Scenario: The token usage read is not rewound
+    Given a source reading token usage rather than money
+    When the next read starts
+    Then it starts where the last one finished
+    # A known limit, stated rather than left to be discovered. Usage rows are
+    # identified partly by how the customer asked for them to be bucketed, so
+    # re-reading a period after that choice changed would land the same usage
+    # beside itself rather than replacing it. Money rows carry no such choice.
+
+  @unit
+  Scenario: A cost row read again replaces the record it already exported
+    Given a day whose cost was read once and written to the export
+    When a later read reports a different figure for that same day
+    Then the exported record for that day carries the newer figure
+    And no second record is added for the same day
+    # Stated because it is already what happens and reading further back
+    # makes it happen far more often. A customer who took their copy of the
+    # export before the correction holds a figure that no longer matches
+    # ours, and neither copy says so. Adding a correction record instead is
+    # a separate piece of work, deliberately not done here.
+
+  # --- Small honesty repairs on the way in ---
+
+  @unit
+  Scenario: A read that loses per-person attribution says so before carrying on
+    Given a provider that refuses to break a period down per key
+    When the read falls back to asking for the period undivided
+    Then the run records that it continued without per-key attribution
+    And the money for the period is still recorded
+    # The fallback is correct and the money survives it. What was missing was
+    # any trace that it happened, so a provider quietly widening what it
+    # refuses would cost every customer their attribution in silence.
+
+  @unit
+  Scenario: Days a bill was never priced for are remembered as never read
+    Given a source that waited as long as it is allowed for a bill that never arrived
+    When it gives up and moves on to a more recent period
+    Then those days join the period the source already reports as unpriced
+    And that period only ever grows to take them in, never shrinks
+    And those days are not reported as costing nothing
+    # Giving up is the right call: the alternative pins the source on one
+    # missing bill forever. The period a source reports as unpriced is the
+    # only place a reader is already shown unknown rather than zero, so the
+    # abandoned days belong there and not in a field nothing renders.
+
+  @unit
+  Scenario: The cloud bill is asked only for the lines that carry AI spend
+    Given a subscription billing both AI services and unrelated infrastructure
+    When the bill is read
+    Then the request asks only for the categories that carry AI spend
+    And unrelated infrastructure lines are not recorded as AI cost
+
+  @unit
+  Scenario: A bill read that comes back with no AI lines at all is an error
+    Given a subscription whose bill is asked only for the categories that carry AI spend
+    When the provider answers with no lines
+    Then the run fails and says no AI lines were found
+    And the source reads as failing for that reason
+    And the position it had reached does not move
+    # An empty answer used to be recorded as a day that was priced, walking
+    # the read position forward over money nobody ever saw. Before the
+    # filter an empty answer was impossible on a live subscription, so
+    # narrowing the request removes the accident that kept this honest.
+
+  @unit
+  Scenario: The conversation read asks the provider for the page size it intends to read
+    When a source reads a period of conversations
+    Then one run brings back no more rows than it set out to read
+    # Naming a row count without stating it as a preference leaves this
+    # provider free to answer with its own far larger page, so the limit on
+    # how many pages one run may take bounds a much bigger read than intended.
+
+  @unit
+  Scenario: The agent list follows the provider next-page link
+    Given a tenant holding more agents than one page returns
+    When the agent list is read
+    Then every agent the tenant holds is listed
+    And no agent is left showing an identifier in place of its name
+
+  # --- A Genie question is never a measured zero ---
+  # Genie bills nothing per question. The compute behind it is on the
+  # warehouse's bill, which lands later and only when the credential can read
+  # the billing tables. A question recorded at zero dollars before that bill
+  # answers is indistinguishable from one that genuinely cost nothing, and if
+  # the bill can never be read the zero stays and reads as a measurement.
+
+  @unit
+  Scenario: A Genie message whose bill has not answered carries no amount
+    Given a Genie source whose warehouse bill has not answered for a question yet
+    When the source records that question
+    Then the question is recorded with no amount rather than at zero
+    And the question is still recorded
+    And the amount lands when the bill answers on a later run
+    # Also true of a source that names no warehouse at all: there is no bill
+    # to back a figure, so no figure is recorded.
+
+  @unit
+  Scenario: A warehouse that cannot be read holds the day open instead of closing it at zero
+    Given a Genie source whose warehouse bill is refused, or whose warehouse no longer exists
+    When the source runs
+    Then the questions are still recorded, with no amount
+    And the source keeps its place so the same period is asked about again
+    And the run's result names that the bill could not be read
+    And no question is recorded at zero
+    # "Names" in its result, as data the run hands back: nothing downstream
+    # reads that code yet, so no screen and no person sees it. The log line
+    # beside it is where a reader finds out today.
+    # Held the same way an answer cut short or timed out is held, and bounded
+    # by the same hold: a bill refused for longer than the hold allows lets
+    # the source move on, and the questions it leaves behind stay unpriced.
+
+  # --- The paid Genie bill line ---
+  # Databricks bills paid Genie usage on its own line, per person and per day,
+  # with no warehouse behind it. The warehouse allocation above can never see
+  # those rows. This read asks for them directly and is a separate read with
+  # its own position, switched on per source.
+
+  @unit
+  Scenario: The paid Genie bill read is off unless switched on
+    Given a Genie source that has not switched the paid bill read on
+    When the source runs
+    Then it never asks the workspace for the Genie bill
+    And no bill row is recorded
+
+  @unit
+  Scenario: A paid Genie charge lands on the person who ran it, for that day and that price line
+    Given a Genie source with the paid bill read switched on
+    And the workspace bills a person's Genie usage on a day under a price line that has a list price
+    When the source runs
+    Then a cost row is recorded for that person, that day and that price line
+    And its amount is the usage quantity at the list price in force that day
+    And the row names Genie's price line as its model and never a warehouse as its agent
+    And the amount is marked an estimate
+    # List prices, not the account's negotiated rate, which is on no table this
+    # credential can read. An estimate by construction and recorded as one.
+
+  @unit
+  Scenario: A free Genie row lands with its usage count and no amount
+    Given a Genie source with the paid bill read switched on
+    And the workspace reports a person's Genie usage under a price line with no list price
+    When the source runs
+    Then the row is recorded with its usage quantity
+    And the row carries no amount
+    And a price line published at zero counts as no list price
+    # Free usage has no price, and no price is not zero. Inventing one would
+    # put a figure on the screen the bill cannot back. The day the provider
+    # lists the free line at zero, the bill's arithmetic yields a well-formed
+    # zero rather than nothing; that zero is stripped on the way in, so a row
+    # nobody was billed for never lands as a measured zero dollars.
+
+  @unit
+  Scenario: A paid Genie read that stops short holds its place and lands nothing
+    Given a Genie source with the paid bill read switched on
+    And a bill answer that comes back cut short, times out, or is refused
+    When the source runs
+    Then no bill row from that answer is recorded
+    And the paid bill read keeps its own place so the period is asked about again
+    And the warehouse read's place is not moved by it
+    # Two reads, two positions. The warehouse allocation and the bill line
+    # answer on different tables and fail independently, so one holding must
+    # never pin or free the other.
+
+  @unit
+  Scenario: A held paid Genie read keeps its floor across runs
+    Given a Genie source with the paid bill read switched on and no configured start
+    And the bill is refused on its first run and again on the next
+    When the source runs twice
+    Then the paid bill read holds at the same floor both times
+    And the second run asks about the held period again from that floor
+    And the hold is released on the first run that reads the bill whole
+    # A first read with no configured start begins thirty days back, which is
+    # a different instant every run. A hold that wrote nothing down would
+    # begin a day later each day and quietly lose the day before it while
+    # claiming to hold. The floor is written on the held run so it stays put.
+
+  @unit
+  Scenario: A paid Genie hold older than the limit moves on
+    Given a Genie source whose paid bill has been refused for longer than the hold allows
+    When the source runs
+    Then the paid bill read moves past the window it was holding
+    And no row is recorded for that window, with no amount rather than zero
+    And the run's result still names that the bill could not be read
+    And the warehouse read's hold is not the one that was aged
+    # The same limit the warehouse read holds for. A workspace that refuses
+    # the billing tables every run would otherwise re-ask the same window
+    # forever; once the hold runs out the source moves on, the rows for that
+    # span stay unrecorded, and the next hold ages from its own start.
+
+  @unit
+  Scenario: Surface and channel are labels and do not split a person's day
+    Given a Genie source with the paid bill read switched on
+    And a person's usage on one day under one price line spans several surfaces and channels
+    When the source runs
+    Then one row is recorded for that person, day and price line
+    And the surfaces and channels travel on the row as labels only
+    And they are no part of what identifies the row
+    # A key cannot be changed once money sits under it. Surface and channel
+    # are how Databricks describes the usage, not what it bills, and keying on
+    # them would mint a fresh row for every description the provider adds.

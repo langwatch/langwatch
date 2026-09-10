@@ -332,12 +332,14 @@ Feature: Governance home — route, nav promotion, persona detection
     And the address carries no "view" parameter
 
   @bdd @ui @governance-home @agents-tabs @integration
-  Scenario: The agents page issues no query while no organization list exists
+  Scenario: The agents page reads the organization's own agents
     When a governance viewer opens "/governance/agents"
-    Then no procedure is queried
-    # Honest empty state: nothing org-scoped lists agents yet (every agents
-    # procedure is project-scoped), so nothing is fetched and no rows are
-    # invented.
+    Then the organization's agents are queried
+    # Organization-scoped on purpose. The platform's other agents procedure is
+    # scoped to one project, and calling one project's agents the
+    # organization's would be a lie. What that read returns, and what the page
+    # does with an empty or failed answer, lives in
+    # specs/ai-governance/dashboard/agents-page.feature.
 
   @bdd @ui @governance-home @agents-tabs @integration
   Scenario: An unknown agents layout value falls back to the list

@@ -13,7 +13,13 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -102,9 +108,14 @@ vi.mock("~/utils/api", () => {
         summary: {
           useQuery: () => harness.query,
         },
-        // The spender panel is its own read with its own tests; here it
-        // answers nothing so the lane assertions stay about the lanes.
+        // The spender panel and the day split are their own reads with their
+        // own tests; here they answer nothing so the lane assertions stay
+        // about the lanes.
         spenders: empty,
+        dailyByProvider: empty,
+        // The ranked model panel reads the billed rollup now rather
+        // than the activity monitor; it answers nothing here too.
+        spendByModel: empty,
       },
       activityMonitor: {
         summary: empty,
@@ -154,11 +165,19 @@ function summaryFixture(overrides: Record<string, unknown> = {}) {
       amountUsd: 123.45,
       cellsWithoutAmount: 0,
       currenciesWithoutUsdAmount: [],
+      // The US dollar line IS the lane's dollar total, so the default fixture
+      // states it once and the two agree by construction.
+      currencyTotals: [
+        { currencyCode: "USD", amount: 123.45, cellsWithoutAmount: 0 },
+      ],
     },
     gateway: {
       amountUsd: 67.89,
       cellsWithoutAmount: 0,
       currenciesWithoutUsdAmount: [],
+      currencyTotals: [
+        { currencyCode: "USD", amount: 67.89, cellsWithoutAmount: 0 },
+      ],
     },
     seats: { status: "awaiting_data" },
     series: [
@@ -413,11 +432,13 @@ describe("the governance cost screen", () => {
             amountUsd: null,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [],
           },
           gateway: {
             amountUsd: null,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [],
           },
           series: [],
         }),
@@ -441,6 +462,9 @@ describe("the governance cost screen", () => {
             amountUsd: -42.5,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: -42.5, cellsWithoutAmount: 0 },
+            ],
           },
           series: [
             {
@@ -485,11 +509,17 @@ describe("the governance cost screen", () => {
             amountUsd: 365_000,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 365_000, cellsWithoutAmount: 0 },
+            ],
           },
           gateway: {
             amountUsd: 182_500,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 182_500, cellsWithoutAmount: 0 },
+            ],
           },
           series,
           windowDays: 365,
@@ -510,15 +540,18 @@ describe("the governance cost screen", () => {
     });
   });
 
-  describe("given a lane whose total was withheld over a foreign currency", () => {
+  describe("given a lane whose dollar total was withheld over an unpriced part", () => {
     /** @scenario "A lane with no total says why instead of showing a figure" */
-    it("shows no amount and names the currency behind the missing total", () => {
+    it("shows no amount and says we hold no dollar figure for part of what it covers", () => {
       harness.query = {
         data: summaryFixture({
           billed: {
             amountUsd: null,
             cellsWithoutAmount: 4,
             currenciesWithoutUsdAmount: ["EUR"],
+            currencyTotals: [
+              { currencyCode: "USD", amount: null, cellsWithoutAmount: 4 },
+            ],
           },
           series: [
             {
@@ -542,8 +575,16 @@ describe("the governance cost screen", () => {
       expect(within(billed).getByText("—")).toBeInTheDocument();
 
       const note = within(billed).getByTestId("cost-lane-billed-note");
-      expect(note).toHaveTextContent(/billed in EUR rather than US dollars/i);
-      expect(note).toHaveTextContent(/No total is shown/i);
+      // What the screen actually knows, and all it knows: part of this lane
+      // holds no dollar figure. Two different causes produce that — spend the
+      // provider billed in another currency, and spend read on a day when
+      // cost recording was off — and copy naming a currency states a false
+      // reason for the second, which a reader checking the invoice finds
+      // wrong. Money billed in euros that we DO hold a figure for now has a
+      // euro line of its own and is no longer a reason to withhold anything.
+      expect(note).toHaveTextContent(/we hold no dollar figure for part of/i);
+      expect(note).not.toHaveTextContent(/rather than US dollars/i);
+      expect(note).not.toHaveTextContent(/billed in EUR/i);
       // The old copy said the usage "arrived without a stated amount", which
       // is not what happened: the provider stated it, in euros.
       expect(note).not.toHaveTextContent(/without a stated amount/i);
@@ -556,6 +597,100 @@ describe("the governance cost screen", () => {
       expect(
         within(gateway).queryByTestId("cost-lane-gateway-note"),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a window billed in two currencies", () => {
+    /** @scenario "A window billed in two currencies shows one total per currency" */
+    it("shows one total per currency, combines neither, and applies no rate", () => {
+      harness.query = {
+        data: summaryFixture({
+          billed: {
+            // The US dollar line IS this number. It is stated once, and the
+            // screen renders the lines rather than a second headline beside
+            // them.
+            amountUsd: 100,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "USD", amount: 100, cellsWithoutAmount: 0 },
+              { currencyCode: "EUR", amount: 40, cellsWithoutAmount: 0 },
+            ],
+          },
+        }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      expect(billed.getByText("$100.00")).toBeInTheDocument();
+      // The euros, in the currency they were billed in and named as such.
+      const euros = billed.getByText(/(€|EUR)/);
+      expect(euros).toBeInTheDocument();
+      expect(readableStrings(euros).join(" ")).toMatch(/40/);
+
+      // Nothing on the screen adds the two. 140 is what a rate of exactly one
+      // would produce — but rejecting 140 alone only rules out that one rate,
+      // and a conversion at 1.08 renders $143.20 through the same assertion
+      // untouched. So the lane is read for EVERY money figure standing in it
+      // and the whole list is pinned: one dollar figure, which is the dollars,
+      // and one named-currency figure, which is the euros. A third of any size
+      // fails, whatever rate produced it.
+      const lane = screen.getByTestId("cost-lane-billed");
+      const spoken = lane.textContent ?? "";
+      expect(spoken.match(/-?\$[\d,]+(?:\.\d+)?/g) ?? []).toEqual(["$100.00"]);
+      // No word boundary before the code: the card's text runs together as
+      // `$100.00EUR 40.00`, and a `\b` there never matches.
+      expect(spoken.match(/[A-Z]{3} -?[\d,]+(?:\.\d+)?/g) ?? []).toEqual([
+        "EUR 40.00",
+      ]);
+    });
+  });
+
+  describe("given a window billed only in a currency nobody converted", () => {
+    /** @scenario "A currency nobody converted still totals in the currency it was billed in" */
+    it("shows the euro total on its own and leaves the dollar figure withheld", () => {
+      harness.query = {
+        data: summaryFixture({
+          billed: {
+            // Every cell holds an amount, in euros, and none was converted:
+            // no dollar figure, and NOTHING unpriced. The lane still
+            // reported — the money totals in the currency it was billed in.
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [
+              { currencyCode: "EUR", amount: 40, cellsWithoutAmount: 0 },
+            ],
+          },
+          // The other lane is empty too, so this passes only if the euro
+          // total alone is enough to count the bill as reported. With a
+          // dollar figure beside it the screen would show the lanes anyway
+          // and the regression — a euro-only bill reading as no bill at all
+          // — would slip through.
+          gateway: {
+            amountUsd: null,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+            currencyTotals: [],
+          },
+        }),
+        isLoading: false,
+        isError: false,
+      };
+      renderScreen();
+
+      // The lanes render: this is a real bill, not an account with nothing
+      // recorded against it.
+      const lane = screen.getByTestId("cost-lane-billed");
+      const spoken = lane.textContent ?? "";
+      // The euros total in euros, and the dollar figure is untouched by
+      // them: no dollar amount is shown at all, and no rate produced one.
+      expect(spoken.match(/[A-Z]{3} -?[\d,]+(?:\.\d+)?/g) ?? []).toEqual([
+        "EUR 40.00",
+      ]);
+      expect(spoken.match(/-?\$[\d,]+(?:\.\d+)?/g) ?? []).toEqual([]);
     });
   });
 
@@ -572,6 +707,7 @@ describe("the governance cost screen", () => {
             amountUsd: null,
             cellsWithoutAmount: 0,
             currenciesWithoutUsdAmount: [],
+            currencyTotals: [],
           },
         }),
         isLoading: false,
@@ -579,15 +715,32 @@ describe("the governance cost screen", () => {
       };
     };
 
+    /**
+     * What the billed lane's (i) says, opened.
+     *
+     * The lane's sentence and whatever the read side added about it moved off
+     * the face of the card and behind the (i) beside its title: three cards
+     * sit in a row and each closed on a paragraph, which set the row's height
+     * by the longest of them. The popover portals out of the card, so it is
+     * found on the document rather than inside the lane.
+     */
+    const billedLaneInfo = () => {
+      fireEvent.click(screen.getByTestId("cost-lane-billed-about"));
+      const body = document.querySelector<HTMLElement>(
+        '[data-scope="popover"][data-part="content"]',
+      );
+      if (body === null) throw new Error("the lane's (i) did not open");
+      return body;
+    };
+
     /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
     it("explains a declared-prepaid tenant's empty bill on the billed lane", () => {
       withNote("prepaid_declared");
       renderScreen();
 
-      const note = within(screen.getByTestId("cost-lane-billed")).getByTestId(
-        "cost-lane-billed-lane-note",
+      expect(billedLaneInfo()).toHaveTextContent(
+        /prepaid.*never appear.*bill/i,
       );
-      expect(note).toHaveTextContent(/prepaid.*never appear.*bill/i);
     });
 
     /** @scenario "A tenant that declared nothing is never told it is prepaid" */
@@ -595,11 +748,16 @@ describe("the governance cost screen", () => {
       withNote("no_spend_recorded");
       renderScreen();
 
-      const billed = screen.getByTestId("cost-lane-billed");
-      const note = within(billed).getByTestId("cost-lane-billed-lane-note");
-      expect(note).toHaveTextContent(/was read/i);
-      expect(note).toHaveTextContent(/no .*charges/i);
-      for (const readable of readableStrings(billed)) {
+      const info = billedLaneInfo();
+      expect(info).toHaveTextContent(/was read/i);
+      expect(info).toHaveTextContent(/no .*charges/i);
+      // The word must be absent from the card AND from what its (i) says: a
+      // tenant that declared nothing being told about prepaid packs is the
+      // defect, wherever the sentence happens to live.
+      for (const readable of [
+        ...readableStrings(screen.getByTestId("cost-lane-billed")),
+        ...readableStrings(info),
+      ]) {
         expect(readable).not.toMatch(/prepaid/i);
       }
     });
@@ -607,7 +765,8 @@ describe("the governance cost screen", () => {
     /** @scenario "A declared-prepaid tenant whose bill has amounts sees the amounts" */
     it("renders the figures with no note when the read side sent none", () => {
       // The read side withholds the note whenever the bill holds amounts;
-      // the screen's half of that contract is to render nothing extra.
+      // the screen's half of that contract is to add nothing to what the (i)
+      // already says about the lane itself.
       harness.query = {
         data: summaryFixture({ azureBilling: null }),
         isLoading: false,
@@ -617,19 +776,17 @@ describe("the governance cost screen", () => {
 
       const billed = screen.getByTestId("cost-lane-billed");
       expect(within(billed).getByText("$123.45")).toBeInTheDocument();
-      expect(
-        within(billed).queryByTestId("cost-lane-billed-lane-note"),
-      ).not.toBeInTheDocument();
+      expect(billedLaneInfo()).toHaveTextContent(
+        "Provider-reported costs recorded for this period.",
+      );
+      expect(billedLaneInfo()).not.toHaveTextContent(/could not be read/i);
     });
 
     it("reports a failed read as missing data on the lane", () => {
       withNote("billing_read_failed");
       renderScreen();
 
-      const note = within(screen.getByTestId("cost-lane-billed")).getByTestId(
-        "cost-lane-billed-lane-note",
-      );
-      expect(note).toHaveTextContent(/could not be read/i);
+      expect(billedLaneInfo()).toHaveTextContent(/could not be read/i);
     });
   });
 
@@ -664,8 +821,19 @@ describe("the governance cost screen", () => {
   });
 
   describe("given a source whose pulls have been failing", () => {
-    /** @scenario "The cost screen says where its numbers stop being complete" */
-    it("names the source and the day, next to the lanes it undercounts", () => {
+    /**
+     * THE SCREEN NO LONGER SAYS SO, by decision rather than by regression.
+     * Two warning banners stood above the lanes — this one, and one for days
+     * read while cost recording was off — and both were removed at the
+     * product owner's direction: the screen opens with figures rather than
+     * with caveats about them, and the source pages carry the same fact
+     * beside the source a reader would have to visit to act on it.
+     *
+     * The read still reports it (see the unit scenarios under the summary's
+     * own Rule), so this holds the screen's half: it draws neither banner,
+     * and it does not fall over on a summary that carries one.
+     */
+    it("draws no warning banner over the lanes", () => {
       harness.query = {
         data: summaryFixture({
           staleSources: {
@@ -679,30 +847,15 @@ describe("the governance cost screen", () => {
 
       renderScreen();
 
-      const notice = screen.getByTestId("cost-stale-sources");
-      expect(within(notice).getByText(/Azure Billing/)).toBeInTheDocument();
-      expect(
-        within(notice).getByText(/unknown rather than zero/i),
-      ).toBeInTheDocument();
-      // The day itself, not merely the words around it. Asserting only the
-      // phrase let a title that had lost its date pass. Matching the digits
-      // rather than a formatted string keeps this locale-independent: every
-      // locale renders a numeric day and year as those numerals.
-      const since = within(notice).getByText(/^No data since /);
-      expect(since.textContent).toMatch(/\b20\b/);
-      expect(since.textContent).toMatch(/\b2026\b/);
-      // The lanes still render. A stalled pull caveats the figures; it does
-      // not withdraw them.
-      expect(screen.getByTestId("cost-lane-billed")).toBeInTheDocument();
-    });
-
-    /** @scenario "A screen whose sources are all pulling carries no warning" */
-    it("stays silent while every source is still pulling", () => {
-      renderScreen();
-
       expect(
         screen.queryByTestId("cost-stale-sources"),
       ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("cost-unpriced-window"),
+      ).not.toBeInTheDocument();
+      // The lanes still render, which is what makes this a removal rather
+      // than a screen that fell over on the field it stopped reading.
+      expect(screen.getByTestId("cost-lane-billed")).toBeInTheDocument();
     });
   });
 

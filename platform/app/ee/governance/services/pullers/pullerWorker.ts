@@ -307,12 +307,15 @@ function assertRunMadeProgress(params: {
   );
 }
 
-export async function runIngestionPull(params: {
-  sourceId: string;
-  cursor: string | null;
-  pulledUsage?: PulledUsageDispatcher;
-  identityMatch?: DiscoveredPeopleMatcher;
-}): Promise<{
+/**
+ * What one pull run reports back to whoever asked for it.
+ *
+ * Named a report rather than an outcome because `IngestionPullRunOutcome` in
+ * the pipeline's own constants is already taken, and means something
+ * narrower: the single word "completed" or "failed" that lands on the
+ * run-status row. This is the whole of what the run has to say.
+ */
+export type IngestionPullRunReport = {
   nextCursor: string | null;
   eventCount: number;
   /**
@@ -321,7 +324,66 @@ export async function runIngestionPull(params: {
    * instead of returning, so a nonzero value here always means partial success.
    */
   errorCount: number;
-}> {
+  /**
+   * Whether the run reached the end of what it set out to read.
+   *
+   * Carried up from the adapter unchanged. A truncated run is NOT a failed
+   * one: the money and audit rows it gathered are written and its cursor
+   * advances, so `errorCount` stays zero and this is the only thing that
+   * distinguishes a source permanently stuck on a fraction of its data from a
+   * healthy quiet one. Adapters that say nothing read as complete.
+   */
+  completeness: "complete" | "truncated";
+  /**
+   * The instant the source is known to have been read up to, or null when the
+   * adapter states none.
+   *
+   * Deliberately NOT the instant the run finished. The run clock advances on
+   * every attempt, so a stuck source re-reading the same half would look like
+   * steady progress to anything reasoning from it.
+   */
+  readThroughAt: Date | null;
+};
+
+/**
+ * The outcome a source that is not currently pulling reports, or null when it
+ * is pulling and the run should go ahead.
+ *
+ * A paused or archived source is not a failure and not an empty read: it is a
+ * run that never started. Reporting it as complete with the incoming cursor
+ * untouched is what keeps a pause from moving the source's position, and
+ * `readThroughAt` null is what keeps it from claiming it read up to now.
+ */
+function outcomeForSourceNotPulling({
+  status,
+  ingestionSourceId,
+  cursor,
+}: {
+  status: string;
+  ingestionSourceId: string;
+  cursor: string | null;
+}): IngestionPullRunReport | null {
+  if (status === "active" || status === "awaiting_first_event") return null;
+  logger.info(
+    { ingestionSourceId, status },
+    "IngestionSource not active, skipping",
+  );
+  return {
+    nextCursor: cursor,
+    eventCount: 0,
+    errorCount: 0,
+    // Nothing was read, so nothing was left half-read either.
+    completeness: "complete",
+    readThroughAt: null,
+  };
+}
+
+export async function runIngestionPull(params: {
+  sourceId: string;
+  cursor: string | null;
+  pulledUsage?: PulledUsageDispatcher;
+  identityMatch?: DiscoveredPeopleMatcher;
+}): Promise<IngestionPullRunReport> {
   registerBuiltInPullers();
 
   const ingestionSourceId = params.sourceId;
@@ -333,13 +395,12 @@ export async function runIngestionPull(params: {
   if (!source) {
     throw new Error(`IngestionSource ${ingestionSourceId} not found`);
   }
-  if (source.status !== "active" && source.status !== "awaiting_first_event") {
-    logger.info(
-      { ingestionSourceId, status: source.status },
-      "IngestionSource not active, skipping",
-    );
-    return { nextCursor: params.cursor, eventCount: 0, errorCount: 0 };
-  }
+  const notPulling = outcomeForSourceNotPulling({
+    status: source.status,
+    ingestionSourceId,
+    cursor: params.cursor,
+  });
+  if (notPulling !== null) return notPulling;
 
   const pullConfig = (source.parserConfig ?? {}) as Record<string, unknown>;
   const { adapterId, adapter, validatedConfig } = resolvePullAdapter({
@@ -372,6 +433,9 @@ export async function runIngestionPull(params: {
       source,
       pulledUsage: params.pulledUsage,
       identityMatch: params.identityMatch,
+      // Same default as the run report takes below: an adapter that says
+      // nothing is claiming it read to the end of its window.
+      completeness: result.completeness ?? "complete",
     });
     logger.info(
       {
@@ -398,7 +462,55 @@ export async function runIngestionPull(params: {
     nextCursor: result.cursor,
     eventCount: result.events.length,
     errorCount: result.errorCount,
+    completeness: result.completeness ?? "complete",
+    readThroughAt: readThroughInstant(result),
   };
+}
+
+/**
+ * The instant a run read through to.
+ *
+ * Three sources, in falling order of authority, and the ordering is the point.
+ *
+ * The adapter's own statement wins: it alone knows what its cursor means. Next
+ * comes the newest event this run actually emitted, which is a fact about the
+ * data rather than about the attempt — it does not move when a run stalls, so
+ * a source stuck re-reading the same half reports the same point every time,
+ * which is precisely how being stuck becomes visible. Only a run that reached
+ * the END falls through to the clock, and there it is not a guess: a complete
+ * read has been read through to now by definition.
+ *
+ * A truncated run that emitted nothing gets null. It read up to nowhere, and
+ * the clock would say otherwise.
+ */
+/**
+ * The newest timestamp among the events one run emitted, or null when it
+ * emitted none this run could read.
+ *
+ * Unreadable stamps are skipped rather than treated as the epoch: one adapter
+ * writing a malformed timestamp would otherwise drag the answer to 1970 and
+ * report the source as read through to a point half a century behind.
+ */
+function newestEventInstant(events: PullResult["events"]): Date | null {
+  let newestMs: number | null = null;
+  for (const event of events) {
+    const ms = Date.parse(event.event_timestamp);
+    if (Number.isNaN(ms)) continue;
+    if (newestMs === null || ms > newestMs) newestMs = ms;
+  }
+  return newestMs === null ? null : new Date(newestMs);
+}
+
+function readThroughInstant(result: PullResult): Date | null {
+  if (result.readThroughAt !== undefined) {
+    const stated = new Date(result.readThroughAt);
+    if (!Number.isNaN(stated.getTime())) return stated;
+  }
+
+  const newest = newestEventInstant(result.events);
+  if (newest !== null) return newest;
+
+  return (result.completeness ?? "complete") === "complete" ? new Date() : null;
 }
 
 /** The IngestionSource fields the write paths below actually read. */
@@ -438,11 +550,15 @@ async function writePulledEvents({
   source,
   pulledUsage,
   identityMatch,
+  completeness,
 }: {
   events: NormalizedPullEvent[];
   source: PullingSource;
   pulledUsage?: PulledUsageDispatcher;
   identityMatch?: DiscoveredPeopleMatcher;
+  /** Passed through untouched to `recordUnpricedUsageWindow`, which is the
+   * only decision here that turns on whether the run read to its end. */
+  completeness: "complete" | "truncated";
 }): Promise<void> {
   const govProject = await ensureHiddenGovernanceProject(
     prisma,
@@ -503,6 +619,7 @@ async function writePulledEvents({
     source,
     droppedPeriodsMs,
     recordedPeriodsMs,
+    completeness,
   });
   if (suppressedCount > 0) {
     // Worth a line: these are real provider rows this run deliberately did not
@@ -537,10 +654,14 @@ async function writePulledEvents({
 }
 
 /**
- * The per-event writes of one run: each kept event's OCSF audit row, and its
- * usage record beside it. Returns the priced periods split by whether the
- * cost flag let them be stored — the dropped ones become the source's
+ * The writes of one run: the kept events' OCSF audit rows in chunked inserts,
+ * then each event's usage record. Returns the priced periods split by whether
+ * the cost flag let them be stored — the dropped ones become the source's
  * unpriced window, and the recorded ones are what later closes that window.
+ *
+ * One insert per chunk, not per row: the per-row loop awaited each statement
+ * in turn, but it still put ~150 of the ~2,600 statements a pull issues
+ * against a dev ClickHouse budgeted at 32 (#8064).
  */
 async function writeAuditAndUsageRows({
   kept,
@@ -561,15 +682,19 @@ async function writeAuditAndUsageRows({
 }): Promise<{ droppedPeriodsMs: number[]; recordedPeriodsMs: number[] }> {
   const droppedPeriodsMs: number[] = [];
   const recordedPeriodsMs: number[] = [];
-  for (const event of kept) {
-    await ocsfRepo.insertEvent(
-      mapToOcsfRow({
-        event,
-        tenantId: govProjectId,
-        ingestionSourceId: source.id,
-        sourceType: source.sourceType,
-      }),
+  if (kept.length > 0) {
+    await ocsfRepo.insertEvents(
+      kept.map((event) =>
+        mapToOcsfRow({
+          event,
+          tenantId: govProjectId,
+          ingestionSourceId: source.id,
+          sourceType: source.sourceType,
+        }),
+      ),
     );
+  }
+  for (const event of kept) {
     const { pricedPeriodMs } = await recordPulledUsageFor({
       event,
       source,
@@ -975,21 +1100,46 @@ async function recordPulledUsageFor({
  * extend the window, never shrink it, so a short run in the middle of a gap
  * cannot make the gap look smaller than it is.
  *
- * Clearing is deliberately all-or-nothing. The cost adapters re-read a whole
- * trailing window from the source's start date rather than resuming from a
- * high-water mark, so a run that prices a period at or before the start of
- * the gap has necessarily re-read every later day in it too. A partial
- * re-read leaves the window alone: half a repair is not a repair, and
+ * Clearing is deliberately all-or-nothing. A run that prices a period at or
+ * before the start of the gap has re-read every later day in it too, so
+ * reaching back past the start is evidence the whole gap was re-priced. A
+ * partial re-read leaves the window alone: half a repair is not a repair, and
  * narrowing it would claim days that were never re-priced.
+ *
+ * AND ONLY IF THE RUN THAT REACHED BACK RAN TO ITS END. The evidence above
+ * assumes the read covered its whole window, and a truncated one did not.
+ * Adapters that own their cost read walk the bill oldest-first — anthropic and
+ * openai resume from a high-water mark and page forward, the polling adapters
+ * the same — so a run cut off by its page limit or by the clock emits exactly
+ * the earliest days, which are the ones that satisfy the test above, and never
+ * reaches the tail of the gap it would be credited with repairing. Clearing
+ * there forgets a loss that is still present, and nothing reopens it: the
+ * window is the source's only memory of those days, so once dropped they read
+ * as free from then on.
+ *
+ * An earlier version of this comment justified the clear by claiming the cost
+ * adapters re-read a whole trailing window from the source's start date. They
+ * do not: `anthropicAdmin` advances its cursor to the newest instant it
+ * emitted and the window start only ever moves forward. The lookbacks are
+ * three days, or seven — bounded, and unrelated to where the gap begins.
+ *
+ * ONE ADAPTER IS NOT COVERED. `copilotStudioDataverse` takes its completeness
+ * from the transcript walk while its cost half advances independently, so a
+ * truncated cost read there can still report a complete run. That is
+ * over-inclusive in the safe direction — the window is kept when it might have
+ * been cleared — and it is a separate defect from this one.
  */
 async function recordUnpricedUsageWindow({
   source,
   droppedPeriodsMs,
   recordedPeriodsMs,
+  completeness,
 }: {
   source: PullingSource;
   droppedPeriodsMs: number[];
   recordedPeriodsMs: number[];
+  /** Whether the run that produced these periods read to the end of its window. */
+  completeness: "complete" | "truncated";
 }): Promise<void> {
   if (droppedPeriodsMs.length > 0) {
     const since = new Date(Math.min(...droppedPeriodsMs));
@@ -1018,6 +1168,13 @@ async function recordUnpricedUsageWindow({
   const gapStart = source.unpricedUsageSince;
   if (!gapStart || recordedPeriodsMs.length === 0) return;
   if (Math.min(...recordedPeriodsMs) > gapStart.getTime()) return;
+  if (completeness === "truncated") {
+    logger.info(
+      { ingestionSourceId: source.id },
+      "a re-read reached back across the unpriced window but stopped short of its end; the window is kept",
+    );
+    return;
+  }
 
   logger.info(
     { ingestionSourceId: source.id },

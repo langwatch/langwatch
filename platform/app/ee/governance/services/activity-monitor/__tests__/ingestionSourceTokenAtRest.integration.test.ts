@@ -27,7 +27,7 @@ import { IngestionSourceService } from "@ee/governance/services/activity-monitor
 import { FREE_PLAN } from "@ee/licensing/constants";
 import type { PlanInfo } from "@ee/licensing/planInfo";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
@@ -196,7 +196,14 @@ describe("given an admin saves an OpenAI Admin source carrying an admin API key"
     /** @scenario "The Admin API key is never stored in plain text" */
     it("stores the key encrypted and unreadable from the source's configuration", async () => {
       const token = `sk-admin-${nanoid(24)}`;
-      const service = IngestionSourceService.create(prisma);
+      // An administrator key names no account in the config, so the save asks
+      // the provider which one it reads and refuses the save if it cannot.
+      // That lookup is a real HTTP call, and it is not what this file is about:
+      // stubbed at the service seam the way the provider-account tests do, so
+      // the encryption assertions below are the only thing that can fail here.
+      const service = IngestionSourceService.create(prisma, {
+        lookUpProviderAccount: vi.fn().mockResolvedValue(`org-${ns}-openai`),
+      });
 
       // The pullConfig the governance composer produces for the OpenAI Admin
       // cost source, with the key in PLAINTEXT — the service is the one that

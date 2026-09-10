@@ -203,6 +203,7 @@ function buildErasure(prisma: PrismaClient) {
         { tenantId: TENANT, day: "2026-08-20" },
       ],
       deleteRowsCarryingActor: async () => {},
+      renameActorInRestatementIndex: async () => {},
     } as never,
     // The replay is where the danger lives, so this asks the question the
     // replay would ask, at the moment the replay would ask it.

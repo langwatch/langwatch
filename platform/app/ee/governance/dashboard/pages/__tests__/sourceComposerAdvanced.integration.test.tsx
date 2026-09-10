@@ -95,6 +95,9 @@ function ComposerHarness({ sourceType }: { sourceType: string }) {
       destinationCtx={DESTINATION_CTX}
       composer={composer}
       setComposer={setComposer}
+      // Nothing refused yet: this file is about what the Advanced group
+      // holds, and the marking is covered where the fields themselves are.
+      invalidFieldKeys={[]}
       onClose={vi.fn()}
       onSubmit={vi.fn()}
       isPending={false}
@@ -412,6 +415,46 @@ describe("given the create drawer for a source that pulls counts", () => {
       renderComposer("anthropic_admin");
 
       expect(screen.queryByTestId("composer-destination-hint")).toBeNull();
+    });
+  });
+});
+
+/**
+ * Where the source type's own prerequisites are printed.
+ *
+ * Driven through the real drawer for the same reason the Advanced tests are:
+ * the claim is about what the DRAWER puts in its body, and a harness that
+ * rendered the text itself would keep passing after the drawer stopped.
+ */
+describe("given a source type that explains what it needs granted", () => {
+  describe("when the composer opens", () => {
+    /** @scenario "The setup prose sits behind the heading, not above the fields" */
+    it("keeps the prerequisites out of the body", () => {
+      renderComposer("copilot_studio_dataverse");
+
+      // Chakra's popover keeps its content mounted and hidden while closed, so
+      // only a visibility matcher can tell "behind the (i)" from "in the body".
+      expect(
+        screen.getByText(/Needs an app registration with a client secret/),
+      ).not.toBeVisible();
+      expect(screen.getByTestId("source-type-blurb")).toBeVisible();
+    });
+
+    /** @scenario "The setup prose sits behind the heading, not above the fields" */
+    it("shows them once the reader asks for them", async () => {
+      const user = userEvent.setup();
+      renderComposer("copilot_studio_dataverse");
+
+      await user.click(screen.getByTestId("source-type-blurb"));
+
+      // The same query that found it hidden above finds it visible here, so
+      // the assertion above is a real state rather than a string that never
+      // matched anything.
+      expect(
+        await screen.findByText(
+          /Needs an app registration with a client secret/,
+        ),
+      ).toBeVisible();
     });
   });
 });

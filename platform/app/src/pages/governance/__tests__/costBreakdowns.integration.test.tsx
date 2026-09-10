@@ -34,6 +34,16 @@ const harness = vi.hoisted(() => ({
     spendByUser: undefined as unknown,
     spendOverTime: undefined as unknown,
   },
+  /**
+   * The ranked model read's answer. `undefined` means it has not answered.
+   *
+   * On the billed router rather than the activity monitor: this panel reads
+   * the same rollup the lanes above it read, which is where pulled bills land.
+   * Pointed at the metered traces it reported an empty window over a table
+   * that held every model the organization had been billed for.
+   */
+  modelSpend: undefined as unknown,
+  modelSpendFails: false,
   /** The spender breakdown read: its answer, whether it failed, retry spy. */
   spenders: {
     data: undefined as unknown,
@@ -55,6 +65,21 @@ const harness = vi.hoisted(() => ({
    * before it was a variable.
    */
   lanesReport: true,
+  /**
+   * The billed lane's per-provider window totals, as the summary read answers
+   * them. Empty by default: the provider panel is not what most of this file
+   * is about, and an empty list renders nothing.
+   */
+  providers: [] as unknown[],
+  /**
+   * Not yet implemented: the per-(day, provider) read. It is the one thing the
+   * screen could never answer — it could say what a provider cost over a
+   * quarter and what the organization spent on a given day, and had no way to
+   * say which provider caused a day that stood out.
+   */
+  dailyByProvider: undefined as unknown,
+  /** Not yet implemented: the records behind one day at one provider. */
+  periodRecords: undefined as unknown,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -88,6 +113,13 @@ vi.mock("~/components/LoadingScreen", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     governanceCost: {
+      spendByModel: {
+        useQuery: () => ({
+          data: harness.modelSpend,
+          isLoading: false,
+          isError: harness.modelSpendFails,
+        }),
+      },
       spenders: {
         useQuery: () => ({
           data: harness.spenders.data,
@@ -95,16 +127,65 @@ vi.mock("~/utils/api", () => ({
           refetch: harness.spenders.refetch,
         }),
       },
+      dailyByProvider: {
+        useQuery: () => ({
+          data: harness.dailyByProvider,
+          isLoading: false,
+          isError: false,
+        }),
+      },
+      periodRecords: {
+        useQuery: () => ({
+          data: harness.periodRecords,
+          isLoading: false,
+          isError: false,
+        }),
+      },
       summary: {
         useQuery: () => ({
           data: {
             unavailableReason: null,
+            providers: harness.providers,
+            // In the DTO's own shape: the US dollar line IS the lane's dollar
+            // figure, and a lane that reported nothing has no line at all.
             billed: harness.lanesReport
-              ? { amountUsd: 123.45, cellsWithoutAmount: 0 }
-              : { amountUsd: null, cellsWithoutAmount: 0 },
+              ? {
+                  amountUsd: 123.45,
+                  cellsWithoutAmount: 0,
+                  currenciesWithoutUsdAmount: [],
+                  currencyTotals: [
+                    {
+                      currencyCode: "USD",
+                      amount: 123.45,
+                      cellsWithoutAmount: 0,
+                    },
+                  ],
+                }
+              : {
+                  amountUsd: null,
+                  cellsWithoutAmount: 0,
+                  currenciesWithoutUsdAmount: [],
+                  currencyTotals: [],
+                },
             gateway: harness.lanesReport
-              ? { amountUsd: 67.89, cellsWithoutAmount: 0 }
-              : { amountUsd: null, cellsWithoutAmount: 0 },
+              ? {
+                  amountUsd: 67.89,
+                  cellsWithoutAmount: 0,
+                  currenciesWithoutUsdAmount: [],
+                  currencyTotals: [
+                    {
+                      currencyCode: "USD",
+                      amount: 67.89,
+                      cellsWithoutAmount: 0,
+                    },
+                  ],
+                }
+              : {
+                  amountUsd: null,
+                  cellsWithoutAmount: 0,
+                  currenciesWithoutUsdAmount: [],
+                  currencyTotals: [],
+                },
             seats: { status: "awaiting_data" },
             series: harness.lanesReport
               ? [{ day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 }]
@@ -149,6 +230,11 @@ beforeEach(() => {
   };
   harness.spenders = { data: undefined, isError: false, refetch: vi.fn() };
   harness.lanesReport = true;
+  harness.providers = [];
+  harness.dailyByProvider = undefined;
+  harness.periodRecords = undefined;
+  harness.modelSpend = undefined;
+  harness.modelSpendFails = false;
 });
 
 afterEach(() => cleanup());
@@ -212,16 +298,115 @@ describe("the cost breakdown panels", () => {
     });
   });
 
+  describe("given billed spend recorded against two models", () => {
+    /** @scenario "The ranked model panel fills from the billed lane" */
+    it("names both models and does not say the window holds nothing", () => {
+      // The activity reads stay silent on purpose: this panel must fill from
+      // the billed rollup alone. Pointed at the metered traces it reported an
+      // empty window over a table holding every model that had been billed.
+      harness.modelSpend = {
+        unavailableReason: null,
+        rows: [
+          { model: "claude-opus-5", amountUsd: 34.95, cellsWithoutAmount: 0 },
+          {
+            model: "gpt-5-mini-2025-08-07, output",
+            amountUsd: 4.34,
+            cellsWithoutAmount: 0,
+          },
+        ],
+        windowDays: 30,
+      };
+
+      renderScreen();
+
+      const panel = screen
+        .getByText("Cost by model")
+        .closest('[data-testid="cost-panel"]');
+      expect(panel).not.toBeNull();
+      const models = within(panel as HTMLElement);
+
+      expect(models.getByText("claude-opus-5")).toBeInTheDocument();
+      // The line item verbatim: OpenAI bills per token kind and the puller
+      // stores that unsplit, so re-cutting it anywhere would invent a
+      // grouping the invoice does not make.
+      expect(
+        models.getByText("gpt-5-mini-2025-08-07, output"),
+      ).toBeInTheDocument();
+      expect(
+        models.queryByText("Nothing in this window yet."),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given billed spend recorded against a priced model and an unpriced one", () => {
+    /** @scenario "A model the screen cannot price is listed without a figure" */
+    it("lists both and shows no number for the one it cannot price", () => {
+      // The panel used to drop the unpriced model. Dropping it reports a
+      // smaller bill than the provider sent, and a window whose models were
+      // all unpriced emptied the panel into a measurement claim.
+      harness.modelSpend = {
+        unavailableReason: null,
+        rows: [
+          { model: "claude-opus-5", amountUsd: 34.95, cellsWithoutAmount: 0 },
+          {
+            model: "claude-sonnet-5",
+            amountUsd: null,
+            cellsWithoutAmount: 3,
+          },
+        ],
+        windowDays: 30,
+      };
+
+      renderScreen();
+
+      const panel = screen
+        .getByText("Cost by model")
+        .closest('[data-testid="cost-panel"]');
+      expect(panel).not.toBeNull();
+      const models = within(panel as HTMLElement);
+
+      expect(models.getByText("claude-opus-5")).toBeInTheDocument();
+      expect(models.getByText("claude-sonnet-5")).toBeInTheDocument();
+
+      // No figure in its place, and the reason on hover rather than a zero
+      // that would read as "this model cost nothing".
+      const withheld = panel?.querySelector('[data-unpriced="true"]');
+      expect(withheld).not.toBeNull();
+      expect(withheld?.textContent).toBe("—");
+      expect(withheld?.getAttribute("title")).toContain("unpriced");
+      expect(withheld?.getAttribute("title")).toContain("3");
+    });
+  });
+
   describe("given an activity read has not answered", () => {
     it("says so rather than printing a zero nobody measured", () => {
       renderScreen();
 
-      // The adoption card and every real panel are unanswered here, so the
-      // screen may not show "0" or claim the window held nothing.
+      // The adoption card and every read-backed panel are unanswered here, so
+      // the screen may not show "0" or claim the window held nothing.
       expect(screen.queryByText("0")).not.toBeInTheDocument();
-      expect(
-        screen.queryByText("Nothing in this window yet."),
-      ).not.toBeInTheDocument();
+      // SCOPED TO THE PANELS THAT HAVE A READ. The agent breakdowns and the
+      // two count panels have none yet — they are drawn in both modes so the
+      // screen keeps its shape when a reader turns samples off, and outside
+      // sample mode they carry a stated placeholder. A page-wide search for
+      // the sentence now finds theirs and says nothing about the panels this
+      // is actually about.
+      for (const title of [
+        "Cost over time",
+        "Cost by department",
+        "Cost by model",
+        "Metered spend by person",
+      ]) {
+        const panel = screen
+          .getByText(title)
+          .closest('[data-testid="cost-panel"]');
+        expect(panel).not.toBeNull();
+        expect(
+          within(panel as HTMLElement).queryByText(
+            "Nothing in this window yet.",
+          ),
+        ).not.toBeInTheDocument();
+      }
     });
 
     /** @scenario "An empty panel says what it holds and what would fill it" */
@@ -236,9 +421,9 @@ describe("the cost breakdown panels", () => {
         screen.getByText("Spend per model, largest first."),
       ).toBeInTheDocument();
       expect(
-        screen.getByText(
-          "Fills from gateway traffic and from usage rows that name a model.",
-        ),
+        screen.getAllByText(
+          "Fills from the bills a connected source reports.",
+        )[0],
       ).toBeInTheDocument();
       expect(
         screen.getAllByRole("link", { name: /Add a source/ }).length,
@@ -413,10 +598,19 @@ describe("the cost breakdown panels", () => {
 
   describe("given the window answers with days but nothing spent on any of them", () => {
     it("says the window is empty rather than drawing bare axes", () => {
-      // The read answered, and it answered with a full window — one bucket per
-      // day, no spend on any. There is a row per day and no series to plot, so
-      // a length check on the rows alone lets this through and the panel draws
-      // an axis with nothing above it, which reads as a chart that broke.
+      // The read answered and the window holds nothing. That is a FINDING and
+      // the panel is allowed to say so — but it must say it in words, because
+      // a time chart handed an answer with no series to plot draws an axis
+      // with nothing above it, which reads as a chart that broke rather than
+      // as a quarter nobody spent in.
+      //
+      // The panel under this name used to chart spend by team off the metered
+      // trace store, and the case was a window of 365 empty buckets from a
+      // read that answers a row per day whether or not anything was spent.
+      // That read is gone. The billed rollup this now folds only ever answers
+      // days it holds cells for, so the same case arrives as no rows at all —
+      // and the assertion below is unchanged, which is the point of moving it
+      // rather than deleting it.
       harness.activity.summary = {
         activeUsersThisWindow: 4,
         newUsersThisWindow: 1,
@@ -432,12 +626,7 @@ describe("the cost breakdown panels", () => {
       harness.activity.spendByUser = [
         { actor: "ada@acme.test", spendUsd: "200.00", requests: 90 },
       ];
-      harness.activity.spendOverTime = {
-        buckets: [
-          { bucketIso: "2026-08-01", points: [] },
-          { bucketIso: "2026-08-02", points: [] },
-        ],
-      };
+      harness.dailyByProvider = { rows: [] };
 
       renderScreen();
 
@@ -445,13 +634,217 @@ describe("the cost breakdown panels", () => {
       // reasons and print the same sentence, so a page-wide search for it
       // passes whether or not this panel drew bare axes.
       const panel = screen
-        .getByText("Cost over time · by team")
+        .getByText("Cost over time")
         .closest('[data-testid="cost-panel"]');
 
       expect(panel).not.toBeNull();
       expect(
         within(panel as HTMLElement).getByText("Nothing in this window yet."),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("given two providers billed on the same days of the window", () => {
+    /**
+     * Distinct at every figure on purpose. With any two of them equal, an
+     * implementation that mixed up a day, a provider or a total would still
+     * satisfy the assertions below.
+     */
+    beforeEach(() => {
+      harness.providers = [
+        { provider: "openai_admin", amountUsd: 90, cellsWithoutAmount: 0 },
+        { provider: "anthropic_admin", amountUsd: 62, cellsWithoutAmount: 0 },
+      ];
+      harness.dailyByProvider = {
+        rows: [
+          {
+            day: "2026-01-15",
+            provider: "openai_admin",
+            amountUsd: 60,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+          {
+            day: "2026-01-15",
+            provider: "anthropic_admin",
+            amountUsd: 41,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+          {
+            day: "2026-01-16",
+            provider: "openai_admin",
+            amountUsd: 30,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+          {
+            day: "2026-01-16",
+            provider: "anthropic_admin",
+            amountUsd: 21,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+        ],
+      };
+    });
+
+    /**
+     * The panel keeps its place in the grid and says whose spend it is.
+     *
+     * WHAT IT DRAWS IS NOT CHECKED HERE. It is a chart now, and a chart draws
+     * nothing under a renderer with no layout: its container measures zero
+     * and recharts declines to plot into it. The arithmetic behind the bars —
+     * the split per period, the span each bar covers — is checked directly in
+     * `src/components/governance/costs/__tests__/providerPeriods.unit.test.ts`,
+     * where it can be.
+     */
+    it("renders under its own heading beside the lane it splits", () => {
+      renderScreen();
+
+      expect(
+        screen.getByLabelText("Cost over time · by provider"),
+      ).toBeInTheDocument();
+      // Its neighbour still states the window total the bars split up, so a
+      // reader has both halves of the comparison on one screen.
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      expect(billed.getByText("$90.00")).toBeInTheDocument();
+      expect(billed.getByText("$62.00")).toBeInTheDocument();
+    });
+  });
+
+  describe("given one provider holds a day we have no dollar figure for", () => {
+    /** @scenario "A provider holding a period with no dollar figure shows no window total" */
+    it("shows that provider no window total and marks its bars as covering only part of the spend", () => {
+      harness.providers = [
+        { provider: "openai_admin", amountUsd: 90, cellsWithoutAmount: 0 },
+        // The window total is withheld: one of its days holds no figure, so
+        // adding up the rest would understate what the provider charged.
+        { provider: "anthropic_admin", amountUsd: null, cellsWithoutAmount: 1 },
+      ];
+      harness.dailyByProvider = {
+        rows: [
+          {
+            day: "2026-01-15",
+            provider: "anthropic_admin",
+            amountUsd: 41,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+          {
+            day: "2026-01-16",
+            provider: "anthropic_admin",
+            amountUsd: null,
+            cellsWithoutAmount: 1,
+            currenciesWithoutUsdAmount: [],
+          },
+        ],
+      };
+      renderScreen();
+
+      const billed = within(screen.getByTestId("cost-lane-billed"));
+      expect(billed.getByText("Anthropic")).toBeInTheDocument();
+      expect(billed.getByText("USD amount unavailable")).toBeInTheDocument();
+
+      // Its other days each hold a real number, so a reader who adds the bars
+      // up rebuilds exactly the partial sum the window total refused to show
+      // them. The mark on the bars is what stops the chart from being that
+      // sum.
+      const region = within(
+        screen.getByLabelText("Cost over time · by provider"),
+      );
+      expect(
+        region.getByLabelText(/cover only part of what was spent/i),
+      ).toBeInTheDocument();
+      // And it names WHICH provider is short, because the chart stacks two of
+      // them and a bare caveat leaves a reader unable to tell which bar to
+      // distrust.
+      expect(region.getByText(/Anthropic/)).toBeInTheDocument();
+    });
+  });
+
+  describe("given the window holds a day we have no dollar figure for", () => {
+    /** @scenario "A day with a withheld amount shows as withheld in cost over time, not as a smaller bar" */
+    it("marks the cost-over-time chart as short and names the provider that withheld", () => {
+      harness.providers = [
+        { provider: "openai_admin", amountUsd: 90, cellsWithoutAmount: 0 },
+        { provider: "anthropic_admin", amountUsd: null, cellsWithoutAmount: 1 },
+      ];
+      harness.dailyByProvider = {
+        rows: [
+          {
+            day: "2026-01-15",
+            provider: "openai_admin",
+            amountUsd: 90,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: [],
+          },
+          {
+            day: "2026-01-16",
+            provider: "anthropic_admin",
+            amountUsd: null,
+            cellsWithoutAmount: 1,
+            currenciesWithoutUsdAmount: [],
+          },
+        ],
+      };
+      renderScreen();
+
+      // Scoped to THIS panel: the provider split beside it carries the same
+      // note for the same rows, and a page-wide search would pass on that one
+      // while the total chart stayed silent — which is the bug.
+      const panel = screen
+        .getByText("Cost over time")
+        .closest('[data-testid="cost-panel"]');
+      expect(panel).not.toBeNull();
+      const region = within(panel as HTMLElement);
+      const note = region.getByLabelText(/cover only part of what was spent/i);
+      // Names WHO withheld, so a reader knows which bill to go and look at.
+      expect(note).toHaveTextContent(/Anthropic/);
+      expect(note).not.toHaveTextContent(/OpenAI/);
+    });
+  });
+
+  describe("given one provider billed in two currencies on the same day", () => {
+    /**
+     * The day holds a dollar bill and a euro bill, and only the dollars were
+     * ever published in dollars. That is a different shape from the case above
+     * and the screen currently cannot tell them apart.
+     *
+     * The figure here is NOT null and the cell count is NOT one: the euro cell
+     * holds a real amount, in euros, so the rule that asks whether a cell holds
+     * money in any currency at all is satisfied and counts nothing. Every mark
+     * the panel has is keyed off those two values, so the day renders as a
+     * plain complete figure that silently omits the euros.
+     *
+     * The lane headline one level up already says which currency it left out.
+     * This is the same sentence, at the level where a reader actually compares
+     * one provider against another.
+     */
+    /** @scenario "A provider billed in two currencies says which one its figure leaves out" */
+    it("names the currency its figure leaves out", () => {
+      harness.providers = [
+        { provider: "anthropic_admin", amountUsd: 41, cellsWithoutAmount: 0 },
+      ];
+      harness.dailyByProvider = {
+        rows: [
+          {
+            day: "2026-01-15",
+            provider: "anthropic_admin",
+            amountUsd: 41,
+            cellsWithoutAmount: 0,
+            currenciesWithoutUsdAmount: ["EUR"],
+          },
+        ],
+      };
+      renderScreen();
+
+      const region = within(
+        screen.getByLabelText("Cost over time · by provider"),
+      );
+      const note = region.getByLabelText(/cover only part of what was spent/i);
+      expect(note).toHaveTextContent(/Anthropic/);
+      expect(note).toHaveTextContent(/EUR/);
     });
   });
 });

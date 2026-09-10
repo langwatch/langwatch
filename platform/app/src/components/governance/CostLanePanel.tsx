@@ -5,17 +5,17 @@ import type {
 } from "@ee/governance/services/governanceCost.service";
 import type { ReactNode } from "react";
 
-import type { TimeInterval } from "~/components/governance/filters";
+import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { MeterBar } from "~/components/ui/MeterBar";
 
 import { CHART_SEAT_FILL } from "./chartTheme";
 import {
+  formatLaneCurrencyTotal,
   formatLaneUsd,
   laneTrendBadge,
   laneWithheldTotalNote,
   seatPoolName,
 } from "./costLaneFormat";
-import { LaneSparkline } from "./costs/CostCharts";
 import { SampleMark } from "./costs/sampleMark";
 
 /**
@@ -38,10 +38,9 @@ export function CostLanePanel({
   amountUsd,
   cellsWithoutAmount,
   currenciesWithoutUsdAmount,
+  currencyTotals,
   laneNote,
-  trend,
   trendPct,
-  interval,
   sample = false,
   testId,
   children,
@@ -55,28 +54,31 @@ export function CostLanePanel({
   /** Which currencies those cells were billed in. May be empty. */
   currenciesWithoutUsdAmount: readonly string[];
   /**
+   * One total per currency the lane was billed in.
+   *
+   * The US dollar entry IS `amountUsd` and is already the headline, so only
+   * the others are drawn — printing it twice would put two figures for one
+   * amount on one card, which is the shape of every defect this screen is
+   * built against.
+   */
+  currencyTotals?: ReadonlyArray<{
+    currencyCode: string;
+    amount: number | null;
+    cellsWithoutAmount: number;
+  }>;
+  /**
    * A read-side sentence explaining this lane's figure or its absence — the
    * Azure billing note today. Rendered verbatim: the panel never composes
    * copy about money, it shows what the read side decided to say.
    */
   laneNote?: string | null;
   /**
-   * This lane's own series across the window, for the card's sparkline. The
-   * same read the figure above it was totalled from, so the shape and the
-   * total can never describe different money. Omitted when the read holds no
-   * series, in which case the card simply has no sparkline.
-   */
-  trend?: Array<{ day: string; value: number | null }>;
-  /**
-   * Which way this lane is running, already measured. Passed in rather than
-   * derived from `trend`, because `trend` is folded to the calendar and a
-   * calendar bucket is not a unit of time you may compare: a partial January
-   * beside a full April reports change that is a property of the months. The
-   * caller measures on the unfolded series, where every period is one period.
+   * Which way this lane is running, already measured. Measured by the caller
+   * on the UNFOLDED series, not derived from anything drawn here: a calendar
+   * bucket is not a unit of time you may compare, and a partial January
+   * beside a full April reports change that is a property of the months.
    */
   trendPct?: number | null;
-  /** The bucket width in view, for the sparkline's tooltip heading. */
-  interval?: TimeInterval;
   /**
    * Whether this lane's figure is invented. Never optional in practice on a
    * sample lane: an unbadged figure in the house typeface reads as measured
@@ -84,10 +86,21 @@ export function CostLanePanel({
    */
   sample?: boolean;
   testId: string;
-  /** Optional detail belonging to this lane, below its trend. */
+  /** Optional detail belonging to this lane, below its figure. */
   children?: ReactNode;
 }) {
   const badge = laneTrendBadge(trendPct ?? null);
+  // The lane's own sentence, and whatever the read side had to add about it —
+  // one piece of prose, because a tooltip that opened on two paragraphs of
+  // different provenance would read as two tooltips that collided.
+  const aboutThisLane = [description, laneNote].filter(Boolean).join(" ");
+  // NO RATE IS APPLIED and nothing here is added to the headline. Money a
+  // provider billed in euros is money we can state exactly, and it gets its
+  // own line rather than being folded into a dollar figure nobody was charged
+  // (ADR-128 §3).
+  const otherCurrencies = (currencyTotals ?? []).filter(
+    (total) => total.currencyCode !== "USD",
+  );
   return (
     <Box
       data-testid={testId}
@@ -100,6 +113,16 @@ export function CostLanePanel({
       <VStack align="start" gap={1} height="full">
         <HStack gap={2}>
           <Heading size="sm">{label}</Heading>
+          {/* WHAT THE LANE IS goes here rather than under the figure. Three
+              cards sit in a row and each closed on a paragraph, which set the
+              row's height by its longest sentence and left the shortest card
+              with a hole in the middle. The sentence is read once, when a
+              reader first meets the card; the figure is read every time. */}
+          <FieldInfoTooltip
+            description={aboutThisLane}
+            testId={`${testId}-about`}
+            trigger="hover"
+          />
           <SampleMark shown={sample} />
         </HStack>
         <HStack gap={2} alignItems="baseline">
@@ -128,33 +151,34 @@ export function CostLanePanel({
             </Text>
           )}
         </HStack>
-        {/* The middle of the card used to be blank, and a reader looking at it
-            was owed an answer about what it was for. A lane states one figure,
-            and the question a single figure always raises is which way it has
-            been moving — so the space holds the window's own shape. */}
-        {trend && <LaneSparkline points={trend} interval={interval} />}
+        {otherCurrencies.length > 0 && (
+          <VStack align="start" gap={0}>
+            {otherCurrencies.map((total) => (
+              <Text
+                key={total.currencyCode}
+                fontSize="sm"
+                color="fg.muted"
+                fontVariantNumeric="tabular-nums"
+              >
+                {formatLaneCurrencyTotal(total)}
+              </Text>
+            ))}
+          </VStack>
+        )}
         {children}
-        {/* The claim sits at the top of the card and what it means sits at the
-            bottom, so three cards of different content still agree on two
-            lines. `marginTop="auto"` takes the slack in the middle: a card
-            with room to spare shows it between the figure and its footing,
-            where it reads as spacing, rather than trailing off the end, where
-            it reads as something that failed to load. */}
-        <Text fontSize="sm" color="fg.muted" marginTop="auto">
-          {description}
-        </Text>
+        {/* THIS ONE STAYS ON THE CARD. Everything else the lane has to say is
+            about what it measures, and a reader needs that once. This says the
+            figure beside it is not the whole figure — and a caveat on a number
+            that only appears when the reader goes looking for it is a caveat
+            that will be missed by exactly the reader who needed it. */}
         {cellsWithoutAmount > 0 ? (
-          <Text fontSize="xs" color="fg.subtle" data-testid={`${testId}-note`}>
-            {laneWithheldTotalNote({ currenciesWithoutUsdAmount })}
-          </Text>
-        ) : null}
-        {laneNote ? (
           <Text
             fontSize="xs"
             color="fg.subtle"
-            data-testid={`${testId}-lane-note`}
+            marginTop="auto"
+            data-testid={`${testId}-note`}
           >
-            {laneNote}
+            {laneWithheldTotalNote()}
           </Text>
         ) : null}
       </VStack>
@@ -204,6 +228,11 @@ export function SeatLanePanel({
       <VStack align="start" gap={1} height="full">
         <HStack gap={2}>
           <Heading size="sm">Seats</Heading>
+          <FieldInfoTooltip
+            description="Seats your provider reports as bought, and how many are assigned to someone."
+            testId={`${testId}-about`}
+            trigger="hover"
+          />
           <SampleMark shown={sample} />
         </HStack>
         {seats.status === "reported" ? (
@@ -279,12 +308,6 @@ function SeatPools({ pools }: { pools: GovernanceSeatPoolDto[] }) {
       {pools.map((pool) => (
         <SeatPoolRow key={pool.skuPartNumber} pool={pool} />
       ))}
-      {/* Same footing as the money lanes: the explanation goes to the bottom
-          of the card, so all three lanes close on the same line. */}
-      <Text fontSize="xs" color="fg.subtle" marginTop="auto">
-        Seats your provider reports as bought, and how many are assigned to
-        someone.
-      </Text>
     </VStack>
   );
 }

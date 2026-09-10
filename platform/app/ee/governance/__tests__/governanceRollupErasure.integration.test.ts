@@ -19,7 +19,10 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GOVERNANCE_COST_ROLLUP_TABLE } from "../projections/governanceCostRollup.constants";
+import {
+  GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE,
+  GOVERNANCE_COST_ROLLUP_TABLE,
+} from "../projections/governanceCostRollup.constants";
 import { GovernanceRollupErasureClickHouseRepository } from "../services/governanceRollupErasure.clickhouse.repository";
 
 const ns = nanoid(8);
@@ -147,6 +150,14 @@ describe("Feature: erasing an actor from the daily totals", () => {
       query_params: { tenantIds: [CURRENT_TENANT, RETIRED_TENANT] },
       clickhouse_settings: { mutations_sync: "1" },
     });
+    await client.exec({
+      query: `
+        ALTER TABLE ${GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE}
+        DELETE WHERE TenantId IN ({tenantIds:Array(String)})
+      `,
+      query_params: { tenantIds: [CURRENT_TENANT, RETIRED_TENANT] },
+      clickhouse_settings: { mutations_sync: "1" },
+    });
   });
 
   describe("given daily totals holding an erased person's identifier", () => {
@@ -240,6 +251,77 @@ describe("Feature: erasing an actor from the daily totals", () => {
 
         expect(remaining).toEqual([]);
       });
+    });
+  });
+
+  describe("given a note of where each of that person's pulled charges was filed", () => {
+    /**
+     * The index beside the totals carries the same identifier and nothing
+     * touches it, so erasure leaves the name behind for the full 13-month TTL.
+     * The replay does not rescue it either — the write path files a key once
+     * and skips it forever after, so the rebuilt cells arrive under the
+     * stand-in while this row keeps the original verbatim.
+     *
+     * BOTH halves are asserted together because each alone is satisfied by a
+     * wrong fix. Deleting the row clears the identifier and loses the address,
+     * and the address is the entire content of the table: the next reissue of
+     * that charge would be filed as new spend on top of the old figure rather
+     * than recognised as a replacement. Leaving the row untouched keeps the
+     * address and the name.
+     *
+     * Overwriting in place is available here and not on the totals: there
+     * `RawActorId` is in the sort key and `ALTER UPDATE` is refused by the
+     * engine, which is why that side removes and rebuilds. Here it is payload.
+     */
+    /** @scenario "Erasure reaches the note of where each pulled charge was filed" */
+    it("carries the stand-in, and still names the day and source it was first filed under", async () => {
+      const key = `restatement-${ns}`;
+      await client.insert({
+        table: GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE,
+        values: [
+          {
+            TenantId: CURRENT_TENANT,
+            RestatementKey: key,
+            Day: "2026-08-20",
+            CostSource: "pulled",
+            IngestionSourceId: "src_anthropic_1",
+            Provider: "anthropic",
+            Model: "anthropic/claude-sonnet-5",
+            AgentId: "",
+            CurrencyCode: "USD",
+            RawActorId: ERASED,
+            EventTimestamp: 1,
+          },
+        ],
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+      });
+
+      await repository.renameActorInRestatementIndex({
+        tenantIds: [CURRENT_TENANT, RETIRED_TENANT],
+        rawActorId: ERASED,
+        pseudonymousActorId: PSEUDONYM,
+      });
+
+      const result = await client.query({
+        query: `
+          SELECT RawActorId, toString(Day) AS Day, IngestionSourceId
+          FROM ${GOVERNANCE_COST_ROLLUP_RESTATEMENT_INDEX_TABLE}
+          WHERE TenantId = {tenantId:String}
+            AND RestatementKey = {key:String}
+        `,
+        query_params: { tenantId: CURRENT_TENANT, key },
+        format: "JSONEachRow",
+      });
+      const rows = (await result.json()) as Record<string, unknown>[];
+
+      expect(rows).toEqual([
+        {
+          RawActorId: PSEUDONYM,
+          Day: "2026-08-20",
+          IngestionSourceId: "src_anthropic_1",
+        },
+      ]);
     });
   });
 });

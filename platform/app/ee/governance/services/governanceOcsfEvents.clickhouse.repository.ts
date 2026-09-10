@@ -22,6 +22,18 @@ import { SEAT_REPORT_ACTION } from "./pullers/microsoftGraphSeats";
 
 const TABLE_NAME = "governance_ocsf_events" as const;
 
+/**
+ * Rows per INSERT. A run's kept events arrive as one array and each carries
+ * its whole raw payload, so an unchunked page has no upper bound on size.
+ */
+const INSERT_CHUNK_SIZE = 500;
+
+/**
+ * Wait for the async-insert flush: a rejected flush must reach the caller as
+ * an error, not vanish after the insert has already returned.
+ */
+const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
+
 const logger = createLogger(
   "langwatch:governance:governance-ocsf-events-clickhouse-repository",
 );
@@ -249,56 +261,83 @@ function decodeSeatReport(
   };
 }
 
+function toOcsfEventValues(row: GovernanceOcsfEventInput) {
+  return {
+    TenantId: row.tenantId,
+    OcsfSchemaVersion: OCSF_SCHEMA_VERSION,
+    EventId: row.eventId,
+    TraceId: row.traceId,
+    SourceId: row.sourceId,
+    SourceType: row.sourceType,
+    ClassUid: OCSF_CLASS_API_ACTIVITY,
+    CategoryUid: OCSF_CATEGORY_APPLICATION_ACTIVITY,
+    ActivityId: row.activityId,
+    TypeUid: OCSF_CLASS_API_ACTIVITY * 100 + row.activityId,
+    SeverityId: row.severityId,
+    EventTime: row.eventTime,
+    ActorUserId: row.actorUserId,
+    ActorEmail: row.actorEmail,
+    ActorEnduserId: row.actorEnduserId,
+    ActionName: row.actionName,
+    TargetName: row.targetName,
+    AnomalyAlertId: row.anomalyAlertId,
+    RawOcsfJson: row.rawOcsfJson,
+  };
+}
+
 export class GovernanceOcsfEventsClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   async insertEvent(row: GovernanceOcsfEventInput): Promise<void> {
-    if (!row.tenantId || !row.eventId) {
+    await this.insertEvents([row]);
+  }
+
+  /**
+   * One INSERT per chunk of rows, awaited in turn. The old loop awaited one
+   * INSERT per row — one statement at a time, but ~150 of them removed from a
+   * pull that issues ~2,600 against a dev server budgeted at 32 (#8064).
+   * Every row must belong to the same tenant: the client is resolved once,
+   * for that tenant, and a mixed page is refused rather than split.
+   */
+  async insertEvents(rows: GovernanceOcsfEventInput[]): Promise<void> {
+    if (rows.length === 0) return;
+    for (const row of rows) {
+      if (!row.tenantId || !row.eventId) {
+        throw new Error(
+          "GovernanceOcsfEventsClickHouseRepository.insertEvents: tenantId / eventId are required",
+        );
+      }
+    }
+    const tenantId = rows[0]!.tenantId;
+    if (rows.some((row) => row.tenantId !== tenantId)) {
       throw new Error(
-        "GovernanceOcsfEventsClickHouseRepository.insertEvent: tenantId / eventId are required",
+        "GovernanceOcsfEventsClickHouseRepository.insertEvents: every row must belong to the same tenant",
       );
     }
     try {
-      const client = await this.resolveClient(row.tenantId);
-      await client.insert({
-        table: TABLE_NAME,
-        values: [
-          {
-            TenantId: row.tenantId,
-            OcsfSchemaVersion: OCSF_SCHEMA_VERSION,
-            EventId: row.eventId,
-            TraceId: row.traceId,
-            SourceId: row.sourceId,
-            SourceType: row.sourceType,
-            ClassUid: OCSF_CLASS_API_ACTIVITY,
-            CategoryUid: OCSF_CATEGORY_APPLICATION_ACTIVITY,
-            ActivityId: row.activityId,
-            TypeUid: OCSF_CLASS_API_ACTIVITY * 100 + row.activityId,
-            SeverityId: row.severityId,
-            EventTime: row.eventTime,
-            ActorUserId: row.actorUserId,
-            ActorEmail: row.actorEmail,
-            ActorEnduserId: row.actorEnduserId,
-            ActionName: row.actionName,
-            TargetName: row.targetName,
-            AnomalyAlertId: row.anomalyAlertId,
-            RawOcsfJson: row.rawOcsfJson,
-          },
-        ],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
-      });
+      const client = await this.resolveClient(tenantId);
+      for (let start = 0; start < rows.length; start += INSERT_CHUNK_SIZE) {
+        await client.insert({
+          table: TABLE_NAME,
+          values: rows
+            .slice(start, start + INSERT_CHUNK_SIZE)
+            .map(toOcsfEventValues),
+          format: "JSONEachRow",
+          clickhouse_settings: INSERT_SETTINGS,
+        });
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
       logger.error(
         {
-          tenantId: row.tenantId,
-          eventId: row.eventId,
-          traceId: row.traceId,
+          tenantId,
+          rowCount: rows.length,
+          firstEventId: rows[0]!.eventId,
+          firstTraceId: rows[0]!.traceId,
           error: errorMessage,
         },
-        "Failed to insert governance_ocsf_events row",
+        "Failed to insert governance_ocsf_events rows",
       );
       throw error;
     }

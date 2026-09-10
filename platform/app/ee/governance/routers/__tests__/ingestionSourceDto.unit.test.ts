@@ -43,6 +43,7 @@ describe("a source's latest pull result", () => {
         LastRunAt: 1,
         LastRunOutcome: "failed",
         LastRunError: "Anthropic rate limit exceeded (HTTP 429).",
+        LastRunErrorCode: "pull_failed",
       },
     });
     expect(dto.pullStatus.error).toBe(
@@ -64,6 +65,7 @@ describe("a source's latest pull result", () => {
         LastRunAt: Date.parse("2026-02-02T12:00:00Z"),
         LastRunOutcome: "failed",
         LastRunError: "Too many simultaneous queries; private upstream payload",
+        LastRunErrorCode: "pull_failed",
       },
     });
     expect(dto.pullStatus).toEqual({

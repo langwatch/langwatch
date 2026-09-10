@@ -17,17 +17,67 @@ Feature: Choose Anthropic adapter settings instead of typing them
       Then the choices are exactly the usage report and the cost report
 
     @unit
-    Scenario: The bucket widths offered are the ones the adapter declares
+    Scenario: The bucket width is daily whichever report is chosen
       Given the report is set to usage
       When the admin looks at the bucket width field
-      Then the widths offered are the ones the adapter's own schema accepts
-      And no width is offered that the adapter would reject
+      Then the only entry offered is the daily one
+      And it carries no value, so the adapter's own default decides
+      And that default is daily, so the entry does not name a width the
+        source will not be read at
+      # The finer widths multiply the rows a day costs and change no
+      # figure the pillar shows, because every screen that reads this data
+      # reads it by day. The entry stays empty rather than spelling "1d"
+      # out, so daily is written down once, in the adapter's schema.
 
     @unit
-    Scenario: A required choice does not answer itself
+    Scenario: A source already reading hourly keeps reading hourly
+      Given a usage source was saved with an hourly bucket width
+      When the admin opens that source to edit it
+      Then the hourly width is offered alongside the daily one
+      And the field still holds hourly
+      # The form drops any held value its picker does not offer, so
+      # offering daily alone would have moved this source to daily the
+      # next time anyone opened it for an unrelated change -- a settings
+      # change nobody asked for and nothing announced. The finer widths
+      # are withdrawn from new sources, not taken off the ones already
+      # reading at them; the admin can still move to daily by choosing it.
+
+    @unit
+    Scenario: A width the cost report would reject is not kept either
+      Given a cost source was somehow saved with an hourly bucket width
+      When the admin opens that source to edit it
+      Then the only entry offered is the daily one
+      # The puller ignores the width on a cost source, so the stored one
+      # was never in effect. Keeping it would show the admin a setting
+      # that does nothing, and the builder refuses it anyway.
+
+    @unit
+    Scenario: Clearing the report to re-pick it does not cost the source its width
+      Given a usage source was saved with an hourly bucket width
+      When the admin clears the report field before choosing one again
+      Then the hourly width is still offered alongside the daily one
+      And the field still holds hourly
+      # The report picker keeps an empty entry so a cleared field is
+      # refused rather than quietly refilled, which makes "no report yet"
+      # a state the admin passes through on the way to re-picking one.
+      # Only the cost report retires the finer widths; an empty report
+      # has not retired anything, and treating it as if it had would drop
+      # the width mid-gesture -- the same silent migration, by a second
+      # route. The save is refused meanwhile because the report is
+      # required, so nothing can reach the adapter from this state.
+
+    @unit
+    Scenario: The report opens on the one almost every organization wants
       When the admin opens the form without touching the report field
-      Then the report field offers an unselected entry carrying no value
+      Then the report field holds the cost report
       And the form still marks the report as required
+      And an unselected entry carrying no value is still offered
+      # Cost is the provider's own figure for what was spent, which is
+      # what this source is added for; usage is the specialist choice made
+      # by someone who wants our pricing applied to raw token counts. The
+      # empty entry remains so clearing the field is possible — the form
+      # then refuses the save and marks the field rather than quietly
+      # putting the default back.
 
   Rule: A setting the cost report would reject is not offered on a cost source
 
