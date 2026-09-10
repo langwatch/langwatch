@@ -95,7 +95,6 @@ export {
 export type { ScimApi, ScimService } from "@langwatch/enterprise-scim-contract";
 export { eventMatches } from "@langwatch/webhook-contract";
 export {
-  createWebhookRestApp,
   webhookEndpointTrpcTransport,
   WebhookApp,
   WebhookEnvelopeService,

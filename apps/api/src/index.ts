@@ -230,7 +230,6 @@ export { createGovernanceRestApp } from "@langwatch/enterprise-api";
 
 
 export { type CodingAgentCallerScope } from "@langwatch/coding-agent-server";
-export { createWebhookRestApp } from "@langwatch/enterprise-api";
 export {
   createEventsRestApp,
   type TrackedEventPorts,
