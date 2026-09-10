@@ -5,6 +5,14 @@
  */
 export { identityServer } from "./identity.server.ts";
 export { IdentityApp } from "./app/identity.app.ts";
+export type { IdentityInfrastructure } from "./app/identity-infrastructure.ts";
+export { PrismaIdentityReservationRepository } from "./repositories/prisma/prisma.identity-reservations.repository.ts";
+export { PrismaIdentitySecretCarryRepository } from "./repositories/prisma/prisma.identity-secret-carry.repository.ts";
+export { PrismaJoinRequestAudienceRepository } from "./repositories/prisma/prisma.join-request-audience.repository.ts";
+export { AdminEmailPlatformOperatorsRepository } from "./repositories/prisma/prisma.sso-platform-operators.repository.ts";
+export { SsoConnectionLedgerWriterAdapter } from "./adapters/eventing.sso-connection-ledger.adapter.ts";
+export { PrismaSsoConnectionProjectionRepository } from "./repositories/prisma/prisma.sso-connection-projection.repository.ts";
+export type { SsoConnectionEvent } from "./projections/sso-connection-state.projection.ts";
 export { CryptoIdentifierIdentityAdapter } from "./adapters/crypto.identifier-identity.adapter.ts";
 export {
   type DeriveIdentifierIdInput,

@@ -88,13 +88,9 @@ export { organizationServer } from "./organization.server.ts";
 export { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
 export type { OrganizationRepositories } from "./repositories/organization.repositories.ts";
 export {
-  createOrganizationRestApp,
-  type OrganizationRestInviteService,
-  type OrganizationRestMemberSummary,
-  type OrganizationRestMemberTeamBinding,
-  type OrganizationRestPorts,
-  type OrganizationRestService,
-} from "./transport/api-rest/organization.api.ts";
+  organizationManagementEnterpriseGate,
+  organizationManagementRest,
+} from "./transport/organization-management.rest.ts";
 export { groupTrpcTransport } from "./transport/group.trpc.ts";
 export { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
 export { onboardingTrpcTransport } from "./transport/onboarding.trpc.ts";
@@ -117,6 +113,9 @@ export type {
   OrganizationSignals,
 } from "./app/organization.infrastructure.ts";
 export { createGroupRestApp } from "./transport/api-rest/group.api.ts";
+export { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
+// See the NOTE above `createOrganizationRestApp`: the legacy provisioning
+// family stays exported for the same four out-of-path consumers.
 export {
   createOrganizationsRestApp,
   type OrganizationProvisioningPort,

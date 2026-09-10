@@ -3,12 +3,12 @@ import {
   type AttachIdentifierCommandData,
   attachIdentifierCommandDataSchema,
   IDENTIFIER_ATTACHED_EVENT_TYPE,
+  type IdentityGuardsApi,
   IdentityEmailInUseError,
   type IdentityFactInput,
   normalizeIdentifierValue,
 } from "@langwatch/identity-contract";
 import { deriveNewbornUserId } from "../rules/identifier-hash.rules.ts";
-import { type IdentityGuardsService } from "./identity-guards.service.ts";
 import { adoptUserEmailCommandId } from "../rules/identity-command-id.rules.ts";
 import { type IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import {
@@ -25,7 +25,7 @@ import { identityEventsFor } from "../intents/identity-events.intent.ts";
 const logger = createLogger("langwatch:identity:birth");
 
 export interface IdentityBirthServiceDeps {
-  guards: IdentityGuardsService;
+  guards: IdentityGuardsApi;
   ledger: IdentityBirthLedgerPort;
   rows: IdentityNewbornRepository;
   /** The address lock (ADR-116 §6): the entrance and the verification

@@ -1,4 +1,5 @@
 import { moduleApi } from "@langwatch/runtime-composition";
+import type { AuthzAccessBreakdownOutput } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 import type { PaginatedProjects, Project } from "@langwatch/project-contract";
 import type {
@@ -189,6 +190,31 @@ export interface OrganizationApi {
     organizationId: string,
   ): Promise<OrganizationProvisioningSummary | null>;
   deleteProvisionedOrganization(input: { organizationId: string }): Promise<void>;
+  /**
+   * Provisions a new organization end to end: the organization and its first
+   * team, a bootstrap admin service key, and the read-back summary. On
+   * failure past organization creation it compensates by deleting the
+   * organization, reporting a failed compensation rather than raising it over
+   * the original error.
+   */
+  createForProvisioningWithAdminKey(input: {
+    name: string;
+    slug?: string;
+    adminApiKeyName?: string;
+  }): Promise<{
+    organization: { id: string; name: string; slug: string };
+    team: { id: string; slug: string; name: string };
+    adminApiKey: { id: string; token: string };
+  }>;
+  /** The authorization feature's per-member access breakdown, organization's own door onto it. */
+  getMemberAccessBreakdown(
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      userName: string | null;
+      userEmail: string | null;
+    }>,
+  ): Promise<AuthzAccessBreakdownOutput>;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;
   memberOrganizationIds(
     input: Readonly<{ userId: string; organizationIds: string[] }>,

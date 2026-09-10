@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",

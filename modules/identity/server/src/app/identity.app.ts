@@ -4,7 +4,7 @@
  * guards, and the directory-sync guards - every capability that crosses a
  * package boundary today (`IdentityApi`, ADR-101, ADR-115, ADR-116, ADR-117).
  */
-import { IdentityApi } from "@langwatch/identity-contract";
+import { IdentityApi, IdentityCapabilityUnavailableError } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { CryptoIdentifierIdentityAdapter } from "../adapters/crypto.identifier-identity.adapter.ts";
 import { LocalDoorBreakGlassBindingAdapter } from "../adapters/local-door-break-glass-binding.adapter.ts";
@@ -82,14 +82,17 @@ export class IdentityApp implements IdentityApi {
       stranding: setup.repositories.ssoStranding,
       platformOperators: setup.infrastructure.ssoPlatformOperators,
     });
-    const ssoConnections = SsoConnectionService.create(
-      ssoConnectionGuards,
-      setup.infrastructure.ssoConnectionLedger,
-    );
-    const ssoBackoffice = SsoConnectionBackofficeService.create({
-      reads: setup.repositories.ssoBackoffice,
-      connections: () => ssoConnections,
-    });
+    // Q3(c): the ledger is nullable exactly like `mail`; without it neither
+    // capability has a store to write through, so both refuse by name.
+    const ssoConnections = setup.infrastructure.ssoConnectionLedger
+      ? SsoConnectionService.create(ssoConnectionGuards, setup.infrastructure.ssoConnectionLedger)
+      : null;
+    const ssoBackoffice = ssoConnections
+      ? SsoConnectionBackofficeService.create({
+          reads: setup.repositories.ssoBackoffice,
+          connections: () => ssoConnections,
+        })
+      : null;
     const scimSyncGuards = ScimSyncGuardsService.create({ syncs: setup.infrastructure.scimSyncs });
 
     return new IdentityApp({
@@ -122,9 +125,9 @@ export class IdentityApp implements IdentityApi {
       secrets: IdentitySecretCarryService;
       joinRequestGuards: JoinRequestGuardsService;
       joinRequestNotifications: JoinRequestNotificationService | null;
-      ssoConnections: SsoConnectionService;
+      ssoConnections: SsoConnectionService | null;
       ssoConnectionGuards: SsoConnectionGuardsService;
-      ssoBackoffice: SsoConnectionBackofficeService;
+      ssoBackoffice: SsoConnectionBackofficeService | null;
       scimSyncGuards: ScimSyncGuardsService;
     },
   ) {}
@@ -133,23 +136,27 @@ export class IdentityApp implements IdentityApi {
     return this.parts.emails.tryResolveEmail(input);
   }
 
-  get guards(): IdentityGuardsService {
+  verifiedEmailsOf(input: { userId: string }) {
+    return this.parts.emails.tryVerifiedEmailsOf(input);
+  }
+
+  guards(): IdentityGuardsService {
     return this.parts.identityGuards;
   }
 
-  get mfaGuards(): MfaGuardsService {
+  mfaGuards(): MfaGuardsService {
     return this.parts.mfaGuards;
   }
 
-  get reservations(): IdentityRepositories["reservations"] {
+  reservations(): IdentityRepositories["reservations"] {
     return this.parts.reservations;
   }
 
-  get identity(): IdentityService {
+  identity(): IdentityService {
     return this.parts.identity;
   }
 
-  get newbornSweep(): IdentityNewbornReconciliationService {
+  newbornSweep(): IdentityNewbornReconciliationService {
     return this.parts.newbornSweep;
   }
 
@@ -160,27 +167,33 @@ export class IdentityApp implements IdentityApi {
     ] as const;
   }
 
-  get joinRequestGuards(): JoinRequestGuardsService {
+  joinRequestGuards(): JoinRequestGuardsService {
     return this.parts.joinRequestGuards;
   }
 
-  get joinRequestNotifications(): JoinRequestNotificationService | null {
+  joinRequestNotifications(): JoinRequestNotificationService | null {
     return this.parts.joinRequestNotifications;
   }
 
-  get ssoConnections(): SsoConnectionService {
+  ssoConnections(): SsoConnectionService {
+    if (!this.parts.ssoConnections) {
+      throw new IdentityCapabilityUnavailableError("SSO connection store");
+    }
     return this.parts.ssoConnections;
   }
 
-  get ssoConnectionGuards(): SsoConnectionGuardsService {
+  ssoConnectionGuards(): SsoConnectionGuardsService {
     return this.parts.ssoConnectionGuards;
   }
 
-  get ssoBackoffice(): SsoConnectionBackofficeService {
+  ssoBackoffice(): SsoConnectionBackofficeService {
+    if (!this.parts.ssoBackoffice) {
+      throw new IdentityCapabilityUnavailableError("SSO connection backoffice");
+    }
     return this.parts.ssoBackoffice;
   }
 
-  get scimSyncGuards(): ScimSyncGuardsService {
+  scimSyncGuards(): ScimSyncGuardsService {
     return this.parts.scimSyncGuards;
   }
 }

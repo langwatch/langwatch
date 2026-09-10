@@ -47,6 +47,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/share-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",

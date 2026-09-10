@@ -32,8 +32,8 @@ export type IdentityInfrastructure = Readonly<{
   joinRequestAudience: JoinRequestAudiencePort;
   /** Who counts as a LangWatch platform operator, for the SSO connection guards (D05 tier 1). */
   ssoPlatformOperators: SsoPlatformOperatorRepository;
-  /** The SSO connection ledger's append surface. */
-  ssoConnectionLedger: SsoConnectionLedger;
+  /** The SSO connection ledger's append surface, or nothing where the process composed no SSO connection store. Mirrors `mail`: absent means the capability refuses by name rather than answering emptily. */
+  ssoConnectionLedger: SsoConnectionLedger | null;
   /** The folded state of one connection's directory sync (D08). */
   scimSyncs: ScimSyncReadRepository;
 }>;

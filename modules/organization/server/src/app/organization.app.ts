@@ -13,6 +13,8 @@ import {
 } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { ShareApi } from "@langwatch/share-contract";
 import { UserApi } from "@langwatch/user-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { HandledError } from "@langwatch/handled-error";
@@ -177,10 +179,20 @@ export interface ServerOrganizationAppDependencies {
   projects: OrganizationProjectApi;
   /** The one permission service every door on this application asks. */
   permissions: AuthzApi;
+  /** Revokes trace shares after a settings write turns trace sharing off. */
+  shares: ShareApi;
+  /** Mints the bootstrap admin service key a provisioned organization needs. */
+  apiKeys: ApiKeyApi;
 }
 
 type OrganizationSetup = FeatureSetup<
-  { projects: typeof ProjectApi; permissions: typeof AuthzApi; users: typeof UserApi },
+  {
+    projects: typeof ProjectApi;
+    permissions: typeof AuthzApi;
+    users: typeof UserApi;
+    shares: typeof ShareApi;
+    apiKeys: typeof ApiKeyApi;
+  },
   OrganizationInfrastructure,
   undefined,
   OrganizationRepositories
@@ -254,6 +266,8 @@ export class ServerOrganizationApp implements OrganizationApi {
     projects: ProjectApi,
     permissions: AuthzApi,
     users: UserApi,
+    shares: ShareApi,
+    apiKeys: ApiKeyApi,
   };
   #dependencies: ServerOrganizationAppDependencies;
 
@@ -287,6 +301,8 @@ export class ServerOrganizationApp implements OrganizationApi {
       groups,
       projects: setup.dependencies.projects,
       permissions: setup.dependencies.permissions,
+      shares: setup.dependencies.shares,
+      apiKeys: setup.dependencies.apiKeys,
     });
 
     application.#infrastructure = setup.infrastructure;
@@ -337,16 +353,20 @@ export class ServerOrganizationApp implements OrganizationApi {
    * by name, which is what a deployment that composed none of it does.
    */
   static createForTesting(setup: {
-    dependencies: Omit<ServerOrganizationAppDependencies, "groups"> & {
+    dependencies: Omit<ServerOrganizationAppDependencies, "groups" | "shares" | "apiKeys"> & {
       groups?: OrganizationGroupService;
+      shares?: ShareApi;
+      apiKeys?: ApiKeyApi;
     };
     infrastructure?: Partial<OrganizationInfrastructure>;
     /** Defaults to a reader that finds no personal team in any scope. */
     personalTeamScope?: PersonalTeamScopeReader;
   }): ServerOrganizationApp {
-    const { groups, ...dependencies } = setup.dependencies;
+    const { groups, shares, apiKeys, ...dependencies } = setup.dependencies;
     const application = new ServerOrganizationApp({
       ...dependencies,
+      shares: shares ?? refusing<ShareApi>("trace share revocation"),
+      apiKeys: apiKeys ?? refusing<ApiKeyApi>("api key provisioning"),
       groups:
         groups ??
         OrganizationGroupScopeService.create({
@@ -481,10 +501,39 @@ export class ServerOrganizationApp implements OrganizationApi {
    * existing share link now has to be revoked (ADR-057) — only the write saw the stored value
    * beforehand, so the answer is carried through rather than dropped here.
    */
-  updateSettings(
+  async updateSettings(
     input: UpdateOrganizationSettingsInput,
   ): Promise<UpdateOrganizationSettingsResult> {
-    return this.#dependencies.organizations.updateSettings(input);
+    const result = await this.#dependencies.organizations.updateSettings(input);
+    await this.#revokeTraceSharesIfRequired(input.organizationId, result);
+
+    return result;
+  }
+
+  /**
+   * Trace sharing switched off means every existing share link on every
+   * project in the organization now has to go: this feature owns neither
+   * projects nor shares, so it reaches both peers directly rather than
+   * leaving the revocation to whoever called it. Loud on purpose - a share
+   * link that survives the switch is a live leak.
+   */
+  async #revokeTraceSharesIfRequired(
+    organizationId: string,
+    result: UpdateOrganizationSettingsResult,
+  ): Promise<void> {
+    if (!result.traceShareRevocationRequired) return;
+
+    const projectIds = await this.#dependencies.projects.listIdsByOrganization({ organizationId });
+    const outcomes = await Promise.allSettled(
+      projectIds.map((projectId) => this.#dependencies.shares.revokeAllTraceShares(projectId)),
+    );
+    const unrevoked = projectIds.filter((_, index) => outcomes[index]?.status === "rejected");
+
+    if (unrevoked.length > 0) {
+      throw new Error(
+        `Trace sharing was disabled, but share links survive on ${unrevoked.length} project(s): ${unrevoked.join(", ")}`,
+      );
+    }
   }
 
   getSettings(input: { organizationId: string }) {
@@ -526,6 +575,75 @@ export class ServerOrganizationApp implements OrganizationApi {
       .then((summary) =>
         summary === null ? null : organizationProvisioningSummaryFromDate(summary),
       );
+  }
+
+  getMemberAccessBreakdown(
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      userName: string | null;
+      userEmail: string | null;
+    }>,
+  ) {
+    return this.#dependencies.permissions.getAccessBreakdown(input);
+  }
+
+  /**
+   * Provisions an organization, its bootstrap admin service key and reads the
+   * summary back, self-hosted instance administrators only. Without its
+   * bootstrap key the organization is unreachable, so a failure past creation
+   * compensates by deleting it; the caller sees the ORIGINAL failure, so a
+   * failed compensation is only reported.
+   */
+  async createForProvisioningWithAdminKey(input: {
+    name: string;
+    slug?: string;
+    adminApiKeyName?: string;
+  }) {
+    const created = await this.createForProvisioning({
+      name: input.name,
+      ...(input.slug !== undefined ? { slug: input.slug } : {}),
+    });
+
+    try {
+      const adminKey = await this.#dependencies.apiKeys.create({
+        name: input.adminApiKeyName ?? "Provisioning admin",
+        userId: null,
+        createdByUserId: null,
+        organizationId: created.organization.id,
+        permissionMode: "all",
+        bindings: [
+          { role: "ADMIN", scopeType: "ORGANIZATION", scopeId: created.organization.id },
+        ],
+      });
+
+      const summary = await this.findProvisioningSummary(created.organization.id);
+      if (!summary) {
+        // The slug is the natural key an infrastructure-as-code caller
+        // stores; answering success with a blank one moves the failure far
+        // from its cause.
+        throw new Error(
+          `provisioned organization ${created.organization.id} could not be read back`,
+        );
+      }
+
+      return {
+        organization: { id: created.organization.id, name: created.organization.name, slug: summary.slug },
+        team: created.team,
+        adminApiKey: { id: adminKey.apiKey.id, token: adminKey.token },
+      };
+    } catch (error) {
+      try {
+        await this.deleteProvisionedOrganization({ organizationId: created.organization.id });
+      } catch (compensationError) {
+        this.#infrastructure.signals.reportError(
+          compensationError instanceof Error
+            ? compensationError
+            : new Error(String(compensationError)),
+        );
+      }
+      throw error;
+    }
   }
 
   deleteProvisionedOrganization(

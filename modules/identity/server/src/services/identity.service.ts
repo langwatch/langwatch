@@ -20,7 +20,7 @@ import {
   type VerifyIdentifierCommandData,
   verifyIdentifierCommandDataSchema,
 } from "@langwatch/identity-contract";
-import type { IdentityGuardsService } from "./identity-guards.service.ts";
+import type { IdentityGuardsApi } from "@langwatch/identity-contract";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import type {
   IdentityAdoptionWrites,
@@ -39,12 +39,12 @@ export class IdentityService
     IdentityAdoptionWrites,
     IdentityLinkProposalWrites
 {
-  static create(guards: IdentityGuardsService, ledger: IdentityLedger): IdentityService {
+  static create(guards: IdentityGuardsApi, ledger: IdentityLedger): IdentityService {
     return new IdentityService(guards, ledger);
   }
 
   private constructor(
-    private readonly guards: IdentityGuardsService,
+    private readonly guards: IdentityGuardsApi,
     private readonly ledger: IdentityLedger,
   ) {}
 

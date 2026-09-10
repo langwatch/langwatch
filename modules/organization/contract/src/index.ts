@@ -1,3 +1,5 @@
+export * from "./organization-management.rest.ts";
+export * from "./organizations-provisioning.rest.ts";
 export * from "./group.ts";
 export * from "./group.trpc-schemas.ts";
 export * from "./group.errors.ts";

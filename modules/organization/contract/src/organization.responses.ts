@@ -99,15 +99,13 @@ const organizationInviteRowSchema = z
 
 /** One created invitation, and whether its email actually went out. */
 export const organizationInviteCreatedSchema = z
-  .object({ invite: organizationInviteRowSchema, emailNotSent: z.boolean() })
+  .object({ invite: organizationInviteRowSchema, emailNotSent: z.boolean(), inviteUrl: z.string() })
   .strict();
 export type OrganizationInviteCreated = z.infer<typeof organizationInviteCreatedSchema>;
 export const organizationInvitesCreatedSchema = organizationInviteCreatedSchema.array();
 
 /** A resent invitation: the row, whether the email went out, and its accept link. */
-export const organizationInviteResentSchema = organizationInviteCreatedSchema
-  .extend({ inviteUrl: z.string() })
-  .strict();
+export const organizationInviteResentSchema = organizationInviteCreatedSchema;
 export type OrganizationInviteResent = z.infer<typeof organizationInviteResentSchema>;
 
 /** One pending invitation, as the members screen's admin list renders it. */

@@ -1,5 +1,6 @@
 import { moduleApi } from "@langwatch/runtime-composition";
 import type { SystemMigration } from "@langwatch/system-migrations";
+import type { MatchableEmail } from "./matchable-emails.ts";
 import type {
   AttachIdentifierCommandData,
   DetachIdentifierCommandData,
@@ -266,9 +267,12 @@ export interface ScimSyncGuardsApi {
 export interface IdentityApi {
   /** The identifier-backed address for this user, or null while they keep the legacy `User.email`. */
   findEmail(input: { userId: string }): Promise<string | null>;
-  readonly guards: IdentityGuardsApi;
-  readonly mfaGuards: MfaGuardsApi;
-  readonly reservations: {
+  /** Every address this user has PROVEN, through any method (D11 invitation matching), or null while they keep the legacy `User.email`. */
+  verifiedEmailsOf(input: { userId: string }): Promise<MatchableEmail[] | null>;
+  /** Operations, not properties: a module boundary carries callable members only. */
+  guards(): IdentityGuardsApi;
+  mfaGuards(): MfaGuardsApi;
+  reservations(): {
     claim(args: {
       normalizedValue: string;
       userId: string;
@@ -278,16 +282,16 @@ export interface IdentityApi {
     release(args: { userId: string; holdingIdentifierIds: readonly string[] }): Promise<number>;
     reapOrphans(): Promise<number>;
   };
-  readonly identity: IdentityLedgerApi;
-  readonly newbornSweep: IdentityNewbornSweepApi;
+  identity(): IdentityLedgerApi;
+  newbornSweep(): IdentityNewbornSweepApi;
   /** The USER-rooted migration registry (ADR-101 §6), in main's order. */
   userMigrations(): readonly SystemMigration[];
-  readonly joinRequestGuards: JoinRequestGuardsApi;
-  readonly joinRequestNotifications: JoinRequestNotificationApi | null;
-  readonly ssoConnections: SsoConnectionApi;
-  readonly ssoConnectionGuards: SsoConnectionGuardsApi;
-  readonly ssoBackoffice: SsoConnectionBackofficeApi;
-  readonly scimSyncGuards: ScimSyncGuardsApi;
+  joinRequestGuards(): JoinRequestGuardsApi;
+  joinRequestNotifications(): JoinRequestNotificationApi | null;
+  ssoConnections(): SsoConnectionApi;
+  ssoConnectionGuards(): SsoConnectionGuardsApi;
+  ssoBackoffice(): SsoConnectionBackofficeApi;
+  scimSyncGuards(): ScimSyncGuardsApi;
 }
 
 export const IdentityApi = moduleApi<IdentityApi>("identity");

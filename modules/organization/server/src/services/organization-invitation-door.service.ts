@@ -77,8 +77,12 @@ export class OrganizationInvitationDoorService {
     }
 
     const created = await this.#createOrRefuse(input);
+    const withUrls = created.invites.map((record) => ({
+      ...record,
+      inviteUrl: this.deps.invitations.acceptUrl(record.invite.inviteCode),
+    }));
 
-    if (created.invites.length === 0) return [...created.invites];
+    if (withUrls.length === 0) return withUrls;
 
     await this.#answerOpenJoinRequests(created.invites);
 
@@ -97,7 +101,7 @@ export class OrganizationInvitationDoorService {
       });
     }
 
-    return [...created.invites];
+    return withUrls;
   }
 
   revoke(input: OrganizationApiInviteScope): Promise<void> {

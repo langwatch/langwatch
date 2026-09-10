@@ -465,6 +465,25 @@ export class IdentityPasskeyNotRecognizedError extends PasskeyCommandRefusedErro
  * in. Covers both "nothing verified" and "only passkeys, no recoverable
  * address" — same remedy shape: add another way in FIRST.
  */
+/**
+ * The SSO connection write surface, refused by name rather than answered
+ * emptily: this deployment composed the identity app with no SSO connection
+ * store, so `ssoConnections`/`ssoBackoffice` have nothing to write through.
+ * Same code and shape as `OrganizationCapabilityUnavailableError`.
+ */
+export class IdentityCapabilityUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `This deployment has no ${capability}.`, {
+      httpStatus: 503,
+      fault: "platform",
+      meta: { capability },
+    });
+    this.name = "IdentityCapabilityUnavailableError";
+  }
+}
+
 export class IdentityDetachStrandsUserError extends IdentityCommandRefusedError {
   constructor(detail: string) {
     super("identity_detach_strands_user", "identity_detach_strands_user", {

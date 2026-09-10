@@ -119,6 +119,7 @@ export {
   verifyDomainCommandDataSchema,
 } from "./connection-commands.ts";
 export {
+  IdentityCapabilityUnavailableError,
   IdentityCommandRefusedError,
   IdentityDetachStrandsUserError,
   IdentityEmailInUseError,
