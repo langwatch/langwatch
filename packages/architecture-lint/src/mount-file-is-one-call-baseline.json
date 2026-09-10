@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "policy": "mount-file-is-one-call",
+  "entries": [
+    {
+      "key": "apps/api/src/features/agent/agent-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/analytics/langwatch-ql-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/analytics/query-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/annotation/annotation-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/api-key/api-key-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/auth/auth-cli-device-flow-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/auth/auth-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/coding-agent/coding-agent-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/dashboard/dashboard-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/enterprise/governance-cli-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/enterprise/governance-ingest-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/enterprise/scim-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/experiment/experiment-dspy-steps-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/experiment/experiment-init-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/experiment/experiment-v3-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/export/scenario-run-export-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/export/trace-export-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/gateway/gateway-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/github/github-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/health/health-probe-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/image-proxy/image-proxy-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/langy/langy-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/mcp/mcp-authorize-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/model-provider/model-provider-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/model-provider/playground-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/ops/admin-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/ops/ops-clickhouse-explain-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/organization/organization-management-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/organization/organizations-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/platform-health/platform-health-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/prompt/prompt-execute-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/rum/rum-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/scenario/scenario-generate-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/scenario/scenario-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/stored-object/stored-object-file-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/stored-object/stored-object-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/suite/suite-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/trace/otlp-ingest-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/trace/trace-legacy-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/trace/traces-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/trace/tracked-event-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/workflow/workflow-run-rest.mount.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "apps/api/src/features/workflow/workflow-studio-rest.mount.ts",
+      "measured": "2026-09-10"
+    }
+  ]
+}

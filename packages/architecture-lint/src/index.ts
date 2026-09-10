@@ -140,6 +140,28 @@ export type {
   SourceFolderShapeFinding,
   SourceFolderShapeKind,
 } from "./policies/source-folder-shape.ts";
+export {
+  collectCompositionRootBudget,
+  collectCompositionRootBudgetFindings,
+  collectMountFileIsOneCallBaseline,
+  collectMountFileIsOneCallFindings,
+  collectPortsAndAdaptersFoldersBaseline,
+  collectPortsAndAdaptersFoldersFindings,
+  collectRestDoorWithoutMountBaseline,
+  collectRestDoorWithoutMountFindings,
+  lintCompositionRootMayOnlyShrink,
+  lintMountFileIsOneCall,
+  lintPortsAndAdaptersFolders,
+  lintRestDoorWithoutMount,
+  MOUNT_FILE_IS_ONE_CALL_BASELINE,
+  PORTS_AND_ADAPTERS_FOLDERS_BASELINE,
+  REST_DOOR_WITHOUT_MOUNT_BASELINE,
+} from "./policies/shape-counters.ts";
+export type {
+  CompositionRootBudgetFinding,
+  MountFileFinding,
+  RestDoorWithoutMountFinding,
+} from "./policies/shape-counters.ts";
 export { lintStrictPortModules } from "./policies/boundaries/port-modules.ts";
 export {
   COMPOSED_EXPORTS_BASELINE,

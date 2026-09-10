@@ -1,0 +1,1718 @@
+{
+  "version": 1,
+  "policy": "ports-and-adapters-folders",
+  "entries": [
+    {
+      "key": "enterprise/modules/billing/server/src/adapters/eventing.billable-events-meter.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/adapters/eventing.billing-meter-dispatch.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/adapters/eventing.billing-reporting.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/adapters/eventing.report-usage-for-month.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/adapters/null-organization.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/adapters/null-subscription-notifier.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/adapters/observability.billing-error.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/adapters/plan-limits.plan-catalogue.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/adapters/stripe-error.stripe-error.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/adapters/stripe.stripe-client.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/adapters/stripe.usage-reporting.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/ports/billable-events-meter.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/ports/billing-checkpoint.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/ports/billing-report-organization.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/ports/billing-webhook-host.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/ports/error-reporter.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/ports/organization-pricing.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/ports/organization.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/ports/stripe-error-translator.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/ports/subscription-notifier.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/ports/tenant-organization.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/ports/usage-limit-email.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/admin-usage-report.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/anthropic-admin-puller.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/claude-compliance-puller.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/copilot-studio-dataverse-puller.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/copilot-studio-puller.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/databricks-genie-puller.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/governance-events.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/http-poller.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/ingestion-pull.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/openai-admin-puller.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/openai-compliance-puller.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/otel.trace-alert-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/postgres.governance-installation.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/postgres.governance.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/postgres.ingestion-pull-source.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/postgres.session-policy.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/pulled-usage.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/adapters/s3-puller.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/__tests__/subscribers/governance-subscriber.fixtures.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/__tests__/support/test-organization-service.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/__tests__/support/test-project-api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/ai-tool-catalog.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/governance-budget-overview.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/governance-diagnostics.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/governance-ingest-rate-limit.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/governance-object-storage.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/governance-project.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/governance-signal.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/governance-subscriber.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/governance-webhook.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/ingestion-pull-lifecycle.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/ingestion-pull-worker.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/ingestion-pull.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/ingestion-source-activity.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/ingestion-source-key.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/ingestion-source.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/ingestion-template.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/personal-usage.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/pulled-usage-ledger.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/pulled-usage-rate.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/quarantine-fill.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/ports/spend-spike-anomaly.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server/src/ports/license-storage.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/managed-provider/server/src/adapters/aws-sts.aws-sts.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/managed-provider/server/src/adapters/environment-config.environment-config.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/managed-provider/server/src/ports/managed-provider-configuration.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/managed-provider/server/src/ports/managed-provider-credentials.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/sso/server/src/adapters/__tests__/support/fake-oidc-provider.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/adapters/__tests__/support/eventing.authz-ledger-fork.harness.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/adapters/eventing.authz-audit.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/adapters/eventing.authz-command-dispatcher.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/adapters/eventing.authz-grant.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/adapters/eventing.authz-ledger.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/adapters/eventing.authz.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/adapters/ksuid.authz-binding-id.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/adapters/observability.authz-cutover.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/adapters/observability.authz-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/adapters/observability.authz-revocation.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/ports/authz-cutover-telemetry.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/ports/authz-grants-command-dispatcher.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/ports/authz-metrics.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/ports/authz-revocation-telemetry.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/ports/postgres-authz-database.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/eventing.automation.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/hmac.unsubscribe-token.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/otel.automation-runaway-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/otel.automation-settlement-observability.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/postgres.automation-settlement-ledger.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/postgres.automation-trace-trigger-catalogue.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/registry.automation-provider.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/slack-provider.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/slack-web-api.delivery.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/slack-webhook.client.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/slack-webhook.delivery.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/webhook-delivery.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/adapters/webhook-provider.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/__tests__/pipeline-test-harness.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/__tests__/support/settlement.fixtures.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/__tests__/support/test-project-api.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-graph.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-intent-retention.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-notification-delivery.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-persist-action.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-provider.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-runaway.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-scheduled-intent.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-settlement-ledger.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-settlement-read.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-settlement.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-test-fire.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/automation-trace-trigger-catalogue.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/email-cap.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/scheduled-jobs.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/scheduler-wake.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/ports/unsubscribe-token.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/adapters/__tests__/fixtures/coding-agent-processing.fixture.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/adapters/coding-agent-clock.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/adapters/coding-agent-read-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/adapters/eventing.coding-agent-projections.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/adapters/eventing.coding-agent-session-store.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/adapters/eventing.contribute-log-facts.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/adapters/eventing.contribute-metric-facts.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/adapters/eventing.contribute-span-facts.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/adapters/model-catalog.cost-estimator.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/adapters/otel.coding-agent-cost-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/ports/coding-agent-billing.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/ports/coding-agent-caller-scope.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/ports/coding-agent-clickhouse.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/ports/coding-agent-clock.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/ports/coding-agent-cost-estimator.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/ports/coding-agent-cost-metrics.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/ports/coding-agent-project-activity.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/ports/coding-agent-pull-request-mapping.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/ports/coding-agent-read-metrics.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/ports/coding-agent-trace-processing.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dashboard/server/src/ports/alert-redaction.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dashboard/server/src/ports/platform-url.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dashboard/server/src/ports/workbench-access.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dashboard/server/src/ports/workbench-caller.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-privacy/server/src/adapters/otel.pii-analysis-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-privacy/server/src/ports/data-privacy.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-privacy/server/src/ports/pii-analysis-metrics.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-privacy/server/src/ports/pii-analysis.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/ports/data-retention-plan.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/ports/storage-meter-clickhouse.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/adapters/azure.dataset-storage.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/adapters/dataset-content.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/adapters/dataset-normalize.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/adapters/dataset-object-storage-resolver.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/adapters/dataset-upload.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/adapters/local.dataset-storage.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/adapters/s3.dataset-storage.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/ports/dataset-normalize.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/ports/dataset-storage.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/ports/dataset.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/entitlement/server/src/ports/usage-cache.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/entitlement/server/src/ports/usage-counter.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/entitlement/server/src/ports/usage-organization.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/entitlement/server/src/ports/usage-volume-counter.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/entitlement/server/src/ports/usage-warning.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/adapters/direct.evaluation-execution-receipt.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/adapters/evaluation-command.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/adapters/evaluation-processing-producer.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/adapters/evaluation-processing.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/adapters/evaluation.eventing.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/adapters/http.langevals-evaluator.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/adapters/otel.evaluation-execution-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/adapters/workflow-evaluation.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/ports/__tests__/support/evaluation-execution.fixtures.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/ports/evaluation-execution.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/ports/evaluation-rescore.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/ports/evaluation.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/adapters/noop-experiment-workbench-updates.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/adapters/unavailable-experiment-execution.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-clickhouse.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-connected-agent-ownership.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-connected-dispatch.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-dspy-retention.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-evaluation-reporting.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-execution.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-model-cost.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-run-error-reporting.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-sandbox-credential.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-studio-dispatch.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-target-entity-names.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-workbench-updates.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/ports/experiment-workflow-dsl.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/feature-flag/server/src/adapters/cached.feature-flag-row.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/feature-flag/server/src/adapters/feature-flag.kill-switch.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/clickhouse.gateway-open-admissions.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/eventing.gateway-spend.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/fixed-gateway-settlement.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-budget-dto.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-budget-ledger.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-end-user-caps.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-provider-label.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-spend-cursor.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-spend-events-clickhouse.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-spend-filters.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-spend-grouping.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-spend-producer.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-virtual-key-dto.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-virtual-key-spend.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/gateway-wire-pagination.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/jwt.gateway-token.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/model-catalog.gateway-spend-rating.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/postgres.gateway-budget-resolution.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/postgres.gateway-config-assembly.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/postgres.gateway-internal-store.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/postgres.gateway-spend-scope.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/postgres.gateway-trace-destination-report.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/postgres.gateway-transaction.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/postgres.gateway-virtual-key-config-backfill.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/postgres.virtual-key.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/prisma.gateway.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/virtual-key-crypto.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/ports/gateway-internal-store.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/ports/gateway-open-admissions.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/ports/gateway-spend-events.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/ports/gateway-virtual-key-spend.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/ports/gateway-virtual-key.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/hosted-mcp/server/src/adapters/header.mcp-client-address.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/hosted-mcp/server/src/ports/hosted-mcp.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/better-auth.account-queries.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/better-auth.identity-birth.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/better-auth.identity-ceremonies.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/better-auth.identity-storage.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/crypto.identifier-identity.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/eventing.join-request-ledger.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/eventing.join-request-lifecycle.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/eventing.scim-sync-ledger.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/eventing.sso-connection-ledger.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/eventing.sso-connection-teardown.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/identity-ledger.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/identity-pipeline-definition.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/in-process-break-glass-limiter.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/join-request-ledger.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/join-request-pipeline-definition.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/local-door-break-glass-binding.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/metrics.identity-ledger.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/postgres.identity-email.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/postgres.identity-guards.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/postgres.identity-newborn-sweep.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/postgres.identity-pipeline.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/postgres.identity-user-migrations.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/postgres.join-request-notification.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/postgres.join-request-pipeline.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/postgres.join-request.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/postgres.scim-sync-pipeline.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/postgres.sso-connection-pipeline.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/producer.identity-pipelines.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/scim-sync-pipeline-definition.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/sso-connection-pipeline-definition.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/sso-connection-routing-shadow.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/sso-connection-teardown.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/system-migration.identity-connection-grandfather.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/system-migration.identity-identifier-backfill.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/adapters/system-migration.identity-secret-heal.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/ports/identifier-identity.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/ports/identity-birth-ledger.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/ports/identity-birth.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/ports/identity-eventing.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/ports/identity-write-gate-state.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/ports/join-request-audience.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/ports/join-request-mail.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/ports/join-request-notification-mail.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/ports/platform-operator.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/__tests__/helpers/langyEventFixtures.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/eventing.langy-conversation.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/eventing.langy-maintenance.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/feature-flag.langy-ui-action-surface.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/langy-analytics-event-storage.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/langy-worker-http.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/langy.langy.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/null-langy-block-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/null-langy-worker-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/otel.langy-block-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/otel.langy-session-key-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/otel.langy-worker-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/adapters/unavailable-langy-worker.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-conversation-process.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-effect.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-feedback-prompt.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-frame-auth.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-ids.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-navigate-project.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-navigate-resource.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-session-key-metrics.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-title-model.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-turn-runtime.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-ui-action-backend.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/ports/langy-ui-action-catalog.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/log/server/src/adapters/log-processing.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/__tests__/metric-processing/canonical-metric.fixture.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/canonical-metric.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/metric-attributes.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/metric-correlations.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/metric-kinds.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/metric-numbers.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/metric-point.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/metric-processing.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/metric-redaction.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/metric-serialization.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/metric-validation.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/adapters/metric-values.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/ports/metric-preparation.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/ports/metric-redaction.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/adapters/http.model-provider-credential-probe.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/adapters/registry.model-provider-catalog.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/monitor/server/src/ports/monitor-evaluator.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/monitor/server/src/ports/monitor-performance.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/adapters/audit-log.queue-audit.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/adapters/eventing.ops-introspection.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/adapters/null.organization-dataplane.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/adapters/ops-worker-contribution.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/adapters/otel.storage-stats-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/adapters/queue.ops-queue-metrics-source.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/adapters/routing-table.organization-dataplane.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/adapters/slack.bug-report-notifier.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/ports/queue-audit-sink.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/platform-health/server/src/adapters/subsystem-probe.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/platform-health/server/src/ports/subsystem-probe.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/presence/server/src/adapters/broadcast-tenant-rate-limiter.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/presence/server/src/ports/presence.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/project/server/src/adapters/project-credentials.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/project/server/src/ports/project.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/adapters/postgres.prompt.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/role/server/src/ports/role.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/agent-test-script.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/child-egress-policy.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/child-logger.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/child-process-spawn.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/child-tls-env.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/compute-run-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/finish-run.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/http-auth.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/litellm-model.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/nlp-fetch.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/node-scenario-child-process.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/otel.scenario-processor-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/prompt-template.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/remote-trace-run.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/scenario-child-execution.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/scenario-role-model.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/scenario-secret-reference.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/serialized-agent-registry.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/serialized-code-agent.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/serialized-connected-agent.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/serialized-http-agent.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/serialized-prompt-config.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/serialized-workflow-agent.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/simulation-processing-commands.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/adapters/simulation-processing-pipeline.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/ports/scenario-activity.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/ports/serialized-agent.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/secret/server/src/adapters/aes-gcm.secret-encryption.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/secret/server/src/ports/secret.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/stored-object/server/src/ports/stored-object.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/suite/server/src/ports/suite-execution.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/adapters/eventing.topic-clustering-commands.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/adapters/eventing.topic-clustering-schedule.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/adapters/eventing.topic-clustering.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/adapters/eventing.topic-events.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/adapters/langevals-staged-payload.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/adapters/otel.topic-clustering-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/adapters/topic-clustering-processing-producer.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/__tests__/fixtures/fake-event-log.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/eventing.change-trace-name.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/eventing.deferred-origin.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/eventing.record-span.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/eventing.trace-log-contribution.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/eventing.trace-metric-correlation.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/eventing.trace-origin.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/eventing.trace-pipeline.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/eventing.trace-processing-installer.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/eventing.trace-processing.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/eventing.trace-projection-lean.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/eventing.trace-topic-assignment.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/model-catalog.trace-model-cost.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/otel.trace-edge-media-telemetry.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/otel.trace-evaluation-loop-metrics.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/trace-io-extraction.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/trace-media-reference.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/trace-processing-producer.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/trace-processing-span-ingest.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/trace-query-classification.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/trace-span-cost-enrichment.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/trace-span-normalization.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/trace-span-spool.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/adapters/trace-span-token-estimation.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/__tests__/repositories/clickhouse-test-helpers.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/__tests__/support/model-provider.service.fake.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/__tests__/support/query-classification.fake.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/__tests__/support/trace-read-ports.fake.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/canonical-attributes.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/clickhouse.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/trace-span-preparation.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/trace-span-spool.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/trace-spool-storage.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/trace-tenant-broadcast.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/trace-token-counter.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/trace-topic-assignment-command.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/trace-windowed-read-metrics.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/ports/trace.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/adapters/http.webhook-destination.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/adapters/sqs.webhook-destination.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/adapters/webhook-destination.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/ports/webhook-destination.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/ports/webhook-id.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/ports/webhook-secret.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/adapters/aws.nlp-lambda-arn-resolver.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/adapters/aws.nlp-lambda-fleet.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/adapters/aws.nlp-lambda-stream-invoke.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/adapters/lambda.workflow-studio-stream.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/adapters/workflow-agent-mapping.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/adapters/workflow-code-completion.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/adapters/workflow-dsl-migration.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/adapters/workflow-nlp-lambda.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/adapters/workflow-nlp-runtime.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/adapters/workflow-studio-dsl.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/adapters/workflow-studio-stream.adapter.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/ports/nlp-lambda-arn.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/ports/nlp-lambda-stream.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/ports/workflow-commit-message.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/ports/workflow-nlp-lambda.port.ts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/ports/workflow.port.ts",
+      "measured": "2026-09-10"
+    }
+  ]
+}

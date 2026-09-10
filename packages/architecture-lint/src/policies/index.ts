@@ -34,6 +34,12 @@ import { lintDeclarations } from "./quality/declarations.ts";
 import { lintOxlintBaseline } from "./quality/oxlint-baseline-check.ts";
 import { lintServiceCeilings } from "./quality/service-ceilings.ts";
 import { lintServiceProjectionBoundaries } from "./quality/service-projection-boundaries.ts";
+import {
+  lintCompositionRootMayOnlyShrink,
+  lintMountFileIsOneCall,
+  lintPortsAndAdaptersFolders,
+  lintRestDoorWithoutMount,
+} from "./shape-counters.ts";
 import { lintSourceFolderShape } from "./source-folder-shape.ts";
 import { lintTestQuality } from "./test-quality.ts";
 
@@ -107,6 +113,29 @@ export const POLICIES: readonly PolicyDefinition[] = [
     spec: "specs/source-folder-shape.feature",
     baseline: "source-folder-shape-baseline.json",
     run: lintSourceFolderShape,
+  }),
+  definePolicy({
+    id: "rest-door-without-mount",
+    spec: LINT_BASELINES,
+    baseline: "rest-door-without-mount-baseline.json",
+    run: lintRestDoorWithoutMount,
+  }),
+  definePolicy({
+    id: "ports-and-adapters-folders",
+    spec: LINT_BASELINES,
+    baseline: "ports-and-adapters-folders-baseline.json",
+    run: lintPortsAndAdaptersFolders,
+  }),
+  definePolicy({
+    id: "composition-root-may-only-shrink",
+    spec: LINT_BASELINES,
+    run: lintCompositionRootMayOnlyShrink,
+  }),
+  definePolicy({
+    id: "mount-file-is-one-call",
+    spec: LINT_BASELINES,
+    baseline: "mount-file-is-one-call-baseline.json",
+    run: lintMountFileIsOneCall,
   }),
   definePolicy({
     id: "feature-configuration",
