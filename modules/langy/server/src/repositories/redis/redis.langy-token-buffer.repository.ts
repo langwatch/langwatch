@@ -8,15 +8,15 @@ import {
   LANGY_LIVENESS,
   LANGY_STREAM,
   LANGY_STREAMING,
-} from "../rules/langy-streaming-constants.rules.ts";
-import { langyEmptyTurnLine } from "../rules/langy-empty-turn.rules.ts";
+} from "../../rules/langy-streaming-constants.rules.ts";
+import { langyEmptyTurnLine } from "../../rules/langy-empty-turn.rules.ts";
 import type { CliResultDigest, CliToolResult, LangyStreamEntry } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 import {
   type LangyStreamRead,
   type LangyStreamRedis,
   LangyTokenBufferPort,
-} from "../ports/langy-token-buffer.port.ts";
+} from "../langy-token-buffer.repository.ts";
 
 const PAYLOAD_FIELD = "p";
 
@@ -39,7 +39,7 @@ function decodeFields(fields: string[]): LangyStreamEntry | null {
   return null;
 }
 
-export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
+export class LangyTokenBufferRedisRepository extends LangyTokenBufferPort {
   private readonly redis: LangyStreamRedis;
   /** Per-turn token accumulator, flushed on the hybrid size/time policy. */
   private readonly pending = new Map<string, string>();
@@ -63,12 +63,12 @@ export class LangyTokenBufferAdapter extends LangyTokenBufferPort {
     this.redis = deps.redis;
   }
 
-  static create(deps: { redis: unknown; blockingRedis?: unknown }): LangyTokenBufferAdapter {
+  static create(deps: { redis: unknown; blockingRedis?: unknown }): LangyTokenBufferRedisRepository {
     const redis = deps.redis as LangyStreamRedis;
     if (deps.blockingRedis) {
       redis.blocking = deps.blockingRedis as LangyStreamRedis["blocking"];
     }
-    return new LangyTokenBufferAdapter({ redis });
+    return new LangyTokenBufferRedisRepository({ redis });
   }
 
   private streamKey(conversationId: string, turnId: string): string {

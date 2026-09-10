@@ -8,15 +8,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
-import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
-import { LangyLocalPresenceAdapter } from "../redis.langy-local-presence.adapter.ts";
-import type { ConnectedWorkspace } from "../../ports/langy-local-presence.port.ts";
+import { presenceKey } from "../../../rules/langy-local-control-keys.rules.ts";
+import { LangyLocalPresenceRedisRepository } from "../redis.langy-local-presence.repository.ts";
+import type { ConnectedWorkspace } from "../../langy-local-presence.repository.ts";
 
 const conversationId = "conv_1";
 
 let now = 1_700_000_000_000;
 let store: SessionStateStore;
-let presence: LangyLocalPresenceAdapter;
+let presence: LangyLocalPresenceRedisRepository;
 
 function workspace(instanceId = "lci_1"): ConnectedWorkspace {
   return {
@@ -39,7 +39,7 @@ function workspace(instanceId = "lci_1"): ConnectedWorkspace {
 beforeEach(() => {
   now = 1_700_000_000_000;
   store = SessionStateStoreFactory.memory({ now: () => now });
-  presence = LangyLocalPresenceAdapter.create({ store, now: () => now });
+  presence = LangyLocalPresenceRedisRepository.create({ store, now: () => now });
 });
 
 describe("given a folder connected to the conversation", () => {

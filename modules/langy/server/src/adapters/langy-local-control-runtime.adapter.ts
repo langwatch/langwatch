@@ -13,7 +13,7 @@ import {
   type ControlRequestKeyMinter,
   type ControlRequestProjects,
 } from "../services/langy-local-control-request.service.ts";
-import { LangyLocalPresenceAdapter } from "./redis.langy-local-presence.adapter.ts";
+import { LangyLocalPresenceRedisRepository } from "../repositories/redis/redis.langy-local-presence.repository.ts";
 import { UserWaitService } from "../services/langy-local-user-wait.service.ts";
 import type {
   UserWaitBuffer,
@@ -22,7 +22,7 @@ import type {
 
 export interface LocalControlRuntime {
   store: SessionStateStore;
-  presence: LangyLocalPresenceAdapter;
+  presence: LangyLocalPresenceRedisRepository;
   dispatcher: LocalCallDispatcherService;
   waits: UserWaitService;
   requests: ControlRequestService;
@@ -54,7 +54,7 @@ export class LangyLocalControlRuntimeAdapter {
     pollIntervalMs?: number;
     now?: () => number;
   }): LocalControlRuntime {
-    const presence = LangyLocalPresenceAdapter.create({
+    const presence = LangyLocalPresenceRedisRepository.create({
       store,
       ...(now ? { now } : {}),
     });

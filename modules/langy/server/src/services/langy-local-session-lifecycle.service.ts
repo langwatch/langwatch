@@ -18,7 +18,7 @@ function safeNudge(raw: string) {
     return null;
   }
 }
-import type { LangyLocalPresencePort } from "../ports/langy-local-presence.port.ts";
+import type { LangyLocalPresencePort } from "../repositories/langy-local-presence.repository.ts";
 import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
 import type { ControlRequestService } from "./langy-local-control-request.service.ts";
 import type {

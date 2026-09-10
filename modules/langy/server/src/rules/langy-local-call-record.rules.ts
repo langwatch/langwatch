@@ -4,8 +4,8 @@
  */
 import { z } from "zod";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import type { LangyLocalPresencePort } from "../ports/langy-local-presence.port.ts";
-import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
+import type { LangyLocalPresencePort } from "../repositories/langy-local-presence.repository.ts";
+import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
 import {
   CALL_STATES,
   bashOutputSchema,

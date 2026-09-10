@@ -111,10 +111,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "modules/langy/server|NullLangyAnalyticsEventSinkAdapter",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "modules/log/server|LogRequestCollectionService",
       "measured": "2026-09-07"
     },

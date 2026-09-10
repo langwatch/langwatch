@@ -1,7 +1,7 @@
 /**
  * The API process's four Langy REST doors, and what it can and cannot put behind each of them.
  */
-import { LangyTokenBufferAdapter, SkipPermissionsService } from "@langwatch/langy-server";
+import { LangyTokenBufferRedisRepository, SkipPermissionsService } from "@langwatch/langy-server";
 import { LangyUiNoBrowserError } from "@langwatch/langy-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -148,7 +148,7 @@ export function composeApiLangyRest(
         const blocking = redis.duplicate();
 
         return {
-          buffer: LangyTokenBufferAdapter.create({ redis, blockingRedis: blocking }),
+          buffer: LangyTokenBufferRedisRepository.create({ redis, blockingRedis: blocking }),
           release: () => blocking.disconnect(),
         };
       },

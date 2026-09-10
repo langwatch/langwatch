@@ -20,7 +20,7 @@ import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { LangyTurnInProgressError } from "@langwatch/langy-contract";
-import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
+import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
 import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
 import {} from "./langy-local-session-text.rules.ts";
 import { workspaceNudgeSchema } from "../rules/langy-local-call-record.rules.ts";
@@ -30,7 +30,7 @@ import { workspaceChannel } from "./langy-local-control-keys.rules.ts";
 import type {
   ConnectedWorkspace,
   LangyLocalPresencePort,
-} from "../ports/langy-local-presence.port.ts";
+} from "../repositories/langy-local-presence.repository.ts";
 import {
   type LocalControlRefusedCode,
   type PlatformFrame,

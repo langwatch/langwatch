@@ -159,17 +159,25 @@ export {
   type LangySessionKeyReapDeps,
 } from "./intents/langy-session-key-reap.intent.ts";
 export type { LangyAnalyticsEventProjectionRecord } from "./projections/langy-analytics-event.projection.ts";
-export {
-  LangyAnalyticsEventStorageAdapter,
-  NullLangyAnalyticsEventSinkAdapter,
-} from "./adapters/langy-analytics-event-storage.adapter.ts";
+export { LangyAnalyticsEventStorageAdapter } from "./adapters/langy-analytics-event-storage.adapter.ts";
+export { LangyAnalyticsEventMemoryRepository } from "./repositories/memory/memory.langy-analytics-event.repository.ts";
+export { LangyMemoryStore } from "./repositories/memory/langy-memory.store.ts";
+export { langyRepositories } from "./repositories/langy-repositories.registry.ts";
+export { MemoryLangyRepositories } from "./repositories/memory/memory.langy.repositories.ts";
+export { PostgresLangyRepositories } from "./repositories/prisma/prisma.langy.repositories.ts";
+export type { LangyRepositories } from "./repositories/langy-repositories.registry.ts";
 export {
   ClickHouseLangyAnalyticsEventAdapter,
+  LangyTokenBufferAdapter,
+  LangyTurnHandoffAdapter,
+} from "./adapters/langy-composition-handover.adapter.ts";
+export {
+  LangyAnalyticsEventClickHouseRepository,
   type LangyAnalyticsClickHouseClientResolver,
   type LangyAnalyticsClickHouseWriteClient,
-} from "./adapters/clickhouse.langy-analytics-event.adapter.ts";
-export { LangyAnalyticsEventSinkPort } from "./ports/langy-analytics-event-sink.port.ts";
-export type { LangyAnalyticsEventRecord } from "./ports/langy-analytics-event-sink.port.ts";
+} from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
+export { LangyAnalyticsEventSinkPort } from "./repositories/langy-analytics-event.repository.ts";
+export type { LangyAnalyticsEventRecord } from "./repositories/langy-analytics-event.repository.ts";
 export type { LangyEffectPorts } from "./ports/langy-effect.port.ts";
 export type { LangyTitleGenerator } from "./ports/langy-effect.port.ts";
 export { LangyTitleModelPort } from "./ports/langy-title-model.port.ts";
@@ -202,35 +210,33 @@ export type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
 } from "./ports/langy-conversation-process.port.ts";
-export { LangyFrameDedupAdapter } from "./adapters/redis.langy-frame-dedup.adapter.ts";
+export { LangyFrameDedupRedisRepository } from "./repositories/redis/redis.langy-frame-dedup.repository.ts";
+export type { LangyFrameDedupRedis } from "./repositories/redis/redis.langy-frame-dedup.repository.ts";
 export type {
-  LangyFrameDedup,
-  LangyFrameDedupRedis,
-} from "./adapters/redis.langy-frame-dedup.adapter.ts";
-export { LangyResourceLinksAdapter } from "./adapters/redis.langy-resource-links.adapter.ts";
-export type {
-  LangyLinkRedis,
-  LangyResourceLinkStore,
-} from "./adapters/redis.langy-resource-links.adapter.ts";
-export { LangyTurnAccessAdapter } from "./adapters/redis.langy-turn-access.adapter.ts";
+  LangyFrameDedupRepository,
+  LangyResourceLinksRepository,
+} from "./repositories/langy-live-turn.repository.ts";
+export { LangyResourceLinksRedisRepository } from "./repositories/redis/redis.langy-resource-links.repository.ts";
+export type { LangyLinkRedis } from "./repositories/redis/redis.langy-resource-links.repository.ts";
+export { LangyTurnAccessRedisRepository } from "./repositories/redis/redis.langy-turn-access.repository.ts";
 export {
   LANGY_TURN_ACCESS_TTL_SECONDS,
   type LangyTurnAccess,
   LangyTurnAccessPort,
-} from "./ports/langy-turn-access.port.ts";
-export { LangyTurnHandoffAdapter } from "./adapters/redis.langy-turn-handoff.adapter.ts";
-export type { LangyHandoffRedis } from "./adapters/redis.langy-turn-handoff.adapter.ts";
+} from "./repositories/langy-live-turn.repository.ts";
+export { LangyTurnHandoffRedisRepository } from "./repositories/redis/redis.langy-turn-handoff.repository.ts";
+export type { LangyHandoffRedis } from "./repositories/redis/redis.langy-turn-handoff.repository.ts";
 export {
   LANGY_HANDOFF_TTL_SECONDS,
   type LangyTurnHandoff,
   LangyTurnHandoffPort,
-} from "./ports/langy-turn-handoff.port.ts";
-export { LangyTokenBufferAdapter } from "./adapters/redis.langy-token-buffer.adapter.ts";
+} from "./repositories/langy-live-turn.repository.ts";
+export { LangyTokenBufferRedisRepository } from "./repositories/redis/redis.langy-token-buffer.repository.ts";
 export {
   type LangyStreamRead,
   type LangyStreamRedis,
   LangyTokenBufferPort,
-} from "./ports/langy-token-buffer.port.ts";
+} from "./repositories/langy-token-buffer.repository.ts";
 export { LANGY_EMPTY_TURN_FALLBACK } from "./rules/langy-empty-turn.rules.ts";
 export { LangyTurnSettlementWaiterService } from "./services/langy-turn-settlement-waiter.service.ts";
 export { decideSyntheticTerminal } from "./rules/langy-turn-settlement.rules.ts";
@@ -332,7 +338,7 @@ export {
 export { LocalCallDispatcherService } from "./services/langy-local-call-dispatcher.service.ts";
 export { UserWaitService } from "./services/langy-local-user-wait.service.ts";
 export type { UserWaitEvents } from "./rules/langy-local-user-wait-record.rules.ts";
-export { LangyLocalPresenceAdapter } from "./adapters/redis.langy-local-presence.adapter.ts";
+export { LangyLocalPresenceRedisRepository } from "./repositories/redis/redis.langy-local-presence.repository.ts";
 export { reconcileSkipPolicy, type SkipGate } from "./rules/langy-local-skip-policy.rules.ts";
 export {
   SkipPermissionsService,

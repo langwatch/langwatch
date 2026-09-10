@@ -3,7 +3,7 @@ import {
   type LangyTurnAccess,
   LangyTurnAccessPort,
   langyTurnAccessSchema,
-} from "../ports/langy-turn-access.port.ts";
+} from "../langy-live-turn.repository.ts";
 
 interface LangyAccessRedis {
   get(key: string): Promise<string | null>;
@@ -11,9 +11,9 @@ interface LangyAccessRedis {
 }
 
 /** Redis-backed turn access, keyed by conversation so a turn's slot hashes together. */
-export class LangyTurnAccessAdapter extends LangyTurnAccessPort {
-  static create(options: { redis: LangyAccessRedis }): LangyTurnAccessAdapter {
-    return new LangyTurnAccessAdapter(options.redis);
+export class LangyTurnAccessRedisRepository extends LangyTurnAccessPort {
+  static create(options: { redis: LangyAccessRedis }): LangyTurnAccessRedisRepository {
+    return new LangyTurnAccessRedisRepository(options.redis);
   }
 
   private constructor(private readonly redis: LangyAccessRedis) {

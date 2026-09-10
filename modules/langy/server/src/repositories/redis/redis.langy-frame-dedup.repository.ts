@@ -1,18 +1,12 @@
+import type { LangyFrameDedupRepository } from "../langy-live-turn.repository.ts";
+
 /** Redis-backed cross-instance frame nonce deduplication for Langy relay frames. */
 export interface LangyFrameDedupRedis {
   sadd(key: string, member: string): Promise<number>;
   expire(key: string, seconds: number): Promise<number>;
 }
 
-export interface LangyFrameDedup {
-  reserveFrameNonce(input: {
-    conversationId: string;
-    turnId: string;
-    frameNonce: string;
-  }): Promise<boolean>;
-}
-
-export class LangyFrameDedupAdapter implements LangyFrameDedup {
+export class LangyFrameDedupRedisRepository implements LangyFrameDedupRepository {
   private constructor(
     private readonly redis: LangyFrameDedupRedis,
     private readonly ttlSeconds: number,
@@ -21,8 +15,8 @@ export class LangyFrameDedupAdapter implements LangyFrameDedup {
   static create(options: {
     redis: LangyFrameDedupRedis;
     ttlSeconds?: number;
-  }): LangyFrameDedupAdapter {
-    return new LangyFrameDedupAdapter(options.redis, options.ttlSeconds ?? 3600);
+  }): LangyFrameDedupRedisRepository {
+    return new LangyFrameDedupRedisRepository(options.redis, options.ttlSeconds ?? 3600);
   }
 
   async reserveFrameNonce(input: {

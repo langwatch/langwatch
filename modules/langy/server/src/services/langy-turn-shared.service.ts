@@ -18,9 +18,9 @@ import {
   type LangyWorkerProbeInput,
   LangyWorkerPort,
 } from "../ports/langy-turn-runtime.port.ts";
-import type { LangyTurnAccessPort } from "../ports/langy-turn-access.port.ts";
-import type { LangyTurnHandoffPort } from "../ports/langy-turn-handoff.port.ts";
-import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
+import type { LangyTurnAccessPort } from "../repositories/langy-live-turn.repository.ts";
+import type { LangyTurnHandoffPort } from "../repositories/langy-live-turn.repository.ts";
+import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
 import { LangyConversationService } from "./langy-conversation.service.ts";
 import { LangyCredentialService } from "./langy-credential.service.ts";
 import { LangyMessageRepository } from "../repositories/langy-message.repository.ts";

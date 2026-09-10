@@ -2,7 +2,7 @@
  * The frameNonce dedup is the relay's intra-turn replay guard.
  */
 import { describe, expect, it, vi } from "vitest";
-import { LangyFrameDedupAdapter, type LangyFrameDedupRedis } from "@langwatch/langy-server";
+import { LangyFrameDedupRedisRepository, type LangyFrameDedupRedis } from "@langwatch/langy-server";
 
 function fakeRedis(): LangyFrameDedupRedis & {
   sets: Map<string, Set<string>>;
@@ -25,11 +25,11 @@ function fakeRedis(): LangyFrameDedupRedis & {
 
 const at = { conversationId: "conv-1", turnId: "turn-1" };
 
-describe("LangyFrameDedupAdapter", () => {
+describe("LangyFrameDedupRedisRepository", () => {
   describe("given a nonce never seen for this turn", () => {
     it("reserves it as fresh and arms the TTL", async () => {
       const redis = fakeRedis();
-      const dedup = LangyFrameDedupAdapter.create({ redis, ttlSeconds: 60 });
+      const dedup = LangyFrameDedupRedisRepository.create({ redis, ttlSeconds: 60 });
       expect(await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" })).toBe(true);
       expect(redis.expire).toHaveBeenCalledWith("langy:seen:conv-1:turn-1", 60);
     });
@@ -38,7 +38,7 @@ describe("LangyFrameDedupAdapter", () => {
   describe("given the same nonce a second time", () => {
     it("reports it as a duplicate and does NOT re-arm the TTL", async () => {
       const redis = fakeRedis();
-      const dedup = LangyFrameDedupAdapter.create({ redis });
+      const dedup = LangyFrameDedupRedisRepository.create({ redis });
       await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" });
       redis.expire.mockClear();
 
@@ -50,7 +50,7 @@ describe("LangyFrameDedupAdapter", () => {
   describe("given the same nonce under a different turn", () => {
     it("is fresh — dedup is scoped per (conversation, turn)", async () => {
       const redis = fakeRedis();
-      const dedup = LangyFrameDedupAdapter.create({ redis });
+      const dedup = LangyFrameDedupRedisRepository.create({ redis });
       await dedup.reserveFrameNonce({ ...at, frameNonce: "n1" });
       expect(
         await dedup.reserveFrameNonce({

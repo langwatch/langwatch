@@ -16,7 +16,7 @@ import { describe, expect, it } from "vitest";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
-import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter.ts";
+import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
 
 const projectId = "project_envelope";
 const conversationId = "conv_envelope";
@@ -44,7 +44,7 @@ async function callWaitingOnACard(clock: { now: number }) {
   const store: SessionStateStore = SessionStateStoreFactory.memory({
     now: () => clock.now,
   });
-  const presence = LangyLocalPresenceAdapter.create({ store, now: () => clock.now });
+  const presence = LangyLocalPresenceRedisRepository.create({ store, now: () => clock.now });
   await presence.register(connectedFolder(clock.now));
   const dispatcher = LocalCallDispatcherService.create({
     store,

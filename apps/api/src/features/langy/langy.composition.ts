@@ -15,9 +15,9 @@ import {
   LangyNavigateFallbackService,
   type LangyNavigateResourcePort,
   LangyBlockOtelMetricsAdapter,
-  LangyTokenBufferAdapter,
-  LangyTurnAccessAdapter,
-  LangyTurnHandoffAdapter,
+  LangyTokenBufferRedisRepository,
+  MemoryLangyRepositories,
+  PostgresLangyRepositories,
   LangyUiActionCatalogPort,
   LangyUiActionService,
   type LangyEgressTrpcPorts,
@@ -159,6 +159,13 @@ class ApiLangyUnavailableError extends HandledError {
 
 function composeLangy(options: LangyFeatureCollaborators): LangyApp {
   const redis = options.redis;
+  // The tier the process can honestly serve: Redis when the deployment has a
+  // connection, and the in-memory twin when it does not. The turn ports below
+  // still read `redis` directly for the rows that are per-connection rather
+  // than per-row - a blocking tail borrows its own connection.
+  const repositories = redis
+    ? PostgresLangyRepositories.create({ redis })
+    : MemoryLangyRepositories.create();
   // The daily pull-request budget, metered on the SAME connection the token
   // buffer and the turn stores use. Without Redis the service answers every
   // reservation `allowed` and reports nothing reserved, which is what a
@@ -179,7 +186,7 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
     },
     // No agent manager on a web process: dispatching is the worker's.
     worker: null,
-    tokenBuffer: redis ? LangyTokenBufferAdapter.create({ redis }) : null,
+    tokenBuffer: redis ? LangyTokenBufferRedisRepository.create({ redis }) : null,
     permits: prQuota,
     perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
     sessionKeys: {
@@ -191,13 +198,14 @@ function composeLangy(options: LangyFeatureCollaborators): LangyApp {
     context: { tryRender: renderLangyTurnContext },
     uiActionSurface: FeatureFlagLangyUiActionSurfaceAdapter.create(options.featureFlags),
     metrics: { count: () => undefined },
-    accessStore: redis ? LangyTurnAccessAdapter.create({ redis }) : null,
-    handoffStore: redis ? LangyTurnHandoffAdapter.create({ redis }) : null,
+    accessStore: repositories.turnAccess,
+    handoffStore: repositories.turnHandoff,
   };
 
   const relay = composeLangyRelay(options, redis);
   return LangyApp.create({
     dependencies: {},
+    repositories,
     infrastructure: {
       database: options.prisma,
       turns,

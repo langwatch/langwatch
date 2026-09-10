@@ -1,5 +1,6 @@
 import { defineModule } from "@langwatch/runtime-composition";
 import { LangyApp } from "./app/langy.app.ts";
+import { langyRepositories } from "./repositories/langy-repositories.registry.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
 
 export type { LangyInfrastructure } from "./app/langy.app.ts";
@@ -9,6 +10,7 @@ export type { LangyInfrastructure } from "./app/langy.app.ts";
 // WebSocket transport are unconverted too. See
 // dev/docs/plans/lane-brief.md and the langy lane's report for state.
 export const langyServer = defineModule("langy")
+  .withRepositories(langyRepositories)
   .withApp(LangyApp)
   .withTransports(setupSkillsTrpcTransport)
   .build();

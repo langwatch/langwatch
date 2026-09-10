@@ -25,8 +25,8 @@ import {
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { LangyChatMessageInput } from "../services/langy-turn-shared.service.ts";
 
-import { LangyTokenBufferAdapter } from "../adapters/redis.langy-token-buffer.adapter.ts";
-import { LangyTurnAccessAdapter } from "../adapters/redis.langy-turn-access.adapter.ts";
+import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
+import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { decideSyntheticTerminal } from "../rules/langy-turn-settlement.rules.ts";
 import { LangyTurnSettlementWaiterService } from "../services/langy-turn-settlement-waiter.service.ts";
 import {
@@ -67,6 +67,8 @@ export type LangyBroadcast = Readonly<{
 /** What the process composes this feature's application from. */
 type LangyAppDependencies = {
   langy: LangyApiContract;
+  /** The rows the module keeps outside its event log, chosen at boot. */
+  repositories: LangyRepositories;
   /** Absent in a deployment without Redis; the live edge degrades to the fold. */
   redis: LangyRedis | null;
   broadcast: LangyBroadcast;
@@ -81,7 +83,7 @@ export interface LangyEgressState {
 
 /** One live turn's durable buffer, plus the connection it borrowed. */
 export interface LangyTurnStream {
-  buffer: LangyTokenBufferAdapter;
+  buffer: LangyTokenBufferRedisRepository;
   /** Releases the dedicated blocking connection. Always call it. */
   close(): void;
 }
@@ -100,7 +102,12 @@ export interface LangyTurnRequest {
   turnContext: object;
 }
 
-type LangySetup = FeatureSetup<Record<never, never>, LangyInfrastructure, LangyServerConfig>;
+type LangySetup = FeatureSetup<
+  Record<never, never>,
+  LangyInfrastructure,
+  LangyServerConfig,
+  LangyRepositories
+>;
 
 export class LangyApp implements LangyApiContract {
   static readonly contract: typeof LangyApi = LangyApi;
@@ -121,6 +128,7 @@ export class LangyApp implements LangyApiContract {
     });
     return new LangyApp({
       langy,
+      repositories: setup.repositories,
       redis: setup.infrastructure.redis,
       broadcast: setup.infrastructure.broadcast,
     });
@@ -459,12 +467,14 @@ export class LangyApp implements LangyApiContract {
     userId: string;
   }): Promise<boolean> {
     const { projectId, conversationId, turnId, userId } = input;
-    const { redis, langy } = this.dependencies;
-    if (redis) {
-      const access = LangyTurnAccessAdapter.create({ redis });
-      if (await access.isTurnActor({ projectId, conversationId, turnId, userId })) {
-        return true;
-      }
+    const { redis, langy, repositories } = this.dependencies;
+    if (redis && (await repositories.turnAccess.isTurnActor({
+      projectId,
+      conversationId,
+      turnId,
+      userId,
+    }))) {
+      return true;
     }
     const conversation = await langy.findByIdVisible({
       id: conversationId,
@@ -484,7 +494,7 @@ export class LangyApp implements LangyApiContract {
     if (!connection) return null;
     const blocking = connection.duplicate();
     return {
-      buffer: LangyTokenBufferAdapter.create({ redis: connection, blockingRedis: blocking }),
+      buffer: LangyTokenBufferRedisRepository.create({ redis: connection, blockingRedis: blocking }),
       close: () => blocking.disconnect(),
     };
   }

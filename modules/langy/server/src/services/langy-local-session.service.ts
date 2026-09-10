@@ -13,7 +13,7 @@ import {
   LangyActorSessionService,
   type LangyActorUserReader,
 } from "./langy-actor-session.service.ts";
-import type { LangyTokenBufferPort } from "../ports/langy-token-buffer.port.ts";
+import type { LangyTokenBufferPort } from "../repositories/langy-token-buffer.repository.ts";
 import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
 import {
   connectMessage,
@@ -29,7 +29,7 @@ import { workspaceChannel } from "../rules/langy-local-control-keys.rules.ts";
 import type {
   LangyLocalPresencePort,
   PresenceHeartbeat,
-} from "../ports/langy-local-presence.port.ts";
+} from "../repositories/langy-local-presence.repository.ts";
 import {
   type CallEnvelope,
   LOCAL_CONTROL_PROTOCOL_VERSION,

@@ -12,8 +12,8 @@ import type {
 import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-analytics-event.projection.ts";
 import type { LangyTitleGenerator } from "../ports/langy-effect.port.ts";
 import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
-import type { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter.ts";
-import type { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter.ts";
+import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
+import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
 import type { LangyBroadcastPort } from "../subscribers/langy-conversation.subscriber.ts";
 import { NullLangyWorkerMetricsAdapter } from "./null-langy-worker-metrics.adapter.ts";
 import { UnavailableLangyWorkerAdapter } from "./unavailable-langy-worker.adapter.ts";
@@ -71,12 +71,12 @@ function buildLangyConversationProducerPipeline(input: { processName: string }) 
     confirmAccepted: refuse("confirm a turn admission"),
     release: refuse("release a turn admission"),
   };
-  const buffer: Pick<LangyTokenBufferAdapter, "liveness" | "appendStatus" | "markError"> = {
+  const buffer: Pick<LangyTokenBufferRedisRepository, "liveness" | "appendStatus" | "markError"> = {
     liveness: refuse("read a turn's live buffer"),
     appendStatus: refuse("append a turn status frame"),
     markError: refuse("mark a turn errored"),
   };
-  const handoffStore: Pick<LangyTurnHandoffAdapter, "read" | "stash" | "isStopped"> = {
+  const handoffStore: Pick<LangyTurnHandoffRedisRepository, "read" | "stash" | "isStopped"> = {
     read: refuse("read a turn handoff"),
     stash: refuse("stash a turn handoff"),
     isStopped: refuse("read a turn's stop marker"),

@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import { LangyTurnAccessAdapter } from "@langwatch/langy-server";
+import { LangyTurnAccessRedisRepository } from "@langwatch/langy-server";
 
 /** An in-memory stand-in for the Redis surface the store needs. */
 function fakeRedis() {
@@ -26,11 +26,11 @@ const ACCESS = {
   userId: "alice",
 };
 
-describe("LangyTurnAccessAdapter", () => {
+describe("LangyTurnAccessRedisRepository", () => {
   describe("given the user who started the turn", () => {
     it("confirms them immediately — no fold to wait for", async () => {
       const redis = fakeRedis();
-      const store = LangyTurnAccessAdapter.create({ redis });
+      const store = LangyTurnAccessRedisRepository.create({ redis });
       await store.grant(ACCESS);
 
       expect(await store.isTurnActor(ACCESS)).toBe(true);
@@ -40,7 +40,7 @@ describe("LangyTurnAccessAdapter", () => {
   describe("given a different user", () => {
     it("does not confirm them — access is per-actor", async () => {
       const redis = fakeRedis();
-      const store = LangyTurnAccessAdapter.create({ redis });
+      const store = LangyTurnAccessRedisRepository.create({ redis });
       await store.grant(ACCESS);
 
       expect(await store.isTurnActor({ ...ACCESS, userId: "mallory" })).toBe(false);
@@ -48,7 +48,7 @@ describe("LangyTurnAccessAdapter", () => {
 
     it("does not confirm across projects, even for the same user", async () => {
       const redis = fakeRedis();
-      const store = LangyTurnAccessAdapter.create({ redis });
+      const store = LangyTurnAccessRedisRepository.create({ redis });
       await store.grant(ACCESS);
 
       expect(await store.isTurnActor({ ...ACCESS, projectId: "p2" })).toBe(false);
@@ -60,7 +60,7 @@ describe("LangyTurnAccessAdapter", () => {
       // `false` is NOT a denial — it means "no fast answer". A shared-conversation
       // viewer has no record here and must fall through to the fold, which is
       // exactly what enforces sharing.
-      const store = LangyTurnAccessAdapter.create({ redis: fakeRedis() });
+      const store = LangyTurnAccessRedisRepository.create({ redis: fakeRedis() });
       expect(await store.isTurnActor(ACCESS)).toBe(false);
     });
   });
@@ -69,7 +69,7 @@ describe("LangyTurnAccessAdapter", () => {
     it("fails closed", async () => {
       const redis = fakeRedis();
       redis.store.set("langy:turn-access:{conv-1}:turn-1", "not json");
-      const store = LangyTurnAccessAdapter.create({ redis });
+      const store = LangyTurnAccessRedisRepository.create({ redis });
       expect(await store.isTurnActor(ACCESS)).toBe(false);
     });
 
@@ -79,7 +79,7 @@ describe("LangyTurnAccessAdapter", () => {
         "langy:turn-access:{conv-1}:turn-1",
         JSON.stringify({ ...ACCESS, userId: 123 }),
       );
-      const store = LangyTurnAccessAdapter.create({ redis });
+      const store = LangyTurnAccessRedisRepository.create({ redis });
       expect(await store.isTurnActor(ACCESS)).toBe(false);
     });
   });

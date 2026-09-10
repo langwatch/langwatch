@@ -16,8 +16,8 @@ import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-a
 import type { LangyTitleGenerator } from "../ports/langy-effect.port.ts";
 import type { LangyWorkerPort } from "../ports/langy-turn-runtime.port.ts";
 import type { LangySessionKeyService } from "../services/langy-session-key.service.ts";
-import type { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter.ts";
-import type { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter.ts";
+import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
+import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
 import { nowInstant } from "@langwatch/time";
 import {
   createAgentTurnLivenessSubscriber,
@@ -58,8 +58,8 @@ export interface EventingLangyConversationAdapterOptions {
   broadcast: LangyBroadcastPort;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   admissions: Pick<LangyTurnAdmissionCapability, "confirmAccepted" | "release">;
-  buffer: Pick<LangyTokenBufferAdapter, "liveness" | "appendStatus" | "markError">;
-  handoffStore: Pick<LangyTurnHandoffAdapter, "read" | "stash" | "isStopped">;
+  buffer: Pick<LangyTokenBufferRedisRepository, "liveness" | "appendStatus" | "markError">;
+  handoffStore: Pick<LangyTurnHandoffRedisRepository, "read" | "stash" | "isStopped">;
   worker: LangyWorkerPort;
   titleGenerator: LangyTitleGenerator;
   sessionKeys: Pick<LangySessionKeyService, "mintForUser" | "revoke">;

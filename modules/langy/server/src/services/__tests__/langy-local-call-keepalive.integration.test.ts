@@ -21,7 +21,7 @@ import {
 import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { LANGY_LIVENESS } from "../../rules/langy-streaming-constants.rules.ts";
-import { LangyTokenBufferAdapter } from "../../adapters/redis.langy-token-buffer.adapter.ts";
+import { LangyTokenBufferRedisRepository } from "../../repositories/redis/redis.langy-token-buffer.repository.ts";
 import { createAgentTurnLivenessSubscriber } from "../../subscribers/langy-conversation.subscriber.ts";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
@@ -30,7 +30,7 @@ import { DispatchError } from "@langwatch/eventing";
 import type { EventSubscriberContext } from "@langwatch/eventing";
 import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
 import { CALL_POLL_HOLD_MS } from "@langwatch/langy-contract";
-import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter.ts";
+import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
 
 /** How long the subscriber lets a turn go quiet before it ends it. */
@@ -43,7 +43,7 @@ const context: EventSubscriberContext = {
 };
 
 let connection: RedisConnection;
-let buffer: LangyTokenBufferAdapter;
+let buffer: LangyTokenBufferRedisRepository;
 let store: SessionStateStore;
 let now = 1_752_600_100_000;
 
@@ -136,7 +136,7 @@ beforeAll(() => {
     dbIndex: process.env.REDIS_DB_INDEX,
   })!;
   if (!connection) throw new Error("This test needs a real Redis");
-  buffer = LangyTokenBufferAdapter.create({ redis: connection });
+  buffer = LangyTokenBufferRedisRepository.create({ redis: connection });
   store = SessionStateStoreFactory.memory({ now: () => now });
 });
 
@@ -152,7 +152,7 @@ describe("given a command running on the developer's machine", () => {
       const conversationId = "conv_alive";
       const turnId = "turn_alive";
       const acceptedAt = startedAt();
-      const presence = LangyLocalPresenceAdapter.create({ store, now: () => now });
+      const presence = LangyLocalPresenceRedisRepository.create({ store, now: () => now });
       await presence.register(workspace(conversationId));
       const dispatcher = LocalCallDispatcherService.create({
         store,
@@ -209,7 +209,7 @@ describe("given a command running on the developer's machine", () => {
       const conversationId = "conv_gone";
       const turnId = "turn_gone";
       const acceptedAt = startedAt();
-      const presence = LangyLocalPresenceAdapter.create({ store, now: () => now });
+      const presence = LangyLocalPresenceRedisRepository.create({ store, now: () => now });
       await presence.register(workspace(conversationId));
       const dispatcher = LocalCallDispatcherService.create({
         store,

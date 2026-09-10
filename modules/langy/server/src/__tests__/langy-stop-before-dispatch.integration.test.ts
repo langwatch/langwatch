@@ -17,9 +17,9 @@ import { LangyTurnService } from "../services/langy-turn.service.ts";
 import IORedis from "ioredis";
 import {
   type LangyHandoffRedis,
-  LangyTurnHandoffAdapter,
-} from "../adapters/redis.langy-turn-handoff.adapter.ts";
-import type { LangyTurnHandoff } from "../ports/langy-turn-handoff.port.ts";
+  LangyTurnHandoffRedisRepository,
+} from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
+import type { LangyTurnHandoff } from "../repositories/langy-live-turn.repository.ts";
 import { LangyEffectPortsAdapter } from "../adapters/langy-effect.adapter.ts";
 import { testRedisUrl } from "./support/test-redis-url.ts";
 
@@ -27,7 +27,7 @@ import { testRedisUrl } from "./support/test-redis-url.ts";
 const REDIS_URL = testRedisUrl();
 
 let redis: Redis;
-let handoffStore: LangyTurnHandoffAdapter;
+let handoffStore: LangyTurnHandoffRedisRepository;
 
 const IDS = {
   projectId: "project-stop",
@@ -114,7 +114,7 @@ function makeDispatchPorts() {
 
 beforeAll(() => {
   redis = new IORedis(REDIS_URL!) as unknown as Redis;
-  handoffStore = LangyTurnHandoffAdapter.create({
+  handoffStore = LangyTurnHandoffRedisRepository.create({
     redis: redis as unknown as LangyHandoffRedis,
   });
 });

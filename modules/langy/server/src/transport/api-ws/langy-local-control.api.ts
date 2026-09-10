@@ -11,7 +11,7 @@ import { WebSocket, WebSocketServer } from "ws";
 import type { ConnectUpgradeRouterPort as UpgradeRouter } from "@langwatch/api";
 import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
 import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
-import type { PresenceHeartbeat } from "../../ports/langy-local-presence.port.ts";
+import type { PresenceHeartbeat } from "../../repositories/langy-local-presence.repository.ts";
 import {
   type CliFrame,
   cliFrameSchema,

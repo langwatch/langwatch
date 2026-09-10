@@ -51,7 +51,7 @@ import { AGENT_CHAT_TIMEOUT_MS } from "@langwatch/langy-contract";
 import { ADOPTABLE_CONVERSATION_ID } from "../../services/langy-conversation.service.ts";
 import type { LangyChatMessageInput } from "../../services/langy-turn-shared.service.ts";
 import type { LangyStreamEntry } from "@langwatch/langy-contract";
-import type { LangyTokenBufferAdapter } from "../../adapters/redis.langy-token-buffer.adapter.ts";
+import type { LangyTokenBufferRedisRepository } from "../../repositories/redis/redis.langy-token-buffer.repository.ts";
 import type { LangyApp } from "#app/langy.app";
 import type { LocalControlRuntime } from "../../adapters/langy-local-control-runtime.adapter.ts";
 import { workspaceChannel } from "../../rules/langy-local-control-keys.rules.ts";
@@ -272,7 +272,7 @@ async function* followMissedTerminal({
   conversationId: string;
   turnId: string;
   userId: string;
-  buffer: LangyTokenBufferAdapter;
+  buffer: LangyTokenBufferRedisRepository;
   fromId: string;
   signal: AbortSignal;
 }): AsyncGenerator<LangyStreamEntry> {

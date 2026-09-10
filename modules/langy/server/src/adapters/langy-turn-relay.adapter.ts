@@ -26,14 +26,15 @@ import {
   langyFrameEnvelopeSchema,
   langyRelayFrameSchema,
 } from "../rules/langy-relay-frame.rules.ts";
-import type { LangyLinkRedis, LangyResourceLinkStore } from "./redis.langy-resource-links.adapter.ts";
-import { LangyFrameDedupAdapter } from "./redis.langy-frame-dedup.adapter.ts";
-import type { LangyFrameDedupRedis } from "./redis.langy-frame-dedup.adapter.ts";
-import { LangyResourceLinksAdapter } from "./redis.langy-resource-links.adapter.ts";
-import { LangyTurnHandoffAdapter } from "./redis.langy-turn-handoff.adapter.ts";
-import type { LangyHandoffRedis } from "./redis.langy-turn-handoff.adapter.ts";
-import { LangyTokenBufferAdapter } from "./redis.langy-token-buffer.adapter.ts";
-import type { LangyStreamRedis } from "../ports/langy-token-buffer.port.ts";
+import type { LangyLinkRedis } from "../repositories/redis/redis.langy-resource-links.repository.ts";
+import type { LangyResourceLinksRepository } from "../repositories/langy-live-turn.repository.ts";
+import { LangyFrameDedupRedisRepository } from "../repositories/redis/redis.langy-frame-dedup.repository.ts";
+import type { LangyFrameDedupRedis } from "../repositories/redis/redis.langy-frame-dedup.repository.ts";
+import { LangyResourceLinksRedisRepository } from "../repositories/redis/redis.langy-resource-links.repository.ts";
+import { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
+import type { LangyHandoffRedis } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
+import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
+import type { LangyStreamRedis } from "../repositories/langy-token-buffer.repository.ts";
 import { LANGY_EMPTY_TURN_FALLBACK } from "../rules/langy-empty-turn.rules.ts";
 
 type PlatformProgress = { headline: string };
@@ -247,7 +248,7 @@ export interface LangyTurnRelayDeps {
    * Per-conversation memory of "which platform address did a lookup surface for resource X". A
    * `navigate` instruction resolves its destination from here.
    */
-  resourceLinks: LangyResourceLinkStore;
+  resourceLinks: LangyResourceLinksRepository;
   /**
    * Verified server-side fallback when the link store misses: the platform looks the id up with the
    * PROJECT's own access and computes the address itself (see langyNavigateFallback). Null = not
@@ -324,21 +325,21 @@ export class LangyTurnRelayAdapter {
     reserveFrameNonce?: LangyTurnRelayDeps["reserveFrameNonce"];
     readHandoffRunToken?: LangyTurnRelayDeps["readHandoffRunToken"];
     refreshHandoffTtl?: LangyTurnRelayDeps["refreshHandoffTtl"];
-    resourceLinks?: LangyResourceLinkStore;
+    resourceLinks?: LangyResourceLinksRepository;
     resolveResourceUrl?: LangyTurnRelayDeps["resolveResourceUrl"];
     resolveCapabilityProgress?: (name: string) => PlatformProgress | null;
     logger?: LangyTurnRelayDeps["logger"];
   }): LangyTurnRelayAdapter {
     const redis = options.redis;
     const buffer =
-      options.buffer ?? (redis ? LangyTokenBufferAdapter.create({ redis }) : undefined);
+      options.buffer ?? (redis ? LangyTokenBufferRedisRepository.create({ redis }) : undefined);
     if (!buffer) {
       throw new Error("Langy relay requires Redis or a buffer");
     }
-    const frameDedup = redis ? LangyFrameDedupAdapter.create({ redis }) : null;
-    const handoff = redis ? LangyTurnHandoffAdapter.create({ redis }) : null;
+    const frameDedup = redis ? LangyFrameDedupRedisRepository.create({ redis }) : null;
+    const handoff = redis ? LangyTurnHandoffRedisRepository.create({ redis }) : null;
     const resourceLinks =
-      options.resourceLinks ?? (redis ? LangyResourceLinksAdapter.create({ redis }) : undefined);
+      options.resourceLinks ?? (redis ? LangyResourceLinksRedisRepository.create({ redis }) : undefined);
     if (!resourceLinks) {
       throw new Error("Langy relay requires Redis or resource links");
     }

@@ -1,3 +1,5 @@
+import type { LangyResourceLinksRepository } from "../langy-live-turn.repository.ts";
+
 /** Conversation-scoped Redis links used by Langy's navigate command. */
 export interface LangyLinkRedis {
   hset(key: string, field: string, value: string): Promise<number>;
@@ -5,19 +7,11 @@ export interface LangyLinkRedis {
   expire(key: string, seconds: number): Promise<number | boolean>;
 }
 
-export interface LangyResourceLinkStore {
-  remember(input: {
-    conversationId: string;
-    links: Array<{ id: string; href: string }>;
-  }): Promise<void>;
-  resolve(input: { conversationId: string; id: string }): Promise<string | null>;
-}
-
-export class LangyResourceLinksAdapter implements LangyResourceLinkStore {
+export class LangyResourceLinksRedisRepository implements LangyResourceLinksRepository {
   private constructor(private readonly redis: LangyLinkRedis) {}
 
-  static create(options: { redis: LangyLinkRedis }): LangyResourceLinksAdapter {
-    return new LangyResourceLinksAdapter(options.redis);
+  static create(options: { redis: LangyLinkRedis }): LangyResourceLinksRedisRepository {
+    return new LangyResourceLinksRedisRepository(options.redis);
   }
 
   async remember(input: {

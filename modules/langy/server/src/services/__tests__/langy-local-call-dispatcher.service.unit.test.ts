@@ -11,7 +11,7 @@ import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
 import type { WorkspaceNudge } from "../../rules/langy-local-call-record.rules.ts";
 import { workspaceChannel } from "../../rules/langy-local-control-keys.rules.ts";
-import { LangyLocalPresenceAdapter } from "../../adapters/redis.langy-local-presence.adapter.ts";
+import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
 
 const projectId = "proj_1";
 const conversationId = "conv_1";
@@ -19,7 +19,7 @@ const turnId = "turn_1";
 
 let now = 1_700_000_000_000;
 let store: SessionStateStore;
-let presence: LangyLocalPresenceAdapter;
+let presence: LangyLocalPresenceRedisRepository;
 let dispatcher: LocalCallDispatcherService;
 
 function workspace() {
@@ -56,7 +56,7 @@ async function collectNudges(): Promise<WorkspaceNudge[]> {
 beforeEach(() => {
   now = 1_700_000_000_000;
   store = SessionStateStoreFactory.memory({ now: () => now });
-  presence = LangyLocalPresenceAdapter.create({ store, now: () => now });
+  presence = LangyLocalPresenceRedisRepository.create({ store, now: () => now });
   dispatcher = LocalCallDispatcherService.create({
     store,
     presence,
@@ -106,7 +106,7 @@ describe("given a folder connected to the conversation", () => {
     it("is delivered from the store, so another replica can serve the socket", async () => {
       const otherPod = LocalCallDispatcherService.create({
         store,
-        presence: LangyLocalPresenceAdapter.create({ store, now: () => now }),
+        presence: LangyLocalPresenceRedisRepository.create({ store, now: () => now }),
         now: () => now,
         offlineWaitMs: 0,
         pollIntervalMs: 1,

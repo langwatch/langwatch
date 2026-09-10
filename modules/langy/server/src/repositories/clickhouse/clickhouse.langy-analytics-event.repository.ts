@@ -3,7 +3,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   LangyAnalyticsEventSinkPort,
   type LangyAnalyticsEventRecord,
-} from "../ports/langy-analytics-event-sink.port.ts";
+} from "../langy-analytics-event.repository.ts";
 import { Temporal, toDate } from "@langwatch/time";
 
 /**
@@ -108,11 +108,11 @@ function validateBatch(records: LangyAnalyticsEventRecord[]): string | null {
  * single append is a projection write whose caller is holding a fold open, and
  * a batch is a bulk flush the runtime already sequences.
  */
-export class ClickHouseLangyAnalyticsEventAdapter extends LangyAnalyticsEventSinkPort {
+export class LangyAnalyticsEventClickHouseRepository extends LangyAnalyticsEventSinkPort {
   static create(
     resolveClient: LangyAnalyticsClickHouseClientResolver,
-  ): ClickHouseLangyAnalyticsEventAdapter {
-    return new ClickHouseLangyAnalyticsEventAdapter(resolveClient);
+  ): LangyAnalyticsEventClickHouseRepository {
+    return new LangyAnalyticsEventClickHouseRepository(resolveClient);
   }
 
   constructor(private readonly resolveClient: LangyAnalyticsClickHouseClientResolver) {

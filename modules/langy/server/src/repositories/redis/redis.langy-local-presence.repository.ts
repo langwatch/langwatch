@@ -6,14 +6,14 @@
 
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { PRESENCE_TTL_MS } from "@langwatch/langy-contract";
-import { policyKey, presenceKey } from "../rules/langy-local-control-keys.rules.ts";
+import { policyKey, presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
 import { nowInstant } from "@langwatch/time";
 import {
   connectedWorkspaceSchema,
   type ConnectedWorkspace,
   LangyLocalPresencePort,
   type PresenceHeartbeat,
-} from "../ports/langy-local-presence.port.ts";
+} from "../langy-local-presence.repository.ts";
 
 /** How long the skip choice outlives the socket that carried it. */
 const POLICY_TTL_SECONDS = 6 * 60 * 60;
@@ -24,7 +24,7 @@ export interface LocalPresenceOptions {
   presenceTtlMs?: number;
 }
 
-export class LangyLocalPresenceAdapter extends LangyLocalPresencePort {
+export class LangyLocalPresenceRedisRepository extends LangyLocalPresencePort {
   private readonly store: SessionStateStore;
   private readonly presenceTtlMs: number;
   readonly now: () => number;
@@ -36,8 +36,8 @@ export class LangyLocalPresenceAdapter extends LangyLocalPresencePort {
     this.presenceTtlMs = options.presenceTtlMs ?? PRESENCE_TTL_MS;
   }
 
-  static create(options: LocalPresenceOptions): LangyLocalPresenceAdapter {
-    return new LangyLocalPresenceAdapter(options);
+  static create(options: LocalPresenceOptions): LangyLocalPresenceRedisRepository {
+    return new LangyLocalPresenceRedisRepository(options);
   }
 
   /** Writes the folder as connected, replacing whatever was there. */
