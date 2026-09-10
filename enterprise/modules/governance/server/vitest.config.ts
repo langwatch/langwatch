@@ -1,10 +1,8 @@
 import { fileURLToPath } from "node:url";
 import { configDefaults, defineConfig } from "vitest/config";
+import { moduleVitestTestOptions } from "../../../../packages/test-harness/src/vitest-config.ts";
 
 export default defineConfig({
-  test: {
-    exclude: [...configDefaults.exclude, "src/**/*.integration.test.ts"],
-  },
   resolve: {
     alias: {
       "@langwatch/enterprise-governance-contract": fileURLToPath(
@@ -12,4 +10,11 @@ export default defineConfig({
       ),
     },
   },
+  test: moduleVitestTestOptions({
+    kind: "node",
+    isolate: true,
+    test: {
+      exclude: [...configDefaults.exclude, "src/**/*.integration.test.ts"],
+    },
+  }),
 });

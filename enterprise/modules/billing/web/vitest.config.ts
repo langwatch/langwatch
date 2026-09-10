@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+import { moduleVitestTestOptions } from "../../../../packages/test-harness/src/vitest-config.ts";
 
 export default defineConfig({
   resolve: {
@@ -12,5 +13,9 @@ export default defineConfig({
       ),
     },
   },
-  test: { environment: "node" },
+  test: moduleVitestTestOptions({
+    kind: "jsdom",
+    isolate: true,
+    test: { environment: "node" },
+  }),
 });

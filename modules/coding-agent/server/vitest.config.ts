@@ -1,9 +1,14 @@
-import { configDefaults } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
+import { moduleVitestTestOptions } from "../../../packages/test-harness/src/vitest-config.ts";
 
-export default {
-  test: {
-    exclude: [...configDefaults.exclude, "src/**/*.integration.test.ts"],
-  },
+export default defineConfig({
+  test: moduleVitestTestOptions({
+    kind: "node",
+    isolate: false,
+    test: {
+      exclude: [...configDefaults.exclude, "src/**/*.integration.test.ts"],
+    },
+  }),
   resolve: {
     alias: {
       "@langwatch/coding-agent-contract/testing": new URL(
@@ -22,4 +27,4 @@ export default {
       ).pathname,
     },
   },
-};
+});

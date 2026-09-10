@@ -1,10 +1,8 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+import { moduleVitestTestOptions } from "../../../packages/test-harness/src/vitest-config.ts";
 
 export default defineConfig({
-  test: {
-    setupFiles: ["./vitest.setup.ts"],
-  },
   resolve: {
     alias: {
       "@langwatch/authz-contract": fileURLToPath(
@@ -47,4 +45,11 @@ export default defineConfig({
       ),
     },
   },
+  test: moduleVitestTestOptions({
+    kind: "jsdom",
+    isolate: true,
+    test: {
+      setupFiles: ["./vitest.setup.ts"],
+    },
+  }),
 });

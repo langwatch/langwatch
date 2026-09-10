@@ -1,5 +1,7 @@
-import { defineConfig } from "vitest/config";
+import { defineModuleVitestConfig } from "../test-harness/src/vitest-config.ts";
 
-export default defineConfig({
+export default defineModuleVitestConfig({
+  kind: "node",
+  isolate: false,
   test: { environment: "node", include: ["tests/**/*.test.mjs"] },
 });

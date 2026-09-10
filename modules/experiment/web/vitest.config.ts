@@ -1,6 +1,9 @@
-import { configDefaults, defineConfig } from "vitest/config";
+import { configDefaults } from "vitest/config";
+import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vitest-config.ts";
 
-export default defineConfig({
+export default defineModuleVitestConfig({
+  kind: "jsdom",
+  isolate: true,
   test: {
     exclude: [...configDefaults.exclude, "src/**/__tests__/**/*.browser.test.tsx"],
     setupFiles: ["./src/__tests__/setup.ts"],

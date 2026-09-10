@@ -1,6 +1,9 @@
-import { configDefaults, defineConfig } from "vitest/config";
+import { configDefaults } from "vitest/config";
+import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vitest-config.ts";
 
-export default defineConfig({
+export default defineModuleVitestConfig({
+  kind: "jsdom",
+  isolate: true,
   test: {
     /**
      * The real-browser lane is excluded, exactly as `platform/app` excluded it.

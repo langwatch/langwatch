@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineModuleVitestConfig } from "../packages/test-harness/src/vitest-config.ts";
 
 /**
  * Both layouts, because both are in use.
@@ -11,7 +11,10 @@ import { defineConfig } from "vitest/config";
  * test files found" and exited, which reads as a package with no tests rather
  * than one whose tests cannot be seen.
  */
-export default defineConfig({
+
+export default defineModuleVitestConfig({
+  kind: "node",
+  isolate: false,
   test: {
     include: ["tests/**/*.test.ts", "src/**/*.test.ts", "src/**/*.test.tsx"],
   },

@@ -1,10 +1,8 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+import { moduleVitestTestOptions } from "../../../../packages/test-harness/src/vitest-config.ts";
 
 export default defineConfig({
-  test: {
-    setupFiles: ["./src/__tests__/setup.ts"],
-  },
   resolve: {
     alias: {
       "@langwatch/enterprise-licensing-contract": fileURLToPath(
@@ -15,4 +13,11 @@ export default defineConfig({
       ),
     },
   },
+  test: moduleVitestTestOptions({
+    kind: "jsdom",
+    isolate: true,
+    test: {
+      setupFiles: ["./src/__tests__/setup.ts"],
+    },
+  }),
 });

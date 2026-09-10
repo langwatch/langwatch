@@ -1,10 +1,14 @@
-import { configDefaults, defineConfig } from "vitest/config";
+import { configDefaults } from "vitest/config";
+import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vitest-config.ts";
 
 /**
  * The unit lane, split by DEPENDENCY rather than by file name: the two suites
  * named below need a real Redis, and every other file here needs none.
  */
-export default defineConfig({
+
+export default defineModuleVitestConfig({
+  kind: "node",
+  isolate: true,
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],

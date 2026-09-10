@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineModuleVitestConfig } from "../../packages/test-harness/src/vitest-config.ts";
 
 /**
  * The suite is two files: JSON contract assertions, and one that spawns the
@@ -10,7 +10,10 @@ import { defineConfig } from "vitest/config";
  * worktrees at once is several gigabytes of resident processes for two test
  * files. Two is enough to keep the files parallel.
  */
-export default defineConfig({
+
+export default defineModuleVitestConfig({
+  kind: "node",
+  isolate: false,
   test: {
     environment: "node",
     include: ["__tests__/**/*.test.ts"],
