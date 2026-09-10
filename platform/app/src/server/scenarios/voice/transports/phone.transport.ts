@@ -194,7 +194,7 @@ function normalizeToHttpUrl(value: string): string | undefined {
   if (isValidHttpUrl(value)) return value;
   if (/\s/.test(value) || value.includes("://")) return undefined;
 
-  const hostname = value.split(/[/:]/)[0];
+  const hostname = value.split(/[/:]/)[0] ?? "";
   const isLocalHost =
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
