@@ -7,7 +7,7 @@ import type {
 } from "@langwatch/enterprise-governance-server";
 import {
   GovernanceIngestRateLimitPort,
-  PostgresGovernanceDirectoryAdapter,
+  PrismaGovernanceDirectoryRepository,
 } from "@langwatch/enterprise-governance-server";
 import {
   INGEST_RATE_LIMIT_MAX_REQUESTS,
@@ -94,7 +94,7 @@ export function composeApiGovernanceIngestRest(
     governance: () => governance,
     projects: () => projects,
     traceCollection,
-    directory: () => PostgresGovernanceDirectoryAdapter.create({ database: prisma }),
+    directory: () => PrismaGovernanceDirectoryRepository.create(prisma),
     rateLimit: ApiGovernanceIngestRateLimit.create(options.rateLimit),
   };
 }

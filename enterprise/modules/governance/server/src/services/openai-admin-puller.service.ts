@@ -51,7 +51,7 @@ import type {
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
 import type { GovernanceHttpPort } from "../app/governance.infrastructure.ts";
-import { AdminUsageReportAdapter } from "./admin-usage-report.adapter.ts";
+import { AdminUsageReportAdapter } from "./admin-usage-report.service.ts";
 import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:openai-admin-puller");

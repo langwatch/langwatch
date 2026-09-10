@@ -16,7 +16,7 @@ import {
   GovernanceHttpPort,
   type GovernanceHttpResponse,
 } from "../../app/governance.infrastructure.ts";
-import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
+import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));
 /** The reason a failed run leaves behind is a log line, so the log is captured. */
@@ -32,8 +32,8 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 }));
 
 import { OPENAI_ADMIN_ADAPTER_ID } from "@langwatch/enterprise-governance-contract";
-import { OpenAiAdminPullerAdapter } from "../openai-admin-puller.adapter.ts";
-import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
+import { OpenAiAdminPullerAdapter } from "../openai-admin-puller.service.ts";
+import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 import { Temporal } from "@langwatch/time";
 
 class StubHttp implements GovernanceHttpPort {

@@ -25,7 +25,7 @@
  */
 
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
-import { type S3PollingConfig, S3PollingPullerAdapter } from "./s3-puller.adapter.ts";
+import { type S3PollingConfig, S3PollingPullerAdapter } from "./s3-puller.service.ts";
 import type { GovernanceObjectStoragePort } from "../app/governance.infrastructure.ts";
 import type { IngestionPullDiagnosticsPort } from "../ports/ingestion-pull-worker.port.ts";
 

@@ -12,13 +12,13 @@
 import type { PulledUsageRateInput } from "../../ports/pulled-usage-rate.port.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
-import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.adapter.ts";
+import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.service.ts";
 import {
   GovernanceHttpPort,
   type GovernanceHttpResponse,
 } from "../../app/governance.infrastructure.ts";
-import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
-import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
+import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 import { Temporal } from "@langwatch/time";
 
 const { fetchMock } = vi.hoisted(() => ({ fetchMock: vi.fn() }));

@@ -4,7 +4,7 @@ import {
   AiToolCatalogRepository,
   AiToolProviderCatalogPort,
   AiToolSlugPort,
-} from "../ai-tool-catalog.port.ts";
+} from "../../repositories/ai-tool-catalog.repository.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../../services/ai-tool-catalog.service.ts";
 
 const tile: AiToolEntry = {

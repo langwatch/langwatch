@@ -22,8 +22,8 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { IngestionPullEventingAdapter } from "../../adapters/ingestion-pull.adapter.ts";
-import { PulledUsageEventingAdapter } from "../../adapters/pulled-usage.adapter.ts";
+import { IngestionPullEventingAdapter } from "../../services/ingestion-pull-eventing.service.ts";
+import { PulledUsageEventingAdapter } from "../../services/pulled-usage-eventing.service.ts";
 import {
   GatewayDebitPort,
   type GatewayBudgetCrossingCandidate,
@@ -60,7 +60,7 @@ import { PulledUsageLedgerIntent } from "../../intents/pulled-usage-ledger.inten
 import {
   RecordBudgetCrossingCommand,
   RecordVkLifecycleCommand,
-} from "../../adapters/governance-events.adapter.ts";
+} from "../../services/governance-events.service.ts";
 
 class FixedSchedule extends IngestionPullSchedulePort {
   nextRunAt(input: { cron: string; after: number }): number {

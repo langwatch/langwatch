@@ -1,6 +1,6 @@
-import type { GovernanceDiagnosticsPort } from "../ports/governance-diagnostics.port.ts";
-import { PrismaCostAttributionPolicyRepository } from "../repositories/prisma/prisma.cost-attribution-policy.repository.ts";
-import { PostgresGovernancePolicyService } from "../services/governance-policy.service.ts";
+import type { GovernanceDiagnosticsPort } from "../../ports/governance-diagnostics.port.ts";
+import { PrismaCostAttributionPolicyRepository } from "./prisma.cost-attribution-policy.repository.ts";
+import { PostgresGovernancePolicyService } from "../../services/governance-policy.service.ts";
 
 export type GovernanceDatabase = {
   aiToolEntry: {
@@ -28,11 +28,11 @@ export type PostgresGovernanceServices = {
 };
 
 /** Public composition seam; persistence repositories stay private. */
-export class PostgresGovernanceAdapter {
+export class PrismaGovernanceRepository {
   private constructor(private readonly options: PostgresGovernanceAdapterOptions) {}
 
-  static create(options: PostgresGovernanceAdapterOptions): PostgresGovernanceAdapter {
-    return new PostgresGovernanceAdapter(options);
+  static create(options: PostgresGovernanceAdapterOptions): PrismaGovernanceRepository {
+    return new PrismaGovernanceRepository(options);
   }
 
   build(): PostgresGovernanceServices {

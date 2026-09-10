@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   RecordBudgetCrossingCommand,
   RecordVkLifecycleCommand,
-} from "../../adapters/governance-events.adapter.ts";
+} from "../../services/governance-events.service.ts";
 import { GovernanceEventDeliveryProcess } from "../governance-event-delivery.process.ts";
 
 const lifecycle = (action: "created" | "rotated" | "disabled" | "enabled" | "revoked") => ({

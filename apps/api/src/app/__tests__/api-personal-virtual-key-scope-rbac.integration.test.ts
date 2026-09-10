@@ -20,8 +20,10 @@ import {
   type PersonalVirtualKeyTrpcContext,
 } from "@langwatch/enterprise-governance-server";
 import {
-  PostgresPersonalVirtualKeyAdapter,
-  PostgresRoutingPolicyAdapter,
+  DefaultGovernancePersonalVirtualKeyService,
+  DefaultGovernanceRoutingPolicyService,
+  PrismaPersonalVirtualKeyRepository,
+  PrismaRoutingPolicyRepository,
 } from "@langwatch/enterprise-governance-server/testing";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
@@ -141,17 +143,19 @@ async function buildGovernanceApp(): Promise<GovernanceApp> {
     virtualKeyPepper: "test-virtual-key-pepper",
   });
 
-  const personalKeys = PostgresPersonalVirtualKeyAdapter.create({
-    database: prisma,
+  const personalKeys = DefaultGovernancePersonalVirtualKeyService.create({
+    repository: PrismaPersonalVirtualKeyRepository.create(prisma),
     // The gateway's own write service is what mints the key; the issuer is the
     // process's mapping between the two shapes, taken rather than restated.
     issuer: AppPersonalVirtualKeyIssuerPort.create(
       gateway.virtualKeys as unknown as GovernanceVirtualKeyPort,
     ),
     organizations,
-    policies: PostgresRoutingPolicyAdapter.create({ database: prisma }).build(),
+    policies: DefaultGovernanceRoutingPolicyService.create({
+      repository: PrismaRoutingPolicyRepository.create(prisma),
+    }),
     gatewayBaseUrl: GATEWAY_BASE_URL,
-  }).build();
+  });
 
   return GovernanceApp.create({
     governance: governanceServiceFor({

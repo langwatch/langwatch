@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { PrismaOrganizationSessionPolicyRepository } from "../repositories/prisma/prisma.organization-session-policy.repository.ts";
-import { OrganizationSessionPolicyService } from "../services/organization-session-policy.service.ts";
+import { PrismaOrganizationSessionPolicyRepository } from "./prisma.organization-session-policy.repository.ts";
+import { OrganizationSessionPolicyService } from "../../services/organization-session-policy.service.ts";
 
 /**
  * The Postgres composition of the session-policy service.
@@ -15,7 +15,7 @@ import { OrganizationSessionPolicyService } from "../services/organization-sessi
  * and a feature: it is why the `prisma-containment` policy allows
  * `adapters/postgres.*.adapter.ts` to import `PrismaClient` at all.
  */
-export class PostgresSessionPolicyAdapter {
+export class PrismaSessionPolicyRepository {
   static create(prisma: PrismaClient): OrganizationSessionPolicyService {
     return OrganizationSessionPolicyService.create(
       PrismaOrganizationSessionPolicyRepository.create(prisma),

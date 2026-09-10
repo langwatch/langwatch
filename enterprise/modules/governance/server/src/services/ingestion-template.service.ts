@@ -18,18 +18,18 @@ import {
   type UpdateIngestionTemplateOttlInput,
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
-import type { IngestionTemplatePort } from "../ports/ingestion-template.port.ts";
+import type { IngestionTemplateRepository } from "../repositories/ingestion-template.repository.ts";
 import { type Instant, nowInstant } from "@langwatch/time";
 
 export class IngestionTemplateService {
   private constructor(
-    private readonly repository: IngestionTemplatePort,
+    private readonly repository: IngestionTemplateRepository,
     private readonly newSlugSuffix: () => string,
     private readonly now: () => Instant,
   ) {}
 
   static create(options: {
-    repository: IngestionTemplatePort;
+    repository: IngestionTemplateRepository;
     newSlugSuffix?: () => string;
     now?: () => Instant;
   }): IngestionTemplateService {

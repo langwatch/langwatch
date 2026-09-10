@@ -28,12 +28,12 @@
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { GovernanceHttpPort } from "../app/governance.infrastructure.ts";
-import { COPILOT_CONVERSATION_ACTION } from "../services/copilot-studio-trace-mapper.service.ts";
+import { COPILOT_CONVERSATION_ACTION } from "./copilot-studio-trace-mapper.service.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
   DataverseEnvironmentService,
-} from "../services/dataverse-environment.service.ts";
+} from "./dataverse-environment.service.ts";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,

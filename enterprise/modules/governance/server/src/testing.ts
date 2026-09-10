@@ -3,10 +3,11 @@ export { DATABRICKS_GENIE_ADAPTER_ID } from "./services/pull-destination.service
 export {
   DatabricksGeniePullerAdapter,
   type DatabricksGeniePullConfig,
-} from "./adapters/databricks-genie-puller.adapter.ts";
-/**
- * The personal-key half of the Governance installation, on its own.
- */
-export { PostgresPersonalVirtualKeyAdapter } from "./adapters/postgres.governance-personal-key.adapter.ts";
-export { PostgresRoutingPolicyAdapter } from "./adapters/postgres.governance-routing.adapter.ts";
-export { PostgresDepartmentAdapter } from "./adapters/postgres.department.adapter.ts";
+} from "./services/databricks-genie-puller.service.ts";
+export { PrismaDepartmentRepository } from "./repositories/prisma/prisma.department.repository.ts";
+export { DefaultGovernancePersonalVirtualKeyService } from "./services/governance-personal-key.service.ts";
+export { PrismaPersonalVirtualKeyRepository } from "./repositories/prisma/prisma.governance-personal-key.repository.ts";
+export { DefaultGovernanceRoutingPolicyService } from "./services/governance-routing.service.ts";
+export { PrismaRoutingPolicyRepository } from "./repositories/prisma/prisma.governance-routing.repository.ts";
+export { ActivityMonitorService } from "./services/ingestion-source-activity.service.ts";
+export { PrismaActivityMonitorRepository } from "./repositories/prisma/prisma.ingestion-source-activity.repository.ts";

@@ -17,8 +17,11 @@ import type { Organization, PrismaClient } from "@langwatch/prisma-client/genera
 import {
   GovernanceClickHouseClientPort,
   GovernanceClickHouseResolverPort,
-  PostgresIngestionSourceActivityAdapter,
 } from "@langwatch/enterprise-governance-server";
+import {
+  ActivityMonitorService,
+  PrismaActivityMonitorRepository,
+} from "@langwatch/enterprise-governance-server/testing";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -122,10 +125,12 @@ describe.skipIf(!databaseUrl || !chUrl)("ActivityMonitorService.spendByDepartmen
         return Promise.resolve(client);
       }
     }
-    return PostgresIngestionSourceActivityAdapter.create({
-      database: prisma,
-      clickhouse: new SuiteResolver(),
-    }).build();
+    return ActivityMonitorService.create(
+      PrismaActivityMonitorRepository.create({
+        prisma,
+        clickhouse: new SuiteResolver(),
+      }),
+    );
   };
 
   beforeAll(async () => {

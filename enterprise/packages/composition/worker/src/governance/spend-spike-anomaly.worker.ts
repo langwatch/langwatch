@@ -5,7 +5,8 @@ import {
   AnomalyAlertDispatcherService,
   type AnomalyAlertHttpPort,
   type AnomalySpendReaderPort,
-  PostgresSpendSpikeAnomalyAdapter,
+  PrismaSpendSpikeAnomalyRepository,
+  SpendSpikeAnomalyEvaluatorService,
   type SpendSpikeAnomalyDatabase,
 } from "@langwatch/enterprise-governance-server";
 import { nowInstant } from "@langwatch/time";
@@ -74,11 +75,11 @@ export function startSpendSpikeAnomalyWorker(
 ): SpendSpikeAnomalyWorkerHandle {
   let stopped = false;
   let timer: NodeJS.Timeout | undefined;
-  const evaluator = PostgresSpendSpikeAnomalyAdapter.create({
-    database: dependencies.database,
+  const evaluator = SpendSpikeAnomalyEvaluatorService.create({
+    repository: PrismaSpendSpikeAnomalyRepository.create(dependencies.database),
     spend: dependencies.spend,
     dispatcher: AnomalyAlertDispatcherService.create({ http: dependencies.http }),
-  }).build();
+  });
 
   const tick = async () => {
     if (stopped) return;

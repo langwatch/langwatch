@@ -9,10 +9,10 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
-  IngestionTemplatePort,
+  IngestionTemplateRepository,
   type IngestionTemplateMutationResult,
   type NewIngestionTemplate,
-} from "../ingestion-template.port.ts";
+} from "../../repositories/ingestion-template.repository.ts";
 import { IngestionTemplateService } from "../../services/ingestion-template.service.ts";
 
 function template(overrides: Partial<IngestionTemplate> = {}): IngestionTemplate {
@@ -32,7 +32,7 @@ function template(overrides: Partial<IngestionTemplate> = {}): IngestionTemplate
   };
 }
 
-class MemoryIngestionTemplateRepository extends IngestionTemplatePort {
+class MemoryIngestionTemplateRepository extends IngestionTemplateRepository {
   readonly createWithAudit = vi.fn(
     async (input: {
       template: NewIngestionTemplate;

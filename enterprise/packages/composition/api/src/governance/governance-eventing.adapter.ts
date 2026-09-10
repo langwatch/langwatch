@@ -5,7 +5,7 @@ import {
   GovernanceDiagnosticsPort,
   IngestionPullEventingAdapter,
   IngestionPullLifecycleCommandPort,
-  type IngestionPullLifecycleService,
+  IngestionPullLifecycleService,
   IngestionPullMetricsPort,
   IngestionPullOutcomePort,
   IngestionPullProcess,
@@ -13,8 +13,8 @@ import {
   IngestionPullSchedulePort,
   IngestionPullService,
   IngestionPullTenantPort,
-  PostgresIngestionPullLifecycleAdapter,
-  PostgresIngestionPullRunProjectionAdapter,
+  PrismaIngestionPullLifecycleRepository,
+  PrismaIngestionPullRunProjectionRepository,
   PulledUsageDispatcherPort,
   PulledUsageEventingAdapter,
   PulledUsageLedgerPort,
@@ -502,9 +502,9 @@ export class AppGovernanceEventingAdapter {
     );
     const ingestionPullPipeline = this.eventSourcing.register(
       IngestionPullEventingAdapter.create({
-        runStatusStore: PostgresIngestionPullRunProjectionAdapter.create(
+        runStatusStore: PrismaIngestionPullRunProjectionRepository.create(
           this.runtime.lifecycle.database,
-        ).build(),
+        ),
         process: IngestionPullProcess.create({
           schedule: UtcIngestionPullSchedulePort.create(this.runtime.lifecycle.schedule),
           execution,
@@ -524,12 +524,12 @@ export class AppGovernanceEventingAdapter {
   }
 
   private lifecycle(pipeline: AppIngestionPullPipeline): IngestionPullLifecycleService {
-    return PostgresIngestionPullLifecycleAdapter.create({
-      database: this.runtime.lifecycle.database,
+    return IngestionPullLifecycleService.create({
+      repository: PrismaIngestionPullLifecycleRepository.create(this.runtime.lifecycle.database),
       tenant: AppIngestionPullTenantPort.create(this.runtime.lifecycle.projects),
       commands: AppIngestionPullLifecycleCommandPort.create(pipeline),
       diagnostics: new AppIngestionPullDiagnosticsPort(),
-    }).build();
+    });
   }
 
   private reconcile(lifecycle: IngestionPullLifecycleService): void {

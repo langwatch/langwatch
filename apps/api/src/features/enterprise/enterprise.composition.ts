@@ -8,7 +8,7 @@ import type {
   LimitCheckResult,
   LimitType,
 } from "@langwatch/enterprise-licensing-contract";
-import { LicensingApp, type LicenseStoragePort } from "@langwatch/enterprise-licensing-server";
+import { LicensingApp, type LicenseStorage } from "@langwatch/enterprise-licensing-server";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { ResourceScope } from "@langwatch/runtime-composition";
@@ -70,7 +70,7 @@ export function composeEnterpriseFeature(options: {
   /** The seat allowances this deployment answers without an Enterprise application. */
   seats?: ApiSeatAllowancePort | undefined;
   /** The process-owned licence store used for enforcement on an unlicensed deployment. */
-  licensingStore?: LicenseStoragePort | undefined;
+  licensingStore?: LicenseStorage | undefined;
   /** Optional rotated public key for validating activated licences. */
   licensePublicKey?: string | undefined;
 }): ComposedEnterpriseFeature {
@@ -178,7 +178,7 @@ function unlicensedLicensing(options: {
   logger: Logger;
   /** Where a reached ceiling is reported, as this deployment composed it. */
   notifier: ApiTrpcFeatureApplication["usageLimits"];
-  repository: LicenseStoragePort | undefined;
+  repository: LicenseStorage | undefined;
   publicKey: string | undefined;
 }): LicensingApp {
   if (!options.repository) {

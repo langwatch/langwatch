@@ -259,7 +259,7 @@ afterEach(() => {
 
 async function newAdapter() {
   const { CopilotStudioDataversePullerAdapter } =
-    await import("../copilot-studio-dataverse-puller.adapter.ts");
+    await import("../copilot-studio-dataverse-puller.service.ts");
   return CopilotStudioDataversePullerAdapter.create(new StubHttp());
 }
 

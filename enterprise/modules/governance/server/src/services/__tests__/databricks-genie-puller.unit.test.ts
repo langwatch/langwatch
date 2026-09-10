@@ -5,7 +5,7 @@ import { z } from "zod";
 import {
   DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_ROW_LIMIT,
-} from "../databricks-genie-puller.adapter.ts";
+} from "../databricks-genie-puller.service.ts";
 import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
 
 const workspaceUrl = "https://workspace.example.test";

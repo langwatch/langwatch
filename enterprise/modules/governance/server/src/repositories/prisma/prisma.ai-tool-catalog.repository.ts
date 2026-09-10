@@ -14,7 +14,7 @@ import type {
   SeedAiToolStarterPackInput,
   UpdateAiToolEntryInput,
 } from "@langwatch/enterprise-governance-contract";
-import { AiToolCatalogRepository } from "../../ports/ai-tool-catalog.port.ts";
+import { AiToolCatalogRepository } from "../ai-tool-catalog.repository.ts";
 
 type EntryRow = PrismaAiToolEntry & {
   departments: Pick<AiToolEntryDepartment, "departmentId">[];

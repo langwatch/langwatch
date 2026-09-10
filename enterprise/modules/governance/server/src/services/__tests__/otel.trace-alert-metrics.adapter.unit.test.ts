@@ -9,7 +9,7 @@ import {
   AUTOMATION_MATCH_RECORDS_METRIC_DESCRIPTION,
   AUTOMATION_MATCH_RECORDS_METRIC_NAME,
   OtelTraceAlertMetricsAdapter,
-} from "../otel.trace-alert-metrics.adapter.ts";
+} from "../otel.trace-alert-metrics.service.ts";
 
 describe("OtelTraceAlertMetricsAdapter", () => {
   let metrics: RecordingMeterProvider;

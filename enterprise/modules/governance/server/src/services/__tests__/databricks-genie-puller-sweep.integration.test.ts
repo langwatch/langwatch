@@ -26,11 +26,11 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { NormalizedPullEvent, PullResult } from "@langwatch/enterprise-governance-contract";
 import { FetchHttpPort } from "../../__tests__/support/puller-test-ports.ts";
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../../services/pull-destination.service.ts";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../pull-destination.service.ts";
 import {
   type DatabricksGeniePullConfig,
   DatabricksGeniePullerAdapter,
-} from "../databricks-genie-puller.adapter.ts";
+} from "../databricks-genie-puller.service.ts";
 
 /** Mirrors the adapter's own constant; asserted against, not imported by it. */
 const WATERMARK_LAG_MS = 5 * 60 * 1000;

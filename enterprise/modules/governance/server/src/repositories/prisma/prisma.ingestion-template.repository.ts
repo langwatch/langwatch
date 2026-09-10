@@ -7,10 +7,10 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
-  IngestionTemplatePort,
+  IngestionTemplateRepository,
   type IngestionTemplateMutationResult,
   type NewIngestionTemplate,
-} from "../../ports/ingestion-template.port.ts";
+} from "../ingestion-template.repository.ts";
 import { toDate, type Instant } from "@langwatch/time";
 
 type Client = Prisma.TransactionClient | PrismaClient;
@@ -24,7 +24,7 @@ export type IngestionTemplateDatabase = Pick<
   "ingestionTemplate" | "auditLog" | "$transaction"
 >;
 
-export class PrismaIngestionTemplateRepository extends IngestionTemplatePort {
+export class PrismaIngestionTemplateRepository extends IngestionTemplateRepository {
   private constructor(private readonly prisma: IngestionTemplateDatabase) {
     super();
   }

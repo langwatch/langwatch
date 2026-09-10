@@ -31,7 +31,7 @@ import type {
   AiToolCatalogRepository,
   AiToolProviderCatalogPort,
   AiToolSlugPort,
-} from "../ports/ai-tool-catalog.port.ts";
+} from "../repositories/ai-tool-catalog.repository.ts";
 
 export class DefaultGovernanceAiToolCatalogService {
   private constructor(

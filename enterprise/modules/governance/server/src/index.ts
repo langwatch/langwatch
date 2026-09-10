@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 export {
-  PostgresGovernanceAdapter,
+  PrismaGovernanceRepository as PostgresGovernanceAdapter,
   type PostgresGovernanceServices,
-} from "./adapters/postgres.governance.adapter.ts";
+} from "./repositories/prisma/prisma.governance.repository.ts";
 
-export { PostgresGovernanceDirectoryAdapter } from "./adapters/postgres.governance-directory.adapter.ts";
-export { PostgresOrganizationSupportContactAdapter } from "./adapters/postgres.organization-support-contact.adapter.ts";
+export { PrismaGovernanceDirectoryRepository } from "./repositories/prisma/prisma.governance-directory.repository.ts";
+export { PrismaOrganizationSupportContactRepository } from "./repositories/prisma/prisma.organization-support-contact.repository.ts";
 
 export {
   GovernanceDirectoryPort,
@@ -22,9 +22,9 @@ export {
   type PersonaResolution,
 } from "@langwatch/enterprise-governance-contract";
 export {
-  PostgresGovernanceInstallationAdapter,
+  PrismaGovernanceInstallationRepository as PostgresGovernanceInstallationAdapter,
   type GovernanceInstallationOptions,
-} from "./adapters/postgres.governance-installation.adapter.ts";
+} from "./repositories/prisma/prisma.governance-installation.repository.ts";
 
 /**
  * The feature's application: the one typed thing its transports are given.
@@ -50,13 +50,13 @@ export {
 
 // Process and eventing boundaries. Domain collaborators remain private to the
 // installation adapter and are never application capabilities.
-export * from "./adapters/governance-events.adapter.ts";
+export * from "./services/governance-events.service.ts";
 export type { GatewaySpendUsage, GatewaySpendAttribution, GatewaySpendAdmittedData, GatewaySpendOutcomeData, GatewaySpendFailedData, GatewaySpendSettledData, GatewaySpendProcessingEvent, GatewayBudgetScope, GatewayBudgetWindow, GatewayBudgetDefinition, GatewayResolvedBudget, GatewayBudgetDebitRow, GatewayBudgetCrossingCandidate, GatewayDebitPort } from "./app/governance.infrastructure.ts";
 export * from "./ports/governance-budget-overview.port.ts";
 export type { GovernanceEventingPort } from "./app/governance.infrastructure.ts";
 export * from "./ports/ingestion-source-activity.port.ts";
 export * from "./repositories/audit/admin-workspace-view-audit.repository.ts";
-export * from "./ports/ai-tool-catalog.port.ts";
+export * from "./repositories/ai-tool-catalog.repository.ts";
 export type { CliBudgetOverview, CliBudgetOverviewPort, CliAdminContactPort } from "./app/governance.infrastructure.ts";
 export type { CliTokenStorePort } from "./app/governance.infrastructure.ts";
 export * from "./repositories/policy/anomaly-rule.repository.ts";
@@ -73,7 +73,7 @@ export * from "./ports/ingestion-pull.port.ts";
 export * from "./ports/ingestion-pull-lifecycle.port.ts";
 export * from "./ports/ingestion-pull-worker.port.ts";
 export * from "./ports/ingestion-source.port.ts";
-export * from "./ports/ingestion-template.port.ts";
+export * from "./repositories/ingestion-template.repository.ts";
 export type { GovernanceOcsfEventsReaderPort, AdminWorkspaceViewOcsfPort, GovernanceSetupActivityPort } from "./app/governance.infrastructure.ts";
 export * from "./ports/ingestion-source-key.port.ts";
 export * from "./ports/personal-usage.port.ts";
@@ -90,19 +90,17 @@ export {
   AUTOMATION_MATCH_RECORDS_METRIC_DESCRIPTION,
   AUTOMATION_MATCH_RECORDS_METRIC_NAME,
   OtelTraceAlertMetricsAdapter,
-} from "./adapters/otel.trace-alert-metrics.adapter.ts";
+} from "./services/otel.trace-alert-metrics.service.ts";
 
-export { IngestionPullEventingAdapter } from "./adapters/ingestion-pull.adapter.ts";
-export { PostgresDepartmentAdapter } from "./adapters/postgres.department.adapter.ts";
-export { PostgresSpendSpikeAnomalyAdapter } from "./adapters/postgres.spend-spike-anomaly.adapter.ts";
+export { IngestionPullEventingAdapter } from "./services/ingestion-pull-eventing.service.ts";
+export { PrismaSpendSpikeAnomalyRepository } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 export type { SpendSpikeAnomalyDatabase } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
-export { PostgresIngestionSourceActivityAdapter } from "./adapters/postgres.ingestion-source-activity.adapter.ts";
-export { PostgresIngestionPullLifecycleAdapter } from "./adapters/postgres.ingestion-pull-lifecycle.adapter.ts";
-export { PostgresIngestionPullSourceAdapter } from "./adapters/postgres.ingestion-pull-source.adapter.ts";
+export { PrismaIngestionPullLifecycleRepository } from "./repositories/prisma/prisma.ingestion-pull-lifecycle.repository.ts";
+export { PrismaIngestionPullSourceRepository as PostgresIngestionPullSourceAdapter } from "./repositories/prisma/prisma.ingestion-pull-source.repository.ts";
 export type { IngestionSourceDatabase } from "./repositories/prisma/prisma.ingestion-source.repository.ts";
-export { PostgresIngestionPullRunProjectionAdapter } from "./adapters/postgres.ingestion-pull-run-projection.adapter.ts";
+export { PrismaIngestionPullRunProjectionRepository } from "./repositories/prisma/prisma.ingestion-pull-run-projection.repository.ts";
 export type { IngestionPullRunProjectionDatabase } from "./repositories/prisma/prisma.ingestion-pull-run-projection.repository.ts";
-export { PulledUsageEventingAdapter } from "./adapters/pulled-usage.adapter.ts";
+export { PulledUsageEventingAdapter } from "./services/pulled-usage-eventing.service.ts";
 
 export {
   GATEWAY_DEBITS_PROCESS_NAME,
@@ -114,17 +112,18 @@ export { PulledUsageLedgerProcess } from "./processes/pulled-usage-ledger.proces
 
 export { BuiltInPullerRegistryService } from "./services/built-in-puller-registry.service.ts";
 export { PullerRegistryService } from "./services/puller-registry.service.ts";
-export { AnthropicAdminPullerAdapter } from "./adapters/anthropic-admin-puller.adapter.ts";
-export { ClaudeComplianceReferencePullerAdapter } from "./adapters/claude-compliance-puller.adapter.ts";
-export { CopilotStudioReferencePullerAdapter } from "./adapters/copilot-studio-puller.adapter.ts";
-export { CopilotStudioDataversePullerAdapter } from "./adapters/copilot-studio-dataverse-puller.adapter.ts";
-export { DatabricksGeniePullerAdapter } from "./adapters/databricks-genie-puller.adapter.ts";
-export { HttpPollingPullerAdapter } from "./adapters/http-poller.adapter.ts";
-export { OpenAiComplianceReferencePullerAdapter } from "./adapters/openai-compliance-puller.adapter.ts";
-export { OpenAiAdminPullerAdapter } from "./adapters/openai-admin-puller.adapter.ts";
-export { S3PollingPullerAdapter } from "./adapters/s3-puller.adapter.ts";
+export { AnthropicAdminPullerAdapter } from "./services/anthropic-admin-puller.service.ts";
+export { ClaudeComplianceReferencePullerAdapter } from "./services/claude-compliance-puller.service.ts";
+export { CopilotStudioReferencePullerAdapter } from "./services/copilot-studio-puller.service.ts";
+export { CopilotStudioDataversePullerAdapter } from "./services/copilot-studio-dataverse-puller.service.ts";
+export { DatabricksGeniePullerAdapter } from "./services/databricks-genie-puller.service.ts";
+export { HttpPollingPullerAdapter } from "./services/http-poller.service.ts";
+export { OpenAiComplianceReferencePullerAdapter } from "./services/openai-compliance-puller.service.ts";
+export { OpenAiAdminPullerAdapter } from "./services/openai-admin-puller.service.ts";
+export { S3PollingPullerAdapter } from "./services/s3-puller.service.ts";
 export { AnomalyRuleService } from "./services/anomaly-rule.service.ts";
 export { DepartmentService } from "./services/department.service.ts";
+export { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 export { AnomalyAlertDispatcherService } from "./services/anomaly-alert-dispatcher.service.ts";
 export { GovernanceSignalService } from "./services/governance-signal.service.ts";
 export { IngestionCredentialsService } from "./services/ingestion-credentials.service.ts";
@@ -141,7 +140,7 @@ export {
   SESSION_POLICY_MAX_DAYS,
   SessionPolicyOutOfRangeError,
 } from "./services/organization-session-policy.service.ts";
-export { PostgresSessionPolicyAdapter } from "./adapters/postgres.session-policy.adapter.ts";
+export { PrismaSessionPolicyRepository as PostgresSessionPolicyAdapter } from "./repositories/prisma/prisma.session-policy.repository.ts";
 export { GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS } from "./subscribers/governance-ocsf.subscriber.ts";
 export {
   GOVERNANCE_KPIS_SYNC_WINDOW_MS,

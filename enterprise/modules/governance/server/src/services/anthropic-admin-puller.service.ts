@@ -43,7 +43,7 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import type { GovernanceHttpPort } from "../app/governance.infrastructure.ts";
-import { AdminUsageReportAdapter } from "./admin-usage-report.adapter.ts";
+import { AdminUsageReportAdapter } from "./admin-usage-report.service.ts";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import type {
   GovernancePuller as PullerAdapter,

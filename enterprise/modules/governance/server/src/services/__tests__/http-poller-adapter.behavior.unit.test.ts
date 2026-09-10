@@ -5,7 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HttpPollingPullerAdapter } from "../http-poller.adapter.ts";
+import { HttpPollingPullerAdapter } from "../http-poller.service.ts";
 import { GovernanceHttpPort, type GovernanceHttpResponse } from "../../app/governance.infrastructure.ts";
 
 const VALID_CONFIG = {

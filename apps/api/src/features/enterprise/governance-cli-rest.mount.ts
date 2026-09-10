@@ -34,8 +34,8 @@ import type { AuthzService } from "@langwatch/authz-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import {
   OrganizationSupportContactService,
-  PostgresGovernanceDirectoryAdapter,
-  PostgresOrganizationSupportContactAdapter,
+  PrismaGovernanceDirectoryRepository,
+  PrismaOrganizationSupportContactRepository,
 } from "@langwatch/enterprise-governance-server";
 import type {
   GovernanceCliAccessTokenPort,
@@ -111,10 +111,10 @@ export function composeApiGovernanceCliRest(
   return {
     accessTokens,
     governance: () => governance,
-    directory: () => PostgresGovernanceDirectoryAdapter.create({ database: prisma }),
+    directory: () => PrismaGovernanceDirectoryRepository.create(prisma),
     supportContacts: () =>
       OrganizationSupportContactService.create({
-        repository: PostgresOrganizationSupportContactAdapter.create({ database: prisma }),
+        repository: PrismaOrganizationSupportContactRepository.create({ prisma }),
       }),
     ensurePersonalWorkspace,
     tryFindPersonalWorkspace,

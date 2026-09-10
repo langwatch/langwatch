@@ -20,11 +20,11 @@ import http from "http";
 import type { AddressInfo } from "net";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../../services/pull-destination.service.ts";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../pull-destination.service.ts";
 import {
   DatabricksGeniePullerAdapter,
   WAREHOUSE_COST_ROW_LIMIT,
-} from "../databricks-genie-puller.adapter.ts";
+} from "../databricks-genie-puller.service.ts";
 import {
   WAREHOUSE_COST_MAX_HOLD_MS,
   WAREHOUSE_COST_SETTLING_LAG_MS,
