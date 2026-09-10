@@ -10,10 +10,10 @@ import {
 } from "@langwatch/egress";
 
 import {
-  WebhookDestinationPort,
+  WebhookDestination,
   type WebhookDispatchRequest,
   type WebhookDispatchResult,
-} from "../ports/webhook-destination.port.ts";
+} from "../app/webhook.app.ts";
 import { parseSqsQueueUrl, sqsHostFor } from "../rules/sqs-queue-url.rules.ts";
 import { nowInstant } from "@langwatch/time";
 
@@ -420,14 +420,13 @@ export interface SqsWebhookDestinationAdapterOptions extends SqsDestinationConfi
   rateLimiter?: WebhookDispatchRateLimiterPort | undefined;
 }
 
-export class SqsWebhookDestinationAdapter extends WebhookDestinationPort {
+export class SqsWebhookDestinationAdapter implements WebhookDestination {
   readonly kind = "sqs" as const;
 
   private constructor(
     private readonly config: SqsWebhookDestinationAdapterOptions,
     private readonly createClient?: (config: SqsDestinationConfig) => SQSClient,
   ) {
-    super();
   }
 
   static create({

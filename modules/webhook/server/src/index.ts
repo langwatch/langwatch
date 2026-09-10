@@ -28,8 +28,7 @@ export {
   type WebhookEndpointServiceOptions,
   type WebhookEndpointStatusSnapshot,
 } from "./repositories/webhook-endpoint.repository.ts";
-export { WebhookIdPort } from "./ports/webhook-id.port.ts";
-export { WebhookSecretPort } from "./ports/webhook-secret.port.ts";
+export type { WebhookId, WebhookSecret } from "./app/webhook.app.ts";
 // Webhook event reads are composed through the repository and held as the
 // port. Its cursor codec is private to the feature: nothing outside it
 // names that any more.
@@ -138,23 +137,24 @@ export { webhookRest } from "./transport/webhook.rest.ts";
 // LAST HOP Everything above the destination interface is one machinery no matter where an
 // endpoint delivers — the same coalescing buffer, the same retry ladder, the same delivery log,
 // the same signature over the same bytes. Only the hop differs, and it differs behind
-// `WebhookDestinationPort`.
+// `WebhookDestination`.
 export {
-  WebhookDestinationPort,
+  type WebhookDestination,
   type WebhookDispatchRequest,
+  type WebhookDispatchResult,
   type WebhookDispatchVerdict,
-} from "./ports/webhook-destination.port.ts";
+} from "./app/webhook.app.ts";
 export {
   WebhookDestinationAdapter,
   type WebhookDestinationDeps,
-} from "./adapters/webhook-destination.adapter.ts";
-export { HttpWebhookDestinationAdapter } from "./adapters/http.webhook-destination.adapter.ts";
+} from "./services/webhook-destination-dispatch.service.ts";
+export { HttpWebhookDestinationAdapter } from "./services/http.webhook-destination.service.ts";
 export {
   SQS_MAX_MESSAGE_BYTES,
   SqsWebhookDestinationAdapter,
   type AwsClientConfigPort,
   type SqsDestinationConfig,
-} from "./adapters/sqs.webhook-destination.adapter.ts";
+} from "./services/sqs.webhook-destination.service.ts";
 export {
   inspectSqsQueueUrl,
   parseSqsQueueUrl,

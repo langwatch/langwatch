@@ -51,8 +51,8 @@ import {
   WebhookEventsService,
   WebhookApp,
   WebhookHealthService,
-  WebhookIdPort,
-  WebhookSecretPort,
+  type WebhookId,
+  type WebhookSecret,
   webhookRepositories,
   type WebhookClickHouseClientResolver,
   type WebhookDeliveryProcessDeps,
@@ -200,7 +200,7 @@ function unrunExecutorCollaborators(): Pick<
 }
 
 /** The endpoint id format, as the resource prefix the platform already mints. */
-class ApiWebhookIds extends WebhookIdPort {
+class ApiWebhookIds implements WebhookId {
   newEndpointId(): string {
     return generate("webhookendpoint").toString();
   }
@@ -214,14 +214,12 @@ class ApiWebhookIds extends WebhookIdPort {
  * read, and a customer verifying a signature against a secret we could no
  * longer decrypt would see every delivery fail verification.
  */
-class ApiWebhookSecrets extends WebhookSecretPort {
+class ApiWebhookSecrets implements WebhookSecret {
   static create(cipher: SecretEncryptionPort): ApiWebhookSecrets {
     return new ApiWebhookSecrets(cipher);
   }
 
-  private constructor(private readonly cipher: SecretEncryptionPort) {
-    super();
-  }
+  private constructor(private readonly cipher: SecretEncryptionPort) {}
 
   encrypt(value: string): string {
     return this.cipher.encrypt(value);

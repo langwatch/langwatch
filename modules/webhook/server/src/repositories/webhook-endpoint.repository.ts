@@ -5,14 +5,14 @@ import type {
   WebhookEndpointView,
 } from "@langwatch/webhook-contract";
 import type { Instant } from "@langwatch/time";
-import type { WebhookIdPort } from "../ports/webhook-id.port.ts";
-import type { WebhookSecretPort } from "../ports/webhook-secret.port.ts";
+import type { WebhookId } from "../app/webhook.app.ts";
+import type { WebhookSecret } from "../app/webhook.app.ts";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
 import type { WebhookEndpointConfiguration } from "../services/webhook-endpoint-policy.service.ts";
 
 export type WebhookEndpointServiceOptions = {
-  ids: WebhookIdPort;
-  secrets: WebhookSecretPort;
+  ids: WebhookId;
+  secrets: WebhookSecret;
   configuration?: WebhookEndpointConfiguration;
   pruneDeliveries?: (now: Instant) => Promise<number>;
   notifyAutoDisabled?: (input: {

@@ -1,12 +1,12 @@
 import type { WebhookDispatchRateLimiterPort, WebhookEgressService } from "@langwatch/egress";
 
-import type { WebhookDestinationPort } from "../ports/webhook-destination.port.ts";
-import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
-import { HttpWebhookDestinationAdapter } from "./http.webhook-destination.adapter.ts";
+import type { WebhookDestination } from "../app/webhook.app.ts";
+import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
+import { HttpWebhookDestinationAdapter } from "./http.webhook-destination.service.ts";
 import {
   type AwsClientConfigPort,
   SqsWebhookDestinationAdapter,
-} from "./sqs.webhook-destination.adapter.ts";
+} from "./sqs.webhook-destination.service.ts";
 
 /**
  * What a process must hold before it can deliver to either transport.
@@ -32,7 +32,7 @@ export class WebhookDestinationAdapter {
   }
 
   /** The transport for one endpoint. */
-  destinationFor(config: WebhookDestinationConfig): WebhookDestinationPort {
+  destinationFor(config: WebhookDestinationConfig): WebhookDestination {
     switch (config.kind) {
       case "http":
         return HttpWebhookDestinationAdapter.create({

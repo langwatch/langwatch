@@ -38,8 +38,8 @@ import { cleanupTestRows } from "@langwatch/test-harness";
 
 import { PrismaWebhookEndpointRepository } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
 import type { WebhookEndpointRuntime } from "../../repositories/webhook-endpoint.repository.ts";
-import type { WebhookIdPort } from "../../ports/webhook-id.port.ts";
-import type { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
+import type { WebhookId } from "../../app/webhook.app.ts";
+import type { WebhookSecret } from "../../app/webhook.app.ts";
 import {
   WebhookDeliveryService,
   type WebhookDeliveryProcessDeps,
@@ -68,10 +68,10 @@ const connection = databaseUrl
   : null;
 const prisma = connection?.client as PrismaClient;
 
-const ids: WebhookIdPort = {
+const ids: WebhookId = {
   newEndpointId: () => `whep_${randomBytes(6).toString("hex")}`,
 };
-const secrets: WebhookSecretPort = {
+const secrets: WebhookSecret = {
   encrypt: (value: string) => `enc:${value}`,
   decrypt: (value: string) => value.replace(/^enc:/, ""),
 };

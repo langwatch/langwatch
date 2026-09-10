@@ -15,8 +15,8 @@ import {
 } from "@langwatch/webhook-contract";
 import type { Prisma, PrismaClient, WebhookEndpoint } from "@langwatch/prisma-client/generated";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
-import type { WebhookIdPort } from "../../ports/webhook-id.port.ts";
-import type { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
+import type { WebhookId } from "../../app/webhook.app.ts";
+import type { WebhookSecret } from "../../app/webhook.app.ts";
 import {
   WebhookDestinationService,
   type WebhookDestinationConfig,
@@ -109,8 +109,8 @@ function statusSnapshotOf(row: {
 
 export interface WebhookEndpointDeps {
   prisma: WebhookEndpointDatabase;
-  ids: WebhookIdPort;
-  secrets: WebhookSecretPort;
+  ids: WebhookId;
+  secrets: WebhookSecret;
   configuration?: WebhookEndpointConfiguration;
   pruneDeliveries?: (now: Instant) => Promise<number>;
   /**
@@ -924,7 +924,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
       sqs?: SqsDestinationInput;
     },
     configuration: WebhookEndpointConfiguration,
-    secrets: WebhookSecretPort,
+    secrets: WebhookSecret,
   ): StoredDestination {
     if (params.destinationKind === "http") {
       if (!params.url) {
@@ -951,7 +951,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
 
   private static storedSqsDestination(
     sqs: SqsDestinationInput,
-    secrets: WebhookSecretPort,
+    secrets: WebhookSecret,
   ): StoredDestination {
     return {
       ...EMPTY_DESTINATION,
@@ -1052,7 +1052,7 @@ export class PrismaWebhookEndpointRepository implements WebhookEndpointRuntime {
     endpoint: WebhookEndpoint;
     sqs: Partial<SqsDestinationInput>;
     configuration: WebhookEndpointConfiguration;
-    secrets: WebhookSecretPort;
+    secrets: WebhookSecret;
   }): StoredDestination {
     const selectsRole = PrismaWebhookEndpointRepository.selects(sqs.roleArn);
     const selectsStatic = PrismaWebhookEndpointRepository.selects(sqs.accessKeyId);

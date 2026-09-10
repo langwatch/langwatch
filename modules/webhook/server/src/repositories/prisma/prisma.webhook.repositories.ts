@@ -8,8 +8,8 @@
  * endpoint registry also needs the deployment's own id and secret codecs.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { WebhookIdPort } from "../../ports/webhook-id.port.ts";
-import type { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
+import type { WebhookId } from "../../app/webhook.app.ts";
+import type { WebhookSecret } from "../../app/webhook.app.ts";
 import type { WebhookEndpointConfiguration } from "../../services/webhook-endpoint-policy.service.ts";
 import type { WebhookRepositories } from "../webhook.repositories.ts";
 import {
@@ -26,8 +26,8 @@ export class PostgresWebhookRepositories {
   static create(
     infrastructure: Readonly<{
       prisma: PrismaClient;
-      ids: WebhookIdPort;
-      secrets: WebhookSecretPort;
+      ids: WebhookId;
+      secrets: WebhookSecret;
       clickhouse: WebhookClickHouseClientResolver;
       configuration: WebhookEndpointConfiguration;
     }>,

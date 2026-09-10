@@ -13,8 +13,8 @@ import {
   type WebhookEndpointDeps,
 } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
 import { WebhookApp } from "../../app/webhook.app.ts";
-import { WebhookIdPort } from "../../ports/webhook-id.port.ts";
-import { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
+import { WebhookId } from "../../app/webhook.app.ts";
+import { WebhookSecret } from "../../app/webhook.app.ts";
 import { webhookEndpointTrpcTransport } from "../webhook-endpoint.trpc.ts";
 import {
   webhookEndpointTrpcTestPorts,
@@ -44,7 +44,7 @@ const ENDPOINT_ROW = {
   updatedAt: new Date("2026-07-01T00:00:00Z"),
 };
 
-class TestIdPort extends WebhookIdPort {
+class TestIdPort implements WebhookId {
   private next = 0;
   newEndpointId(): string {
     this.next += 1;
@@ -57,7 +57,7 @@ class TestIdPort extends WebhookIdPort {
  * this file pins is about where the PLAINTEXT travels, so the cipher stands in
  * as an identity pair and the assertions hold anywhere.
  */
-class TestSecretPort extends WebhookSecretPort {
+class TestSecretPort implements WebhookSecret {
   encrypt(value: string): string {
     return `encrypted:${value}`;
   }

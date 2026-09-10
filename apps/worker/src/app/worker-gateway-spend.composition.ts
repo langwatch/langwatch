@@ -16,8 +16,8 @@ import {
   WebhookDeliveryService,
   WebhookDestinationAdapter,
   WebhookEndpointConfiguration,
-  WebhookIdPort,
-  WebhookSecretPort,
+  type WebhookId,
+  type WebhookSecret,
   webhookRepositories,
   type AwsClientConfigPort,
   type WebhookDeliveryProcessDeps,
@@ -358,7 +358,7 @@ function pruneExpiredIdempotencyReceipts(
 }
 
 /** The endpoint id format, as the resource prefix the App already mints. */
-class WorkerWebhookIds extends WebhookIdPort {
+class WorkerWebhookIds implements WebhookId {
   newEndpointId(): string {
     return generate("webhookendpoint").toString();
   }
@@ -369,7 +369,7 @@ class WorkerWebhookIds extends WebhookIdPort {
  * refuses — a deployment with no key has no encrypted secret to read; what
  * must not happen is a no-op that signs a customer's payload with the ciphertext.
  */
-function resolveWebhookSecrets(options: WorkerGatewaySpendCompositionInput): WebhookSecretPort {
+function resolveWebhookSecrets(options: WorkerGatewaySpendCompositionInput): WebhookSecret {
   const key = options.config.automation.credentialsEncryptionKey;
   if (!key) {
     options.absence?.withoutEndpointSecretKey();
@@ -378,10 +378,8 @@ function resolveWebhookSecrets(options: WorkerGatewaySpendCompositionInput): Web
   return new AesGcmWebhookSecrets(AesGcmSecretEncryptionAdapter.create({ key }));
 }
 
-class AesGcmWebhookSecrets extends WebhookSecretPort {
-  constructor(private readonly cipher: { encrypt(v: string): string; decrypt(v: string): string }) {
-    super();
-  }
+class AesGcmWebhookSecrets implements WebhookSecret {
+  constructor(private readonly cipher: { encrypt(v: string): string; decrypt(v: string): string }) {}
 
   encrypt(value: string): string {
     return this.cipher.encrypt(value);
@@ -392,7 +390,7 @@ class AesGcmWebhookSecrets extends WebhookSecretPort {
   }
 }
 
-class UnconfiguredWebhookSecrets extends WebhookSecretPort {
+class UnconfiguredWebhookSecrets implements WebhookSecret {
   encrypt(): never {
     throw new Error(
       "This process holds no credentials key; set CREDENTIALS_SECRET to store or read encrypted webhook endpoint secrets.",

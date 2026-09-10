@@ -24,8 +24,8 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import type { WebhookIdPort } from "../../../ports/webhook-id.port.ts";
-import type { WebhookSecretPort } from "../../../ports/webhook-secret.port.ts";
+import type { WebhookId } from "../../../app/webhook.app.ts";
+import type { WebhookSecret } from "../../../app/webhook.app.ts";
 import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository.ts";
 import { Temporal } from "@langwatch/time";
 
@@ -43,10 +43,10 @@ const connection = databaseUrl
   : null;
 const prisma = connection?.client as PrismaClient;
 
-const ids: WebhookIdPort = {
+const ids: WebhookId = {
   newEndpointId: () => `whep_${randomBytes(6).toString("hex")}`,
 };
-const secrets: WebhookSecretPort = {
+const secrets: WebhookSecret = {
   encrypt: (value: string) => `enc:${value}`,
   decrypt: (value: string) => value.replace(/^enc:/, ""),
 };

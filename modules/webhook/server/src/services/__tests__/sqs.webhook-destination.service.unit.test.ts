@@ -6,8 +6,8 @@ import {
   SQS_MAX_MESSAGE_BYTES,
   type SqsDestinationConfig,
   SqsWebhookDestinationAdapter,
-} from "../sqs.webhook-destination.adapter.ts";
-import type { WebhookDispatchRequest } from "../../ports/webhook-destination.port.ts";
+} from "../sqs.webhook-destination.service.ts";
+import type { WebhookDispatchRequest } from "../../app/webhook.app.ts";
 
 // The queue client and the rate limiter are the two boundaries; everything
 // else in these tests is the real envelope, the real signature and the real

@@ -16,13 +16,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { WebhookEndpointRuntime } from "../webhook-endpoint.repository.ts";
 import { MemoryWebhookDatabase } from "../memory/memory.webhook-database.ts";
 import { MemoryWebhookEndpointRepository } from "../memory/memory.webhook-endpoint.repository.ts";
-import { WebhookIdPort } from "../../ports/webhook-id.port.ts";
-import { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
+import { WebhookId } from "../../app/webhook.app.ts";
+import { WebhookSecret } from "../../app/webhook.app.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const OTHER_ORGANIZATION_ID = "organization-2";
 
-class SequentialIds extends WebhookIdPort {
+class SequentialIds implements WebhookId {
   #count = 0;
 
   newEndpointId(): string {
@@ -32,7 +32,7 @@ class SequentialIds extends WebhookIdPort {
   }
 }
 
-class PassthroughSecrets extends WebhookSecretPort {
+class PassthroughSecrets implements WebhookSecret {
   encrypt(value: string): string {
     return `enc:${value}`;
   }

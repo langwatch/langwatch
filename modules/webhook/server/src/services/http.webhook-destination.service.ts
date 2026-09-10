@@ -5,10 +5,10 @@ import {
 } from "@langwatch/egress";
 
 import {
-  WebhookDestinationPort,
+  WebhookDestination,
   type WebhookDispatchRequest,
   type WebhookDispatchResult,
-} from "../ports/webhook-destination.port.ts";
+} from "../app/webhook.app.ts";
 
 /** How much of the receiver's response the delivery log keeps. */
 const RESPONSE_SNIPPET_CHARS = 1000;
@@ -32,7 +32,7 @@ export interface HttpWebhookDestinationAdapterOptions {
 /**
  * The HTTPS destination: the transport every endpoint used before there was more than one.
  */
-export class HttpWebhookDestinationAdapter extends WebhookDestinationPort {
+export class HttpWebhookDestinationAdapter implements WebhookDestination {
   readonly kind = "http" as const;
 
   private readonly url: string;
@@ -40,7 +40,6 @@ export class HttpWebhookDestinationAdapter extends WebhookDestinationPort {
   private readonly allowInsecureLocal: boolean;
 
   private constructor(options: HttpWebhookDestinationAdapterOptions) {
-    super();
     this.url = options.url;
     this.egress = options.egress;
     this.allowInsecureLocal = options.allowInsecureLocal;

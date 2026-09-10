@@ -1,6 +1,6 @@
 import { generate } from "@langwatch/ksuid";
-import { WebhookIdPort } from "../../ports/webhook-id.port.ts";
-import { WebhookSecretPort } from "../../ports/webhook-secret.port.ts";
+import { WebhookId } from "../../app/webhook.app.ts";
+import { WebhookSecret } from "../../app/webhook.app.ts";
 import type { WebhookRepositories } from "../webhook.repositories.ts";
 import { MemoryWebhookDatabase } from "./memory.webhook-database.ts";
 import { MemoryWebhookEndpointRepository } from "./memory.webhook-endpoint.repository.ts";
@@ -8,7 +8,7 @@ import { MemoryWebhookEventsRepository } from "./memory.webhook-events.repositor
 import { MemoryWebhookRetentionRepository } from "./memory.webhook-retention.repository.ts";
 import { MemoryWebhookTenantsRepository } from "./memory.webhook-tenants.repository.ts";
 
-class MemoryWebhookIds extends WebhookIdPort {
+class MemoryWebhookIds implements WebhookId {
   newEndpointId(): string {
     return generate("webhookendpoint").toString();
   }
@@ -16,7 +16,7 @@ class MemoryWebhookIds extends WebhookIdPort {
 
 /** Not a cipher: round-trips the value so a memory-backed boot never has to
  *  compose an encryption key it has no deployment secret to derive. */
-class MemoryWebhookSecrets extends WebhookSecretPort {
+class MemoryWebhookSecrets implements WebhookSecret {
   encrypt(value: string): string {
     return Buffer.from(value, "utf8").toString("base64url");
   }

@@ -11,8 +11,8 @@ import type { SecretEncryptionPort } from "@langwatch/secret-server";
 import {
   WebhookApp,
   WebhookEndpointConfiguration,
-  WebhookIdPort,
-  WebhookSecretPort,
+  type WebhookId,
+  type WebhookSecret,
   webhookServer,
   type WebhookClickHouseClientResolver,
 } from "@langwatch/webhook-server";
@@ -20,7 +20,7 @@ import {
 export type ComposedWebhookFeature = Readonly<{ app: WebhookApp }>;
 
 /** The endpoint id format, as the resource prefix the platform mints. */
-class ApiWebhookIds extends WebhookIdPort {
+class ApiWebhookIds implements WebhookId {
   newEndpointId(): string {
     return generate("webhookendpoint").toString();
   }
@@ -28,14 +28,12 @@ class ApiWebhookIds extends WebhookIdPort {
 
 /** An endpoint's signing secret, under the same cipher every other at-rest
  *  secret on this process is written with. */
-class ApiWebhookSecrets extends WebhookSecretPort {
+class ApiWebhookSecrets implements WebhookSecret {
   static create(cipher: SecretEncryptionPort): ApiWebhookSecrets {
     return new ApiWebhookSecrets(cipher);
   }
 
-  private constructor(private readonly cipher: SecretEncryptionPort) {
-    super();
-  }
+  private constructor(private readonly cipher: SecretEncryptionPort) {}
 
   encrypt(value: string): string {
     return this.cipher.encrypt(value);

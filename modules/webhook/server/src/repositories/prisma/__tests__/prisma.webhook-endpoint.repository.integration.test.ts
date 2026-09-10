@@ -28,8 +28,8 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { WebhookEndpointValidationError } from "@langwatch/webhook-contract";
-import type { WebhookIdPort } from "../../../ports/webhook-id.port.ts";
-import type { WebhookSecretPort } from "../../../ports/webhook-secret.port.ts";
+import type { WebhookId } from "../../../app/webhook.app.ts";
+import type { WebhookSecret } from "../../../app/webhook.app.ts";
 import {
   WEBHOOK_AUTO_DISABLE_AFTER_MS,
   WEBHOOK_DISABLED_REASON_AUTO,
@@ -52,11 +52,11 @@ const connection = databaseUrl
   : null;
 const prisma = connection?.client as PrismaClient;
 
-const ids: WebhookIdPort = {
+const ids: WebhookId = {
   newEndpointId: () => `whep_${randomBytes(6).toString("hex")}`,
 };
 
-const secrets: WebhookSecretPort = {
+const secrets: WebhookSecret = {
   encrypt: (value: string) => `enc:${value}`,
   decrypt: (value: string) => value.replace(/^enc:/, ""),
 };
