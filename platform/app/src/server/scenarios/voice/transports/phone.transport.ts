@@ -90,6 +90,8 @@ export type TwilioAgentFactory = (options: {
   /** The account's OWN Twilio number (the "from"), NOT the destination. */
   phoneNumber: string;
   publicBaseUrl?: string;
+  /** The port the SDK's local media-stream server binds. See {@link resolveHttpPort}. */
+  httpPort?: number;
   allowedCallees: readonly string[];
   /** The target under test is the agent; the synthetic caller is the user. */
   role: AgentRole;
@@ -113,6 +115,22 @@ export function resolvePublicBaseUrl(
     processEnv.BASE_HOST?.trim() ||
     undefined
   );
+}
+
+/**
+ * The port the SDK's local media-stream server binds. `VOICE_WS_PORT` when it
+ * is a valid port number, otherwise `0` (OS-assigned), the SDK's own default.
+ * A fixed port lets an operator route a public HTTPS origin to the child in a
+ * single-worker deployment; slice 3's listener handoff supersedes it.
+ */
+export function resolveHttpPort(
+  processEnv: Pick<NodeJS.ProcessEnv, "VOICE_WS_PORT"> = process.env,
+): number {
+  const raw = processEnv.VOICE_WS_PORT?.trim();
+  if (!raw) return 0;
+  const port = Number(raw);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) return 0;
+  return port;
 }
 
 /** The dependencies the phone runner is built from. Injected in tests so a fake
@@ -226,6 +244,7 @@ export function createPhoneTransport(
         authToken: twilio.authToken,
         phoneNumber: twilio.fromNumber,
         publicBaseUrl: resolvePublicBaseUrl(deps.processEnv),
+        httpPort: resolveHttpPort(deps.processEnv),
         // Only the dialled target is allowlisted, so the SDK's deny-by-default
         // a-leg guard passes for exactly this number and nothing else. There is
         // no user-facing allowlist; this guard is internal to the SDK.
