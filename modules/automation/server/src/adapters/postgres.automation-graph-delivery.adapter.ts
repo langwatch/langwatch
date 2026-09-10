@@ -1,6 +1,4 @@
-import type { WebhookDeliveryInput } from "@langwatch/automation-contract";
 import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
-import { AutomationGraphDeliveryPort } from "../ports/automation-graph-delivery.port.ts";
 import {
   PrismaEmailSuppressionRepository,
   type EmailSuppressionDatabase,
@@ -13,56 +11,18 @@ import {
   PrismaWebhookDeliveryRepository,
   type WebhookDeliveryDatabase,
 } from "../repositories/prisma/prisma.webhook-delivery.repository.ts";
-import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
-import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
+import { AutomationGraphDeliveryService } from "../services/automation-graph-delivery.service.ts";
 
-const normalizeEmail = (email: string): string => email.trim().toLowerCase();
-
-/** Process-composition adapter for graph delivery's Automation persistence. */
-export class PostgresAutomationGraphDeliveryAdapter extends AutomationGraphDeliveryPort {
-  private constructor(
-    private readonly triggers: TriggerRepository,
-    private readonly suppressions: EmailSuppressionRepository,
-    private readonly webhookDeliveries: WebhookDeliveryRepository,
-  ) {
-    super();
-  }
-
+/** Process-composition shim for graph delivery's Automation persistence. */
+export class PostgresAutomationGraphDeliveryAdapter {
   static create(input: {
     database: TriggerDatabase & EmailSuppressionDatabase & WebhookDeliveryDatabase;
     clock: AutomationClockPort;
-  }): PostgresAutomationGraphDeliveryAdapter {
-    return new PostgresAutomationGraphDeliveryAdapter(
-      PrismaTriggerRepository.create(input.database, input.clock),
-      PrismaEmailSuppressionRepository.create(input.database),
-      PrismaWebhookDeliveryRepository.create(input.database),
-    );
-  }
-
-  async filterSuppressed(input: {
-    projectId: string;
-    triggerId: string;
-    emails: string[];
-  }): Promise<string[]> {
-    const rows = await this.suppressions.findMatching(input);
-    const blocked = new Set(rows.map((row) => normalizeEmail(row.email)));
-    return input.emails.filter((email) => !blocked.has(normalizeEmail(email)));
-  }
-
-  isSendClaimed(input: {
-    triggerId: string;
-    traceId: string;
-    projectId: string;
-  }): Promise<boolean> {
-    return this.triggers.isSendClaimed(input);
-  }
-
-  claimSend(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean> {
-    return this.triggers.claimSend(input);
-  }
-
-  recordWebhookDelivery(input: WebhookDeliveryInput): Promise<void> {
-    return this.webhookDeliveries.create(input);
+  }): AutomationGraphDeliveryService {
+    return AutomationGraphDeliveryService.create({
+      triggers: PrismaTriggerRepository.create(input.database, input.clock),
+      suppressions: PrismaEmailSuppressionRepository.create(input.database),
+      webhookDeliveries: PrismaWebhookDeliveryRepository.create(input.database),
+    });
   }
 }

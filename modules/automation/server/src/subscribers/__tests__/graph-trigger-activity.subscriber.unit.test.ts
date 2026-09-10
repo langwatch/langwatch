@@ -2,7 +2,11 @@ import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { GraphTriggerEvaluationResult, TriggerSummary } from "@langwatch/automation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
-import { PostgresAutomationGraphActivityAdapter } from "../../adapters/postgres.automation-graph-activity.adapter.ts";
+import {
+  SlackProviderAdapter,
+  SlackBotTokenDecryptorAdapter,
+} from "../../adapters/slack-provider.adapter.ts";
+import { WebhookProviderAdapter } from "../../adapters/webhook-provider.adapter.ts";
 import {
   BreachingAnalytics,
   createGraphActivityPrismaDouble,
@@ -14,7 +18,17 @@ import {
   TestDispatchErrors,
 } from "../../fixtures/graph-activity.fixture.ts";
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
+import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
+import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
 import { AutomationGraphActivityPort } from "../../ports/automation-graph-activity.port.ts";
+import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
+import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
+import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
+import {
+  PrismaTriggerRepository,
+  type TriggerDatabase,
+} from "../../repositories/prisma/prisma.trigger.repository.ts";
+import { PrismaWebhookDeliveryRepository } from "../../repositories/prisma/prisma.webhook-delivery.repository.ts";
 import { createGraphTriggerActivityHandler } from "../graph-trigger-activity.subscriber.ts";
 
 /**
@@ -67,15 +81,29 @@ describe("createGraphTriggerActivityHandler", () => {
     /** @scenario "The two questions the real-time path asks are the whole port" */
     it("is accepted by the handler with nothing else supplied", async () => {
       const database = createGraphActivityPrismaDouble({ triggers: [graphTriggerRow()] });
+      const clock = new FrozenClock();
       const delivery = new RecordingDelivery();
+      const crypto = { encrypt: (value: string) => value, decrypt: (value: string) => value };
+      const triggers = PrismaTriggerRepository.create(
+        database.prisma as unknown as TriggerDatabase,
+        clock,
+      );
       const handler = createGraphTriggerActivityHandler(
-        PostgresAutomationGraphActivityAdapter.create({
-          prisma: database.prisma as never,
-          clock: new FrozenClock(),
+        AutomationGraphActivityService.create({
+          triggers,
+          customGraphs: PrismaCustomGraphRepository.create(database.prisma as never),
+          graphTriggerSent: PrismaGraphTriggerSentRepository.create(database.prisma as never),
+          persistence: AutomationGraphDeliveryService.create({
+            triggers,
+            suppressions: PrismaEmailSuppressionRepository.create(database.prisma as never),
+            webhookDeliveries: PrismaWebhookDeliveryRepository.create(database.prisma as never),
+          }),
+          clock,
           projects: new OneProject() as unknown as ProjectApi,
           analytics: new BreachingAnalytics() as unknown as AnalyticsService,
           delivery,
-          crypto: { encrypt: (value) => value, decrypt: (value) => value },
+          webhooks: WebhookProviderAdapter.create(crypto),
+          slackTokens: new SlackBotTokenDecryptorAdapter(SlackProviderAdapter.create(crypto)),
           emailCaps: AutomationEmailCapService.create({ store: null }),
           logger: new SilentLogger(),
           dispatchErrors: new TestDispatchErrors(),

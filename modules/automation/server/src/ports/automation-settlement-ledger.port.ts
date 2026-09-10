@@ -89,3 +89,11 @@ export abstract class AutomationSettlementLedgerPort {
    */
   abstract handlePersistCapBreach(input: AutomationPersistCapBreach): Promise<void>;
 }
+
+export type AutomationSettlementPersistCap =
+  | { readonly kind: "fixed"; readonly cap: number }
+  | { readonly kind: "resolved"; resolve(projectId: string): Promise<number> };
+
+export abstract class AutomationSettlementBreachPort {
+  abstract handle(input: AutomationPersistCapBreach): Promise<void>;
+}

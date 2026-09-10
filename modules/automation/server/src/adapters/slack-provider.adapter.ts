@@ -5,6 +5,7 @@ import {
   slackDeliveryMethodOf,
 } from "@langwatch/automation-contract";
 import { AutomationSlackProviderPort } from "../ports/automation-provider.port.ts";
+import { AutomationSlackBotTokenDecryptorPort } from "../ports/automation-graph.port.ts";
 
 export interface AutomationSecretCrypto {
   encrypt(value: string): string;
@@ -109,5 +110,23 @@ export class SlackProviderAdapter extends AutomationSlackProviderPort {
 
   assertToken(incoming: SlackActionParams, existing: SlackActionParams | null | undefined): void {
     assertSlackBotToken(incoming, existing);
+  }
+}
+
+/**
+ * Narrows the Slack provider to the one thing evaluation asks of it.
+ *
+ * `SlackProviderAdapter` also persists and redacts action parameters, which is
+ * the drawer's business, not this path's. The wrapper is what keeps the
+ * evaluator's dependency honest — and it is a class rather than an object
+ * literal because the port it satisfies is nominal.
+ */
+export class SlackBotTokenDecryptorAdapter extends AutomationSlackBotTokenDecryptorPort {
+  constructor(private readonly provider: SlackProviderAdapter) {
+    super();
+  }
+
+  tryDecrypt(params: SlackActionParams): string | null {
+    return this.provider.tryDecrypt(params);
   }
 }

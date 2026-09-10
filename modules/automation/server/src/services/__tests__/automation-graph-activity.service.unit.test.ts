@@ -2,7 +2,21 @@ import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
-import { PostgresAutomationGraphActivityAdapter } from "../postgres.automation-graph-activity.adapter.ts";
+import {
+  SlackProviderAdapter,
+  SlackBotTokenDecryptorAdapter,
+} from "../../adapters/slack-provider.adapter.ts";
+import { WebhookProviderAdapter } from "../../adapters/webhook-provider.adapter.ts";
+import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
+import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
+import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
+import {
+  PrismaTriggerRepository,
+  type TriggerDatabase,
+} from "../../repositories/prisma/prisma.trigger.repository.ts";
+import { PrismaWebhookDeliveryRepository } from "../../repositories/prisma/prisma.webhook-delivery.repository.ts";
+import { AutomationGraphDeliveryService } from "../automation-graph-delivery.service.ts";
+import { AutomationGraphActivityService } from "../automation-graph-activity.service.ts";
 import {
   BreachingAnalytics,
   createGraphActivityPrismaDouble,
@@ -29,15 +43,25 @@ function compose(
   over: { delivery?: RecordingDelivery } = {},
 ) {
   const database = createGraphActivityPrismaDouble(seed);
+  const clock = new FrozenClock();
   const delivery = over.delivery ?? new RecordingDelivery();
   const logger = new SilentLogger();
-  const adapter = PostgresAutomationGraphActivityAdapter.create({
-    prisma: database.prisma as never,
-    clock: new FrozenClock(),
+  const triggers = PrismaTriggerRepository.create(database.prisma as unknown as TriggerDatabase, clock);
+  const service = AutomationGraphActivityService.create({
+    triggers,
+    customGraphs: PrismaCustomGraphRepository.create(database.prisma as never),
+    graphTriggerSent: PrismaGraphTriggerSentRepository.create(database.prisma as never),
+    persistence: AutomationGraphDeliveryService.create({
+      triggers,
+      suppressions: PrismaEmailSuppressionRepository.create(database.prisma as never),
+      webhookDeliveries: PrismaWebhookDeliveryRepository.create(database.prisma as never),
+    }),
+    clock,
     projects: new OneProject() as unknown as ProjectApi,
     analytics: new BreachingAnalytics() as unknown as AnalyticsService,
     delivery,
-    crypto,
+    webhooks: WebhookProviderAdapter.create(crypto),
+    slackTokens: new SlackBotTokenDecryptorAdapter(SlackProviderAdapter.create(crypto)),
     emailCaps: AutomationEmailCapService.create({ store: null }),
     logger,
     dispatchErrors: new TestDispatchErrors(),
@@ -46,10 +70,10 @@ function compose(
     tenantDailyCap: 10_000,
   });
 
-  return { adapter, database, delivery, logger };
+  return { adapter: service, database, delivery, logger };
 }
 
-describe("PostgresAutomationGraphActivityAdapter", () => {
+describe("AutomationGraphActivityService", () => {
   describe("given a composed graph-alert vertical", () => {
     /** @scenario "The two questions the real-time path asks are the whole port" */
     it("reports only the automations that watch a custom graph", async () => {

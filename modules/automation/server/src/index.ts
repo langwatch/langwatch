@@ -15,6 +15,7 @@ export type {
 export { SlackWebhookClientAdapter } from "./adapters/slack-webhook.client.adapter.ts";
 export { SlackProviderAdapter } from "./adapters/slack-provider.adapter.ts";
 export type { AutomationSecretCrypto } from "./adapters/slack-provider.adapter.ts";
+export { SlackBotTokenDecryptorAdapter } from "./adapters/slack-provider.adapter.ts";
 export {
   WebhookProviderAdapter,
   WEBHOOK_PREVIOUS_SECRET_TTL_MS,
@@ -142,18 +143,45 @@ export {
 } from "./ports/automation-settlement-read.port.ts";
 export {
   AutomationSettlementBreachPort,
+  type AutomationSettlementPersistCap,
+} from "./ports/automation-settlement-ledger.port.ts";
+export {
   PostgresAutomationSettlementLedgerAdapter,
   type AutomationSettlementLedgerDatabase,
-  type AutomationSettlementPersistCap,
 } from "./adapters/postgres.automation-settlement-ledger.adapter.ts";
 export { AutomationSettlementDispatchService } from "./services/trigger-settlement-dispatch.service.ts";
 export {
   GraphTriggerHeartbeatService,
   type GraphTriggerHeartbeatDeps,
 } from "./services/graph-trigger-heartbeat.service.ts";
-export { PrismaTriggerRepository } from "./repositories/prisma/prisma.trigger.repository.ts";
-export { PrismaGraphTriggerSentRepository } from "./repositories/prisma/prisma.graph-trigger-sent.repository.ts";
-export { PrismaWebhookDeliveryRepository } from "./repositories/prisma/prisma.webhook-delivery.repository.ts";
+export {
+  PrismaTriggerRepository,
+  type TriggerDatabase,
+} from "./repositories/prisma/prisma.trigger.repository.ts";
+export {
+  PrismaGraphTriggerSentRepository,
+  type GraphTriggerSentDatabase,
+} from "./repositories/prisma/prisma.graph-trigger-sent.repository.ts";
+export {
+  PrismaWebhookDeliveryRepository,
+  type WebhookDeliveryDatabase,
+} from "./repositories/prisma/prisma.webhook-delivery.repository.ts";
+export {
+  PrismaEmailSuppressionRepository,
+  type EmailSuppressionDatabase,
+} from "./repositories/prisma/prisma.email-suppression.repository.ts";
+export {
+  AutomationGraphActivityService,
+} from "./services/automation-graph-activity.service.ts";
+export {
+  AutomationGraphDeliveryService,
+} from "./services/automation-graph-delivery.service.ts";
+export {
+  AutomationSettlementLedgerService,
+} from "./services/automation-settlement-ledger.service.ts";
+export {
+  AutomationTraceTriggerCatalogueService,
+} from "./services/automation-trace-trigger-catalogue.service.ts";
 export { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service.ts";
 export { GraphAlertDispatchService } from "./services/graph-alert-dispatch.service.ts";
 export { AutomationClockPort } from "./ports/automation-clock.port.ts";
@@ -248,7 +276,10 @@ export { ReportTraceRowService } from "./services/report-trace-row.service.ts";
  * can compose the handler over its own client.
  */
 export { PrismaTriggerFireHistoryRepository } from "./repositories/prisma/prisma.trigger-fire-history.repository.ts";
-export { PrismaCustomGraphRepository } from "./repositories/prisma/prisma.custom-graph.repository.ts";
+export {
+  PrismaCustomGraphRepository,
+  type CustomGraphDatabase,
+} from "./repositories/prisma/prisma.custom-graph.repository.ts";
 export { ReportScheduleService } from "./services/report-schedule.service.ts";
 export {
   AUTOMATION_AUTO_PAUSED_METRIC_NAME,
