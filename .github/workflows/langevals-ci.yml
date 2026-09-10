@@ -146,8 +146,24 @@ jobs:
         # tests/` runs on the secret-bearing step by default, which forks skip,
         # so a contributor could otherwise break the request shape and see CI
         # stay green.
+        #
+        # The two ragas files are named individually for the same reason. The
+        # step above ignores `evaluators/ragas/` wholesale because the evaluator
+        # tests there are LLM-judged, and that is how two import-time breaks
+        # reached main without CI noticing: the litellm client losing the shape
+        # langchain-openai calls it with, and a notebooks dependency that could
+        # not be imported on this Python taking the whole suite's collection
+        # down. Neither needs a provider. These two files stub every call, so
+        # they pin the client shape and the token accounting that prices each
+        # evaluation, and they fail loudly at import if that surface moves again.
         working-directory: services/langevals
-        run: uv run pytest -x -v evaluators/langevals/tests/test_llm_answer_match_threading.py tests/deterministic/ langevals_core/tests/
+        run: |
+          uv run pytest -x -v \
+            evaluators/langevals/tests/test_llm_answer_match_threading.py \
+            evaluators/ragas/tests/test_model_to_langchain.py \
+            evaluators/ragas/tests/test_token_usage.py \
+            tests/deterministic/ \
+            langevals_core/tests/
 
   docker-build:
     needs: changes
