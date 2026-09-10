@@ -29,6 +29,41 @@ legacy-migration option can turn off with ones it cannot, and the legacy
 checks are cheap, so it always runs; `excludedPolicyIds()` drops only the
 findings its own `policy` field names.
 
+## The dead-code guards
+
+Three policies read the whole tree at once to find code that has quietly
+stopped being read. Each is a ratchet, and each answers a question no
+per-file rule can:
+
+| policy | fires on | why a per-file rule cannot see it |
+| --- | --- | --- |
+| `unused-module-export` | a name a module's `server` package exports that no file in the repository imports, the package index included | the answer is the whole import graph; the declaring file looks perfectly well formed |
+| `infrastructure-member-unused` | a member of a `<Feature>Infrastructure` interface that no app, service or repository in the owning package reaches | the member is declared in one file and read, or not read, across the package |
+| `memory-twin-drift` | a repository whose Prisma implementation and memory twin declare different method sets, in either direction | the two classes are in different folders and only their difference is the defect |
+
+`unused-module-export` is the guard that would have caught the nine adapter
+files a codemod orphaned in one week: it moved each file, left the old copy
+behind, and every check the repository owns stayed green. It is deliberately
+NOT `composed-exports`, which asks whether a name the package PUBLISHES is
+constructed by a process; a name that never reached the index is invisible to
+that one, and a name that did belongs to it rather than here. Barrels, test
+files, testing entries and a configuration module's default export are out of
+scope; a namespace import, a `export * from` and a dynamic `import()` each name
+the module without naming a member, so each marks the whole target read.
+
+`infrastructure-member-unused` reads a member as used when the package reaches
+it through a value: `infrastructure.foo`, `infrastructure["foo"]`, or
+`const { foo } = infrastructure`. Filling the field in is not a read, and
+neither is a fixture: a member only a test names is dead weight every process
+still has to supply.
+
+`memory-twin-drift` is the sharper half of `feature-shape`'s
+`postgres-without-memory`, which only asserts a twin exists. It pairs the two
+classes by subject - the class name with the word `Prisma` or `Memory` taken
+out, whichever end it sits at, plus every interface the class implements - and
+reports each method one side declares and the other does not against the side
+that is short.
+
 ## Baselines
 
 A baseline is a policy's inventory of what already offended when the policy
@@ -68,6 +103,9 @@ with nothing left to except, and the policy becomes a plain refusal.
 | --- | --- | --- |
 | `src/feature-shape-baseline.json` | `feature-shape` | `<feature>\|<kind>` |
 | `src/source-folder-shape-baseline.json` | `source-folder-shape` | `<kind>\|<path>` |
+| `src/unused-module-export-baseline.json` | `unused-module-export` | `<file>\|<exported name>` |
+| `src/infrastructure-member-unused-baseline.json` | `infrastructure-member-unused` | `<package directory>\|<interface>\|<member>` |
+| `src/memory-twin-drift-baseline.json` | `memory-twin-drift` | `<package directory>\|<subject>\|<side>\|<method>` |
 | `src/oxlint-baseline.json` | `oxlint` | `<rule>\|<file>` |
 | `src/boundary-edge-baseline.json` | `boundary-edge` | `<kind>\|<from>\|<to>` |
 | `src/composed-exports-baseline.json` | `composed-exports` | `<package directory>\|<exported name>` |

@@ -24,7 +24,7 @@ export type LangyTurnAccess = z.infer<typeof langyTurnAccessSchema>;
  * answer has to survive one process asking about a turn another process started, which is what
  * makes it stored rather than derived.
  */
-export abstract class LangyTurnAccessPort {
+export abstract class LangyTurnAccessRepository {
   /** Records the actor this turn belongs to. */
   abstract grant(access: LangyTurnAccess): Promise<void>;
 
@@ -58,7 +58,7 @@ export const LANGY_HANDOFF_TTL_SECONDS = 300;
  * Everything a worker needs to pick a turn up, parked for the window between
  * the process that admitted the turn and the process that runs it.
  */
-export abstract class LangyTurnHandoffPort {
+export abstract class LangyTurnHandoffRepository {
   /** Parks the handoff for its TTL. */
   abstract stash(handoff: LangyTurnHandoff): Promise<void>;
 

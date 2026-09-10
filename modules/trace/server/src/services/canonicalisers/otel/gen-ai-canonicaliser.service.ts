@@ -1,5 +1,5 @@
 import type {
-  CanonicalAttributesPort,
+  AttributeCanonicaliser,
   ExtractorContext,
   LogExtractorContext,
 } from "../canonical-attributes.service.ts";
@@ -8,7 +8,7 @@ import { GenAiSpanService } from "./gen-ai-span.service.ts";
 
 const genAiSpanService = GenAiSpanService.create();
 
-export class GenAICanonicaliserService implements CanonicalAttributesPort {
+export class GenAICanonicaliserService implements AttributeCanonicaliser {
   static create(): GenAICanonicaliserService {
     return new GenAICanonicaliserService();
   }

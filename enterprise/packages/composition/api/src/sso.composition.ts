@@ -7,7 +7,7 @@ import {
 } from "@langwatch/enterprise-sso-contract";
 import {
   ssoServer,
-  type SsoConnectionLedgerPort,
+  type SsoConnectionLedger,
   type SsoGateLogger,
 } from "@langwatch/enterprise-sso-server";
 import { OpsApi } from "@langwatch/ops-contract";
@@ -35,7 +35,7 @@ export class EnterpriseApiSso {
 
   static async create(options: {
     configuration: SsoConfiguration;
-    connections: SsoConnectionLedgerPort;
+    connections: SsoConnectionLedger;
     logger: SsoGateLogger;
     peers: EnterpriseApiSsoPeers;
   }): Promise<EnterpriseApiSso> {

@@ -2,7 +2,7 @@ import type {
   MetricDataPointPreparation,
   MetricPiiRedactionLevel,
 } from "@langwatch/metric-contract";
-import { MetricPreparation } from "../app/metric.infrastructure.ts";
+import type { MetricPreparation } from "../app/metric.infrastructure.ts";
 
 /** Canonical preparation for one OTLP metric export request. */
 export class MetricService {

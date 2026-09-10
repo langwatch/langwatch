@@ -2,7 +2,7 @@ export { ssoServer } from "./sso.server.ts";
 export { ssoConnectionTrpcTransport } from "./transport/sso-connection.trpc.ts";
 export type { SsoInfrastructure } from "./app/sso.app.ts";
 export {
-  type SsoConnectionLedgerPort,
+  type SsoConnectionLedger,
   type SsoConnectionLedgerOperator,
   type SsoConnectionTeardownRequest,
   type SsoGateLogger,

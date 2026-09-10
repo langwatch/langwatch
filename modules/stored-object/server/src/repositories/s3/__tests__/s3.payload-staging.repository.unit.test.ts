@@ -4,7 +4,7 @@ import {
   AbsentPayloadStagingAdapter,
   PayloadStagingUnavailableError,
 } from "#services/absent-payload-staging.service";
-import { PayloadStagingS3TargetPort, S3PayloadStagingAdapter } from "#repositories/s3/s3.payload-staging.repository";
+import { PayloadStagingS3TargetRepository, S3PayloadStagingAdapter } from "#repositories/s3/s3.payload-staging.repository";
 
 function s3(): { client: S3Client; sent: unknown[] } {
   const client = new S3Client({
@@ -19,8 +19,8 @@ function s3(): { client: S3Client; sent: unknown[] } {
   return { client, sent };
 }
 
-function targets(client: S3Client): PayloadStagingS3TargetPort {
-  return new (class extends PayloadStagingS3TargetPort {
+function targets(client: S3Client): PayloadStagingS3TargetRepository {
+  return new (class extends PayloadStagingS3TargetRepository {
     async resolve() {
       return { bucket: "staging-bucket", client };
     }

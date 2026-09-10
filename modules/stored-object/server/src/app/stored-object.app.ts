@@ -28,7 +28,7 @@ import type {
 import type {
   StoredObjectDelivery,
   StoredObjectStorage,
-  StoredObjectUploadTokenPort,
+  StoredObjectUploadTokenCodec,
 } from "./stored-object.infrastructure.ts";
 import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
 import { StoredObjectService } from "../services/stored-object.service.ts";
@@ -47,7 +47,7 @@ export type StoredObjectFileStreamRead =
  * process supplies them. Separate from the portable capability because it is
  * shaped differently rather than merely narrower.
  */
-export interface StoredObjectFileReadPort {
+export interface StoredObjectFileReader {
   headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead>;
   tryGetById(
     input: Readonly<{ projectId: string; id: string }>,
@@ -57,12 +57,12 @@ export interface StoredObjectFileReadPort {
 export type StoredObjectInfrastructure = Readonly<{
   storage: StoredObjectStorage;
   delivery: StoredObjectDelivery;
-  uploadTokens: StoredObjectUploadTokenPort;
+  uploadTokens: StoredObjectUploadTokenCodec;
   idDeriver: StoredObjectIdDeriver;
   maximumUploadBytes: number;
   uploadExpiryMs: number;
   /** The row-and-stream reads the byte surface and the probe perform. */
-  files: StoredObjectFileReadPort;
+  files: StoredObjectFileReader;
   /** Which project owns an object, when the URL does not say. */
   owners: StoredObjectOwnerResolver;
 }>;
@@ -95,12 +95,12 @@ export class StoredObjectApp implements StoredObjectApi {
   }
 
   #storedObjects: StoredObjectService;
-  #files: StoredObjectFileReadPort;
+  #files: StoredObjectFileReader;
   #owners: StoredObjectOwnerResolver;
 
   private constructor(
     storedObjects: StoredObjectService,
-    files: StoredObjectFileReadPort,
+    files: StoredObjectFileReader,
     owners: StoredObjectOwnerResolver,
   ) {
     this.#storedObjects = storedObjects;

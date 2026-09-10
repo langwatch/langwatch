@@ -5,7 +5,7 @@ import { createLogger } from "@langwatch/observability";
 import { randomUUID } from "crypto";
 import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
 import type { ReplayRepository } from "../repositories/process/replay.repository.ts";
-import type { OpsReplayRuntime, OpsReplayRuntimePort } from "../app/ops.app.ts";
+import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../app/ops.app.ts";
 import { ReplayLockHeartbeatService } from "./replay-lock-heartbeat.service.ts";
 import { nowInstant } from "@langwatch/time";
 
@@ -33,14 +33,14 @@ export class ReplayService {
     runtimeFactory,
   }: {
     repo: ReplayRepository;
-    runtimeFactory: OpsReplayRuntimePort;
+    runtimeFactory: OpsReplayRuntimeFactory;
   }): ReplayService {
     return new ReplayService(repo, runtimeFactory);
   }
 
   private constructor(
     readonly repo: ReplayRepository,
-    private readonly runtimeFactory: OpsReplayRuntimePort,
+    private readonly runtimeFactory: OpsReplayRuntimeFactory,
   ) {}
 
   async getStatus(): Promise<ReplayStatus> {

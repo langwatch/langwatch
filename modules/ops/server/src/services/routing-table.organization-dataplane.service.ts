@@ -1,6 +1,6 @@
 import {
   type OrganizationDataplane,
-  OrganizationDataplanePort,
+  OrganizationDataplaneResolver,
 } from "../app/ops.app.ts";
 
 /**
@@ -11,7 +11,7 @@ import {
  * dependency on the ClickHouse client for one map. An organization the map
  * does not name is on the shared instance, the router's own fallback.
  */
-export class RoutingTableOrganizationDataplaneAdapter implements OrganizationDataplanePort {
+export class RoutingTableOrganizationDataplaneAdapter implements OrganizationDataplaneResolver {
   static create({
     routes,
   }: {

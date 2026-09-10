@@ -3563,36 +3563,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|#repositories/azure/azure.stored-object-blob.repository",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|#repositories/filesystem/filesystem.stored-object-blob.repository",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|#repositories/redis/redis.object-storage-migration-audit.repository",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|#repositories/s3/s3.object-storage-migration-blob.repository",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|#repositories/s3/s3.payload-staging.repository",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/stored-object/server/src/index.ts|#repositories/s3/s3.stored-object-blob.repository",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/stored-object/server/src/index.ts|./app/stored-object.app.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"

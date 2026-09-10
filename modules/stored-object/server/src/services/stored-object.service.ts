@@ -24,7 +24,7 @@ import {
 import {
   StoredObjectDelivery,
   StoredObjectStorage,
-  StoredObjectUploadTokenPort,
+  StoredObjectUploadTokenCodec,
   type StoredObjectStorageAddress,
 } from "../app/stored-object.infrastructure.ts";
 import type {
@@ -39,7 +39,7 @@ export type StoredObjectServiceOptions = Readonly<{
   records: StoredObjectRecordRepository;
   storage: StoredObjectStorage;
   delivery: StoredObjectDelivery;
-  uploadTokens: StoredObjectUploadTokenPort;
+  uploadTokens: StoredObjectUploadTokenCodec;
   idDeriver: StoredObjectIdDeriver;
   maximumUploadBytes: number;
   uploadExpiryMs: number;

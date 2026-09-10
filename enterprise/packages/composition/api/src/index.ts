@@ -88,7 +88,7 @@ export {
   scimTokenTrpcTransport,
   scimWebhookRest,
   ScimSyncLifecycleAdapter,
-  ScimSyncLifecyclePort,
+  type ScimSyncLifecycle,
   type PostgresScimAdapterOptions,
   type ScimSyncLifecycleAdapterDeps,
 } from "@langwatch/enterprise-scim-server";
@@ -122,7 +122,7 @@ export { EnterpriseApiAuditLog } from "./audit-log.composition.ts";
 export { EnterpriseApiSso, type EnterpriseApiSsoPeers } from "./sso.composition.ts";
 export {
   ssoConnectionTrpcTransport,
-  SsoConnectionLedgerPort,
+  SsoConnectionLedger,
   SsoGateLogger,
   type SsoInfrastructure,
 } from "@langwatch/enterprise-sso-server";

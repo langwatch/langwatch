@@ -10,7 +10,7 @@ import {
   OtelLangyWorkerMetricsAdapter,
   UnavailableLangyWorkerAdapter,
   type LangyAnalyticsClickHouseClientResolver,
-  type LangyBroadcastPort,
+  type LangyConversationUpdateChannel,
   type LangyDatabase,
   type LangyTitleGenerator,
   type LangyTitleModel,
@@ -106,7 +106,7 @@ export function createWorkerLangyConversation(
 /**
  * Renames the shared publisher onto Langy's own port, or drops the broadcast.
  */
-class WorkerLangyTenantBroadcastAdapter implements LangyBroadcastPort {
+class WorkerLangyTenantBroadcastAdapter implements LangyConversationUpdateChannel {
   constructor(private readonly broadcast: TenantBroadcast | undefined) {}
 
   async broadcastToTenant(

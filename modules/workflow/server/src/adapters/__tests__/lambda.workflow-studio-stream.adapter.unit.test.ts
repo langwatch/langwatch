@@ -5,7 +5,7 @@
  * @see modules/workflow/specs/studio-lambda-stream.feature
  */
 import { describe, expect, it } from "vitest";
-import { NlpLambdaFunctionPort } from "../../app/workflow.app.ts";
+import { NlpLambdaFunctionReader } from "../../app/workflow.app.ts";
 import {
   NlpLambdaStreamInvoke,
   type NlpLambdaStreamChunk,
@@ -26,7 +26,7 @@ const INPUT: WorkflowStudioStreamInput = {
   origin: "workflow",
 };
 
-class FixedFunctions implements NlpLambdaFunctionPort {
+class FixedFunctions implements NlpLambdaFunctionReader {
   readonly asked: string[] = [];
 
   arnFor(input: { projectId: string }): Promise<string> {

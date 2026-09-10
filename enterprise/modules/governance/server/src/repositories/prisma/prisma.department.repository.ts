@@ -4,7 +4,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { DepartmentPort } from "../directory/department.repository.ts";
+import { DepartmentRepository } from "../directory/department.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -15,7 +15,7 @@ export type DepartmentDatabase = Pick<
   "department" | "organizationUser" | "project" | "team"
 >;
 
-export class PrismaDepartmentRepository extends DepartmentPort {
+export class PrismaDepartmentRepository extends DepartmentRepository {
   private constructor(private readonly prisma: DepartmentDatabase) {
     super();
   }

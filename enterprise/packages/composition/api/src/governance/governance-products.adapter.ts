@@ -5,7 +5,7 @@ import {
   AiToolProviderCatalog,
   AiToolSlug,
   CliAdminContact,
-  PersonalVirtualKeyIssuerPort,
+  PersonalVirtualKeyIssuer,
 } from "@langwatch/enterprise-governance-server";
 import { nanoid } from "nanoid";
 import type { Instant } from "@langwatch/time";
@@ -53,10 +53,8 @@ export type GovernanceOrganizationContact = {
   tryResolveAdminEmail(organizationId: string): Promise<string | null>;
 };
 
-export class AppPersonalVirtualKeyIssuer extends PersonalVirtualKeyIssuerPort {
-  private constructor(private readonly virtualKeys: GovernanceVirtualKey) {
-    super();
-  }
+export class AppPersonalVirtualKeyIssuer implements PersonalVirtualKeyIssuer {
+  private constructor(private readonly virtualKeys: GovernanceVirtualKey) {}
 
   static create(virtualKeys: GovernanceVirtualKey): AppPersonalVirtualKeyIssuer {
     return new AppPersonalVirtualKeyIssuer(virtualKeys);

@@ -46,7 +46,7 @@ import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
-import type { RedisConnection } from "@langwatch/redis-client";
+import { reads, type MembersRead } from "@langwatch/infrastructure";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
@@ -68,12 +68,14 @@ const agentAppConfigSchema = z.object({
   httpTesting: z.boolean().optional(),
 });
 export type AgentAppConfig = z.infer<typeof agentAppConfigSchema>;
-export interface AgentInfrastructure {
-  redis?: RedisConnection | null;
-}
+/**
+ * The relay behind connected agents runs on the process's own `redis` member.
+ * A deployment that named no Redis refuses at boot naming this module, rather
+ * than starting with the relay quietly switched off.
+ */
 type AgentSetup = FeatureSetup<
   typeof AgentApp.dependencies,
-  AgentInfrastructure,
+  MembersRead<typeof AgentApp.reads>,
   AgentAppConfig,
   AgentRepositories
 >;
@@ -91,6 +93,7 @@ export class AgentApp implements AgentApi {
     users: UserApi,
     workflows: WorkflowApi,
   };
+  static readonly reads = reads("redis");
 
   readonly #agents: AgentService;
   readonly #copies: AgentCopyService;
@@ -108,7 +111,7 @@ export class AgentApp implements AgentApi {
   private constructor({
     repositories,
     dependencies,
-    infrastructure,
+    members,
     config,
     resources,
   }: AgentSetup) {
@@ -135,7 +138,7 @@ export class AgentApp implements AgentApi {
         apiKeys: dependencies.apiKeys,
         authz: dependencies.permissions,
         projects: dependencies.projects,
-        redis: infrastructure.redis ?? null,
+        redis: members.redis,
         config: config.connected,
         publicBaseUrl: config.publicBaseUrl,
       });

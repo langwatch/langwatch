@@ -44,5 +44,5 @@ export type {
 export {
   ProcessWakeWorker,
   type ProcessWakeWorkerOptions,
-  type WakeHandlerPort,
+  type ProcessWakeHandler,
 } from "./wake/processWakeWorker.ts";

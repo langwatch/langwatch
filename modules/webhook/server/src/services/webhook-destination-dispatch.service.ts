@@ -4,7 +4,7 @@ import type { WebhookDestination } from "../app/webhook.app.ts";
 import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
 import { HttpWebhookDestinationAdapter } from "./http.webhook-destination.service.ts";
 import {
-  type AwsClientConfigPort,
+  type AwsClientConfigResolver,
   SqsWebhookDestinationAdapter,
 } from "./sqs.webhook-destination.service.ts";
 
@@ -14,7 +14,7 @@ import {
 export type WebhookDestinationDeps = Readonly<{
   egress: WebhookEgressService;
   allowInsecureLocal: boolean;
-  awsClientConfig: AwsClientConfigPort;
+  awsClientConfig: AwsClientConfigResolver;
   /**
    * The counter the hourly dispatch cap is kept in. The HTTPS transport reads it off the egress
    * service; a queue send never passes through that sender, so it has to be handed the same

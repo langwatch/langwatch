@@ -1,6 +1,6 @@
 import type { Department, DepartmentAssignments } from "@langwatch/enterprise-governance-contract";
 
-export abstract class DepartmentPort {
+export abstract class DepartmentRepository {
   abstract getAll(organizationId: string): Promise<Department[]>;
   abstract findById(input: { id: string; organizationId: string }): Promise<Department | null>;
   abstract getAssignments(organizationId: string): Promise<DepartmentAssignments>;

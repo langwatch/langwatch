@@ -4,13 +4,13 @@ export {
   TeamIdentityAdapter,
 } from "./services/resource-identifiers.service.ts";
 export { PersonalWorkspaceDiagnosticsAdapter } from "./services/personal-workspace-diagnostics.service.ts";
-export {
-  OrganizationGrantCachePort,
-  OrganizationPromptSeedPort,
-  OrganizationSeatLicensePort,
-  OrganizationSessionRevocationPort,
-  type OrganizationPlanUser,
-  type OrganizationSeatDecision,
+export type {
+  OrganizationGrantCache,
+  OrganizationPromptSeed,
+  OrganizationSeatLicense,
+  OrganizationSessionRevocation,
+  OrganizationPlanUser,
+  OrganizationSeatDecision,
 } from "./app/organization.infrastructure.ts";
 export { OrganizationMembershipService } from "./services/organization-membership.service.ts";
 export { OrganizationGroupScopeService } from "./services/organization-group-scope.service.ts";
@@ -63,12 +63,12 @@ export {
   PostgresOrganizationAdapter,
   type PostgresOrganizationAdapterOptions,
 } from "./services/postgres-organization.service.ts";
-export {
-  PersonalWorkspaceDiagnosticsPort,
-  PersonalWorkspaceIdentityPort,
-  OrganizationSettingsSecretPort,
-  GroupIdentityPort,
-  TeamIdentityPort,
+export type {
+  PersonalWorkspaceDiagnostics,
+  PersonalWorkspaceIdentity,
+  OrganizationSettingsSecret,
+  GroupIdentity,
+  TeamIdentity,
 } from "./app/organization.infrastructure.ts";
 export {
   OrganizationRepository,

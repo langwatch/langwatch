@@ -19,7 +19,7 @@ import type {
 } from "./processManager.types.ts";
 import { ProcessManagerService, type SignalHandleResult } from "./processManagerService.ts";
 import type { ProcessStore } from "./stores/processStore.types.ts";
-import { ProcessWakeWorker, type WakeHandlerPort } from "./wake/processWakeWorker.ts";
+import { ProcessWakeWorker, type ProcessWakeHandler } from "./wake/processWakeWorker.ts";
 import { nowInstant } from "@langwatch/time";
 
 const defaultLogger = createLogger("langwatch:event-sourcing:process-runtime");
@@ -213,7 +213,7 @@ export class ProcessRuntime {
   private readonly logger: Logger;
   private readonly consumersEnabled: boolean;
   private readonly managers = new Map<string, RegisteredProcessManager>();
-  private readonly wakeManagers: Record<string, WakeHandlerPort> = {};
+  private readonly wakeManagers: Record<string, ProcessWakeHandler> = {};
   private wakeWorker: ProcessWakeWorker | null = null;
 
   constructor(options: { store: ProcessStore; consumersEnabled: boolean; logger?: Logger }) {

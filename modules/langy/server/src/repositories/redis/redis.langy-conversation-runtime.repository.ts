@@ -23,7 +23,7 @@ import {
   createAgentTurnLivenessSubscriber,
   createLangyConversationUpdateBroadcastSubscriber,
   createLangyTurnAdmissionLifecycleSubscriber,
-  type LangyBroadcastPort,
+  type LangyConversationUpdateChannel,
 } from "../../subscribers/langy-conversation.subscriber.ts";
 
 /** The two command senders this pipeline's own effects need back. */
@@ -55,7 +55,7 @@ export interface EventingLangyConversationAdapterOptions {
   langyMessageProjectionStore: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free ClickHouse event-grain analytics. */
   langyAnalyticsEventProjectionStore: AppendStore<LangyAnalyticsEventProjectionRecord>;
-  broadcast: LangyBroadcastPort;
+  broadcast: LangyConversationUpdateChannel;
   /** Postgres-authoritative logical-send receipts and active-turn claims. */
   admissions: Pick<LangyTurnAdmissionCapability, "confirmAccepted" | "release">;
   buffer: Pick<LangyTokenBufferRedisRepository, "liveness" | "appendStatus" | "markError">;

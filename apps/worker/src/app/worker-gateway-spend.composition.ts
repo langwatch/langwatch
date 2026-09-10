@@ -19,7 +19,7 @@ import {
   type WebhookId,
   type WebhookSecret,
   webhookRepositories,
-  type AwsClientConfigPort,
+  type AwsClientConfigResolver,
   type WebhookDeliveryProcessDeps,
   type WebhookDispatchRequest,
   type WebhookEndpointDeps,
@@ -100,7 +100,7 @@ export type WorkerGatewaySpendCompositionInput = Readonly<{
    * role). Absent leaves a queue endpoint undeliverable, reported rather
    * than answered with a client built here, which would bypass a self-hosted install's own egress proxy.
    */
-  awsClientConfig?: AwsClientConfigPort;
+  awsClientConfig?: AwsClientConfigResolver;
   /**
    * The counter the hourly dispatch cap is kept in — the HTTPS transport
    * reads it off the egress service, but a queue send never passes through
@@ -299,7 +299,7 @@ function createWebhookDeliveryDeps(
   return {
     processStore: options.processStore,
     endpoints: instantiateRepositories(webhookRepositories, {
-      backend: "postgres",
+      backend: "live",
       infrastructure: {
         prisma: options.database,
         ids: new WorkerWebhookIds(),

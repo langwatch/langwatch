@@ -142,7 +142,7 @@ export async function createWorkerObservabilityApps(
       prisma: options.connection.client,
       // The trace tier spans two stores that coexist: Postgres holds the
       // reviewer correction, ClickHouse the projections the fold commits
-      // through, so both are required inputs of the one "postgres" tier.
+      // through, so both are required inputs of the one live tier.
       clickhouse: options.resolveClickHouseClient,
       defaultRetentionDays: options.config.retention.defaultDays,
       // The model-provider repositories are built over the deployment's own

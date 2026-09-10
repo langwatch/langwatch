@@ -80,7 +80,7 @@ export {
   OtelCodingAgentReadMetricsAdapter,
 } from "./services/coding-agent-read-metrics-otel.service.ts";
 export type {
-  CodingAgentAuditPort,
+  CodingAgentAuditSink,
   CodingAgentViewerVisibility,
-  CodingAgentViewerVisibilityPort,
+  CodingAgentViewerVisibilityReader,
 } from "./app/coding-agent.app.ts";

@@ -109,12 +109,12 @@ export type CodingAgentViewerVisibility = Readonly<{
 }>;
 
 /** Resolves one viewer's protections over one project; throws when the policy cannot be resolved. */
-export interface CodingAgentViewerVisibilityPort {
+export interface CodingAgentViewerVisibilityReader {
   readVisibility(input: { userId: string; projectId: string }): Promise<CodingAgentViewerVisibility>;
 }
 
 /** Where a read that names people is written down; the application builds the entry. */
-export interface CodingAgentAuditPort {
+export interface CodingAgentAuditSink {
   auditLog(entry: {
     userId: string;
     organizationId: string;
@@ -131,9 +131,9 @@ export type CodingAgentInfrastructure = Readonly<{
   scopeDirectory: CodingAgentCallerScopeDirectory;
   scopePermissions: CodingAgentScopePermissions;
   /** What one viewer may read of one project's captured content and spend. */
-  visibility: CodingAgentViewerVisibilityPort;
+  visibility: CodingAgentViewerVisibilityReader;
   /** Where a read that names people is written down. */
-  audit: CodingAgentAuditPort;
+  audit: CodingAgentAuditSink;
   /** Test-only service seam; production composition leaves this absent. */
   service?: CodingAgentSessionService;
 }>;
@@ -199,8 +199,8 @@ export class CodingAgentApp implements CodingAgentApi {
   readonly #codingAgents: CodingAgentSessionService;
   readonly #github: GithubApi;
   readonly #scope: CodingAgentScopeMembers;
-  readonly #visibility: CodingAgentViewerVisibilityPort;
-  readonly #audit: CodingAgentAuditPort;
+  readonly #visibility: CodingAgentViewerVisibilityReader;
+  readonly #audit: CodingAgentAuditSink;
 
   private constructor(
     codingAgents: CodingAgentSessionService,

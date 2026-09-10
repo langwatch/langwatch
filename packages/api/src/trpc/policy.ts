@@ -132,7 +132,7 @@ export type TrpcResponseLike = { statusCode?: number };
 export type TrpcActor = Readonly<{ id: string; impersonatorId?: string }>;
 
 /** Reads the actor off a request context. */
-export interface TrpcActorPort<TContext> {
+export interface TrpcActorReader<TContext> {
   actor(ctx: TrpcMiddlewareContext<TContext>): TrpcActor | undefined;
 }
 
@@ -146,10 +146,10 @@ export interface TrpcActorPort<TContext> {
 export interface TrpcIdentity<
   TContext,
   TAuthenticatedContext extends object,
-> extends TrpcActorPort<TContext> {
+> extends TrpcActorReader<TContext> {
   authenticate(ctx: TrpcMiddlewareContext<TContext>): TAuthenticatedContext;
   /**
-   * Widened from `TrpcActorPort`: the audit middleware reads the caller from
+   * Widened from `TrpcActorReader`: the audit middleware reads the caller from
    * behind the authentication middleware, where the context carries the
    * authenticated shape. Both spellings are the same object.
    */
@@ -361,7 +361,7 @@ export interface TrpcDeclaredAuthzMiddlewares<TContext> {
 }
 
 export type TrpcDeclaredAuthzMembers<TContext> = Readonly<{
-  identity: TrpcActorPort<TContext>;
+  identity: TrpcActorReader<TContext>;
   authorization: TrpcAuthorization<TContext>;
   denials: TrpcAuthorizationDenial;
 }>;

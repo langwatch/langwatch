@@ -12,7 +12,7 @@
  */
 import { createLogger } from "@langwatch/observability";
 import { WorkflowExecutionFailedError } from "@langwatch/workflow-contract";
-import { NlpLambdaFunctionPort } from "../app/workflow.app.ts";
+import { NlpLambdaFunctionReader } from "../app/workflow.app.ts";
 import {
   NlpLambdaStreamInvoke,
   type NlpLambdaStreamChunk,
@@ -35,7 +35,7 @@ const logger = createLogger("langwatch:workflow:studio-lambda-stream");
 const STUDIO_EXECUTE_PATH = "/go/studio/execute";
 
 export type LambdaWorkflowStudioStreamOptions = Readonly<{
-  functions: NlpLambdaFunctionPort;
+  functions: NlpLambdaFunctionReader;
   invoke: NlpLambdaStreamInvoke;
   /**
    * Where an oversized body is parked. Absent is a supported composition — a

@@ -13,7 +13,7 @@ import {
   userMigrates,
 } from "../rules/ops-system-migration-cohort.rules.ts";
 import { NullOrganizationDataplaneAdapter } from "../services/null.organization-dataplane.service.ts";
-import type { OrganizationDataplanePort } from "./ops.app.ts";
+import type { OrganizationDataplaneResolver } from "./ops.app.ts";
 import { SystemMigrationCohortService } from "../services/system-migration-cohort.service.ts";
 import { PrismaMigrationMembershipRepository } from "../repositories/prisma/prisma.migration-membership.repository.ts";
 import { PrismaUserTenantSourceRepository } from "../repositories/prisma/prisma.user-tenant-source.repository.ts";
@@ -78,7 +78,7 @@ export type OpsSystemMigrationsOptions = Readonly<{
    * never holds an organization back - but a pass that admits one says which
    * instance it landed on. Omitted, every organization reads as shared.
    */
-  dataplane?: OrganizationDataplanePort;
+  dataplane?: OrganizationDataplaneResolver;
 }>;
 
 /**

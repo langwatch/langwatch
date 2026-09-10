@@ -29,7 +29,7 @@ export interface WorkerMetricsSnapshot {
 
 export type WorkerMetricsLogger = Pick<Logger, "info" | "warn" | "error">;
 
-export interface WorkerMetricsPorts {
+export interface WorkerMetricsMembers {
   /**
    * The host's bearer gate. May THROW to mean "fail closed" (production with
    * no metrics API key configured), which is answered 500, never 200.
@@ -40,7 +40,7 @@ export interface WorkerMetricsPorts {
   logger?: WorkerMetricsLogger;
 }
 
-export interface StartWorkerMetricsServerOptions extends WorkerMetricsPorts {
+export interface StartWorkerMetricsServerOptions extends WorkerMetricsMembers {
   /** The port the liveness thread binds — the port the kubelet probes. */
   port: number;
 }
@@ -64,7 +64,7 @@ async function evaluateMetricsRequest({
 }: {
   url: string | undefined;
   request: WorkerMetricsRequest;
-} & WorkerMetricsPorts): Promise<{
+} & WorkerMetricsMembers): Promise<{
   status: number;
   headers?: Record<string, string>;
   body?: string;
@@ -96,7 +96,7 @@ async function evaluateMetricsRequest({
  * the fallback path (liveness thread failed to start); the normal path serves
  * the same decisions through the thread proxy.
  */
-export function createWorkerMetricsHandler(ports: WorkerMetricsPorts): RequestListener {
+export function createWorkerMetricsHandler(ports: WorkerMetricsMembers): RequestListener {
   return (req: IncomingMessage, res: ServerResponse) => {
     if (req.url === WORKER_LIVENESS_PATH) {
       res.writeHead(200, { "Content-Type": "text/plain" }).end("ok");
@@ -265,7 +265,7 @@ export async function startWorkerMetricsServer(
 async function wireLivenessThread({
   thread,
   ...ports
-}: { thread: Worker } & WorkerMetricsPorts): Promise<void> {
+}: { thread: Worker } & WorkerMetricsMembers): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     // Reject on early exit too: a thread that dies before listening without
     // emitting "error" would otherwise leave this promise pending forever
@@ -330,7 +330,7 @@ async function respondToLivenessThread({
 }: {
   thread: Worker;
   msg: { id: number; url: string; authorization: string | null };
-} & WorkerMetricsPorts): Promise<void> {
+} & WorkerMetricsMembers): Promise<void> {
   const { status, headers, body } = await evaluateMetricsRequest({
     url: msg.url,
     request: { headers: { authorization: msg.authorization ?? undefined } },

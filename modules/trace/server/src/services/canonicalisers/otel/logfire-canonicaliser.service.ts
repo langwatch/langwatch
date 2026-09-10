@@ -10,11 +10,11 @@ import {
 } from "../../../rules/canonical-extraction.rules.ts";
 import { safeJsonParse } from "../../../rules/canonical-guard.rules.ts";
 import type {
-  CanonicalAttributesPort,
+  AttributeCanonicaliser,
   ExtractorContext,
 } from "../canonical-attributes.service.ts";
 
-export class LogfireCanonicaliserService implements CanonicalAttributesPort {
+export class LogfireCanonicaliserService implements AttributeCanonicaliser {
   static create(): LogfireCanonicaliserService {
     return new LogfireCanonicaliserService();
   }

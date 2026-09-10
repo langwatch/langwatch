@@ -10,7 +10,7 @@ export {
 export { storedObjectTrpcTransport } from "./transport/stored-object.trpc.ts";
 export {
   StoredObjectApp,
-  type StoredObjectFileReadPort,
+  type StoredObjectFileReader,
   type StoredObjectFileStreamRead,
   type StoredObjectInfrastructure,
 } from "./app/stored-object.app.ts";
@@ -68,7 +68,7 @@ export {
 export {
   StoredObjectDelivery,
   StoredObjectStorage,
-  StoredObjectUploadTokenPort,
+  StoredObjectUploadTokenCodec,
   type StoredObjectStorageAddress,
   type StoredObjectUploadTokenClaims,
 } from "./app/stored-object.infrastructure.ts";
@@ -97,7 +97,7 @@ export {
 } from "./app/stored-object.infrastructure.ts";
 export { type StoredObjectsTelemetry } from "./app/stored-object.infrastructure.ts";
 export {
-  type StoredObjectS3TargetPort,
+  type StoredObjectS3TargetResolver,
   type StoredObjectS3Credentials,
   type StoredObjectS3Target,
 } from "./app/stored-object.infrastructure.ts";
@@ -154,7 +154,7 @@ export {
 } from "./services/group-queue.object-storage-migration.service.ts";
 export { PayloadStaging, type StagedPayload } from "./repositories/payload-staging.repository.ts";
 export {
-  PayloadStagingS3TargetPort,
+  PayloadStagingS3TargetRepository,
   S3PayloadStagingAdapter,
   type PayloadStagingS3Target,
 } from "#repositories/s3/s3.payload-staging.repository";

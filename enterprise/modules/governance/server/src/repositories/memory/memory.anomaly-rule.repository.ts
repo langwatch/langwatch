@@ -3,7 +3,7 @@
 import type { AnomalyRule } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
 import {
-  AnomalyRulePort,
+  AnomalyRuleRepository,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
 } from "../policy/anomaly-rule.repository.ts";
@@ -12,7 +12,7 @@ import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 const ANOMALY_RULE_KSUID_RESOURCE = "anomrule";
 
 /** The anomaly-rule twin: the organization's rules, newest write last. */
-export class MemoryAnomalyRuleRepository extends AnomalyRulePort {
+export class MemoryAnomalyRuleRepository extends AnomalyRuleRepository {
   private constructor(private readonly store: MemoryGovernanceStore) {
     super();
   }

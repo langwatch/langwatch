@@ -20,7 +20,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
 import type {
   DataRetentionPlan,
-  DataRetentionPlanPort,
+  DataRetentionPlanResolver,
 } from "../app/data-retention.infrastructure.ts";
 import type { RetentionPermissionsService } from "./retention-permissions.service.ts";
 
@@ -30,7 +30,7 @@ export type RetentionActor = Readonly<{ userId: string; email: string | null }>;
 export type DataRetentionPolicyServiceOptions = Readonly<{
   directory: DataRetentionDirectoryReader;
   permissions: RetentionPermissionsService;
-  plans: DataRetentionPlanPort;
+  plans: DataRetentionPlanResolver;
   /** The platform-operator allow-list, which is an address list rather than a grant. */
   administrators: Pick<UserApi, "isAdmin">;
 }>;

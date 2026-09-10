@@ -2,7 +2,7 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import { organizationMigrates } from "../rules/ops-system-migration-cohort.rules.ts";
 import type {
   OrganizationDataplane,
-  OrganizationDataplanePort,
+  OrganizationDataplaneResolver,
 } from "../app/ops.app.ts";
 
 /** One organization's place in one migration's cohort, and where it lives. */
@@ -35,7 +35,7 @@ export class SystemMigrationCohortService {
     /** migration name -> the organization ids an operator enrolled for it. */
     enrolled: ReadonlyMap<string, ReadonlySet<string>>;
     migrations: readonly SystemMigration[];
-    dataplane: OrganizationDataplanePort;
+    dataplane: OrganizationDataplaneResolver;
   }): SystemMigrationCohortService {
     return new SystemMigrationCohortService(deps);
   }
@@ -47,7 +47,7 @@ export class SystemMigrationCohortService {
       isSaaS: boolean;
       enrolled: ReadonlyMap<string, ReadonlySet<string>>;
       migrations: readonly SystemMigration[];
-      dataplane: OrganizationDataplanePort;
+      dataplane: OrganizationDataplaneResolver;
     },
   ) {
     this.automatic = new Set(

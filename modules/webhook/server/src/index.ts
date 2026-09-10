@@ -36,7 +36,7 @@ export {
   WebhookEventsClickHouseRepository,
   type WebhookClickHouseClientResolver,
 } from "./repositories/clickhouse/clickhouse.webhook-events.repository.ts";
-export { WebhookEventsRepository as WebhookEventsRepositoryPort } from "./repositories/webhook-events.repository.ts";
+export { WebhookEventsRepository } from "./repositories/webhook-events.repository.ts";
 export { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
 export type { WebhookRepositories } from "./repositories/webhook.repositories.ts";
 export {
@@ -152,7 +152,7 @@ export { HttpWebhookDestinationAdapter } from "./services/http.webhook-destinati
 export {
   SQS_MAX_MESSAGE_BYTES,
   SqsWebhookDestinationAdapter,
-  type AwsClientConfigPort,
+  type AwsClientConfigResolver,
   type SqsDestinationConfig,
 } from "./services/sqs.webhook-destination.service.ts";
 export {

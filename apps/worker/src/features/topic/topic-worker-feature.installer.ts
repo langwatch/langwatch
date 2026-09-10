@@ -1,5 +1,5 @@
 import { Deferred } from "@langwatch/eventing";
-import type { TopicClusteringCommandsPort } from "@langwatch/topic-server";
+import type { TopicClusteringCommands } from "@langwatch/topic-server";
 import type { TraceTopicAssignment } from "@langwatch/trace-contract";
 import type {
   WorkerFeatureCloser,
@@ -10,7 +10,7 @@ import { nowInstant } from "@langwatch/time";
 
 /** Topic's worker-facing capability after its server graph is composed. */
 export interface TopicWorkerCapability {
-  readonly commandDispatch: TopicClusteringCommandsPort;
+  readonly commandDispatch: TopicClusteringCommands;
   install(options: {
     eventSourcing: WorkerEventingRuntime["eventSourcing"];
     traceAssignments: TraceTopicAssignment;

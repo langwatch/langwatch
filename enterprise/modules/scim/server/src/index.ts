@@ -18,17 +18,17 @@ export { scimProtocolErrorHandler, scimProtocolRest } from "./transport/scim-pro
 export { scimWebhookRest } from "./transport/scim-webhook.rest.ts";
 
 export { PostgresScimAdapter, type PostgresScimAdapterOptions } from "./services/postgres-scim.service.ts";
-export {
-  ScimSyncLifecyclePort,
-  type ScimRemovalOperation,
-  type ScimUserPushOperation,
-} from "./ports/scim-sync-lifecycle.port.ts";
+export type {
+  ScimSyncLifecycle,
+  ScimRemovalOperation,
+  ScimUserPushOperation,
+} from "./app/scim.infrastructure.ts";
 export { ScimDirectoryIdentityService } from "./services/scim-directory-identity.service.ts";
 export type { ScimUserProvisioning } from "./services/scim-provisioning.service.ts";
 
 /**
  * The durable directory-sync history: the SCIM boundary's own implementation of
- * `ScimSyncLifecyclePort`, stating what happened as facts on the connection's identity
+ * `ScimSyncLifecycle`, stating what happened as facts on the connection's identity
  * aggregate. Was `platform/app/src/server/app-layer/identity/scim-sync-lifecycle.ts`.
  */
 export {

@@ -14,7 +14,7 @@ import {
 } from "../platform/lifecycle/worker-runtime.port.ts";
 import {
   createWorkerPrivateInfrastructureComposition,
-  type WorkerPrivateInfrastructurePorts,
+  type WorkerPrivateInfrastructureMembers,
 } from "./worker-private-infrastructure.composition.ts";
 import {
   WorkerProductionComposition,
@@ -30,7 +30,7 @@ import {
  * store side is a tenant-aware ClickHouse resolver, because routing a tenant
  * to its instance is the host's decision and Eventing must never make it.
  */
-export type WorkerDurablePersistencePorts = Readonly<{
+export type WorkerDurablePersistenceMembers = Readonly<{
   database: EventingProcessPersistenceDatabase;
   resolveClickHouseClient: EventingClickHouseClientResolver;
   /** The fallback for event rows whose tenant declares no override. */
@@ -45,9 +45,9 @@ export type WorkerDurableCompositionOptions = Readonly<{
   resources: ResourceScope;
   lifecycle: WorkerLifecycle;
   transport: WorkerTransport;
-  persistence: WorkerDurablePersistencePorts;
+  persistence: WorkerDurablePersistenceMembers;
   /** Project BYOC and Azure capabilities for the Group Queue's blob offload. */
-  storage: WorkerPrivateInfrastructurePorts;
+  storage: WorkerPrivateInfrastructureMembers;
   /** The one Prisma client this process opened. */
   database: WorkerDatabaseCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;

@@ -1,7 +1,7 @@
 import {
   LANGY_TURN_ACCESS_TTL_SECONDS,
   type LangyTurnAccess,
-  LangyTurnAccessPort,
+  LangyTurnAccessRepository,
   langyTurnAccessSchema,
 } from "../langy-live-turn.repository.ts";
 
@@ -11,7 +11,7 @@ interface LangyAccessRedis {
 }
 
 /** Redis-backed turn access, keyed by conversation so a turn's slot hashes together. */
-export class LangyTurnAccessRedisRepository extends LangyTurnAccessPort {
+export class LangyTurnAccessRedisRepository extends LangyTurnAccessRepository {
   static create(options: { redis: LangyAccessRedis }): LangyTurnAccessRedisRepository {
     return new LangyTurnAccessRedisRepository(options.redis);
   }

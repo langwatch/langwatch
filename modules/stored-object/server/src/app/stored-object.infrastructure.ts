@@ -16,7 +16,7 @@ export type StoredObjectOwnerLookupSpan = Readonly<{
 
 /**
  * Process observability stays at composition while the Stored Object owner
- * lookup records its fixed database-operation attributes through this port.
+ * lookup records its fixed database-operation attributes through this seam.
  */
 export interface StoredObjectOwnerLookupTelemetry {
   withLookupSpan<Result>(
@@ -48,7 +48,7 @@ export type StoredObjectS3Target = Readonly<{
 }>;
 
 /** Resolves the S3 connection one project's objects are reached through. */
-export interface StoredObjectS3TargetPort {
+export interface StoredObjectS3TargetResolver {
   resolve(projectId: string): Promise<StoredObjectS3Target>;
 }
 
@@ -145,7 +145,7 @@ export abstract class StoredObjectStorage {
   }): Promise<void>;
 }
 
-export abstract class StoredObjectUploadTokenPort {
+export abstract class StoredObjectUploadTokenCodec {
   abstract encode(claims: StoredObjectUploadTokenClaims): Promise<string>;
   abstract decode(token: string): Promise<StoredObjectUploadTokenClaims>;
 }

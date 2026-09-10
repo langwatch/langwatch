@@ -288,7 +288,7 @@ export async function createWorkerScenarioExecutionGraph(input: {
     staging: deps.payloadStaging,
   });
   const workflowRepos = instantiateRepositories(workflowRepositories, {
-    backend: "postgres",
+    backend: "live",
     infrastructure: { prisma },
   });
   const workflowLlmParameters = WorkerWorkflowLlmParameters.create({

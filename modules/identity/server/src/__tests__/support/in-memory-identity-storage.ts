@@ -4,8 +4,8 @@ import type {
   IdentityAccountSecrets,
   IdentityAccounts,
   IdentityResolution,
-  IdentityResolutionPort,
-} from "../../rules/identity-storage-ports.rules.ts";
+  IdentityResolver,
+} from "../../rules/identity-storage.rules.ts";
 import type { InMemoryHeads } from "./in-memory-heads.ts";
 
 interface StoredCredential {
@@ -37,7 +37,7 @@ const EMPTY_SECRETS = {
  * `Account` rows are the memory adapter's own, which is what makes the
  * bridge mirror observable.
  */
-export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolutionPort {
+export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolver {
   readonly credentials = new Map<string, StoredCredential>();
 
   constructor(
@@ -265,5 +265,5 @@ export const inertIdentityPorts = {
     async tryResolveByProviderSubject() {
       return null;
     },
-  } satisfies IdentityResolutionPort,
+  } satisfies IdentityResolver,
 };

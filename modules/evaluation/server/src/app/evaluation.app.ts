@@ -46,7 +46,7 @@ import type {
   EvaluationReport,
   EvaluationRescore,
   EvaluationRunAnalytics,
-  EvaluationWarmupPort,
+  EvaluationWarmupProbe,
 } from "../app/evaluation.infrastructure.ts";
 import { ClickHouseEvaluationRepository } from "../repositories/clickhouse/evaluation.repository.ts";
 import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/monitor-performance.repository.ts";
@@ -68,7 +68,7 @@ export type EvaluationInfrastructure = Readonly<{
   environment: EvaluationInstallEnvironment;
   customEvaluators: EvaluationCustomEvaluators;
   rescore: EvaluationRescore;
-  warmup: EvaluationWarmupPort;
+  warmup: EvaluationWarmupProbe;
   analytics: EvaluationRunAnalytics;
   report: EvaluationReport;
   // What the public evaluation doors reach beyond the module: the experiment
@@ -156,7 +156,7 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #environment: EvaluationInstallEnvironment;
   readonly #customEvaluators: EvaluationCustomEvaluators;
   readonly #rescore: EvaluationRescore;
-  readonly #warmup: EvaluationWarmupPort;
+  readonly #warmup: EvaluationWarmupProbe;
   readonly #analytics: EvaluationRunAnalytics;
   readonly #report: EvaluationReport;
   readonly #batchLog: EvaluationBatchLogService;

@@ -19,7 +19,7 @@ import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-stor
 import { StoredObjectsService } from "#services/stored-objects.service";
 import type { StoredObject } from "#rules/stored-object-row.rules";
 import type { StoredObjectsRepository } from "#repositories/stored-objects.repository";
-import type { StoredObjectsTelemetryPort } from "#ports/stored-objects-telemetry.port";
+import type { StoredObjectsTelemetry } from "#app/stored-object.infrastructure";
 
 const ACCOUNT = "lwacct";
 const CONTAINER = "stored-objects";
@@ -147,7 +147,7 @@ describe("given a deployment whose object storage is Azure Blob and nothing else
           recordWriteFailure: vi.fn(),
           recordReadFailure: vi.fn(),
           observeSizeBytes: vi.fn(),
-        } as unknown as StoredObjectsTelemetryPort,
+        } as unknown as StoredObjectsTelemetry,
       });
 
       const stored = await service.storeFromBytes({

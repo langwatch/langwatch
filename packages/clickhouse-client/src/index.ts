@@ -129,9 +129,9 @@ export {
 export type {
   QueryErrorDescriptor,
   QueryOutcome,
-  SpanPort,
+  Span,
   TraceOptions,
-  TracerPort,
+  Tracer,
 } from "./tracing.ts";
 export { describeQueryError, QueryTracer, SPAN_ATTRIBUTES } from "./tracing.ts";
 export type {

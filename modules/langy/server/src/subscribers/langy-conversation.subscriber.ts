@@ -114,7 +114,7 @@ export interface LangyConversationFreshnessReader {
  * this feature ever fires, not an open string.
  * contravariant. Pinning the literal is also the ADR-046 contract: the signal
  */
-export interface LangyBroadcastPort {
+export interface LangyConversationUpdateChannel {
   broadcastToTenant(
     tenantId: string,
     payload: string,
@@ -122,7 +122,7 @@ export interface LangyBroadcastPort {
   ): Promise<void>;
 }
 export interface LangyConversationUpdateBroadcastSubscriberDeps {
-  broadcast: LangyBroadcastPort;
+  broadcast: LangyConversationUpdateChannel;
   conversations: LangyConversationFreshnessReader;
 }
 

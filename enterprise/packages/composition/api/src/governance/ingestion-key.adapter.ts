@@ -2,7 +2,7 @@
 
 import type { ApiKeyRevocationCause, ApiKeyApi } from "@langwatch/api-key-contract";
 import {
-  IngestionKeyIssuerPort,
+  IngestionKeyIssuer,
   IngestionKeyRepository,
   type StoredIngestionKey,
   type StoredIngestionKeyOwnership,
@@ -90,10 +90,8 @@ export class AppIngestionKeyRepository extends IngestionKeyRepository {
   }
 }
 
-export class AppIngestionKeyIssuer extends IngestionKeyIssuerPort {
-  private constructor(private readonly apiKeys: ApiKeyApi) {
-    super();
-  }
+export class AppIngestionKeyIssuer implements IngestionKeyIssuer {
+  private constructor(private readonly apiKeys: ApiKeyApi) {}
 
   static create(apiKeys: ApiKeyApi): AppIngestionKeyIssuer {
     return new AppIngestionKeyIssuer(apiKeys);
@@ -124,7 +122,7 @@ export class AppIngestionKeyAdapter {
     return AppIngestionKeyRepository.create(this.apiKeys);
   }
 
-  issuer(): IngestionKeyIssuerPort {
+  issuer(): IngestionKeyIssuer {
     return AppIngestionKeyIssuer.create(this.apiKeys);
   }
 }

@@ -7,7 +7,7 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { inferSpanTypeIfAbsent } from "../../../rules/canonical-extraction.rules.ts";
 import { isNonEmptyString } from "../../../rules/canonical-guard.rules.ts";
 import type {
-  CanonicalAttributesPort,
+  AttributeCanonicaliser,
   ExtractorContext,
 } from "../canonical-attributes.service.ts";
 
@@ -27,7 +27,7 @@ const OPERATION_TO_SPAN_TYPE: Record<string, string> = {
   chat: "llm",
 };
 
-export class CopilotCanonicaliserService implements CanonicalAttributesPort {
+export class CopilotCanonicaliserService implements AttributeCanonicaliser {
   static create(): CopilotCanonicaliserService {
     return new CopilotCanonicaliserService();
   }

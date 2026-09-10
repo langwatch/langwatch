@@ -7,12 +7,12 @@ export {
 } from "./app/worker-production.composition.ts";
 export {
   createWorkerPrivateInfrastructureComposition,
-  type WorkerPrivateInfrastructurePorts,
+  type WorkerPrivateInfrastructureMembers,
 } from "./app/worker-private-infrastructure.composition.ts";
 export {
   createWorkerDurableComposition,
   type WorkerDurableCompositionOptions,
-  type WorkerDurablePersistencePorts,
+  type WorkerDurablePersistenceMembers,
 } from "./app/worker-durable.composition.ts";
 export {
   WorkerInfrastructureAdapter,
@@ -115,7 +115,7 @@ export {
   WORKER_HEARTBEAT_INTERVAL_MS,
   type StartWorkerMetricsServerOptions,
   type WorkerMetricsLogger,
-  type WorkerMetricsPorts,
+  type WorkerMetricsMembers,
   type WorkerMetricsRequest,
   type WorkerMetricsServerHandle,
   type WorkerMetricsSnapshot,
@@ -123,7 +123,7 @@ export {
 export {
   bootWorker,
   WorkerProcess,
-  type WorkerApplicationPort,
+  type WorkerApplicationLifecycle,
   type WorkerBootOptions,
   type WorkerProcessComposition,
   type WorkerProcessFactoryContext,

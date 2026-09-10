@@ -69,7 +69,7 @@ export type WorkerEvaluationExecutionCollaborators = Readonly<{
  * The two collaborators Automation's evaluation subscribers reach, plus the recorder they write
  * matches through.
  */
-export type WorkerEvaluationAutomationPorts = Readonly<{
+export type WorkerEvaluationAutomationMembers = Readonly<{
   triggers: AutomationTraceTriggerCatalogue;
   graphActivity: AutomationGraphActivity;
   triggerMatches: AutomationTriggerMatchRecorder;
@@ -84,7 +84,7 @@ export type WorkerEvaluationProcessingOptions = Readonly<{
   analytics: AnalyticsService;
   /** The one trace reader this process composes: summary read and classifier. */
   traces: AutomationEvaluationTraceSummary & AutomationEvaluationQueryClassification;
-  automation: WorkerEvaluationAutomationPorts;
+  automation: WorkerEvaluationAutomationMembers;
   /** The queue's own Redis, or nothing on a deployment that configured none. */
   redis?: RedisConnection | null;
   /** `LANGWATCH_FOLD_CACHE_TTL_SECONDS`, read once by the process. */

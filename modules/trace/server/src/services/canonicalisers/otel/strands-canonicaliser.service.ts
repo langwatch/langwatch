@@ -9,7 +9,7 @@ import {
   stripSystemMessages,
 } from "../../../rules/canonical-message.rules.ts";
 import type {
-  CanonicalAttributesPort,
+  AttributeCanonicaliser,
   ExtractorContext,
 } from "../canonical-attributes.service.ts";
 
@@ -77,7 +77,7 @@ const strandsContentOfCandidate = (candidate: unknown): unknown => {
   return void 0;
 };
 
-export class StrandsCanonicaliserService implements CanonicalAttributesPort {
+export class StrandsCanonicaliserService implements AttributeCanonicaliser {
   static create(): StrandsCanonicaliserService {
     return new StrandsCanonicaliserService();
   }

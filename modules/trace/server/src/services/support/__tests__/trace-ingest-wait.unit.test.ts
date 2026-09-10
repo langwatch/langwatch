@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TraceQueryFieldValuesRepository } from "../../../repositories/read/query-field-values.repository.ts";
 import { TraceSummaryReaderRepository } from "../../../repositories/read/trace-summary-reader.repository.ts";
 import {
-  TracePort,
+  TraceProjectedReadRepository,
   type TraceIngestLagSample,
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
@@ -12,7 +12,7 @@ import { TestModelProviderService } from "../../../__tests__/support/model-provi
 import { TestTraceQueryClassification } from "../../../__tests__/support/query-classification.fake.ts";
 import { traceReadPorts } from "../../../__tests__/support/trace-read-ports.fake.ts";
 
-class IngestLagRepository extends TracePort {
+class IngestLagRepository extends TraceProjectedReadRepository {
   readonly calls: string[] = [];
   sample: TraceIngestLagSample | null = null;
   failure: Error | null = null;
@@ -52,7 +52,7 @@ class NullSummaryReaderRepository extends TraceSummaryReaderRepository {
   }
 }
 
-function createService(repository: TracePort): TraceService {
+function createService(repository: TraceProjectedReadRepository): TraceService {
   return TraceService.create({
     repository,
     modelProviders: new TestModelProviderService(),

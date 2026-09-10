@@ -14,7 +14,7 @@ import type {
   SetDefaultRoutingPolicyInput,
   UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
-import { RoutingPolicyPort } from "../policy/routing-policy.repository.ts";
+import { RoutingPolicyRepository } from "../policy/routing-policy.repository.ts";
 
 type PolicyRow = PrismaRoutingPolicy & { scopes: PrismaRoutingPolicyScope[] };
 
@@ -27,7 +27,7 @@ export type RoutingPolicyDatabase = Pick<
   "modelProvider" | "project" | "routingPolicy" | "team" | "$transaction"
 >;
 
-export class PrismaRoutingPolicyRepository extends RoutingPolicyPort {
+export class PrismaRoutingPolicyRepository extends RoutingPolicyRepository {
   private constructor(private readonly database: RoutingPolicyDatabase) {
     super();
   }

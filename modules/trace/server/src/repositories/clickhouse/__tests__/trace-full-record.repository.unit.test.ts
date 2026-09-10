@@ -10,7 +10,7 @@ import { TracePayloadReaderRepository } from "../../read/trace-payload-reader.re
 import { TraceFullIo } from "../../../app/trace.infrastructure.ts";
 import { ClickHouseTraceFullRecordRepository } from "../trace-full-record.repository.ts";
 
-class ClientPort extends TraceClickHouse {
+class TenantClickHouseResolver extends TraceClickHouse {
   readonly tenants: string[] = [];
 
   constructor(private readonly client: TraceClickHouseClient) {
@@ -128,7 +128,7 @@ function clientFor(
 
 describe("ClickHouseTraceFullRecordRepository", () => {
   it("returns tenant-scoped rich full records, recalls payloads, and recomputes IO", async () => {
-    const port = new ClientPort(clientFor());
+    const port = new TenantClickHouseResolver(clientFor());
     const payloads = new Payloads("full output");
     const repository = ClickHouseTraceFullRecordRepository.create(port, payloads, new FullIo());
 
@@ -157,7 +157,7 @@ describe("ClickHouseTraceFullRecordRepository", () => {
   });
 
   it("throws the canonical missing error and never issues a cross-tenant payload read", async () => {
-    const port = new ClientPort(clientFor({ missing: true }));
+    const port = new TenantClickHouseResolver(clientFor({ missing: true }));
     const payloads = new Payloads("unexpected");
     const repository = ClickHouseTraceFullRecordRepository.create(port, payloads, new FullIo());
 
@@ -171,7 +171,7 @@ describe("ClickHouseTraceFullRecordRepository", () => {
   it("uses stored_spans' StartTime ReplacingMergeTree election key", async () => {
     const queries: string[] = [];
     const repository = ClickHouseTraceFullRecordRepository.create(
-      new ClientPort(clientFor({}, queries)),
+      new TenantClickHouseResolver(clientFor({}, queries)),
       new Payloads(null),
       new FullIo(),
     );
@@ -186,7 +186,7 @@ describe("ClickHouseTraceFullRecordRepository", () => {
   });
 
   it("keeps the projection preview on blob failure and returns chronological thread records", async () => {
-    const port = new ClientPort(clientFor({ thread: true }));
+    const port = new TenantClickHouseResolver(clientFor({ thread: true }));
     const repository = ClickHouseTraceFullRecordRepository.create(
       port,
       new Payloads(null),
@@ -205,7 +205,7 @@ describe("ClickHouseTraceFullRecordRepository", () => {
 
   it("deserializes claim-check JSON before canonical IO recomputation", async () => {
     const repository = ClickHouseTraceFullRecordRepository.create(
-      new ClientPort(clientFor()),
+      new TenantClickHouseResolver(clientFor()),
       new Payloads('{"answer":"full"}'),
       new TypedFullIo(),
     );

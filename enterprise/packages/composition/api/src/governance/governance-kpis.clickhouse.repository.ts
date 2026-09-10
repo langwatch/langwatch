@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import {
-  AnomalySpendReaderPort,
+  AnomalySpendReader,
   type AnomalySpendSourceFilter,
 } from "@langwatch/enterprise-governance-server";
 /**
@@ -41,10 +41,8 @@ export interface GovernanceKpiContribution {
   lastEventOccurredAt: Instant;
 }
 
-export class AppGovernanceKpisAdapter extends AnomalySpendReaderPort {
-  constructor(private readonly resolveClient: GovernanceClickHouseClientResolver) {
-    super();
-  }
+export class AppGovernanceKpisAdapter implements AnomalySpendReader {
+  constructor(private readonly resolveClient: GovernanceClickHouseClientResolver) {}
 
   async insertContribution(row: GovernanceKpiContribution): Promise<void> {
     if (!row.tenantId || !row.sourceId || !row.traceId) {

@@ -3,18 +3,6 @@
   "policy": "source-folder-shape",
   "entries": [
     {
-      "key": "crowded-folder|apps/api/src",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|apps/api/src/app",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|apps/api/src/app-trpc",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "crowded-folder|apps/server/src/predeps",
       "measured": "2026-09-08"
     },
@@ -252,10 +240,6 @@
     },
     {
       "key": "crowded-folder|modules/gateway/server/src/adapters",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|modules/gateway/server/src/ports",
       "measured": "2026-09-08"
     },
     {
@@ -560,10 +544,6 @@
     },
     {
       "key": "crowded-folder|modules/workflow/contract/src",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "crowded-folder|modules/workflow/server/src/adapters",
       "measured": "2026-09-08"
     },
     {
@@ -875,10 +855,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/gateway/contract/src/gateway.api.ts",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "fragment-file|modules/gateway/contract/src/gateway.audit-serializer.ts",
       "measured": "2026-09-08"
     },
@@ -956,10 +932,6 @@
     },
     {
       "key": "fragment-file|modules/organization/contract/src/organization-group.service.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|modules/organization/contract/src/organization.errors.ts",
       "measured": "2026-09-08"
     },
     {
@@ -1119,10 +1091,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/trace/server/src/services/support/trace-number-coercion.service.ts",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "fragment-file|modules/trace/server/src/services/support/trace-safe-json.service.ts",
       "measured": "2026-09-08"
     },
@@ -1196,10 +1164,6 @@
     },
     {
       "key": "fragment-file|packages/clickhouse-client/src/shutdown.ts",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "fragment-file|packages/config/src/clickhouse.config.ts",
       "measured": "2026-09-08"
     },
     {

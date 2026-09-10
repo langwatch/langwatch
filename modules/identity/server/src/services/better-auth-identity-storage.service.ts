@@ -27,8 +27,8 @@ import type {
   IdentityAccountRow,
   IdentityAccountSecrets,
   IdentityAccounts,
-  IdentityResolutionPort,
-} from "../rules/identity-storage-ports.rules.ts";
+  IdentityResolver,
+} from "../rules/identity-storage.rules.ts";
 
 const logger = createLogger("langwatch:identity:storage-adapter");
 
@@ -93,7 +93,7 @@ export interface IdentityStorageAdapterDeps {
    */
   legacyEngine: (options: BetterAuthOptions) => DBAdapter;
   accounts: IdentityAccounts;
-  resolution: IdentityResolutionPort;
+  resolution: IdentityResolver;
   ceremonies: IdentityAccountCeremonies;
   /** ADR-116 §2: `finalized` and nothing else, cached, fail-closed. */
   isUserOnIdentityWrites: IdentityUserGate;

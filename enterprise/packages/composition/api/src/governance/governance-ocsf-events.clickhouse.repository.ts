@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
-import { GovernanceOcsfEventsReaderPort } from "@langwatch/enterprise-governance-server";
+import { GovernanceOcsfEventsReader } from "@langwatch/enterprise-governance-server";
 /**
  * GovernanceOcsfEventsClickHouseRepository — write side of the
  * `governance_ocsf_events` fold projection. Each call inserts ONE
@@ -127,10 +127,8 @@ interface OcsfExportCHRow {
   RawOcsfJson: string;
 }
 
-export class AppGovernanceOcsfEventsAdapter extends GovernanceOcsfEventsReaderPort {
-  constructor(private readonly resolveClient: GovernanceClickHouseClientResolver) {
-    super();
-  }
+export class AppGovernanceOcsfEventsAdapter implements GovernanceOcsfEventsReader {
+  constructor(private readonly resolveClient: GovernanceClickHouseClientResolver) {}
 
   async insertEvent(row: GovernanceOcsfEventInput): Promise<void> {
     if (!row.tenantId || !row.eventId) {

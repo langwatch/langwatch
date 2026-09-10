@@ -21,7 +21,7 @@ import { nowInstant } from "@langwatch/time";
  * How this process builds an AWS transport — the corporate proxy, the TLS agent, the assumed
  * role.
  */
-export type AwsClientConfigPort = (input: AwsClientConfigInput) => AwsClientConfig;
+export type AwsClientConfigResolver = (input: AwsClientConfigInput) => AwsClientConfig;
 
 /**
  * The Amazon SQS destination: the same batch, the same bytes, the same signature, put on a
@@ -354,7 +354,7 @@ function clientCacheKey(config: SqsDestinationConfig): string {
 
 function sqsClientFor(
   config: SqsDestinationConfig,
-  awsClientConfig: AwsClientConfigPort,
+  awsClientConfig: AwsClientConfigResolver,
 ): SQSClient {
   const key = clientCacheKey(config);
   const cached = clients.get(key);
@@ -411,7 +411,7 @@ function resetSqsClientCache(): void {
 
 export interface SqsWebhookDestinationAdapterOptions extends SqsDestinationConfig {
   /** How this process builds an AWS transport. */
-  awsClientConfig: AwsClientConfigPort;
+  awsClientConfig: AwsClientConfigResolver;
   /**
    * Where the hourly dispatch cap is counted. Optional only because the
    * cap is a limit, not a gate: a process without a shared counter delivers
@@ -473,7 +473,7 @@ export class SqsWebhookDestinationAdapter implements WebhookDestination {
     awsClientConfig,
   }: {
     config: SqsDestinationConfig;
-    awsClientConfig: AwsClientConfigPort;
+    awsClientConfig: AwsClientConfigResolver;
   }): SQSClient {
     return sqsClientFor(config, awsClientConfig);
   }

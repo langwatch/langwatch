@@ -69,16 +69,14 @@ import { OrganizationService as OrganizationEntityService } from "../services/or
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import type {
   GroupIdentity,
-  OrganizationSettingsSecret,
-  PersonalWorkspaceDiagnostics,
-  PersonalWorkspaceIdentity,
-  TeamIdentity,
-} from "./organization.infrastructure.ts";
-import {
   OrganizationGrantCache,
   OrganizationPromptSeed,
   OrganizationSeatLicense,
   OrganizationSessionRevocation,
+  OrganizationSettingsSecret,
+  PersonalWorkspaceDiagnostics,
+  PersonalWorkspaceIdentity,
+  TeamIdentity,
 } from "./organization.infrastructure.ts";
 import type {
   CustomRole,
@@ -155,13 +153,6 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
 // ---------------------------------------------------------------------------
 // What the process composes this feature's application from
 // ---------------------------------------------------------------------------
-
-/**
- * The organization reads and writes this feature makes that the canonical `OrganizationService`
- * contract does not declare — membership, invitations, the audit trail. Named structurally
- * rather than picked, since none of these fourteen live in the contract.
- */
-type OrganizationMembershipPort = OrganizationMembershipService;
 
 /** The three project reads an organization screen makes: what lives where. */
 type OrganizationProjectApi = ProjectApi;
@@ -462,15 +453,15 @@ export class ServerOrganizationApp implements OrganizationApi {
 
   /** Sign-up: the caller's first organization and its first team. */
   createAndAssign(
-    input: Omit<Parameters<OrganizationMembershipPort["createAndAssign"]>[0], "userId">,
+    input: Omit<Parameters<OrganizationMembershipService["createAndAssign"]>[0], "userId">,
     by: OrganizationCaller,
-  ): ReturnType<OrganizationMembershipPort["createAndAssign"]> {
+  ): ReturnType<OrganizationMembershipService["createAndAssign"]> {
     return this.#dependencies.membership.createAndAssign({ ...input, userId: by.id });
   }
 
   /** Removes one seat, attributed to the caller who asked for it. */
   deleteMember(
-    input: Omit<Parameters<OrganizationMembershipPort["deleteMember"]>[0], "actingUserId">,
+    input: Omit<Parameters<OrganizationMembershipService["deleteMember"]>[0], "actingUserId">,
     by: OrganizationCaller | null,
   ): Promise<void> {
     return this.#dependencies.membership.deleteMember({ ...input, actingUserId: by?.id ?? null });
@@ -479,7 +470,7 @@ export class ServerOrganizationApp implements OrganizationApi {
   /** Frees a seat reversibly. The acting user travels whole, since the disable
    * guard identifies the operator by more than their id. */
   setMemberDisabled(
-    input: Omit<Parameters<OrganizationMembershipPort["setMemberDisabled"]>[0], "actingUser">,
+    input: Omit<Parameters<OrganizationMembershipService["setMemberDisabled"]>[0], "actingUser">,
     by: (OrganizationCaller & { name?: string | null; email?: string | null }) | null,
   ): Promise<void> {
     return this.#dependencies.membership.setMemberDisabled({
@@ -490,7 +481,7 @@ export class ServerOrganizationApp implements OrganizationApi {
 
   /** Every organization the caller can reach, fully loaded. */
   getAllForUser(
-    input: Omit<Parameters<OrganizationMembershipPort["getAllForUser"]>[0], "userId">,
+    input: Omit<Parameters<OrganizationMembershipService["getAllForUser"]>[0], "userId">,
     by: OrganizationCaller,
   ): Promise<FullyLoadedOrganization[]> {
     return this.#dependencies.membership.getAllForUser({ ...input, userId: by.id });
@@ -679,7 +670,7 @@ export class ServerOrganizationApp implements OrganizationApi {
   /** One organization with its members and each member's teams. */
   findOrganizationWithMembers(
     input: Omit<
-      Parameters<OrganizationMembershipPort["findOrganizationWithMembers"]>[0],
+      Parameters<OrganizationMembershipService["findOrganizationWithMembers"]>[0],
       "userId"
     >,
     by: OrganizationCaller,
@@ -692,7 +683,7 @@ export class ServerOrganizationApp implements OrganizationApi {
 
   /** One member, redacted to what the calling member may see. */
   findMemberById(
-    input: Omit<Parameters<OrganizationMembershipPort["findMemberById"]>[0], "currentUserId">,
+    input: Omit<Parameters<OrganizationMembershipService["findMemberById"]>[0], "currentUserId">,
     by: OrganizationCaller,
   ): Promise<OrganizationMemberWithUser | null> {
     return this.#dependencies.membership.findMemberById({ ...input, currentUserId: by.id });
@@ -757,7 +748,7 @@ export class ServerOrganizationApp implements OrganizationApi {
 
   /** Changes one member's role inside one team. */
   updateTeamMemberRole(
-    input: Omit<Parameters<OrganizationMembershipPort["updateTeamMemberRole"]>[0], "currentUserId">,
+    input: Omit<Parameters<OrganizationMembershipService["updateTeamMemberRole"]>[0], "currentUserId">,
     by: OrganizationCaller,
   ): Promise<void> {
     return this.#dependencies.membership.updateTeamMemberRole({
@@ -768,9 +759,9 @@ export class ServerOrganizationApp implements OrganizationApi {
 
   /** Changes one member's organization role, with its team-role fallout. */
   changeMemberRole(
-    input: Omit<Parameters<OrganizationMembershipPort["changeMemberRole"]>[0], "currentUserId">,
+    input: Omit<Parameters<OrganizationMembershipService["changeMemberRole"]>[0], "currentUserId">,
     by: OrganizationCaller | null,
-  ): ReturnType<OrganizationMembershipPort["changeMemberRole"]> {
+  ): ReturnType<OrganizationMembershipService["changeMemberRole"]> {
     return this.#dependencies.membership.changeMemberRole({
       ...input,
       currentUserId: by?.id ?? null,
@@ -779,7 +770,7 @@ export class ServerOrganizationApp implements OrganizationApi {
 
   /** The organization's audit trail, one page at a time. */
   getAuditLogs(
-    input: Parameters<OrganizationMembershipPort["getAuditLogs"]>[0],
+    input: Parameters<OrganizationMembershipService["getAuditLogs"]>[0],
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     return this.#dependencies.membership.getAuditLogs(input);
   }
@@ -1152,7 +1143,7 @@ export class ServerOrganizationApp implements OrganizationApi {
    * so a project-scoped grant cannot widen a read to rows outside it.
    */
   async readAuditLogs(
-    input: Parameters<OrganizationMembershipPort["getAuditLogs"]>[0],
+    input: Parameters<OrganizationMembershipService["getAuditLogs"]>[0],
     by: OrganizationCaller,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     await this.#infrastructure.plans.assertAuditLogsAllowed({

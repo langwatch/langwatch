@@ -89,7 +89,7 @@ export function createWorkerEvaluationWorkflows(
       })
     : UnconfiguredWorkflowNlpRuntimeAdapter.create();
   const repositories = instantiateRepositories(workflowRepositories, {
-    backend: "postgres",
+    backend: "live",
     infrastructure: { prisma: input.database },
   });
   const llmParameters = WorkerEvaluationWorkflowLlmParameters.create({

@@ -79,7 +79,7 @@ export {
   EvaluationReport,
   EvaluationRescore,
   EvaluationRunAnalytics,
-  EvaluationWarmupPort,
+  EvaluationWarmupProbe,
 } from "./app/evaluation.infrastructure.ts";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
 export {

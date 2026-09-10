@@ -34,7 +34,7 @@ export {
 export {
   DatasetObjectStorageResolverAdapter,
   DatasetObjectStorageS3ClientResolverAdapter,
-  DatasetStorageDestinationPort,
+  DatasetStorageDestinationService,
   type DatasetStorageDestination,
   type DatasetS3Target,
 } from "./services/dataset-object-storage-resolver.service.ts";

@@ -12,7 +12,7 @@ export type OrganizationSessionPolicy = Readonly<{
   maxSessionDurationDays: number;
 }>;
 
-export abstract class OrganizationSessionPolicyPort {
+export abstract class OrganizationSessionPolicyRepository {
   abstract find(organizationId: string): Promise<OrganizationSessionPolicy>;
   abstract setMaxDurationDays(
     organizationId: string,

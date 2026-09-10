@@ -1,5 +1,5 @@
 import type { CodingAgentProjectActivity } from "@langwatch/coding-agent-server";
-import type { GithubProjectActivityPort } from "@langwatch/github-server";
+import type { GithubProjectActivity } from "@langwatch/github-server";
 import { toDate, type Instant } from "@langwatch/time";
 
 type WorkerProjectActivitySource = {
@@ -14,7 +14,7 @@ type WorkerProjectActivitySource = {
  * columns, which take a `Date`, so the conversion happens once, here.
  */
 export class WorkerProjectActivityAdapter
-  implements GithubProjectActivityPort, CodingAgentProjectActivity
+  implements GithubProjectActivity, CodingAgentProjectActivity
 {
   static create(activity: WorkerProjectActivitySource): WorkerProjectActivityAdapter {
     return new WorkerProjectActivityAdapter(activity);

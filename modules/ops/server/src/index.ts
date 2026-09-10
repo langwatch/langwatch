@@ -104,7 +104,7 @@ export {
   type OpsProjectionMetadata,
 } from "./app/ops.app.ts";
 export { EventingOpsIntrospectionAdapter } from "./services/eventing.ops-introspection.service.ts";
-export { OpsReplayRuntimePort, type OpsReplayRuntime } from "./app/ops.app.ts";
+export { OpsReplayRuntimeFactory, type OpsReplayRuntime } from "./app/ops.app.ts";
 export { MemoryEventExplorerRepository } from "./repositories/memory/memory.event-explorer.repository.ts";
 export type {
   AggregateDiscoveryRow,
@@ -164,7 +164,7 @@ export { NullOrganizationDataplaneAdapter } from "./services/null.organization-d
 export { RoutingTableOrganizationDataplaneAdapter } from "./services/routing-table.organization-dataplane.service.ts";
 export {
   type OrganizationDataplane,
-  OrganizationDataplanePort,
+  OrganizationDataplaneResolver,
 } from "./app/ops.app.ts";
 export {
   type OrganizationCohortAdmission,

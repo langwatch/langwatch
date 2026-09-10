@@ -21,7 +21,11 @@ import {
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
-import { PersonalWorkspaceIdentity, TeamIdentity } from "../../app/organization.infrastructure.ts";
+import type {
+  GroupIdentity,
+  PersonalWorkspaceIdentity,
+  TeamIdentity,
+} from "../../app/organization.infrastructure.ts";
 import {
   OrganizationRepository,
   type PersonalWorkspaceFeatureProject,
@@ -266,7 +270,7 @@ function createService(
     } as unknown as import("../../repositories/group.repository.ts").GroupRepository,
     identities: new FixedIdentities(),
     teamIdentities: new FixedTeamIdentities(),
-    groupIdentities: {} as import("../../ports/organization.port.ts").GroupIdentityPort,
+    groupIdentities: {} as GroupIdentity,
     authz: {
       listScopeBindings: () => Promise.resolve(teamBindings),
     } as unknown as AuthzService,

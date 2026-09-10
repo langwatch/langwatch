@@ -9,10 +9,8 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { CanonicalMetricAdapter } from "../services/canonical-metric.service.ts";
 import { MetricService } from "../services/metric.service.ts";
 
-export type MetricInfrastructure = Readonly<Record<never, never>>;
-
 type MetricDependencies = Readonly<{ dataPrivacy: typeof DataPrivacyApi }>;
-type MetricSetup = FeatureSetup<MetricDependencies, MetricInfrastructure, undefined>;
+type MetricSetup = FeatureSetup<MetricDependencies, never, undefined>;
 
 /** The process-owned metric preparation capability. */
 export class MetricApp implements MetricApiContract {

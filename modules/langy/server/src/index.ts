@@ -197,7 +197,7 @@ export type {
   LangyConversationFreshnessRecord,
   LangyConversationLivenessReader,
   LangyConversationLivenessRecord,
-  LangyBroadcastPort,
+  LangyConversationUpdateChannel,
   LangyConversationUpdateBroadcastSubscriberDeps,
   LangyFailTurnCommand,
 } from "./subscribers/langy-conversation.subscriber.ts";
@@ -217,14 +217,14 @@ export { LangyTurnAccessRedisRepository } from "./repositories/redis/redis.langy
 export {
   LANGY_TURN_ACCESS_TTL_SECONDS,
   type LangyTurnAccess,
-  LangyTurnAccessPort,
+  LangyTurnAccessRepository,
 } from "./repositories/langy-live-turn.repository.ts";
 export { LangyTurnHandoffRedisRepository } from "./repositories/redis/redis.langy-turn-handoff.repository.ts";
 export type { LangyHandoffRedis } from "./repositories/redis/redis.langy-turn-handoff.repository.ts";
 export {
   LANGY_HANDOFF_TTL_SECONDS,
   type LangyTurnHandoff,
-  LangyTurnHandoffPort,
+  LangyTurnHandoffRepository,
 } from "./repositories/langy-live-turn.repository.ts";
 export { LangyTokenBufferRedisRepository } from "./repositories/redis/redis.langy-token-buffer.repository.ts";
 export {

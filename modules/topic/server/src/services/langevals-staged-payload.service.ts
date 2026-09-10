@@ -1,0 +1,200 @@
+import { createLogger } from "@langwatch/observability";
+import {
+  LangevalsPayloadStaging,
+  STAGED_PAYLOAD_HEADER,
+} from "../app/topic.infrastructure.ts";
+
+const logger = createLogger("langwatch:langevals:stagedFetch");
+
+const STAGING_PREFIX = "langevals-staging";
+
+/**
+ * The staged URL's host, for the log line. The HOST only: a presigned URL
+ * carries its signature in the query string, so logging the whole thing would
+ * put a credential in the log.
+ */
+function safeUrlHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "<invalid-url>";
+  }
+}
+
+/**
+ * Which langevals call path we're making. Drives: - the per-kind hard cap (eval vs topic
+ * clustering) - log attribution so we can split metrics in CloudWatch Adding a new kind is
+ * intentional friction — pick the right cap, don't fall through to a generic default.
+ */
+export type LangevalsCallKind =
+  | "evaluation"
+  | "topic_clustering_batch"
+  | "topic_clustering_incremental";
+
+export class PayloadTooLargeError extends Error {
+  constructor(
+    public readonly bytes: number,
+    public readonly limitBytes: number,
+    public readonly kind: LangevalsCallKind,
+  ) {
+    super(`${kind} payload is ${bytes} bytes, exceeds configured cap of ${limitBytes} bytes`);
+    this.name = "PayloadTooLargeError";
+  }
+}
+
+export interface StagedFetchOptions {
+  url: string;
+  body: unknown;
+  projectId: string;
+  kind: LangevalsCallKind;
+  headers?: Record<string, string>;
+  /**
+   * Optional client deadline / cancellation, forwarded verbatim to fetch().
+   */
+  signal?: AbortSignal;
+}
+
+/**
+ * The staging policy as a value, so a composed transport takes it from the
+ * process configuration rather than reading the application environment.
+ */
+export type LangevalsStagedPayloadConfig = {
+  /** Unset disables staging entirely: every payload goes inline. */
+  stagingThresholdBytes: number | undefined;
+  stagingTtlSeconds: number;
+  evaluationMaxPayloadBytes: number;
+  topicClusteringMaxPayloadBytes: number;
+};
+
+/**
+ * Configured transport for callers composed at the application root.
+ */
+export class LangevalsStagedPayloadAdapter {
+  static create(input: {
+    config: LangevalsStagedPayloadConfig;
+    /**
+     * Where an over-threshold body is parked. REQUIRED: a deployment with no
+     * object storage composes a refusing implementation, so an oversized
+     * payload is named rather than silently posted inline into the 6 MB cap.
+     */
+    staging: LangevalsPayloadStaging;
+  }): LangevalsStagedPayloadAdapter {
+    return new LangevalsStagedPayloadAdapter(input.config, input.staging);
+  }
+
+  private constructor(
+    private readonly config: LangevalsStagedPayloadConfig,
+    private readonly staging: LangevalsPayloadStaging,
+  ) {}
+
+  post(opts: StagedFetchOptions): Promise<Response> {
+    return postStagedLangevalsPayload(opts, this.config, this.staging);
+  }
+}
+
+function maxBytesForKind(kind: LangevalsCallKind, config: LangevalsStagedPayloadConfig): number {
+  switch (kind) {
+    case "evaluation":
+      return config.evaluationMaxPayloadBytes;
+    case "topic_clustering_batch":
+    case "topic_clustering_incremental":
+      return config.topicClusteringMaxPayloadBytes;
+  }
+}
+
+/**
+ * POST a JSON body to a langevals endpoint, auto-staging through the staging port when the body
+ * exceeds the configured threshold. Why: langevals on SaaS is fronted by AWS Lambda whose sync
+ * request body is capped at 6 MB.
+ */
+async function postStagedLangevalsPayload(
+  opts: StagedFetchOptions,
+  config: LangevalsStagedPayloadConfig,
+  staging: LangevalsPayloadStaging,
+): Promise<Response> {
+  const { url, body, projectId, kind, headers = {}, signal } = opts;
+
+  const serialized = Buffer.from(JSON.stringify(body), "utf-8");
+  const bytes = serialized.byteLength;
+  const limit = maxBytesForKind(kind, config);
+  const threshold = config.stagingThresholdBytes;
+
+  if (bytes > limit) {
+    logger.error(
+      { projectId, kind, bytes, limitBytes: limit, url },
+      "langevals payload exceeds configured hard cap, rejecting before any network call",
+    );
+    throw new PayloadTooLargeError(bytes, limit, kind);
+  }
+
+  // Staging is opt-in: only enabled when LANGEVALS_STAGING_THRESHOLD_BYTES
+  // is configured (SaaS / Lambda-fronted langevals). When unset (self-hosted
+  // HTTP langevals), all payloads go inline regardless of size — there's no
+  // 6 MB cap to dodge.
+  if (threshold === undefined || bytes <= threshold) {
+    logger.debug(
+      { projectId, kind, bytes, thresholdBytes: threshold, url },
+      threshold === undefined
+        ? "posting langevals payload inline (staging disabled)"
+        : "posting langevals payload inline (below staging threshold)",
+    );
+    return fetch(url, {
+      method: "POST",
+      // Content-Type is pinned last so callers can't override it: the
+      // body is always JSON-serialized here, same contract as the
+      // staged path below.
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: serialized,
+      ...(signal ? { signal } : {}),
+    });
+  }
+
+  const ttlSeconds = config.stagingTtlSeconds;
+  const staged = await staging.stage({
+    projectId,
+    keyPrefix: `${STAGING_PREFIX}/${projectId}/${kind}`,
+    serialized,
+    ttlSeconds,
+    // The upload is part of the deadline-bounded exchange: it runs BEFORE
+    // the fetch, so leaving it unsignalled would let a stalled put spend the
+    // caller's whole deadline (and, for topic clustering, its lease) before
+    // the abort could bite.
+    ...(signal ? { signal } : {}),
+  });
+
+  logger.info(
+    {
+      projectId,
+      kind,
+      bytes,
+      thresholdBytes: threshold,
+      limitBytes: limit,
+      ttlSeconds,
+      stagedUrlHost: safeUrlHost(staged.url),
+      target: url,
+    },
+    "staged large langevals payload via presigned S3 URL",
+  );
+
+  try {
+    return await fetch(url, {
+      method: "POST",
+      // Caller headers are spread first so the contract-defining
+      // X-Payload-S3-URL and Content-Type cannot be silently overridden;
+      // letting a caller override the staged header would mean the
+      // upstream Lambda fetches the wrong URL (or no URL at all).
+      headers: {
+        ...headers,
+        "Content-Type": "application/json",
+        [STAGED_PAYLOAD_HEADER]: staged.url,
+      },
+      ...(signal ? { signal } : {}),
+    });
+  } finally {
+    // Best-effort delete: by the time fetch() resolves, langevals has already fetched the
+    // presigned URL during its request handling, so the object is no longer needed. Staged
+    // bodies carry customer trace data and provider credentials (api keys, vertex_credentials,
+    // bedrock keys) so we don't want them lingering.
+    await staged.discard();
+  }
+}

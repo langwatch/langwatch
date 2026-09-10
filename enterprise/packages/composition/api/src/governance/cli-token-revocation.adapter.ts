@@ -2,7 +2,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import {
-  CliTokenStorePort,
+  CliTokenStore,
   GovernanceDiagnostics,
 } from "@langwatch/enterprise-governance-server";
 import type { Cluster, Redis } from "ioredis";
@@ -10,10 +10,8 @@ import type { Cluster, Redis } from "ioredis";
 const logger = createLogger("langwatch:cli-token-revocation");
 type RedisLike = Redis | Cluster;
 
-export class RedisCliTokenStoreAdapter extends CliTokenStorePort {
-  constructor(private readonly redis: RedisLike) {
-    super();
-  }
+export class RedisCliTokenStoreAdapter implements CliTokenStore {
+  constructor(private readonly redis: RedisLike) {}
 
   members(key: string): Promise<string[]> {
     return this.redis.smembers(key);

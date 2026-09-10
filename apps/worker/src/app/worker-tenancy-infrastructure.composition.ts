@@ -5,7 +5,7 @@ import {
   type AuthzGrantsCommandDispatcher,
 } from "@langwatch/authz-server";
 import {
-  DataRetentionPlanPort,
+  DataRetentionPlanResolver,
   type DataRetentionInfrastructure,
   type DataRetentionPlan,
 } from "@langwatch/data-retention-server";
@@ -44,7 +44,7 @@ export type WorkerTenancyInfrastructureOptions = Readonly<{
  * on. Which plan types count as enterprise, and whether this install is SaaS at
  * all, are billing and licensing facts the feature deliberately does not know.
  */
-export class WorkerDataRetentionPlans implements DataRetentionPlanPort {
+export class WorkerDataRetentionPlans implements DataRetentionPlanResolver {
   static create(plans: Pick<PlanProvider, "getActivePlan">): WorkerDataRetentionPlans {
     return new WorkerDataRetentionPlans(plans);
   }

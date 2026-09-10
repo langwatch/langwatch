@@ -1,5 +1,6 @@
 import { ApiKeyApi, type ApiKeyApi as ApiKeyApiContract } from "@langwatch/api-key-contract";
-import { apiKeyServer, type ApiKeyInfrastructure } from "@langwatch/api-key-server";
+import type { ApiKeyServerConfig } from "@langwatch/api-key-contract";
+import { apiKeyServer } from "@langwatch/api-key-server";
 import type { AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import { authzServer, type AuthzInfrastructure } from "@langwatch/authz-server";
 import {
@@ -20,13 +21,13 @@ import type { Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   GroupIdentityAdapter,
-  OrganizationPromptSeedPort,
-  OrganizationSeatLicensePort,
-  OrganizationSettingsSecretPort,
   PersonalWorkspaceDiagnosticsAdapter,
   PersonalWorkspaceIdentityAdapter,
   organizationServer,
   TeamIdentityAdapter,
+  type OrganizationPromptSeed,
+  type OrganizationSeatLicense,
+  type OrganizationSettingsSecret,
 } from "@langwatch/organization-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { PostgresPromptAdapter, type PromptService } from "@langwatch/prompt-server";
@@ -61,7 +62,7 @@ export type WorkerTenancyCompositionOptions = Readonly<{
   encryption: AutomationSecretCrypto;
   plans: PlanProvider;
   authz: Omit<AuthzInfrastructure, "database" | "redis">;
-  apiKeys: ApiKeyInfrastructure;
+  apiKeys: ApiKeyServerConfig;
   dataRetention: Omit<DataRetentionInfrastructure, "redis">;
   share: Omit<ShareInfrastructure, "database" | "redis">;
   topics: TopicInfrastructure;
@@ -98,7 +99,7 @@ export function installWorkerTenancy<Infrastructure>(
       },
     })
     .withModule(projectServer, { infrastructure: options.project })
-    .withModule(apiKeyServer, { infrastructure: options.apiKeys })
+    .withModule(apiKeyServer, { config: options.apiKeys })
     .withModule(dataRetentionServer, {
       infrastructure: { ...options.dataRetention, redis: options.redis },
     })
@@ -108,13 +109,11 @@ export function installWorkerTenancy<Infrastructure>(
     .withModule(topicServer, { infrastructure: options.topics });
 }
 
-class WorkerOrganizationSettingsSecrets extends OrganizationSettingsSecretPort {
+class WorkerOrganizationSettingsSecrets implements OrganizationSettingsSecret {
   static create(encryption: AutomationSecretCrypto): WorkerOrganizationSettingsSecrets {
     return new WorkerOrganizationSettingsSecrets(encryption);
   }
-  private constructor(private readonly encryption: AutomationSecretCrypto) {
-    super();
-  }
+  private constructor(private readonly encryption: AutomationSecretCrypto) {}
   encrypt(value: string): string {
     return this.encryption.encrypt(value);
   }
@@ -123,16 +122,14 @@ class WorkerOrganizationSettingsSecrets extends OrganizationSettingsSecretPort {
   }
 }
 
-class WorkerOrganizationPrompts extends OrganizationPromptSeedPort {
+class WorkerOrganizationPrompts implements OrganizationPromptSeed {
   static create(prompts: PromptService, logger: Pick<Logger, "error">): WorkerOrganizationPrompts {
     return new WorkerOrganizationPrompts(prompts, logger);
   }
   private constructor(
     private readonly prompts: PromptService,
     private readonly logger: Pick<Logger, "error">,
-  ) {
-    super();
-  }
+  ) {}
   seedTagsForOrganization(input: { organizationId: string }): Promise<void> {
     return this.prompts.seedTagsForOrganization(input);
   }
@@ -141,7 +138,7 @@ class WorkerOrganizationPrompts extends OrganizationPromptSeedPort {
   }
 }
 
-class WorkerOrganizationSeats extends OrganizationSeatLicensePort {
+class WorkerOrganizationSeats implements OrganizationSeatLicense {
   static create(options: {
     plans: PlanProvider;
     database: PrismaConnection["client"];
@@ -154,9 +151,7 @@ class WorkerOrganizationSeats extends OrganizationSeatLicensePort {
   private constructor(
     private readonly plans: PlanProvider,
     private readonly memberships: PrismaUsageMembershipRepository,
-  ) {
-    super();
-  }
+  ) {}
   async checkLimit(input: {
     organizationId: string;
     resource: "members" | "membersLite";

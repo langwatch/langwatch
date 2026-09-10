@@ -9,7 +9,7 @@ import {
   type RetentionProjectLineage,
 } from "../../app/data-retention.app.ts";
 import {
-  DataRetentionPlanPort,
+  DataRetentionPlanResolver,
   type DataRetentionPlan,
 } from "../../app/data-retention.infrastructure.ts";
 import { createDataRetentionTestAuthz } from "../../app/__tests__/data-retention.fixture.ts";
@@ -40,7 +40,7 @@ class StubDirectory implements DataRetentionDirectoryReader {
   }
 }
 
-class StubPlans implements DataRetentionPlanPort {
+class StubPlans implements DataRetentionPlanResolver {
   constructor(private readonly plan: DataRetentionPlan) {
   }
   async getPlan(): Promise<DataRetentionPlan> {

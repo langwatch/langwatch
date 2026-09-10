@@ -11,13 +11,13 @@ import {
 } from "../../../rules/canonical-message.rules.ts";
 import { MastraValuesService } from "./mastra-value.service.ts";
 import type {
-  CanonicalAttributesPort,
+  AttributeCanonicaliser,
   ExtractorContext,
 } from "../canonical-attributes.service.ts";
 
 const mastraValuesService = MastraValuesService.create();
 
-export class MastraCanonicaliserService implements CanonicalAttributesPort {
+export class MastraCanonicaliserService implements AttributeCanonicaliser {
   static create(): MastraCanonicaliserService {
     return new MastraCanonicaliserService();
   }

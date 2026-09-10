@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { IdentityAccountSecrets } from "../rules/identity-storage-ports.rules.ts";
+import type { IdentityAccountSecrets } from "../rules/identity-storage.rules.ts";
 
 const logger = createLogger("langwatch:identity:secret-carry");
 

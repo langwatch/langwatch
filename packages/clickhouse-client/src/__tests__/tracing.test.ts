@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { QueryRequest } from "../query.ts";
-import { SPAN_ATTRIBUTES, type SpanPort, type TracerPort, QueryTracer } from "../tracing.ts";
+import { SPAN_ATTRIBUTES, type Span, type Tracer, QueryTracer } from "../tracing.ts";
 
 const recordingTracer = () => {
   const attributes: Record<string, string | number | boolean> = {};
   const errors: unknown[] = [];
   let ended = 0;
 
-  const span: SpanPort = {
+  const span: Span = {
     setAttribute: (key, value) => {
       attributes[key] = value;
     },
@@ -19,7 +19,7 @@ const recordingTracer = () => {
     },
   };
 
-  const tracer: TracerPort = { startSpan: () => span };
+  const tracer: Tracer = { startSpan: () => span };
   return { tracer, attributes, errors, ended: () => ended };
 };
 
@@ -208,7 +208,7 @@ describe("trace", () => {
 
     describe("when the tracer cannot start a span", () => {
       it("still returns the rows", async () => {
-        const tracer: TracerPort = {
+        const tracer: Tracer = {
           startSpan: () => {
             throw exploding;
           },
@@ -225,7 +225,7 @@ describe("trace", () => {
 
     describe("when the span throws while being written", () => {
       it("still returns the rows", async () => {
-        const tracer: TracerPort = {
+        const tracer: Tracer = {
           startSpan: () => ({
             setAttribute: () => {
               throw exploding;
@@ -248,7 +248,7 @@ describe("trace", () => {
       });
 
       it("still reports the ClickHouse failure, not the span one", async () => {
-        const tracer: TracerPort = {
+        const tracer: Tracer = {
           startSpan: () => ({
             setAttribute: () => undefined,
             recordError: () => {

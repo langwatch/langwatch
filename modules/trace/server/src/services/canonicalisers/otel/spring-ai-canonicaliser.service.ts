@@ -1,7 +1,7 @@
 /** Maps Spring AI prompt/completion observation log bodies to canonical I/O. */
 
 import type {
-  CanonicalAttributesPort,
+  AttributeCanonicaliser,
   ExtractorContext,
   LogExtractorContext,
 } from "../canonical-attributes.service.ts";
@@ -14,7 +14,7 @@ export const SPRING_AI_SCOPE_NAMES: ReadonlySet<string> = new Set([
 const PROMPT_IDENTIFIER = "Chat Model Prompt Content:";
 const COMPLETION_IDENTIFIER = "Chat Model Completion:";
 
-export class SpringAICanonicaliserService implements CanonicalAttributesPort {
+export class SpringAICanonicaliserService implements AttributeCanonicaliser {
   static create(): SpringAICanonicaliserService {
     return new SpringAICanonicaliserService();
   }

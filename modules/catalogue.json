@@ -5,6 +5,7 @@
       "id": "agent",
       "root": "modules/agent",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "agent"
       ]
@@ -13,6 +14,7 @@
       "id": "analytics",
       "root": "modules/analytics",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "analytics"
       ]
@@ -21,6 +23,7 @@
       "id": "annotation",
       "root": "modules/annotation",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "annotation"
       ]
@@ -29,6 +32,7 @@
       "id": "api-key",
       "root": "modules/api-key",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "api-key"
       ]
@@ -37,6 +41,7 @@
       "id": "auth",
       "root": "modules/auth",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "auth",
         "cli-bootstrap",
@@ -48,6 +53,7 @@
       "id": "authz",
       "root": "modules/authz",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "authz",
         "authz-grant"
@@ -57,6 +63,7 @@
       "id": "automation",
       "root": "modules/automation",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "automation",
         "email-suppression",
@@ -69,6 +76,7 @@
       "id": "coding-agent",
       "root": "modules/coding-agent",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "coding-agent"
       ]
@@ -77,6 +85,7 @@
       "id": "dashboard",
       "root": "modules/dashboard",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "dashboard",
         "graph",
@@ -87,6 +96,7 @@
       "id": "data-privacy",
       "root": "modules/data-privacy",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "data-privacy"
       ]
@@ -95,6 +105,7 @@
       "id": "data-retention",
       "root": "modules/data-retention",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "data-retention"
       ]
@@ -103,6 +114,7 @@
       "id": "dataset",
       "root": "modules/dataset",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "dataset",
         "dataset-record"
@@ -112,6 +124,7 @@
       "id": "entitlement",
       "root": "modules/entitlement",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "entitlement"
       ]
@@ -120,6 +133,7 @@
       "id": "evaluation",
       "root": "modules/evaluation",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "evaluation"
       ]
@@ -128,6 +142,7 @@
       "id": "evaluator",
       "root": "modules/evaluator",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "evaluator"
       ]
@@ -136,6 +151,7 @@
       "id": "experiment",
       "root": "modules/experiment",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "experiment"
       ]
@@ -144,6 +160,7 @@
       "id": "feature-flag",
       "root": "modules/feature-flag",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "feature-flag"
       ]
@@ -152,6 +169,7 @@
       "id": "gateway",
       "root": "modules/gateway",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "gateway",
         "personal-virtual-key",
@@ -163,6 +181,7 @@
       "id": "github",
       "root": "modules/github",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "github",
         "github-installation",
@@ -173,6 +192,7 @@
       "id": "hosted-mcp",
       "root": "modules/hosted-mcp",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "hosted-mcp",
         "mcp-oauth"
@@ -182,6 +202,7 @@
       "id": "identity",
       "root": "modules/identity",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "identity"
       ]
@@ -190,6 +211,7 @@
       "id": "langy",
       "root": "modules/langy",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "conversation",
         "credential",
@@ -203,6 +225,7 @@
       "id": "log",
       "root": "modules/log",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "log",
         "log-ingestion"
@@ -212,6 +235,7 @@
       "id": "metric",
       "root": "modules/metric",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "metric",
         "metric-ingestion"
@@ -221,6 +245,7 @@
       "id": "model-provider",
       "root": "modules/model-provider",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "model-provider"
       ]
@@ -229,6 +254,7 @@
       "id": "monitor",
       "root": "modules/monitor",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "monitor"
       ]
@@ -237,6 +263,7 @@
       "id": "navigation",
       "root": "modules/navigation",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "navigation"
       ]
@@ -245,6 +272,7 @@
       "id": "notification",
       "root": "modules/notification",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "notification"
       ]
@@ -253,6 +281,7 @@
       "id": "onboarding",
       "root": "modules/onboarding",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "onboarding"
       ]
@@ -261,6 +290,7 @@
       "id": "ops",
       "root": "modules/ops",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "admin",
         "impersonation",
@@ -271,6 +301,7 @@
       "id": "organization",
       "root": "modules/organization",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "group",
         "invite",
@@ -285,6 +316,7 @@
       "id": "platform-health",
       "root": "modules/platform-health",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "platform-health"
       ]
@@ -293,6 +325,7 @@
       "id": "presence",
       "root": "modules/presence",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "presence"
       ]
@@ -301,6 +334,7 @@
       "id": "project",
       "root": "modules/project",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "project"
       ]
@@ -309,6 +343,7 @@
       "id": "prompt",
       "root": "modules/prompt",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "prompt",
         "prompt-tag",
@@ -319,6 +354,7 @@
       "id": "role",
       "root": "modules/role",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "custom-role",
         "role"
@@ -328,6 +364,7 @@
       "id": "scenario",
       "root": "modules/scenario",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "scenario",
         "simulation"
@@ -337,6 +374,7 @@
       "id": "secret",
       "root": "modules/secret",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "secret"
       ]
@@ -345,6 +383,7 @@
       "id": "share",
       "root": "modules/share",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "share"
       ]
@@ -353,6 +392,7 @@
       "id": "stored-object",
       "root": "modules/stored-object",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "stored-object"
       ]
@@ -361,6 +401,7 @@
       "id": "suite",
       "root": "modules/suite",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "suite"
       ]
@@ -369,6 +410,7 @@
       "id": "topic",
       "root": "modules/topic",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "topic",
         "topic-clustering"
@@ -378,6 +420,7 @@
       "id": "trace",
       "root": "modules/trace",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "trace",
         "trace-ingestion"
@@ -387,6 +430,7 @@
       "id": "user",
       "root": "modules/user",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "user",
         "user-avatar"
@@ -396,6 +440,7 @@
       "id": "workflow",
       "root": "modules/workflow",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "workflow"
       ]
@@ -404,6 +449,7 @@
       "id": "audit-log",
       "root": "modules/audit-log",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "audit-log"
       ]
@@ -412,6 +458,7 @@
       "id": "billing",
       "root": "enterprise/modules/billing",
       "classification": "enterprise",
+      "tier": "enterprise",
       "subjects": [
         "billing"
       ]
@@ -420,6 +467,7 @@
       "id": "governance",
       "root": "enterprise/modules/governance",
       "classification": "enterprise",
+      "tier": "enterprise",
       "subjects": [
         "ai-tool-catalog",
         "anomaly-alert",
@@ -449,6 +497,7 @@
       "id": "licensing",
       "root": "enterprise/modules/licensing",
       "classification": "enterprise",
+      "tier": "enterprise",
       "subjects": [
         "license",
         "licensing"
@@ -458,6 +507,7 @@
       "id": "managed-provider",
       "root": "enterprise/modules/managed-provider",
       "classification": "enterprise",
+      "tier": "enterprise",
       "subjects": [
         "managed-model-provider",
         "managed-provider"
@@ -467,6 +517,7 @@
       "id": "saas",
       "root": "enterprise/modules/saas",
       "classification": "enterprise",
+      "tier": "enterprise",
       "subjects": [
         "saas"
       ]
@@ -475,6 +526,7 @@
       "id": "scim",
       "root": "enterprise/modules/scim",
       "classification": "enterprise",
+      "tier": "enterprise",
       "subjects": [
         "scim"
       ]
@@ -483,6 +535,7 @@
       "id": "sso",
       "root": "enterprise/modules/sso",
       "classification": "enterprise",
+      "tier": "enterprise",
       "subjects": [
         "sso"
       ]
@@ -491,6 +544,7 @@
       "id": "webhook",
       "root": "modules/webhook",
       "classification": "core",
+      "tier": "core",
       "subjects": [
         "webhook"
       ]

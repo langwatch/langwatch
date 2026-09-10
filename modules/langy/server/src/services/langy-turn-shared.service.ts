@@ -12,14 +12,14 @@ import {
   LangyHarness,
   LangyModel,
   LangySessionKey,
-  LangyTurnContextPort,
+  LangyTurnContextRenderer,
   LangyTurnMetrics,
   LangyUiActionSurface,
   type LangyWorkerProbeInput,
   LangyWorker,
 } from "../app/langy.infrastructure.ts";
-import type { LangyTurnAccessPort } from "../repositories/langy-live-turn.repository.ts";
-import type { LangyTurnHandoffPort } from "../repositories/langy-live-turn.repository.ts";
+import type { LangyTurnAccessRepository } from "../repositories/langy-live-turn.repository.ts";
+import type { LangyTurnHandoffRepository } from "../repositories/langy-live-turn.repository.ts";
 import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
 import { LangyConversationService } from "./langy-conversation.service.ts";
 import { LangyCredentialService } from "./langy-credential.service.ts";
@@ -58,12 +58,12 @@ export interface LangyTurnServiceDeps {
   harness?: LangyHarness;
   perDayPrCap: number;
   sessionKeys: LangySessionKey;
-  context: LangyTurnContextPort;
+  context: LangyTurnContextRenderer;
   uiActionSurface: LangyUiActionSurface;
   metrics: LangyTurnMetrics;
   admission: LangyTurnAdmissionRepository;
-  accessStore: LangyTurnAccessPort | null;
-  handoffStore: LangyTurnHandoffPort | null;
+  accessStore: LangyTurnAccessRepository | null;
+  handoffStore: LangyTurnHandoffRepository | null;
   messages: LangyMessageRepository | null;
 }
 
@@ -82,11 +82,11 @@ export type LangyTurnTechnicalMembers = {
   harness?: LangyHarness;
   perDayPrCap: number;
   sessionKeys: LangySessionKey;
-  context: LangyTurnContextPort;
+  context: LangyTurnContextRenderer;
   uiActionSurface: LangyUiActionSurface;
   metrics: LangyTurnMetrics;
-  accessStore: LangyTurnAccessPort | null;
-  handoffStore: LangyTurnHandoffPort | null;
+  accessStore: LangyTurnAccessRepository | null;
+  handoffStore: LangyTurnHandoffRepository | null;
 };
 
 export const LANGY_USER_MESSAGE_LABEL = "THE USER'S MESSAGE:";

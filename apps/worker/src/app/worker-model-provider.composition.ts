@@ -4,8 +4,8 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import {
-  AwsStsManagedProviderCredentialAdapter,
-  EnvironmentManagedProviderConfigurationAdapter,
+  HttpManagedProviderCredentialsChannel,
+  ManagedProviderConfigurationService,
   ManagedProviderConfigurationReporter,
   ManagedProviderService as EnterpriseManagedProviderService,
 } from "@langwatch/enterprise-managed-provider-server";
@@ -229,11 +229,11 @@ function composeWorkerManagedProviders(input: {
 }): ManagedProviderApi {
   return EnterpriseManagedProviderService.create({
     projects: input.projects,
-    configuration: EnvironmentManagedProviderConfigurationAdapter.create({
+    configuration: ManagedProviderConfigurationService.create({
       source: input.environment,
       reporter: WorkerManagedProviderConfigurationReporter.create(input.logger),
     }),
-    credentials: AwsStsManagedProviderCredentialAdapter.create(),
+    credentials: HttpManagedProviderCredentialsChannel.create(),
   });
 }
 

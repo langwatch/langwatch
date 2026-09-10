@@ -1,7 +1,7 @@
 import {
   LANGY_HANDOFF_TTL_SECONDS,
   type LangyTurnHandoff,
-  LangyTurnHandoffPort,
+  LangyTurnHandoffRepository,
   langyTurnHandoffSchema,
 } from "../langy-live-turn.repository.ts";
 
@@ -12,7 +12,7 @@ export interface LangyHandoffRedis {
 }
 
 /** Redis-backed turn handoff, parked for `LANGY_HANDOFF_TTL_SECONDS`. */
-export class LangyTurnHandoffRedisRepository extends LangyTurnHandoffPort {
+export class LangyTurnHandoffRedisRepository extends LangyTurnHandoffRepository {
   static create(options: { redis: LangyHandoffRedis }): LangyTurnHandoffRedisRepository {
     return new LangyTurnHandoffRedisRepository(options.redis);
   }

@@ -8,7 +8,7 @@ import {
   type WorkerProjectS3Target,
 } from "../platform/infrastructure/worker-stored-object-storage.adapter.ts";
 
-export type WorkerPrivateInfrastructurePorts = Readonly<{
+export type WorkerPrivateInfrastructureMembers = Readonly<{
   projects: WorkerProjectS3Source;
   azure?: WorkerAzureStorageFactory;
 }>;
@@ -20,7 +20,7 @@ export type WorkerPrivateInfrastructurePorts = Readonly<{
  */
 export function createWorkerPrivateInfrastructureComposition(options: {
   config: WorkerConfig;
-  ports: WorkerPrivateInfrastructurePorts;
+  ports: WorkerPrivateInfrastructureMembers;
 }): WorkerInfrastructureCompositionOptions {
   return {
     redis: options.config.infrastructure.redis,

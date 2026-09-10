@@ -1,4 +1,5 @@
 /** The secret feature application shared by all transports. */
+import { reads, type MembersRead } from "@langwatch/infrastructure";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import {
   RESERVED_PROJECT_SECRET_NAMES,
@@ -15,14 +16,14 @@ import {
 import type { SecretRepositories } from "../repositories/secret.repositories.ts";
 import { SecretService } from "../services/secret.service.ts";
 
-/** The cipher the composing process owns; the key never reaches this package. */
-export interface SecretInfrastructure {
-  readonly encryption: SecretEncryption;
-}
-
+/**
+ * The cipher is the process's own `encryption` member; the key never reaches
+ * this package, and a deployment that configured none refuses at boot naming
+ * this module rather than storing a project's value in the clear.
+ */
 type SecretSetup = FeatureSetup<
   typeof SecretApp.dependencies,
-  SecretInfrastructure,
+  MembersRead<typeof SecretApp.reads>,
   undefined,
   SecretRepositories
 >;
@@ -30,6 +31,7 @@ type SecretSetup = FeatureSetup<
 export class SecretApp implements SecretApiContract {
   static readonly contract = SecretApi;
   static readonly dependencies = {};
+  static readonly reads = reads("encryption");
 
   #secrets: SecretService;
 
@@ -41,7 +43,7 @@ export class SecretApp implements SecretApiContract {
     return new SecretApp(
       SecretService.create({
         repository: setup.repositories.secrets,
-        encryption: setup.infrastructure.encryption,
+        encryption: setup.members.encryption,
         reservedNames: RESERVED_PROJECT_SECRET_NAMES,
       }),
     );

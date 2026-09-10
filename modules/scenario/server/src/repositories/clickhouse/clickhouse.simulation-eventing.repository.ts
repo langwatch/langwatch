@@ -80,7 +80,7 @@ class GatedSimulationRunStateFoldStore implements FoldProjectionStore<Simulation
 export type SimulationStalledRun = StalledHistoricalRun;
 export { BACKFILL_STALE_THRESHOLD_MS };
 
-type SimulationRunMetricsAppendPort = {
+type SimulationRunMetricsAppend = {
   append(
     record: SimulationRunMetricsProjectionRecord,
     context: ProjectionStoreContext,
@@ -167,7 +167,7 @@ export class SimulationRunMetricsStoreAdapter implements AppendStore<SimulationR
     return new SimulationRunMetricsStoreAdapter(store);
   }
 
-  private constructor(private readonly store: SimulationRunMetricsAppendPort) {}
+  private constructor(private readonly store: SimulationRunMetricsAppend) {}
 
   append(
     record: SimulationRunMetricsProjectionRecord,

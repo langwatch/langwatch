@@ -10,7 +10,7 @@ import type {
   UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
-import { RoutingPolicyPort } from "../policy/routing-policy.repository.ts";
+import { RoutingPolicyRepository } from "../policy/routing-policy.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
 const ROUTING_POLICY_KSUID_RESOURCE = "routepol";
@@ -20,7 +20,7 @@ const ROUTING_POLICY_KSUID_RESOURCE = "routepol";
  * setting a default clears the previous holder the way the Prisma
  * transaction does.
  */
-export class MemoryRoutingPolicyRepository extends RoutingPolicyPort {
+export class MemoryRoutingPolicyRepository extends RoutingPolicyRepository {
   private constructor(private readonly store: MemoryGovernanceStore) {
     super();
   }

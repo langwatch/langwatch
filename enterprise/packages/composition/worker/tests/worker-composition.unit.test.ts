@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
 import {
   ManagedProviderConfiguration,
-  ManagedProviderCredentialsPort,
+  ManagedProviderCredentialVendor,
   type ManagedProviderCredentials,
 } from "@langwatch/enterprise-managed-provider-server";
 import { TestProjectApi } from "./test-project-api.ts";
@@ -80,7 +80,7 @@ class TestConfiguration extends ManagedProviderConfiguration {
   }
 }
 
-class TestCredentials extends ManagedProviderCredentialsPort {
+class TestCredentials extends ManagedProviderCredentialVendor {
   static create(): TestCredentials {
     return new TestCredentials();
   }

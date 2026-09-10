@@ -20,7 +20,7 @@ import {
 } from "../use-workflow-evaluator-picker-flow.ts";
 import {
   type PromptPickerCallbacks,
-  type PromptPickerPort,
+  type PromptPickerController,
   useWorkflowPromptPickerFlow,
 } from "../use-workflow-prompt-picker-flow.ts";
 
@@ -104,7 +104,7 @@ describe("Workflow prompt picker flow", () => {
   /** @scenario "Node selection transitions use named drawer host ports" */
   it("updates and selects a dropped node, while the app port owns drawer effects", () => {
     let callbacks: PromptPickerCallbacks | undefined;
-    const port: PromptPickerPort = {
+    const port: PromptPickerController = {
       register: (registered) => {
         callbacks = registered;
       },
@@ -136,7 +136,7 @@ describe("Workflow prompt picker flow", () => {
   /** @scenario "Node selection transitions use named drawer host ports" */
   it("clears and selects the placeholder when creating a new prompt", () => {
     let callbacks: PromptPickerCallbacks | undefined;
-    const port: PromptPickerPort = {
+    const port: PromptPickerController = {
       register: (registered) => {
         callbacks = registered;
       },
@@ -157,7 +157,7 @@ describe("Workflow prompt picker flow", () => {
   /** @scenario "Node selection transitions use named drawer host ports" */
   it("deletes a cancelled prompt placeholder", () => {
     let callbacks: PromptPickerCallbacks | undefined;
-    const port: PromptPickerPort = {
+    const port: PromptPickerController = {
       register: (registered) => {
         callbacks = registered;
       },

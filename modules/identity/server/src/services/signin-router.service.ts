@@ -24,7 +24,7 @@ export interface SignInDomainRouting {
 }
 
 /** Instance-level method policy, including ADR-027's frozen license gate. */
-export interface SignInMethodPolicyPort {
+export interface SignInMethodPolicyResolver {
   resolvePolicy(): Promise<SignInMethodPolicy>;
 }
 
@@ -66,7 +66,7 @@ const defaultRecorder: SignInRoutingRecorder = {
 
 export interface SignInRouterDeps {
   domains: SignInDomainRouting;
-  policy: SignInMethodPolicyPort;
+  policy: SignInMethodPolicyResolver;
   breakGlass: SignInBreakGlassLimiter;
   recorder?: SignInRoutingRecorder;
 }
@@ -85,7 +85,7 @@ export class SignInRouterService {
   }
 
   private readonly domains: SignInDomainRouting;
-  private readonly policy: SignInMethodPolicyPort;
+  private readonly policy: SignInMethodPolicyResolver;
   private readonly breakGlass: SignInBreakGlassLimiter;
   private readonly recorder: SignInRoutingRecorder;
 

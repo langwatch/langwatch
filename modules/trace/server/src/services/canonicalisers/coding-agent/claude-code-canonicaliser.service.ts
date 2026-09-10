@@ -1,6 +1,6 @@
 import { ATTR_KEYS, CLAUDE_CODE_LLM_REQUEST_SPAN_NAME } from "@langwatch/trace-contract";
 import type {
-  CanonicalAttributesPort,
+  AttributeCanonicaliser,
   ExtractorContext,
   LogExtractorContext,
 } from "../canonical-attributes.service.ts";
@@ -20,7 +20,7 @@ export const CLAUDE_CODE_SCOPE_NAMES: ReadonlySet<string> = new Set([
 const asString = (raw: unknown): string | null =>
   typeof raw === "string" && raw.length > 0 ? raw : null;
 
-export class ClaudeCodeCanonicaliserService implements CanonicalAttributesPort {
+export class ClaudeCodeCanonicaliserService implements AttributeCanonicaliser {
   static create(): ClaudeCodeCanonicaliserService {
     return new ClaudeCodeCanonicaliserService();
   }

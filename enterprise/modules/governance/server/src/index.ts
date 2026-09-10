@@ -147,7 +147,7 @@ export { createGovernanceRestApp } from "./transport/api-rest/governance.api.ts"
 // device token; the services underneath are the console's own.
 export {
   createGovernanceCliRestApp,
-  type GovernanceCliAccessToken as GovernanceCliAccessTokenPort,
+  type GovernanceCliAccessToken,
   type GovernanceCliBudgetReader as GovernanceCliBudget,
   type GovernanceCliCaller,
   type GovernanceCliPersonalWorkspace,

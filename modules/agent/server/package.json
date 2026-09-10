@@ -38,6 +38,7 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/infrastructure": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

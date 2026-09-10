@@ -51,7 +51,7 @@ export function createWorkerTraceNarrowPorts(options: {
   monitors: TraceEvaluationMonitorReader;
   modelProviders: TraceModelCostReader;
   productAnalytics: TraceProductAnalytics;
-}): WorkerTraceNarrowPorts {
+}): WorkerTraceNarrowMembers {
   return {
     projects: new WorkerTraceProjectMetadataAdapter(options.projects),
     monitors: createWorkerTraceEvaluationMonitorPort(options.monitors),
@@ -103,7 +103,7 @@ export type TraceModelCostReader = {
   listCosts(input: { projectId: string }): Promise<ModelCost[]>;
 };
 
-export type WorkerTraceNarrowPorts = Readonly<{
+export type WorkerTraceNarrowMembers = Readonly<{
   projects: TraceProjectMetadata;
   monitors: TraceEvaluationMonitor;
   modelCosts: TraceModelCostCatalog;

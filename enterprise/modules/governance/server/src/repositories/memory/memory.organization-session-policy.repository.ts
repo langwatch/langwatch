@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  OrganizationSessionPolicyPort,
+  OrganizationSessionPolicyRepository,
   type OrganizationSessionPolicy,
 } from "../policy/session-policy.repository.ts";
 
@@ -9,7 +9,7 @@ import {
 const UNBOUNDED: OrganizationSessionPolicy = { maxSessionDurationDays: 0 };
 
 /** The session policy twin: one column on one organization, held in a map. */
-export class MemoryOrganizationSessionPolicyRepository extends OrganizationSessionPolicyPort {
+export class MemoryOrganizationSessionPolicyRepository extends OrganizationSessionPolicyRepository {
   private readonly byOrganization = new Map<string, OrganizationSessionPolicy>();
 
   static create(): MemoryOrganizationSessionPolicyRepository {

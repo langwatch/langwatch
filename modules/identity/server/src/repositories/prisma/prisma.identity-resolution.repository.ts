@@ -1,8 +1,8 @@
 import { LIVE_IDENTIFIER_STATES } from "@langwatch/identity-contract";
 import type {
   IdentityResolution,
-  IdentityResolutionPort,
-} from "../../rules/identity-storage-ports.rules.ts";
+  IdentityResolver,
+} from "../../rules/identity-storage.rules.ts";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
 
@@ -21,7 +21,7 @@ interface ResolutionRow {
  * in ONE query. Joined rather than asked of the write gate on purpose.
  * The reads that carry no `userId` (ADR-116 §2): an identifier, and the
  */
-export class PrismaIdentityResolutionRepository implements IdentityResolutionPort {
+export class PrismaIdentityResolutionRepository implements IdentityResolver {
   static create(prisma: PrismaClient): PrismaIdentityResolutionRepository {
     return new PrismaIdentityResolutionRepository(prisma);
   }

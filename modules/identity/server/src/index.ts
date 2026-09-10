@@ -126,7 +126,7 @@ export { MfaGuardsService } from "./services/mfa-guards.service.ts";
 export {
   type SignInBreakGlassLimiter,
   type SignInDomainRouting,
-  type SignInMethodPolicyPort,
+  type SignInMethodPolicyResolver,
   type SignInRouteRequest,
   SignInRouterService,
   type SignInRouterDeps,

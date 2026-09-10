@@ -42,7 +42,7 @@ import { VercelCanonicaliserService } from "./vercel-canonicaliser.service.ts";
 import { VertexAdkCanonicaliserService } from "./vertex-adk-canonicaliser.service.ts";
 import type { ExtractorContext, LogExtractorContext } from "./canonical-attributes.service.ts";
 import {
-  CanonicalAttributesPort,
+  AttributeCanonicaliser,
   CanonicalLogRecordStore,
   CanonicalSpanStore,
 } from "./canonical-attributes.service.ts";
@@ -63,7 +63,7 @@ const claudeCodeResponseService = ClaudeCodeResponseService.create();
 const claudeCodeRequestService = ClaudeCodeRequestService.create();
 
 export class TraceCanonicalisationService extends TraceCanonicalisationServiceContract {
-  private readonly extractors: CanonicalAttributesPort[] = [
+  private readonly extractors: AttributeCanonicaliser[] = [
     LangWatchCanonicaliserService.create(),
     GenAICanonicaliserService.create(),
     VertexAdkCanonicaliserService.create(),

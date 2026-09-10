@@ -29,7 +29,7 @@ import {
   EventingOpsIntrospectionAdapter,
   IoredisOpsSnapshotRedisAdapter,
   ManagerExplorerService,
-  OpsReplayRuntimePort,
+  OpsReplayRuntimeFactory,
   type OpsAppDependencies,
   OpsOperations,
   PrismaProcessAuditRepository,
@@ -274,7 +274,7 @@ class WorkerOpsQueuePayloadDecoder extends QueuePayloadDecoder {
 }
 
 /** A fresh replay engine per run, over the live worker registry and shared Redis markers. */
-class WorkerOpsReplayRuntime extends OpsReplayRuntimePort {
+class WorkerOpsReplayRuntime extends OpsReplayRuntimeFactory {
   static create(input: {
     eventing: EventSourcing;
     redis: RedisConnection;

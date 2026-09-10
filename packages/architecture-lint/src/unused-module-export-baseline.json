@@ -1,0 +1,4070 @@
+{
+  "version": 1,
+  "policy": "unused-module-export",
+  "entries": [
+    {
+      "key": "enterprise/modules/audit-log/server/src/app/audit-log.app.ts|AuditLogConfig",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/audit-log/server/src/app/audit-log.app.ts|auditLogConfigSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/audit-log/server/src/migrations/agent-audit-log-ids.migration.ts|AgentAuditLogBackfillOutcome",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/repositories/clickhouse/clickhouse.billable-events.repository.ts|ClickHouseClientResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/repositories/memory/memory-billing.store.ts|MemoryBillingUser",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/repositories/prisma/prisma.duplicate-subscriptions-report.repository.ts|DuplicateSubscriptionsDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/rules/seat-event-quote.rules.ts|AlwaysInvoicePreview",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/services/annual-events-billing-threshold.service.ts|ThresholdResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/services/nurturing-sink-registry.service.ts|OrganizationAdminResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/tasks/stripe-prices-sync.task.ts|fetchAllStripeMeters",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/billing/server/src/tasks/stripe-prices-sync.task.ts|fetchAllStripePrices",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/intents/governance-event-delivery.intent.ts|DeliverGovernancePayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/intents/governance-event-delivery.intent.ts|governanceWebhookEnvelopeSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/intents/ingestion-pull.intent.ts|IngestionPullRunIntent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/processes/ingestion-pull.process.ts|INGESTION_PULL_STALE_RUN_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/projections/ingestion-pull-run-status.projection.ts|IngestionPullRunStatus",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/memory/memory-governance.store.ts|MemoryGovernanceAlert",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/memory/memory-governance.store.ts|MemoryGovernanceMember",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/memory/memory-governance.store.ts|MemoryGovernancePerson",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/memory/memory-governance.store.ts|MemoryGovernanceProject",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.admin-workspace-view-audit.repository.ts|AdminWorkspaceViewAuditDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.ai-tool-catalog.repository.ts|AiToolCatalogDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.anomaly-rule.repository.ts|AnomalyRuleDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.department.repository.ts|DepartmentDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.governance-personal-key.repository.ts|PersonalVirtualKeyDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.governance-routing.repository.ts|RoutingPolicyDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.governance-setup-state.repository.ts|GovernanceSetupStateDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.governance.repository.ts|PostgresGovernanceAdapterOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.ingestion-source-activity.repository.ts|ActivityMonitorDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.ingestion-template.repository.ts|IngestionTemplateDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.ocsf-export.repository.ts|GovernanceOcsfExportDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/repositories/prisma/prisma.organization-support-contact.repository.ts|OrganizationSupportContactDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/rules/copilot-transcript.rules.ts|ActivityFrom",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/rules/genie-message.rules.ts|GenieQueryAttachment",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/canonical-cost-extractor.service.ts|CanonicalCostEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/canonical-cost-extractor.service.ts|OtlpAnyValue",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/canonical-cost-extractor.service.ts|OtlpLogRecord",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/claude-compliance-puller.service.ts|CLAUDE_COMPLIANCE_PULL_CONFIG",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/conversation-trace-assembly.service.ts|ConversationIdentity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/conversation-trace-assembly.service.ts|IdentityField",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/conversation-trace-assembly.service.ts|KnownAgentIdentity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/copilot-studio-puller.service.ts|COPILOT_STUDIO_PULL_CONFIG",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/copilot-studio-trace-mapper.service.ts|COPILOT_CONVERSATION_SPAN_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/copilot-studio-trace-mapper.service.ts|COPILOT_TOOL_SPAN_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/databricks-genie-puller.service.ts|databricksGeniePullConfigSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/genie-trace-mapper.service.ts|GENIE_PROVENANCE_SOURCE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/genie-trace-mapper.service.ts|GENIE_QUERY_ACTION",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/ingestion-pull-eventing.service.ts|IngestionPullEventingAdapterOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/ingestion-pull.service.ts|IngestionPullExecution",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/openai-compliance-puller.service.ts|OPENAI_COMPLIANCE_PULL_CONFIG",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/personal-usage-dashboard.service.ts|PersonalUsageDashboardQuery",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/pull-destination.service.ts|DATABRICKS_WORKSPACE_HOST_SUFFIXES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/pulled-usage-pricing.service.ts|PulledUsagePrice",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/pulled-usage-pricing.service.ts|PulledUsageQuantities",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/puller-registry.service.ts|RegisteredGovernancePuller",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/services/spend-spike-anomaly-evaluator.service.ts|SpendSpikeEvaluationSummary",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/subscribers/governance-ocsf.subscriber.ts|GOVERNANCE_OCSF_INFO_SEVERITY_ID",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/subscribers/governance-ocsf.subscriber.ts|GOVERNANCE_OCSF_INVOKE_ACTIVITY_ID",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server/src/subscribers/governance-ocsf.subscriber.ts|GOVERNANCE_OCSF_MEDIUM_SEVERITY_ID",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server/src/app/licensing.infrastructure.ts|LicensingInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server/src/licensing.server.ts|LicensingInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server/src/licensing.server.ts|LicensingRuntime",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server/src/repositories/prisma/prisma.organization-license.repository.ts|OrganizationLicenseDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server/src/services/node-license-cryptography.service.ts|NodeLicenseCryptographyAdapterOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/managed-provider/server/src/managed-provider.server.ts|ManagedProviderInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/scim/server/src/app/scim.infrastructure.ts|SCIMInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/scim/server/src/repositories/scim.repository.ts|ScimDirectoryIdentityRecord",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/scim/server/src/repositories/scim.repository.ts|ScimGroupMemberUserRecord",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/scim/server/src/repositories/scim.repository.ts|ScimUserRecord",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/scim/server/src/rules/scim-webhook-signature.rules.ts|ScimWebhookSignatureVerdict",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/scim/server/src/services/scim-deprovision.service.ts|ScimRemovalManifest",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/scim/server/src/services/scim-sync-lifecycle.service.ts|ScimSyncLifecycleGuards",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/scim/server/src/services/scim-sync-lifecycle.service.ts|ScimSyncLifecycleLedger",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/sso/server/src/services/sso-gate.service.ts|SsoGateServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/rules/agent-test-tracing.rules.ts|AgentTestTrace",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/rules/agent-test-tracing.rules.ts|TraceTestContext",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/rules/connected-agent-caps.rules.ts|jsonByteLength",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/services/connected-agent-connection.service.ts|ConnectedAgentConnectionOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/services/connected-agent-dispatch.service.ts|CallDispatcherOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/services/connected-agent-long-poll.service.ts|LongPollTransportOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/services/connected-agent-parameter-spec.service.ts|NormalizedParameters",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/services/connected-agent.service.ts|ConnectedAgentOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/transport/agent-connect.rest.ts|framesAnswerSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/transport/agent-connect.rest.ts|pollAnswerSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/transport/agent-connect.rest.ts|postedFramesSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/transport/agent-connect.rest.ts|registerAnswerSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/transport/agent.rest.ts|relayCallBodySchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/agent/server/src/transport/agent.rest.ts|relayCallResponseSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/analytics.server.ts|AnalyticsInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/app/analytics.infrastructure.ts|AnalyticsInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts|BuiltQuery",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts|DateGrouping",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts|GroupByField",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts|TimeseriesQueryInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|AnalyticsTable",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|EvalRollupMetricKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|PickAnalyticsTableInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|ROLLUP_AVG_METRIC_KEYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|ROLLUP_ROLLABLE_METRIC_KEYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|RollupAvgMetricKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|RollupRollableMetricKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|SLIM_ELIGIBLE_METRIC_KEYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|SlimEligibleMetricKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|SlimEvalMetricKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|__testOnly__",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|isRollupRollableMetricKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics-route-table.mapper.ts|isSlimEligibleMetricKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.analytics.repository.ts|AnalyticsClientUnavailableError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.eval-rollup-timeseries-query.mapper.ts|EvalRollupAggregation",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.eval-rollup-timeseries-query.mapper.ts|EvalRollupGroupByKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.eval-slim-timeseries-query.mapper.ts|EvalSlimGroupByKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.field-mappings.mapper.ts|EVALUATION_ANALYTICS_COLUMNS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.field-mappings.mapper.ts|EVALUATION_IDENTITY_COLUMNS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.field-mappings.mapper.ts|FieldMapping",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.field-mappings.mapper.ts|SPAN_ANALYTICS_COLUMNS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.field-mappings.mapper.ts|SPAN_IDENTITY_COLUMNS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.filter-shapes.mapper.ts|ClickHouseFilterTable",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.filter-shapes.mapper.ts|FilterConditionResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts|NullLwqlKeyMapRepository",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts|EVALUATION_METRIC_KEYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts|EVENT_METRIC_KEYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts|METADATA_METRIC_KEYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts|PERFORMANCE_METRIC_KEYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts|PercentileMode",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts|SENTIMENT_METRIC_KEYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts|THREADS_METRIC_KEYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts|isKnownMetricKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.metric-translator.mapper.ts|unknownMetricError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.query-error-translation.mapper.ts|TRANSIENT_NETWORK_CODES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.rollup-timeseries-query.mapper.ts|RollupAggregation",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.slim-timeseries-query.mapper.ts|SlimGroupByKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.timeseries-query-shared.mapper.ts|MAX_TIMESERIES_BUCKETS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.timeseries-query-shared.mapper.ts|adjustTimeScaleForBucketCap",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/repositories/clickhouse/clickhouse.timeseries-query-shared.mapper.ts|validateTimeZone",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/langwatch-ql-diagnostics-shape.rules.ts|LangWatchQLDiagnosticCode",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/langwatch-ql-parser.rules.ts|SqlParseOutcome",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/langwatch-ql-policy.rules.ts|LangWatchQLLimits",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/langwatch-ql-validation-shape.rules.ts|LangWatchQLJoinEdge",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/langwatch-ql-validation-shape.rules.ts|LangWatchQLTableReference",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/langwatch-ql-violations.rules.ts|LWQL_CLAUSES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/langwatch-ql-violations.rules.ts|LWQL_VIOLATION_CODES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/lwql-content-gating.rules.ts|CONTENT_ATTRIBUTE_KEY_PREFIXES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/string-casing.rules.ts|camelCaseToLowerCase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/string-casing.rules.ts|camelCaseToPascalCase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/string-casing.rules.ts|camelCaseToSnakeCase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/string-casing.rules.ts|camelCaseToTitleCase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/string-casing.rules.ts|kebabCase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/string-casing.rules.ts|snakeCaseToCamelCase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/string-casing.rules.ts|snakeCaseToPascalCase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/string-casing.rules.ts|titleCase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/string-casing.rules.ts|uppercaseFirstLetter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/rules/string-casing.rules.ts|uppercaseFirstLetterLowerCaseRest",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-access-model.service.ts|LangWatchQLResourceLimits",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-catalog-shapes.service.ts|LangWatchQLColumnUnit",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-catalog-shapes.service.ts|LangWatchQLViewDedup",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-executor.service.ts|LangWatchQLStatistics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-postgres-mapping.service.ts|LangWatchQLColumn",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-postgres-mapping.service.ts|PostgresNamedCollection",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-postgres-mapping.service.ts|PostgresReaderRole",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-production-provisioning.service.ts|LWQL_KEY_MAP_TABLE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-production-provisioning.service.ts|LWQL_POSTGRES_READER_ROLE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-production-provisioning.service.ts|LWQL_POSTGRES_SCHEMA",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-schema.service.ts|LangWatchQLSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-schema.service.ts|LangWatchQLSchemaColumn",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-schema.service.ts|LangWatchQLSchemaDataset",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-time-window.service.ts|LangWatchQLBudgetOverflowMode",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-time-window.service.ts|LangWatchQLTimeWindowResolution",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-validation-errors.service.ts|LangWatchQLNotPermittedError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql-validation-errors.service.ts|LangWatchQLUnparseableError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql.service.ts|LangWatchQLCaller",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql.service.ts|LangWatchQLExecuteInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql.service.ts|LangWatchQLQueryResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/services/langwatch-ql.service.ts|ValidatedLangWatchQL",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/tasks/lwql-provision.task.ts|runLwqlProvisioningTask",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/transport/query.rest.ts|lwqlResultSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/analytics/server/src/transport/query.rest.ts|lwqlSchemaSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/annotation/server/src/repositories/memory/memory.annotation-queue.database.ts|MemoryAnnotationQueue",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/api-key/server/src/processes/agent-sandbox-key-reap.process.ts|AgentSandboxKeyReapIntents",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/api-key/server/src/repositories/memory/memory.api-key-token.repository.ts|API_KEY_PREFIX",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/api-key/server/src/repositories/memory/memory.api-key-token.repository.ts|INGEST_KEY_PREFIX",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/api-key/server/src/repositories/memory/memory.api-key-token.repository.ts|LEGACY_PAT_PREFIX",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/api-key/server/src/repositories/memory/memory.api-key-token.repository.ts|splitApiKeyToken",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/auth/server/src/repositories/memory/memory.auth.database.ts|StoredVerificationToken",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/auth/server/src/services/browser-session.service.ts|BrowserSessionDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/auth/server/src/transport/better-auth/better-auth.api.ts|AuthenticationResponseJSON",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/auth/server/src/transport/better-auth/better-auth.api.ts|PublicKeyCredentialCreationOptionsJSON",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/auth/server/src/transport/better-auth/better-auth.api.ts|PublicKeyCredentialRequestOptionsJSON",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/authz.server.ts|AuthzSetup",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/migrations/legacy-import.authz-grant.migration.ts|AuthzEngineDiff",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/migrations/legacy-import.authz-grant.migration.ts|AuthzExpectedFactsMapper",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/migrations/legacy-import.authz-grant.migration.ts|AuthzMigrationProofMapper",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/migrations/legacy-import.authz-grant.migration.ts|BindingCoverage",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/migrations/legacy-import.authz-grant.migration.ts|CheckResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/migrations/legacy-import.authz-grant.migration.ts|ExpectedFacts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/migrations/legacy-import.authz-grant.migration.ts|ExpectedShareLink",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/migrations/legacy-import.authz-grant.migration.ts|HeadState",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/migrations/legacy-import.authz-grant.migration.ts|LegacyImportAuthzGrantMigrationOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/projections/authz-grant.projection.ts|AUTHZ_GRANTS_WRITE_EVENT_TYPES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/projections/authz-grant.projection.ts|AUTHZ_GRANTS_WRITE_PROJECTION_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/authz-grant.repository.ts|OffboardCounts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/eventing/eventing.authz-grant.mapper.ts|BindingIdentityInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/eventing/eventing.authz-grant.mapper.ts|BindingIdentityPrincipal",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/eventing/eventing.authz-grant.repository.ts|EventingAuthzGrantRepositoryOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/memory/authz-memory.store.ts|AuthzMemoryCutoverRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/prisma/prisma.authz-grant.mapper.ts|CompatBindingRowShape",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/prisma/prisma.authz-grant.mapper.ts|CompatShareLinkRowShape",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/prisma/prisma.authz-grant.mapper.ts|GrantPrincipalTypeDb",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/prisma/prisma.authz-grant.mapper.ts|GrantResourceKindDb",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/prisma/prisma.authz-grant.mapper.ts|GrantScopeTypeDb",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/prisma/prisma.authz-grant.mapper.ts|SHARE_VISIBILITY_BY_PRINCIPAL",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/prisma/prisma.authz-grant.mapper.ts|ShareLinkAudience",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/prisma/prisma.authz-grant.repository.ts|AuthzGrantsReadRepository",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/prisma/prisma.authz-revocation.repository.ts|PrismaAuthzRevocationRepositoryOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/repositories/redis/redis.authz-epoch.repository.ts|RedisAuthzEpochRepositoryOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/rules/role-binding-read-back.rules.ts|BindingWire",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/rules/role-binding-read-back.rules.ts|CreatedPrincipal",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/services/authz-cutover-gate.service.ts|AuthzCutoverGateOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/services/authz-grant-snapshot.service.ts|AuthzGrantSnapshotServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/services/authz-grants.service.ts|GrantableScope",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/authz/server/src/stores/memory/memory.per-organization-cached-gate.store.ts|MAX_CACHE_ENTRIES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|AutomationGraphNotifierInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|AutomationGraphNotifierResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|AutomationInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|AutomationRunawayPort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|AutomationWebhookStoredParams",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|ClaimLease",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|ScheduledJobRecord",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|ScheduledJobStorePort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|TestFireEmail",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|TestFireSlackBot",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|TestFireSlackWebhook",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|TestFireWebhook",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/app/automation.infrastructure.ts|UnsubscribeTokenPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/automation.server.ts|AutomationInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/fixtures/graph-activity.fixture.ts|TriggerRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/processes/graph-alert-sweep.process.ts|GRAPH_ALERT_SWEEP_PROCESS_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/processes/trigger-settlement.process.ts|OverflowFlush",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/processes/trigger-settlement.process.ts|PendingMatch",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/processes/trigger-settlement.process.ts|PersistPage",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/processes/trigger-settlement.process.ts|TRIGGER_SETTLEMENT_PROCESS_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/processes/trigger-settlement.process.ts|TriggerSettlementState",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/processes/webhook-delivery-prune.process.ts|WEBHOOK_DELIVERY_PRUNE_PROCESS_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/repositories/memory/memory.automation.store.ts|StoredGraphTriggerSent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/repositories/memory/memory.automation.store.ts|StoredTriggerSend",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/repositories/memory/memory.automation.store.ts|StoredWebhookDelivery",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/repositories/prisma/prisma.email-suppression-name.repository.ts|EmailSuppressionNameDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/rules/report-chart.rules.ts|pieSegments",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/automation-authoring.service.ts|AutomationAuthoringCollaborators",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/automation-rules.service.ts|AutomationRulesCollaborators",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/graph-trigger-heartbeat.service.ts|AnalyticsMetricSource",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/graph-trigger-heartbeat.service.ts|GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/graph-trigger-heartbeat.service.ts|GRAPH_TRIGGER_HEARTBEAT_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/persist-cap.service.ts|ConsumePersistCapSlotOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/persist-cap.service.ts|PersistCapClaimKeyInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/persist-cap.service.ts|PersistCapKeyInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/persist-cap.service.ts|ReadPersistCapCountsOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/trigger-evaluator.service.ts|EvaluateGraphTriggerResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/trigger-evaluator.service.ts|EvaluationReason",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/trigger-evaluator.service.ts|TimeseriesFilterValue",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/trigger-evaluator.service.ts|TimeseriesPipeline",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server/src/services/trigger-evaluator.service.ts|TimeseriesReadOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/app/coding-agent.infrastructure.ts|CodingAgentInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/coding-agent.server.ts|CodingAgentInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/projections/coding-agent-session-log.projection.ts|CodingAgentSessionLogProjectionInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/projections/coding-agent-session-metric.projection.ts|CodingAgentSessionMetricProjectionInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/projections/coding-agent-session-metric.projection.ts|MetricFactsView",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/projections/coding-agent-session-span.projection.ts|CodingAgentSessionSpanCandidate",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/projections/coding-agent-session-span.projection.ts|CodingAgentSessionSpanProjectionInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/projections/coding-agent-session-span.projection.ts|SpanFactsView",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/projections/coding-agent-session-state.projection.ts|SessionStep",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/projections/coding-agent-session.projection.ts|CODING_AGENT_SESSION_COALESCE_MAX_BATCH",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/projections/coding-agent-session.projection.ts|CODING_AGENT_SESSION_READ_WINDOW_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/projections/coding-agent-session.projection.ts|CodingAgentSessionMetricSeriesRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/repositories/clickhouse/clickhouse.coding-agent-session-event.repository.ts|CodingAgentSessionEventRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/repositories/clickhouse/clickhouse.coding-agent-session-event.repository.ts|MODEL_CALL_EVENT_KIND",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/repositories/clickhouse/clickhouse.coding-agent-session-event.repository.ts|SessionEventsCursor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/repositories/clickhouse/clickhouse.coding-agent-session-event.repository.ts|SessionModelTotalsRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/repositories/clickhouse/clickhouse.coding-agent.repositories.ts|ClickHouseCodingAgentInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/repositories/clickhouse/clickhouse.session-metric-series.repository.ts|SessionMetricTotal",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/repositories/memory/memory.coding-agent.database.ts|MemoryStoredSession",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/services/coding-agent-personal-pull-request-values.service.ts|CodingAgentPersonalSession",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/services/coding-agent-pull-request-assignment.service.ts|AssignableDrivingSession",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/services/coding-agent-pull-request-mapping-backfill.service.ts|PULL_REQUEST_MAPPING_BACKFILL_CONCURRENCY",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/services/coding-agent-pull-request-read.service.ts|DETAIL_SESSIONS_LIMIT",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/services/coding-agent-pull-request-read.service.ts|PERSONAL_SESSION_LIMIT",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/services/coding-agent-pull-request-read.service.ts|PERSONAL_SESSION_WINDOW_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/services/coding-agent-pull-request-share.service.ts|PullRequestAttribution",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts|CodingAgentContributor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts|CodingAgentUsageTotals",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts|PULL_REQUEST_MAPPING_WINDOW_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts|pullRequestMappingGroupKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts|pullRequestMappingJobId",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts|pullRequestMappingStateSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dashboard/server/src/app/dashboard.infrastructure.ts|DashboardInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dashboard/server/src/repositories/saved-view.repository.ts|SavedViewUpdate",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-privacy/server/src/services/data-privacy-snapshot.service.ts|DataPrivacySnapshotPolicies",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/app/data-retention.infrastructure.ts|DataRetentionInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/app/data-retention.infrastructure.ts|StorageMeterClickHouse",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/app/data-retention.infrastructure.ts|StorageMeterQueryParams",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/repositories/clickhouse/clickhouse.retroactive-retention.repository.ts|RetentionClickHouseClientResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/repositories/prisma/prisma.data-retention-directory.repository.ts|DataRetentionDirectoryDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/services/data-retention-policy.service.ts|DataRetentionPolicyServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/services/data-retention-snapshot.service.ts|DataRetentionSnapshotServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/services/data-retention.service.ts|DataRetentionServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/services/storage-meter-scope.service.ts|StorageMeterScopeServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server/src/stores/storage-meter-cache.store.ts|CachedStorageBytes",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/repositories/dataset-content.repository.ts|DatasetJsonArray",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/repositories/dataset-content.repository.ts|DatasetJsonObject",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/repositories/dataset-content.repository.ts|DatasetJsonValue",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/repositories/dataset-content.repository.ts|DatasetWriteFields",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/repositories/memory/memory.dataset.repository.ts|toDataset",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/repositories/prisma/prisma.dataset-migration.repository.ts|DatasetMigrationOutcome",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/repositories/prisma/prisma.dataset-migration.repository.ts|DatasetMigrationRunResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/repositories/prisma/prisma.dataset-migration.repository.ts|DatasetMigrationSummary",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/repositories/prisma/prisma.dataset-record-content.repository.ts|DatasetRecordContentDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/repositories/prisma/prisma.dataset-record.repository.ts|DatasetRecordDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/repositories/prisma/prisma.dataset.repository.ts|DatasetDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/rules/dataset-generate-tools.rules.ts|tools",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/services/dataset-normalize.service.ts|CSV_IO_CHUNK_BYTES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/services/dataset-normalize.service.ts|LARGE_JSON_MAX_BYTES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/services/dataset-normalize.service.ts|LargeJsonUnsupportedError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/services/dataset-normalize.service.ts|MAX_CSV_ROW_BYTES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/services/dataset-normalize.service.ts|MAX_JSONL_LINE_BYTES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/tasks/dataset-content-backfill.task.ts|DatasetContentMigration",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server/src/transport/dataset.rest.ts|DatasetRestDeclaration",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/entitlement/server/src/app/entitlement.infrastructure.ts|EntitlementInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/entitlement/server/src/entitlement.server.ts|EntitlementInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/app/evaluation.app.ts|EvaluationLedger",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/app/evaluation.app.ts|EvaluationModelCascade",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/app/evaluation.app.ts|EvaluationRunner",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/app/evaluation.app.ts|EvaluationSavedEvaluatorDirectory",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/app/evaluation.app.ts|EvaluationSlugDirectory",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/app/evaluation.infrastructure.ts|EvaluationInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/evaluation.server.ts|EvaluationInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/projections/evaluation-analytics-fold.projection.ts|EVALUATION_ANALYTICS_COALESCE_MAX_BATCH",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/projections/evaluation-analytics-fold.projection.ts|EVALUATION_ANALYTICS_READ_WINDOW_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/projections/evaluation-analytics-fold.projection.ts|EvaluationAnalyticsRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/projections/evaluation-run.projection.ts|EvaluationRun",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/projections/evaluation-run.projection.ts|EvaluationRunData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/rules/evaluations-legacy-schemas.rules.ts|datasetEvaluateRequestSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/rules/evaluations-legacy-schemas.rules.ts|evaluateRequestSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/rules/evaluations-legacy-schemas.rules.ts|requestBodySchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/services/evaluation-batch-log.service.ts|EvaluationBatchLogDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/services/evaluation-execution-intent.service.ts|ExecuteEvaluationCommand",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/transport/evaluations-legacy.rest.ts|getEvaluatorIncludingCustom",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server/src/transport/evaluations-legacy.rest.ts|resolveEvaluatorSettingsDefaults",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluator/server/src/services/evaluator-code-execution.service.ts|EvaluatorCodeExecutionResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluator/server/src/services/evaluator.service.ts|EvaluatorServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/experiment.server.ts|ExperimentAppDependencies",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-cell-error-events.process.ts|NO_INPUTS_RESOLVED",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-cell-error-events.process.ts|evaluatorDisplayName",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-comparison-candidates.process.ts|variantDisplayNameFor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-comparison-candidates.process.ts|variantIdentifierFor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-connected-target.process.ts|ConnectedTargetCall",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-result-mapping.process.ts|isEvaluatorNode",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-run-event-guards.process.ts|isTraceMetricsComputedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-run-event-stream.process.ts|EventStream",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-run-events.process.ts|ExperimentRunCompletedEventData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-run-events.process.ts|ExperimentRunStartedEventData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-run-events.process.ts|TraceMetricsComputedEventData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/processes/experiment-run-semaphore.process.ts|Semaphore",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/repositories/clickhouse/clickhouse.experiment-dspy.repository.ts|ExperimentDspyClickHouseResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/repositories/clickhouse/clickhouse.experiment-dspy.repository.ts|ExperimentDspyTelemetry",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts|CompleteExperimentRunCommand",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts|ComputeExperimentRunMetricsCommand",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts|StartExperimentRunCommand",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/rules/experiment-run-event-types.rules.ts|EXPERIMENT_RUN_COMMAND_TYPES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/rules/experiment-run-event-types.rules.ts|EXPERIMENT_RUN_PROCESSING_COMMAND_TYPES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/rules/experiment-run-event-types.rules.ts|ExperimentRunProcessingCommandType",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/rules/experiment-run-event-types.rules.ts|ExperimentRunProcessingEventType",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/rules/experiment-run-input.rules.ts|ConnectedDispatch",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/services/experiment-connected-cell.service.ts|ConnectedCellExecutionInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/services/experiment-run-loop.service.ts|RunLoopDependencies",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/services/experiment-run-orchestrator.service.ts|ComparisonSkipReason",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/services/experiment-run-orchestrator.service.ts|NO_INPUTS_RESOLVED",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/services/experiment-workbench.service.ts|ExperimentDraftNames",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/experiment/server/src/services/experiment-workbench.service.ts|ExperimentWorkbenchServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/feature-flag/server/src/repositories/feature-flag-experiment-setting.repository.ts|ExperimentSubjectType",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/adapters/postgres.gateway-transaction.adapter.ts|GatewayTransactionDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/app/gateway.infrastructure.ts|GatewayInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/gateway.server.ts|GatewayInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/projections/gateway-spend.projection.ts|GATEWAY_SPEND_PIPELINE_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/projections/gateway-spend.projection.ts|GatewaySpendStatus",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/clickhouse/clickhouse.gateway-budget.repository.ts|BudgetBucketBoundary",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/clickhouse/clickhouse.gateway-budget.repository.ts|BudgetSpendTarget",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/clickhouse/clickhouse.gateway-budget.repository.ts|LedgerEventRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/clickhouse/clickhouse.gateway-budget.repository.ts|PULLED_USAGE_BUDGET_ID",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/clickhouse/clickhouse.gateway-budget.repository.ts|PULLED_USAGE_SCOPE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/clickhouse/clickhouse.gateway-budget.repository.ts|ScopeSpend",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts|SPEND_ROW_COLUMNS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/gateway-budget.repository.ts|BudgetDetail",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/gateway-budget.repository.ts|BudgetHealth",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/gateway-budget.repository.ts|GatewayBudgetReachInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/gateway-budget.repository.ts|GatewayProjectBudgetScopeInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-audit.repository.ts|GATEWAY_AUDIT_ACTIONS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-audit.repository.ts|GATEWAY_AUDIT_TARGET_KINDS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-audit.repository.ts|GatewayAuditAction",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-audit.repository.ts|GatewayAuditDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-audit.repository.ts|GatewayAuditTargetKind",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget-overview.repository.ts|GatewayBudgetOverviewDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget-resolution.repository.ts|BudgetResolutionTarget",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget-resolution.repository.ts|ResolvedBudget",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget-scope-reach.repository.ts|GatewayBudgetScopeReachDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget-scope-target.repository.ts|GatewayBudgetScopeTargetDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|ArchiveBudgetInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|BudgetCheckDecision",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|BudgetCheckInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|BudgetCheckResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|BudgetDetail",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|BudgetHealth",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|BudgetLedgerLine",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|BudgetListWithHealth",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|BudgetScope",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|CreateBudgetInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|GatewayBudgetWithSeats",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|GatewayProjectBudgetScopeInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|UpdateBudgetInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts|toGatewayBudgetResource",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-change-event.repository.ts|GatewayChangeEventDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts|GatewayElevenLabsCredentialDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-key-budget.repository.ts|GatewayKeyBudgetDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-realtime-session.repository.ts|GatewayRealtimeSessionDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-scope-resolution.repository.ts|GatewayScopeResolutionDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-trace-destination-report.repository.ts|TraceDestinationReportDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-virtual-key-config-backfill.repository.ts|VirtualKeyConfigBackfillDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts|VirtualKeyDirectBudgetDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.virtual-key-authorization.repository.ts|VirtualKeyAuthorizationDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.virtual-key.repository.ts|CreateVirtualKeyData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.virtual-key.repository.ts|ScopeInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.virtual-key.repository.ts|SetVirtualKeyDisabledData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/repositories/prisma/prisma.virtual-key.repository.ts|VirtualKeyWithScopes",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|BudgetWire",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|BundlePolicyRules",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|CacheRuleWire",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|GuardrailAttachmentWire",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|GuardrailWire",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|ProviderSlot",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|budgetSpentMicroUSD",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|buildProviderConfig",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|decimalToMicroUSD",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|decimalUSDStringToMicroUSD",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|emptyPolicyRules",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|mergePolicyDim",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|normalisePolicyRules",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|routingWire",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/rules/gateway-config-wire.rules.ts|scopeToWire",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-applicable-budgets.service.ts|DraftVirtualKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-budget-overview.service.ts|BUDGET_SCOPE_RANK",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-budget-overview.service.ts|BudgetOverviewForUser",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-budget-overview.service.ts|BudgetOverviewItem",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-budget-overview.service.ts|BudgetOverviewScopeClass",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-guardrail-evaluation.service.ts|EvaluatorRunInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-guardrail-evaluation.service.ts|GuardrailCheckContent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-guardrail-evaluation.service.ts|GuardrailCheckVerdict",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-guardrail-evaluation.service.ts|GuardrailDecision",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-realtime-session-reconciliation.service.ts|RealtimeSessionReconciliationClock",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-realtime-session-reconciliation.service.ts|RealtimeSessionReconciliationConfig",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/gateway-realtime-session-reconciliation.service.ts|RealtimeSessionReconciliationLogger",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server/src/services/virtual-key-direct-budget.service.ts|VirtualKeyDirectBudget",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server/src/app/github.app.ts|GithubComposition",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server/src/app/github.infrastructure.ts|GithubInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server/src/github.server.ts|GithubInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server/src/intents/github-branch-recheck.intent.ts|GithubBranchRecheckDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server/src/services/github-branch-mapping.service.ts|BranchMappingOrigin",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server/src/services/github-host.service.ts|GithubHostConfig",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server/src/services/github-installations.service.ts|GithubWebhookAction",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server/src/services/github-maintenance.service.ts|GithubMaintenancePipelineDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server/src/services/github-pull-request-status.service.ts|GithubPullRequestLiveStatus",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server/src/services/github-pull-request-status.service.ts|GithubPullRequestStatusServiceDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/hosted-mcp/server/src/services/mcp-oauth-client-registry.service.ts|RegisteredOAuthClient",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/join-request.intent.ts|ApproveJoinPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/join-request.intent.ts|ExpireJoinPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/join-request.intent.ts|RejectJoinPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/join-request.intent.ts|RequestJoinPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/join-request.intent.ts|WithdrawJoinPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|ActivateConnectionPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|ApproveDomainClaimPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|AttestDomainPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|ClaimDomainPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|CompleteTeardownPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|DiscardConnectionPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|GrandfatherConnectionPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|RegisterConnectionPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|RejectDomainClaimPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|RequestTeardownPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|RequestVerificationPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|ResumeConnectionPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|SuspendConnectionPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/intents/sso-connection.intent.ts|VerifyDomainPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/processes/connection-teardown.process.ts|CONNECTION_TEARDOWN_GRACE_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/processes/join-request-lifecycle.process.ts|JoinRequestLifecycleIntents",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|IdentifierAttachedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|IdentifierDeadEndedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|IdentifierDetachedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|IdentifierVerifiedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|LinkProposedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|PrimaryChangedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|UserErasedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|identifierAttachedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|identifierDeadEndedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|identifierDetachedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|identifierVerifiedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|identityEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|linkProposedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|primaryChangedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/identity-state.projection.ts|userErasedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JOIN_REQUEST_PROJECTION_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JoinApprovedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JoinExpiredEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JoinRejectedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JoinRequestedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|JoinWithdrawnEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinApprovedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinExpiredEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinRejectedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinRequestEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinRequestedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/join-request-state.projection.ts|joinWithdrawnEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|BackupCodeConsumedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|BackupCodesRegeneratedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|MfaConfirmedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|MfaDisabledEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|MfaEnrolledEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|MfaEnrollmentExpiredEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|MfaVerificationFailedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|backupCodeConsumedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|backupCodesRegeneratedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaConfirmedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaDisabledEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaEnrolledEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaEnrollmentExpiredEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/mfa-enrollment-state.projection.ts|mfaVerificationFailedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|SCIM_SYNC_PROJECTION_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimApplyFailedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimApplyRecoveredEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimApplyRetiredEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimGroupMappedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimTokenIssuedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimTokenRevokedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|ScimUserPushedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimApplyFailedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimApplyRecoveredEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimApplyRetiredEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimGroupMappedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimSyncEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimTokenIssuedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimTokenRevokedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/scim-sync-state.projection.ts|scimUserPushedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionActivatedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionDiscardedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionRegisteredEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionResumedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionSuspendedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ConnectionTornDownEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|DomainAttestedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|DomainClaimApprovedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|DomainClaimRejectedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|DomainClaimedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|DomainVerifiedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|SSO_CONNECTION_PROJECTION_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|TeardownRequestedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|VerificationRequestedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionActivatedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionDiscardedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionRegisteredEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionResumedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionSuspendedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|connectionTornDownEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|domainAttestedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|domainClaimApprovedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|domainClaimRejectedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|domainClaimedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|domainVerifiedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|ssoConnectionEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|teardownRequestedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/projections/sso-connection-state.projection.ts|verificationRequestedEventSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/repositories/memory/memory-identity.store.ts|MemoryUserRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/repositories/prisma/prisma.identifier.mapper.ts|parseIdentifierLifecycleState",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/repositories/prisma/prisma.identity-projection.repository.ts|FOLD_OWNED_ACCOUNT_COLUMNS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/repositories/prisma/prisma.join-request-lifecycle.repository.ts|EventingJoinRequestLifecycleOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/repositories/prisma/prisma.mfa-enrollment.mapper.ts|MfaEnrollmentRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/repositories/prisma/prisma.sso-platform-operators.repository.ts|SystemActorPlatformOperatorsRepository",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/better-auth-identity-birth.service.ts|IdentityBirthScope",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/eventing-join-request-ledger.service.ts|EventingJoinRequestLedgerOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/eventing-join-request-ledger.service.ts|JOIN_REQUEST_CONVERGENCE_POLL_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/eventing-join-request-ledger.service.ts|JOIN_REQUEST_CONVERGENCE_TIMEOUT_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/eventing-sso-connection-ledger.service.ts|SSO_CONNECTION_CONVERGENCE_POLL_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/eventing-sso-connection-ledger.service.ts|SSO_CONNECTION_CONVERGENCE_TIMEOUT_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/eventing-sso-connection-ledger.service.ts|SsoConnectionLedgerWriterDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/identity-pipeline-definition.service.ts|IdentityPipelineDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/in-process-break-glass-limiter.service.ts|BREAK_GLASS_WINDOW_BUDGET",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/in-process-break-glass-limiter.service.ts|BREAK_GLASS_WINDOW_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/join-request-notifier.service.ts|JoinRequestNotifierMemberships",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/join-request-notifier.service.ts|JoinRequestNotifierPlans",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/join-request-pipeline-definition.service.ts|JoinRequestPipelineDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/metrics-identity-ledger.service.ts|identityCommitDurationSeconds",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/metrics-identity-ledger.service.ts|identityWriteGateReadFailuresTotal",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/per-subject-cached-latch.service.ts|IDENTITY_LATCH_CACHE_MAX_USERS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/per-subject-cached-latch.service.ts|IDENTITY_LATCH_CACHE_TTL_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/scim-sync-pipeline-definition.service.ts|ScimSyncPipelineDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/identity/server/src/services/sso-connection-pipeline-definition.service.ts|SsoConnectionPipelineDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/app/langy.infrastructure.ts|LangyInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/app/langy.infrastructure.ts|LangyProcessIntentType",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/intents/langy-conversation.intent.ts|LangyAcceptAgentTurnCommandData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/intents/langy-conversation.intent.ts|langyGenerateTitleIntentSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/intents/langy-conversation.intent.ts|langyWorkerDispatchIntentSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/langy.server.ts|LangyInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/processes/langy-conversation-process.types.ts|LANGY_OUTBOX_LEASE_MARGIN_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|INITIAL_LANGY_PROCESS_STATE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleAgentResponded",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleAgentResponseFailed",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleAgentTurnAccepted",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleArchived",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleHandoffConsumed",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleHandoffPending",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleMetadataUpdated",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleNoDecision",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/processes/langy-conversation.process.ts|handleTitleGenerated",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/projections/langy-conversation-state.projection.ts|LangyConversationState",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/projections/langy-conversation-turn.projection.ts|LangyConversationTurn",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/repositories/langy-conversation-projection.repository.ts|NullLangyConversationRepository",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/repositories/langy-turn-admission.repository.ts|NullLangyTurnAdmissionRepository",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/repositories/redis/redis.langy-local-presence.repository.ts|LocalPresenceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/repositories/redis/redis.langy-turn-relay.repository.ts|LangyRelayOutcome",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/repositories/redis/redis.langy-turn-relay.repository.ts|LangyRelayRejection",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/repositories/redis/redis.langy-turn-relay.repository.ts|LangyTurnRelayDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/rules/langy-conversation-shape.rules.ts|ADOPTABLE_CONVERSATION_ID",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/rules/langy-relay-frame.rules.ts|LangyRelayToolCall",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/rules/langy-relay-frame.rules.ts|langyRelayToolCallSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/rules/langy-relay-frame.rules.ts|langyToolCallIdSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/rules/langy-relay-frame.rules.ts|normalizeToolCallId",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/rules/langy-turn-settlement.rules.ts|SettlementStreaks",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-conversation-event-guards.service.ts|LangyEventGuardsService",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-conversation-memory.service.ts|LangyConversationMemoryEntry",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-conversation-memory.service.ts|MAX_MEMORY_ENTRIES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-conversation-memory.service.ts|MAX_MEMORY_IDS_PER_ENTRY",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-conversation-memory.service.ts|MAX_TRANSCRIPT_CHARS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-conversation-memory.service.ts|MAX_TRANSCRIPT_MESSAGE_CHARS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-conversation.service.ts|LangyConversationReadRepository",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-credential.service.ts|LangyCredentialServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-feedback-prompt.service.ts|FEEDBACK_MIN_ANSWERS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-local-control-request.service.ts|ApprovedControlRequest",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-local-control-request.service.ts|ControlRequestServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-local-control-request.service.ts|SessionKeyBinding",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-local-control-request.service.ts|sessionKeyBindingSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-message.service.ts|LangyMessageRepository",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-message.service.ts|LangyMessageRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-message.service.ts|MessageRole",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-navigate-fallback.service.ts|LangyNavigatePlatformUrl",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-prompt-registry.service.ts|ResolveLangyPromptParams",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-prompt-registry.service.ts|ResolvedLangyPrompt",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-turn-attempt.service.ts|LangyTurnAttemptIdentity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-turn-order.service.ts|LangyTurnStreamTail",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-turn-override.service.ts|LangyTurnOverride",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-turn.service.ts|LANGY_USER_MESSAGE_LABEL",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-turn.service.ts|LangyChatMessageInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-turn.service.ts|LangyTurnSharedService",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-ui-action-backend.service.ts|LangyUiActionBackendServiceDependencies",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy-ui-action.service.ts|LangyUiActionServiceDependencies",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy.service.ts|ConversationDetail",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy.service.ts|ConversationListItem",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy.service.ts|ConversationListPage",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/services/langy.service.ts|LangyTrustedMessageReader",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/subscribers/langy-conversation.subscriber.ts|LangyTurnHandoffReader",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/subscribers/langy-conversation.subscriber.ts|LangyTurnHandoffRecord",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/transport/api-rest/langy-local-control-long-poll.api.ts|LongPollRegisterOutcome",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/transport/api-rest/langy-local-control.api.ts|FramesAnswer",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/transport/api-rest/langy-local-control.api.ts|PollAnswer",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server/src/transport/api-rest/langy-local-control.api.ts|RegisterAnswer",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/log/server/src/app/log.infrastructure.ts|LogInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/log/server/src/log.server.ts|LogInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/log/server/src/services/log-processing.service.ts|LogProcessingAdapterOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/log/server/src/services/log-processing.service.ts|LogProcessingPipelineDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/metric.server.ts|MetricInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/repositories/clickhouse/clickhouse.metric-data-point.mapper.ts|RawMetricRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/services/metric-point.service.ts|PreparedMetricPoint",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/services/metric-processing.service.ts|MetricProcessingAdapterOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/services/metric-processing.service.ts|MetricProcessingPipelineDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/services/metric-processing.service.ts|clampMetricCommandShardCount",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/metric/server/src/services/metric-values.service.ts|CanonicalPointValues",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/model-provider.server.ts|ModelProviderInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/catalog-price-audit.rules.ts|PriceDisagreement",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/catalog-price-audit.rules.ts|UnitMismatch",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/catalog-price-audit.rules.ts|hasAnyRate",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/litellm-audio-prices.rules.ts|LITELLM_PRICES_URL",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/litellm-audio-prices.rules.ts|LitellmAudioMapping",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/model-defaults-schemas.rules.ts|ApiResponseModelDefaults",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/model-defaults-schemas.rules.ts|CreateModelDefaultConfigInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/model-defaults-schemas.rules.ts|UpdateModelDefaultConfigInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/model-provider-schemas.rules.ts|ApiResponseModelProvider",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/model-provider-schemas.rules.ts|ApiResponseModelProviders",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/model-provider-schemas.rules.ts|apiResponseModelProviderSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/provider-id-mapping.rules.ts|KNOWN_VARIANT_SUFFIXES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/rules/provider-id-mapping.rules.ts|getUniqueProviders",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/services/codex-oauth.model-provider-token-refresher.service.ts|CodexClaims",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderEndpointRedirectedError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderKeyInvalidError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderKeyMissingError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderKeyRestrictedError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderRefusedError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderServiceDisabledError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/services/model-provider-scope.service.ts|ModelProviderAvailableScopes",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/services/model-provider-scope.service.ts|ModelProviderProjectContext",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/services/model-provider-scope.service.ts|ModelProviderProjectSystemContext",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/services/model-provider.service.ts|ModelProviderServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/model-provider/server/src/tasks/model-provider-custom-models-migrate.task.ts|runCustomModelsMigration",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/monitor/server/src/services/monitor.service.ts|MonitorServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/notification/server/src/app/notification.infrastructure.ts|NotificationInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/app/ops.app.ts|OpsOperatorRequiredError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/app/ops.app.ts|OpsOperatorSecretRequiredError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/app/ops.app.ts|UsageStatsCountDelegate",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/repositories/clickhouse/clickhouse.event-explorer.repository.ts|EventExplorerClickHouseClient",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/repositories/memory/memory.ops.store.ts|MemoryProcessInstanceRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/repositories/memory/memory.ops.store.ts|MemoryUsageStatsClickHouseCounts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/repositories/prisma/prisma.user-tenant-source.repository.ts|PrismaOrganizationMemberTenantSourceRepository",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/repositories/redis/redis.anomaly-state.repository.ts|Anomaly",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/repositories/redis/redis.anomaly-state.repository.ts|AnomalyKind",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/repositories/redis/redis.anomaly-state.repository.ts|AnomalyTier",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/repositories/redis/redis.ops-snapshot.repository.ts|SNAPSHOT_DETAIL_KEY",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/repositories/redis/redis.ops-snapshot.repository.ts|SNAPSHOT_EPOCH_KEY",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/repositories/redis/redis.ops-snapshot.repository.ts|SNAPSHOT_LIVE_KEY",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/rules/legacy-sso-string-writes.rules.ts|LEGACY_SSO_STRING_COLUMNS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/admin-backoffice.service.ts|AdminBackofficeServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/anomaly-detector.service.ts|BASELINE_LOOKBACK_SECONDS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/anomaly-detector.service.ts|HARD_TIER_MULTIPLIER",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/anomaly-detector.service.ts|MIN_BASELINE_RATE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/anomaly-detector.service.ts|SURFACE_TIER_MULTIPLIER",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/impersonation.service.ts|ImpersonationServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/ops-metrics-window.service.ts|PeakBucket",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/ops-metrics-window.service.ts|PersistedMetricsState",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/ops-worker-contribution.service.ts|AnomalyTickPort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/ops-worker-contribution.service.ts|AnomalyTickResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/ops-worker-contribution.service.ts|AnomalyWorkerContributionOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/ops-worker-contribution.service.ts|UsageStatsWorkerContributionOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/system-migration-lookup.service.ts|SystemMigrationLookupService",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/system-migrations.service.ts|MigrationOverview",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server/src/services/usage-stats-collection.service.ts|UsageStatsCollectionServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/app/organization.infrastructure.ts|OrganizationInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/app/organization.infrastructure.ts|OrganizationSeatChangeType",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/memory/memory.organization.database.ts|MemoryAuditLogRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/memory/memory.organization.database.ts|MemoryCustomRoleRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/memory/memory.organization.database.ts|MemoryOrganizationUserRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/memory/memory.organization.database.ts|MemoryProjectRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/memory/memory.organization.database.ts|MemoryTeamUserRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/organization-membership.repository.ts|TeamMemberWithTeam",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/organization-membership.repository.ts|TeamMemberWithUser",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/organization-membership.repository.ts|TeamWithProjects",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/organization-membership.repository.ts|TeamWithProjectsAndMembers",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/organization-membership.repository.ts|TeamWithProjectsAndMembersAndUsers",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/organization-membership.repository.ts|UserWithTeams",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/prisma/prisma.personal-team-scope.repository.ts|PersonalTeamScopeClient",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/prisma/prisma.personal-team-scope.repository.ts|RoleBindingScope",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/prisma/prisma.tenant-directory.repository.ts|PrismaTenantDirectoryRepository",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/repositories/prisma/prisma.tenant-directory.repository.ts|TenantDirectoryClient",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/services/organization-invitation-door.service.ts|OrganizationInvitationDoorDependencies",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/services/organization-join-door.service.ts|OrganizationJoinDoorDependencies",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/services/organization-onboarding.service.ts|OrganizationOnboardingDependencies",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/services/organization-visibility.service.ts|OrganizationVisibilityDependencies",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/services/organization-visibility.service.ts|OrganizationVisibilityReader",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/transport/api-rest/organization.api.ts|OrganizationRestInviteService",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/transport/api-rest/organization.api.ts|OrganizationRestMemberSummary",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/transport/api-rest/organization.api.ts|OrganizationRestMemberTeamBinding",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/transport/api-rest/organization.api.ts|OrganizationRestPorts",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/transport/api-rest/organization.api.ts|OrganizationRestService",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server/src/transport/api-rest/organization.api.ts|createOrganizationRestApp",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/platform-health/server/src/app/platform-health.infrastructure.ts|PlatformHealthInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/platform-health/server/src/platform-health.server.ts|PlatformHealthInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/project/server/src/app/project.app.ts|TopicClusteringCommands",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/project/server/src/repositories/coding-agent-activity.repository.ts|CODING_AGENT_ACTIVITY_TOUCH_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/project/server/src/repositories/memory/memory.project.database.ts|MemoryOrganizationRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/project/server/src/repositories/prisma/prisma.project.mapper.ts|ProjectIdentityRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/project/server/src/repositories/recent-items.repository.ts|AuditLogJsonArray",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/project/server/src/repositories/recent-items.repository.ts|AuditLogJsonObject",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/project/server/src/repositories/recent-items.repository.ts|AuditLogJsonValue",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/repositories/prompt-tag-assignment.repository.ts|PromptTagAssignmentRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/repositories/prompt-version.repository.ts|PromptVersionAuthor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/repositories/prompt.repository.ts|PromptConfigRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/rules/prompt-execution-event.rules.ts|PromptChatTurn",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/rules/prompt-execution-event.rules.ts|PromptRuntimeVariable",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/rules/prompt-execution-stream.rules.ts|deltaFrom",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/rules/prompt-output-format.rules.ts|formatOutputForStreaming",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/services/prompt-postgres-composition.service.ts|PostgresPromptAdapterOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/services/prompt-postgres-composition.service.ts|PromptPersistence",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/services/prompt-sync.service.ts|ConfigData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/services/prompt-write.service.ts|CreatePromptParams",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/prompt/server/src/services/prompt-write.service.ts|PromptUpdateInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/projections/simulation-run-state.projection.ts|SimulationMessageRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts|AtomFilterSql",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts|CODE_TARGET_SLUG_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts|COST_NUMERIC_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts|COST_SOURCE_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts|COST_UNKNOWN_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts|COST_VALUE_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts|NAME_SLUG_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts|OUTCOME_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts|SET_KEY_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.result-atoms.repository.ts|TRIGGER_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.run-configurations.repository.ts|HAS_NOTE_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.run-configurations.repository.ts|HAS_TARGET_CLAUSE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.run-configurations.repository.ts|JUDGE_MODEL_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.run-configurations.repository.ts|RUN_PARAMETERS_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.run-configurations.repository.ts|SIMULATOR_MODEL_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.run-configurations.repository.ts|TARGET_PAIR_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.run-configurations.repository.ts|TARGET_TYPE_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.simulation-run-metrics.repository.ts|SimulationMetricsClickHouseClientResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.simulation-run-metrics.repository.ts|SimulationRunMetricsRepositoryClickHouse",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.simulation-run-metrics.repository.ts|SimulationRunMetricsRollup",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.simulation-run-state.repository.ts|SimulationClickHouseClientResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.stalled-simulation-run.repository.ts|ClickHouseStalledRunFinder",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/clickhouse.stalled-simulation-run.repository.ts|StalledSimulationRunClickHouseClient",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/simulation-clickhouse.repository.ts|RUN_ACTOR_ID_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/simulation-clickhouse.repository.ts|RUN_ACTOR_LABEL_EXPR",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/simulation-clickhouse.repository.ts|RUN_ID_CAP",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/simulation-clickhouse.repository.ts|SimulationWindowFallback",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/clickhouse/simulation-clickhouse.repository.ts|SimulationWindowFragment",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/memory/memory.simulation-run-state.repository.ts|SimulationRunStateRepositoryMemory",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/simulation.repository.ts|AllSimulationSuitesRunData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/repositories/stalled-simulation-run.repository.ts|StalledRunFinder",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/rules/result-atoms-fold.rules.ts|carriedName",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/rules/result-atoms-fold.rules.ts|carriedTargetName",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/rules/result-atoms-fold.rules.ts|headline",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server/src/services/agent-test-prefetch.service.ts|AgentTestReads",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/secret/server/src/services/secret.service.ts|SecretServiceOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/share/server/src/repositories/memory/memory.share.database.ts|MemoryShareGrant",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/share/server/src/repositories/memory/memory.share.database.ts|MemoryShareProject",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/share/server/src/repositories/memory/memory.share.database.ts|MemoryShareUsage",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/stored-object/server/src/repositories/memory/memory-stored-object-blob.store.ts|StoredObjectBlobEntry",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/stored-object/server/src/services/object-storage-migration.service.ts|DatasetBlockerReason",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/stored-object/server/src/services/stored-object-storage-runtime.service.ts|StoredObjectByteStore",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/stored-object/server/src/tasks/object-storage-migrate.task.ts|assertMigrationPhaseMatchesActiveProvider",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/stored-object/server/src/tasks/object-storage-migrate.task.ts|parseMigrationTaskPhase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/stored-object/server/src/tasks/object-storage-migrate.task.ts|runMigrationPhase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/stored-object/server/src/tasks/object-storage-migrate.task.ts|toAzureCredentials",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/suite/server/src/projections/suite-run-state.projection.ts|SuiteRunState",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/suite/server/src/repositories/clickhouse-client.repository.ts|SuiteClickHouseQueryResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/suite/server/src/repositories/clickhouse/clickhouse.suite-run.repository.ts|SuiteRunClickHouseRepositoryOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/suite/server/src/repositories/memory/memory.suite.database.ts|MemoryScenarioRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/suite/server/src/rules/suite-wire-v1.rules.ts|RunPlanRunResultWire",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/suite/server/src/rules/suite-wire-v1.rules.ts|runPlanConfigWireSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/suite/server/src/rules/suite-wire-v1.rules.ts|runPlanScopeSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/suite/server/src/services/suite-execution.service.ts|SuiteExecutionRequest",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/app/topic.infrastructure.ts|TopicClusteringClickHouseQuery",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/app/topic.infrastructure.ts|TopicClusteringClickHouseQueryParams",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/app/topic.infrastructure.ts|TopicClusteringLangevalsResponse",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/app/topic.infrastructure.ts|TopicInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/processes/topic-clustering.process.ts|INITIAL_TOPIC_CLUSTERING_STATE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/processes/topic-clustering.process.ts|TopicClusteringProcessEventView",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/processes/topic-clustering.process.ts|topicClusteringProcessEventViewSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/repositories/memory/topic-memory.store.ts|MemoryClusteringCost",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/repositories/memory/topic-memory.store.ts|emptyClusteringProject",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/repositories/prisma/prisma.topic-model-projection.repository.ts|TopicModelProjectionDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/repositories/prisma/prisma.topic-server-installer.repository.ts|TopicClusteringPersistence",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server/src/services/topic-events.service.ts|EventingTopicEventsAdapter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/app/trace-read.composition.ts|TraceReaderCompositionOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/app/trace.app.ts|ResolvedShare",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/app/trace.app.ts|TraceCaller",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/app/trace.infrastructure.ts|TraceInfrastructure",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/projections/trace-derived.projection.ts|TRACE_ANALYTICS_ATTR_KEYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/projections/trace-derived.projection.ts|TRACE_ANALYTICS_COALESCE_MAX_BATCH",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/projections/trace-derived.projection.ts|TRACE_ANALYTICS_HAS_SIGNAL_SQL",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/projections/trace-derived.projection.ts|TRACE_ANALYTICS_READ_WINDOW_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/projections/trace-summary.projection.ts|RESERVED_CACHE_CREATION_1H_TOKENS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/projections/trace-summary.projection.ts|RESERVED_CACHE_CREATION_5M_TOKENS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/projections/trace-summary.projection.ts|RESERVED_CONTEXT_SIZE_AT_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/projections/trace-summary.projection.ts|RESERVED_CONTEXT_SIZE_TOKENS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/projections/trace-summary.projection.ts|TRACE_SUMMARY_READ_WINDOW_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/clickhouse/trace-derivation-span.repository.ts|DERIVATION_EVENT_LIMIT",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/clickhouse/trace-derivation-span.repository.ts|DERIVATION_SPAN_LIMIT",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/clickhouse/trace-facet-event-attribute-keys.clickhouse.adapter.ts|ClickHouseEventAttributeKeysFacetAdapter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/clickhouse/trace-facet-label.clickhouse.adapter.ts|ClickHouseLabelFacetAdapter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/clickhouse/trace-facet-metadata-keys.clickhouse.adapter.ts|ClickHouseMetadataKeysFacetAdapter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/clickhouse/trace-facet-registry.clickhouse.adapter.ts|CategoricalFacetDef",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/clickhouse/trace-facet-registry.clickhouse.adapter.ts|FacetGroup",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/clickhouse/trace-full-protection.mapper.ts|TraceFullReadProtections",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/clickhouse/trace-query-fields.clickhouse.adapter.ts|KnownField",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/clickhouse/trace-query-fields.clickhouse.adapter.ts|TraceQueryFieldsAdapter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/clickhouse/trace-summary.repository.ts|TraceSummaryFieldsBase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/memory/null-query-field-values.adapter.ts|NullQueryFieldValuesAdapter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/session-groups.repository.ts|SessionGroupSort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/repositories/trace-legacy-read.repository.ts|TraceOccurredAtRange",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/analytics-attribute-trim.rules.ts|PAYLOAD_BLOCKLIST_EXACT",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/analytics-attribute-trim.rules.ts|PAYLOAD_BLOCKLIST_PREFIXES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/canonical-extraction.rules.ts|MessageSource",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/canonical-extraction.rules.ts|UsageTokenSources",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/canonical-message.rules.ts|isSystemRole",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/canonical-message.rules.ts|unwrapWrappedMessages",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/claude-code-message-index.rules.ts|USER_PROMPT_EVENT",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/claude-code-message-index.rules.ts|byTimeAsc",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/claude-code-message-index.rules.ts|normalizeRole",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/claude-code-message-index.rules.ts|querySourceKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/claude-code-span-keys.rules.ts|INTERACTION_SPAN_NAME",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/claude-code-span-keys.rules.ts|SPAN_TOOL_CALL_ID_KEY",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/claude-code-span-keys.rules.ts|SPAN_TOOL_USE_ID_KEY",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/claude-code-tool-enrichment.rules.ts|toJsonOrText",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/codex-canonical-value.rules.ts|UUID_SHAPE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/content-part-extraction.rules.ts|BinaryInputPart",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/content-part-extraction.rules.ts|storePartBytes",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/legacy-summary-attributes.rules.ts|INPUT_FIELD_NAMES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/legacy-summary-attributes.rules.ts|OUTPUT_FIELD_NAMES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/legacy-summary-attributes.rules.ts|RESERVED_TOKEN_METRIC_ATTRIBUTES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/legacy-summary-attributes.rules.ts|hasAnnotatedType",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-event-log-payload.rules.ts|EventLogPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-io-text.rules.ts|COMMON_TEXT_KEYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-io-text.rules.ts|MAX_PLAIN_JSON_RECURSION_DEPTH",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-io-text.rules.ts|extractTextFromPlainJson",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-io-text.rules.ts|hasMeaningfulLeaf",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-io-text.rules.ts|tryUnwrapJsonTextBlock",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-list-row.rules.ts|parseLabels",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-spool-location.rules.ts|SPOOL_KEY_PREFIX",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-spool-location.rules.ts|projectIdFromLegacySpoolKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-spool-location.rules.ts|safePathSegment",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-storage-anchor.rules.ts|AnchorableTraceState",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-storage-anchor.rules.ts|MAX_ANCHOR_FUTURE_SKEW_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/trace-storage-anchor.rules.ts|isUsableAnchorMs",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/vercel-tool-call.rules.ts|stringifyToolPayload",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/rules/vertex-adk-core.rules.ts|VERTEX_ADK_PROVIDER",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/attribute/trace-attribute-accumulation.service.ts|MODEL_METADATA_STAMPED_MARKER",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/attribute/trace-attribute-accumulation.service.ts|STAMPED_MODELS_ATTRIBUTE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/attribute/trace-attribute-accumulation.service.ts|STAMPED_MODEL_ATTRIBUTE",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/attribute/trace-attribute-extraction.service.ts|RESOURCE_ATTR_CANONICAL_MAPPINGS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/attribute/trace-attribute-extraction.service.ts|RESOURCE_ATTR_MAPPINGS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/attribute/trace-attribute-extraction.service.ts|SPAN_ATTR_MAPPINGS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/attribute/trace-attribute-extraction.service.ts|STANDARD_RESOURCE_PREFIXES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/canonicalisers/canonical-attributes.service.ts|CanonicalEventStore",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/canonicalisers/coding-agent/copilot-canonicaliser.service.ts|COPILOT_SCOPES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/content/trace-io-accumulation.service.ts|TraceIOAccumulation",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/content/trace-value-media-extraction.service.ts|EXTRACTION_DEADLINE_MS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/eventing.change-trace-name.service.ts|EventingChangeTraceNameAdapter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/ingestion/otlp-trace-request.service.ts|ParentContext",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/ingestion/otlp-trace-request.service.ts|TraceFlagsInfo",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/ingestion/otlp-trace-request.service.ts|TraceStateInfo",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/ingestion/trace-eventref-parsing.service.ts|EventRefEntry",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/ingestion/trace-eventref-parsing.service.ts|ParsedSpanEventRefs",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/ingestion/trace-ingestion.service.ts|SpanIngestionResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/ingestion/trace-ingestion.service.ts|SpanIngestionStatus",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/log/trace-log-content-derivation.service.ts|DerivedToolCall",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/offload/trace-blob-store.service.ts|SpoolObjectStore",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/offload/trace-cold-scan-detector.service.ts|TraceColdScanDetectorService",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/offload/trace-span-storage-read.service.ts|SpanReadBlobResolutionDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/query/trace-ai-query.service.ts|AiQueryProviderError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/read/trace-legacy-read.service.ts|FULL_TRACE_ID_LENGTH",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/read/trace-legacy-read.service.ts|MIN_TRACE_ID_PREFIX_LENGTH",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/read/trace-legacy-read.service.ts|TRACE_ID_PREFIX_CANDIDATE_LIMIT",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/read/trace-legacy-read.service.ts|TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/read/trace-origin.service.ts|LEGACY_ORIGIN_RULES",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/read/trace-summary-read.service.ts|TraceSummaryFullResolutionDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/read/trace-windowed-read.service.ts|QueryWindowedOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/read/trace-windowed-read.service.ts|WindowFallback",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/session/trace-session-groups-cursor.service.ts|SessionGroupsCursor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/span/span-cost.service.ts|FIRST_TOKEN_EVENTS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/span/span-cost.service.ts|LAST_TOKEN_EVENTS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/services/support/trace-evaluation-mapping.service.ts|EVALUATION_RUN_COLUMNS_LIGHT",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/subscribers/span-storage-broadcast.subscriber.ts|SpanStorageBroadcastSubscriberDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/subscribers/trace-update-broadcast.subscriber.ts|TraceUpdateBroadcastSubscriberDeps",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/subscribers/tracked-event-sync.subscriber.ts|ReconstructedTrackedEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/api-rest/collector-dispatch.api.ts|EVALUATION_INGESTION_FAILED",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/api-rest/collector-dispatch.api.ts|EvaluationDispatchOutcome",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/api-rest/collector-dispatch.api.ts|SPAN_INGESTION_FAILED",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/api-rest/collector-dispatch.api.ts|SpanDispatchOutcome",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/api-rest/trace-legacy.api.ts|TraceLegacyCredential",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/api-rest/trace-legacy.api.ts|TraceLegacyReadsPort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/api-rest/trace-legacy.api.ts|TraceLegacySharePort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/api-trpc/trace-read-mappers.api.ts|TraceSpanDisplayPort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/api-trpc/trace-read-mappers.api.ts|TraceSpanProtectionPort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/api-trpc/trace-view-gates.api.ts|HIDDEN_RESOURCE_ATTRS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/api-trpc/trace-view-gates.api.ts|SessionTitleRedactionFlag",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpIngestApi",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpIngestCredentialPort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpIngestErrorReportPort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpIngestIdentity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpIngestProject",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpIngestUsageLimitPort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpLogCollectionOutcome",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpLogCollectionPort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpMetricCollectionOutcome",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpMetricCollectionPort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpTraceCollectionPort",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|OtlpTraceCollectionResult",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-ingest.rest.ts|peekCustomerTraceIds",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-path-alias.rest.ts|OtlpPathAliasApi",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/otlp-path-alias.rest.ts|OtlpPathAliasApp",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/traces.rest.ts|TraceSearchBody",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/traces.rest.ts|TracesRestOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server/src/transport/traces.rest.ts|traceSearchBodyExtensions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/user/server/src/repositories/memory/memory.user.database.ts|MemoryUserAccountRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/user/server/src/repositories/memory/memory.user.database.ts|MemoryUserPasskeyRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/user/server/src/repositories/prisma/prisma.user-data-erase.repository.ts|GdprOrganizationRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/user/server/src/repositories/prisma/prisma.user-data-erase.repository.ts|GdprOrganizationWithMemberCount",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/user/server/src/repositories/prisma/prisma.user-data-erase.repository.ts|GdprUser",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/user/server/src/repositories/prisma/prisma.user-signin-credential.repository.ts|UserCredentialDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/user/server/src/repositories/user.repository.ts|UserCredentialIssuer",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/user/server/src/services/user-account.service.ts|PersonalProjectKeyRequiredError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/user/server/src/services/user-account.service.ts|PersonalUsageKeyMismatchError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/user/server/src/services/user-account.service.ts|PersonalUsageServiceKeyUnsupportedError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/repositories/clickhouse/clickhouse.webhook-events.repository.ts|WebhookClickHouseClient",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/repositories/clickhouse/clickhouse.webhook-events.repository.ts|WebhookEventsCursor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/repositories/memory/memory.webhook-database.ts|MemoryWebhookDeliveryRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/repositories/prisma/prisma.webhook-endpoint.repository.ts|WebhookEndpointDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/repositories/prisma/prisma.webhook-tenants.repository.ts|WebhookTenantsDatabase",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/rules/webhook-delivery-contract.rules.ts|SpendAttributionData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/rules/webhook-delivery-contract.rules.ts|SpendOutcomeAttributionData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/rules/webhook-delivery-contract.rules.ts|SpendOutcomeData",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/rules/webhook-delivery-contract.rules.ts|spendUsagePayloadSchema",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/rules/webhook-delivery-fold.rules.ts|DeliverOutcomeContext",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/rules/webhook-delivery-fold.rules.ts|isEndpointStreamKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/rules/webhook-spend-payload.rules.ts|deliverPayloadFor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/services/http.webhook-destination.service.ts|HttpWebhookDestinationAdapterOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/services/sqs.webhook-destination.service.ts|SqsWebhookDestinationAdapterOptions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/services/webhook-delivery.service.ts|WebhookReplayInput",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/webhook.server.ts|WebhookAppDependencies",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server/src/webhook.server.ts|WebhookTestDispatch",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/repositories/memory/workflow-memory.store.ts|StoredEnvironmentRow",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/rules/nlp-lambda-config.rules.ts|CODE_BLOCK_TIMEOUT_SAFETY_MARGIN_SECONDS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/rules/nlp-lambda-config.rules.ts|NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server/src/rules/workflow-commit-message.rules.ts|WorkflowCommitMessagePrompt",
+      "measured": "2026-09-10"
+    }
+  ]
+}

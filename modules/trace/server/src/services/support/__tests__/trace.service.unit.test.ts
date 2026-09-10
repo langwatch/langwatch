@@ -6,7 +6,7 @@ import {
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
 } from "../../../repositories/read/query-field-values.repository.ts";
-import { TracePort, type TraceSpanSummaryRecord, type TraceSpanPage } from "../../../repositories/trace-projected-read.repository.ts";
+import { TraceProjectedReadRepository, type TraceSpanSummaryRecord, type TraceSpanPage } from "../../../repositories/trace-projected-read.repository.ts";
 import { TraceSummaryReaderRepository } from "../../../repositories/read/trace-summary-reader.repository.ts";
 import { TraceService } from "../trace.service.ts";
 import { TraceFullRecordRepository } from "../../../repositories/read/trace-full-record.repository.ts";
@@ -43,7 +43,7 @@ const record = (value: SpanTreeNode): TraceSpanSummaryRecord => ({
   },
 });
 
-class FakeTraceRepository extends TracePort {
+class FakeTraceRepository extends TraceProjectedReadRepository {
   findEvaluationSpans(): Promise<[]> {
     return Promise.resolve([]);
   }
@@ -186,7 +186,7 @@ describe("TraceService span-tree read", () => {
     describe("when this project reads its span tree", () => {
       /** @scenario "A trace read is tenant scoped" */
       it("reads nothing back and offers no cursor to page on with", async () => {
-        class TenantKeyedRepository extends TracePort {
+        class TenantKeyedRepository extends TraceProjectedReadRepository {
           readonly seen: string[] = [];
 
           findEvaluationSpans(): Promise<[]> {
@@ -276,7 +276,7 @@ describe("TraceService span-tree read", () => {
   });
 
   it("fails loudly if a repository claims another page without a cursor row", async () => {
-    class InvalidTraceRepository extends TracePort {
+    class InvalidTraceRepository extends TraceProjectedReadRepository {
       findEvaluationSpans(): Promise<[]> {
         return Promise.resolve([]);
       }

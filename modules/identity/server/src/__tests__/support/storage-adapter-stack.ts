@@ -17,8 +17,8 @@ import {
 import { BetterAuthIdentityStorageAdapter } from "../../services/better-auth-identity-storage.service.ts";
 import type {
   IdentityAccounts,
-  IdentityResolutionPort,
-} from "../../rules/identity-storage-ports.rules.ts";
+  IdentityResolver,
+} from "../../rules/identity-storage.rules.ts";
 import { IdentityGuardsService } from "../../services/identity-guards.service.ts";
 import {
   adoptUserEmailCommandId,
@@ -225,7 +225,7 @@ export function identityStack({
   };
 
   const accounts: IdentityAccounts = inert ? inertIdentityPorts.accounts : storage;
-  const resolution: IdentityResolutionPort = inert ? inertIdentityPorts.resolution : storage;
+  const resolution: IdentityResolver = inert ? inertIdentityPorts.resolution : storage;
 
   const bridge = BetterAuthCeremonyBridgeAdapter.create({
     ceremonies,

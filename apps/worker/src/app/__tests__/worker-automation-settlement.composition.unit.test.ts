@@ -12,7 +12,7 @@ import {
 } from "@langwatch/automation-server";
 import { AnnotationAnnotatorReferenceInvalidError } from "@langwatch/annotation-contract";
 import { PLAN_LIMITS, PlanTypes } from "@langwatch/enterprise-billing-contract";
-import { PlanLimitsPlanCatalogueAdapter } from "@langwatch/enterprise-billing-server";
+import { PlanLimitsCatalogueService } from "@langwatch/enterprise-billing-server";
 import { PlanNextStepService } from "@langwatch/entitlement-server";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
 import {
@@ -526,7 +526,7 @@ function recordingContainment(input: {
             plans: { getActivePlan: async () => ({ type: input.nextStep!.planType }) as never },
             organizations: new StubOrganizationPricing(),
             nextStep: PlanNextStepService.create({
-              catalogue: PlanLimitsPlanCatalogueAdapter.create(),
+              catalogue: PlanLimitsCatalogueService.create(),
             }),
             baseHost: ENVIRONMENT.BASE_HOST,
           }),

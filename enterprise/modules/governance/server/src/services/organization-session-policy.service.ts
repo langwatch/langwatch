@@ -1,6 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import {
-  OrganizationSessionPolicyPort,
+  OrganizationSessionPolicyRepository,
   type OrganizationSessionPolicy,
 } from "../repositories/policy/session-policy.repository.ts";
 
@@ -29,9 +29,9 @@ export class SessionPolicyOutOfRangeError extends HandledError {
 
 /** Read and update the organization's session-lifetime policy. */
 export class OrganizationSessionPolicyService {
-  private constructor(private readonly repository: OrganizationSessionPolicyPort) {}
+  private constructor(private readonly repository: OrganizationSessionPolicyRepository) {}
 
-  static create(repository: OrganizationSessionPolicyPort): OrganizationSessionPolicyService {
+  static create(repository: OrganizationSessionPolicyRepository): OrganizationSessionPolicyService {
     return new OrganizationSessionPolicyService(repository);
   }
 

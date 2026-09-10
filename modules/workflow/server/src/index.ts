@@ -56,7 +56,7 @@ export {
 } from "./app/workflow.app.ts";
 export {
   NlpLambdaArnResolver,
-  NlpLambdaFunctionPort,
+  NlpLambdaFunctionReader,
   type NlpLambdaArnEntry,
 } from "./app/workflow.app.ts";
 export {

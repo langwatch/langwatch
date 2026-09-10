@@ -3,10 +3,6 @@
   "policy": "oxlint",
   "entries": [
     {
-      "key": "banned-test-model-names|apps/api/src/features/agent/__tests__/http-proxy.composition.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "banned-test-model-names|apps/ui/src/features/simulations/ui/__tests__/agent-list-drawer.integration.test.tsx",
       "measured": "2026-09-10"
     },
@@ -8843,15 +8839,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "module-app-only-across-packages|apps/api/src/features/agent/__tests__/http-proxy.composition.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "module-app-only-across-packages|apps/api/src/features/agent/agent-platform-url.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "module-app-only-across-packages|apps/api/src/features/auth/__tests__/support/test-auth-api.ts",
       "measured": "2026-09-10"
     },
     {
@@ -8911,39 +8899,11 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "module-app-only-across-packages|apps/api/src/features/trace/__tests__/trace-rest.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "module-app-only-across-packages|apps/api/src/features/trace/__tests__/trace.composition.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "module-app-only-across-packages|apps/api/src/features/trace/__tests__/traces-rest.mount.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "module-app-only-across-packages|apps/api/src/features/trace/__tests__/tracked-event-ports.unit.test.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "module-app-only-across-packages|apps/api/src/features/trace/__tests__/tracked-event-rest.mount.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "module-app-only-across-packages|apps/api/src/features/trace/trace-read-stack.port.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "module-app-only-across-packages|apps/api/src/features/trace/tracked-event-ports.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "module-app-only-across-packages|apps/api/src/features/user/__tests__/user-credentials.composition.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "module-app-only-across-packages|apps/api/src/features/user/__tests__/user-directory.composition.integration.test.ts",
       "measured": "2026-09-10"
     },
     {
@@ -8952,10 +8912,6 @@
     },
     {
       "key": "module-app-only-across-packages|apps/api/src/features/user/user-avatar-storage.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "module-app-only-across-packages|apps/api/src/features/webhook/__tests__/webhook.composition.integration.test.ts",
       "measured": "2026-09-10"
     },
     {
@@ -10891,10 +10847,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-nested-ternary|apps/api/src/features/trace/__tests__/trace.composition.integration.test.ts",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "no-nested-ternary|apps/ui/e2e/langy/scenario-transcript.ts",
       "measured": "2026-09-07"
     },
@@ -12147,14 +12099,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|apps/api/src/features/agent/__tests__/http-proxy.composition.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|apps/api/src/features/bug-report/bug-report-rest.ports.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "no-port-vocabulary|apps/api/src/features/experiment/__tests__/experiment-execution-data.integration.test.ts",
       "measured": "2026-09-10"
     },
@@ -12179,27 +12123,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|apps/api/src/features/trace/__tests__/trace-rest.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|apps/api/src/features/trace/__tests__/trace.composition.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|apps/api/src/features/trace/__tests__/traces-rest.mount.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "no-port-vocabulary|apps/api/src/features/trace/__tests__/tracked-event-ports.unit.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|apps/api/src/features/trace/__tests__/tracked-event-rest.mount.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|apps/api/src/features/trace/trace-read-stack.port.ts",
       "measured": "2026-09-10"
     },
     {
@@ -12208,14 +12132,6 @@
     },
     {
       "key": "no-port-vocabulary|apps/api/src/features/trace/tracked-event-ports.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|apps/api/src/features/user/__tests__/user-credentials.composition.integration.test.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "no-port-vocabulary|apps/api/src/features/user/__tests__/user-directory.composition.integration.test.ts",
       "measured": "2026-09-10"
     },
     {
@@ -15595,10 +15511,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|modules/identity/server/src/rules/identity-storage-ports.rules.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "no-port-vocabulary|modules/identity/server/src/rules/join-requests-contract.rules.ts",
       "measured": "2026-09-10"
     },
@@ -17551,10 +17463,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "no-port-vocabulary|packages/eventing/src/kill-switch/killSwitch.port.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "no-port-vocabulary|packages/eventing/src/pipeline/types.ts",
       "measured": "2026-09-10"
     },
@@ -19360,10 +19268,6 @@
     },
     {
       "key": "temporal-only|modules/gateway/server/src/adapters/gateway-wire-pagination.adapter.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "temporal-only|modules/identity/server/src/rules/identity-storage-ports.rules.ts",
       "measured": "2026-09-06"
     },
     {

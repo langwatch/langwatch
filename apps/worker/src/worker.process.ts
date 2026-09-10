@@ -18,7 +18,7 @@ import { resolveWorkerConfig, type WorkerConfig } from "./platform/config/worker
 const DRAIN_PHASE_TIMEOUT_MS = 60_000;
 
 export type WorkerProcessComposition = {
-  readonly application: WorkerApplicationPort;
+  readonly application: WorkerApplicationLifecycle;
   /**
    * Who consumes the shared Eventing queue in this process, stated by the
    * composition that decided it. The process itself cannot know: consumer
@@ -29,7 +29,7 @@ export type WorkerProcessComposition = {
   readonly eventingConsumers?: "packaged" | "app-owned";
 };
 
-export type WorkerApplicationPort = {
+export type WorkerApplicationLifecycle = {
   start(): Promise<void>;
   drain(): Promise<void>;
   closeResources(): Promise<void>;
@@ -137,7 +137,7 @@ export class WorkerProcess {
      * to the others, rather than each one setting the SDK up again.
      */
     readonly observability: ProcessObservability,
-    readonly application: WorkerApplicationPort,
+    readonly application: WorkerApplicationLifecycle,
   ) {}
 
   get logger(): ProcessObservability["logger"] {

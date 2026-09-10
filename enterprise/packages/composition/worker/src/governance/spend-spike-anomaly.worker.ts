@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   AnomalyAlertDispatcherService,
   type AnomalyAlertHttp,
-  type AnomalySpendReaderPort,
+  type AnomalySpendReader,
   PrismaSpendSpikeAnomalyRepository,
   SpendSpikeAnomalyEvaluatorService,
   type SpendSpikeAnomalyDatabase,
@@ -55,7 +55,7 @@ export type SpendSpikeAnomalyWorkerDependencies = {
    * log a healthy tick — indistinguishable from a fleet where nothing ever
    * spikes.
    */
-  spend: AnomalySpendReaderPort;
+  spend: AnomalySpendReader;
   http: AnomalyAlertHttp;
 };
 

@@ -8,7 +8,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 import {
-  DataRetentionPlanPort,
+  DataRetentionPlanResolver,
   type DataRetentionPlan,
 } from "../data-retention.infrastructure.ts";
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
@@ -91,7 +91,7 @@ export class MemoryRetentionDirectory implements DataRetentionDirectoryReader {
 }
 
 /** The plan every gate is decided against, stated rather than billed for. */
-export class MemoryRetentionPlans implements DataRetentionPlanPort {
+export class MemoryRetentionPlans implements DataRetentionPlanResolver {
   static create(plan: DataRetentionPlan = { free: false, uncapped: true }): MemoryRetentionPlans {
     return new MemoryRetentionPlans(plan);
   }

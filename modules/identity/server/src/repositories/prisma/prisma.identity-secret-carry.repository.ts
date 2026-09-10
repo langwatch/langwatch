@@ -2,7 +2,7 @@ import type {
   AccountSecretPair,
   IdentitySecretCarryRepository,
 } from "../../services/identity-secret-carry.service.ts";
-import type { IdentityAccountSecrets } from "../../rules/identity-storage-ports.rules.ts";
+import type { IdentityAccountSecrets } from "../../rules/identity-storage.rules.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**

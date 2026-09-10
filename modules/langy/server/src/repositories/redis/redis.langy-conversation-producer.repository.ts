@@ -14,7 +14,7 @@ import type { LangyTitleGenerator } from "../../app/langy.infrastructure.ts";
 import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
 import type { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
-import type { LangyBroadcastPort } from "../../subscribers/langy-conversation.subscriber.ts";
+import type { LangyConversationUpdateChannel } from "../../subscribers/langy-conversation.subscriber.ts";
 import { NullLangyWorkerMetricsAdapter } from "../../services/langy-worker-metrics-null.service.ts";
 import { UnavailableLangyWorkerAdapter } from "../../services/langy-worker-unavailable.service.ts";
 import { EventingLangyConversationAdapter } from "./redis.langy-conversation-runtime.repository.ts";
@@ -64,7 +64,7 @@ function buildLangyConversationProducerPipeline(input: { processName: string }) 
   const refuse = (capability: string) => (): Promise<never> =>
     Promise.reject(producerOnly(processName, capability));
 
-  const broadcast: LangyBroadcastPort = {
+  const broadcast: LangyConversationUpdateChannel = {
     broadcastToTenant: refuse("broadcast a conversation update"),
   };
   const admissions: Pick<LangyTurnAdmissionCapability, "confirmAccepted" | "release"> = {

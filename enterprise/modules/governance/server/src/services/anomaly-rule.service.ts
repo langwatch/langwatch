@@ -12,16 +12,16 @@ import {
   validateDestinationConfig,
   validateThresholdConfig,
 } from "@langwatch/enterprise-governance-contract";
-import type { AnomalyRuleChanges, AnomalyRulePort } from "../repositories/policy/anomaly-rule.repository.ts";
+import type { AnomalyRuleChanges, AnomalyRuleRepository } from "../repositories/policy/anomaly-rule.repository.ts";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 export class AnomalyRuleService {
   private constructor(
-    private readonly repository: AnomalyRulePort,
+    private readonly repository: AnomalyRuleRepository,
     private readonly now: () => Instant,
   ) {}
 
-  static create(options: { repository: AnomalyRulePort; now?: () => Instant }): AnomalyRuleService {
+  static create(options: { repository: AnomalyRuleRepository; now?: () => Instant }): AnomalyRuleService {
     return new AnomalyRuleService(options.repository, options.now ?? nowInstant);
   }
 

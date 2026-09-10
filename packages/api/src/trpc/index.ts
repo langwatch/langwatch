@@ -68,7 +68,7 @@ export {
   createTrpcRuntimePolicy,
   type PendingPermissionProcedureBuilder,
   type TrpcActor,
-  type TrpcActorPort,
+  type TrpcActorReader,
   type TrpcAuditEntry,
   type TrpcAudit,
   type TrpcAuthenticatedMiddlewareContext,

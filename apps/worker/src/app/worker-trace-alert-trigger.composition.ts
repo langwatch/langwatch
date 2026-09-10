@@ -14,11 +14,11 @@ import {
 import type { TriggerContext } from "@langwatch/eventing";
 import {
   OtelTraceAlertMetricsAdapter,
-  TraceAlertOriginGuardPort,
   TraceAlertTriggerMatch,
   TraceAlertTriggerMatchSubscriber,
-  TraceAlertTriggerPort,
   type GovernanceTraceEvent,
+  type TraceAlertOriginGuard,
+  type TraceAlertTriggerReader,
   type GovernanceTraceSummary,
   type TraceAlertTrigger,
 } from "@langwatch/enterprise-governance-server";
@@ -38,8 +38,8 @@ import { passesTraceOriginGuards } from "@langwatch/trace-server";
  *
  *     triggerMatchHandler
  *       └─ TraceAlertTriggerMatchSubscriber   (enterprise governance owns it)
- *            ├─ TraceAlertOriginGuardPort     packaged `passesTraceOriginGuards`
- *            ├─ TraceAlertTriggerPort         the project's trace automations
+ *            ├─ TraceAlertOriginGuard         packaged `passesTraceOriginGuards`
+ *            ├─ TraceAlertTriggerReader       the project's trace automations
  *            │    └─ AutomationTraceTriggerCatalogue   one cached read
  *            ├─ TraceAlertTriggerMatch    one durable match
  *            │    └─ the installer's `recordTriggerMatch` proxy
@@ -83,10 +83,8 @@ export function createWorkerTraceAlertTriggerHandler(options: {
  * `string` and this stops satisfying the port, which the compiler would report
  * far from here.
  */
-class WorkerTraceAlertTriggerAdapter extends TraceAlertTriggerPort {
-  constructor(private readonly catalogue: AutomationTraceTriggerCatalogue) {
-    super();
-  }
+class WorkerTraceAlertTriggerAdapter implements TraceAlertTriggerReader {
+  constructor(private readonly catalogue: AutomationTraceTriggerCatalogue) {}
 
   async activeForProject(projectId: string): Promise<TraceAlertTrigger[]> {
     const triggers = await this.catalogue.getActiveTraceTriggersForProject(projectId);
@@ -149,7 +147,7 @@ class WorkerTraceAlertTriggerMatchAdapter extends TraceAlertTriggerMatch {
  * over thousands of historical traces from re-firing every alert a customer has
  * ever configured.
  */
-class WorkerTraceAlertOriginGuardAdapter extends TraceAlertOriginGuardPort {
+class WorkerTraceAlertOriginGuardAdapter implements TraceAlertOriginGuard {
   passes(input: { event: GovernanceTraceEvent; state: GovernanceTraceSummary }): boolean {
     return passesTraceOriginGuards(input.event, input.state as TraceSummaryData);
   }

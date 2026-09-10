@@ -14,9 +14,9 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { Organization, PrismaClient } from "@langwatch/prisma-client/generated";
-import {
-  GovernanceClickHouseClientPort,
-  GovernanceClickHouseResolverPort,
+import type {
+  GovernanceClickHouseClient,
+  GovernanceClickHouseResolver,
 } from "@langwatch/enterprise-governance-server";
 import {
   ActivityMonitorService,
@@ -119,9 +119,9 @@ describe.skipIf(!databaseUrl || !chUrl)("ActivityMonitorService.spendByDepartmen
 
   /** The activity service the process composes, over this suite's endpoints. */
   const service = () => {
-    const client = ch as unknown as GovernanceClickHouseClientPort;
-    class SuiteResolver extends GovernanceClickHouseResolverPort {
-      tryResolve(): Promise<GovernanceClickHouseClientPort | null> {
+    const client = ch as unknown as GovernanceClickHouseClient;
+    class SuiteResolver implements GovernanceClickHouseResolver {
+      tryResolve(): Promise<GovernanceClickHouseClient | null> {
         return Promise.resolve(client);
       }
     }

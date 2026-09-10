@@ -2,7 +2,7 @@
 
 import {
   GovernanceDiagnostics,
-  IngestionSourceEntitlementsPort,
+  IngestionSourceEntitlements,
   IngestionSourceLifecycle,
 } from "@langwatch/enterprise-governance-server";
 import { createLogger } from "@langwatch/observability";
@@ -17,10 +17,8 @@ type PlanProvider = {
 
 const logger = createLogger("langwatch:governance:ingestion-source");
 
-class AppIngestionSourceEntitlements extends IngestionSourceEntitlementsPort {
-  private constructor(private readonly plans: PlanProvider) {
-    super();
-  }
+class AppIngestionSourceEntitlements implements IngestionSourceEntitlements {
+  private constructor(private readonly plans: PlanProvider) {}
 
   static create(plans: PlanProvider): AppIngestionSourceEntitlements {
     return new AppIngestionSourceEntitlements(plans);
@@ -65,7 +63,7 @@ export class AppIngestionSourceAdapter {
     return new DisabledIngestionSourceLifecycle();
   }
 
-  entitlements(): IngestionSourceEntitlementsPort {
+  entitlements(): IngestionSourceEntitlements {
     return AppIngestionSourceEntitlements.create(this.options.plans);
   }
 

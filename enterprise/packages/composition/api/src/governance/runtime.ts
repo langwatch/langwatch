@@ -1,9 +1,9 @@
 import {
   GovernanceBudgetOverview,
-  GovernanceClickHouseResolverPort,
+  GovernanceClickHouseResolver,
   GovernanceEventing,
   GovernanceSetupActivity,
-  IngestionSourceEntitlementsPort,
+  IngestionSourceEntitlements,
   IngestionSourceLifecycle,
   PostgresGovernanceInstallationAdapter,
   type GovernanceInstallationOptions,
@@ -45,8 +45,8 @@ type GovernanceRuntimeOptions = {
   providers: GovernanceModelProviderCatalog;
   contacts: GovernanceOrganizationContact;
   eventing: GovernanceEventing;
-  activityClickhouse: GovernanceClickHouseResolverPort;
-  ingestionSourceEntitlements: IngestionSourceEntitlementsPort;
+  activityClickhouse: GovernanceClickHouseResolver;
+  ingestionSourceEntitlements: IngestionSourceEntitlements;
   ingestionSourceLifecycle: IngestionSourceLifecycle;
   ingestionEncryption: GovernanceInstallationOptions["ingestionEncryption"];
   ingestionSecretPepper: string;

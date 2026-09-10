@@ -7,7 +7,7 @@ import {
   AzureBlobStoredObjectDriverAdapter,
   AzureBlobCredentialsAdapter,
   PayloadStaging,
-  PayloadStagingS3TargetPort,
+  PayloadStagingS3TargetRepository,
   S3PayloadStagingAdapter,
   type PayloadStagingS3Target,
 } from "@langwatch/stored-object-server";
@@ -158,7 +158,7 @@ export function createWorkerObjectStorage(options: {
  * routing the object store uses, so a tenant's oversized body is parked in the
  * tenant's own bucket rather than the deployment's.
  */
-class WorkerPayloadStagingS3Targets extends PayloadStagingS3TargetPort {
+class WorkerPayloadStagingS3Targets extends PayloadStagingS3TargetRepository {
   static create(options: {
     projects: WorkerProjectS3Source;
     global: WorkerProjectS3Target;

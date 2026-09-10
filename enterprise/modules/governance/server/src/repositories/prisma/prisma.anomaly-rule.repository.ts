@@ -1,7 +1,7 @@
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import { anomalyRuleSchema, type AnomalyRule } from "@langwatch/enterprise-governance-contract";
 import {
-  AnomalyRulePort,
+  AnomalyRuleRepository,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
 } from "../policy/anomaly-rule.repository.ts";
@@ -12,7 +12,7 @@ import {
  */
 export type AnomalyRuleDatabase = Pick<PrismaClient, "anomalyRule">;
 
-export class PrismaAnomalyRuleRepository extends AnomalyRulePort {
+export class PrismaAnomalyRuleRepository extends AnomalyRuleRepository {
   private constructor(private readonly prisma: AnomalyRuleDatabase) {
     super();
   }

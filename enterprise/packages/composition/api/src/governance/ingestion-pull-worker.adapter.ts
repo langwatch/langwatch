@@ -11,7 +11,7 @@ import {
   BuiltInPullerRegistryService,
   GovernanceHttp,
   GovernanceObjectStorage,
-  GovernanceOcsfEventSinkPort,
+  GovernanceOcsfEventSink,
   IngestionCredentialsService,
   IngestionPullDiagnostics,
   type IngestionPullSource,
@@ -217,10 +217,8 @@ function defaultS3Host(region: string): string {
   return `s3.${region}${suffix}`;
 }
 
-class AppGovernanceOcsfEventSink extends GovernanceOcsfEventSinkPort {
-  private constructor(private readonly events: AppGovernanceOcsfEventsAdapter | undefined) {
-    super();
-  }
+class AppGovernanceOcsfEventSink implements GovernanceOcsfEventSink {
+  private constructor(private readonly events: AppGovernanceOcsfEventsAdapter | undefined) {}
 
   static create(
     events: AppGovernanceOcsfEventsAdapter | undefined,

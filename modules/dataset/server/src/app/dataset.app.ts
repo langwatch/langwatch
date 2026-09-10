@@ -38,11 +38,11 @@ import { DatasetService } from "../services/dataset.service.ts";
 export interface DatasetInfrastructure {
   /** Where a project's dataset content is stored, when the deployment has any. */
   readonly storageResolver?: DatasetStorageResolver;
-  /** A process-supplied upload port, in place of the resolver-built one. */
+  /** A process-supplied upload seam, in place of the resolver-built one. */
   readonly storage?: DatasetUpload;
   /** Where normalize work is queued; the in-process service when absent. */
   readonly queue?: DatasetNormalizeQueue;
-  /** A process-supplied content port, in place of the resolver-built one. */
+  /** A process-supplied content seam, in place of the resolver-built one. */
   readonly content?: DatasetContent;
   /** The identifier format a new entry is written under. */
   readonly generateId?: () => string;
@@ -578,7 +578,7 @@ export interface DatasetNormalizeQueue {
 
 /**
  * Content-layout operations that cannot be served by the relational record
- * repositories.  The Dataset service chooses this port only for
+ * repositories.  The Dataset service chooses this seam only for
  * `contentLayout: "s3_jsonl"`; the application supplies the concrete object
  * storage implementation at process composition time.  Keeping this seam
  * explicit is important: routes must never decide whether a dataset is in

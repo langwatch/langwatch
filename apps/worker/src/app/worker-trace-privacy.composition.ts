@@ -32,7 +32,7 @@ import type { WorkerTracePrivacyConfig } from "../platform/config/worker.config.
  *                 └─ WorkerPiiAnalysisAdapter   Presidio, Google DLP fallback
  *
  * WHAT IS DELIBERATELY NOT HERE. The service's log and metric halves were not
- * harvested: `LogRedaction` and `MetricRedactionPort` belong to the log
+ * harvested: `LogRedaction` and `MetricRedaction` belong to the log
  * and metric conversions, and the trace conversion reaches this graph through
  * `redact` alone. When those convert, they compose the same service and the
  * same transport rather than a second copy of either.

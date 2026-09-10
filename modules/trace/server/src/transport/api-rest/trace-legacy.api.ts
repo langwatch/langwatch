@@ -1,5 +1,5 @@
 /**
- * REST for the deprecated trace endpoints: `GET /api/trace/:id`, `POST /api/trace/:id/share`, `POST /api/trace/:id/unshare`, `POST /api/trace/search`, `GET /api/thread/:id`. Was `platform/app/src/server/routes/traces-legacy.ts`, itself a replacement for five `pages/api` handlers; every route carries `Deprecation: true` and a successor `Link` where it has one, with bodies transcribed rather than rewritten since a deployed SDK parses them. The family resolves its own credential (`handlerManagedAuth`) because its refusals predate the framework envelope (a bare `{ message }` for unauthenticated, the full handled payload for a ceiling denial); that resolution arrives as {@link TraceLegacyCredentialPort} so this door and the framework chain decide the same thing about the same caller.
+ * REST for the deprecated trace endpoints: `GET /api/trace/:id`, `POST /api/trace/:id/share`, `POST /api/trace/:id/unshare`, `POST /api/trace/search`, `GET /api/thread/:id`. Was `platform/app/src/server/routes/traces-legacy.ts`, itself a replacement for five `pages/api` handlers; every route carries `Deprecation: true` and a successor `Link` where it has one, with bodies transcribed rather than rewritten since a deployed SDK parses them. The family resolves its own credential (`handlerManagedAuth`) because its refusals predate the framework envelope (a bare `{ message }` for unauthenticated, the full handled payload for a ceiling denial); that resolution arrives as {@link TraceLegacyCredentialResolver} so this door and the framework chain decide the same thing about the same caller.
  */
 import { TraceReadableSpanService } from "#services/read/trace-readable-span.service";
 import { TraceFormattingService } from "#services/support/trace-formatting.service";
@@ -34,7 +34,7 @@ export type TraceLegacyCredential =
 /**
  * How this process turns a request plus one permission ceiling into a project credential. The permission travels with the request because the family is split by grain: reads ask for `traces:view`, the share pair asks for `traces:share`, which mints a PUBLIC link.
  */
-export type TraceLegacyCredentialPort = (input: {
+export type TraceLegacyCredentialResolver = (input: {
   request: Request;
   permission: "traces:view" | "traces:share";
 }) => Promise<TraceLegacyCredential>;
@@ -71,7 +71,7 @@ export interface TraceLegacyShare {
 
 /** What the legacy trace family needs from the process. */
 export interface TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw> {
-  credential: TraceLegacyCredentialPort;
+  credential: TraceLegacyCredentialResolver;
   /** The reads. Resolved per request, never constructed at mount. */
   traces(): TraceLegacyReads;
   /** The share ledger, resolved the same way. */

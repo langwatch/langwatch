@@ -13,13 +13,13 @@ import { nowInstant } from "@langwatch/time";
 /** Which bucket, on which connection, one project's staged bodies belong in. */
 export type PayloadStagingS3Target = Readonly<{ bucket: string; client: S3Client }>;
 
-export abstract class PayloadStagingS3TargetPort {
+export abstract class PayloadStagingS3TargetRepository {
   abstract resolve(projectId: string): Promise<PayloadStagingS3Target>;
 }
 
 export class S3PayloadStagingAdapter extends PayloadStaging {
   static create(options: {
-    targets: PayloadStagingS3TargetPort;
+    targets: PayloadStagingS3TargetRepository;
     logger?: Pick<Logger, "debug" | "warn">;
     /** Injected so the object name is deterministic under test. */
     uniqueSuffix?: () => string;
@@ -32,7 +32,7 @@ export class S3PayloadStagingAdapter extends PayloadStaging {
   }
 
   private constructor(
-    private readonly targets: PayloadStagingS3TargetPort,
+    private readonly targets: PayloadStagingS3TargetRepository,
     private readonly logger: Pick<Logger, "debug" | "warn"> | undefined,
     private readonly uniqueSuffix: () => string,
   ) {

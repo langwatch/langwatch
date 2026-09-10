@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  OrganizationSessionPolicyPort,
+  OrganizationSessionPolicyRepository,
   type OrganizationSessionPolicy,
 } from "../../repositories/policy/session-policy.repository.ts";
 import {
@@ -9,7 +9,7 @@ import {
   SessionPolicyOutOfRangeError,
 } from "../organization-session-policy.service.ts";
 
-class MemoryRepository extends OrganizationSessionPolicyPort {
+class MemoryRepository extends OrganizationSessionPolicyRepository {
   readonly values = new Map<string, number>();
   find(organizationId: string): Promise<OrganizationSessionPolicy> {
     return Promise.resolve({

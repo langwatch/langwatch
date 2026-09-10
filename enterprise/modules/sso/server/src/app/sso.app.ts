@@ -35,7 +35,7 @@ import { UserApi } from "@langwatch/user-contract";
 import { BetterAuthSsoProviderMount } from "../services/better-auth-sso.service.ts";
 import type {
   SsoConnectionLedgerOperator,
-  SsoConnectionLedgerPort,
+  SsoConnectionLedger,
 } from "./sso.infrastructure.ts";
 import type { SsoGateLogger } from "./sso.infrastructure.ts";
 import { SsoGateService } from "../services/sso-gate.service.ts";
@@ -43,7 +43,7 @@ import { SsoGateService } from "../services/sso-gate.service.ts";
 /** What the process composes this feature's application over. */
 export type SsoInfrastructure = Readonly<{
   /** The identity aggregate's connection ledger, as the back office commands it. */
-  connections: SsoConnectionLedgerPort;
+  connections: SsoConnectionLedger;
   /** Where the gate's decisions are written. */
   logger: SsoGateLogger;
 }>;
@@ -72,14 +72,14 @@ export class SsoApp implements SsoApiContract {
   static readonly configSchema = ssoConfigurationSchema;
 
   readonly #gate: SsoGateService;
-  readonly #connections: SsoConnectionLedgerPort;
+  readonly #connections: SsoConnectionLedger;
   readonly #operators: OpsApi;
   readonly #users: UserApi;
   readonly #auditLog: AuditLogApi;
 
   private constructor(
     gate: SsoGateService,
-    connections: SsoConnectionLedgerPort,
+    connections: SsoConnectionLedger,
     dependencies: SsoSetup["dependencies"],
   ) {
     this.#gate = gate;

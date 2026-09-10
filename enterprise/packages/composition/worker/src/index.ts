@@ -2,7 +2,7 @@ import { EnterpriseCatalogue } from "@langwatch/enterprise";
 
 import type {
   ManagedProviderConfiguration,
-  ManagedProviderCredentialsPort,
+  ManagedProviderCredentialVendor,
 } from "@langwatch/enterprise-managed-provider-server";
 import { ManagedProviderService } from "@langwatch/enterprise-managed-provider-server";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -11,7 +11,7 @@ export type EnterpriseWorkerCompositionOptions = {
   managedProvider: {
     projects: ProjectApi;
     configuration: ManagedProviderConfiguration;
-    credentials: ManagedProviderCredentialsPort;
+    credentials: ManagedProviderCredentialVendor;
   };
 };
 

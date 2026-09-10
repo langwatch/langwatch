@@ -13,7 +13,7 @@ import type {
 import {
   StoredObjectDelivery,
   StoredObjectStorage,
-  StoredObjectUploadTokenPort,
+  StoredObjectUploadTokenCodec,
   type StoredObjectStorageAddress,
   type StoredObjectUploadTokenClaims,
 } from "../stored-object.infrastructure.ts";
@@ -21,7 +21,7 @@ import type { StoredObjectRepositories } from "../../repositories/stored-object.
 import { MemoryStoredObjectRepositories } from "../../repositories/memory/memory.stored-object.repositories.ts";
 import {
   StoredObjectApp,
-  type StoredObjectFileReadPort,
+  type StoredObjectFileReader,
   type StoredObjectFileStreamRead,
   type StoredObjectInfrastructure,
 } from "../stored-object.app.ts";
@@ -79,7 +79,7 @@ export class MemoryStoredObjectStorage extends StoredObjectStorage {
   }
 }
 
-export class MemoryStoredObjectTokens extends StoredObjectUploadTokenPort {
+export class MemoryStoredObjectTokens extends StoredObjectUploadTokenCodec {
   claims: StoredObjectUploadTokenClaims | null = null;
 
   async encode(claims: StoredObjectUploadTokenClaims): Promise<string> {
@@ -108,7 +108,7 @@ export class FixedStoredObjectDelivery extends StoredObjectDelivery {
 }
 
 /** The byte surface's reads, answering "no such row" until a test says otherwise. */
-export class MemoryStoredObjectFiles implements StoredObjectFileReadPort {
+export class MemoryStoredObjectFiles implements StoredObjectFileReader {
   head: StoredObjectHead = { status: "not_found" };
   read: StoredObjectFileStreamRead | null = null;
 

@@ -2,7 +2,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import type { AuthzGrantsCommandDispatcher } from "@langwatch/authz-server";
 import type {
   DataRetentionDirectoryReader,
-  DataRetentionPlanPort,
+  DataRetentionPlanResolver,
 } from "@langwatch/data-retention-server";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -84,7 +84,7 @@ async function compose(
     topicSchedule: createApiFixture<TopicClusteringScheduleReader>(),
     dataRetention: {
       directory: createApiFixture<DataRetentionDirectoryReader>({}, "retention directory"),
-      plans: createApiFixture<DataRetentionPlanPort>({}, "retention plans"),
+      plans: createApiFixture<DataRetentionPlanResolver>({}, "retention plans"),
       resolveClickHouseClient: null,
     },
   });

@@ -16,7 +16,7 @@ import { S3UriRules } from "#rules/s3-uri.rules";
 const { parseS3Uri } = S3UriRules;
 import type {
   StoredObjectS3Target,
-  StoredObjectS3TargetPort,
+  StoredObjectS3TargetResolver,
 } from "../../app/stored-object.infrastructure.ts";
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 
@@ -36,7 +36,7 @@ export type StoredObjectS3ClientPolicy = Readonly<{
 export class StoredObjectBlobS3Repository implements StoredObjectStorageDriver {
   static create(options: {
     projectId: string;
-    targets: StoredObjectS3TargetPort;
+    targets: StoredObjectS3TargetResolver;
     policy: StoredObjectS3ClientPolicy;
   }): StoredObjectBlobS3Repository {
     return new StoredObjectBlobS3Repository(options.projectId, options.targets, options.policy);
@@ -44,7 +44,7 @@ export class StoredObjectBlobS3Repository implements StoredObjectStorageDriver {
 
   private constructor(
     private readonly projectId: string,
-    private readonly targets: StoredObjectS3TargetPort,
+    private readonly targets: StoredObjectS3TargetResolver,
     private readonly policy: StoredObjectS3ClientPolicy,
   ) {}
 

@@ -47,12 +47,12 @@ import type { TraceSummaryReaderRepository } from "../../repositories/read/trace
 import type { TraceRecordRepository } from "../../repositories/read/trace-record.repository.ts";
 import type { TraceEventDerivation } from "../../app/trace.infrastructure.ts";
 import type { TraceFullRecordRepository } from "../../repositories/read/trace-full-record.repository.ts";
-import { TracePort, type TraceSpanSummaryRecord } from "../../repositories/trace-projected-read.repository.ts";
+import { TraceProjectedReadRepository, type TraceSpanSummaryRecord } from "../../repositories/trace-projected-read.repository.ts";
 import { TraceQueryFieldCatalogueService } from "../facet/trace-query-field-catalogue.service.ts";
 import { nowInstant } from "@langwatch/time";
 
 type TraceComposition = {
-  repository: TracePort;
+  repository: TraceProjectedReadRepository;
   modelProviders: ModelProviderApi;
   queryFieldValues: TraceQueryFieldValuesRepository;
   queryClassification: TraceQueryClassifier;

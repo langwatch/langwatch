@@ -76,7 +76,7 @@ export type OtlpIngestCredential =
   | Readonly<{ ok: false; status: ContentfulStatusCode; body: object }>;
 
 /** How this process turns a request into a project credential. */
-export type OtlpIngestCredentialPort = (input: {
+export type OtlpIngestCredentialResolver = (input: {
   request: Request;
 }) => Promise<OtlpIngestCredential>;
 
@@ -138,7 +138,7 @@ export type OtlpIngestErrorReport = (
 ) => void;
 
 export type OtlpIngestRestMembers = Readonly<{
-  credential: OtlpIngestCredentialPort;
+  credential: OtlpIngestCredentialResolver;
   usageLimit: OtlpIngestUsageLimit;
   traces?: OtlpTraceCollection | undefined;
   logs?: OtlpLogCollection | undefined;

@@ -2,16 +2,16 @@ import {
   type LangyFrameDedupRepository,
   type LangyResourceLinksRepository,
   type LangyTurnAccess,
-  LangyTurnAccessPort,
+  LangyTurnAccessRepository,
   type LangyTurnHandoff,
-  LangyTurnHandoffPort,
+  LangyTurnHandoffRepository,
   langyTurnAccessSchema,
   langyTurnHandoffSchema,
 } from "../langy-live-turn.repository.ts";
 import type { LangyMemoryStore } from "./langy-memory.store.ts";
 
 /** Who may watch a turn, held for the life of the process. */
-export class LangyTurnAccessMemoryRepository extends LangyTurnAccessPort {
+export class LangyTurnAccessMemoryRepository extends LangyTurnAccessRepository {
   private constructor(private readonly store: LangyMemoryStore) {
     super();
   }
@@ -33,7 +33,7 @@ export class LangyTurnAccessMemoryRepository extends LangyTurnAccessPort {
 }
 
 /** The parked handoff a worker picks a turn up from. */
-export class LangyTurnHandoffMemoryRepository extends LangyTurnHandoffPort {
+export class LangyTurnHandoffMemoryRepository extends LangyTurnHandoffRepository {
   private constructor(private readonly store: LangyMemoryStore) {
     super();
   }

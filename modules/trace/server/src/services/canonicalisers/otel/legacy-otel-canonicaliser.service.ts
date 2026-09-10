@@ -7,7 +7,7 @@ import {
   inferSpanTypeIfAbsent,
   recordValueType,
 } from "../../../rules/canonical-extraction.rules.ts";
-import type { CanonicalAttributesPort, ExtractorContext } from "../canonical-attributes.service.ts";
+import type { AttributeCanonicaliser, ExtractorContext } from "../canonical-attributes.service.ts";
 
 /** OTel span kinds that name a span type on their own, in the spelling they arrive with. */
 const SPAN_KIND_TYPES: ReadonlyArray<readonly [string, string]> = [
@@ -17,7 +17,7 @@ const SPAN_KIND_TYPES: ReadonlyArray<readonly [string, string]> = [
   ["CONSUMER", "consumer"],
 ];
 
-export class LegacyOtelCanonicaliserService implements CanonicalAttributesPort {
+export class LegacyOtelCanonicaliserService implements AttributeCanonicaliser {
   static create(): LegacyOtelCanonicaliserService {
     return new LegacyOtelCanonicaliserService();
   }

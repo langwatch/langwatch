@@ -30,6 +30,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/infrastructure": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

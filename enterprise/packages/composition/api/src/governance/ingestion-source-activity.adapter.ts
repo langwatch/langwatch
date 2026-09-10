@@ -16,8 +16,8 @@ import type {
   SpendOverTimeResult,
 } from "@langwatch/enterprise-governance-contract";
 import {
-  GovernanceClickHouseClientPort,
-  GovernanceClickHouseResolverPort,
+  GovernanceClickHouseClient,
+  GovernanceClickHouseResolver,
 } from "@langwatch/enterprise-governance-server";
 
 type GovernanceClickHouseQuery = {
@@ -50,10 +50,8 @@ export type GovernanceActivityMonitorCapability = {
   }): Promise<SourceHealthMetrics>;
 };
 
-class AppGovernanceClickHouseClient extends GovernanceClickHouseClientPort {
-  private constructor(private readonly client: ClickHouseClient) {
-    super();
-  }
+class AppGovernanceClickHouseClient implements GovernanceClickHouseClient {
+  private constructor(private readonly client: ClickHouseClient) {}
 
   static create(client: ClickHouseClient): AppGovernanceClickHouseClient {
     return new AppGovernanceClickHouseClient(client);
@@ -64,12 +62,10 @@ class AppGovernanceClickHouseClient extends GovernanceClickHouseClientPort {
   }
 }
 
-class AppGovernanceClickHouseResolver extends GovernanceClickHouseResolverPort {
+class AppGovernanceClickHouseResolver implements GovernanceClickHouseResolver {
   private constructor(
     private readonly resolveClient: (organizationId: string) => Promise<ClickHouseClient | null>,
-  ) {
-    super();
-  }
+  ) {}
 
   static create(
     resolveClient: (organizationId: string) => Promise<ClickHouseClient | null>,
@@ -77,7 +73,7 @@ class AppGovernanceClickHouseResolver extends GovernanceClickHouseResolverPort {
     return new AppGovernanceClickHouseResolver(resolveClient);
   }
 
-  async tryResolve(organizationId: string): Promise<GovernanceClickHouseClientPort | null> {
+  async tryResolve(organizationId: string): Promise<GovernanceClickHouseClient | null> {
     const client = await this.resolveClient(organizationId);
     return client ? AppGovernanceClickHouseClient.create(client) : null;
   }

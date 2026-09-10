@@ -5,14 +5,9 @@
  *
  * @see dev/docs/adr/134-private-prisma-table-ownership.md
  */
-import {
-  ApiKeyBindingIdAdapter,
-  ApiKeyDiagnosticsAdapter,
-  apiKeyServer,
-  type ApiKeyInfrastructure,
-} from "@langwatch/api-key-server";
+import type { ApiKeyServerConfig } from "@langwatch/api-key-contract";
+import { apiKeyServer } from "@langwatch/api-key-server";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { projectServer, type ProjectInfrastructure } from "@langwatch/project-server";
 import { createApp } from "@langwatch/runtime-composition";
@@ -27,12 +22,7 @@ afterEach(async () => {
   for (const runtime of runtimes.splice(0)) await runtime.stop();
 });
 
-const apiKeys: ApiKeyInfrastructure = {
-  pepper: "0".repeat(64),
-  bindingIds: ApiKeyBindingIdAdapter.create(),
-  deriveBindingId: () => "binding-1",
-  diagnostics: ApiKeyDiagnosticsAdapter.create(createLogger("langwatch:test:api-key")),
-};
+const apiKeys: ApiKeyServerConfig = { pepper: "0".repeat(64) };
 const project: ProjectInfrastructure = {
   topicClustering: createApiFixture<ProjectInfrastructure["topicClustering"]>(),
 };
@@ -47,7 +37,7 @@ async function bootProjectAndApiKey() {
     .withProvided(ShareApi, createApiFixture<ShareApi>({}, "shares"))
     .withProvided(TopicApi, createApiFixture<TopicApi>({}, "topics"))
     .withModule(projectServer, { infrastructure: project })
-    .withModule(apiKeyServer, { infrastructure: apiKeys })
+    .withModule(apiKeyServer, { config: apiKeys })
     .boot({ role: "worker" });
   runtimes.push(runtime);
 

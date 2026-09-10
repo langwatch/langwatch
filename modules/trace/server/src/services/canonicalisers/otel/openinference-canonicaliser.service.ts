@@ -4,11 +4,11 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { ALLOWED_SPAN_TYPES } from "../../../rules/canonical-extraction.rules.ts";
 import { asNumber } from "../../../rules/canonical-guard.rules.ts";
 import type {
-  CanonicalAttributesPort,
+  AttributeCanonicaliser,
   ExtractorContext,
 } from "../canonical-attributes.service.ts";
 
-export class OpenInferenceCanonicaliserService implements CanonicalAttributesPort {
+export class OpenInferenceCanonicaliserService implements AttributeCanonicaliser {
   static create(): OpenInferenceCanonicaliserService {
     return new OpenInferenceCanonicaliserService();
   }

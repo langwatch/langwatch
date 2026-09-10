@@ -34,7 +34,7 @@ export interface QueryErrorDescriptor {
   status?: number | undefined;
 }
 
-export interface SpanPort {
+export interface Span {
   setAttribute(key: string, value: string | number | boolean): void;
   recordError(error: QueryErrorDescriptor): void;
   end(): void;
@@ -59,8 +59,8 @@ export function describeQueryError(error: unknown): QueryErrorDescriptor {
   };
 }
 
-export interface TracerPort {
-  startSpan(name: string): SpanPort;
+export interface Tracer {
+  startSpan(name: string): Span;
 }
 
 export interface QueryOutcome {
@@ -71,7 +71,7 @@ export interface QueryOutcome {
 }
 
 export interface TraceOptions {
-  tracer: TracerPort;
+  tracer: Tracer;
   /** Defaults to `clickhouse.query`. */
   spanName?: string | undefined;
   /** Called on every completion, success or failure. For counters. */
@@ -102,7 +102,7 @@ export const SPAN_ATTRIBUTES = {
  * tracer must not be able to fail a query that would otherwise have succeeded.
  */
 export class QueryTracer {
-  private readonly tracer: TracerPort;
+  private readonly tracer: Tracer;
   private readonly spanName: string;
   private readonly onComplete: TraceOptions["onComplete"];
   private readonly now: () => number;
@@ -127,7 +127,7 @@ export class QueryTracer {
     request: QueryRequest;
     task: () => Promise<QueryResult<Row>>;
   }): Promise<QueryResult<Row>> {
-    let span: SpanPort | undefined;
+    let span: Span | undefined;
     quietly(() => {
       span = this.tracer.startSpan(this.spanName);
     });

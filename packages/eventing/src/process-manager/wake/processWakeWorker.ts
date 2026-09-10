@@ -10,7 +10,7 @@ const DEFAULT_INTERVAL_MS = 5_000;
 const DEFAULT_BATCH_SIZE = 20;
 
 /** The slice of ProcessManagerService a wake needs. */
-export interface WakeHandlerPort {
+export interface ProcessWakeHandler {
   handleWake(params: { wake: DueWake; now: number }): Promise<HandleResult>;
 }
 
@@ -23,7 +23,7 @@ export interface ProcessWakeWorkerOptions {
    * same log-and-skip posture the calendar scheduler takes for orphan
    * targetTypes).
    */
-  managers: Record<string, WakeHandlerPort>;
+  managers: Record<string, ProcessWakeHandler>;
   logger: Logger;
   /** Best-effort drain nudge after a committed wake inserted intents. */
   notifyOutbox?: () => void;
@@ -43,7 +43,7 @@ export interface ProcessWakeWorkerOptions {
  */
 export class ProcessWakeWorker {
   private readonly store: Pick<ProcessStore, "findDueWakes">;
-  private readonly managers: Record<string, WakeHandlerPort>;
+  private readonly managers: Record<string, ProcessWakeHandler>;
   private readonly logger: Logger;
   private readonly notifyOutbox: (() => void) | undefined;
   private readonly intervalMs: number;

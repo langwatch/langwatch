@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { GovernanceEncryptionPort } from "@langwatch/enterprise-governance-server";
+import { GovernanceEncryptor } from "@langwatch/enterprise-governance-server";
 
 /** Encryption remains process infrastructure supplied by the API installer. */
 export type GovernanceEncryption = {
@@ -8,10 +8,8 @@ export type GovernanceEncryption = {
   decrypt(value: string): string;
 };
 
-export class AppGovernanceEncryption extends GovernanceEncryptionPort {
-  private constructor(private readonly encryption: GovernanceEncryption) {
-    super();
-  }
+export class AppGovernanceEncryption implements GovernanceEncryptor {
+  private constructor(private readonly encryption: GovernanceEncryption) {}
 
   static create(encryption: GovernanceEncryption): AppGovernanceEncryption {
     return new AppGovernanceEncryption(encryption);

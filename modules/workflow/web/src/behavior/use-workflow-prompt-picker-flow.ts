@@ -21,14 +21,14 @@ export type PromptPickerCallbacks = {
   onClose: () => void;
 };
 
-export type PromptPickerPort = {
+export type PromptPickerController = {
   register: (callbacks: PromptPickerCallbacks) => void;
   open: () => void;
   close: () => void;
 };
 
 /** Workflow-owned state transition for selecting a prompt after a canvas drop. */
-export function useWorkflowPromptPickerFlow(port: PromptPickerPort) {
+export function useWorkflowPromptPickerFlow(port: PromptPickerController) {
   const { setNode, deleteNode, setSelectedNode } = useWorkflowStore((state) => ({
     setNode: state.setNode,
     deleteNode: state.deleteNode,

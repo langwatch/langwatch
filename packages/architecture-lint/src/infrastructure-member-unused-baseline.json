@@ -1,0 +1,902 @@
+{
+  "version": 1,
+  "policy": "infrastructure-member-unused",
+  "entries": [
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|activityMonitorRepository",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|adminWorkspaceViewOcsf",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|anomalyAlertHttp",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|anomalySpendReader",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|cliAdminContact",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|cliBudgetOverview",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|gatewayDebit",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceClickHouseClient",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceClickHouseResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceEncryption",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceEventing",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceHttp",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceKpiContribution",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceObjectStorage",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceOcsfEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceOcsfEventsReader",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceSetupActivity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceSignal",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceSubscriberDiagnostics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|governanceWebhook",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|ingestionKeyCapability",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|pulledUsageLedger",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|pulledUsageRate",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|traceAlertMetrics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|traceAlertOriginGuard",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|traceAlertTrigger",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceInfrastructure|traceAlertTriggerMatch",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server|LicensingInfrastructure|licenseCryptography",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server|LicensingInfrastructure|licenseLogger",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server|LicensingInfrastructure|licenseRetention",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server|LicensingInfrastructure|licenseStorage",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server|LicensingInfrastructure|licenseUsage",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/licensing/server|LicensingInfrastructure|organizationLicense",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/scim/server|SCIMInfrastructure|scimSyncLifecycle",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationClock",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationDatasetMapper",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationDispatchError",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationEmailCapStore",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationEvaluationQueryClassification",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationEvaluationTraceSummary",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationEvaluationTriggerFilter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationGraphActivity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationGraphDelivery",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationGraphNotifier",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationHeartbeat",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationIntentRetention",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationLogger",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationNotificationDelivery",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationPersistActionWriter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationProjectIdentity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationRunaway",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationScheduledIntent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationSlackBotTokenDecryptor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationSlackProvider",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationTestFire",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationTraceTriggerCatalogue",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationTriggerMatchRecorder",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|automationWebhookProvider",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|scheduledJobStore",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|schedulerWake",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/automation/server|AutomationInfrastructure|unsubscribeTokenVerifier",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server|CodingAgentInfrastructure|codingAgentBillingPolicy",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server|CodingAgentInfrastructure|codingAgentCallerScopeDirectory",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server|CodingAgentInfrastructure|codingAgentClickHouse",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server|CodingAgentInfrastructure|codingAgentClock",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server|CodingAgentInfrastructure|codingAgentCostEstimator",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server|CodingAgentInfrastructure|codingAgentCostMetrics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server|CodingAgentInfrastructure|codingAgentProjectActivity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server|CodingAgentInfrastructure|codingAgentPullRequestMapping",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server|CodingAgentInfrastructure|codingAgentReadMetrics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server|CodingAgentInfrastructure|codingAgentScopePermissions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/coding-agent/server|CodingAgentInfrastructure|codingAgentTraceProcessing",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server|DataRetentionInfrastructure|dataRetentionPlan",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/data-retention/server|DataRetentionInfrastructure|storageMeterClickHouse",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server|DatasetInfrastructure|datasetAzureConfigResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server|DatasetInfrastructure|datasetNormalize",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/dataset/server|DatasetInfrastructure|datasetS3ClientResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/entitlement/server|EntitlementInfrastructure|usageCounter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/entitlement/server|EntitlementInfrastructure|usageOrganization",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/entitlement/server|EntitlementInfrastructure|usageVolumeCounter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/entitlement/server|EntitlementInfrastructure|usageWarning",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationCustomEvaluators",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationExecutionTelemetry",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationInstallEnvironment",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationLangevals",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationModelEnv",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationMonitorLookup",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationReport",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationRescore",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationRunAnalytics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationSpanDigest",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationTraceEvidence",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationTraceRead",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationWarmup",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/evaluation/server|EvaluationInfrastructure|evaluationWorkflowExecutor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewayAudit",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewayBudgetSpend",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewayChangeEvents",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewayClickHouse",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewayConfigAssembly",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewayGovernanceSignals",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewayModelProviderCredentials",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewayScopePermissions",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewaySettlementPolicy",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewaySpanIngestion",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewaySpendConfirmation",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewaySpendRating",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewayTransaction",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewayVirtualKeyCrypto",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/gateway/server|GatewayInfrastructure|gatewayVirtualKeySpend",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server|GithubInfrastructure|githubBranchDemand",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server|GithubInfrastructure|githubBranchMaintenance",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server|GithubInfrastructure|githubHost",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server|GithubInfrastructure|githubInstallResponse",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server|GithubInfrastructure|githubInstallState",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server|GithubInfrastructure|githubProjectActivity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/github/server|GithubInfrastructure|githubPullRequestEvent",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyBlockMetrics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyFrameAuth",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyGithubPermit",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyHarness",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyIds",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyModel",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyNavigateProject",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyNavigateResource",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyProcessEventView",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langySessionKey",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langySessionKeyMetrics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyTitleGeneration",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyTitleModel",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyTurnContext",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyTurnMetrics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyUiActionBackend",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyUiActionCatalog",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyUiActionSurface",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyWorker",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyWorkerDispatch",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/langy/server|LangyInfrastructure|langyWorkerMetrics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/log/server|LogInfrastructure|logPreparation",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/log/server|LogInfrastructure|logRedaction",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/log/server|LogInfrastructure|logTraceIo",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|anomalyHardTierAlert",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|opsReplayRuntime",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|opsSnapshotRedis",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|opsWorker",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|organizationDataplane",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|queuePayloadDecoder",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|schedulerWake",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|storageStatsMetrics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|usageStatsClickHouseClient",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|usageStatsClickHouseClientResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|usageStatsErrorReporter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/ops/server|OpsAppInfrastructure|usageStatsTelemetryClient",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|groupIdentity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|organizationGrantCache",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|organizationInviteMail",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|organizationInviteRateLimit",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|organizationInviteSeatCensus",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|organizationInviteWorkspaceCensus",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|organizationPromptSeed",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|organizationSeatLicense",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|organizationSessionRevocation",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|organizationSettingsSecret",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|personalWorkspaceDiagnostics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|personalWorkspaceIdentity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|OrganizationInfrastructure|teamIdentity",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/platform-health/server|PlatformHealthInfrastructure|subsystemProbe",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioAppInfrastructure|agentAdapterFactory",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioAppInfrastructure|cancellationPublisher",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioAppInfrastructure|cancellationSubscriber",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioAppInfrastructure|scenarioChildBootstrap",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioAppInfrastructure|scenarioChildExecutionSession",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioAppInfrastructure|scenarioExecutionPool",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioAppInfrastructure|scenarioExecutionRunner",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioAppInfrastructure|scenarioHttp",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioAppInfrastructure|scenarioProcessorServiceMetrics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioAppInfrastructure|scenarioTabStore",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/suite/server|SuiteAppInfrastructure|suiteRunCommands",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/suite/server|SuiteAppInfrastructure|suiteRunId",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server|TopicInfrastructure|langevalsPayloadStaging",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server|TopicInfrastructure|topicClusteringClickHouse",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server|TopicInfrastructure|topicClusteringCommands",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/topic/server|TopicInfrastructure|topicClusteringLangevals",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceEdgeMediaTelemetry",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceEvaluationDispatch",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceEvaluationLoopMetrics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceEvaluationMonitor",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceEventDerivation",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceFullIo",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceIoExtraction",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceLegacyRead",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceMediaReferenceResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceMediaStore",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceModelCost",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceModelCostCatalog",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceProcessingInstaller",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceProcessingPipeline",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceProductAnalytics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceProjectMetadata",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceQueryClassifier",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceSpanContentDrop",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceSpanCostEnrichment",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceSpanIngest",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceSpanNormalization",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceSpanPiiRedaction",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceSpanSpool",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceSpanTokenEstimation",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceSpoolLegacyObject",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceSpoolStorage",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceTenantBroadcast",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceTokenCounter",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceTopicAssignmentCommand",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/trace/server|TraceInfrastructure|traceWindowedReadMetrics",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server|WebhookInfrastructure|webhookDestination",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server|WebhookInfrastructure|webhookId",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/webhook/server|WebhookInfrastructure|webhookSecret",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server|WorkflowInfrastructure|nlpLambdaArnResolver",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server|WorkflowInfrastructure|nlpLambdaFunction",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server|WorkflowInfrastructure|nlpLambdaInvoke",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server|WorkflowInfrastructure|nlpLambdaStreamInvoke",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server|WorkflowInfrastructure|nlpPayloadStaging",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server|WorkflowInfrastructure|studioStream",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server|WorkflowInfrastructure|workflowAiCall",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/workflow/server|WorkflowInfrastructure|workflowCommitMessageModel",
+      "measured": "2026-09-10"
+    }
+  ]
+}

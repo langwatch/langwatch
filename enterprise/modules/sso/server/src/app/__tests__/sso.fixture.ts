@@ -9,7 +9,7 @@ import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
 import { SsoApp, type SsoInfrastructure } from "../sso.app.ts";
-import { SsoConnectionLedgerPort } from "../sso.infrastructure.ts";
+import { SsoConnectionLedger } from "../sso.infrastructure.ts";
 import { SsoGateLogger } from "../sso.infrastructure.ts";
 
 /** The one operator on the staff list, exactly as `ADMIN_EMAILS` decides it. */
@@ -67,10 +67,10 @@ export function createSsoTestAuditLog(): AuditLogApi {
   return createApiFixture<AuditLogApi>({ record: async () => {} });
 }
 
-type Ledger = SsoConnectionLedgerPort;
+type Ledger = SsoConnectionLedger;
 
 /** Every ledger verb, recorded, so a test reads what was commanded. */
-export class RecordingSsoConnectionLedger implements SsoConnectionLedgerPort {
+export class RecordingSsoConnectionLedger implements SsoConnectionLedger {
   static create(): RecordingSsoConnectionLedger {
     return new RecordingSsoConnectionLedger();
   }

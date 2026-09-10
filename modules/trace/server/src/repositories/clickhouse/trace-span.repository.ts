@@ -8,7 +8,7 @@ import { EventUtils } from "@langwatch/eventing";
 
 import type { TraceClickHouse } from "../trace-clickhouse-client.repository.ts";
 import {
-  TracePort,
+  TraceProjectedReadRepository,
   type TraceIngestLagSample,
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
@@ -103,7 +103,7 @@ type EvaluationEventRow = {
 };
 
 /** Concrete, tenant-scoped span-tree persistence for ClickHouse. */
-export class ClickHouseTraceSpanRepository extends TracePort {
+export class ClickHouseTraceSpanRepository extends TraceProjectedReadRepository {
   private constructor(private readonly clickhouse: TraceClickHouse) {
     super();
   }

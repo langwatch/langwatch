@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { CodingAgentApp } from "#app/coding-agent.app";
 import type { CodingAgentSessionService } from "#services/coding-agent.service";
-import type { CodingAgentAuditPort, CodingAgentViewerVisibilityPort } from "../../app/coding-agent.app.ts";
+import type { CodingAgentAuditSink, CodingAgentViewerVisibilityReader } from "../../app/coding-agent.app.ts";
 import {
   CodingAgentCallerScopeDirectory,
   CodingAgentScopePermissions,
@@ -92,7 +92,7 @@ class ProjectForRest extends TestProjectService {
   }
 }
 
-class NoVisibility implements CodingAgentViewerVisibilityPort {
+class NoVisibility implements CodingAgentViewerVisibilityReader {
   readVisibility(): Promise<{ canReadCapturedContent: boolean; canSeeCosts: boolean }> {
     return Promise.resolve({ canReadCapturedContent: true, canSeeCosts: true });
   }
@@ -155,7 +155,7 @@ function mount({
     }
   }
 
-  class RecordingAudit implements CodingAgentAuditPort {
+  class RecordingAudit implements CodingAgentAuditSink {
     async auditLog(entry: Record<string, unknown>): Promise<void> {
       audits.push(entry);
     }

@@ -2,7 +2,7 @@ import {
   DatasetContentBackfillTask,
   DatasetObjectStorageResolverAdapter,
   DatasetObjectStorageS3ClientResolverAdapter,
-  DatasetStorageDestinationPort,
+  DatasetStorageDestinationService,
   type DatasetStorageDestination,
 } from "@langwatch/dataset-server";
 import { PrismaDatasetMigrationRepository } from "@langwatch/dataset-server/composition/dataset-migration";
@@ -13,7 +13,7 @@ import type { TasksHost } from "./tasks-host.composition.ts";
  * Translates this process's own destination POLICY (BYOC first, then this deployment's
  * backend) into the simpler decision `DatasetObjectStorageResolverAdapter` needs.
  */
-class TasksDatasetStorageDestination extends DatasetStorageDestinationPort {
+class TasksDatasetStorageDestination extends DatasetStorageDestinationService {
   constructor(private readonly policy: TasksObjectStorage["destination"]) {
     super();
   }

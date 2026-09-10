@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
-  GovernanceKpiContributionPort,
+  GovernanceKpiContributionWriter,
   GovernanceKpisSubscriber,
-  GovernanceOcsfEventPort,
+  GovernanceOcsfEventWriter,
   GovernanceOcsfSubscriber,
   GovernanceSubscriberDiagnostics,
   TraceAlertMetrics,
-  TraceAlertOriginGuardPort,
+  TraceAlertOriginGuard,
   TraceAlertTriggerMatch,
   TraceAlertTriggerMatchSubscriber,
-  TraceAlertTriggerPort,
+  TraceAlertTriggerReader,
   type GovernanceKpiContribution,
   type GovernanceOcsfEvent,
   type GovernanceTraceContext,
@@ -57,12 +57,10 @@ class AppGovernanceSubscriberDiagnostics extends GovernanceSubscriberDiagnostics
   }
 }
 
-class AppGovernanceKpiContribution extends GovernanceKpiContributionPort {
-  private constructor(private readonly writer: GovernanceKpiContributionPort) {
-    super();
-  }
+class AppGovernanceKpiContribution implements GovernanceKpiContributionWriter {
+  private constructor(private readonly writer: GovernanceKpiContributionWriter) {}
 
-  static create(writer: GovernanceKpiContributionPort): AppGovernanceKpiContribution {
+  static create(writer: GovernanceKpiContributionWriter): AppGovernanceKpiContribution {
     return new AppGovernanceKpiContribution(writer);
   }
 
@@ -71,12 +69,10 @@ class AppGovernanceKpiContribution extends GovernanceKpiContributionPort {
   }
 }
 
-class AppGovernanceOcsfEvent extends GovernanceOcsfEventPort {
-  private constructor(private readonly writer: GovernanceOcsfEventPort) {
-    super();
-  }
+class AppGovernanceOcsfEvent implements GovernanceOcsfEventWriter {
+  private constructor(private readonly writer: GovernanceOcsfEventWriter) {}
 
-  static create(writer: GovernanceOcsfEventPort): AppGovernanceOcsfEvent {
+  static create(writer: GovernanceOcsfEventWriter): AppGovernanceOcsfEvent {
     return new AppGovernanceOcsfEvent(writer);
   }
 
@@ -85,12 +81,10 @@ class AppGovernanceOcsfEvent extends GovernanceOcsfEventPort {
   }
 }
 
-class AppTraceAlertTrigger extends TraceAlertTriggerPort {
-  private constructor(private readonly triggers: TraceAlertTriggerPort) {
-    super();
-  }
+class AppTraceAlertTrigger implements TraceAlertTriggerReader {
+  private constructor(private readonly triggers: TraceAlertTriggerReader) {}
 
-  static create(triggers: TraceAlertTriggerPort): AppTraceAlertTrigger {
+  static create(triggers: TraceAlertTriggerReader): AppTraceAlertTrigger {
     return new AppTraceAlertTrigger(triggers);
   }
 
@@ -113,10 +107,8 @@ class AppTraceAlertTriggerMatch extends TraceAlertTriggerMatch {
   }
 }
 
-class AppTraceAlertOriginGuard extends TraceAlertOriginGuardPort {
-  constructor(private readonly runtime: GovernanceSubscriberRuntime) {
-    super();
-  }
+class AppTraceAlertOriginGuard implements TraceAlertOriginGuard {
+  constructor(private readonly runtime: GovernanceSubscriberRuntime) {}
 
   passes(input: { event: GovernanceTraceEvent; state: GovernanceTraceSummary }): boolean {
     return this.runtime.passesTraceOriginGuard(input);
@@ -146,14 +138,14 @@ export class AppGovernanceSubscriberAdapter {
     );
   }
 
-  kpis(writer: GovernanceKpiContributionPort): GovernanceKpisSubscriber {
+  kpis(writer: GovernanceKpiContributionWriter): GovernanceKpisSubscriber {
     return GovernanceKpisSubscriber.create({
       contributions: AppGovernanceKpiContribution.create(writer),
       diagnostics: this.diagnostics,
     });
   }
 
-  ocsf(writer: GovernanceOcsfEventPort): GovernanceOcsfSubscriber {
+  ocsf(writer: GovernanceOcsfEventWriter): GovernanceOcsfSubscriber {
     return GovernanceOcsfSubscriber.create({
       events: AppGovernanceOcsfEvent.create(writer),
       diagnostics: this.diagnostics,
@@ -161,7 +153,7 @@ export class AppGovernanceSubscriberAdapter {
   }
 
   traceAlerts(
-    triggers: TraceAlertTriggerPort,
+    triggers: TraceAlertTriggerReader,
     matches: TraceAlertTriggerMatch,
   ): (event: GovernanceTraceEvent, context: GovernanceTraceContext) => Promise<void> {
     const subscriber = TraceAlertTriggerMatchSubscriber.create({
@@ -176,9 +168,9 @@ export class AppGovernanceSubscriberAdapter {
 }
 
 export type AppGovernanceKpisSubscriberDependencies = {
-  governanceKpisRepository: GovernanceKpiContributionPort;
+  governanceKpisRepository: GovernanceKpiContributionWriter;
 };
 
 export type AppGovernanceOcsfSubscriberDependencies = {
-  governanceOcsfEventsRepository: GovernanceOcsfEventPort;
+  governanceOcsfEventsRepository: GovernanceOcsfEventWriter;
 };

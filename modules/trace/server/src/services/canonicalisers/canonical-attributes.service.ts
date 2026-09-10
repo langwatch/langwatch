@@ -24,7 +24,7 @@ export type LogExtractorContext = {
   setAttrIfAbsent: (key: string, value: unknown) => void;
 };
 
-export abstract class CanonicalAttributesPort {
+export abstract class AttributeCanonicaliser {
   abstract readonly id: string;
 
   /** Span canonicalisation. Extractors consume owned bag values and record rules. */

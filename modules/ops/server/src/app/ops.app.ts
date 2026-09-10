@@ -381,10 +381,10 @@ export interface OpsAppInfrastructure {
    */
   isProduction: boolean;
   anomalyHardTierAlert: AnomalyHardTierAlert;
-  opsReplayRuntime: OpsReplayRuntimePort;
+  opsReplayRuntime: OpsReplayRuntimeFactory;
   opsSnapshotRedis: OpsSnapshotRedis;
   opsWorker: OpsWorker;
-  organizationDataplane: OrganizationDataplanePort;
+  organizationDataplane: OrganizationDataplaneResolver;
   queuePayloadDecoder: QueuePayloadDecoder;
   schedulerWake: SchedulerWake;
   storageStatsMetrics: StorageStatsMetrics;
@@ -1463,7 +1463,7 @@ export type OrganizationDataplane =
   | Readonly<{ kind: "private"; endpoint: string }>;
 
 
-export interface OrganizationDataplanePort {
+export interface OrganizationDataplaneResolver {
   /**
    * Synchronous: the routing table is an environment fact read once at boot,
    * so a pass that asks per organization must not pay a round trip for it.
@@ -1505,7 +1505,7 @@ export interface OpsReplayRuntime {
  * ClickHouse route). `ReplayService` finalises the run with that message rather
  * than leaving a lock held on a run that never began.
  */
-export interface OpsReplayRuntimePort {
+export interface OpsReplayRuntimeFactory {
   create(): OpsReplayRuntime;
 }
 

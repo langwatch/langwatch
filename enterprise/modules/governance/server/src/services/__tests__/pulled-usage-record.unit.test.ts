@@ -16,7 +16,7 @@ import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 import { Temporal } from "@langwatch/time";
 
-class FixedRatePort implements PulledUsageRateReader {
+class FixedRateReader implements PulledUsageRateReader {
   rate(input: Parameters<PulledUsageRateReader["rate"]>[0]): {
     costNanoUsd: number;
     rateVersion: string;
@@ -29,7 +29,7 @@ class FixedRatePort implements PulledUsageRateReader {
 }
 
 const pulledUsageRecords = PulledUsageRecordService.create(
-  PulledUsagePricingService.create(new FixedRatePort()),
+  PulledUsagePricingService.create(new FixedRateReader()),
 );
 const buildPulledUsageRecord = pulledUsageRecords.findBuilt.bind(pulledUsageRecords);
 

@@ -9,13 +9,13 @@ import {
   IngestionPullMetrics,
   IngestionPullOutcome,
   IngestionPullProcess,
-  IngestionPullRunPort,
+  IngestionPullRunner,
   IngestionPullSchedule,
   IngestionPullService,
   IngestionPullTenant,
   PrismaIngestionPullLifecycleRepository,
   PrismaIngestionPullRunProjectionRepository,
-  PulledUsageDispatcherPort,
+  PulledUsageDispatcher,
   PulledUsageEventingAdapter,
   PulledUsageLedger,
   PulledUsageLedgerProcess,
@@ -243,10 +243,8 @@ class AppPulledUsageLedger extends PulledUsageLedger {
 }
 
 /** The one named dispatch boundary between a pull worker and the durable ledger. */
-export class AppPulledUsageEventDispatcher extends PulledUsageDispatcherPort {
-  private constructor(private readonly pipeline: AppPulledUsagePipeline) {
-    super();
-  }
+export class AppPulledUsageEventDispatcher implements PulledUsageDispatcher {
+  private constructor(private readonly pipeline: AppPulledUsagePipeline) {}
 
   static create(pipeline: AppPulledUsagePipeline): AppPulledUsageEventDispatcher {
     return new AppPulledUsageEventDispatcher(pipeline);
@@ -257,17 +255,15 @@ export class AppPulledUsageEventDispatcher extends PulledUsageDispatcherPort {
   }
 }
 
-class AppIngestionPullRun extends IngestionPullRunPort {
+class AppIngestionPullRun implements IngestionPullRunner {
   private constructor(
     private readonly worker: IngestionPullWorkerService,
-    private readonly pulledUsage: PulledUsageDispatcherPort,
-  ) {
-    super();
-  }
+    private readonly pulledUsage: PulledUsageDispatcher,
+  ) {}
 
   static create(options: {
     worker: IngestionPullWorkerService;
-    pulledUsage: PulledUsageDispatcherPort;
+    pulledUsage: PulledUsageDispatcher;
   }): AppIngestionPullRun {
     return new AppIngestionPullRun(options.worker, options.pulledUsage);
   }

@@ -16,7 +16,7 @@ import {
   EvaluationReport,
   EvaluationRescore,
   EvaluationRunAnalytics,
-  EvaluationWarmupPort,
+  EvaluationWarmupProbe,
 } from "../../app/evaluation.infrastructure.ts";
 import {
   EvaluationExecution,
@@ -63,7 +63,7 @@ export class TestEvaluationRescore implements EvaluationRescore {
   }
 }
 
-export class TestEvaluationWarmup implements EvaluationWarmupPort {
+export class TestEvaluationWarmup implements EvaluationWarmupProbe {
   readonly probes: string[] = [];
 
   constructor(private readonly failing = false) {

@@ -5,7 +5,7 @@ import type {
   DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
-import { DepartmentPort } from "../directory/department.repository.ts";
+import { DepartmentRepository } from "../directory/department.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
 const DEPARTMENT_KSUID_RESOURCE = "dept";
@@ -15,7 +15,7 @@ const DEPARTMENT_KSUID_RESOURCE = "dept";
  * assignable entity, which is the shape the three nullable columns behind the
  * Prisma repository have.
  */
-export class MemoryDepartmentRepository extends DepartmentPort {
+export class MemoryDepartmentRepository extends DepartmentRepository {
   private constructor(private readonly store: MemoryGovernanceStore) {
     super();
   }

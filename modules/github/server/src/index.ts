@@ -16,9 +16,9 @@ export {
   type GithubBranchDemandComposition,
 } from "./app/github.app.ts";
 export { EventingGithubMaintenanceAdapter } from "./services/github-maintenance.service.ts";
-export { GithubBranchMaintenancePort } from "./ports/github-branch-maintenance.port.ts";
-export { GithubBranchDemandPort } from "./ports/github-branch-demand.port.ts";
-export { GithubProjectActivityPort } from "./ports/github-project-activity.port.ts";
+export type { GithubBranchMaintenance } from "./app/github.infrastructure.ts";
+export type { GithubBranchDemand } from "./app/github.infrastructure.ts";
+export type { GithubProjectActivity } from "./app/github.infrastructure.ts";
 export { GithubHostApi } from "./ports/github-host.port.ts";
 export {
   GithubBranchDemandService,

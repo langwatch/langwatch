@@ -1,12 +1,12 @@
 import type {
-  CanonicalAttributesPort,
+  AttributeCanonicaliser,
   ExtractorContext,
   LogExtractorContext,
 } from "../canonical-attributes.service.ts";
 import { CodexLogCanonicaliserService } from "./codex-log.service.ts";
 import { CodexSpanCanonicaliserService } from "./codex-span.service.ts";
 
-export class CodexCanonicaliserService implements CanonicalAttributesPort {
+export class CodexCanonicaliserService implements AttributeCanonicaliser {
   static create(): CodexCanonicaliserService {
     return new CodexCanonicaliserService();
   }

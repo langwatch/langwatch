@@ -262,7 +262,7 @@ export interface WorkflowInfrastructure {
    * than reporting a clean run over nothing.
    */
   nlpLambdaFleet?: NlpLambdaFleet;
-  nlpLambdaFunction: NlpLambdaFunctionPort;
+  nlpLambdaFunction: NlpLambdaFunctionReader;
   nlpLambdaInvoke: NlpLambdaInvoke;
   nlpLambdaStreamInvoke: NlpLambdaStreamInvoke;
   nlpPayloadStaging: NlpPayloadStaging;
@@ -812,7 +812,7 @@ export interface NlpLambdaArnResolver {
  * Which function one project's engine answers on, as the caller needs it. The
  * resolution behind it is cached and single-flighted; a caller only asks.
  */
-export interface NlpLambdaFunctionPort {
+export interface NlpLambdaFunctionReader {
   arnFor(input: { projectId: string }): Promise<string>;
 }
 

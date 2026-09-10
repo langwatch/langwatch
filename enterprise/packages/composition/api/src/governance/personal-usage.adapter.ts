@@ -5,7 +5,7 @@ import type {
   PersonalUsageBreakdown,
   PersonalUsageBucket,
 } from "@langwatch/enterprise-governance-contract";
-import { PersonalUsageReaderPort } from "@langwatch/enterprise-governance-server";
+import { PersonalUsageReader } from "@langwatch/enterprise-governance-server";
 import type {
   AppPersonalUsageReadAdapter,
   PersonalUsageWindow,
@@ -30,10 +30,8 @@ type IngestionPrincipalSummaryRow = {
   topModel: { name: string; requests: number } | null;
 };
 
-export class AppPersonalUsageReader extends PersonalUsageReaderPort {
-  private constructor(private readonly repository: AppPersonalUsageReadAdapter) {
-    super();
-  }
+export class AppPersonalUsageReader implements PersonalUsageReader {
+  private constructor(private readonly repository: AppPersonalUsageReadAdapter) {}
 
   static create(repository: AppPersonalUsageReadAdapter): AppPersonalUsageReader {
     return new AppPersonalUsageReader(repository);

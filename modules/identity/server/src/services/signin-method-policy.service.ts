@@ -1,5 +1,5 @@
 import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity-contract";
-import type { SignInMethodPolicyPort } from "./signin-router.service.ts";
+import type { SignInMethodPolicyResolver } from "./signin-router.service.ts";
 
 /**
  * The instance's method-set policy (ADR-117 §4) — the module ADR-027's
@@ -47,7 +47,7 @@ export const LOCAL_METHOD_SET: readonly SignInMethod[] = [PASSWORD_METHOD];
  * the router routes on and the hook enforces from: one resolution per request, and both gate reads
  * inside it hit the same per-process memo.
  */
-export class SignInMethodPolicyService implements SignInMethodPolicyPort {
+export class SignInMethodPolicyService implements SignInMethodPolicyResolver {
   static create(inputs: SignInMethodPolicyInputs): SignInMethodPolicyService {
     return new SignInMethodPolicyService(inputs);
   }

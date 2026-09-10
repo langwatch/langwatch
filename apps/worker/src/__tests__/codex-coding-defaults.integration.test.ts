@@ -23,7 +23,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import type { AuthzGrantsCommandDispatcher } from "@langwatch/authz-server";
 import type {
   DataRetentionDirectoryReader,
-  DataRetentionPlanPort,
+  DataRetentionPlanResolver,
 } from "@langwatch/data-retention-server";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -132,7 +132,7 @@ async function composeTenancy(config: WorkerConfig) {
       topicSchedule: createApiFixture<TopicClusteringScheduleReader>(),
       dataRetention: {
         directory: createApiFixture<DataRetentionDirectoryReader>({}, "retention directory"),
-        plans: createApiFixture<DataRetentionPlanPort>({}, "retention plans"),
+        plans: createApiFixture<DataRetentionPlanResolver>({}, "retention plans"),
         resolveClickHouseClient: null,
       },
     }),
@@ -349,7 +349,7 @@ describe.skipIf(!databaseUrl)(
           studioDsl: createApiFixture<WorkflowStudioDsl>(),
           agentMappings: createApiFixture<WorkflowAgentMapping>(),
           workflowRows: instantiateRepositories(workflowRepositories, {
-            backend: "postgres",
+            backend: "live",
             infrastructure: { prisma: db },
           }).workflowRows,
         },

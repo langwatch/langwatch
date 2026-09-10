@@ -19,7 +19,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createWorkerMetricsHandler, type WorkerMetricsPorts } from "../worker-metrics.server.ts";
+import { createWorkerMetricsHandler, type WorkerMetricsMembers } from "../worker-metrics.server.ts";
 import { WORKER_LIVENESS_PATH } from "../worker.liveness.ts";
 
 // Derive the fakes' types from the handler itself, so this test cannot drift
@@ -32,7 +32,7 @@ type HandlerResponse = Parameters<Handler>[1];
 const PROMETHEUS_CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8";
 const SAMPLES = "worker_metrics_handler_probe_total 1\n";
 
-const servesSamples = vi.fn<WorkerMetricsPorts["readMetrics"]>(async () => ({
+const servesSamples = vi.fn<WorkerMetricsMembers["readMetrics"]>(async () => ({
   body: SAMPLES,
   contentType: PROMETHEUS_CONTENT_TYPE,
 }));
@@ -87,7 +87,7 @@ describe("createWorkerMetricsHandler", () => {
       it("answers 200 without consulting the gate", async () => {
         // The default-install case: this is exactly the configuration that
         // made a /metrics probe crash-loop every stock worker deployment.
-        const isAuthorized = vi.fn<WorkerMetricsPorts["isAuthorized"]>(() => {
+        const isAuthorized = vi.fn<WorkerMetricsMembers["isAuthorized"]>(() => {
           throw new Error("metrics API key is not set");
         });
         const { req, res, captured } = fakeExchange(WORKER_LIVENESS_PATH);
@@ -105,7 +105,7 @@ describe("createWorkerMetricsHandler", () => {
       it("answers 200 even though the gate would reject", async () => {
         // The secretKeyRef case: the key exists in the container's env, but no
         // rendered httpGet header can ever carry it.
-        const isAuthorized = vi.fn<WorkerMetricsPorts["isAuthorized"]>(() => false);
+        const isAuthorized = vi.fn<WorkerMetricsMembers["isAuthorized"]>(() => false);
         const { req, res, captured } = fakeExchange(WORKER_LIVENESS_PATH);
 
         createWorkerMetricsHandler({ isAuthorized, readMetrics: servesSamples })(req, res);

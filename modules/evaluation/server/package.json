@@ -63,6 +63,7 @@
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
+    "@langwatch/workflow-server": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

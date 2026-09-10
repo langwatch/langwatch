@@ -14,7 +14,7 @@ import {
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { OpsReplayRuntimePort, type OpsReplayRuntime } from "../../app/ops.app.ts";
+import { OpsReplayRuntimeFactory, type OpsReplayRuntime } from "../../app/ops.app.ts";
 import { ReplayRedisRepository } from "../../repositories/redis/redis.replay.repository.ts";
 import { ReplayService } from "../replay.service.ts";
 
@@ -170,7 +170,7 @@ describe("ops replay full rebuild", () => {
       } as unknown as MapProjectionDefinition<any, Event>,
     };
 
-    const runtimeFactory = new (class extends OpsReplayRuntimePort {
+    const runtimeFactory = new (class extends OpsReplayRuntimeFactory {
       create(): OpsReplayRuntime {
         return {
           service: new EventingReplayService({

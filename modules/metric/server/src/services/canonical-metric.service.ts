@@ -13,7 +13,7 @@ import { MetricSerializationAdapter } from "./metric-serialization.service.ts";
 const { isRecord } = MetricSerializationAdapter;
 import { MetricRedactionAdapter } from "./metric-redaction.service.ts";
 import {
-  MetricPreparation,
+  type MetricPreparation,
   type MetricPreparationInput,
 } from "../app/metric.infrastructure.ts";
 import type { MetricRedaction } from "../app/metric.infrastructure.ts";
