@@ -19,16 +19,19 @@ export const ORGANIZATION_ID = "organization-1";
 
 /** Every dependency `WebhookApp` needs, defaulted to "not under test here". */
 function unreachableDependencies(): WebhookAppDependencies {
-  const unreachable = (name: string) => () => {
-    throw new Error(`${name} is not under test here`);
-  };
+  const unreachable = <T extends object>(name: string): T =>
+    new Proxy({} as T, {
+      get: () => (): never => {
+        throw new Error(`${name} is not under test here`);
+      },
+    });
 
   return {
-    endpoints: unreachable("endpoints") as never,
-    health: { health: unreachable("health") as never },
+    endpoints: unreachable("endpoints"),
+    health: { health: unreachable("health") },
     events: undefined,
     assertEndpointsEntitled: async () => undefined,
-    dispatch: unreachable("dispatch") as never,
+    dispatch: unreachable("dispatch"),
   };
 }
 

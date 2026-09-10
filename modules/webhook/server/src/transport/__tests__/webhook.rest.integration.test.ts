@@ -7,6 +7,7 @@
  * @see specs/webhooks/webhook-endpoints.feature
  * @see modules/webhook/specs/webhooks.feature
  */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { WebhookEndpointsNotEntitledError } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
@@ -194,9 +195,9 @@ describe("the /api/webhooks/v1 door", () => {
         updatedAt: new Date("2026-07-20T00:00:00.000Z"),
       };
       const { request } = mountWebhookRest({
-        endpoints: {
+        endpoints: createApiFixture<WebhookAppDependencies["endpoints"]>({
           create: async () => ({ endpoint: created, secret: "whsec_test" }),
-        } as never,
+        }),
       });
 
       const response = await request("/api/webhooks/v1/endpoints", {
