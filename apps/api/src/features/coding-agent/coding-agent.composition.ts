@@ -7,6 +7,7 @@ import {
   CodingAgentBillingPolicyPort,
   CodingAgentCallerScopeDirectoryPort,
   CodingAgentScopePermissionsPort,
+  CodingAgentUnavailableError,
   codingAgentServer,
   type CodingAgentClickHousePort,
   type CodingAgentScopeCaller,
@@ -16,9 +17,7 @@ import {
   type CodingAgentViewerVisibility,
   type CodingAgentViewerVisibilityPort,
 } from "@langwatch/coding-agent-server";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { GithubApi } from "@langwatch/github-contract";
-import { HandledError } from "@langwatch/handled-error";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
 import { createApp } from "@langwatch/runtime-composition";
@@ -83,21 +82,6 @@ export async function composeCodingAgentFeature(options: {
 }
 
 /**
- * `codingAgents.*` on a process that composed no project graph to read them over.
- */
-export function refusingCodingAgentFeature(): ComposedCodingAgentFeature {
-  const refuse = (): never => {
-    throw new ApiCodingAgentUnavailableError("coding-agent session store");
-  };
-  const refuseEvery = <T>(): T => new Proxy({}, { get: () => refuse, has: () => true }) as T;
-
-  return {
-    app: refuseEvery<CodingAgentApi>(),
-    router: (mount) => createCodingAgentTrpcRouter(mount.runtime),
-  };
-}
-
-/**
  * What one viewer may see of one project: whether captured content is readable,
  * and whether spend is. The SAME resolution the five trace surfaces read
  * through, so a session list and the traces behind it cannot disagree.
@@ -108,7 +92,7 @@ function apiCodingAgentVisibility(
   return {
     readVisibility: async (input): Promise<CodingAgentViewerVisibility> => {
       if (!protections) {
-        throw new ApiCodingAgentUnavailableError(
+        throw new CodingAgentUnavailableError(
           "content-protections resolver, so it cannot say what this viewer may read of a coding-agent session",
         );
       }
@@ -236,18 +220,5 @@ export class ApiCodingAgentScopePermissions extends CodingAgentScopePermissionsP
         ),
       ]),
     );
-  }
-}
-
-/** A capability this deployment did not compose, refused by name. */
-export class ApiCodingAgentUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `This deployment has no ${capability}.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ApiCodingAgentUnavailableError";
   }
 }

@@ -9,7 +9,7 @@ import type {
   PermissionDecision,
 } from "@langwatch/authz-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { EvaluatorService } from "@langwatch/evaluator-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { GithubService } from "@langwatch/github-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -58,7 +58,8 @@ import { refusingWorkflowFeature } from "../../workflow/workflow.composition.ts"
 import { refusingExperimentFeature } from "../../experiment/experiment.composition.ts";
 import { refusingOrganizationFeature } from "../../organization/organization.composition.ts";
 import { refusingProjectFeature } from "../../project/project.composition.ts";
-import { refusingCodingAgentFeature } from "../../coding-agent/coding-agent.composition.ts";
+import { CodingAgentApp } from "@langwatch/coding-agent-server";
+import { createCodingAgentTrpcRouter } from "../../coding-agent/coding-agent-trpc.mount.ts";
 import { refusingAutomationFeature } from "../../automation/automation.composition.ts";
 import { refusingEnterpriseFeature } from "../../enterprise/enterprise.composition.ts";
 import { refusingHomeFeature } from "../../project/home.composition.ts";
@@ -193,7 +194,7 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
     infrastructure,
     peers: {
       projects,
-      evaluators: {} as unknown as EvaluatorService,
+      evaluators: {} as unknown as EvaluatorApi,
       monitors: stub<MonitorApi>("monitors"),
     },
     // No ClickHouse: the gateway ledger is a projection there, so the spend
@@ -238,7 +239,10 @@ function composeApplication(overrides: { saasBilling?: boolean; enterprise?: unk
       evaluation: stubEvaluationFeature(),
       organization: refusingOrganizationFeature(),
       project: refusingProjectFeature(),
-      codingAgent: refusingCodingAgentFeature(),
+      codingAgent: {
+        app: CodingAgentApp.refusing(),
+        router: (mount) => createCodingAgentTrpcRouter(mount.runtime),
+      },
       automation: refusingAutomationFeature(),
       enterprise: refusingEnterpriseFeature(),
       secret: stubSecretFeature(),

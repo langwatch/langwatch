@@ -159,22 +159,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "coding-agent|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "coding-agent|fixtures-directory",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "coding-agent|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "coding-agent|testing-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "coding-agent|unregistered-repositories",
       "measured": "2026-09-08"
     },

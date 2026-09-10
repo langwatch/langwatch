@@ -29,7 +29,7 @@ class TestCodingAgentApi {
   tracePullRequestLinks: CodingAgentTracePullRequestLink[] = [];
   readonly tracePullRequestInputs: unknown[] = [];
 
-  tryGetBySessionId(input: {
+  findBySessionId(input: {
     projectId: string;
     sessionId: string;
   }): Promise<CodingAgentSession | null> {
@@ -58,8 +58,12 @@ class TestCodingAgentApi {
     throw new Error("Not used by session group tests: buildTranscript.");
   }
 
-  tryGetSessionForTrace(): never {
-    throw new Error("Not used by session group tests: tryGetSessionForTrace.");
+  findSessionForTrace(): never {
+    throw new Error("Not used by session group tests: findSessionForTrace.");
+  }
+
+  recordPullRequestUsageRead(): never {
+    throw new Error("Not used by session group tests: recordPullRequestUsageRead.");
   }
 
   getSessionEvents(): never {
@@ -86,8 +90,8 @@ class TestCodingAgentApi {
     throw new Error("Not used by session group tests: githubWebBase.");
   }
 
-  tryResolveOrganizationForProject(): never {
-    throw new Error("Not used by session group tests: tryResolveOrganizationForProject.");
+  findOrganizationForProject(): never {
+    throw new Error("Not used by session group tests: findOrganizationForProject.");
   }
 
   getPullRequestUsage(): never {
@@ -322,7 +326,7 @@ describe("SessionGroupsService", () => {
       const service = SessionGroupsService.create({
         repository: new FakeRepository([makeRow()]),
         codingAgentSessions: Object.assign(TestCodingAgentApi.create(), {
-          async tryGetBySessionId(): Promise<never> {
+          async findBySessionId(): Promise<never> {
             throw new Error("clickhouse hiccup");
           },
         }),

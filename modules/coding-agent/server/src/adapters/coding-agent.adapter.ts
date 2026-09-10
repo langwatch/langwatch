@@ -1,6 +1,5 @@
 import {
   CodingAgentProjectionPersistence,
-  type CodingAgentService,
   type CodingAgentSession,
   type CodingAgentSessionEventRecord,
   type CodingAgentSessionMetricSeriesRecord,
@@ -35,7 +34,10 @@ import {
   NullSessionMetricSeriesRepository,
   SessionMetricSeriesRepository,
 } from "../repositories/session-metric-series.repository.ts";
-import { CodingAgentFeatureService } from "../services/coding-agent.service.ts";
+import {
+  CodingAgentFeatureService,
+  type CodingAgentSessionService,
+} from "../services/coding-agent.service.ts";
 import type { CodingAgentBillingPolicyPort } from "../ports/coding-agent-billing.port.ts";
 
 type CodingAgentRepositories = {
@@ -54,7 +56,7 @@ const projectionClocks = new WeakMap<CodingAgentProjectionPersistence, CodingAge
 /**
  * The process-owned persistence adapter installed into Coding Agent's event projections.
  * It is not a second domain service: projection registration is an application lifecycle
- * boundary, while ordinary callers use only CodingAgentService.
+ * boundary, while ordinary callers use only CodingAgentSessionService.
  */
 export class CodingAgentProjectionPersistenceAdapter extends CodingAgentProjectionPersistence {
   private constructor(private readonly repositories: CodingAgentRepositories) {
@@ -142,7 +144,7 @@ export type CodingAgentProjectionPersistenceOptions = {
 
 /** Builds the one Coding Agent service and its projection persistence once. */
 export class CodingAgentRuntime {
-  readonly service: CodingAgentService;
+  readonly service: CodingAgentSessionService;
   readonly projections: CodingAgentProjectionPersistence;
 
   static create(options: CodingAgentRuntimeOptions): CodingAgentRuntime {
@@ -161,7 +163,10 @@ export class CodingAgentRuntime {
     return new CodingAgentRuntime(service, options.projections);
   }
 
-  private constructor(service: CodingAgentService, projections: CodingAgentProjectionPersistence) {
+  private constructor(
+    service: CodingAgentSessionService,
+    projections: CodingAgentProjectionPersistence,
+  ) {
     this.service = service;
     this.projections = projections;
   }

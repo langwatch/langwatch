@@ -1,19 +1,43 @@
-import { CodingAgentService } from "@langwatch/coding-agent-contract";
+import {
+  buildCodingAgentTranscript,
+  contentAttrKeys,
+  logContentKeys,
+  shouldFilterCodingAgentSpan,
+  type CodingAgentApi,
+  type CodingAgentSpanFilterInput,
+} from "@langwatch/coding-agent-contract";
 
-export class TestCodingAgentService extends CodingAgentService {
+/** A `CodingAgentApi` double: the pure derivations answer for real, everything else refuses. */
+export class TestCodingAgentService implements CodingAgentApi {
   private unused(): Promise<never> {
     return Promise.reject(new Error("unused coding agent capability"));
+  }
+
+  logContentKeys(eventName: string) {
+    return logContentKeys(eventName);
+  }
+
+  contentAttrKeys(eventName: string) {
+    return contentAttrKeys(eventName);
+  }
+
+  shouldFilterSpan(input: CodingAgentSpanFilterInput): boolean {
+    return shouldFilterCodingAgentSpan(input);
+  }
+
+  buildTranscript(input: Parameters<CodingAgentApi["buildTranscript"]>[0]) {
+    return buildCodingAgentTranscript(input);
   }
 
   getSessionEvents(): Promise<never> {
     return this.unused();
   }
 
-  tryGetBySessionId(): Promise<never> {
+  findBySessionId(): Promise<never> {
     return this.unused();
   }
 
-  tryGetSessionForTrace(): Promise<never> {
+  findSessionForTrace(): Promise<never> {
     return this.unused();
   }
 
@@ -37,7 +61,23 @@ export class TestCodingAgentService extends CodingAgentService {
     return this.unused();
   }
 
+  recordPullRequestUsageRead(): Promise<never> {
+    return this.unused();
+  }
+
+  githubWebBase(): string {
+    throw new Error("unused coding agent capability");
+  }
+
+  findOrganizationForProject(): Promise<never> {
+    return this.unused();
+  }
+
   getPullRequestUsage(): Promise<never> {
+    return this.unused();
+  }
+
+  getOrganizationPullRequestUsage(): Promise<never> {
     return this.unused();
   }
 
@@ -45,7 +85,11 @@ export class TestCodingAgentService extends CodingAgentService {
     return this.unused();
   }
 
-  getForPersonalProject(): Promise<never> {
+  getPersonalProjectPullRequestUsage(): Promise<never> {
+    return this.unused();
+  }
+
+  githubConnection(): Promise<never> {
     return this.unused();
   }
 }

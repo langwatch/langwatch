@@ -1,6 +1,5 @@
 import {
   MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE,
-  CodingAgentService as CodingAgentServiceContract,
   type CodingAgentPersonalPullRequestUsage,
   type CodingAgentPersonalPullRequestUsageInput,
   type CodingAgentPullRequestDetail,
@@ -41,8 +40,40 @@ import { CodingAgentTracePullRequestService } from "./coding-agent-trace-pull-re
 
 export const MAX_SESSION_EVENTS_PAGE_SIZE = MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
 
+/**
+ * The session-aggregate capability `CodingAgentApp` composes over: private to this
+ * package, narrower than the public `CodingAgentApi` (no viewer-scoped params, no
+ * pure derivations `CodingAgentApp` answers itself).
+ */
+export interface CodingAgentSessionService {
+  getSessionEvents(input: CodingAgentSessionEventsInput): Promise<{
+    events: CodingAgentSessionEvent[];
+    nextCursor: CodingAgentSessionCursor | null;
+  }>;
+  findBySessionId(input: CodingAgentSessionLookupInput): Promise<CodingAgentSession | null>;
+  findSessionForTrace(
+    input: CodingAgentTraceSessionLookupInput,
+  ): Promise<CodingAgentSession | null>;
+  listRecent(input: CodingAgentRecentSessionsInput): Promise<CodingAgentSession[]>;
+  backfillPullRequestMappings(input: CodingAgentPullRequestMappingBackfillInput): Promise<void>;
+  getUsageTotals(input: CodingAgentUsageTotalsInput): Promise<CodingAgentUsageTotals>;
+  listForProject(input: CodingAgentSessionsListInput): Promise<CodingAgentSessionListRow[]>;
+  linkTraceSessionsToPullRequests(
+    input: CodingAgentTracePullRequestInput,
+  ): Promise<CodingAgentTracePullRequestLink[]>;
+  getPullRequestUsage(
+    input: CodingAgentPullRequestUsageInput,
+  ): Promise<CodingAgentPullRequestUsage>;
+  getPullRequestDetail(
+    input: CodingAgentPullRequestUsageInput,
+  ): Promise<CodingAgentPullRequestDetail>;
+  getForPersonalProject(
+    input: CodingAgentPersonalPullRequestUsageInput,
+  ): Promise<CodingAgentPersonalPullRequestUsage>;
+}
+
 /** The one public Coding Agent contract, composed from private role-specific collaborators. */
-export class CodingAgentFeatureService extends CodingAgentServiceContract {
+export class CodingAgentFeatureService implements CodingAgentSessionService {
   static create(options: {
     sessions: CodingAgentSessionRepository;
     traceSessions: CodingAgentTraceSessionRepository;
@@ -112,9 +143,7 @@ export class CodingAgentFeatureService extends CodingAgentServiceContract {
       mappingBackfill: CodingAgentPullRequestMappingBackfillService;
       tracePullRequests: CodingAgentTracePullRequestService;
     },
-  ) {
-    super();
-  }
+  ) {}
 
   getSessionEvents(input: CodingAgentSessionEventsInput): Promise<{
     events: CodingAgentSessionEvent[];

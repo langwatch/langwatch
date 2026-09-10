@@ -4,15 +4,13 @@
  * refuses by name, and what it writes down about the read.
  */
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
-import type {
-  CodingAgentPullRequestUsage,
-  CodingAgentService,
-} from "@langwatch/coding-agent-contract";
+import type { CodingAgentPullRequestUsage } from "@langwatch/coding-agent-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { CodingAgentApp } from "#app/coding-agent.app";
+import type { CodingAgentSessionService } from "#services/coding-agent.service";
 import type { CodingAgentAuditPort, CodingAgentViewerVisibilityPort } from "../../app/coding-agent.app.ts";
 import {
   CodingAgentCallerScopeDirectoryPort,
@@ -173,7 +171,7 @@ function mount({
       scopePermissions: new ScopePermissions(),
       visibility: new NoVisibility(),
       audit: new RecordingAudit(),
-      service: { getPullRequestUsage } as CodingAgentService,
+      service: { getPullRequestUsage } as CodingAgentSessionService,
     },
     config: undefined,
     resources: new ResourceScope(),

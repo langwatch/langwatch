@@ -31,6 +31,13 @@ export type CodingAgentCallerScope =
 /** Who a viewer-scoped read is answered for. */
 export type CodingAgentViewer = { readonly id: string };
 
+/** The input `shouldFilterSpan` decides from: no store read, no session lookup. */
+export type CodingAgentSpanFilterInput = {
+  scopeName: string | null | undefined;
+  spanName: string;
+  attributeKeys: readonly string[];
+};
+
 /**
  * One read of a pull request's usage rollup, as it is written down. Never the
  * contributors themselves: how many projects fed it says how wide the read
@@ -49,11 +56,7 @@ export type CodingAgentPullRequestUsageRead = Readonly<{
 export interface CodingAgentApi {
   logContentKeys(eventName: string): readonly LogContentKey[];
   contentAttrKeys(eventName: string): readonly string[];
-  shouldFilterSpan(input: {
-    scopeName: string | null | undefined;
-    spanName: string;
-    attributeKeys: readonly string[];
-  }): boolean;
+  shouldFilterSpan(input: CodingAgentSpanFilterInput): boolean;
   buildTranscript(input: {
     spans: SpanDetail[];
     logs: TranscriptLogRecord[];

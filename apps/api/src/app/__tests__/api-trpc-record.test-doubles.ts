@@ -367,11 +367,7 @@ export function stubComposedFeatures(): ComposedApiFeatures {
     gateway: {
       app: stub("app.gateway", { schemas: { virtualKeyBudgetInput: anySchema } }),
       composition: undefined,
-      router: (mount) =>
-        createGatewayTrpcRouters({
-          ...mount,
-          ports: { virtualKeys: { virtualKeyBudgetInput: anySchema } },
-        }),
+      routers: (mount) => createGatewayTrpcRouters(mount.runtime),
     },
     langy: refusingLangyFeature(),
     ops: stubOpsFeature(),

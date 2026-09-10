@@ -176,6 +176,7 @@ export {
   TraceIngressCommandPort,
   TraceIngressPayloadPort,
   TraceSpanDedupPort,
+  type CodingAgentIngestFilter,
   type SpanDedupRef,
 } from "./services/trace-ingestion.service.ts";
 export { TraceAttributeCapService } from "./services/trace-attribute-cap.service.ts";

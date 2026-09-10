@@ -59,6 +59,7 @@ export {
 } from "./ports/coding-agent-caller-scope.port.ts";
 export {
   CodingAgentApp,
+  CodingAgentUnavailableError,
   type CodingAgentCaller,
   type CodingAgentCallerScope,
   type CodingAgentPullRequestRef,

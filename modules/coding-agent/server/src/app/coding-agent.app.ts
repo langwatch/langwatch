@@ -1,4 +1,5 @@
 import type { CodingAgentSessionLookupInput } from "@langwatch/coding-agent-contract";
+import { HandledError } from "@langwatch/handled-error";
 /** The coding-agent application shared by all transports. */
 import type {
   CodingAgentApi,
@@ -9,19 +10,26 @@ import type {
   CodingAgentPullRequestMappingBackfillInput,
   CodingAgentPullRequestUsage,
   CodingAgentRecentSessionsInput,
-  CodingAgentService,
   CodingAgentSession,
   CodingAgentSessionEvent,
   CodingAgentSessionEventsInput,
   CodingAgentSessionListRow,
   CodingAgentSessionsListInput,
   CodingAgentSessionCursor,
+  CodingAgentSpanFilterInput,
   CodingAgentUsageTotals,
   CodingAgentUsageTotalsInput,
 } from "@langwatch/coding-agent-contract";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import type { TranscriptLogRecord } from "@langwatch/coding-agent-contract";
-import { CodingAgentApi as CodingAgentApiToken } from "@langwatch/coding-agent-contract";
+import {
+  buildCodingAgentTranscript,
+  contentAttrKeys,
+  type LogContentKey,
+  logContentKeys,
+  shouldFilterCodingAgentSpan,
+  CodingAgentApi as CodingAgentApiToken,
+} from "@langwatch/coding-agent-contract";
 import { GithubApi } from "@langwatch/github-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
@@ -32,6 +40,7 @@ import type {
 } from "@langwatch/coding-agent-contract";
 import type { CodingAgentScopeCaller } from "#ports/coding-agent-caller-scope.port";
 import type { CodingAgentClickHousePort } from "#ports/coding-agent-clickhouse.port";
+import type { CodingAgentSessionService } from "../services/coding-agent.service.ts";
 import type { CodingAgentBillingPolicyPort } from "#ports/coding-agent-billing.port";
 import {
   gatePullRequestSessionTitles,
@@ -130,7 +139,7 @@ export type CodingAgentInfrastructure = Readonly<{
   /** Where a read that names people is written down. */
   audit: CodingAgentAuditPort;
   /** Test-only service seam; production composition leaves this absent. */
-  service?: CodingAgentService;
+  service?: CodingAgentSessionService;
 }>;
 
 type CodingAgentDependencies = { projects: typeof ProjectApi; github: typeof GithubApi };
@@ -173,14 +182,27 @@ export class CodingAgentApp implements CodingAgentApi {
     return new CodingAgentApp(service, dependencies.github, scope, infrastructure);
   }
 
-  readonly #codingAgents: CodingAgentService;
+  /**
+   * `codingAgents.*` on a process that composed no session store. The namespace still
+   * mounts and every call refuses by name: a process either installs this feature or
+   * does not, so the refusal lives here rather than as a second hand-rolled
+   * implementation in each composing process.
+   */
+  static refusing(): CodingAgentApi {
+    const refuse = (): never => {
+      throw new CodingAgentUnavailableError("coding-agent session store");
+    };
+    return new Proxy({}, { get: () => refuse, has: () => true }) as CodingAgentApi;
+  }
+
+  readonly #codingAgents: CodingAgentSessionService;
   readonly #github: GithubApi;
   readonly #scope: CodingAgentScopePorts;
   readonly #visibility: CodingAgentViewerVisibilityPort;
   readonly #audit: CodingAgentAuditPort;
 
   private constructor(
-    codingAgents: CodingAgentService,
+    codingAgents: CodingAgentSessionService,
     github: GithubApi,
     scope: CodingAgentScopePorts,
     infrastructure: CodingAgentInfrastructure,
@@ -192,24 +214,24 @@ export class CodingAgentApp implements CodingAgentApi {
     this.#audit = infrastructure.audit;
   }
 
-  logContentKeys(eventName: string) {
-    return this.#codingAgents.logContentKeys(eventName);
+  /** Pure derivation, no session store read: which log fields an event name captures. */
+  logContentKeys(eventName: string): readonly LogContentKey[] {
+    return logContentKeys(eventName);
   }
 
-  contentAttrKeys(eventName: string) {
-    return this.#codingAgents.contentAttrKeys(eventName);
+  /** Pure derivation, no session store read: which attribute keys an event name captures. */
+  contentAttrKeys(eventName: string): readonly string[] {
+    return contentAttrKeys(eventName);
   }
 
-  shouldFilterSpan(input: {
-    scopeName: string | null | undefined;
-    spanName: string;
-    attributeKeys: readonly string[];
-  }): boolean {
-    return this.#codingAgents.shouldFilterSpan(input);
+  /** Pure derivation, no session store read: whether a span is coding-agent noise. */
+  shouldFilterSpan(input: CodingAgentSpanFilterInput): boolean {
+    return shouldFilterCodingAgentSpan(input);
   }
 
+  /** Pure derivation, no session store read: folds spans and logs into a transcript. */
   buildTranscript(input: { spans: SpanDetail[]; logs: TranscriptLogRecord[] }) {
-    return this.#codingAgents.buildTranscript(input);
+    return buildCodingAgentTranscript(input);
   }
 
   findBySessionId(input: CodingAgentSessionLookupInput) {
@@ -221,7 +243,7 @@ export class CodingAgentApp implements CodingAgentApi {
   }
 
   linkTraceSessionsToPullRequests(
-    input: Parameters<CodingAgentService["linkTraceSessionsToPullRequests"]>[0],
+    input: Parameters<CodingAgentSessionService["linkTraceSessionsToPullRequests"]>[0],
   ) {
     return this.#codingAgents.linkTraceSessionsToPullRequests(input);
   }
@@ -466,4 +488,17 @@ export class CodingAgentApp implements CodingAgentApi {
 /** Nothing readable, nothing priceable, nobody named. */
 function emptyCallerScope(): CodingAgentCallerScope {
   return { permittedProjectIds: [], costProjectIds: [], projects: {} };
+}
+
+/** A capability this deployment did not compose, refused by name. */
+export class CodingAgentUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `This deployment has no ${capability}.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "CodingAgentUnavailableError";
+  }
 }

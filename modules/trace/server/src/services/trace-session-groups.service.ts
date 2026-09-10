@@ -187,7 +187,7 @@ export class SessionGroupsService {
       const settled = await Promise.all(
         chunk.map((row) =>
           this.codingAgentSessions
-            .tryGetBySessionId({
+            .findBySessionId({
               projectId: tenantId,
               sessionId: row.conversationId,
               startedAtMs: row.startedAtMs,

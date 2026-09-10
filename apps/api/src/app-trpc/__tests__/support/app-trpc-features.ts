@@ -53,7 +53,8 @@ import { refusingWorkflowFeature } from "../../../features/workflow/workflow.com
 import { refusingExperimentFeature } from "../../../features/experiment/experiment.composition.ts";
 import { refusingOrganizationFeature } from "../../../features/organization/organization.composition.ts";
 import { refusingProjectFeature } from "../../../features/project/project.composition.ts";
-import { refusingCodingAgentFeature } from "../../../features/coding-agent/coding-agent.composition.ts";
+import { CodingAgentApp } from "@langwatch/coding-agent-server";
+import { createCodingAgentTrpcRouter } from "../../../features/coding-agent/coding-agent-trpc.mount.ts";
 import { refusingAutomationFeature } from "../../../features/automation/automation.composition.ts";
 import { refusingEnterpriseFeature } from "../../../features/enterprise/enterprise.composition.ts";
 import { createAppTrpcFeatures } from "../../app-trpc.features.ts";
@@ -204,7 +205,10 @@ export function buildAppTrpcFeatures(
       evaluation: stubEvaluationFeature(),
       organization: refusingOrganizationFeature(),
       project: refusingProjectFeature(),
-      codingAgent: refusingCodingAgentFeature(),
+      codingAgent: {
+        app: CodingAgentApp.refusing(),
+        router: (mount) => createCodingAgentTrpcRouter(mount.runtime),
+      },
       automation: refusingAutomationFeature(),
       enterprise: refusingEnterpriseFeature(),
       secret: stubSecretFeature(),

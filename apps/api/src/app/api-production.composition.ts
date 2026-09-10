@@ -165,10 +165,9 @@ import {
   installApiProject,
   refusingProjectFeature,
 } from "../features/project/project.composition.ts";
-import {
-  composeCodingAgentFeature,
-  refusingCodingAgentFeature,
-} from "../features/coding-agent/coding-agent.composition.ts";
+import { composeCodingAgentFeature } from "../features/coding-agent/coding-agent.composition.ts";
+import { createCodingAgentTrpcRouter } from "../features/coding-agent/coding-agent-trpc.mount.ts";
+import { CodingAgentApp } from "@langwatch/coding-agent-server";
 import {
   composeAutomationFeature,
   refusingAutomationFeature,
@@ -3632,7 +3631,10 @@ export class ApiProductionComposition extends ApiRuntimeCompositionPort {
     if (!infrastructure || !database || !tenancy || !evaluators || !share || !topic) {
       this.composedOrganization = refusingOrganizationFeature();
       this.composedProject = refusingProjectFeature();
-      this.composedCodingAgent = refusingCodingAgentFeature();
+      this.composedCodingAgent = {
+        app: CodingAgentApp.refusing(),
+        router: (mount) => createCodingAgentTrpcRouter(mount.runtime),
+      };
       this.composedAutomation = refusingAutomationFeature();
       this.composedEnterprise = refusingEnterpriseFeature();
       return;

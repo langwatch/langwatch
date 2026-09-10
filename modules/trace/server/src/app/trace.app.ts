@@ -1063,9 +1063,9 @@ export class TraceApp implements TraceApi {
 
   /** The pre-folded coding-agent session rollup for one trace, or null. */
   readCodingAgentSession(
-    input: Parameters<CodingAgentApi["tryGetSessionForTrace"]>[0],
-  ): ReturnType<CodingAgentApi["tryGetSessionForTrace"]> {
-    return this.#dependencies.codingAgents.tryGetSessionForTrace(input);
+    input: Parameters<CodingAgentApi["findSessionForTrace"]>[0],
+  ): ReturnType<CodingAgentApi["findSessionForTrace"]> {
+    return this.#dependencies.codingAgents.findSessionForTrace(input);
   }
 
   // -------------------------------------------------------------------------

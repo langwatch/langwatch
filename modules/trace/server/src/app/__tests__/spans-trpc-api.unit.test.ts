@@ -16,7 +16,7 @@ type TestContext = { app: { traces: TraceApp } };
  * The App holds every service the trace feature's five doors reach; the two
  * procedures under test reach exactly one of them. The bag is narrowed rather
  * than stubbed whole because a complete one would mean hand-writing four
- * service contracts (`TraceService`, `EvaluationService`, `CodingAgentService`,
+ * service contracts (`TraceService`, `EvaluationService`, `CodingAgentApi`,
  * `TraceCanonicalisationService`) that nothing here calls — and a reach for any
  * of them throws on the missing property, which is the loud failure we want.
  */

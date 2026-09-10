@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import type { CodingAgentService } from "@langwatch/coding-agent-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
@@ -107,6 +107,9 @@ class SpanIngestionTally {
   }
 }
 
+/** The coding-agent contract, holding only what the ingest path reads: no store, no session lookup. */
+export type CodingAgentIngestFilter = Pick<CodingAgentApi, "shouldFilterSpan">;
+
 /**
  * Process-wide Trace receiver. Transport keeps auth and HTTP response mapping;
  * this service owns raw OTLP trace traversal, validation, filtering, dedup and
@@ -117,13 +120,13 @@ export class TraceIngestionService {
   private readonly logger = createLogger("langwatch:trace-processing:span-ingestion");
 
   private constructor(
-    private readonly codingAgents: CodingAgentService,
+    private readonly codingAgents: CodingAgentIngestFilter,
     private readonly codingAgentSpanFilterEnabled: boolean,
     private readonly collection: TraceSpanCollectionService,
   ) {}
 
   static create(options: {
-    codingAgents: CodingAgentService;
+    codingAgents: CodingAgentIngestFilter;
     codingAgentSpanFilterEnabled: boolean;
     dedup: TraceSpanDedupPort;
     commands: TraceIngressCommandPort;
@@ -310,8 +313,8 @@ export class TraceIngestionService {
  * coding-agent span filter and the flag that arms it, and BOTH are reachable
  * only from the OTLP-request path — the tracked-event reactor, which is the
  * caller a background process needs, can never reach either. Composing the
- * whole class for it would have meant a process building a `CodingAgentService`
- * (and through it a `ProjectApi`) to satisfy two arguments that are
+ * whole class for it would have meant a process building the full coding-agent
+ * application (and through it a `ProjectApi`) to satisfy two arguments that are
  * provably never read on the path it uses.
  *
  * `TraceIngestionService.create` still takes the same five options and builds

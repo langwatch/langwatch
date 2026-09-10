@@ -9,7 +9,7 @@ import {
   PRIVACY_DROPPED_MARKER_ATTR,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
 } from "@langwatch/data-privacy-contract";
-import type { CodingAgentService } from "@langwatch/coding-agent-contract";
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
 import { TraceApp } from "../../../../app/trace.app.ts";
 import {
@@ -26,7 +26,7 @@ export type TranscriptStoreMock = ReturnType<
 /**
  * The two stores a transcript read stands on, as mocked boundaries. A real `TraceApp` stands over them rather than an object shaped like the reader's own calls: `readSpans` is where the tenant key and visibility cutoff are decided, so a double of it would assert nothing about the mapping the production read depends on.
  */
-export function createTranscriptApp(codingAgents: CodingAgentService): {
+export function createTranscriptApp(codingAgents: CodingAgentApi): {
   app: TraceApp;
   getSpansByTraceId: TranscriptStoreMock;
   getLogsByTraceId: TranscriptStoreMock;
