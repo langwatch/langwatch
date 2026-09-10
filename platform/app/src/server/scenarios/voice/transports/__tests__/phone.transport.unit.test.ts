@@ -172,7 +172,8 @@ describe("phoneTransport", () => {
     });
 
     describe("when the connect handshake fails", () => {
-      it("surfaces the failure as the run's error and never dials", async () => {
+      /** @scenario "A phone run fails clearly when Twilio refuses the call" */
+      it("surfaces the failure as the run's error, never dials, and disconnects the adapter", async () => {
         const adapter = fakeAdapter({
           connectRejects: new Error("edge not reachable"),
         });
@@ -186,6 +187,7 @@ describe("phoneTransport", () => {
           (built as unknown as Connectable).connect(),
         ).rejects.toThrow(PHONE_CONNECT_REJECTED_PREFIX);
         expect(adapter.placeCallArgs).toHaveLength(0);
+        expect(adapter.disconnectCount()).toBe(1);
       });
     });
   });

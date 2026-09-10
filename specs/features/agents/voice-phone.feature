@@ -60,6 +60,24 @@ Feature: Voice agents: reach an agent by phone
     Then it uses the app's own public base host, and a set VOICE_PUBLIC_BASE_URL overrides it
 
   # ---------------------------------------------------------------------------
+  # Phone run failures
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A phone run fails clearly when the project has no Twilio provider
+    Given a voice agent with a phone-number target and no Twilio provider on the project
+    When the simulation is started
+    Then the run fails with the phone transport's missing-key message pointing at Settings > Model Providers
+    And no call is placed
+
+  @unit
+  Scenario: A phone run fails clearly when Twilio refuses the call
+    Given a phone target with a Twilio credential
+    When Twilio rejects the outbound call
+    Then the run fails with a message prefixed by the phone transport's connect-rejected prefix
+    And the caller adapter is disconnected
+
+  # ---------------------------------------------------------------------------
   # No browser call over phone
   # ---------------------------------------------------------------------------
 

@@ -35,6 +35,8 @@ vi.mock("~/server/gateway/elevenLabsCredential.service", () => ({
     getElevenLabsApiCredential(...a),
 }));
 
+import { PHONE_NO_CREDENTIAL_MESSAGE } from "../../voice/transports/phone.transport";
+import { createSerializedVoiceAgentAdapter } from "../serialized-adapters/voice-agent.adapter";
 import { resolveVoiceTarget } from "../data-prefetcher";
 
 beforeEach(() => vi.clearAllMocks());
@@ -67,7 +69,8 @@ describe("resolveVoiceTarget", () => {
     });
 
     describe("when the project has no Twilio provider", () => {
-      it("carries a null credential so the run fails with a named message", async () => {
+      /** @scenario "A phone run fails clearly when the project has no Twilio provider" */
+      it("carries a null credential so the run fails with a named message, and no call is placed", async () => {
         findTwilioProviderForProject.mockResolvedValue(null);
         const target = await resolveVoiceTarget({
           projectId: "p1",
@@ -79,6 +82,39 @@ describe("resolveVoiceTarget", () => {
           credential: null,
         });
         expect(getTwilioCredential).not.toHaveBeenCalled();
+
+        const createAgentAdapter = vi.fn();
+        expect(() =>
+          createSerializedVoiceAgentAdapter({
+            data: {
+              type: "voice",
+              agentId: "agent-row-1",
+              voiceTarget: target,
+              callerEnv: { OPENAI_API_KEY: "sk-openai" },
+              maxCallSeconds: 90,
+            },
+            registry: {
+              phone: {
+                missingKeyMessage: PHONE_NO_CREDENTIAL_MESSAGE,
+                createAgentAdapter,
+                mintSession: vi.fn(),
+                fetchCallRecord: vi.fn(),
+                endCall: vi.fn(),
+              },
+              elevenlabs_convai: {
+                missingKeyMessage: "unused",
+                createAgentAdapter: vi.fn(),
+                mintSession: vi.fn(),
+                fetchCallRecord: vi.fn(),
+                endCall: vi.fn(),
+              },
+            },
+          }),
+        ).toThrow(PHONE_NO_CREDENTIAL_MESSAGE);
+        expect(PHONE_NO_CREDENTIAL_MESSAGE).toContain(
+          "Settings > Model Providers",
+        );
+        expect(createAgentAdapter).not.toHaveBeenCalled();
       });
     });
   });
