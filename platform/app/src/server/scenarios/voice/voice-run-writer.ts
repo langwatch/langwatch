@@ -54,11 +54,15 @@ export class VoiceAgentNotFoundError extends HandledError {
 function toMessages(
   record: CallRecord,
   scenarioRunId: string,
+  turnTraceIds: readonly string[],
 ): SimulationMessage[] {
   return record.turns.map((turn, index) => ({
     id: `${scenarioRunId}-${index}`,
     role: turn.role === "agent" ? "assistant" : "user",
     content: turn.text,
+    // Links the message to its exchange's trace so the drawer can render the
+    // trace-preview separator (it probes `msg.trace_id`).
+    ...(turnTraceIds[index] ? { trace_id: turnTraceIds[index] } : {}),
     ...(turn.audioUrl ? { audioUrl: turn.audioUrl } : {}),
   }));
 }
@@ -79,6 +83,7 @@ export async function writeVoiceCallRun({
   agentDisplayName,
   record,
   scenario,
+  turnTraceIds,
 }: {
   projectId: string;
   scenarioRunId: string;
@@ -86,6 +91,10 @@ export async function writeVoiceCallRun({
   agentDisplayName: string;
   record: CallRecord;
   scenario?: VoiceRunScenario;
+  /** The trace id each turn links to, one per `record.turns[i]` in order, from
+   *  {@link recordVoiceCallTraces}. Set on the message and the run's trace list
+   *  so the drawer probes the exchange's trace. */
+  turnTraceIds: readonly string[];
 }): Promise<void> {
   // The row id is trusted only as far as the token that carried it; the row
   // itself must exist in this project before a run is written under it.
@@ -134,8 +143,10 @@ export async function writeVoiceCallRun({
   await getApp().simulations.messageSnapshot({
     tenantId: projectId,
     scenarioRunId,
-    messages: toMessages(record, scenarioRunId),
-    traceIds: [],
+    messages: toMessages(record, scenarioRunId, turnTraceIds),
+    // The run-level trace list may repeat an id (two turns share their
+    // exchange's trace), mirroring the SDK; the fold dedupes it.
+    traceIds: [...turnTraceIds],
     occurredAt: record.endedAt,
   });
 
