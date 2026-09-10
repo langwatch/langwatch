@@ -124,7 +124,7 @@ export function resolvePublicBaseUrl(
  * single-worker deployment; slice 3's listener handoff supersedes it.
  */
 export function resolveHttpPort(
-  processEnv: Pick<NodeJS.ProcessEnv, "VOICE_WS_PORT"> = process.env,
+  processEnv: NodeJS.ProcessEnv = process.env,
 ): number {
   const raw = processEnv.VOICE_WS_PORT?.trim();
   if (!raw) return 0;
