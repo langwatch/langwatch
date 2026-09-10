@@ -50,7 +50,7 @@ import { declaredCheckFrom } from "./app-trpc.declared-check.ts";
  * instance the REST doors authorize through, never a second one, because two
  * services for one organization is two permission caches and two epochs.
  */
-export type ApiTrpcPolicyPorts<TContext, TAuthenticatedContext extends object> = Readonly<{
+export type ApiTrpcPolicyMembers<TContext, TAuthenticatedContext extends object> = Readonly<{
   authz: TrpcAuthorizationDecisions;
   identity: TrpcIdentity<TContext, TAuthenticatedContext>;
   audit: TrpcAudit;
@@ -74,7 +74,7 @@ export type ApiTrpcPolicyPorts<TContext, TAuthenticatedContext extends object> =
 export function createApiTrpcPolicy<
   TContext extends TrpcPolicyContext & TrpcDeclaredAuthzContext & TrpcRuntimeContext & object,
   TAuthenticatedContext extends object,
->(root: TrpcRoot<TContext>, ports: ApiTrpcPolicyPorts<TContext, TAuthenticatedContext>) {
+>(root: TrpcRoot<TContext>, ports: ApiTrpcPolicyMembers<TContext, TAuthenticatedContext>) {
   const runtime = createTrpcRuntimePolicy<TContext, TAuthenticatedContext>(root, {
     identity: ports.identity,
     audit: ports.audit,
@@ -130,7 +130,7 @@ export function createApiTrpcPolicy<
 
 /** The same ports the policy chain runs on, as the declared path names them. */
 function runtimePorts<TContext extends TrpcRuntimeContext & object, TAuthenticated extends object>(
-  ports: ApiTrpcPolicyPorts<TContext, TAuthenticated>,
+  ports: ApiTrpcPolicyMembers<TContext, TAuthenticated>,
 ): TrpcRuntimePorts<TContext> {
   // tRPC hands a middleware the context with its index signatures stripped,
   // which the compiler cannot prove assignable back to an unresolved

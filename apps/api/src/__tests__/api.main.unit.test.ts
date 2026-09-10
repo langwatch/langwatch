@@ -117,14 +117,13 @@ describe("ApiRuntimeBootstrap", () => {
     const phases: string[] = [];
     const process = new TestProcess();
     const composition = new TestComposition(process);
-    composition.compose.mockImplementationOnce(async ({ graph, resources }) => {
+    composition.compose.mockImplementationOnce(async ({ secrets, resources }) => {
       resources.own("database", async () => {
         phases.push("graph");
       });
       process.close.mockImplementationOnce(async () => {
         phases.push("listener");
         phases.push("telemetry");
-        await graph.close();
       });
       return process;
     });
@@ -193,7 +192,7 @@ describe("ApiRuntimeBootstrap", () => {
     const phases: string[] = [];
     const process = new TestProcess();
     const composition = new TestComposition(process);
-    composition.compose.mockImplementationOnce(async ({ graph, resources }) => {
+    composition.compose.mockImplementationOnce(async ({ secrets, resources }) => {
       resources.own("database", () => {
         phases.push("resources");
       });
@@ -211,9 +210,7 @@ describe("ApiRuntimeBootstrap", () => {
       });
       process.close.mockImplementation(async () => {
         phases.push("listener:close");
-        await graph.drain();
         phases.push("telemetry");
-        await graph.close();
       });
       return process;
     });

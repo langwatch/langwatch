@@ -15,7 +15,6 @@ import {
   secretLogRedactPaths,
   secretResolutionSummary,
 } from "@langwatch/secrets";
-import { ApiProcessGraph } from "./api.process.ts";
 import {
   apiObservabilityConfiguration,
   apiLoggerConfiguration,
@@ -48,7 +47,8 @@ export abstract class ApiRuntimeProcess {
  */
 export type ApiRuntimeCompositionOptions = {
   config: ApiConfig;
-  graph: ApiProcessGraph;
+  /** Every secret this process resolved, as the members are built from. */
+  secrets: Readonly<Record<string, string>>;
   observability: ProcessObservabilityOptions;
   resources: ResourceScope;
 };
@@ -113,7 +113,7 @@ export class ApiRuntimeBootstrap {
     try {
       const process = await options.composition.compose({
         config,
-        graph,
+        secrets: resolvedSecretValues(secrets.environment),
         observability,
         resources,
       });
@@ -193,7 +193,7 @@ export class ApiRuntimeBootstrap {
 }
 
 async function closeGraphAfterCompositionFailure(
-  graph: ApiProcessGraph,
+  graph: ScopedApiProcessGraph,
   bootError: unknown,
   logger: Pick<Logger, "error">,
 ): Promise<void> {
@@ -207,7 +207,7 @@ async function closeGraphAfterCompositionFailure(
   }
 }
 
-class ScopedApiProcessGraph extends ApiProcessGraph {
+class ScopedApiProcessGraph {
   private lifecycle: RuntimeLifecycle | undefined;
   private closing: Promise<void> | undefined;
 
@@ -215,9 +215,7 @@ class ScopedApiProcessGraph extends ApiProcessGraph {
     return new ScopedApiProcessGraph(resources);
   }
 
-  private constructor(private readonly resources: ResourceScope) {
-    super();
-  }
+  private constructor(private readonly resources: ResourceScope) {}
 
   private runtime(): RuntimeLifecycle {
     this.lifecycle ??= new RuntimeLifecycle(this.resources.sealServices(), new ResourceScope());
@@ -232,7 +230,7 @@ class ScopedApiProcessGraph extends ApiProcessGraph {
     return this.runtime().start();
   }
 
-  override drain(): Promise<void> {
+  drain(): Promise<void> {
     return this.runtime().stop();
   }
 
@@ -245,4 +243,18 @@ class ScopedApiProcessGraph extends ApiProcessGraph {
     });
     return this.closing;
   }
+}
+
+/**
+ * The resolved environment, narrowed to the string values a member is built
+ * from. Anything else was never a secret this process can hand on.
+ */
+function resolvedSecretValues(
+  environment: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, string>> {
+  const values: Record<string, string> = {};
+  for (const [key, value] of Object.entries(environment)) {
+    if (typeof value === "string") values[key] = value;
+  }
+  return values;
 }

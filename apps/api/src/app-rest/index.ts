@@ -34,7 +34,7 @@ export {
   type AppRestProjectVariables,
   type AppRestRbacVocabulary,
   type AppRestSecurity,
-  type AppRestSecurityPorts,
+  type AppRestSecurityMembers,
   BadRequestError,
   badRequestSchema,
   baseResponses,

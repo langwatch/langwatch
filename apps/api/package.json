@@ -116,6 +116,8 @@
     "@langwatch/hosted-mcp-server": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/identity-server": "workspace:*",
+    "@langwatch/infrastructure": "workspace:*",
+    "@langwatch/installed-modules": "workspace:*",
     "@langwatch/ksuid": "catalog:",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/langy-server": "workspace:*",

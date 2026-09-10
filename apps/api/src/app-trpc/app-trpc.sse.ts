@@ -25,7 +25,7 @@ export const SSE_KEEPALIVE_INTERVAL_MS = 25_000;
 export type SseSubscriptionCaller = unknown;
 
 /** What the process supplies so a path can be resolved and run. */
-export interface SseSubscriptionPorts {
+export interface SseSubscriptionMembers {
   /**
    * Build the caller this request's procedure is looked up on.
    */
@@ -119,7 +119,7 @@ function logStreamFailure(
  */
 export function createSseSubscriptionApp(options: {
   security: AppRestSecurity;
-  ports: SseSubscriptionPorts;
+  ports: SseSubscriptionMembers;
   logger?: Logged;
 }): SecuredApp<Record<never, never>> {
   const { ports } = options;

@@ -29,7 +29,8 @@
     "@langwatch/mail": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
-    "@langwatch/redis-client": "workspace:*"
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

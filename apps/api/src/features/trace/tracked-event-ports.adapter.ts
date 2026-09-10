@@ -31,7 +31,7 @@ import { zodErrorMessage } from "@langwatch/config";
 import { ValidationError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { predefinedEventsSchemas, predefinedEventTypes } from "@langwatch/trace-contract";
-import type { TrackedEventPorts } from "@langwatch/trace-server";
+import type { TrackedEventMembers } from "@langwatch/trace-server";
 import { TrackedEventSpanService } from "@langwatch/trace-server";
 import { z } from "zod";
 
@@ -46,13 +46,13 @@ export type ApiTrackedEventCollaborators = Readonly<{
 /**
  * The tracked-event family's ports, over one process's span builder.
  *
- * A plain object rather than a class because {@link TrackedEventPorts} is an
+ * A plain object rather than a class because {@link TrackedEventMembers} is an
  * interface the transport declares, not a port this process owns: there is no
  * second implementation to name and nothing here to subclass.
  */
 export function createApiTrackedEventPorts(
   collaborators: ApiTrackedEventCollaborators,
-): TrackedEventPorts {
+): TrackedEventMembers {
   const { spans, logger } = collaborators;
 
   return {

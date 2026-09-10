@@ -26,6 +26,7 @@ export {
   type StoredObjectAddress,
   type Telemetry,
 } from "./members.ts";
+export { createProcess, type ProcessOptions } from "./create-process.ts";
 export {
   createProcessMembers,
   MemberNotConfiguredError,
