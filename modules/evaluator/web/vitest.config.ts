@@ -3,7 +3,6 @@ import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vit
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
-  isolate: true,
   test: {
     /**
      * The real-browser lane is excluded, exactly as `platform/app` excluded it.

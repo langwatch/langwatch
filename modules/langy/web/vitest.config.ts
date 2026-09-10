@@ -8,7 +8,6 @@ import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vit
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
-  isolate: true,
   test: {
     setupFiles: ["./src/__tests__/setup.ts"],
   },

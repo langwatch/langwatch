@@ -2,7 +2,6 @@ import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vit
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
-  isolate: true,
   test: {
     setupFiles: ["./vitest.setup.ts"],
     // The roles screen drives a Chakra dialog with a two-hundred-checkbox

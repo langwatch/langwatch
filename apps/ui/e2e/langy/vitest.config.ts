@@ -11,7 +11,6 @@ export default defineConfig({
   },
   test: moduleVitestTestOptions({
     kind: "node",
-    isolate: true,
     test: {
       // Scenarios are slow (LLM judge + simulator + multi-tool flows), and a single turn may legitimately work for up to
       // TURN_STREAM_TIMEOUT_MS (langy-agent.ts), which is 420s. runScenarioAndLog replays the whole scenario once on a transient

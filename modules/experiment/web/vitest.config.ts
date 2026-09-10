@@ -3,7 +3,6 @@ import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vit
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
-  isolate: true,
   test: {
     exclude: [...configDefaults.exclude, "src/**/__tests__/**/*.browser.test.tsx"],
     setupFiles: ["./src/__tests__/setup.ts"],

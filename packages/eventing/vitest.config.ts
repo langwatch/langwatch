@@ -3,7 +3,6 @@ import { defineModuleVitestConfig } from "../test-harness/src/vitest-config.ts";
 
 export default defineModuleVitestConfig({
   kind: "node",
-  isolate: true,
   test: {
     environment: "node",
     testTimeout: 30_000,

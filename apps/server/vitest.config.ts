@@ -2,7 +2,6 @@ import { defineModuleVitestConfig } from "../../packages/test-harness/src/vitest
 
 export default defineModuleVitestConfig({
   kind: "node",
-  isolate: true,
   test: {
     fsModuleCache: true,
     include: ["test/**/*.test.ts"],

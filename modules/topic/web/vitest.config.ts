@@ -12,7 +12,6 @@ export default defineConfig({
   },
   test: moduleVitestTestOptions({
     kind: "jsdom",
-    isolate: true,
     test: {
       setupFiles: ["./vitest.setup.ts"],
       testTimeout: 30_000,

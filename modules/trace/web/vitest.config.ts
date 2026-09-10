@@ -2,7 +2,6 @@ import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vit
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
-  isolate: true,
   test: {
     setupFiles: ["./vitest.setup.ts"],
     // `*.browser.test.tsx` is the real-browser lane the explorer's editor

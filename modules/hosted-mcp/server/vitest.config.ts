@@ -8,7 +8,6 @@ import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vit
 
 export default defineModuleVitestConfig({
   kind: "node",
-  isolate: true,
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],

@@ -12,7 +12,6 @@ export default defineConfig({
   },
   test: moduleVitestTestOptions({
     kind: "jsdom",
-    isolate: true,
     test: {
       setupFiles: ["./vitest.setup.ts"],
       // One screen with a date popover, a project select and a CSV export driven

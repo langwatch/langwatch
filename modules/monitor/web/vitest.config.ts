@@ -2,7 +2,6 @@ import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vit
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
-  isolate: true,
   test: {
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],

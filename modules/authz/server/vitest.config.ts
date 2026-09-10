@@ -3,7 +3,6 @@ import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vit
 
 export default defineModuleVitestConfig({
   kind: "node",
-  isolate: true,
   test: {
     watch: false,
     testTimeout: 10000,

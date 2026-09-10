@@ -2,7 +2,6 @@ import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vit
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
-  isolate: true,
   test: {
     // Per-file rather than global: the visualization and model suites are pure
     // and run faster without a DOM, and every file that renders declares

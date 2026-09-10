@@ -2,7 +2,6 @@ import { defineModuleVitestConfig } from "../../packages/test-harness/src/vitest
 
 export default defineModuleVitestConfig({
   kind: "jsdom",
-  isolate: true,
   test: {
     fsModuleCache: true,
     environment: "jsdom",
