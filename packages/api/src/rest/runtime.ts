@@ -168,7 +168,7 @@ export type RestAuditRow = Readonly<{
 }>;
 
 /** Everything the process supplies for the path to run. */
-export type RestRuntimePorts = Readonly<{
+export type RestRuntimeMembers = Readonly<{
   /** The family's own door: the one every route falls back to. */
   identity: RestIdentity;
   /**
@@ -246,7 +246,7 @@ export interface RestRuntime {
 const HOST_ENFORCED = "project credential and permission enforced by the transport host";
 
 /** Builds one process's REST path. */
-export function createRestRuntime(ports: RestRuntimePorts): RestRuntime {
+export function createRestRuntime(ports: RestRuntimeMembers): RestRuntime {
   return {
     mount: (declaration, options) => {
       const dated = declaration.addressing === "dated";
@@ -315,7 +315,7 @@ function assertPortsBound<Api>({
   ports,
 }: {
   declaration: RestTransportDeclaration<Api>;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
 }): void {
   const base = basePathOf(declaration);
 
@@ -364,7 +364,7 @@ function assertCapabilityPorts({
 }: {
   address: string;
   route: RestTransportRoute<unknown>;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
 }): void {
   if (route.rateLimit && !ports.rateLimiter) {
     throw new Error(
@@ -450,7 +450,7 @@ function routeStack<Api>({
 }: {
   route: RestTransportRoute<Api>;
   declaration: RestTransportDeclaration<Api>;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
   facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
   version: string;
@@ -548,7 +548,7 @@ function deprecationLog<Api>({
   route: RestTransportRoute<Api>;
   family: string;
   deprecated: RestDeprecation;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
 }): MiddlewareHandler {
   const key = `${family} ${route.operation}`;
 
@@ -733,7 +733,7 @@ function handlerMiddleware<Api>({
 }: {
   route: RestTransportRoute<Api>;
   credential: RestDoorCredential;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
   facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
   family: string;
@@ -870,7 +870,7 @@ async function auditing<TResult>({
   run,
 }: {
   route: RestTransportRoute<unknown>;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
   actor: Actor | null;
   scope: AuthzDeclaredScopeId | null;
   context: Context;
@@ -948,7 +948,7 @@ function resultIdOf(result: unknown): string | null {
 }
 
 /** @see assertCapabilityPorts, which refuses this before a request arrives. */
-function requireAudit(ports: RestRuntimePorts): RestAuditSink {
+function requireAudit(ports: RestRuntimeMembers): RestAuditSink {
   const audit = ports.audit;
 
   if (!audit) throw new Error("REST runtime supplied no audit sink");
@@ -968,7 +968,7 @@ async function checkEntitlement({
   family,
 }: {
   route: RestTransportRoute<unknown>;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
   scope: AuthzDeclaredScopeId | null;
   family: string;
 }): Promise<void> {
@@ -997,7 +997,7 @@ async function replayable({
   run,
 }: {
   route: RestTransportRoute<unknown>;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
   context: Context;
   input: unknown;
   scope: AuthzDeclaredScopeId | null;
@@ -1054,7 +1054,7 @@ async function countCall({
   caller,
 }: {
   route: RestTransportRoute<unknown>;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
   context: Context;
   family: string;
   version: string;
@@ -1099,7 +1099,7 @@ async function storedAnswer({
   input,
 }: {
   route: RestTransportRoute<unknown>;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
   context: Context;
   family: string;
   version: string;
@@ -1130,7 +1130,7 @@ async function keepAnswer({
   answer,
 }: {
   route: RestTransportRoute<unknown>;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
   family: string;
   version: string;
   input: unknown;
@@ -1228,7 +1228,7 @@ async function checkRouteScope({
   route: RestTransportRoute<unknown>;
   caller: RestCaller;
   door: RestIdentity;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
   input: unknown;
 }): Promise<AuthzDeclaredScopeId | null> {
   if (!route.permissionTarget) return null;
@@ -1280,7 +1280,7 @@ function doorOf({
   ports,
 }: {
   credential: RestDoorCredential;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
 }): RestIdentity {
   return ports.doors?.[credential] ?? ports.identity;
 }
@@ -1571,7 +1571,7 @@ function mountVersionGuards<Api>({
   app: Hono;
   basePath: string;
   declaration: RestTransportDeclaration<Api>;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
   facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
 }): void {
@@ -1614,7 +1614,7 @@ function dateFallback<Api>({
 }: {
   basePath: string;
   declaration: RestTransportDeclaration<Api>;
-  ports: RestRuntimePorts;
+  ports: RestRuntimeMembers;
   options: RestMountOptions<Api>;
   facts: ReadonlyMap<string, RestTransportMiddlewareBinding>;
 }): MiddlewareHandler {

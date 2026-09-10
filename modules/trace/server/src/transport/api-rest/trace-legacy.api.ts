@@ -70,7 +70,7 @@ export interface TraceLegacyShare {
 }
 
 /** What the legacy trace family needs from the process. */
-export interface TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw> {
+export interface TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw> {
   credential: TraceLegacyCredentialPort;
   /** The reads. Resolved per request, never constructed at mount. */
   traces(): TraceLegacyReads;
@@ -106,7 +106,7 @@ type TraceLegacySecuredApp = ReturnType<AppRestSecurity["createServiceApp"]>;
 /** GET /api/trace/:id — the deprecated single-trace read. */
 function registerLegacyTraceRead<TSearchBody extends TraceLegacySearchFields, TSearchBodyRaw>(
   secured: TraceLegacySecuredApp,
-  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>,
+  ports: TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw>,
   tracesViewAuth: ReturnType<typeof handlerManagedAuth>,
 ): void {
   // ---------- GET /api/trace/:id ----------
@@ -173,7 +173,7 @@ function registerLegacyTraceRead<TSearchBody extends TraceLegacySearchFields, TS
 /** POST /api/trace/:id/share and /unshare — the public-link pair. */
 function registerLegacyShareRoutes<TSearchBody extends TraceLegacySearchFields, TSearchBodyRaw>(
   secured: TraceLegacySecuredApp,
-  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>,
+  ports: TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw>,
   tracesShareAuth: ReturnType<typeof handlerManagedAuth>,
 ): void {
   // ---------- POST /api/trace/:id/share ----------
@@ -249,7 +249,7 @@ function legacySearchTraces(
 /** POST /api/trace/search — the deprecated trace search. */
 function registerLegacySearch<TSearchBody extends TraceLegacySearchFields, TSearchBodyRaw>(
   secured: TraceLegacySecuredApp,
-  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>,
+  ports: TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw>,
   tracesViewAuth: ReturnType<typeof handlerManagedAuth>,
 ): void {
   // ---------- POST /api/trace/search ----------
@@ -324,7 +324,7 @@ function registerLegacySearch<TSearchBody extends TraceLegacySearchFields, TSear
 /** GET /api/thread/:id — the deprecated thread read. */
 function registerLegacyThreadRead<TSearchBody extends TraceLegacySearchFields, TSearchBodyRaw>(
   secured: TraceLegacySecuredApp,
-  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>,
+  ports: TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw>,
   tracesViewAuth: ReturnType<typeof handlerManagedAuth>,
 ): void {
   // ---------- GET /api/thread/:id ----------
@@ -358,7 +358,7 @@ export function createTraceLegacyRestApp<
   TSearchBodyRaw,
 >(options: {
   security: AppRestSecurity;
-  ports: TraceLegacyRestPorts<TSearchBody, TSearchBodyRaw>;
+  ports: TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw>;
 }): SecuredApp<Env> {
   const { security, ports } = options;
 

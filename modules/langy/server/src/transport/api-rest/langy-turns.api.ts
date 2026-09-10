@@ -22,7 +22,7 @@ import { LANGY_API_KEY_TURNS_FLAG } from "../../rules/langy-rest-flags.rules.ts"
 import {
   resolveLangyRestActor,
   resolveLangyRestCaller,
-  type LangyRestCredentialPorts,
+  type LangyRestCredentialMembers,
 } from "./langy-rest-credentials.api.ts";
 import {
   type LangyTurnBufferWatch,
@@ -49,7 +49,7 @@ const langyTurnAuth = handlerManagedAuth({
 });
 
 /** Everything the turn surface reaches that Langy does not own. */
-export type LangyTurnsRestPorts = LangyRestCredentialPorts &
+export type LangyTurnsRestMembers = LangyRestCredentialMembers &
   Readonly<{
     /** The SAME application the browser's Langy procedures resolve on. */
     langy: () => LangyApp;
@@ -97,7 +97,7 @@ async function parseTurnBody(c: Context, conversationId: string | null) {
 /** Builds the public `/api/langy/conversations` family over one process's ports. */
 export function createLangyTurnsRestApp(options: {
   security: AppRestSecurity;
-  ports: LangyTurnsRestPorts;
+  ports: LangyTurnsRestMembers;
 }): MountableRestApp {
   const { security, ports } = options;
 

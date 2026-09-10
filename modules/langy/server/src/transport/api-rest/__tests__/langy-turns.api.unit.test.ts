@@ -11,7 +11,7 @@ import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyApp } from "#app/langy.app";
-import { createLangyTurnsRestApp, type LangyTurnsRestPorts } from "../langy-turns.api.ts";
+import { createLangyTurnsRestApp, type LangyTurnsRestMembers } from "../langy-turns.api.ts";
 
 const PROJECT_ID = "project-123";
 const ORGANIZATION_ID = "org-1";
@@ -103,7 +103,7 @@ function buildApi(options: { surfaceOpen?: boolean } = {}) {
   }));
   const getEventsAfter = vi.fn(async (): Promise<TailPage> => emptyTail);
 
-  const ports: LangyTurnsRestPorts = {
+  const ports: LangyTurnsRestMembers = {
     readCredential: () => ({ token: "test-token", projectId: PROJECT_ID }),
     apiKeys: () =>
       ({

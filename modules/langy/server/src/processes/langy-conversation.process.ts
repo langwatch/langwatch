@@ -3,7 +3,7 @@ import { LANGY_CONVERSATION_EVENT_TYPES, LANGY_TITLE_SOURCE } from "@langwatch/l
 import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
 import type {
   LangyConversationProcessState,
-  LangyEffectPorts,
+  LangyEffectMembers,
   LangyGenerateTitleIntent,
   LangyProcessEventView,
   LangyWorkerDispatchIntent,
@@ -174,7 +174,7 @@ export const handleNoDecision: LangyHandler = (state) => ({ state });
  * ADR-052).
  */
 export function langyConversationProcess(
-  ports: LangyEffectPorts,
+  ports: LangyEffectMembers,
 ): ProcessManagerApplier<LangyConversationProcessingEvent> {
   return (pm) =>
     pm

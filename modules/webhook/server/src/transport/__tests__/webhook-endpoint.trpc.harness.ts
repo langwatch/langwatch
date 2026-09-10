@@ -9,14 +9,14 @@ import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
 export type WebhookEndpointTrpcTestContext = { actor: { id: string } };
 
 /** The recorded checks, and the ports that recorded them. */
-export type WebhookEndpointTrpcTestPorts = {
+export type WebhookEndpointTrpcTestMembers = {
   seenPermissions: string[];
   ports: TrpcRuntimePorts<WebhookEndpointTrpcTestContext>;
 };
 
 export function webhookEndpointTrpcTestPorts(
   denied: ReadonlySet<string> = new Set(),
-): WebhookEndpointTrpcTestPorts {
+): WebhookEndpointTrpcTestMembers {
   const seenPermissions: string[] = [];
 
   return {

@@ -17,7 +17,7 @@ import {
  * workflow is copied with the studio DSL and version history the Workflow
  * feature keeps, none of which the Evaluator feature reaches into.
  */
-export type EvaluatorReplicationPorts = Readonly<{
+export type EvaluatorReplicationMembers = Readonly<{
   /**
    * Clones the workflow into the target project and answers the new workflow
    * id. Refuses a workflow with no saved version — an evaluator created
@@ -58,9 +58,9 @@ export type EvaluatorCopyCommand = Readonly<{
  * their work from that request's context.
  */
 export class EvaluatorReplicationService {
-  private constructor(private readonly ports: EvaluatorReplicationPorts) {}
+  private constructor(private readonly ports: EvaluatorReplicationMembers) {}
 
-  static create(ports: EvaluatorReplicationPorts): EvaluatorReplicationService {
+  static create(ports: EvaluatorReplicationMembers): EvaluatorReplicationService {
     return new EvaluatorReplicationService(ports);
   }
 

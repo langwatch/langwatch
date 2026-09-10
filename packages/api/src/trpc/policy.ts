@@ -360,7 +360,7 @@ export interface TrpcDeclaredAuthzMiddlewares<TContext> {
   ): TrpcContextOnlyDeclaredCheck<TContext>;
 }
 
-export type TrpcDeclaredAuthzPorts<TContext> = Readonly<{
+export type TrpcDeclaredAuthzMembers<TContext> = Readonly<{
   identity: TrpcActorPort<TContext>;
   authorization: TrpcAuthorization<TContext>;
   denials: TrpcAuthorizationDenial;
@@ -384,7 +384,7 @@ function rememberOrganizationRole(
 }
 
 export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuthzContext>(
-  ports: TrpcDeclaredAuthzPorts<TContext>,
+  ports: TrpcDeclaredAuthzMembers<TContext>,
 ): TrpcDeclaredAuthzMiddlewares<TContext> {
   /**
    * `.permission(p)` / `.permission(p, { via })`. The type layer guarantees the
@@ -1170,7 +1170,7 @@ export function createIsPublicProcedure(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Everything the process supplies for the policy below to exist. */
-export type TrpcRuntimePolicyPorts<TContext, TAuthenticatedContext extends object> = Readonly<{
+export type TrpcRuntimePolicyMembers<TContext, TAuthenticatedContext extends object> = Readonly<{
   identity: TrpcIdentity<TContext, TAuthenticatedContext>;
   audit: TrpcAudit;
   errorReporting: TrpcErrorReporting;
@@ -1259,7 +1259,7 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
 export function createTrpcRuntimePolicy<
   TContext extends TrpcPolicyContext & object,
   TAuthenticatedContext extends object,
->(root: TrpcRoot<TContext>, ports: TrpcRuntimePolicyPorts<TContext, TAuthenticatedContext>) {
+>(root: TrpcRoot<TContext>, ports: TrpcRuntimePolicyMembers<TContext, TAuthenticatedContext>) {
   /**
    * The two middlewares the authenticated procedure is built from are written
    * as plain functions and only then wrapped with `root.middleware(...)`.

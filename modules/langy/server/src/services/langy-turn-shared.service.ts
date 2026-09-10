@@ -71,7 +71,7 @@ export type LangyTurnServiceDependencies = LangyTurnServiceDeps & {
   finalParts: LangyFinalPartsService;
 };
 
-export type LangyTurnTechnicalPorts = {
+export type LangyTurnTechnicalMembers = {
   finalParts?: LangyFinalPartsService;
   prompts?: LangyPrompt;
   promptProjectId?: string;

@@ -38,7 +38,7 @@ import { conversationUrl } from "#rules/langy-local-session-text.rules";
 import type { LocalControlLongPoll } from "./langy-local-control-long-poll.api.ts";
 
 /** Everything the control family reaches that Langy does not own. */
-export type LangyLocalControlRestPorts = Readonly<{
+export type LangyLocalControlRestMembers = Readonly<{
   /** The SAME runtime the panel and the worker's door read. */
   runtime: () => LocalControlRuntime;
   /** This process's long-poll sessions. */
@@ -62,7 +62,7 @@ const connectAuth = handlerManagedAuth({
 
 export function createLangyLocalControlRestApp(options: {
   security: AppRestSecurity;
-  ports: LangyLocalControlRestPorts;
+  ports: LangyLocalControlRestMembers;
 }): MountableRestApp {
   const { security, ports } = options;
 

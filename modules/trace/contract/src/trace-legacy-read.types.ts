@@ -8,7 +8,7 @@ import type { ProjectionPlan } from "./trace-projection.types.ts";
  * package (the dashboards define every filter field), and a server package may
  * not value-import a browser one. What the read needs from it is the shape,
  * which is stated here; the schema itself still arrives at the transport as
- * `TracesTrpcPorts.filterInputSchema`, so what a caller may SEND is still
+ * `TracesTrpcMembers.filterInputSchema`, so what a caller may SEND is still
  * checked against the real thing.
  */
 export type TraceSharedFiltersInput = {

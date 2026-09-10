@@ -1,7 +1,7 @@
 /**
  * The OTLP receiver's own errors and small pure helpers. The receiver's ports
  * are declared in the server transport file rather than here: they carry the
- * platform's own `Request`, which - like `TraceExportRestPorts` beside it -
+ * platform's own `Request`, which - like `TraceExportRestMembers` beside it -
  * keeps this contract free of a DOM-lib dependency neither the browser SDK
  * shape nor another module needs.
  */

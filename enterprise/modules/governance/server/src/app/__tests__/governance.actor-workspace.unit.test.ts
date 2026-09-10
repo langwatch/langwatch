@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   GovernanceApp,
   type GovernanceActorUser,
-  type GovernancePersonalVirtualKeyPorts,
+  type GovernancePersonalVirtualKeyMembers,
 } from "../governance.app.ts";
 import { TestGovernanceService } from "./support/test-governance-service.ts";
 
@@ -65,7 +65,7 @@ function buildApp(options: {
     personalVirtualKeys: {
       isOrganizationMember,
       hasActivePersonalKeyLabelled:
-        unreachable<GovernancePersonalVirtualKeyPorts["hasActivePersonalKeyLabelled"]>(),
+        unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
     },
     actors: { findUser: tryFindUser },
   });

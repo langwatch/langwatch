@@ -38,7 +38,7 @@ import { conversationTitle, conversationUrl } from "#rules/langy-local-session-t
 import { ControlRequestService } from "#services/langy-local-control-request.service";
 import { reconcileSkipPolicy } from "#rules/langy-local-skip-policy.rules";
 import type { UserWaitEvents } from "../../rules/langy-local-user-wait-record.rules.ts";
-import type { LangyRestCredentialPorts } from "./langy-rest-credentials.api.ts";
+import type { LangyRestCredentialMembers } from "./langy-rest-credentials.api.ts";
 import { nowInstant } from "@langwatch/time";
 
 const AUTH_REASON =
@@ -94,7 +94,7 @@ export type LangyGithubInstallationReader = Readonly<{
 }>;
 
 /** Everything the local surface reaches that Langy does not own. */
-export type LangyLocalRestPorts = LangyRestCredentialPorts &
+export type LangyLocalRestMembers = LangyRestCredentialMembers &
   Readonly<{
     /** The SAME application the browser's Langy procedures resolve on. */
     langy: () => LangyApp;
@@ -114,7 +114,7 @@ export type LangyLocalRestPorts = LangyRestCredentialPorts &
 
 export function createLangyLocalRestApp(options: {
   security: AppRestSecurity;
-  ports: LangyLocalRestPorts;
+  ports: LangyLocalRestMembers;
 }): MountableRestApp {
   const { security, ports } = options;
 

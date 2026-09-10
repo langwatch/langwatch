@@ -28,7 +28,7 @@ import {
   mapSpansToDetailDtos,
   mapTraceSummaryToHeader,
   redactV2Content,
-  type TraceReadMapperPorts,
+  type TraceReadMapperMembers,
 } from "./trace-read-mappers.api.ts";
 import {
   gateEvaluations,
@@ -79,9 +79,9 @@ type SharedTraceTrpcProcedures<
 }>;
 
 /** The process capabilities this transport needs that Trace does not own. */
-export type SharedTraceTrpcPorts = Readonly<{
+export type SharedTraceTrpcMembers = Readonly<{
   /** The mapping and redaction ports the shared read mappers take. */
-  mappers: TraceReadMapperPorts;
+  mappers: TraceReadMapperMembers;
   /**
    * The caller's read-time redactions for the share's project, computed for
    * the presented session with `publiclyShared` set. Resolves to null when the
@@ -136,7 +136,7 @@ async function enforceShareReadLimit({
 }: {
   token: string;
   clientIp: string | undefined;
-  rateLimit: SharedTraceTrpcPorts["rateLimit"];
+  rateLimit: SharedTraceTrpcMembers["rateLimit"];
 }): Promise<void> {
   const checks = [
     rateLimit({
@@ -163,7 +163,7 @@ async function enforceShareReadLimit({
 
 type ShareTraceApp = SharedTraceTrpcContext["app"]["traces"];
 type ShareProtections = NonNullable<
-  Awaited<ReturnType<SharedTraceTrpcPorts["tryGetShareViewerProtections"]>>
+  Awaited<ReturnType<SharedTraceTrpcMembers["tryGetShareViewerProtections"]>>
 >;
 
 /**
@@ -179,7 +179,7 @@ async function resolveShareForRead({
 }: {
   token: string;
   ctx: SharedTraceTrpcContext;
-  ports: SharedTraceTrpcPorts;
+  ports: SharedTraceTrpcMembers;
 }): Promise<{ projectId: string; resourceId: string }> {
   const viewer: ShareViewer = ctx.session?.user
     ? { type: "user", id: ctx.session.user.id }
@@ -258,7 +258,7 @@ async function readShareSources({
   projectId: string;
   traceId: string;
   protections: ShareProtections;
-  ports: SharedTraceTrpcPorts;
+  ports: SharedTraceTrpcMembers;
 }) {
   let summary;
   try {
@@ -316,7 +316,7 @@ async function buildSharedTraceDto({
   traceId: string;
   protections: ShareProtections;
   sources: Awaited<ReturnType<typeof readShareSources>>;
-  ports: SharedTraceTrpcPorts;
+  ports: SharedTraceTrpcMembers;
 }): Promise<SharedTraceDto> {
   const { summary, project, summaryRows, fullSpans, signalRows, resourceRows, eventRows } = sources;
 
@@ -390,7 +390,7 @@ export class SharedTraceTrpcApi {
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: SharedTraceTrpcProcedures<TContext, TOptions, TRoot>,
-    ports: SharedTraceTrpcPorts,
+    ports: SharedTraceTrpcMembers,
   ) {
     const { public: procedure, noPermission } = procedures;
 

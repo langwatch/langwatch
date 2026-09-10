@@ -24,7 +24,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   GovernanceApp,
   type GovernanceActorDirectory,
-  type GovernancePersonalVirtualKeyPorts,
+  type GovernancePersonalVirtualKeyMembers,
   type GovernanceProjectCaller,
 } from "../governance.app.ts";
 import { TestGovernanceService } from "./support/test-governance-service.ts";
@@ -67,9 +67,9 @@ function buildApp(overrides: Partial<TestGovernanceService> = {}) {
     permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
     personalVirtualKeys: {
       isOrganizationMember:
-        unreachable<GovernancePersonalVirtualKeyPorts["isOrganizationMember"]>(),
+        unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
       hasActivePersonalKeyLabelled:
-        unreachable<GovernancePersonalVirtualKeyPorts["hasActivePersonalKeyLabelled"]>(),
+        unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
     },
     actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
   });

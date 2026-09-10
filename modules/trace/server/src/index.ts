@@ -483,7 +483,7 @@ export {
   TrackedEventLegacyPathApi,
   TRACKED_EVENT_CANONICAL_PATH,
   TRACKED_EVENT_LEGACY_PATH,
-  type TrackedEventPorts,
+  type TrackedEventMembers,
 } from "./transport/tracked-event.rest.ts";
 
 export {
@@ -491,5 +491,5 @@ export {
   traceExportRest,
   type TraceExport,
   type TraceExportRequestFields,
-  type TraceExportRestPorts,
+  type TraceExportRestMembers,
 } from "./transport/trace-export.rest.ts";

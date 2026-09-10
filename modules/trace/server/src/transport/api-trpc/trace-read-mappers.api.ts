@@ -80,7 +80,7 @@ export type TraceContentPrivacy = Readonly<{
 }>;
 
 /** The three application capabilities the trace-view mappers take. */
-export type TraceReadMapperPorts = Readonly<{
+export type TraceReadMapperMembers = Readonly<{
   spanDisplay: TraceSpanDisplay;
   spanProtection: TraceSpanProtection;
   contentPrivacy: TraceContentPrivacy;
@@ -283,7 +283,7 @@ export function buildSpanContentRedactions(
 export function mapSpansToDetailDtos(
   spans: Span[],
   protections: Protections,
-  ports: TraceReadMapperPorts,
+  ports: TraceReadMapperMembers,
 ): SpanDetail[] {
   const redactions = buildSpanContentRedactions(spans, protections, ports.spanProtection);
   return spans.map((span) => {

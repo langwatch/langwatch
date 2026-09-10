@@ -14,7 +14,7 @@ import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createLangyLocalRestApp, type LangyLocalRestPorts } from "../langy-local.api.ts";
+import { createLangyLocalRestApp, type LangyLocalRestMembers } from "../langy-local.api.ts";
 
 const PROJECT_ID = "project-123";
 const ORGANIZATION_ID = "organization-1";
@@ -69,7 +69,7 @@ function buildApi(options: { granted: boolean }) {
   const enforceCeiling = ceiling(options.granted);
   const tryFindVisible = vi.fn(async () => ({ id: CONVERSATION_ID, title: "Instrument tracing" }));
 
-  const ports: LangyLocalRestPorts = {
+  const ports: LangyLocalRestMembers = {
     readCredential: () => ({ token: "test-token", projectId: PROJECT_ID }),
     apiKeys: () =>
       ({

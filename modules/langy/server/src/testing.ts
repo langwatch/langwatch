@@ -32,7 +32,7 @@ import type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
 } from "./app/langy.infrastructure.ts";
-import type { LangyEffectPorts } from "./app/langy.infrastructure.ts";
+import type { LangyEffectMembers } from "./app/langy.infrastructure.ts";
 
 export interface StubLangyEffectCalls {
   dispatchedTurns: Array<LangyWorkerDispatchIntent & { projectId: string }>;
@@ -40,7 +40,7 @@ export interface StubLangyEffectCalls {
 }
 
 export function createStubLangyEffectPorts(): {
-  ports: LangyEffectPorts;
+  ports: LangyEffectMembers;
   calls: StubLangyEffectCalls;
 } {
   const calls: StubLangyEffectCalls = {

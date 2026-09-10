@@ -38,6 +38,6 @@ export { promptTagTrpcTransport } from "./transport/prompt-tag.trpc.ts";
 export {
   createPromptExecuteRestApp,
   CrossOriginRefusedError,
-  type PromptExecuteRestPorts,
+  type PromptExecuteRestMembers,
   type PromptExecuteRestSession,
 } from "./transport/prompt-execute.api.ts";

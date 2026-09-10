@@ -16,7 +16,7 @@ import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
 } from "../../../../services/log/trace-log-content-derivation.service.ts";
-import type { TracesV2ReadPorts } from "../../traces-v2.api.ts";
+import type { TracesV2ReadMembers } from "../../traces-v2.api.ts";
 
 /** One of the two stores the read is driven from. */
 export type TranscriptStoreMock = ReturnType<
@@ -47,7 +47,7 @@ export function createTranscriptApp(codingAgents: CodingAgentApi): {
 /**
  * The read ports, real everywhere the package owns the implementation. `tryGetVisibilityCutoffMs` answers "no window": the plan's visibility cutoff is a SEPARATE gate resolved by the process, and leaving it on would mask the data-privacy decisions these suites measure.
  */
-export function createTranscriptReadPorts(): TracesV2ReadPorts {
+export function createTranscriptReadPorts(): TracesV2ReadMembers {
   return {
     tryGetVisibilityCutoffMs: async () => null,
     derivedAttrPrefixes: {

@@ -36,7 +36,7 @@ import {
 import { z } from "zod";
 import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
 import type {
-  LangyEffectPorts,
+  LangyEffectMembers,
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
 } from "../app/langy.infrastructure.ts";
@@ -46,7 +46,7 @@ import {
 } from "../processes/langy-conversation-process.types.ts";
 
 export const createLangyWorkerDispatchIntent =
-  (ports: LangyEffectPorts): IntentExecutor<LangyWorkerDispatchIntent> =>
+  (ports: LangyEffectMembers): IntentExecutor<LangyWorkerDispatchIntent> =>
   async (payload, context) => {
     await ports.workerDispatch.dispatchTurn({
       ...payload,
@@ -55,7 +55,7 @@ export const createLangyWorkerDispatchIntent =
   };
 
 export const createLangyGenerateTitleIntent =
-  (ports: LangyEffectPorts): IntentExecutor<LangyGenerateTitleIntent> =>
+  (ports: LangyEffectMembers): IntentExecutor<LangyGenerateTitleIntent> =>
   async (payload, context) => {
     await ports.titleGeneration.generateTitle({
       ...payload,

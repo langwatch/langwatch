@@ -59,7 +59,7 @@ export {
   type RestIdentity,
   type RestMountOptions,
   type RestRuntime,
-  type RestRuntimePorts,
+  type RestRuntimeMembers,
 } from "./runtime.ts";
 
 // The request half: the validator that fails the way the boundary fails, the
@@ -257,12 +257,12 @@ export {
   type ApiErrorEnvelope,
   type AppRestManagementAudit,
   type AppRestRbacVocabulary,
-  type AppRestSecurityPorts,
+  type AppRestSecurityMembers,
   type AuthDiagnostics,
   type MountedRouteTable,
   type RegisteredRoute,
   type RestAddress,
-  type RestApiServicePorts,
+  type RestApiServiceMembers,
 } from "./security.ts";
 
 import type { Hono } from "hono";

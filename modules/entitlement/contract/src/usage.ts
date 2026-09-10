@@ -2,7 +2,7 @@
  * What an organization's usage against its plan looks like, as every door
  * reads it.
  *
- * The vocabulary was in `platform/app`, so `LimitsTrpcPorts.getUsageStats`
+ * The vocabulary was in `platform/app`, so `LimitsTrpcMembers.getUsageStats`
  * could only say `Promise<unknown>` — and `unknown` is what a tRPC procedure
  * publishes, so the sidebar's usage bar, the usage settings page and the
  * dashboard body were all reading fields off `{}`. The port's own note said

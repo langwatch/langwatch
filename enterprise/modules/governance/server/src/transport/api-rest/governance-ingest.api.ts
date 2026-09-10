@@ -139,7 +139,7 @@ export type GovernanceIngestSpend = Readonly<{
 }>;
 
 /** Everything the receivers reach that they do not own. */
-export type GovernanceIngestRestPorts = Readonly<{
+export type GovernanceIngestRestMembers = Readonly<{
   /** The SAME governance service the console reads sources and templates from. */
   governance: () => Pick<
     GovernanceApi,
@@ -391,7 +391,7 @@ async function extractCostEventsForSource(input: {
 /** Builds the `/api/ingest` receiver family over one process's ports. */
 export function createGovernanceIngestRestApp(options: {
   security: AppRestSecurity;
-  ports: GovernanceIngestRestPorts;
+  ports: GovernanceIngestRestMembers;
 }): MountableRestApp {
   const { security, ports } = options;
   const { service, policy } = security.createServiceVersionedApp({

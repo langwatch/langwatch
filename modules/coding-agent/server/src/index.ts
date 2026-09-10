@@ -65,7 +65,7 @@ export {
   type CodingAgentCaller,
   type CodingAgentCallerScope,
   type CodingAgentPullRequestRef,
-  type CodingAgentScopePorts,
+  type CodingAgentScopeMembers,
 } from "./app/coding-agent.app.ts";
 export { codingAgentServer } from "./coding-agent.server.ts";
 export {

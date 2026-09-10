@@ -44,7 +44,7 @@ export {
   type GovernanceActorUser,
   type GovernanceAppDependencies,
   type GovernanceCaller,
-  type GovernancePersonalVirtualKeyPorts,
+  type GovernancePersonalVirtualKeyMembers,
   type GovernanceProjectCaller,
 } from "./app/governance.app.ts";
 
@@ -151,7 +151,7 @@ export {
   type GovernanceCliBudgetReader as GovernanceCliBudget,
   type GovernanceCliCaller,
   type GovernanceCliPersonalWorkspace,
-  type GovernanceCliRestDependencies as GovernanceCliRestPorts,
+  type GovernanceCliRestDependencies as GovernanceCliRestMembers,
 } from "./transport/api-rest/governance-cli.api.ts";
 
 // The Activity Monitor's push-mode receivers. A signal whose collection this
@@ -161,7 +161,7 @@ export {
   createGovernanceIngestRestApp,
   type GovernanceIngestLogCollectionChannel as GovernanceIngestLogCollection,
   type GovernanceIngestMetricCollectionChannel as GovernanceIngestMetricCollection,
-  type GovernanceIngestRestPorts,
+  type GovernanceIngestRestMembers,
   type GovernanceIngestSpend,
   type GovernanceIngestTraceCollection,
 } from "./transport/api-rest/governance-ingest.api.ts";

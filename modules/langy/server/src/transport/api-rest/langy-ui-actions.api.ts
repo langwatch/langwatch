@@ -33,7 +33,7 @@ import {
 import { LANGY_UI_ACTIONS_FLAG } from "#app/langy.infrastructure";
 import {
   resolveLangyRestCaller,
-  type LangyRestCredentialPorts,
+  type LangyRestCredentialMembers,
 } from "./langy-rest-credentials.api.ts";
 
 const AUTH_REASON =
@@ -60,7 +60,7 @@ export abstract class LangyUiActionRestCatalog implements LangyUiActionCatalog {
 }
 
 /** Everything the UI-action surface reaches that Langy does not own. */
-export type LangyUiActionsRestPorts = LangyRestCredentialPorts &
+export type LangyUiActionsRestMembers = LangyRestCredentialMembers &
   Readonly<{
     /** The SAME application the browser's Langy procedures resolve on. */
     langy: () => LangyApp;
@@ -83,7 +83,7 @@ export type LangyUiActionsRestPorts = LangyRestCredentialPorts &
 /** Builds the `/api/langy/ui/actions` family over one process's ports. */
 export function createLangyUiActionsRestApp(options: {
   security: AppRestSecurity;
-  ports: LangyUiActionsRestPorts;
+  ports: LangyUiActionsRestMembers;
 }): MountableRestApp {
   const { security, ports } = options;
 

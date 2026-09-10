@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import type { LangyConversationCommands, LangyTurnTechnicalPorts } from "@langwatch/langy-server";
+import type { LangyConversationCommands, LangyTurnTechnicalMembers } from "@langwatch/langy-server";
 import { LangyApp } from "../langy.app.ts";
 import { describe, expect, it, vi } from "vitest";
 
@@ -60,7 +60,7 @@ function createApp(): LangyApp {
     startUserWait: vi.fn(),
     endUserWait: vi.fn(),
   } satisfies LangyConversationCommands;
-  const turns: LangyTurnTechnicalPorts = {
+  const turns: LangyTurnTechnicalMembers = {
     models: { resolve: vi.fn() },
     worker: null,
     tokenBuffer: null,

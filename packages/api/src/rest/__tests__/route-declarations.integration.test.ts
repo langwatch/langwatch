@@ -17,7 +17,7 @@ import {
   createRestRuntime,
   type RestAuditRow,
   type RestIdentity,
-  type RestRuntimePorts,
+  type RestRuntimeMembers,
 } from "../runtime.ts";
 
 const VERSION = "2026-09-10";
@@ -96,7 +96,7 @@ function recordingSink(): { rows: RestAuditRow[]; record(row: RestAuditRow): voi
   return { rows, record: (row) => void rows.push(row) };
 }
 
-function mounted(ports: Partial<RestRuntimePorts> = {}): Hono {
+function mounted(ports: Partial<RestRuntimeMembers> = {}): Hono {
   const runtime = createRestRuntime({
     identity: organizationDoor,
     doors: { "instance-admin": instanceAdminDoor },

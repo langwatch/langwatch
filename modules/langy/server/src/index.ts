@@ -2,7 +2,7 @@ export {
   PostgresLangyAdapter,
   type LangyCredentialComposition,
   type LangyServiceCompositionOptions,
-  LangyEventingPorts,
+  LangyEventingMembers,
   LangyTrustedMessage,
   type PostgresLangyAdapterOptions,
 } from "./services/langy-postgres.service.ts";
@@ -25,7 +25,7 @@ export {
 } from "./rules/langy-navigate-resources.rules.ts";
 export type { LangyRelayCompositionOptions } from "./services/langy-postgres.service.ts";
 export type { LangyDatabase } from "./repositories/prisma/langy-database.mapper.ts";
-export type { LangyTurnTechnicalPorts } from "./services/langy-turn.service.ts";
+export type { LangyTurnTechnicalMembers } from "./services/langy-turn.service.ts";
 export {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyService,
@@ -173,7 +173,7 @@ export {
 } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 export { LangyAnalyticsEventSink } from "./repositories/langy-analytics-event.repository.ts";
 export type { LangyAnalyticsEventRecord } from "./repositories/langy-analytics-event.repository.ts";
-export type { LangyEffectPorts } from "./app/langy.infrastructure.ts";
+export type { LangyEffectMembers } from "./app/langy.infrastructure.ts";
 export type { LangyTitleGenerator } from "./app/langy.infrastructure.ts";
 export { LangyTitleModel } from "./app/langy.infrastructure.ts";
 export {
@@ -246,29 +246,28 @@ export type {
 // internal REST doors.
 export {
   createLangyTurnsRestApp,
-  type LangyTurnsRestPorts,
+  type LangyTurnsRestMembers,
 } from "./transport/api-rest/langy-turns.api.ts";
 export {
   createLangyUiActionsRestApp,
   LangyUiActionRestCatalog,
-  type LangyUiActionsRestPorts,
+  type LangyUiActionsRestMembers,
 } from "./transport/api-rest/langy-ui-actions.api.ts";
 export {
-  createLangyInternalRestApp,
+  langyInternalMetrics,
+  langyInternalRest,
+  langyRelayFrameMetrics,
+  langyRelayLiveBuffer,
   type LangyInternalMetrics,
-  type LangyInternalRestPorts,
-} from "./transport/api-rest/langy-internal.api.ts";
-export {
-  createLangyRelayRestApp,
-  type LangyRelayRestPorts,
+  type LangyRelayFrameMetrics,
   type RelayTally,
-} from "./transport/api-rest/langy-relay.api.ts";
+} from "./transport/langy-internal.rest.ts";
 export {
   resolveLangyRestActor,
   resolveLangyRestCaller,
   type LangyRestCaller,
   type LangyRestCeiling,
-  type LangyRestCredentialPorts,
+  type LangyRestCredentialMembers,
   type LangyRestCredentialReader,
 } from "./transport/api-rest/langy-rest-credentials.api.ts";
 export { LANGY_API_KEY_TURNS_FLAG } from "./rules/langy-rest-flags.rules.ts";
@@ -347,11 +346,11 @@ export {
   type LangyCodeAccessPreferenceReader,
   type LangyGithubInstallationReader,
   type LangyLocalRestCommands,
-  type LangyLocalRestPorts,
+  type LangyLocalRestMembers,
 } from "./transport/api-rest/langy-local.api.ts";
 export {
   createLangyLocalControlRestApp,
-  type LangyLocalControlRestPorts,
+  type LangyLocalControlRestMembers,
 } from "./transport/api-rest/langy-local-control.api.ts";
 export {
   LocalControlLongPoll,

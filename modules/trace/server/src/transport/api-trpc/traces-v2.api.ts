@@ -78,7 +78,7 @@ import {
   toConversationContextTurn,
   mapLegacySpanSummaryToTreeNode,
   type TraceDerivedAttrPrefixes,
-  type TraceReadMapperPorts,
+  type TraceReadMapperMembers,
 } from "./trace-read-mappers.api.ts";
 import {
   gateHeaderCost,
@@ -135,7 +135,7 @@ type TracesV2TrpcProcedures<
  * another vertical (Identity, Entitlement, model providers, legacy trace read, Data Privacy,
  * the application). Injecting them lets the transport move without dragging in those modules.
  */
-export type TracesV2TrpcPorts<TMetadata = unknown, TMetadataRaw = unknown> = Readonly<{
+export type TracesV2TrpcMembers<TMetadata = unknown, TMetadataRaw = unknown> = Readonly<{
   /**
    * The caller's read-time redactions for one project: cost visibility, the
    * data-privacy policy's content categories, the restricted-attribute rules
@@ -146,7 +146,7 @@ export type TracesV2TrpcPorts<TMetadata = unknown, TMetadataRaw = unknown> = Rea
   /** The plan's visibility window for one project, or null when unbounded. */
   tryGetVisibilityCutoffMs(projectId: string): Promise<number | null>;
   /** The mapping and redaction ports the shared read mappers take. */
-  mappers: TraceReadMapperPorts;
+  mappers: TraceReadMapperMembers;
   /** The two ingest-derived content attribute prefixes. */
   derivedAttrPrefixes: TraceDerivedAttrPrefixes;
   /**
@@ -235,8 +235,8 @@ export type TracesV2TrpcPorts<TMetadata = unknown, TMetadataRaw = unknown> = Rea
  * through them only to discard them would make the REST caller of
  * `readCodingAgentTranscriptWithProtections` name types it does not have.
  */
-export type TracesV2ReadPorts = Pick<
-  TracesV2TrpcPorts,
+export type TracesV2ReadMembers = Pick<
+  TracesV2TrpcMembers,
   "tryGetVisibilityCutoffMs" | "mappers" | "derivedAttrPrefixes"
 >;
 
@@ -289,7 +289,7 @@ function buildFilterWhere(
     timeRange: { from: number; to: number; live?: boolean };
     query?: string | null;
   },
-  queryTranslation: TracesV2TrpcPorts["queryTranslation"],
+  queryTranslation: TracesV2TrpcMembers["queryTranslation"],
 ) {
   return (
     queryTranslation.translateFilterToClickHouse(
@@ -388,7 +388,7 @@ async function loadSpansFullWithProtections({
   protections,
 }: {
   app: TraceApp;
-  ports: TracesV2ReadPorts;
+  ports: TracesV2ReadMembers;
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
@@ -424,7 +424,7 @@ async function loadTraceLogsWithProtections({
   protections,
 }: {
   app: TraceApp;
-  ports: TracesV2ReadPorts;
+  ports: TracesV2ReadMembers;
   projectId: string;
   traceId: string;
   occurredAtMs?: number;
@@ -480,7 +480,7 @@ export class TracesV2TrpcApi {
     protections,
   }: {
     app: TraceApp;
-    ports: TracesV2ReadPorts;
+    ports: TracesV2ReadMembers;
     projectId: string;
     traceId: string;
     occurredAtMs?: number;
@@ -507,7 +507,7 @@ export class TracesV2TrpcApi {
   >(
     trpc: TRPCRootObject<TContext, object, TOptions, TRoot>,
     procedures: TracesV2TrpcProcedures<TContext, TOptions, TRoot>,
-    ports: TracesV2TrpcPorts<TMetadata, TMetadataRaw>,
+    ports: TracesV2TrpcMembers<TMetadata, TMetadataRaw>,
   ) {
     const { protected: procedure, policy } = procedures;
     const validateOutput = procedures.validateOutput ?? false;

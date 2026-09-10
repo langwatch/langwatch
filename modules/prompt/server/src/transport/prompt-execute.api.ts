@@ -62,7 +62,7 @@ export class CrossOriginRefusedError extends HandledError {
 }
 
 /** What this door reaches that it does not own. */
-export interface PromptExecuteRestPorts<TSession extends PromptExecuteRestSession> {
+export interface PromptExecuteRestMembers<TSession extends PromptExecuteRestSession> {
   /** Whether a state-changing request came from the app's own origin. */
   isAllowedOrigin(input: {
     method: string;
@@ -121,7 +121,7 @@ async function streamPromptExecution({
   preparedEvent: StudioClientEvent;
   traceId: string;
   outputConfigs: ReturnType<typeof outputConfigsFor>;
-  postEvent: PromptExecuteRestPorts<PromptExecuteRestSession>["postEvent"];
+  postEvent: PromptExecuteRestMembers<PromptExecuteRestSession>["postEvent"];
 }): Promise<void> {
   let aborted = false;
   stream.onAbort(() => {
@@ -185,7 +185,7 @@ async function streamPromptExecution({
 /** `/api/prompt-playground/<version>/prompt.execute`, bound to one process. */
 export function createPromptExecuteRestApp<TSession extends PromptExecuteRestSession>(options: {
   security: AppRestSecurity;
-  ports: PromptExecuteRestPorts<TSession>;
+  ports: PromptExecuteRestMembers<TSession>;
 }): MountableRestApp {
   const { security, ports } = options;
   const secured = security.createServiceApp({ basePath: PROMPT_PLAYGROUND_BASE_PATH });
@@ -291,7 +291,7 @@ export function createPromptExecuteRestApp<TSession extends PromptExecuteRestSes
           traceId,
           outputConfigs: outputConfigsFor(formValues),
           postEvent:
-            ports.postEvent as PromptExecuteRestPorts<PromptExecuteRestSession>["postEvent"],
+            ports.postEvent as PromptExecuteRestMembers<PromptExecuteRestSession>["postEvent"],
         }),
       );
     });

@@ -27,7 +27,7 @@ import type { IdempotentRunner } from "./idempotency.ts";
 /** Which error shape a route family publishes. */
 export type ApiErrorEnvelope = "legacy" | "canonical";
 
-export interface RestApiServicePorts {
+export interface RestApiServiceMembers {
   /**
    * Installs the process's application container on the request context.
    * Every family mounts it, so no middleware or handler resolves a singleton.
@@ -103,8 +103,8 @@ export interface RestApiServicePorts {
   ) => MiddlewareHandler;
 }
 
-/** @see RestApiServicePorts — the same contract, named for the composition. */
-export type AppRestSecurityPorts = RestApiServicePorts;
+/** @see RestApiServiceMembers — the same contract, named for the composition. */
+export type AppRestSecurityMembers = RestApiServiceMembers;
 
 /**
  * Derive the family label (tracer span name + registry grouping) from the

@@ -25,7 +25,7 @@ export type LangyExploreLinkProps = {
   children: ReactNode;
 };
 
-export type LangyDerivedCardPorts = {
+export type LangyDerivedCardMembers = {
   renderTimeseries?: (card: Extract<LangyDerivedCard, { kind: "timeseries" }>) => ReactNode;
   renderExploreLink?: (props: LangyExploreLinkProps) => ReactNode;
   resolveExploreHref?: (
@@ -48,7 +48,7 @@ export type LangyDerivedCardViewProps = {
   onChoiceSelect?: (a: { selection: LangyChoiceSelection; card: LangyDerivedChoicesCard }) => void;
   /** Verify hint: ask Langy to run the real query. Absent = chip hidden. */
   onVerify?: (a: { card: LangyDerivedCard }) => void;
-} & LangyDerivedCardPorts;
+} & LangyDerivedCardMembers;
 
 export function LangyDerivedCardView({
   card,
@@ -104,7 +104,7 @@ function DerivedBlockBody({
   renderTimeseries,
 }: {
   card: Exclude<LangyDerivedCard, { kind: "choices" }>;
-  renderTimeseries?: LangyDerivedCardPorts["renderTimeseries"];
+  renderTimeseries?: LangyDerivedCardMembers["renderTimeseries"];
 }) {
   switch (card.kind) {
     case "timeseries":
@@ -302,8 +302,8 @@ function bindHints({
   hints: LangyCardHint[];
   projectSlug: string | null;
   onVerify?: (a: { card: LangyDerivedCard }) => void;
-  renderExploreLink?: LangyDerivedCardPorts["renderExploreLink"];
-  resolveExploreHref?: LangyDerivedCardPorts["resolveExploreHref"];
+  renderExploreLink?: LangyDerivedCardMembers["renderExploreLink"];
+  resolveExploreHref?: LangyDerivedCardMembers["resolveExploreHref"];
 }): ReactNode[] {
   const chips: ReactNode[] = [];
   for (const hint of hints) {

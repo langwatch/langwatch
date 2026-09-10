@@ -2,18 +2,18 @@ import { createContext, type ReactNode, useContext } from "react";
 import type { MediaPartData } from "../../model/transcript/types.ts";
 
 /** Host-owned widgets needed by transcript blocks at a browser boundary. */
-export interface TranscriptRenderPorts {
+export interface TranscriptRenderMembers {
   renderMediaPart?: (part: MediaPartData) => ReactNode;
   renderCommentAction?: (blockKey: string) => ReactNode;
   renderTerminalOutput?: (text: string, isError: boolean) => ReactNode;
 }
 
-const TranscriptRenderPortsContext = createContext<TranscriptRenderPorts>({});
+const TranscriptRenderPortsContext = createContext<TranscriptRenderMembers>({});
 
 export function TranscriptRenderProvider({
   children,
   ...ports
-}: TranscriptRenderPorts & { children: ReactNode }) {
+}: TranscriptRenderMembers & { children: ReactNode }) {
   const parentPorts = useContext(TranscriptRenderPortsContext);
   const mergedPorts = { ...parentPorts, ...ports };
   return (
@@ -23,6 +23,6 @@ export function TranscriptRenderProvider({
   );
 }
 
-export function useTranscriptRenderPorts(): TranscriptRenderPorts {
+export function useTranscriptRenderPorts(): TranscriptRenderMembers {
   return useContext(TranscriptRenderPortsContext);
 }

@@ -37,7 +37,7 @@ export type LangyRestCeiling = (input: {
 }) => Promise<void>;
 
 /** What both public Langy families resolve a caller through. */
-export type LangyRestCredentialPorts = Readonly<{
+export type LangyRestCredentialMembers = Readonly<{
   /** Reads the credential off the request. */
   readCredential: LangyRestCredentialReader;
   /** The directory the credential is resolved and stamped through. */
@@ -67,7 +67,7 @@ export type LangyRestCaller =
  */
 export async function resolveLangyRestCaller(input: {
   request: Request;
-  ports: LangyRestCredentialPorts;
+  ports: LangyRestCredentialMembers;
   /** The rollout flag this surface is gated on. */
   flag: FeatureFlagKey;
 }): Promise<LangyRestCaller> {
@@ -113,7 +113,7 @@ export async function resolveLangyRestCaller(input: {
 
 /** The person a turn is filed under, or the refusal that no such person exists. */
 export async function resolveLangyRestActor(input: {
-  ports: LangyRestCredentialPorts;
+  ports: LangyRestCredentialMembers;
   userId: string;
 }): Promise<LangyCredentialSession> {
   const actor = await LangyActorSessionService.create({

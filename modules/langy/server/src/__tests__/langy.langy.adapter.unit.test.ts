@@ -1,8 +1,8 @@
 import { EventEmitter } from "node:events";
 import type {
   LangyConversationCommands,
-  LangyEventingPorts,
-  LangyTurnTechnicalPorts,
+  LangyEventingMembers,
+  LangyTurnTechnicalMembers,
 } from "@langwatch/langy-server";
 import {
   LangyApp,
@@ -42,7 +42,7 @@ function commands(): LangyConversationCommands {
   ) as unknown as LangyConversationCommands;
 }
 
-function composition(turns: LangyTurnTechnicalPorts) {
+function composition(turns: LangyTurnTechnicalMembers) {
   return {
     commands: commands(),
     credentials: {
@@ -65,7 +65,7 @@ describe("PostgresLangyAdapter", () => {
     const database: LangyDatabase = undefined!;
     const instance = PostgresLangyAdapter.create({ database });
 
-    const first: LangyEventingPorts = instance.eventing();
+    const first: LangyEventingMembers = instance.eventing();
     const second = instance.eventing();
 
     expect(second).toBe(first);

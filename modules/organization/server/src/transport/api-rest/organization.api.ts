@@ -141,7 +141,7 @@ export interface OrganizationRestInviteService {
  * The capabilities this family dispatches through that belong to the process
  * rather than to the organization feature.
  */
-export interface OrganizationRestPorts {
+export interface OrganizationRestMembers {
   /** The management surface's one wire code for "no seat left" — neither the error class nor
    * the code is the organization feature's to own. Throws; never returns. */
   rethrowSeatLimit(error: unknown): never;
@@ -387,7 +387,7 @@ export function createOrganizationRestApp(options: {
   invites: (context: Context) => OrganizationRestInviteService;
   permissions: (context: Context) => AuthzService;
   audit: AppRestManagementAudit;
-  ports: OrganizationRestPorts;
+  ports: OrganizationRestMembers;
 }): MountableRestApp {
   const { security, enterpriseGate, organizations, invites, permissions, audit, ports } = options;
 

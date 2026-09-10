@@ -82,7 +82,7 @@ export interface CodingAgentPullRequestRef {
 }
 
 /** The process capabilities this feature needs that are not coding-agent's own. */
-export interface CodingAgentScopePorts {
+export interface CodingAgentScopeMembers {
   /**
    * The organization a project belongs to, or undefined for an orphan project.
    * Derived here rather than taken from the client, so a caller cannot ask
@@ -170,7 +170,7 @@ export class CodingAgentApp implements CodingAgentApi {
       directory: infrastructure.scopeDirectory,
       permissions: infrastructure.scopePermissions,
     });
-    const scope: CodingAgentScopePorts = {
+    const scope: CodingAgentScopeMembers = {
       findOrganizationForProject: async (projectId: string) => {
         try {
           return await dependencies.projects.getOrganizationId(projectId);
@@ -198,14 +198,14 @@ export class CodingAgentApp implements CodingAgentApi {
 
   readonly #codingAgents: CodingAgentSessionService;
   readonly #github: GithubApi;
-  readonly #scope: CodingAgentScopePorts;
+  readonly #scope: CodingAgentScopeMembers;
   readonly #visibility: CodingAgentViewerVisibilityPort;
   readonly #audit: CodingAgentAuditPort;
 
   private constructor(
     codingAgents: CodingAgentSessionService,
     github: GithubApi,
-    scope: CodingAgentScopePorts,
+    scope: CodingAgentScopeMembers,
     infrastructure: CodingAgentInfrastructure,
   ) {
     this.#codingAgents = codingAgents;

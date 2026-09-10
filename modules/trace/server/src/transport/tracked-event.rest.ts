@@ -44,7 +44,7 @@ class TrackedEventRejectedError extends Error {}
  * Method syntax throughout, so a host implementation may name its own concrete
  * session, project and error types rather than restating the widened ones here.
  */
-export interface TrackedEventPorts {
+export interface TrackedEventMembers {
   /**
    * Refuses a payload whose `event_type` is one of the predefined kinds but
    * whose body does not match that kind's schema. Throws; a payload naming a
@@ -67,7 +67,7 @@ export interface TrackedEventPorts {
   describeValidationError(error: unknown): string;
 }
 
-export const TrackedEventApi = moduleApi<TrackedEventPorts>("trace");
+export const TrackedEventApi = moduleApi<TrackedEventMembers>("trace");
 
 /** The URL every pre-rename SDK release posts a tracked event to. */
 export const TRACKED_EVENT_LEGACY_PATH = "/api/track_event";

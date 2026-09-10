@@ -81,7 +81,7 @@ export {
   type TrpcContextOnlyDeclaredCheck,
   type TrpcDeclaredAuthzContext,
   type TrpcDeclaredAuthzMiddlewares,
-  type TrpcDeclaredAuthzPorts,
+  type TrpcDeclaredAuthzMembers,
   type TrpcDeclaredCheck,
   type TrpcDeclaredCheckParams,
   type TrpcErrorReporting,
@@ -93,7 +93,7 @@ export {
   type TrpcRequestHeaders,
   type TrpcRequestLike,
   type TrpcResponseLike,
-  type TrpcRuntimePolicyPorts,
+  type TrpcRuntimePolicyMembers,
   type TrpcTranslatedCause,
 } from "./policy.ts";
 

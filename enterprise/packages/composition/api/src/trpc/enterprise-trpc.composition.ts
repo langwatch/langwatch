@@ -7,7 +7,7 @@ import {
   ScimTokenTrpcApi,
   type ScimTokenTrpcContext,
   type ScimPlanProvider,
-  type ScimTokenTrpcPorts,
+  type ScimTokenTrpcMembers,
 } from "@langwatch/enterprise-scim-server";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 
@@ -23,7 +23,7 @@ export class EnterpriseTrpcComposition {
     TContext extends EnterpriseTrpcContext,
     TOptions extends TRPCRuntimeConfigOptions<TContext, object>,
     TRoot extends AnyTRPCRootTypes,
-    TScimTokenPorts extends ScimTokenTrpcPorts,
+    TScimTokenMembers extends ScimTokenTrpcMembers,
   >(options: {
     /** The process's one tRPC root; feature routers must not create a second. */
     root: TRPCRootObject<TContext, object, TOptions, TRoot>;
@@ -38,7 +38,7 @@ export class EnterpriseTrpcComposition {
      */
     validateOutput: boolean;
     ports: {
-      scimToken: TScimTokenPorts;
+      scimToken: TScimTokenMembers;
     };
   }) {
     const { root, protectedProcedure, policy, ports, validateOutput } = options;

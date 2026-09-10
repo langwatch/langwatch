@@ -3,7 +3,7 @@
  * application operation each verb dispatches to.
  * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
  */
-import { createRestApiService, type RestApiServicePorts } from "@langwatch/api/rest";
+import { createRestApiService, type RestApiServiceMembers } from "@langwatch/api/rest";
 import type { AppRestOrganizationVariables, AppRestProjectVariables } from "@langwatch/api/rest";
 import type { AuthzService } from "@langwatch/authz-contract";
 import {
@@ -22,7 +22,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   GovernanceApp,
   type GovernanceActorDirectory,
-  type GovernancePersonalVirtualKeyPorts,
+  type GovernancePersonalVirtualKeyMembers,
 } from "../governance.app.ts";
 import { createGovernanceRestApp } from "../../transport/api-rest/governance.api.ts";
 import { TestGovernanceService } from "./support/test-governance-service.ts";
@@ -91,7 +91,7 @@ function spine(grants: readonly string[]) {
     await next();
   };
 
-  const ports: RestApiServicePorts = {
+  const ports: RestApiServiceMembers = {
     appContext: async (_c, next) => next(),
     requestLogger: () => async (_c, next) => next(),
     requestTracer: () => async (_c, next) => next(),
@@ -152,9 +152,9 @@ function buildApi(
     permissions: { getDecision: unreachable<AuthzService["getDecision"]>() },
     personalVirtualKeys: {
       isOrganizationMember:
-        unreachable<GovernancePersonalVirtualKeyPorts["isOrganizationMember"]>(),
+        unreachable<GovernancePersonalVirtualKeyMembers["isOrganizationMember"]>(),
       hasActivePersonalKeyLabelled:
-        unreachable<GovernancePersonalVirtualKeyPorts["hasActivePersonalKeyLabelled"]>(),
+        unreachable<GovernancePersonalVirtualKeyMembers["hasActivePersonalKeyLabelled"]>(),
     },
     actors: { findUser: unreachable<GovernanceActorDirectory["findUser"]>() },
   });

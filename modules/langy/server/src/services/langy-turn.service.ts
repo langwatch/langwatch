@@ -10,7 +10,7 @@ import { LangyTurnWarmService } from "./langy-turn-warm.service.ts";
 export type {
   LangyChatMessageInput,
   LangyTurnServiceDeps,
-  LangyTurnTechnicalPorts,
+  LangyTurnTechnicalMembers,
   StartConversationTurnInput,
 } from "./langy-turn-shared.service.ts";
 export { LANGY_USER_MESSAGE_LABEL, LangyTurnSharedService } from "./langy-turn-shared.service.ts";

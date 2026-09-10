@@ -242,7 +242,7 @@ function auditRequestFrom(request: Request): AdminAuditRequest {
  * itself, and the browser session read that resolves this door's two facts.
  * Framework-free on purpose, so this door names no auth package.
  */
-export interface AdminRestPorts {
+export interface AdminRestMembers {
   ops(): OpsApiContract;
   /** The impersonator-aware actor `adminActor` binds, or null when signed out. */
   resolveActor(request: Request): Promise<OpsOperator | null>;

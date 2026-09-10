@@ -8,7 +8,7 @@ import {
 } from "./plan-gate.errors.ts";
 
 /** What the gate needs from the process it is mounted in. */
-export interface EnterprisePlanGatePorts {
+export interface EnterprisePlanGateMembers {
   /**
    * The organization the request's authentication already resolved. Returning
    * nothing means authentication has not run yet, which is a wiring mistake
@@ -41,7 +41,7 @@ export interface EnterprisePlanGatePorts {
  * CLI or agent can render upgrade guidance.
  */
 export function createEnterprisePlanGate(
-  ports: EnterprisePlanGatePorts,
+  ports: EnterprisePlanGateMembers,
 ): (feature: EnterpriseFeature) => MiddlewareHandler {
   return (feature) => async (context, next) => {
     const organization = ports.organization(context);

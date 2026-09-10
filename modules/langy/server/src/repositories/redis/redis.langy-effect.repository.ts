@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import { LangyDispatchRejectedError } from "@langwatch/langy-contract";
 import { LangyTurnErrors } from "@langwatch/langy-contract";
-import type { LangyEffectPorts, LangyTitleGenerator } from "../../app/langy.infrastructure.ts";
+import type { LangyEffectMembers, LangyTitleGenerator } from "../../app/langy.infrastructure.ts";
 import { LangyTurnDispatchRetry } from "@langwatch/langy-contract";
 import type { LangyWorker } from "../../app/langy.infrastructure.ts";
 import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
@@ -66,7 +66,7 @@ function assertHandoffIdentity(params: {
  * downstream spans.
  */
 export class RedisLangyEffectRepository {
-  static create(deps: CreateLangyEffectPortsOptions): LangyEffectPorts {
+  static create(deps: CreateLangyEffectPortsOptions): LangyEffectMembers {
     return {
       workerDispatch: {
         async dispatchTurn({ projectId, conversationId, turnId }): Promise<void> {

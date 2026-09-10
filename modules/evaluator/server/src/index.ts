@@ -18,7 +18,7 @@ export type { EvaluatorNlpDispatcher } from "./services/evaluator-code-execution
 export {
   EvaluatorReplicationService,
   type EvaluatorCopyCommand,
-  type EvaluatorReplicationPorts,
+  type EvaluatorReplicationMembers,
 } from "./services/evaluator-replication.service.ts";
 
 /** The two declarations a process mounts, and the wire shapes REST publishes. */

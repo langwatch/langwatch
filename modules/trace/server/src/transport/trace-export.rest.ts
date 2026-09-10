@@ -61,7 +61,7 @@ export interface TraceExport<TRequest> {
  * Method syntax throughout, so a host may name its own concrete session,
  * protections and request types rather than restating the widened ones here.
  */
-export interface TraceExportRestPorts<
+export interface TraceExportRestMembers<
   TRequest extends TraceExportRequestFields,
   TRequestRaw,
   TSession,
@@ -105,7 +105,7 @@ export interface TraceExportRestPorts<
 }
 
 export const TraceExportApi =
-  moduleApi<TraceExportRestPorts<TraceExportRequestFields, unknown, unknown>>("trace");
+  moduleApi<TraceExportRestMembers<TraceExportRequestFields, unknown, unknown>>("trace");
 
 /** A JSON answer this door writes itself. */
 const jsonAnswer = (body: unknown, status: number): Response =>

@@ -4,14 +4,14 @@
 import {
   createAppRestSecurity,
   type AppRestSecurity,
-  type RestApiServicePorts,
+  type RestApiServiceMembers,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import type { ErrorHandler, MiddlewareHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import type { TraceLegacyRestPorts, TraceLegacySearchFields } from "../trace-legacy.api.ts";
+import type { TraceLegacyRestMembers, TraceLegacySearchFields } from "../trace-legacy.api.ts";
 import { createTraceLegacyRestApp } from "../trace-legacy.api.ts";
 
 const project = { id: "project-123" };
@@ -28,7 +28,7 @@ const boundaryErrorHandler: ErrorHandler = (error, c) => {
 
 function testSecurity(): AppRestSecurity {
   const pass: MiddlewareHandler = async (_c, next) => next();
-  const ports: RestApiServicePorts = {
+  const ports: RestApiServiceMembers = {
     appContext: async (_c, next) => next(),
     requestLogger: () => async (_c, next) => next(),
     requestTracer: () => async (_c, next) => next(),
@@ -48,13 +48,13 @@ function testSecurity(): AppRestSecurity {
   return createAppRestSecurity(ports);
 }
 
-const searchBodySchema = z.object({}).catchall(z.unknown()) as unknown as TraceLegacyRestPorts<
+const searchBodySchema = z.object({}).catchall(z.unknown()) as unknown as TraceLegacyRestMembers<
   TraceLegacySearchFields,
   unknown
 >["searchBodySchema"];
 
 function buildApi(readTrace: () => Promise<never>) {
-  const ports: TraceLegacyRestPorts<TraceLegacySearchFields, unknown> = {
+  const ports: TraceLegacyRestMembers<TraceLegacySearchFields, unknown> = {
     credential: async () => ({
       ok: true,
       project,

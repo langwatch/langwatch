@@ -12,7 +12,7 @@
 import {
   createAppRestSecurity,
   type AppRestSecurity,
-  type RestApiServicePorts,
+  type RestApiServiceMembers,
 } from "@langwatch/api/rest";
 import { PROMPT_EXECUTE_ENDPOINT } from "@langwatch/prompt-contract";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
@@ -22,7 +22,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createPromptExecuteRestApp,
-  type PromptExecuteRestPorts,
+  type PromptExecuteRestMembers,
   type PromptExecuteRestSession,
 } from "../prompt-execute.api.ts";
 
@@ -38,7 +38,7 @@ const boundaryErrorHandler: ErrorHandler = (error, c) => {
 
 function testSecurity(): AppRestSecurity {
   const pass: MiddlewareHandler = async (_c, next) => next();
-  const ports: RestApiServicePorts = {
+  const ports: RestApiServiceMembers = {
     appContext: async (_c, next) => next(),
     requestLogger: () => async (_c, next) => next(),
     requestTracer: () => async (_c, next) => next(),
@@ -77,7 +77,7 @@ const formValues = {
 
 const SESSION: PromptExecuteRestSession = { user: { id: "user_1" } };
 
-function buildApi(overrides: Partial<PromptExecuteRestPorts<PromptExecuteRestSession>> = {}) {
+function buildApi(overrides: Partial<PromptExecuteRestMembers<PromptExecuteRestSession>> = {}) {
   const isAllowedOrigin = vi.fn(() => true);
   const resolveSession = vi.fn(async () => SESSION as PromptExecuteRestSession | null);
   const probeProjectPermission = vi.fn(async () => true);
@@ -95,7 +95,7 @@ function buildApi(overrides: Partial<PromptExecuteRestPorts<PromptExecuteRestSes
     postEvent,
     newTraceId: () => "trace_1",
     ...overrides,
-  } as unknown as PromptExecuteRestPorts<PromptExecuteRestSession>;
+  } as unknown as PromptExecuteRestMembers<PromptExecuteRestSession>;
 
   const app = createPromptExecuteRestApp<PromptExecuteRestSession>({
     security: testSecurity(),

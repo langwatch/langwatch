@@ -32,7 +32,7 @@ import {
   type TrpcAuthorization,
   type TrpcCheckMiddleware,
   type TrpcDeclaredAuthzContext,
-  type TrpcDeclaredAuthzPorts,
+  type TrpcDeclaredAuthzMembers,
   type TrpcMiddlewareContext,
 } from "../policy.ts";
 
@@ -50,7 +50,7 @@ function makePorts(
       typeof vi.fn<(input: AuthzGetProjectAnyDecisionInput) => Promise<PermissionDecision>>
     >;
   } = {},
-): TrpcDeclaredAuthzPorts<TrpcDeclaredAuthzContext> & {
+): TrpcDeclaredAuthzMembers<TrpcDeclaredAuthzContext> & {
   decisions: TrpcAuthorizationDecisions;
 } {
   const actorId = "actorId" in options ? options.actorId : "alice";

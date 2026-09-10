@@ -23,4 +23,4 @@ export {
   isEnterpriseTier,
 } from "./plan-gate.errors.ts";
 export { assertEnterprisePlan, assertEnterprisePlanType, requireEnterprisePlan } from "./plan-gate.ts";
-export { createEnterprisePlanGate, type EnterprisePlanGatePorts } from "./plan-gate.rest.ts";
+export { createEnterprisePlanGate, type EnterprisePlanGateMembers } from "./plan-gate.rest.ts";

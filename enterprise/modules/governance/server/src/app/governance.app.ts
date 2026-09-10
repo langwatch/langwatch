@@ -180,7 +180,7 @@ export class RoutingPolicyModelNotConcreteError extends HandledError {
  * existence checks the Governance service does not own: one reads organization
  * membership, the other the virtual-key uniqueness tuple.
  */
-export interface GovernancePersonalVirtualKeyPorts {
+export interface GovernancePersonalVirtualKeyMembers {
   /** Whether the caller belongs to this organization at all. */
   isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
   /** Whether this user already has an unrevoked personal key under this label. */
@@ -231,7 +231,7 @@ export interface GovernanceAppDependencies {
    * else's personal keys — is a plain decision at the organization scope.
    */
   permissions: Pick<AuthzService, "getDecision">;
-  personalVirtualKeys: GovernancePersonalVirtualKeyPorts;
+  personalVirtualKeys: GovernancePersonalVirtualKeyMembers;
   /** Resolves the actor token stamped on a span to the person who owns it. */
   actors: GovernanceActorDirectory;
 }
