@@ -4,7 +4,7 @@ import {
   TraceClickHousePort,
   type TraceClickHouseClient,
   type TraceClickHouseResolver,
-} from "../../ports/clickhouse.port.ts";
+} from "../trace-clickhouse-client.repository.ts";
 
 /**
  * The aggregate every offloaded trace field is stored under.

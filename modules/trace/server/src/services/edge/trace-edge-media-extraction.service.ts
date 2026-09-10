@@ -8,8 +8,8 @@ import { TraceValueMediaExtractionService } from "../content/trace-value-media-e
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import { containsMediaMarkers, type OtlpKeyValue, type OtlpSpan } from "@langwatch/trace-contract";
-import type { TraceEdgeMediaTelemetryPort } from "../../ports/trace-media-store.port.ts";
-import type { TraceMediaStorePort } from "../../ports/trace-media-store.port.ts";
+import type { TraceEdgeMediaTelemetry } from "../../app/trace.infrastructure.ts";
+import type { TraceMediaStore } from "../../app/trace.infrastructure.ts";
 import type { ExtractedRef } from "../../rules/content-part-extraction.rules.ts";
 import { type ExtractionBudget } from "../content/trace-value-media-extraction.service.ts";
 
@@ -32,11 +32,11 @@ export interface EdgeMediaExtractionDeps {
    */
   hasContentDropRules: (projectId: string) => Promise<boolean>;
   /** The fail-open counters this hook reports; absent means unreported. */
-  telemetry?: TraceEdgeMediaTelemetryPort;
+  telemetry?: TraceEdgeMediaTelemetry;
   /** Process-composed stored-objects capability for production ingestion. */
-  service?: TraceMediaStorePort;
+  service?: TraceMediaStore;
   /** Compatibility seam retained for focused tests that build local storage. */
-  createService?: (projectId: string) => TraceMediaStorePort;
+  createService?: (projectId: string) => TraceMediaStore;
 }
 
 async function rewriteAttributeList({
@@ -50,7 +50,7 @@ async function rewriteAttributeList({
   attributes: OtlpKeyValue[];
   projectId: string;
   ownerId: string;
-  service: TraceMediaStorePort;
+  service: TraceMediaStore;
   refs: ExtractedRef[];
   budget: ExtractionBudget;
 }): Promise<OtlpKeyValue[]> {
@@ -193,7 +193,7 @@ export class TraceEdgeMediaExtractionService {
     logger,
   }: {
     data: RecordSpanCommandData;
-    service: TraceMediaStorePort;
+    service: TraceMediaStore;
     deps: EdgeMediaExtractionDeps;
     logger: EdgeMediaExtractionLogger;
   }): Promise<RecordSpanCommandData> {

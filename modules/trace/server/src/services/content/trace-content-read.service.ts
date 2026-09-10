@@ -5,13 +5,13 @@ import {
   type TraceLegacyListInput,
   type TracesForProjectResult,
 } from "@langwatch/trace-contract";
-import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port.ts";
+import type { TraceLegacyRead } from "../../app/trace.infrastructure.ts";
 
 export class TraceContentReadServiceImpl extends TraceContentReadService {
-  static create(read: TraceLegacyReadPort): TraceContentReadServiceImpl {
+  static create(read: TraceLegacyRead): TraceContentReadServiceImpl {
     return new TraceContentReadServiceImpl(read);
   }
-  private constructor(private readonly read: TraceLegacyReadPort) {
+  private constructor(private readonly read: TraceLegacyRead) {
     super();
   }
   listTraces(input: {

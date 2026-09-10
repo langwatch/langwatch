@@ -1,4 +1,4 @@
-import { TraceProcessingSpanIngestAdapter } from "../adapters/trace-processing-span-ingest.adapter.ts";
+import { TraceProcessingSpanIngestAdapter } from "../services/trace-processing-span-ingest.service.ts";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -21,11 +21,11 @@ import { SessionGroupsService } from "../services/session/trace-session-groups.s
 import { SpanStorageService } from "../services/offload/trace-span-storage-read.service.ts";
 import { TraceEditOverlayService } from "../services/edit-overlay/trace-edit-overlay.service.ts";
 import { TraceEventDerivationService } from "../services/ingestion/trace-event-derivation.service.ts";
-import { TraceFullIoPort } from "../ports/trace-full-io.port.ts";
+import { TraceFullIo } from "./trace.infrastructure.ts";
 import { TraceIOExtractionService } from "../services/content/trace-io-extraction.service.ts";
 import { TraceService as TraceLegacyReadService } from "../services/read/trace-legacy-read.service.ts";
 import { TraceListService } from "../services/read/trace-list-read.service.ts";
-import { TraceQueryClassificationAdapter } from "../adapters/trace-query-classification.adapter.ts";
+import { TraceQueryClassificationAdapter } from "../services/trace-query-classification.service.ts";
 import {
   TraceQueryFieldValuesRepository,
   type TraceQueryFieldValuesInput,
@@ -39,7 +39,7 @@ import { TraceViewerReadService } from "../services/viewer/trace-viewer.service.
 import { type TraceAppDependencies } from "../app/trace.app.ts";
 import { type TraceBlobStoreService } from "../services/offload/trace-blob-store.service.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { type TraceProcessingCommands } from "../ports/trace-processing-installer.port.ts";
+import { type TraceProcessingCommands } from "./trace.infrastructure.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 
 export type TraceReaderCompositionOptions = {
@@ -203,7 +203,7 @@ class TraceReadQueryFieldValues extends TraceQueryFieldValuesRepository {
   }
 }
 
-export class TraceReadFullIo extends TraceFullIoPort {
+export class TraceReadFullIo implements TraceFullIo {
   static create(extraction: TraceIOExtractionService): TraceReadFullIo {
     return new TraceReadFullIo(extraction);
   }
@@ -211,7 +211,6 @@ export class TraceReadFullIo extends TraceFullIoPort {
   #extraction: TraceIOExtractionService;
 
   private constructor(extraction: TraceIOExtractionService) {
-    super();
     this.#extraction = extraction;
   }
 

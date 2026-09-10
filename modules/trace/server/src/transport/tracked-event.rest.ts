@@ -77,7 +77,7 @@ export const TRACKED_EVENT_CANONICAL_PATH = "/api/events/track";
 export const trackedEventRest = defineRestRouter(TrackedEventApi)
   .withNamespace("events")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("projectKey")
+  .withCredential("project")
 
   .post("/track", "trackEvent")
   .withRawBody("text", { mediaType: "application/json" })

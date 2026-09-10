@@ -8,7 +8,7 @@ import { TraceContentExtractionService } from "../trace-content-extraction.servi
 import { containsMediaMarkers, collectMediaParts } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceMediaStorePort } from "../../../ports/trace-media-store.port.ts";
+import type { TraceMediaStore } from "../../../app/trace.infrastructure.ts";
 import {
   EXTRACTABLE_PART_EXAMPLES,
   NON_EXTRACTABLE_PART_EXAMPLES,
@@ -23,14 +23,14 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-function makeFakeService(): TraceMediaStorePort {
+function makeFakeService(): TraceMediaStore {
   let count = 0;
   return {
     storeFromBytes: async ({ mediaType }: { mediaType: string }) => {
       count += 1;
       return { id: `so-${count}`, mediaType, isDuplicate: false };
     },
-  } as unknown as TraceMediaStorePort;
+  } as unknown as TraceMediaStore;
 }
 
 const PARAMS = {

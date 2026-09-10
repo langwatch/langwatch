@@ -5,15 +5,15 @@ import {
 } from "@langwatch/trace-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import { TraceClickHousePort, type TraceClickHouseResolver } from "../ports/clickhouse.port.ts";
+import { TraceClickHousePort, type TraceClickHouseResolver } from "../repositories/trace-clickhouse-client.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 import { TraceQueryFieldValuesRepository } from "../repositories/read/query-field-values.repository.ts";
-import { TraceQueryClassificationPort } from "../ports/trace-query-classification.port.ts";
+import { TraceQueryClassifier } from "./trace.infrastructure.ts";
 import { TraceSummaryReaderRepository } from "../repositories/read/trace-summary-reader.repository.ts";
 import { TraceRecordRepository } from "../repositories/read/trace-record.repository.ts";
-import { TraceEventDerivationPort } from "../ports/trace-event-derivation.port.ts";
+import { TraceEventDerivation } from "./trace.infrastructure.ts";
 import { TracePayloadReaderRepository } from "../repositories/read/trace-payload-reader.repository.ts";
-import { TraceFullIoPort } from "../ports/trace-full-io.port.ts";
+import { TraceFullIo } from "./trace.infrastructure.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
 import { TraceService } from "../services/support/trace.service.ts";
 
@@ -21,12 +21,12 @@ export type TraceTreeCompositionOptions = {
   resolveClient: TraceClickHouseResolver;
   modelProviders: ModelProviderApi;
   queryFieldValues: TraceQueryFieldValuesRepository;
-  queryClassification?: TraceQueryClassificationPort;
+  queryClassification?: TraceQueryClassifier;
   summaryReader?: TraceSummaryReaderRepository;
   records?: TraceRecordRepository;
-  eventDerivation?: TraceEventDerivationPort;
+  eventDerivation?: TraceEventDerivation;
   payloads: TracePayloadReaderRepository;
-  fullIo: TraceFullIoPort;
+  fullIo: TraceFullIo;
 };
 
 /** Where TraceApp builds the trace-tree read from its ClickHouse and query-value boundaries. */
@@ -83,15 +83,14 @@ class NullTraceRecordRepository extends TraceRecordRepository {
   }
 }
 
-class NullTraceEventDerivationPort extends TraceEventDerivationPort {
+class NullTraceEventDerivationPort implements TraceEventDerivation {
   async derive(_input: TraceDerivedEventsInput): Promise<[]> {
     return [];
   }
 }
 
-class NullTraceQueryClassificationAdapter extends TraceQueryClassificationPort {
+class NullTraceQueryClassificationAdapter implements TraceQueryClassifier {
   private constructor() {
-    super();
   }
 
   static create(): NullTraceQueryClassificationAdapter {

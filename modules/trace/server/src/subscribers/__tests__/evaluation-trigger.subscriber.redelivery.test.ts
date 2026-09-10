@@ -4,12 +4,12 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { TraceEvaluationDispatchPort } from "../../ports/trace-evaluation-dispatch.port.ts";
+import { TraceEvaluationDispatch } from "../../app/trace.infrastructure.ts";
 import {
-  TraceEvaluationLoopMetricsPort,
+  TraceEvaluationLoopMetrics,
   type TraceEvaluationLoopBlockReason,
-} from "../../ports/trace-evaluation-loop-metrics.port.ts";
-import { TraceEvaluationMonitorPort } from "../../ports/trace-evaluation-monitor.port.ts";
+} from "../../app/trace.infrastructure.ts";
+import { TraceEvaluationMonitor } from "../../app/trace.infrastructure.ts";
 import { createEvaluationTriggerSubscriber } from "../evaluation-trigger.subscriber.ts";
 
 /**
@@ -105,7 +105,7 @@ const monitor: MonitorSummary = {
 };
 
 /** The evaluation command's real identity, as `ExecuteEvaluationCommand` mints it. */
-class Dispatch extends TraceEvaluationDispatchPort {
+class Dispatch implements TraceEvaluationDispatch {
   readonly sent: {
     data: ExecuteEvaluationCommandData;
     options?: QueueSendOptions<ExecuteEvaluationCommandData>;
@@ -127,11 +127,11 @@ class Dispatch extends TraceEvaluationDispatchPort {
   }
 }
 
-class LoopMetrics extends TraceEvaluationLoopMetricsPort {
+class LoopMetrics implements TraceEvaluationLoopMetrics {
   loopBlocked(_reason: TraceEvaluationLoopBlockReason): void {}
 }
 
-class Monitors extends TraceEvaluationMonitorPort {
+class Monitors implements TraceEvaluationMonitor {
   async getEnabledOnMessageMonitors(): Promise<MonitorSummary[]> {
     return [monitor];
   }

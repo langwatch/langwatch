@@ -2,7 +2,7 @@ import { ATTR_KEYS, NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { z } from "zod";
-import { TraceModelCostPort } from "../../ports/trace-model-cost.port.ts";
+import { TraceModelCost } from "../../app/trace.infrastructure.ts";
 
 const numericValueSchema = z.union([
   z.number().finite(),
@@ -31,9 +31,9 @@ export const LAST_TOKEN_EVENTS = new Set([
  * accumulates them into trace-level totals.
  */
 export class SpanCostService {
-  private constructor(private readonly modelCosts: TraceModelCostPort) {}
+  private constructor(private readonly modelCosts: TraceModelCost) {}
 
-  static create(options: { modelCosts: TraceModelCostPort }): SpanCostService {
+  static create(options: { modelCosts: TraceModelCost }): SpanCostService {
     return new SpanCostService(options.modelCosts);
   }
 

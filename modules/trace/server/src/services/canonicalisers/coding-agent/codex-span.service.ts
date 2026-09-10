@@ -1,5 +1,5 @@
 import { ATTR_KEYS, CODEX_TURN_SPAN_NAME } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../../../ports/canonical-attributes.port.ts";
+import type { ExtractorContext } from "../canonical-attributes.service.ts";
 import {
   applyCanonicalLifts,
   asNumber,

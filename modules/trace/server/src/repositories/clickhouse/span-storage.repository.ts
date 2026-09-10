@@ -9,7 +9,7 @@ import {
   type WindowFragment,
 } from "../../services/read/trace-windowed-read.service.ts";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port.ts";
+import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
 /**
  * The insert shape of a row whose epoch-millisecond fields are written as
  * `Date`s: the ClickHouse driver serialises a `Date` into a `DateTime64(3)`

@@ -1,6 +1,6 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceTenantBroadcastPort } from "../ports/trace-tenant-broadcast.port.ts";
+import type { TraceTenantBroadcast as TraceTenantBroadcastPort } from "../app/trace.infrastructure.ts";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:span-storage-broadcast");

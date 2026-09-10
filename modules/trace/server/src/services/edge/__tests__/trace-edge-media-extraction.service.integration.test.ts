@@ -8,17 +8,17 @@ import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
-import type { TraceMediaStorePort } from "../../../ports/trace-media-store.port.ts";
+import type { TraceMediaStore } from "../../../app/trace.infrastructure.ts";
 import { type EdgeMediaExtractionDeps } from "../trace-edge-media-extraction.service.ts";
 
 function flags(enabled = true): FeatureFlagApi {
   return { isEnabled: async () => enabled } as never;
 }
 
-function fakeStore(): { service: TraceMediaStorePort; calls: number } {
+function fakeStore(): { service: TraceMediaStore; calls: number } {
   const byHash = new Map<string, string>();
   const state = { calls: 0 };
-  const service: TraceMediaStorePort = {
+  const service: TraceMediaStore = {
     storeFromBytes: async ({ mediaType, bytes }) => {
       const hash = createHash("sha256").update(bytes).digest("hex");
       const existing = byHash.get(hash);
@@ -381,11 +381,11 @@ describe("TraceEdgeMediaExtractionService.maybeExtractSpanMedia", () => {
   describe("given the object store rejects writes", () => {
     /** @scenario "A storage failure falls back to inline ingestion (fail-open)" */
     it("stages the span with its original inline payload and logs the failure", async () => {
-      const failingService: TraceMediaStorePort = {
+      const failingService: TraceMediaStore = {
         storeFromBytes: async () => {
           throw new Error("store unavailable");
         },
-      } as unknown as TraceMediaStorePort;
+      } as unknown as TraceMediaStore;
       const messages = [
         {
           role: "user",

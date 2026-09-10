@@ -1,7 +1,7 @@
 import type { ModelCost } from "@langwatch/model-provider-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { TraceModelCostCatalogPort } from "../../../ports/trace-model-cost-catalog.port.ts";
+import { TraceModelCostCatalog } from "../../../app/trace.infrastructure.ts";
 import { OtlpSpanCostEnrichmentService } from "../span-cost-enrichment.service.ts";
 
 /**
@@ -49,11 +49,11 @@ function cost(overrides: Partial<ModelCost> & { model: string; regex: string }):
 }
 
 function catalog(costs: ModelCost[]): {
-  port: TraceModelCostCatalogPort;
+  port: TraceModelCostCatalog;
   listCosts: ReturnType<typeof vi.fn>;
 } {
   const listCosts = vi.fn(async (_input: { projectId: string }) => costs);
-  class Fake extends TraceModelCostCatalogPort {
+  class Fake implements TraceModelCostCatalog {
     listCosts(input: { projectId: string }): Promise<ModelCost[]> {
       return listCosts(input) as Promise<ModelCost[]>;
     }

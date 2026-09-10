@@ -11,7 +11,7 @@ import {
 import type {
   CanonicalAttributesPort,
   ExtractorContext,
-} from "../../../ports/canonical-attributes.port.ts";
+} from "../canonical-attributes.service.ts";
 
 /** Strands emits one event name for each message role. */
 const ROLE_EVENT_NAMES = [

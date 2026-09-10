@@ -1,5 +1,5 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type { ExtractorContext } from "../services/canonicalisers/canonical-attributes.service.ts";
 import { recordValueType } from "./canonical-extraction.rules.ts";
 import { isNonEmptyString, isRecord } from "./canonical-guard.rules.ts";
 import { extractSystemInstructionFromMessages } from "./canonical-message.rules.ts";

@@ -17,7 +17,7 @@ import {
   clientReturning,
   orderingClient,
   TestWindowedReadMetrics,
-} from "../../../ports/__tests__/repositories/clickhouse-test-helpers.ts";
+} from "./clickhouse-test-helpers.ts";
 import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
 
 const TENANT_ID = "project_analyticsreadbackunit";

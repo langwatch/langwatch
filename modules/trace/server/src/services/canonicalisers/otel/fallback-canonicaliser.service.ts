@@ -5,7 +5,7 @@ import { extractErrorInfo, inferSpanTypeIfAbsent } from "../../../rules/canonica
 import type {
   CanonicalAttributesPort,
   ExtractorContext,
-} from "../../../ports/canonical-attributes.port.ts";
+} from "../canonical-attributes.service.ts";
 
 export class FallbackCanonicaliserService implements CanonicalAttributesPort {
   static create(): FallbackCanonicaliserService {

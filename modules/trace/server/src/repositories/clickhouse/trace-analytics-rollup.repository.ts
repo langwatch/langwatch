@@ -1,6 +1,6 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
+import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 import type { TraceAnalyticsRollupRow } from "../../projections/trace-rollup.projection.ts";
 import { TraceAnalyticsRollupRepository } from "../projection/trace-analytics-rollup.repository.ts";
 

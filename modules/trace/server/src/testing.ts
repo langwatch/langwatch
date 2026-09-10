@@ -3,8 +3,8 @@ import {
   type TraceByIdInput,
   type TraceDerivedEventsInput,
 } from "@langwatch/trace-contract";
-import { TraceEventDerivationPort } from "./ports/trace-event-derivation.port.ts";
-import { TraceQueryClassificationPort } from "./ports/trace-query-classification.port.ts";
+import { TraceEventDerivation } from "./app/trace.infrastructure.ts";
+import { TraceQueryClassifier } from "./app/trace.infrastructure.ts";
 import { TraceRecordRepository } from "./repositories/read/trace-record.repository.ts";
 import { TraceSummaryReaderRepository } from "./repositories/read/trace-summary-reader.repository.ts";
 import { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
@@ -21,7 +21,7 @@ export class MissingTraceRecordRepository extends TraceRecordRepository {
   }
 }
 
-export class EmptyTraceEventDerivationPort extends TraceEventDerivationPort {
+export class EmptyTraceEventDerivationPort implements TraceEventDerivation {
   async derive(_input: TraceDerivedEventsInput): Promise<[]> {
     return [];
   }
@@ -33,7 +33,7 @@ export class EmptyTraceSummaryReaderRepository extends TraceSummaryReaderReposit
   }
 }
 
-export class EmptyTraceQueryClassificationPort extends TraceQueryClassificationPort {
+export class EmptyTraceQueryClassificationPort implements TraceQueryClassifier {
   classify() {
     return { evaluations: false, events: false, spans: false };
   }

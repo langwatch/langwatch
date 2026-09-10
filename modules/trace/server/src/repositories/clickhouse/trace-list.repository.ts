@@ -1,5 +1,5 @@
 import { EventUtils } from "@langwatch/eventing";
-import type { TraceClickHouseResolver } from "../../ports/clickhouse.port.ts";
+import type { TraceClickHouseResolver } from "../trace-clickhouse-client.repository.ts";
 import {
   isStorageAnchoredVersion,
   type TraceListFacetQuery,

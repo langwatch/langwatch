@@ -2,7 +2,7 @@ import type {
   CanonicalAttributesPort,
   ExtractorContext,
   LogExtractorContext,
-} from "../../../ports/canonical-attributes.port.ts";
+} from "../canonical-attributes.service.ts";
 import { canonicaliseGenAILog } from "../../../rules/gen-ai-log.rules.ts";
 import { GenAiSpanService } from "./gen-ai-span.service.ts";
 

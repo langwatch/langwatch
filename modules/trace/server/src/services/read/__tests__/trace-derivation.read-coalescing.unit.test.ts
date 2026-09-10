@@ -1,7 +1,7 @@
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 import { TraceDerivationSpanReaderRepository } from "../../../repositories/read/trace-derivation-span-reader.repository.ts";
-import { TraceModelCostPort } from "../../../ports/trace-model-cost.port.ts";
+import type { TraceModelCost } from "../../../app/trace.infrastructure.ts";
 import { ScenarioRoleMetricsDerivationService } from "../../support/scenario-role-metrics-derivation.service.ts";
 import { SpanCostService } from "../../span/span-cost.service.ts";
 import { TraceEventDerivationService } from "../../ingestion/trace-event-derivation.service.ts";
@@ -32,7 +32,7 @@ class CountingReader extends TraceDerivationSpanReaderRepository {
 }
 
 const spanCosts = SpanCostService.create({
-  modelCosts: new (class extends TraceModelCostPort {
+  modelCosts: new (class implements TraceModelCost {
     estimate(): number {
       return 0;
     }

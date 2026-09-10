@@ -5,9 +5,9 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceClickHousePort, type TraceClickHouseClient } from "../../../ports/clickhouse.port.ts";
+import { TraceClickHousePort, type TraceClickHouseClient } from "../../trace-clickhouse-client.repository.ts";
 import { TracePayloadReaderRepository } from "../../read/trace-payload-reader.repository.ts";
-import { TraceFullIoPort } from "../../../ports/trace-full-io.port.ts";
+import { TraceFullIo } from "../../../app/trace.infrastructure.ts";
 import { ClickHouseTraceFullRecordRepository } from "../trace-full-record.repository.ts";
 
 class ClientPort extends TraceClickHousePort {
@@ -36,7 +36,7 @@ class Payloads extends TracePayloadReaderRepository {
   }
 }
 
-class FullIo extends TraceFullIoPort {
+class FullIo implements TraceFullIo {
   recompute(spans: NormalizedSpan[]) {
     return {
       input: null,
@@ -45,7 +45,7 @@ class FullIo extends TraceFullIoPort {
   }
 }
 
-class TypedFullIo extends TraceFullIoPort {
+class TypedFullIo implements TraceFullIo {
   recompute(spans: NormalizedSpan[]) {
     const value = spans[0]?.spanAttributes["langwatch.output"];
     const parsed = traceRecordValueSchema.safeParse(value);

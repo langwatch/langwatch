@@ -42,12 +42,12 @@ import {
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import type { TraceQueryFieldValuesRepository } from "../../repositories/read/query-field-values.repository.ts";
-import type { TraceQueryClassificationPort } from "../../ports/trace-query-classification.port.ts";
+import type { TraceQueryClassifier } from "../../app/trace.infrastructure.ts";
 import type { TraceSummaryReaderRepository } from "../../repositories/read/trace-summary-reader.repository.ts";
 import type { TraceRecordRepository } from "../../repositories/read/trace-record.repository.ts";
-import type { TraceEventDerivationPort } from "../../ports/trace-event-derivation.port.ts";
+import type { TraceEventDerivation } from "../../app/trace.infrastructure.ts";
 import type { TraceFullRecordRepository } from "../../repositories/read/trace-full-record.repository.ts";
-import { TracePort, type TraceSpanSummaryRecord } from "../../ports/trace.port.ts";
+import { TracePort, type TraceSpanSummaryRecord } from "../../repositories/trace-projected-read.repository.ts";
 import { TraceQueryFieldCatalogueService } from "../facet/trace-query-field-catalogue.service.ts";
 import { nowInstant } from "@langwatch/time";
 
@@ -55,10 +55,10 @@ type TraceComposition = {
   repository: TracePort;
   modelProviders: ModelProviderApi;
   queryFieldValues: TraceQueryFieldValuesRepository;
-  queryClassification: TraceQueryClassificationPort;
+  queryClassification: TraceQueryClassifier;
   summaryReader: TraceSummaryReaderRepository;
   records: TraceRecordRepository;
-  eventDerivation: TraceEventDerivationPort;
+  eventDerivation: TraceEventDerivation;
   fullRecords: TraceFullRecordRepository;
 };
 

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
+import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 import { TraceAnalyticsClickHouseRepository } from "../clickhouse/trace-metrics-analytics.repository.ts";
 import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/trace-analytics-rollup.repository.ts";
 import {

@@ -1,4 +1,4 @@
-import type { CanonicalAttributesPort, ExtractorContext } from "../../ports/canonical-attributes.port.ts";
+import type { CanonicalAttributesPort, ExtractorContext } from "./canonical-attributes.service.ts";
 import { canonicaliseVercelCore } from "../../rules/vercel-core.rules.ts";
 import { canonicaliseVercelIO } from "../../rules/vercel-io.rules.ts";
 

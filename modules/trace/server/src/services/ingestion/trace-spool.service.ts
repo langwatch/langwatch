@@ -4,10 +4,10 @@ import {
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
 import {
-  TraceSpoolLegacyObjectPort,
-  TraceSpoolStoragePort,
+  TraceSpoolLegacyObject,
+  TraceSpoolStorage,
   type TraceSpoolObjectStore,
-} from "../../ports/trace-spool-storage.port.ts";
+} from "../../app/trace.infrastructure.ts";
 import {
   assertLegacySpoolKeyBelongsTo,
   buildSpoolObjectPath,
@@ -82,9 +82,9 @@ function assertDestinationCanHostSpool({
 }
 
 export type TraceSpoolServiceOptions = {
-  storage: TraceSpoolStoragePort;
+  storage: TraceSpoolStorage;
   /** Absent on a deployment that never wrote a v1 reference; see the port. */
-  legacyObjects?: TraceSpoolLegacyObjectPort;
+  legacyObjects?: TraceSpoolLegacyObject;
   /**
    * Used only to surface a refused cross-tenant delete, which `deleteSpool`'s
    * best-effort swallow would otherwise hide.
@@ -235,7 +235,7 @@ export class TraceSpoolService {
     return TraceStreamBufferService.streamToBuffer(body, MAX_SPOOL_BYTES);
   }
 
-  private legacyObjects(): TraceSpoolLegacyObjectPort {
+  private legacyObjects(): TraceSpoolLegacyObject {
     const legacy = this.options.legacyObjects;
     if (!legacy) {
       throw new Error(

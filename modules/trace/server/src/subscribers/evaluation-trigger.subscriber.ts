@@ -10,13 +10,13 @@ import {
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "../adapters/eventing.deferred-origin.adapter.ts";
-import type { TraceEvaluationDispatchPort } from "../ports/trace-evaluation-dispatch.port.ts";
+import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "../services/eventing.deferred-origin.service.ts";
+import type { TraceEvaluationDispatch } from "../app/trace.infrastructure.ts";
 import type {
   TraceEvaluationLoopBlockReason,
-  TraceEvaluationLoopMetricsPort,
-} from "../ports/trace-evaluation-loop-metrics.port.ts";
-import type { TraceEvaluationMonitorPort } from "../ports/trace-evaluation-monitor.port.ts";
+  TraceEvaluationLoopMetrics,
+} from "../app/trace.infrastructure.ts";
+import type { TraceEvaluationMonitor } from "../app/trace.infrastructure.ts";
 import { MAX_PROCESSED_SPANS } from "../projections/trace-summary.projection.ts";
 import {
   defineOriginGuardedTraceSubscriber,
@@ -41,14 +41,14 @@ export interface EvaluationTriggerSubscriberDeps {
    * subscriber calls. The application narrows the same capability inline with
    * `Pick<>`, which narrows the type and not the wiring.
    */
-  monitors: TraceEvaluationMonitorPort;
+  monitors: TraceEvaluationMonitor;
   /** The evaluation command queue, plus the dedup identity that belongs to it. */
-  evaluation: TraceEvaluationDispatchPort;
+  evaluation: TraceEvaluationDispatch;
   /**
    * How an operator sees the loop guard firing. The application increments its
    * own prom-client counter here.
    */
-  metrics: TraceEvaluationLoopMetricsPort;
+  metrics: TraceEvaluationLoopMetrics;
 }
 
 /**
@@ -191,7 +191,7 @@ async function causalityLoopGuardFired({
   tenantId: string;
   traceId: string;
   featureFlags: FeatureFlagApi;
-  metrics: TraceEvaluationLoopMetricsPort;
+  metrics: TraceEvaluationLoopMetrics;
 }): Promise<boolean> {
   const guardDisabled = await featureFlags.isEnabled(CAUSALITY_LOOP_GUARD_DISABLED_FLAG, {
     kind: "system",
@@ -361,7 +361,7 @@ function buildSendOptions({
   monitor,
   threadId,
 }: {
-  dispatch: TraceEvaluationDispatchPort;
+  dispatch: TraceEvaluationDispatch;
   monitor: Pick<MonitorSummary, "threadIdleTimeout">;
   threadId: string | undefined;
 }): QueueSendOptions<ExecuteEvaluationCommandData> {

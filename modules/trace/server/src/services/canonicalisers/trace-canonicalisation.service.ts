@@ -40,12 +40,12 @@ import { StrandsCanonicaliserService } from "./otel/strands-canonicaliser.servic
 import { TraceloopCanonicaliserService } from "./traceloop-canonicaliser.service.ts";
 import { VercelCanonicaliserService } from "./vercel-canonicaliser.service.ts";
 import { VertexAdkCanonicaliserService } from "./vertex-adk-canonicaliser.service.ts";
-import type { ExtractorContext, LogExtractorContext } from "../../ports/canonical-attributes.port.ts";
+import type { ExtractorContext, LogExtractorContext } from "./canonical-attributes.service.ts";
 import {
   CanonicalAttributesPort,
   CanonicalLogRecordStore,
   CanonicalSpanStore,
-} from "../../ports/canonical-attributes.port.ts";
+} from "./canonical-attributes.service.ts";
 import { parseJsonStringValues } from "../../rules/canonical-json.rules.ts";
 import {
   extractLastUserMessageText,

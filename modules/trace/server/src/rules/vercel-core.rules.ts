@@ -1,5 +1,5 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type { ExtractorContext } from "../services/canonicalisers/canonical-attributes.service.ts";
 import {
   extractModelToBoth,
   extractUsageTokens,

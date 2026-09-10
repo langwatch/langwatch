@@ -5,8 +5,8 @@ import {
   isStorageAnchoredVersion,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";
-import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
-import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port.ts";
+import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+import type { TraceWindowedReadMetrics } from "../../app/trace.infrastructure.ts";
 import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules.ts";
 import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
 import {
@@ -162,14 +162,14 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
       defaultRetentionDays: number;
-      windowedReadMetrics?: TraceWindowedReadMetricsPort;
+      windowedReadMetrics?: TraceWindowedReadMetrics;
     },
   ) {}
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
     defaultRetentionDays: number;
-    windowedReadMetrics?: TraceWindowedReadMetricsPort;
+    windowedReadMetrics?: TraceWindowedReadMetrics;
   }): TraceSummaryClickHouseRepository {
     return new TraceSummaryClickHouseRepository(options);
   }
@@ -706,7 +706,7 @@ export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProj
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
     defaultRetentionDays: number;
-    windowedReadMetrics?: TraceWindowedReadMetricsPort;
+    windowedReadMetrics?: TraceWindowedReadMetrics;
   }): TraceSummaryProjectionClickHouseRepository {
     return new TraceSummaryProjectionClickHouseRepository(
       TraceSummaryClickHouseRepository.create(options),

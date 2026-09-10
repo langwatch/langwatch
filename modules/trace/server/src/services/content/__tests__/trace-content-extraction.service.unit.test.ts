@@ -23,7 +23,7 @@ vi.mock("@langwatch/observability", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
-import type { TraceMediaStorePort } from "../../../ports/trace-media-store.port.ts";
+import type { TraceMediaStore } from "../../../app/trace.infrastructure.ts";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -31,8 +31,8 @@ import type { TraceMediaStorePort } from "../../../ports/trace-media-store.port.
 
 /** Builds a minimal mock TraceMediaStorePort. */
 function makeService(
-  overrides: { storeFromBytes?: TraceMediaStorePort["storeFromBytes"] } = {},
-): TraceMediaStorePort {
+  overrides: { storeFromBytes?: TraceMediaStore["storeFromBytes"] } = {},
+): TraceMediaStore {
   return {
     storeFromBytes:
       overrides.storeFromBytes ??
@@ -41,7 +41,7 @@ function makeService(
         mediaType: "audio/mp3",
         isDuplicate: false,
       }),
-  } as unknown as TraceMediaStorePort;
+  } as unknown as TraceMediaStore;
 }
 
 const BASE_PARAMS = {

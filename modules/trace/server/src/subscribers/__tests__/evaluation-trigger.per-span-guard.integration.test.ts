@@ -9,12 +9,12 @@ import type { MonitorSummary } from "@langwatch/monitor-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { TraceEvaluationDispatchPort } from "../../ports/trace-evaluation-dispatch.port.ts";
+import { TraceEvaluationDispatch } from "../../app/trace.infrastructure.ts";
 import {
-  TraceEvaluationLoopMetricsPort,
+  TraceEvaluationLoopMetrics,
   type TraceEvaluationLoopBlockReason,
-} from "../../ports/trace-evaluation-loop-metrics.port.ts";
-import { TraceEvaluationMonitorPort } from "../../ports/trace-evaluation-monitor.port.ts";
+} from "../../app/trace.infrastructure.ts";
+import { TraceEvaluationMonitor } from "../../app/trace.infrastructure.ts";
 import { createEvaluationTriggerSubscriber } from "../evaluation-trigger.subscriber.ts";
 
 const TRACE_ID = "trace-1";
@@ -66,7 +66,7 @@ const spanAtDepth = ({ spanId, depth }: { spanId: string; depth: number }): Trac
     metadata: { spanId, traceId: TRACE_ID },
   }) as unknown as TraceProcessingEvent;
 
-class RecordingDispatch extends TraceEvaluationDispatchPort {
+class RecordingDispatch implements TraceEvaluationDispatch {
   readonly sent: ExecuteEvaluationCommandData[] = [];
 
   makeDedupId(data: ExecuteEvaluationCommandData): string {
@@ -81,7 +81,7 @@ class RecordingDispatch extends TraceEvaluationDispatchPort {
   }
 }
 
-class RecordingMetrics extends TraceEvaluationLoopMetricsPort {
+class RecordingMetrics implements TraceEvaluationLoopMetrics {
   readonly blocked: TraceEvaluationLoopBlockReason[] = [];
 
   loopBlocked(reason: TraceEvaluationLoopBlockReason): void {
@@ -93,7 +93,7 @@ class RecordingMetrics extends TraceEvaluationLoopMetricsPort {
 function trigger() {
   const dispatch = new RecordingDispatch();
   const metrics = new RecordingMetrics();
-  class Monitors extends TraceEvaluationMonitorPort {
+  class Monitors implements TraceEvaluationMonitor {
     getEnabledOnMessageMonitors(): Promise<MonitorSummary[]> {
       return Promise.resolve([
         {

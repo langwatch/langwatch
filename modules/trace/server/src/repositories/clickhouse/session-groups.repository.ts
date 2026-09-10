@@ -1,5 +1,5 @@
 import { EventUtils } from "@langwatch/eventing";
-import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port.ts";
+import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
 import type {
   SessionGroupRow,
   SessionGroupSortColumn,

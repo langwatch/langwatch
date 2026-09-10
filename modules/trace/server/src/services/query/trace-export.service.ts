@@ -12,7 +12,7 @@ import { enrichTracesWithEvaluations } from "../../rules/trace-evaluation-enrich
 // The PORT rather than the concrete legacy service: the export reads one
 // method, and typing it at the port lets a process hand over whatever it
 // composed its legacy read as.
-import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port.ts";
+import type { TraceLegacyRead } from "../../app/trace.infrastructure.ts";
 import {
   CSV_NEWLINE,
   serializeTracesToFullCsv,
@@ -34,14 +34,14 @@ const logger = createLogger("langwatch:export");
  * response while updating progress.
  */
 export class TraceExportService {
-  private readonly traceService: TraceLegacyReadPort;
+  private readonly traceService: TraceLegacyRead;
 
-  private constructor({ traceService }: { traceService: TraceLegacyReadPort }) {
+  private constructor({ traceService }: { traceService: TraceLegacyRead }) {
     this.traceService = traceService;
   }
 
   /** Creates the process-owned export facade over the composed trace reader. */
-  static create({ traceService }: { traceService: TraceLegacyReadPort }): TraceExportService {
+  static create({ traceService }: { traceService: TraceLegacyRead }): TraceExportService {
     return new TraceExportService({ traceService });
   }
 

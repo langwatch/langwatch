@@ -1,7 +1,7 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
-import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port.ts";
+import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+import type { TraceWindowedReadMetrics } from "../../app/trace.infrastructure.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsRow,
@@ -90,7 +90,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
       defaultRetentionDays: number;
-      windowedReadMetrics?: TraceWindowedReadMetricsPort;
+      windowedReadMetrics?: TraceWindowedReadMetrics;
     },
   ) {
     super();
@@ -99,7 +99,7 @@ export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjection
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
     defaultRetentionDays: number;
-    windowedReadMetrics?: TraceWindowedReadMetricsPort;
+    windowedReadMetrics?: TraceWindowedReadMetrics;
   }): TraceAnalyticsClickHouseRepository {
     return new TraceAnalyticsClickHouseRepository(options);
   }

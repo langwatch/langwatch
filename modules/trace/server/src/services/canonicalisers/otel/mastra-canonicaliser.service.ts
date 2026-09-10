@@ -13,7 +13,7 @@ import { MastraValuesService } from "./mastra-value.service.ts";
 import type {
   CanonicalAttributesPort,
   ExtractorContext,
-} from "../../../ports/canonical-attributes.port.ts";
+} from "../canonical-attributes.service.ts";
 
 const mastraValuesService = MastraValuesService.create();
 

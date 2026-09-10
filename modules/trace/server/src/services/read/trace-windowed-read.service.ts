@@ -1,7 +1,7 @@
 import {
-  TraceWindowedReadMetricsPort,
+  TraceWindowedReadMetrics,
   type TraceWindowedReadOutcome,
-} from "../../ports/trace-windowed-read-metrics.port.ts";
+} from "../../app/trace.infrastructure.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**
@@ -9,7 +9,7 @@ import { nowInstant } from "@langwatch/time";
  * `queryWindowed` is called from inside a dozen query bodies and threading an observer through
  * each would put the process's telemetry decision in every signature.
  */
-let windowedReadMetrics: TraceWindowedReadMetricsPort | null = null;
+let windowedReadMetrics: TraceWindowedReadMetrics | null = null;
 
 function incrementWindowedReadCount(table: string, outcome: TraceWindowedReadOutcome): void {
   windowedReadMetrics?.record({ table, outcome });
@@ -101,7 +101,7 @@ export class TraceWindowedReadService {
   }
 
   /** Registers the process's counter. Called once, at composition. */
-  static setTraceWindowedReadMetrics(port: TraceWindowedReadMetricsPort): void {
+  static setTraceWindowedReadMetrics(port: TraceWindowedReadMetrics): void {
     windowedReadMetrics = port;
   }
 

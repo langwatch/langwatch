@@ -1,7 +1,7 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type { TraceProjectMetadataPort } from "../ports/trace-project-metadata.port.ts";
+import type { TraceProjectMetadata } from "../app/trace.infrastructure.ts";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:project-metadata");
@@ -18,7 +18,7 @@ export interface ProjectMetadataSubscriberDeps {
    * subscriber uses. The published service satisfies the port structurally, so
    * every existing caller passes what it already passed.
    */
-  projects: TraceProjectMetadataPort;
+  projects: TraceProjectMetadata;
   /**
    * ADR-051: ensures the project's topic clustering process exists and has a
    * scheduled daily wake.
@@ -65,7 +65,7 @@ export class ProjectMetadataSync {
     tenantId,
     attrs,
   }: {
-    projects: TraceProjectMetadataPort;
+    projects: TraceProjectMetadata;
     recordProductEvent: ProjectMetadataSubscriberDeps["recordProductEvent"];
     tenantId: string;
     attrs: Record<string, string>;

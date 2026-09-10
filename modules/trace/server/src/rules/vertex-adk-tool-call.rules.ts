@@ -1,5 +1,5 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type { ExtractorContext } from "../services/canonicalisers/canonical-attributes.service.ts";
 import { stringifyToolPayload } from "./gemini-content.rules.ts";
 import { setIfMissing, VERTEX_ADK_KEYS, VERTEX_ADK_RULE_PREFIX } from "./vertex-adk-core.rules.ts";
 

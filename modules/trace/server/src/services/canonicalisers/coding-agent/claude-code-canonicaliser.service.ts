@@ -3,7 +3,7 @@ import type {
   CanonicalAttributesPort,
   ExtractorContext,
   LogExtractorContext,
-} from "../../../ports/canonical-attributes.port.ts";
+} from "../canonical-attributes.service.ts";
 import { asNumber } from "../../../rules/canonical-guard.rules.ts";
 import {
   claudeCacheWritesLongLived,

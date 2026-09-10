@@ -3,11 +3,11 @@ import {
   TraceViewerService,
   type TraceViewerReadInput,
 } from "@langwatch/trace-contract";
-import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port.ts";
+import type { TraceLegacyRead } from "../../app/trace.infrastructure.ts";
 import type { TraceViewerProtectionService } from "./trace-viewer-protection.service.ts";
 
 export type TraceViewerServiceOptions = Readonly<{
-  read: TraceLegacyReadPort;
+  read: TraceLegacyRead;
   protections: TraceViewerProtectionService;
 }>;
 

@@ -5,7 +5,7 @@ import {
   CLAUDE_CODE_LLM_REQUEST_SPAN_NAME,
   CODEX_TURN_SPAN_NAME,
 } from "@langwatch/trace-contract";
-import type { TraceModelCostCatalogPort } from "../../ports/trace-model-cost-catalog.port.ts";
+import type { TraceModelCostCatalog } from "../../app/trace.infrastructure.ts";
 import { SpanModelNameService } from "./span-model-name.service.ts";
 
 /**
@@ -73,12 +73,12 @@ export class OtlpSpanCostEnrichmentService {
    * expose construction through a static factory, and `service-quality`
    * requires the constructor to be private once it has one.
    */
-  static create(deps: { modelCosts: TraceModelCostCatalogPort }): OtlpSpanCostEnrichmentService {
+  static create(deps: { modelCosts: TraceModelCostCatalog }): OtlpSpanCostEnrichmentService {
     return new OtlpSpanCostEnrichmentService(deps.modelCosts, SpanModelNameService.create());
   }
 
   private constructor(
-    private readonly modelCosts: TraceModelCostCatalogPort,
+    private readonly modelCosts: TraceModelCostCatalog,
     private readonly modelNames: SpanModelNameService,
   ) {}
 

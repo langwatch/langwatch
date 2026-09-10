@@ -2,10 +2,10 @@ import { Readable } from "node:stream";
 import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  TraceSpoolLegacyObjectPort,
-  TraceSpoolStoragePort,
+  TraceSpoolLegacyObject,
+  TraceSpoolStorage,
   type TraceSpoolObjectStore,
-} from "../../../ports/trace-spool-storage.port.ts";
+} from "../../../app/trace.infrastructure.ts";
 import { SPOOL_REF_V2 } from "../../../rules/trace-spool-location.rules.ts";
 import {
   MAX_SPOOL_BYTES,
@@ -46,7 +46,7 @@ class RecordingObjectStore implements TraceSpoolObjectStore {
   }
 }
 
-class Storage extends TraceSpoolStoragePort {
+class Storage implements TraceSpoolStorage {
   readonly store = new RecordingObjectStore();
   readonly resolved: string[] = [];
 
@@ -54,7 +54,6 @@ class Storage extends TraceSpoolStoragePort {
     private readonly destination: StoredObjectStorageDestination,
     readonly azureRetentionConfirmed = false,
   ) {
-    super();
   }
 
   objectStoreFor(_projectId: string): TraceSpoolObjectStore {
@@ -67,7 +66,7 @@ class Storage extends TraceSpoolStoragePort {
   }
 }
 
-class LegacyObjects extends TraceSpoolLegacyObjectPort {
+class LegacyObjects implements TraceSpoolLegacyObject {
   readonly reads: { projectId: string; key: string }[] = [];
   readonly deletes: { projectId: string; key: string }[] = [];
 

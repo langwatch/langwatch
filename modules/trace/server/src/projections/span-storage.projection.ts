@@ -2,7 +2,7 @@ import type { AppendStore } from "@langwatch/eventing";
 import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
 import { type SpanReceivedEvent, spanReceivedEventSchema } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port.ts";
+import { TraceSpanNormalization } from "../app/trace.infrastructure.ts";
 import { SpanCostService } from "../services/span/span-cost.service.ts";
 import {
   spanStorageMapGroupKey,
@@ -23,7 +23,7 @@ export class SpanStorageMapProjection
   readonly name = "spanStorage";
   readonly store: AppendStore<NormalizedSpan>;
   private readonly spanCostService: SpanCostService;
-  private readonly spanNormalization: TraceSpanNormalizationPort;
+  private readonly spanNormalization: TraceSpanNormalization;
   protected readonly events = spanEvents;
 
   override options = {
@@ -38,7 +38,7 @@ export class SpanStorageMapProjection
   private constructor(deps: {
     store: AppendStore<NormalizedSpan>;
     spanCostService: SpanCostService;
-    spanNormalization: TraceSpanNormalizationPort;
+    spanNormalization: TraceSpanNormalization;
   }) {
     super();
     this.store = deps.store;
@@ -49,7 +49,7 @@ export class SpanStorageMapProjection
   static create(deps: {
     store: AppendStore<NormalizedSpan>;
     spanCostService: SpanCostService;
-    spanNormalization: TraceSpanNormalizationPort;
+    spanNormalization: TraceSpanNormalization;
   }): SpanStorageMapProjection {
     return new SpanStorageMapProjection(deps);
   }

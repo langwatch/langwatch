@@ -1,7 +1,7 @@
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent, NormalizedSpan } from "@langwatch/trace-contract";
-import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
+import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 import { type FullSpanRow, mapChRowToNormalized } from "./stored-span-row.mapper.ts";
 import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read.mapper.ts";
 

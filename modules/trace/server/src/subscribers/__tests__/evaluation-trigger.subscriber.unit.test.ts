@@ -9,12 +9,12 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { TraceEvaluationDispatchPort } from "../../ports/trace-evaluation-dispatch.port.ts";
+import { TraceEvaluationDispatch } from "../../app/trace.infrastructure.ts";
 import {
-  TraceEvaluationLoopMetricsPort,
+  TraceEvaluationLoopMetrics,
   type TraceEvaluationLoopBlockReason,
-} from "../../ports/trace-evaluation-loop-metrics.port.ts";
-import { TraceEvaluationMonitorPort } from "../../ports/trace-evaluation-monitor.port.ts";
+} from "../../app/trace.infrastructure.ts";
+import { TraceEvaluationMonitor } from "../../app/trace.infrastructure.ts";
 import { MAX_PROCESSED_SPANS } from "../../projections/trace-summary.projection.ts";
 import {
   createEvaluationTriggerSubscriber,
@@ -117,14 +117,13 @@ function monitor(overrides: Partial<MonitorSummary> = {}): MonitorSummary {
   };
 }
 
-class Dispatch extends TraceEvaluationDispatchPort {
+class Dispatch implements TraceEvaluationDispatch {
   readonly sent: {
     data: ExecuteEvaluationCommandData;
     options?: QueueSendOptions<ExecuteEvaluationCommandData>;
   }[] = [];
 
   constructor(private readonly behaviour: { throwsFor?: string } = {}) {
-    super();
   }
 
   makeDedupId(data: ExecuteEvaluationCommandData): string {
@@ -140,7 +139,7 @@ class Dispatch extends TraceEvaluationDispatchPort {
   }
 }
 
-class LoopMetrics extends TraceEvaluationLoopMetricsPort {
+class LoopMetrics implements TraceEvaluationLoopMetrics {
   readonly blocked: TraceEvaluationLoopBlockReason[] = [];
 
   loopBlocked(reason: TraceEvaluationLoopBlockReason): void {
@@ -157,7 +156,7 @@ function subscriber(options: {
   const metrics = new LoopMetrics();
   const isEnabled = vi.fn(async () => options.guardDisabled ?? false);
   const listMonitors = vi.fn(async (_projectId: string) => options.monitors ?? [monitor()]);
-  class Monitors extends TraceEvaluationMonitorPort {
+  class Monitors implements TraceEvaluationMonitor {
     getEnabledOnMessageMonitors(projectId: string): Promise<MonitorSummary[]> {
       return listMonitors(projectId) as Promise<MonitorSummary[]>;
     }

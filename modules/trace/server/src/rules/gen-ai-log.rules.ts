@@ -1,5 +1,5 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { LogExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type { LogExtractorContext } from "../services/canonicalisers/canonical-attributes.service.ts";
 
 const GEN_AI_RULE_PREFIX = "genai";
 

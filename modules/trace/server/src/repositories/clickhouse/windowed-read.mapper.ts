@@ -1,4 +1,4 @@
-import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port.ts";
+import type { TraceWindowedReadMetrics } from "../../app/trace.infrastructure.ts";
 import { NullTraceWindowedReadMetricsAdapter } from "../memory/null-trace-windowed-read-metrics.adapter.ts";
 
 export const DEFAULT_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
@@ -15,7 +15,7 @@ type QueryWindowedOptions<T> = {
   fallback: "none" | "unbounded";
   isEmpty: (result: T) => boolean;
   run: (window: WindowFragment | null) => Promise<T>;
-  metrics?: TraceWindowedReadMetricsPort;
+  metrics?: TraceWindowedReadMetrics;
 };
 
 export async function queryWindowed<T>(options: QueryWindowedOptions<T>): Promise<T> {

@@ -1,5 +1,5 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { ExtractorContext } from "../ports/canonical-attributes.port.ts";
+import type { ExtractorContext } from "../services/canonicalisers/canonical-attributes.service.ts";
 import { isRecord } from "./canonical-guard.rules.ts";
 import { safeStringify } from "./langwatch-structured-value.rules.ts";
 

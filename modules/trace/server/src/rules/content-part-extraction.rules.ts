@@ -8,7 +8,7 @@ import { parseBase64DataUri } from "@langwatch/trace-contract";
 import { isReadbackSafe } from "@langwatch/stored-object-contract";
 import { resolveRawPcmFormat, wrapRawPcmToWav } from "@langwatch/trace-contract";
 import { isInlineDataCarrier } from "@langwatch/trace-contract";
-import type { TraceMediaStorePort } from "../ports/trace-media-store.port.ts";
+import type { TraceMediaStore } from "../app/trace.infrastructure.ts";
 import { z } from "zod";
 
 /**
@@ -68,7 +68,7 @@ export interface ExtractionContext {
   purpose: string;
   ownerKind: string;
   ownerId: string;
-  service: TraceMediaStorePort;
+  service: TraceMediaStore;
   /** Where a pass-through decision is recorded; structural so this module names no logger. */
   logger: { debug: (data: Record<string, unknown>, message: string) => void };
 }

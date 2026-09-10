@@ -6,7 +6,7 @@ import { isRecord } from "../../../rules/canonical-guard.rules.ts";
 import type {
   CanonicalAttributesPort,
   ExtractorContext,
-} from "../../../ports/canonical-attributes.port.ts";
+} from "../canonical-attributes.service.ts";
 
 export class HaystackCanonicaliserService implements CanonicalAttributesPort {
   static create(): HaystackCanonicaliserService {

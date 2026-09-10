@@ -12,7 +12,7 @@ import { safeJsonParse } from "../../../rules/canonical-guard.rules.ts";
 import type {
   CanonicalAttributesPort,
   ExtractorContext,
-} from "../../../ports/canonical-attributes.port.ts";
+} from "../canonical-attributes.service.ts";
 
 export class LogfireCanonicaliserService implements CanonicalAttributesPort {
   static create(): LogfireCanonicaliserService {

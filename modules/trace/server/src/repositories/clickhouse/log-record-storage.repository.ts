@@ -2,7 +2,7 @@ import { TraceWindowedReadService } from "../../services/read/trace-windowed-rea
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/read/trace-windowed-read.service.ts";
-import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port.ts";
+import type { TraceClickHouseResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
 import {
   type LogRecordStorageRepository,
   type StoredLogRecordRow,

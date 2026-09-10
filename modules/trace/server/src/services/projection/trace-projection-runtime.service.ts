@@ -1,8 +1,8 @@
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { TraceIoExtractionPort } from "../../ports/trace-io-extraction.port.ts";
-import { TraceMediaReferencePort } from "../../ports/trace-media-reference.port.ts";
-import { TraceModelCostPort } from "../../ports/trace-model-cost.port.ts";
-import { TraceSpanNormalizationPort } from "../../ports/trace-span-normalization.port.ts";
+import { TraceIoExtraction } from "../../app/trace.infrastructure.ts";
+import { TraceMediaReferenceResolver } from "../../app/trace.infrastructure.ts";
+import { TraceModelCost } from "../../app/trace.infrastructure.ts";
+import { TraceSpanNormalization } from "../../app/trace.infrastructure.ts";
 import { SpanCostService } from "../span/span-cost.service.ts";
 import { SpanStatusService } from "../span/span-status.service.ts";
 import { SpanTimingService } from "../span/span-timing.service.ts";
@@ -26,14 +26,14 @@ export class TraceProjectionRuntimeService {
   readonly traceName: TraceNameResolutionService;
   readonly spanCost: SpanCostService;
   readonly traceIo: TraceIOAccumulationService;
-  readonly spanNormalization: TraceSpanNormalizationPort;
+  readonly spanNormalization: TraceSpanNormalization;
 
   private constructor(options: {
     canonicalisation: TraceCanonicalisationService;
-    ioExtraction: TraceIoExtractionPort;
-    mediaReferences: TraceMediaReferencePort;
-    modelCosts: TraceModelCostPort;
-    spanNormalization: TraceSpanNormalizationPort;
+    ioExtraction: TraceIoExtraction;
+    mediaReferences: TraceMediaReferenceResolver;
+    modelCosts: TraceModelCost;
+    spanNormalization: TraceSpanNormalization;
   }) {
     this.spanTiming = SpanTimingService.create();
     this.spanStatus = SpanStatusService.create();
@@ -52,10 +52,10 @@ export class TraceProjectionRuntimeService {
 
   static create(options: {
     canonicalisation: TraceCanonicalisationService;
-    ioExtraction: TraceIoExtractionPort;
-    mediaReferences: TraceMediaReferencePort;
-    modelCosts: TraceModelCostPort;
-    spanNormalization: TraceSpanNormalizationPort;
+    ioExtraction: TraceIoExtraction;
+    mediaReferences: TraceMediaReferenceResolver;
+    modelCosts: TraceModelCost;
+    spanNormalization: TraceSpanNormalization;
   }): TraceProjectionRuntimeService {
     return new TraceProjectionRuntimeService(options);
   }

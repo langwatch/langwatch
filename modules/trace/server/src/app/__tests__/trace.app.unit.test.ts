@@ -36,7 +36,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TraceLegacyReadPort } from "../../ports/trace-legacy-read.port.ts";
+import type { TraceLegacyRead } from "../trace.infrastructure.ts";
 import {
   TraceApp,
   type TraceEditOverlayStore,
@@ -88,23 +88,23 @@ type ReadCall = { name: string; args: unknown[] };
  */
 function harness(
   reads: Partial<{
-    tryGetById: TraceLegacyReadPort["tryGetById"];
-    getEvaluationsMultiple: TraceLegacyReadPort["getEvaluationsMultiple"];
-    getAllTracesForProject: TraceLegacyReadPort["getAllTracesForProject"];
-    getTracesWithSpans: TraceLegacyReadPort["getTracesWithSpans"];
+    tryGetById: TraceLegacyRead["tryGetById"];
+    getEvaluationsMultiple: TraceLegacyRead["getEvaluationsMultiple"];
+    getAllTracesForProject: TraceLegacyRead["getAllTracesForProject"];
+    getTracesWithSpans: TraceLegacyRead["getTracesWithSpans"];
     getByTraceId: TraceSummaryReader["getByTraceId"];
   }> = {},
 ) {
-  const tryGetById = vi.fn<TraceLegacyReadPort["tryGetById"]>(
+  const tryGetById = vi.fn<TraceLegacyRead["tryGetById"]>(
     reads.tryGetById ?? (async () => traceRow("trace-1")),
   );
-  const getEvaluationsMultiple = vi.fn<TraceLegacyReadPort["getEvaluationsMultiple"]>(
+  const getEvaluationsMultiple = vi.fn<TraceLegacyRead["getEvaluationsMultiple"]>(
     reads.getEvaluationsMultiple ?? (async () => ({})),
   );
-  const getAllTracesForProject = vi.fn<TraceLegacyReadPort["getAllTracesForProject"]>(
+  const getAllTracesForProject = vi.fn<TraceLegacyRead["getAllTracesForProject"]>(
     reads.getAllTracesForProject ?? (async () => tracePage([])),
   );
-  const getTracesWithSpans = vi.fn<TraceLegacyReadPort["getTracesWithSpans"]>(
+  const getTracesWithSpans = vi.fn<TraceLegacyRead["getTracesWithSpans"]>(
     reads.getTracesWithSpans ?? (async () => []),
   );
   const getByTraceId = vi.fn<TraceSummaryReader["getByTraceId"]>(
@@ -119,7 +119,7 @@ function harness(
       return [];
     };
 
-  const read: Partial<TraceLegacyReadPort> = {
+  const read: Partial<TraceLegacyRead> = {
     tryGetById,
     getEvaluationsMultiple,
     getAllTracesForProject,
@@ -136,7 +136,7 @@ function harness(
   const app = TraceApp.create({
     traces: {
       existence: { findExistingTraceIds: async ({ traceIds }) => [...traceIds] },
-      read: read as TraceLegacyReadPort,
+      read: read as TraceLegacyRead,
       spans: spans as TracesV2SpanReader,
       summary,
       list: {} as TracesV2ListReader,

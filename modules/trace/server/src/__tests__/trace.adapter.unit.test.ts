@@ -6,13 +6,13 @@ import {
 } from "../index.ts";
 // From the port that defines them: an in-package test does not need the
 // package's public surface, and `index.ts` publishes what CONSUMERS import.
-import type { TraceClickHouseClient, TraceClickHouseResolver } from "../ports/clickhouse.port.ts";
+import type { TraceClickHouseClient, TraceClickHouseResolver } from "../repositories/trace-clickhouse-client.repository.ts";
 import { TraceTreeComposition } from "../index.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 import { describe, expect, it } from "vitest";
-import { TestModelProviderService } from "../ports/__tests__/support/model-provider.service.fake.ts";
-import { TestTraceQueryClassification } from "../ports/__tests__/support/query-classification.fake.ts";
-import { traceReadPorts } from "../ports/__tests__/support/trace-read-ports.fake.ts";
+import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
+import { TestTraceQueryClassification } from "./support/query-classification.fake.ts";
+import { traceReadPorts } from "./support/trace-read-ports.fake.ts";
 
 class EmptyQueryFieldValues extends TraceQueryFieldValuesRepository {
   async list() {
@@ -32,7 +32,7 @@ class EmptyPayloads extends TracePayloadReaderRepository {
   }
 }
 
-class EmptyFullIo extends TraceFullIoPort {
+class EmptyFullIo implements TraceFullIoPort {
   recompute() {
     return { input: null, output: null };
   }

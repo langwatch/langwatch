@@ -9,7 +9,7 @@ import { isNonEmptyString } from "../../../rules/canonical-guard.rules.ts";
 import type {
   CanonicalAttributesPort,
   ExtractorContext,
-} from "../../../ports/canonical-attributes.port.ts";
+} from "../canonical-attributes.service.ts";
 
 const COPILOT_ATTR_PREFIX = "github.copilot.";
 

@@ -4,7 +4,7 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { type SpanReceivedEvent, spanReceivedEventSchema } from "@langwatch/trace-contract";
 import { NormalizedStatusCode } from "@langwatch/trace-contract";
 import { SpanCostService } from "../services/span/span-cost.service.ts";
-import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port.ts";
+import { TraceSpanNormalization } from "../app/trace.infrastructure.ts";
 
 /**
  * One row emitted to `trace_analytics_rollup` per SpanReceivedEvent.
@@ -76,7 +76,7 @@ export class TraceAnalyticsRollupMapProjection
   readonly name = "traceAnalyticsRollup";
   readonly store: AppendStore<TraceAnalyticsRollupRow>;
   private readonly spanCostService: SpanCostService;
-  private readonly spanNormalization: TraceSpanNormalizationPort;
+  private readonly spanNormalization: TraceSpanNormalization;
   protected readonly events = spanEvents;
 
   override options = {
@@ -88,7 +88,7 @@ export class TraceAnalyticsRollupMapProjection
   private constructor(deps: {
     store: AppendStore<TraceAnalyticsRollupRow>;
     spanCostService: SpanCostService;
-    spanNormalization: TraceSpanNormalizationPort;
+    spanNormalization: TraceSpanNormalization;
   }) {
     super();
     this.store = deps.store;
@@ -99,7 +99,7 @@ export class TraceAnalyticsRollupMapProjection
   static create(deps: {
     store: AppendStore<TraceAnalyticsRollupRow>;
     spanCostService: SpanCostService;
-    spanNormalization: TraceSpanNormalizationPort;
+    spanNormalization: TraceSpanNormalization;
   }): TraceAnalyticsRollupMapProjection {
     return new TraceAnalyticsRollupMapProjection(deps);
   }

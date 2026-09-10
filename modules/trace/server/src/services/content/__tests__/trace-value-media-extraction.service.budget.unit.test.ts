@@ -16,7 +16,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import type { TraceMediaStorePort } from "../../../ports/trace-media-store.port.ts";
+import type { TraceMediaStore } from "../../../app/trace.infrastructure.ts";
 import { MAX_MEDIA_PARTS_PER_SPAN } from "../trace-value-media-extraction.service.ts";
 
 interface StoredCall {
@@ -24,14 +24,14 @@ interface StoredCall {
   bytes: Buffer;
 }
 
-function makeFakeService(): { service: TraceMediaStorePort; calls: StoredCall[] } {
+function makeFakeService(): { service: TraceMediaStore; calls: StoredCall[] } {
   const calls: StoredCall[] = [];
   const service = {
     storeFromBytes: async ({ mediaType, bytes }: { mediaType: string; bytes: Buffer }) => {
       calls.push({ mediaType, bytes });
       return { id: `so-${calls.length}`, mediaType, isDuplicate: false };
     },
-  } as unknown as TraceMediaStorePort;
+  } as unknown as TraceMediaStore;
   return { service, calls };
 }
 

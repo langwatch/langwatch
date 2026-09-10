@@ -10,7 +10,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { visitContentPartAsync } from "@langwatch/trace-contract";
 
-import type { TraceMediaStorePort } from "../../ports/trace-media-store.port.ts";
+import type { TraceMediaStore } from "../../app/trace.infrastructure.ts";
 import {
   extractBareImagePart,
   extractBinaryPart,
@@ -43,7 +43,7 @@ interface ExtractionParams {
   purpose: string;
   ownerKind: string;
   ownerId: string;
-  service: TraceMediaStorePort;
+  service: TraceMediaStore;
 }
 
 /**
@@ -146,7 +146,7 @@ export class TraceContentExtractionService {
     purpose: string;
     ownerKind: string;
     ownerId: string;
-    service: TraceMediaStorePort;
+    service: TraceMediaStore;
   }): Promise<{ part: unknown; ref: ExtractedRef | null }> {
     const context: ExtractionContext = {
       part,
@@ -191,7 +191,7 @@ export class TraceContentExtractionService {
     ownerKind: string;
     ownerId: string;
     purpose: string;
-    service: TraceMediaStorePort;
+    service: TraceMediaStore;
   }): Promise<{ rewrittenEvent: unknown; refs: ExtractedRef[] }> {
     return tracer.withActiveSpan(
       "StoredObjects.extractInlineMediaFromEvent",

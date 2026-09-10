@@ -1,4 +1,4 @@
-import type { CanonicalAttributesPort, ExtractorContext } from "../../ports/canonical-attributes.port.ts";
+import type { CanonicalAttributesPort, ExtractorContext } from "./canonical-attributes.service.ts";
 import { canonicaliseVertexAdkCore, isVertexAdkSpan } from "../../rules/vertex-adk-core.rules.ts";
 import { canonicaliseVertexAdkRequest } from "../../rules/vertex-adk-request.rules.ts";
 import { canonicaliseVertexAdkResponse } from "../../rules/vertex-adk-response.rules.ts";

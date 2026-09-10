@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type {
   TraceClickHouseWriteClient,
   TraceClickHouseWriteResolver,
-} from "../../../ports/clickhouse.port.ts";
+} from "../../trace-clickhouse-client.repository.ts";
 import { TraceSpanStorageClickHouseRepository } from "../trace-span-storage.repository.ts";
 
 /**

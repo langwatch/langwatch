@@ -3,9 +3,9 @@ import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
-  TraceMediaReferencePort,
-} from "../../ports/trace-media-reference.port.ts";
-import { TraceIoExtractionPort } from "../../ports/trace-io-extraction.port.ts";
+  TraceMediaReferenceResolver,
+} from "../../app/trace.infrastructure.ts";
+import { TraceIoExtraction } from "../../app/trace.infrastructure.ts";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 export const OUTPUT_SOURCE = {
@@ -46,15 +46,15 @@ export type TraceIOAccumulation = {
  */
 export class TraceIOAccumulationService {
   private constructor(
-    private readonly traceIOExtractionService: TraceIoExtractionPort,
+    private readonly traceIOExtractionService: TraceIoExtraction,
     private readonly traceCanonicalisation: TraceCanonicalisationService,
-    private readonly mediaReferences: TraceMediaReferencePort,
+    private readonly mediaReferences: TraceMediaReferenceResolver,
   ) {}
 
   static create(
-    traceIOExtractionService: TraceIoExtractionPort,
+    traceIOExtractionService: TraceIoExtraction,
     traceCanonicalisation: TraceCanonicalisationService,
-    mediaReferences: TraceMediaReferencePort,
+    mediaReferences: TraceMediaReferenceResolver,
   ): TraceIOAccumulationService {
     return new TraceIOAccumulationService(
       traceIOExtractionService,
@@ -313,7 +313,7 @@ export class TraceIOAccumulationService {
     span: NormalizedSpan;
     side: "input" | "output";
     winning: boolean;
-    mediaReferences: TraceMediaReferencePort;
+    mediaReferences: TraceMediaReferenceResolver;
   }): string | null {
     const incoming = MEDIA_SOURCE_ATTRS[side].flatMap((key) => {
       const value = span.spanAttributes[key];
