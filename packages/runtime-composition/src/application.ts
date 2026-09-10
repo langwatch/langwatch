@@ -32,7 +32,12 @@ import {
   type FeatureTransportHosts,
   type MountedTransports,
 } from "./transport-mounting.ts";
-import { assertInfrastructure } from "./infrastructure-needs.ts";
+import {
+  buildClaimedMembers,
+  membersFor,
+  type MemberClaim,
+  type MemberSource,
+} from "./module-members.ts";
 import {
   commandsOf,
   eventingHostFrom,
@@ -44,10 +49,13 @@ import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./ru
 import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
 import { LocalFeatureApis } from "./local-feature-api.ts";
 import {
+  repositoriesRequire,
   selectedRepositoryOwnership,
   validateRepositorySelection,
-  type RepositoryRegistry,
+  type AnyRepositoryRegistry,
+  type RepositorySelection,
 } from "./repository-registry.ts";
+import type { Tier } from "./tiers.ts";
 export type { RuntimeService } from "./runtime-lifecycle.ts";
 
 /** What a booted runtime hands back for one feature. */
@@ -63,12 +71,18 @@ export interface InstalledFeature<Provided, Rest, Trpc, Worker> {
 }
 
 /** A booted application: everything constructed, nothing serving yet. */
-export class BootedRuntime<Infrastructure, Rest = never, Trpc = never> {
+export class BootedRuntime<Members, Rest = never, Trpc = never> {
   private readonly lifecycle: RuntimeLifecycle;
   constructor(
     readonly name: string,
     readonly role: ServerRole,
-    readonly infrastructure: Infrastructure,
+    /**
+     * The members this process actually built: exactly the union its installed
+     * modules declared and their repository tiers required, and nothing else.
+     * It is partial because that union is the point - a process builds no
+     * client no module asked for.
+     */
+    readonly members: Readonly<Partial<Members>>,
     /**
      * Every declared transport this process mounted, in install order for REST
      * and by namespace for tRPC. Empty where the application was given no door.
@@ -102,11 +116,11 @@ export class BootedRuntime<Infrastructure, Rest = never, Trpc = never> {
     Rest,
     Trpc,
     Worker,
-    FeatureInfrastructure,
+    FeatureMembers,
   >(
     declaration: ServerFeatureDeclaration<
       Config,
-      FeatureInfrastructure,
+      FeatureMembers,
       Dependencies,
       TransportDependencies,
       Provided,
@@ -160,51 +174,72 @@ interface DeclaredFeature {
   readonly transports: readonly FeatureTransportDescriptor[];
   readonly facts: readonly unknown[];
   readonly repositories?: FeatureRepositories;
-  readonly repositoryRegistry?: RepositoryRegistry<
-    Record<
-      string,
-      Readonly<{ requires: readonly string[]; create: (...arguments_: never[]) => unknown }>
-    >
-  >;
+  readonly repositoryRegistry?: AnyRepositoryRegistry;
   readonly apiContract?: FeatureApiIdentity;
   readonly dependencies: TokenMap;
   readonly transportDependencies: TokenMap;
   readonly providers: readonly FeatureProvider<never>[];
   readonly contributesWorkerWork: boolean;
-  /** The pool members this module named, read off the pool before any create. */
-  readonly requiredInfrastructure: readonly string[];
+  /** What this module's App declared it reads, built before any create runs. */
+  readonly requiredMembers: readonly string[];
+  /**
+   * Which of the module's two repository tiers this process installs. Live
+   * unless the caller said otherwise in code with `withMemoryRepositories`,
+   * which is the one seam that may say "memory" and the only way to run a
+   * module without its stores.
+   */
+  readonly tier: Tier;
   readonly install: (args: FeatureInstallArguments<unknown>) => InstalledFeatureState;
+}
+
+/** One instance the process itself answers for, by the token that names it. */
+interface ProcessProvision {
+  readonly token: TokenIdentity;
+  readonly instance: unknown;
 }
 
 /** What a builder collects, shared when one is re-parameterised by its doors. */
 interface BuilderState<Rest, Trpc> {
   readonly features: DeclaredFeature[];
   readonly services: RuntimeService[];
+  /** Peers the process hands in itself, rather than by installing their module. */
+  readonly provisions: ProcessProvision[];
   hosts: FeatureTransportHosts<Rest, Trpc>;
 }
 
-/** What a process is: a role, its parsed config and its one pool (ADR-144). */
-export interface ApplicationOptions<Pool> {
+/**
+ * What a process is: a role, its parsed config, and where its members come
+ * from (ADR-144).
+ *
+ * There is no word here for which backend a store has. A store's ADDRESS is
+ * the statement - `DATABASE_URL` present means Postgres is reached, absent
+ * means every repository that needs it refuses at boot naming the module and
+ * the member - so a lost variable can never read as a decision. The only way
+ * to run a module without its stores is to say so in code, by installing it
+ * with `withMemoryRepositories`.
+ */
+export interface ApplicationOptions<Members> {
   readonly role: ServerRole;
   /** One slice per module name, for the modules that declared a config. */
   readonly config?: Readonly<Record<string, unknown>>;
-  readonly infrastructure: Pool;
+  /** Where the members come from, built by `@langwatch/infrastructure`. */
+  readonly members: MemberSource<Members>;
 }
 
-/** An application with its infrastructure named, collecting declarations. */
-export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
+/** An application with its members named, collecting declarations. */
+export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
   private readonly state: BuilderState<Rest, Trpc>;
   private readonly role: ServerRole;
   private readonly config: Readonly<Record<string, unknown>>;
-  private readonly infrastructure: Infrastructure;
+  private readonly source: MemberSource<Members>;
   readonly name: string;
 
-  constructor(options: ApplicationOptions<Infrastructure>, state?: BuilderState<Rest, Trpc>) {
+  constructor(options: ApplicationOptions<Members>, state?: BuilderState<Rest, Trpc>) {
     this.role = options.role;
     this.config = options.config ?? {};
-    this.infrastructure = options.infrastructure;
+    this.source = options.members;
     this.name = options.role;
-    this.state = state ?? { features: [], services: [], hosts: {} };
+    this.state = state ?? { features: [], services: [], provisions: [], hosts: {} };
   }
 
   /**
@@ -214,24 +249,23 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
    */
   withTransports<NextRest, NextTrpc>(
     hosts: FeatureTransportHosts<NextRest, NextTrpc>,
-  ): ApplicationBuilder<Infrastructure, NextRest, NextTrpc> {
-    return new ApplicationBuilder<Infrastructure, NextRest, NextTrpc>(
-      { role: this.role, config: this.config, infrastructure: this.infrastructure },
+  ): ApplicationBuilder<Members, NextRest, NextTrpc> {
+    return new ApplicationBuilder<Members, NextRest, NextTrpc>(
+      { role: this.role, config: this.config, members: this.source },
       { ...this.state, hosts },
     );
   }
 
   /**
-   * Every module this process installs. A module whose Infrastructure names a
+   * Every module this process installs. A module whose Members names a
    * member this pool lacks is not assignable, so the list fails to compile.
    */
-  withModules(modules: readonly InstallableServerFeature<Infrastructure>[]): this {
+  withModules(modules: readonly InstallableServerFeature<Members>[]): this {
     for (const module of modules) this.addFeature(module);
     return this;
   }
 
-  private addFeature(declaration: InstallableServerFeature<Infrastructure>): this {
-    const infrastructure = this.infrastructure;
+  private addFeature(declaration: InstallableServerFeature<Members>): this {
     this.state.features.push({
       name: declaration.name,
       transports: declaration.transports ?? [],
@@ -243,12 +277,29 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
       transportDependencies: declaration.transportDependencies,
       providers: declaration.providers,
       contributesWorkerWork: declaration.contributesWorkerWork,
-      requiredInfrastructure: declaration.requiredInfrastructure ?? [],
+      requiredMembers: declaration.members ?? [],
+      tier: declaration.tier ?? "live",
       workers: declaration.workers ?? [],
       tasks: declaration.tasks ?? [],
       eventing: declaration.eventing,
-      install: (args) => declaration.install({ ...args, infrastructure }),
+      install: (args) => declaration.install(args as FeatureInstallArguments<Members>),
     });
+    return this;
+  }
+
+  /**
+   * One peer this process answers for itself, by the token that names it.
+   *
+   * A peer is not a member: it is another module's App, and the alternative to
+   * this seam is installing that module, which installs its peers after it,
+   * down to the authorization ledger. A process that hands a peer in AND
+   * installs the module that provides it is refused by the token both claim.
+   */
+  withProvided<Instance>(token: DependencyToken<Instance>, instance: Instance): this {
+    if (this.state.provisions.some((provision) => provision.token === token)) {
+      throw new DuplicateProviderError(tokenName(token), ["the process", "the process"]);
+    }
+    this.state.provisions.push({ token, instance });
     return this;
   }
 
@@ -259,41 +310,62 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
   }
 
   /** Validates providers, allocates peer clients and constructs Apps before serving. */
-  async boot(): Promise<BootedRuntime<Infrastructure, Rest, Trpc>> {
+  async boot(): Promise<BootedRuntime<Members, Rest, Trpc>> {
     const role = this.role;
     const config = this.config;
-    const persistence = persistenceFor(this.infrastructure);
 
     const declarations = this.state.features;
-    for (const declaration of declarations) {
-      assertInfrastructure({
-        module: declaration.name,
-        members: declaration.requiredInfrastructure ?? [],
-        infrastructure: this.infrastructure,
-      });
-    }
-    assertRepositoryBackend(declarations, persistence);
+    // Everything readable off the declarations alone comes first, so a graph
+    // that cannot be built is refused before this process opens one client.
+    // Table ownership is the first of them: two modules writing the same rows
+    // is a fact about the code, not about what this deployment configured.
     assertRepositoryOwnership(
       declarations.map((declaration) => ({
         ...declaration,
         repositories: {
           ...declaration.repositories,
           ...(declaration.repositoryRegistry
-            ? selectedRepositoryOwnership(declaration.repositoryRegistry, persistence)
+            ? selectedRepositoryOwnership(declaration.repositoryRegistry, {
+                tier: declaration.tier,
+                members: {},
+              })
             : {}),
         },
       })),
     );
-    // Providers first: the same feature declared twice is reported by the token
+    // Providers next: the same feature declared twice is reported by the token
     // it claims twice, which is the thing a reader can act on. A feature that
-    // provides nothing still gets the plainer refusal below.
+    // provides nothing still gets the plainer refusal below. All of it is read
+    // off the declarations, so a graph that cannot be built is refused before
+    // this process opens a single client.
     const providerOf = this.resolveProviders(declarations);
     this.assertApiDeclarations(declarations);
     this.assertUniqueFeatures(declarations);
     this.assertEveryDependencyProvided(declarations, providerOf, role);
     const order = orderByDependency(declarations, providerOf, role);
 
-    const eventing = eventingHostFrom(this.infrastructure);
+    // Exactly the union of what every installed module declared it reads and
+    // what its chosen repository tier requires, built eagerly and in the
+    // source's own construction order. A member this process cannot supply
+    // refuses HERE, naming the module and the member, rather than on the first
+    // request that reaches it.
+    const members = buildClaimedMembers({
+      source: this.source,
+      claims: declarations.map((declaration) => ({
+        module: declaration.name,
+        members: claimedBy(declaration),
+      })),
+    });
+    const selections = new Map<string, RepositorySelection>(
+      declarations.map((declaration) => [
+        declaration.name,
+        { tier: declaration.tier, members },
+      ]),
+    );
+    // Belt and braces over the union above: a source that answered a claimed
+    // member with null built something a factory cannot use.
+    assertRepositoryBackend(declarations, selections);
+    const eventing = eventingHostFrom(eventingMemberFor(declarations, this.source));
     const scope = new ResourceScope();
     const featureServices: RuntimeService[] = [];
     const installed = new Map<string, InstalledFeatureState>();
@@ -309,11 +381,17 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
         const state = declaration.install({
           resources,
           config: config[declaration.name],
-          infrastructure: this.infrastructure,
-          persistence,
+          // Each module is handed the members it declared and nothing else, so
+          // one that never named a client cannot reach for one.
+          members: membersFor(members, declaration.requiredMembers) as Members,
+          repositorySelection: selections.get(declaration.name),
           role,
           resolve: (token) =>
-            token instanceof ModuleApiToken ? apis.reference(token) : provided.get(token),
+            provided.has(token)
+              ? provided.get(token)
+              : token instanceof ModuleApiToken
+                ? apis.reference(token)
+                : void 0,
         });
         featureServices.push(...resources.sealServices());
         this.bindProviders(declaration, state, apis, provided);
@@ -336,10 +414,10 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
       return cleanupAfterFailure(error, () => scope.close());
     }
 
-    return new BootedRuntime<Infrastructure, Rest, Trpc>(
+    return new BootedRuntime<Members, Rest, Trpc>(
       this.name,
       role,
-      this.infrastructure,
+      members as Readonly<Partial<Members>>,
       transports,
       installed,
       provided,
@@ -359,13 +437,20 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
     return this.state.hosts.rest !== undefined || this.state.hosts.trpc !== undefined;
   }
 
+  /**
+   * A reference per module-provided API token, and the instance itself for a
+   * peer the process handed in. An instance a caller made is stored as it
+   * stands: wrapping it would make a test double answer for whatever it does
+   * not implement, which is the opposite of what a double is for.
+   */
   private allocateApiClients(
     apis: LocalFeatureApis,
     providerOf: ReadonlyMap<TokenIdentity, string>,
     provided: Map<TokenIdentity, unknown>,
   ): void {
-    for (const token of providerOf.keys()) {
-      if (token instanceof ModuleApiToken) apis.declare(token);
+    for (const provision of this.state.provisions) provided.set(provision.token, provision.instance);
+    for (const [token, owner] of providerOf) {
+      if (owner !== "the process" && token instanceof ModuleApiToken) apis.declare(token);
     }
   }
 
@@ -409,6 +494,10 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
       if (token instanceof ModuleApiToken) apiOwners.set(token.name, owner);
       providerOf.set(token, owner);
     };
+    // The process's own provisions first, so a module that also claims the
+    // token is refused by the token both answer for rather than silently
+    // overwriting what the caller handed in.
+    for (const provision of this.state.provisions) register(provision.token, "the process");
     for (const declaration of declarations) {
       for (const provider of declaration.providers) {
         register(provider.token, declaration.name);
@@ -457,8 +546,47 @@ export class ApplicationBuilder<Infrastructure, Rest = never, Trpc = never> {
  * A process, named by its role and holding its config and its one pool.
  * Nothing is constructed until `boot`.
  */
-export function createApp<Pool>(options: ApplicationOptions<Pool>): ApplicationBuilder<Pool> {
-  return new ApplicationBuilder<Pool>(options);
+export function createApp<Members>(
+  options: ApplicationOptions<Members>,
+): ApplicationBuilder<Members> {
+  return new ApplicationBuilder<Members>(options);
+}
+
+/**
+ * Every member one module makes this process build: what its App declared it
+ * reads, and what the repository tier it is installed on requires.
+ *
+ * A module installed on its memory tier requires nothing, which is what makes
+ * `withMemoryRepositories` the whole of "run this without its stores": the
+ * client is never asked for, so nothing refuses and nothing is opened.
+ */
+/**
+ * The event-sourcing runtime this process holds, where it holds one.
+ *
+ * It is the one member read outside the declared union, and the one absence
+ * that is not a refusal: which log a role appends to and whether it claims the
+ * queue are role decisions carried as a collaborator rather than an address, so
+ * a role that runs no event sourcing has nothing to lose and every declaration
+ * is inert. A STORE never behaves this way - an absent address always refuses.
+ */
+function eventingMemberFor<Members>(
+  declarations: readonly DeclaredFeature[],
+  source: MemberSource<Members>,
+): Readonly<Record<string, unknown>> {
+  const named = source.order.find((member) => member === "eventing");
+  if (named === void 0) return {};
+  if (!declarations.some((declaration) => declaration.eventing)) return {};
+  try {
+    return { eventing: source.read(named) };
+  } catch {
+    return {};
+  }
+}
+
+function claimedBy(declaration: DeclaredFeature): readonly string[] {
+  const registry = declaration.repositoryRegistry;
+  const tier = registry === void 0 ? [] : repositoriesRequire(registry, declaration.tier);
+  return [...declaration.requiredMembers, ...tier];
 }
 
 /**
@@ -495,27 +623,23 @@ function roleContributions(
 }
 
 /**
- * The pool decides persistence: a pool holding a Prisma client selects the
- * postgres backend, and one without it selects the memory backend, so a test
- * and production differ by their pool and by nothing else.
+ * Every module's chosen tier has the members it requires.
+ *
+ * Nothing here infers a tier from what the process happens to hold: a module
+ * asks for the tier it was installed on and gets it or a refusal. The old
+ * `pool.prisma === undefined ? "memory" : "postgres"` is what this replaces,
+ * and it was the exact failure the design exists to delete - a lost
+ * `DATABASE_URL` read as a decision, and an API served empty lists out of
+ * memory while readiness stayed green.
  */
-function persistenceFor(
-  infrastructure: unknown,
-): Readonly<{ backend: string; infrastructure: Readonly<Record<string, unknown>> }> {
-  const pool = (infrastructure ?? {}) as Readonly<Record<string, unknown>>;
-  return Object.freeze({
-    backend: pool.prisma === undefined ? "memory" : "postgres",
-    infrastructure: pool,
-  });
-}
-
 function assertRepositoryBackend(
   declarations: readonly DeclaredFeature[],
-  persistence: Readonly<{ backend: string; infrastructure: Readonly<Record<string, unknown>> }>,
+  selections: ReadonlyMap<string, RepositorySelection>,
 ): void {
   for (const declaration of declarations) {
-    if (!declaration.repositoryRegistry) continue;
-    validateRepositorySelection(declaration.repositoryRegistry, persistence);
+    const selection = selections.get(declaration.name);
+    if (!declaration.repositoryRegistry || !selection) continue;
+    validateRepositorySelection(declaration.repositoryRegistry, selection);
   }
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp, defineModule, moduleApi, type FeatureSetup } from "../src/index.ts";
+import { memberSourceOf } from "./member-source.ts";
 import {
   assertRepositoryOwnership,
   RepositoryOwnershipConflictError,
@@ -41,7 +42,7 @@ describe("repository ownership", () => {
     "rejects conflicting ownership before any %s factory runs",
     async (role) => {
       created.mockClear();
-      const runtime = createApp({ role, infrastructure: {} }).withModules([
+      const runtime = createApp({ role, members: memberSourceOf({}) }).withModules([
         defineModule("user").withApp(UserApp).build(),
         defineModule("annotation").withApp(AnnotationApp).build(),
       ]);

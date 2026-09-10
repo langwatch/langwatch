@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/application.ts";
+import { memberSourceOf } from "./member-source.ts";
 import { moduleApi } from "../src/module-api-token.ts";
 import { defineModule, type FeatureSetup } from "../src/feature-installer.ts";
 import {
@@ -77,7 +78,7 @@ describe("given a feature whose server declares transports", () => {
         .build();
       const rest = recordingRestHost();
 
-      const runtime = await createApp({ role: "api", infrastructure: {} })
+      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest })
         .withModules([server])
         .boot();
@@ -92,7 +93,7 @@ describe("given a feature whose server declares transports", () => {
         .withTransports(catalogueTrpc)
         .build();
 
-      const runtime = await createApp({ role: "api", infrastructure: {} })
+      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
         .withTransports({ trpc: recordingTrpcHost() })
         .withModules([server])
         .boot();
@@ -108,7 +109,7 @@ describe("given a feature whose server declares transports", () => {
         .withTransports(catalogueTrpc)
         .build();
 
-      const runtime = await createApp({ role: "api", infrastructure: {} })
+      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
         .withTransports({ trpc: recordingTrpcHost() })
         .withModules([server])
         .boot();
@@ -123,7 +124,7 @@ describe("given a feature whose server declares transports", () => {
         .withTransports(catalogueRest)
         .build();
 
-      await createApp({ role: "api", infrastructure: {} })
+      await createApp({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest })
         .withModules([server])
         .boot();
@@ -140,7 +141,7 @@ describe("given a feature whose server declares transports", () => {
         .build();
 
       await expect(
-        createApp({ role: "api", infrastructure: {} })
+        createApp({ role: "api", members: memberSourceOf({}) })
           .withTransports({ rest: recordingRestHost() })
           .withModules([server])
           .boot(),
@@ -168,7 +169,7 @@ describe("given a feature whose server declares transports", () => {
         .build();
 
       await expect(
-        createApp({ role: "api", infrastructure: {} })
+        createApp({ role: "api", members: memberSourceOf({}) })
           .withTransports({ trpc: recordingTrpcHost() })
           .withModules([dataset, monitor])
           .boot(),
@@ -184,7 +185,7 @@ describe("given a feature whose server declares transports", () => {
         .build();
       const rest = recordingRestHost();
 
-      const runtime = await createApp({ role: "worker", infrastructure: {} })
+      const runtime = await createApp({ role: "worker", members: memberSourceOf({}) })
         .withTransports({ rest })
         .withModules([server])
         .boot();

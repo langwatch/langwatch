@@ -17,15 +17,13 @@
  * that boots and answers empty lists.
  */
 import { snapshotRepositories } from "./repository-ownership.ts";
+import type { Tier } from "./tiers.ts";
 
 type RepositoryProvider = Readonly<{
   readonly requires: readonly string[];
   readonly create: (...arguments_: never[]) => unknown;
   readonly repositories?: import("./repository-ownership.ts").FeatureRepositories;
 }>;
-
-/** Whether a process reaches live stores. It never names a database. */
-export type RepositoryTier = "live" | "memory";
 
 /** The tiers a registry must declare, both of them. */
 export interface RepositoryTiers<Live extends RepositoryProvider, Memory extends RepositoryProvider> {
@@ -74,7 +72,7 @@ type ValidProvider<Provider> =
 
 /** Which tier a process asked for, and the members that tier may read. */
 export type RepositorySelection = Readonly<{
-  readonly tier: RepositoryTier;
+  readonly tier: Tier;
   readonly members: Readonly<Record<string, unknown>>;
 }>;
 
@@ -96,9 +94,9 @@ export type RepositoryRegistry<
 export type AnyRepositoryRegistry = RepositoryRegistry<RepositoryProvider, RepositoryProvider>;
 
 /** The repositories one tier of a registry hands a module. */
-export type RepositoriesFor<Registry, Tier extends RepositoryTier> =
+export type RepositoriesFor<Registry, Selected extends Tier> =
   Registry extends RepositoryRegistry<infer Live, infer Memory>
-    ? Tier extends "live"
+    ? Selected extends "live"
       ? ProviderResult<Live>
       : ProviderResult<Memory>
     : never;
@@ -140,25 +138,25 @@ function freezeProvider<Provider extends RepositoryProvider>(provider: Provider)
 export function instantiateRepositories<
   Live extends RepositoryProvider,
   Memory extends RepositoryProvider,
-  Tier extends RepositoryTier,
+  Selected extends Tier,
 >(
   registry: RepositoryRegistry<Live, Memory>,
-  selection: RepositorySelection & Readonly<{ tier: Tier }>,
-): RepositoriesFor<RepositoryRegistry<Live, Memory>, Tier> {
+  selection: RepositorySelection & Readonly<{ tier: Selected }>,
+): RepositoriesFor<RepositoryRegistry<Live, Memory>, Selected> {
   validateRepositorySelection(registry, selection);
   const provider = registry.definitions[selection.tier];
   const members: Record<string, unknown> = {};
   for (const key of provider.requires) members[key] = selection.members[key];
   return Reflect.apply(provider.create, provider, [members]) as RepositoriesFor<
     RepositoryRegistry<Live, Memory>,
-    Tier
+    Selected
   >;
 }
 
 /** Every member the chosen tier reads, for the union boot builds up front. */
 export function repositoriesRequire(
   registry: AnyRepositoryRegistry,
-  tier: RepositoryTier,
+  tier: Tier,
 ): readonly string[] {
   return registry.definitions[tier].requires;
 }

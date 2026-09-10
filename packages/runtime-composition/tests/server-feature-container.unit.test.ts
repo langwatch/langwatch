@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
+import { memberSourceOf } from "./member-source.ts";
 import {
   DependencyCycleError,
   DuplicateProviderError,
@@ -38,7 +39,7 @@ abstract class DirectoryService {
   abstract nameOf(id: string): string;
 }
 
-type TestInfrastructure = Readonly<{ prefix: string }>;
+type TestMembers = Readonly<{ prefix: string }>;
 
 class Greeting extends GreetingService {
   constructor(private readonly prefix: string) {
@@ -57,10 +58,11 @@ class Directory extends DirectoryService {
 }
 
 function greetingFeature(setup = vi.fn()) {
-  return serverFeature<TestInfrastructure>("greeting")
-    .withSetup(({ infrastructure }) => {
+  return serverFeature<TestMembers>("greeting")
+    .withMembers("prefix")
+    .withSetup(({ members }) => {
       setup();
-      return { greeting: new Greeting(infrastructure.prefix) };
+      return { greeting: new Greeting(members.prefix) };
     })
     .provides(GreetingApp)
     .withTransport(({ provided }) => ({ door: { greeting: provided.greeting } }))
@@ -77,7 +79,7 @@ describe("the server feature container", () => {
     it("constructs nothing until boot", async () => {
       const setup = vi.fn();
       const declaration = greetingFeature(setup);
-      const application = createApp({ role: "api", infrastructure: { prefix: "a" } })
+      const application = createApp({ role: "api", members: memberSourceOf({ prefix: "a" }) })
         .withModules([declaration]);
 
       expect(setup).not.toHaveBeenCalled();
@@ -86,34 +88,38 @@ describe("the server feature container", () => {
       expect(setup).toHaveBeenCalledOnce();
     });
 
-    it("hands every module the one pool the process holds", async () => {
-      const declaration = serverFeature<TestInfrastructure>("isolated")
-        .withSetup(({ infrastructure }) => ({ value: infrastructure.prefix }))
+    it("hands a module the members it named and nothing else", async () => {
+      const declaration = serverFeature<TestMembers>("isolated")
+        .withMembers("prefix")
+        .withSetup(({ members }) => ({ value: members.prefix }))
         .build();
 
-      const processInfrastructure = { prefix: "process" };
-      const booted = await createApp({ role: "worker", infrastructure: processInfrastructure })
+      const booted = await createApp({
+        role: "worker",
+        members: memberSourceOf({ prefix: "process", unread: "never built" }),
+      })
         .withModules([declaration])
         .boot();
 
-      expect(booted.infrastructure).toBe(processInfrastructure);
+      // The process could build `unread`, and does not: nothing asked for it.
+      expect(booted.members).toEqual({ prefix: "process" });
       expect(booted.module(declaration).provided.value).toBe("process");
     });
 
     it("parses the feature's own config slice and refuses one that does not match", async () => {
-      const declaration = serverFeature<TestInfrastructure>("limits")
+      const declaration = serverFeature<TestMembers>("limits")
         .withConfig(limitsSchema)
         .withSetup(({ config }) => ({ maximum: config.maximum }))
         .build();
 
-      const booted = await createApp({ role: "api", config: { limits: { maximum: 3 } }, infrastructure: { prefix: "a" } })
+      const booted = await createApp({ role: "api", config: { limits: { maximum: 3 } }, members: memberSourceOf({ prefix: "a" }) })
         .withModules([declaration])
         .boot();
       expect(booted.module(declaration).provided.maximum).toBe(3);
 
       await expect(
         Promise.resolve().then(() =>
-          createApp({ role: "api", config: { limits: { maximum: "three" } }, infrastructure: { prefix: "a" } })
+          createApp({ role: "api", config: { limits: { maximum: "three" } }, members: memberSourceOf({ prefix: "a" }) })
             .withModules([declaration])
             .boot(),
         ),
@@ -122,7 +128,7 @@ describe("the server feature container", () => {
   });
 
   it("rejects a second provider instead of replacing the public app", () => {
-    const declaration = serverFeature<TestInfrastructure>("greeting")
+    const declaration = serverFeature<TestMembers>("greeting")
       .withSetup(() => ({ greeting: new Greeting("one") }))
       .provides(GreetingApp);
 
@@ -134,14 +140,14 @@ describe("the server feature container", () => {
   it("installs a task app without resolving or constructing role-only contributions", async () => {
     const transport = vi.fn();
     const worker = vi.fn();
-    const declaration = serverFeature<TestInfrastructure>("greeting")
+    const declaration = serverFeature<TestMembers>("greeting")
       .withTransportDependencies({ directory: DirectoryApp })
       .withSetup(() => ({ greeting: new Greeting("task") }))
       .provides(GreetingApp)
       .withTransport(transport)
       .withWorker(worker)
       .build();
-    const runtime = await createApp({ role: "tasks", infrastructure: { prefix: "task" } })
+    const runtime = await createApp({ role: "tasks", members: memberSourceOf({ prefix: "task" }) })
       .withModules([declaration])
       .boot();
 
@@ -159,7 +165,7 @@ describe("the server feature container", () => {
       const declaration = greetingFeature(setup);
 
       const boot = Promise.resolve().then(() =>
-        createApp({ role: "api", infrastructure: { prefix: "a" } })
+        createApp({ role: "api", members: memberSourceOf({ prefix: "a" }) })
           .withModules([declaration, declaration])
           .boot(),
       );
@@ -176,7 +182,7 @@ describe("the server feature container", () => {
     /** @scenario "A feature whose dependency nobody provides never serves" */
     it("fails the boot naming the feature, the dependency key and the token, and serves nothing", async () => {
       const setup = vi.fn();
-      const declaration = serverFeature<TestInfrastructure>("queue")
+      const declaration = serverFeature<TestMembers>("queue")
         .withDependencies({ directory: DirectoryApp })
         .withSetup(({ dependencies }) => {
           setup();
@@ -185,7 +191,7 @@ describe("the server feature container", () => {
         .build();
 
       const boot = Promise.resolve().then(() =>
-        createApp({ role: "api", infrastructure: { prefix: "a" } })
+        createApp({ role: "api", members: memberSourceOf({ prefix: "a" }) })
           .withModules([declaration])
           .boot(),
       );
@@ -202,12 +208,12 @@ describe("the server feature container", () => {
 
   describe("when features depend on each other", () => {
     it("refuses the boot naming the cycle", async () => {
-      const first = serverFeature<TestInfrastructure>("first")
+      const first = serverFeature<TestMembers>("first")
         .withDependencies({ directory: DirectoryApp })
         .withSetup(() => ({ greeting: new Greeting("first") }))
         .provides(GreetingApp)
         .build();
-      const second = serverFeature<TestInfrastructure>("second")
+      const second = serverFeature<TestMembers>("second")
         .withDependencies({ greeting: GreetingApp })
         .withSetup(() => ({ directory: new Directory() }))
         .provides(DirectoryApp)
@@ -215,7 +221,7 @@ describe("the server feature container", () => {
 
       const error = await Promise.resolve()
         .then(() =>
-          createApp({ role: "api", infrastructure: { prefix: "a" } })
+          createApp({ role: "api", members: memberSourceOf({ prefix: "a" }) })
             .withModules([first, second])
             .boot(),
         )
@@ -227,14 +233,14 @@ describe("the server feature container", () => {
 
     it("constructs a provider before the feature that depends on it", async () => {
       const order: string[] = [];
-      const directory = serverFeature<TestInfrastructure>("directory")
+      const directory = serverFeature<TestMembers>("directory")
         .withSetup(() => {
           order.push("directory");
           return { directory: new Directory() };
         })
         .provides(DirectoryApp)
         .build();
-      const queue = serverFeature<TestInfrastructure>("queue")
+      const queue = serverFeature<TestMembers>("queue")
         .withDependencies({ directory: DirectoryApp })
         .withSetup(() => {
           order.push("queue");
@@ -242,7 +248,7 @@ describe("the server feature container", () => {
         })
         .build();
 
-      await createApp({ role: "api", infrastructure: { prefix: "a" } })
+      await createApp({ role: "api", members: memberSourceOf({ prefix: "a" }) })
         .withModules([queue, directory])
         .boot();
 
@@ -253,12 +259,12 @@ describe("the server feature container", () => {
   describe("when a role does not host a contribution", () => {
     it("selects API contributions from a shared API and worker declaration", async () => {
       const worker = vi.fn(() => ({ consumers: ["index-traces"] }));
-      const declaration = serverFeature<TestInfrastructure>("indexing")
+      const declaration = serverFeature<TestMembers>("indexing")
         .withSetup(() => ({}))
         .withRest(() => ({ route: "/index" }))
         .withWorker(worker)
         .build();
-      const runtime = await createApp({ role: "api", infrastructure: { prefix: "a" } })
+      const runtime = await createApp({ role: "api", members: memberSourceOf({ prefix: "a" }) })
         .withModules([declaration])
         .boot();
 
@@ -268,13 +274,13 @@ describe("the server feature container", () => {
     });
 
     it("installs the same feature in the worker role without its transport dependencies", async () => {
-      const declaration = serverFeature<TestInfrastructure>("indexing")
+      const declaration = serverFeature<TestMembers>("indexing")
         .withTransportDependencies({ directory: DirectoryApp })
         .withSetup(() => ({ indexed: true }))
         .withWorker(() => ({ consumers: ["index-traces"] }))
         .build();
 
-      const booted = await createApp({ role: "worker", infrastructure: { prefix: "a" } })
+      const booted = await createApp({ role: "worker", members: memberSourceOf({ prefix: "a" }) })
         .withModules([declaration])
         .boot();
 
@@ -285,14 +291,14 @@ describe("the server feature container", () => {
   describe("when a boot fails part way", () => {
     it("closes what it already constructed, in reverse order", async () => {
       const closed: string[] = [];
-      const directory = serverFeature<TestInfrastructure>("directory")
+      const directory = serverFeature<TestMembers>("directory")
         .withSetup(() => ({ directory: new Directory() }))
         .provides(DirectoryApp)
         .withClose(() => {
           closed.push("directory");
         })
         .build();
-      const failing = serverFeature<TestInfrastructure>("failing")
+      const failing = serverFeature<TestMembers>("failing")
         .withDependencies({ directory: DirectoryApp })
         .withSetup(() => {
           throw new Error("no index storage");
@@ -301,7 +307,7 @@ describe("the server feature container", () => {
 
       await expect(
         Promise.resolve().then(() =>
-          createApp({ role: "api", infrastructure: { prefix: "a" } })
+          createApp({ role: "api", members: memberSourceOf({ prefix: "a" }) })
             .withModules([directory, failing])
             .boot(),
         ),
@@ -313,14 +319,14 @@ describe("the server feature container", () => {
   describe("when the runtime stops", () => {
     it("stops its services before releasing the features they used", async () => {
       const phases: string[] = [];
-      const declaration = serverFeature<TestInfrastructure>("directory")
+      const declaration = serverFeature<TestMembers>("directory")
         .withSetup(() => ({ directory: new Directory() }))
         .withClose(() => {
           phases.push("feature closed");
         })
         .build();
 
-      const booted = await createApp({ role: "worker", infrastructure: { prefix: "a" } })
+      const booted = await createApp({ role: "worker", members: memberSourceOf({ prefix: "a" }) })
         .withService({
           name: "consumers",
           start: () => {
@@ -345,7 +351,7 @@ describe("the server feature container", () => {
     it("answers both contributions from the single service the setup constructed", async () => {
       const setup = vi.fn();
       const declaration = greetingFeature(setup);
-      const booted = await createApp({ role: "api", infrastructure: { prefix: "one" } })
+      const booted = await createApp({ role: "api", members: memberSourceOf({ prefix: "one" }) })
         .withModules([declaration])
         .boot();
 
@@ -366,7 +372,7 @@ describe("runtime failure ownership", () => {
       .withSetup(() => ({}))
       .withWorker(worker)
       .build();
-    const runtime = await createApp({ role: "worker", infrastructure: {} })
+    const runtime = await createApp({ role: "worker", members: memberSourceOf({}) })
       .withModules([feature])
       .boot();
     expect(worker).toHaveBeenCalledOnce();
@@ -405,7 +411,7 @@ describe("runtime failure ownership", () => {
         })
         .build();
       await expect(
-        createApp({ role: "api", infrastructure: {} })
+        createApp({ role: "api", members: memberSourceOf({}) })
           .withModules([first, failing])
           .boot(),
       ).rejects.toBe(failure);
@@ -428,7 +434,7 @@ describe("runtime failure ownership", () => {
         throw failure;
       })
       .build();
-    const error = await createApp({ role: "tasks", infrastructure: {} })
+    const error = await createApp({ role: "tasks", members: memberSourceOf({}) })
       .withModules([feature])
       .boot()
       .catch((error: unknown) => error);
@@ -439,7 +445,7 @@ describe("runtime failure ownership", () => {
 
   it("serialises concurrent starts and stops and closes each resource once", async () => {
     const phases: string[] = [];
-    const runtime = await createApp({ role: "api", infrastructure: {} })
+    const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
       .withService({
         name: "listener",
         start: async () => {
@@ -470,7 +476,7 @@ describe("runtime failure ownership", () => {
         phases.push("resources");
       })
       .build();
-    const runtime = await createApp({ role: "api", infrastructure: {} })
+    const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
       .withService({
         name: "first",
         start: () => {
@@ -512,7 +518,7 @@ describe("runtime failure ownership", () => {
         throw new Error("resource");
       })
       .build();
-    const runtime = await createApp({ role: "api", infrastructure: {} })
+    const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
       .withService({
         name: "first",
         start: () => {},

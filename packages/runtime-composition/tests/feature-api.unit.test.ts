@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/application.ts";
+import { memberSourceOf } from "./member-source.ts";
 import { LocalFeatureApis } from "../src/local-feature-api.ts";
 import {
   DuplicateProviderError,
@@ -128,15 +129,28 @@ describe("process-owned feature references", () => {
   });
 });
 
-interface Infrastructure {
+/**
+ * The members these two modules read. Every one is always supplied, because a
+ * module is handed exactly what it declared and boot refuses a name this
+ * process cannot answer - which is the behaviour, not an inconvenience.
+ */
+interface DeclaredMembers {
+  events: string[];
+  inspectPeer: boolean;
+  failOrganization: Error | null;
+}
+
+/** What one test states about the run, before the harness completes it. */
+type Harness = Readonly<{
   events: string[];
   inspectPeer?: boolean;
   failOrganization?: Error;
-}
+}>;
 
 class ProjectApp implements ProjectApi {
   static readonly contract = ProjectApi;
   static readonly dependencies = { organizations: OrganizationApi };
+  static readonly reads = ["events", "inspectPeer", "failOrganization"] as const;
   readonly #label = "project";
 
   readonly #organizations: OrganizationApi;
@@ -147,12 +161,12 @@ class ProjectApp implements ProjectApi {
 
   static create({
     dependencies,
-    infrastructure,
+    members,
     resources,
-  }: FeatureSetup<typeof ProjectApp.dependencies, Infrastructure, undefined>) {
-    infrastructure.events.push("create:project");
+  }: FeatureSetup<typeof ProjectApp.dependencies, DeclaredMembers, undefined>) {
+    members.events.push("create:project");
     resources.own("project", () => {
-      infrastructure.events.push("close:project");
+      members.events.push("close:project");
     });
     return new ProjectApp(dependencies.organizations);
   }
@@ -177,6 +191,7 @@ class ProjectApp implements ProjectApi {
 class OrganizationApp implements OrganizationApi {
   static readonly contract = OrganizationApi;
   static readonly dependencies = { projects: ProjectApi };
+  static readonly reads = ["events", "inspectPeer", "failOrganization"] as const;
   readonly #projects: ProjectApi;
 
   private constructor(projects: ProjectApi) {
@@ -185,17 +200,17 @@ class OrganizationApp implements OrganizationApi {
 
   static create({
     dependencies,
-    infrastructure,
+    members,
     resources,
-  }: FeatureSetup<typeof OrganizationApp.dependencies, Infrastructure, undefined>) {
-    infrastructure.events.push("create:organization");
+  }: FeatureSetup<typeof OrganizationApp.dependencies, DeclaredMembers, undefined>) {
+    members.events.push("create:organization");
     resources.own("organization", () => {
-      infrastructure.events.push("close:organization");
+      members.events.push("close:organization");
     });
-    if (infrastructure.inspectPeer) {
+    if (members.inspectPeer) {
       Reflect.get(dependencies.projects, "name");
     }
-    if (infrastructure.failOrganization) throw infrastructure.failOrganization;
+    if (members.failOrganization) throw members.failOrganization;
     return new OrganizationApp(dependencies.projects);
   }
 
@@ -210,8 +225,17 @@ class OrganizationApp implements OrganizationApi {
 const project = defineModule("project").withApp(ProjectApp).build();
 const organization = defineModule("organization").withApp(OrganizationApp).build();
 
-function graph(infrastructure: Infrastructure, reversed = false, role: ServerRole = "api") {
-  const builder = createApp({ role, infrastructure });
+/** Every member these modules declared, so the process can answer all of them. */
+function processMembers(harness: Harness = { events: [] }) {
+  return memberSourceOf<DeclaredMembers>({
+    events: harness.events,
+    inspectPeer: harness.inspectPeer ?? false,
+    failOrganization: harness.failOrganization ?? null,
+  });
+}
+
+function graph(harness: Harness, reversed = false, role: ServerRole = "api") {
+  const builder = createApp({ role, members: processMembers(harness) });
   return builder.withModules(reversed ? [organization, project] : [project, organization]);
 }
 
@@ -264,7 +288,7 @@ describe("feature APIs", () => {
       .provides(ProjectApi)
       .build();
     await expect(
-      createApp({ role: "api", infrastructure: {} })
+      createApp({ role: "api", members: memberSourceOf({}) })
         .withModules([legacy])
         .boot(),
     ).rejects.toThrow("defineModule().withApp()");
@@ -331,7 +355,7 @@ describe("feature APIs", () => {
   it("rejects a missing API before constructing anything", async () => {
     const events: string[] = [];
     await expect(
-      createApp({ role: "api", infrastructure: { events } })
+      createApp({ role: "api", members: processMembers({ events }) })
         .withModules([project])
         .boot(),
     ).rejects.toBeInstanceOf(MissingProviderError);
@@ -396,7 +420,7 @@ describe("feature APIs", () => {
         throw error;
       },
     };
-    const builder = createApp({ role: "api", infrastructure: { events: [] } }).withModules([
+    const builder = createApp({ role: "api", members: processMembers() }).withModules([
       project,
       defineModule("project").withApp(ProjectApp).build(),
     ]);
@@ -408,7 +432,7 @@ describe("feature APIs", () => {
     const declaration = defineModule("organization").withApp(ProjectApp).build();
 
     await expect(
-      createApp({ role: "api", infrastructure: { events } })
+      createApp({ role: "api", members: processMembers({ events }) })
         .withModules([declaration])
         .boot(),
     ).rejects.toThrow('cannot provide API "project"');

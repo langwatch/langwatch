@@ -61,9 +61,10 @@ export interface EventingHost {
 }
 
 /**
- * The eventing runtime on a pool, or nothing. Read by name, the way
- * persistence reads `prisma`: a module never names the member, so a process
- * that runs no event sourcing declares none and every declaration is inert.
+ * The eventing runtime a process holds, or nothing. Read by name, the way a
+ * repository tier reads `prisma`: a module never names the member, so a
+ * process that runs no event sourcing declares none and every declaration is
+ * inert.
  */
 export function eventingHostFrom(pool: unknown): EventingHost | undefined {
   if (typeof pool !== "object" || pool === null) return void 0;

@@ -60,6 +60,29 @@ export {
 } from "./unit-shard-hard-floor.ts";
 export { createWeigher, loadDurationManifest, type DurationManifest } from "./shard-weights.ts";
 export { scanTestSourceForUnsafeDeleteMany, type TeardownViolation } from "./teardown-scan.ts";
+export {
+  frozenAt,
+  memoryCache,
+  memoryIdempotency,
+  memoryObjectStorage,
+  memoryRateLimiter,
+  recordingMail,
+  recordingTelemetry,
+  type Cache,
+  type Clock,
+  type FrozenClock,
+  type IdempotencyStore,
+  type Mail,
+  type MailMessage,
+  type ObjectStorage,
+  type RateLimiter,
+  type RecordedMetric,
+  type RecordingMail,
+  type RecordingTelemetry,
+  type StoredObject,
+  type StoredObjectAddress,
+  type Telemetry,
+} from "./member-doubles.ts";
 export { createTestAuditSink, type TestAuditRow, type TestAuditSink } from "./test-audit-sink.ts";
 export { createTestLogger, type TestLogLine, type TestLogLines } from "./test-logger.ts";
 export { allowConsole } from "./console-guard.ts";

@@ -14,6 +14,11 @@ packages:
   - "apps/*"
   - "packages/*"
   - "modules/*/*"
+  # The generated statement of what this build installs: the server and web
+  # module lists and the members each module declared. It is a package rather
+  # than three loose files so the lists resolve the module packages they name
+  # and a renamed export fails to compile.
+  - "modules"
   - "enterprise"
   - "enterprise/packages/composition/*"
   - "enterprise/packages/plan-gate"

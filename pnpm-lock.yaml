@@ -3226,6 +3226,145 @@ importers:
         specifier: 'catalog:'
         version: 5.0.0(zod@4.4.3)
 
+  modules:
+    dependencies:
+      '@langwatch/agent-server':
+        specifier: workspace:*
+        version: link:agent/server
+      '@langwatch/analytics-server':
+        specifier: workspace:*
+        version: link:analytics/server
+      '@langwatch/annotation-server':
+        specifier: workspace:*
+        version: link:annotation/server
+      '@langwatch/api-key-server':
+        specifier: workspace:*
+        version: link:api-key/server
+      '@langwatch/auth-server':
+        specifier: workspace:*
+        version: link:auth/server
+      '@langwatch/authz-server':
+        specifier: workspace:*
+        version: link:authz/server
+      '@langwatch/automation-server':
+        specifier: workspace:*
+        version: link:automation/server
+      '@langwatch/coding-agent-server':
+        specifier: workspace:*
+        version: link:coding-agent/server
+      '@langwatch/dashboard-server':
+        specifier: workspace:*
+        version: link:dashboard/server
+      '@langwatch/data-privacy-server':
+        specifier: workspace:*
+        version: link:data-privacy/server
+      '@langwatch/data-retention-server':
+        specifier: workspace:*
+        version: link:data-retention/server
+      '@langwatch/dataset-server':
+        specifier: workspace:*
+        version: link:dataset/server
+      '@langwatch/entitlement-server':
+        specifier: workspace:*
+        version: link:entitlement/server
+      '@langwatch/evaluation-server':
+        specifier: workspace:*
+        version: link:evaluation/server
+      '@langwatch/evaluator-server':
+        specifier: workspace:*
+        version: link:evaluator/server
+      '@langwatch/experiment-server':
+        specifier: workspace:*
+        version: link:experiment/server
+      '@langwatch/feature-flag-server':
+        specifier: workspace:*
+        version: link:feature-flag/server
+      '@langwatch/gateway-server':
+        specifier: workspace:*
+        version: link:gateway/server
+      '@langwatch/github-server':
+        specifier: workspace:*
+        version: link:github/server
+      '@langwatch/hosted-mcp-server':
+        specifier: workspace:*
+        version: link:hosted-mcp/server
+      '@langwatch/identity-server':
+        specifier: workspace:*
+        version: link:identity/server
+      '@langwatch/langy-server':
+        specifier: workspace:*
+        version: link:langy/server
+      '@langwatch/log-server':
+        specifier: workspace:*
+        version: link:log/server
+      '@langwatch/metric-server':
+        specifier: workspace:*
+        version: link:metric/server
+      '@langwatch/model-provider-server':
+        specifier: workspace:*
+        version: link:model-provider/server
+      '@langwatch/monitor-server':
+        specifier: workspace:*
+        version: link:monitor/server
+      '@langwatch/notification-server':
+        specifier: workspace:*
+        version: link:notification/server
+      '@langwatch/ops-server':
+        specifier: workspace:*
+        version: link:ops/server
+      '@langwatch/organization-server':
+        specifier: workspace:*
+        version: link:organization/server
+      '@langwatch/platform-health-server':
+        specifier: workspace:*
+        version: link:platform-health/server
+      '@langwatch/presence-server':
+        specifier: workspace:*
+        version: link:presence/server
+      '@langwatch/project-server':
+        specifier: workspace:*
+        version: link:project/server
+      '@langwatch/prompt-server':
+        specifier: workspace:*
+        version: link:prompt/server
+      '@langwatch/role-server':
+        specifier: workspace:*
+        version: link:role/server
+      '@langwatch/scenario-server':
+        specifier: workspace:*
+        version: link:scenario/server
+      '@langwatch/secret-server':
+        specifier: workspace:*
+        version: link:secret/server
+      '@langwatch/share-server':
+        specifier: workspace:*
+        version: link:share/server
+      '@langwatch/stored-object-server':
+        specifier: workspace:*
+        version: link:stored-object/server
+      '@langwatch/suite-server':
+        specifier: workspace:*
+        version: link:suite/server
+      '@langwatch/topic-server':
+        specifier: workspace:*
+        version: link:topic/server
+      '@langwatch/trace-server':
+        specifier: workspace:*
+        version: link:trace/server
+      '@langwatch/user-server':
+        specifier: workspace:*
+        version: link:user/server
+      '@langwatch/webhook-server':
+        specifier: workspace:*
+        version: link:webhook/server
+      '@langwatch/workflow-server':
+        specifier: workspace:*
+        version: link:workflow/server
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
   modules/agent/contract:
     dependencies:
       '@langwatch/api':
@@ -11711,12 +11850,21 @@ importers:
 
   packages/infrastructure:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: 'catalog:'
+        version: 3.1108.0
+      '@clickhouse/client':
+        specifier: 'catalog:'
+        version: 1.23.0
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../clickhouse-client
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../eventing
+      '@langwatch/mail':
+        specifier: workspace:*
+        version: link:../mail
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability

@@ -10,6 +10,7 @@ const installer = resolve(root, "src/feature-installer.ts");
 const application = resolve(root, "src/application.ts");
 const contract = resolve(root, "src/module-api-token.ts");
 const repositoryRegistry = resolve(root, "src/repository-registry.ts");
+const memberSource = resolve(root, "tests/member-source.ts");
 const tsc = resolve(root, "node_modules/.bin/tsc");
 type Diagnostic = { line: number; code: string; text: string };
 
@@ -23,7 +24,8 @@ function diagnosticsFor(source: string): Diagnostic[] {
       .replaceAll("__INSTALLER__", installer)
       .replaceAll("__APPLICATION__", application)
       .replaceAll("__CONTRACT__", contract)
-      .replaceAll("__REPOSITORY_REGISTRY__", repositoryRegistry),
+      .replaceAll("__REPOSITORY_REGISTRY__", repositoryRegistry)
+      .replaceAll("__MEMBERS__", memberSource),
   );
   writeFileSync(
     config,
@@ -75,6 +77,7 @@ describe("defineModule compiler diagnostics", () => {
   it("accepts a valid declaration and matching root", () => {
     const diagnostics = diagnosticsFor(`
       import { createApp } from "__APPLICATION__";
+      import { memberSourceOf } from "__MEMBERS__";
       import { defineModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
       class App extends Contract {
@@ -84,7 +87,7 @@ describe("defineModule compiler diagnostics", () => {
         static create(setup: FeatureSetup<{}, {}, undefined>): App { return new App(); }
       }
       const feature = defineModule("annotation").withApp(App).build();
-      createApp({ role: "api", infrastructure: {} })
+      createApp({ role: "api", members: memberSourceOf({}) })
         .withModules([feature]);
     `);
     expect(diagnostics).toEqual([]);
@@ -94,6 +97,7 @@ describe("defineModule compiler diagnostics", () => {
     expect(
       diagnosticsFor(`
       import { createApp } from "__APPLICATION__";
+      import { memberSourceOf } from "__MEMBERS__";
       import { defineModule, type FeatureSetup } from "__INSTALLER__";
       import { moduleApi } from "__CONTRACT__";
       interface ProjectApi { name(): string; }
@@ -111,7 +115,7 @@ describe("defineModule compiler diagnostics", () => {
         projectName(): string { return this.#projects.name(); }
       }
       const feature = defineModule("annotation").withApp(App).build();
-      createApp({ role: "api", infrastructure: {} })
+      createApp({ role: "api", members: memberSourceOf({}) })
         .withModules([feature]);
     `),
     ).toEqual([]);
@@ -204,11 +208,15 @@ describe("defineModule compiler diagnostics", () => {
       "TS2322",
       `
       import { defineRepositories } from "__REPOSITORY_REGISTRY__";
-      class PostgresRepositories {
+      class LiveRepositories {
         static readonly requires = ["prisma"] as const;
-        static create({ connection }: { connection: object }) { return { value: "postgres" }; }
+        static create({ connection }: { connection: object }) { return { value: "live" }; }
       }
-      defineRepositories({ postgres: PostgresRepositories }); // EXPECT
+      class MemoryRepositories {
+        static readonly requires = [] as const;
+        static create() { return { value: "memory" }; }
+      }
+      defineRepositories({ live: LiveRepositories, memory: MemoryRepositories }); // EXPECT
     `,
     ],
     [
@@ -216,11 +224,15 @@ describe("defineModule compiler diagnostics", () => {
       "TS2322",
       `
       import { defineRepositories } from "__REPOSITORY_REGISTRY__";
-      class PostgresRepositories {
+      class LiveRepositories {
         static readonly requires = ["prisma"] as const;
         static create({ prisma }: { prisma: object }, retry: number) { return { value: prisma, retry }; }
       }
-      defineRepositories({ postgres: PostgresRepositories }); // EXPECT
+      class MemoryRepositories {
+        static readonly requires = [] as const;
+        static create() { return { value: "memory" }; }
+      }
+      defineRepositories({ live: LiveRepositories, memory: MemoryRepositories }); // EXPECT
     `,
     ],
     [
@@ -230,15 +242,15 @@ describe("defineModule compiler diagnostics", () => {
       import { defineModule, type FeatureSetup } from "__INSTALLER__";
       import { defineRepositories } from "__REPOSITORY_REGISTRY__";
       type Repositories = { value: { read(): string } };
-      class PostgresRepositories {
+      class LiveRepositories {
         static readonly requires = [] as const;
-        static create(): Repositories { return { value: { read: () => "postgres" } }; }
+        static create(): Repositories { return { value: { read: () => "live" } }; }
       }
       class MemoryRepositories {
         static readonly requires = [] as const;
         static create() { return { wrong: true }; }
       }
-      const repositories = defineRepositories({ postgres: PostgresRepositories, memory: MemoryRepositories });
+      const repositories = defineRepositories({ live: LiveRepositories, memory: MemoryRepositories });
       class App {
         static readonly contract = App;
         static readonly dependencies = {};
@@ -253,16 +265,17 @@ describe("defineModule compiler diagnostics", () => {
     expectOnlyDiagnostic(source, code);
   });
 
-  /** @scenario A pool that lacks a member an installed module names */
-  it("rejects a module list whose pool lacks a member a module names", () => {
+  /** @scenario "A member an installed module names that this process cannot supply" */
+  it("rejects a module list whose members lack one a module names", () => {
     expectOnlyDiagnostic(
       `
       import { createApp } from "__APPLICATION__";
+      import { memberSourceOf } from "__MEMBERS__";
       import { defineModule, type FeatureSetup } from "__INSTALLER__";
       abstract class Contract { abstract readonly value: string; }
-      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value: string; constructor(value: string) { super(); this.value = value; } static create(setup: FeatureSetup<{}, { suffix: string }, undefined>): App { return new App(setup.infrastructure.suffix); } }
+      class App extends Contract { static readonly contract = Contract; static readonly dependencies = {}; readonly value: string; constructor(value: string) { super(); this.value = value; } static create(setup: FeatureSetup<{}, { suffix: string }, undefined>): App { return new App(setup.members.suffix); } }
       const feature = defineModule("annotation").withApp(App).build();
-      createApp({ role: "api", infrastructure: {} })
+      createApp({ role: "api", members: memberSourceOf({}) })
         .withModules([feature]); // EXPECT
     `,
       "TS2322",

@@ -1,18 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
+import { memberSourceOf } from "./member-source.ts";
 import { defineModule, type FeatureSetup } from "../src/feature-installer.ts";
 
 abstract class DirectoryApp {
   abstract readonly name: string;
 }
 
-type Infrastructure = Readonly<{ prefix: string }>;
+type DeclaredMembers = Readonly<{ prefix: string }>;
 type Config = Readonly<{ suffix: string }>;
 
 class ComposedDirectoryApp extends DirectoryApp {
   static readonly contract = DirectoryApp;
   static readonly dependencies = {};
+  /** The one member this app reads, and therefore the only one boot builds. */
+  static readonly reads = ["prefix"] as const;
   static readonly configSchema = {
     parse(value: unknown): Config {
       if (!value || typeof value !== "object" || !("suffix" in value)) {
@@ -27,9 +30,9 @@ class ComposedDirectoryApp extends DirectoryApp {
   }
 
   static create(
-    setup: FeatureSetup<typeof ComposedDirectoryApp.dependencies, Infrastructure, Config>,
+    setup: FeatureSetup<typeof ComposedDirectoryApp.dependencies, DeclaredMembers, Config>,
   ): ComposedDirectoryApp {
-    return new ComposedDirectoryApp(`${setup.infrastructure.prefix}${setup.config.suffix}`);
+    return new ComposedDirectoryApp(`${setup.members.prefix}${setup.config.suffix}`);
   }
 }
 
@@ -45,7 +48,7 @@ const directoryWithTransports = defineModule("annotation")
 
 describe("defineModule", () => {
   it("constructs the declared app once during boot and publishes its contract", async () => {
-    const runtime = await createApp({ role: "api", config: { annotation: { suffix: "directory" } }, infrastructure: { prefix: "tenant-" } })
+    const runtime = await createApp({ role: "api", config: { annotation: { suffix: "directory" } }, members: memberSourceOf({ prefix: "tenant-" }) })
       .withModules([directoryServer])
       .boot();
 
@@ -64,7 +67,7 @@ describe("defineModule", () => {
       }
 
       static create(
-        setup: FeatureSetup<typeof ResourceApp.dependencies, Infrastructure, undefined>,
+        setup: FeatureSetup<typeof ResourceApp.dependencies, DeclaredMembers, undefined>,
       ): ResourceApp {
         setup.resources.own("resource", own);
         return new ResourceApp();
@@ -72,7 +75,7 @@ describe("defineModule", () => {
     }
 
     const declaration = defineModule("presence").withApp(ResourceApp).build();
-    const runtime = await createApp({ role: "api", infrastructure: { prefix: "unused" } })
+    const runtime = await createApp({ role: "api", members: memberSourceOf({ prefix: "unused" }) })
       .withModules([declaration])
       .boot();
 
@@ -86,7 +89,7 @@ describe("defineModule", () => {
     const declaration = defineModule("annotation").withApp(app).build();
 
     await expect(
-      createApp({ role: "api", config: { annotation: {} }, infrastructure: { prefix: "unused" } })
+      createApp({ role: "api", config: { annotation: {} }, members: memberSourceOf({ prefix: "unused" }) })
         .withModules([declaration])
         .boot(),
     ).rejects.toThrow("suffix is required");

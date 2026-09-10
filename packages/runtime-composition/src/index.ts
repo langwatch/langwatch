@@ -36,11 +36,13 @@ export {
   tokenName,
 } from "./dependency-token.ts";
 export {
-  assertInfrastructure,
-  MissingInfrastructureError,
-  type MissingNeeds,
-  type NeedsResult,
-} from "./infrastructure-needs.ts";
+  buildClaimedMembers,
+  membersFor,
+  MissingMemberError,
+  type MemberClaim,
+  type MemberSource,
+} from "./module-members.ts";
+export type { Tier } from "./tiers.ts";
 export {
   commandsOf,
   eventingHostFrom,
@@ -74,6 +76,7 @@ export {
   ServerFeatureBuilder,
   type ServerFeatureDeclaration,
   type ServerRole,
+  withMemoryRepositories,
 } from "./feature-installer.ts";
 export {
   FEATURE_NAMES,
@@ -96,11 +99,14 @@ export { RuntimeLifecycle, cleanupAfterFailure } from "./runtime-lifecycle.ts";
 export {
   defineRepositories,
   instantiateRepositories,
+  repositoriesRequire,
+  selectedRepositoryOwnership,
   validateRepositorySelection,
-  type PersistenceSelection,
-  type RepositoryBackends,
-  type RepositoryRegistry,
+  type AnyRepositoryRegistry,
   type RepositoriesFor,
+  type RepositoryRegistry,
+  type RepositorySelection,
+  type RepositoryTiers,
 } from "./repository-registry.ts";
 
 export {

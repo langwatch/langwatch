@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/application.ts";
+import { memberSourceOf } from "./member-source.ts";
 import { moduleApi } from "../src/module-api-token.ts";
 import {
   defineModule,
@@ -13,26 +14,49 @@ interface ProjectApi {
 }
 const ProjectApi = moduleApi<ProjectApi>("project");
 
-interface Infrastructure {
+/**
+ * The members this module reads. Each is always supplied, because a module is
+ * handed exactly the names it declared and boot refuses one this process
+ * cannot answer.
+ */
+interface DeclaredMembers {
+  events: string[];
+  bootFailure: Error | null;
+  startFailure: Error | null;
+  stopFailure: Error | null;
+  starting: (() => Promise<void>) | null;
+  capture: ((resources: ResourceOwnership) => void) | null;
+}
+
+/** What one test states about the run, before the harness completes it. */
+type Harness = Readonly<{
   events: string[];
   bootFailure?: Error;
   startFailure?: Error;
   stopFailure?: Error;
   starting?: () => Promise<void>;
   capture?: (resources: ResourceOwnership) => void;
-}
+}>;
 
 class ProjectApp implements ProjectApi {
   static readonly contract = ProjectApi;
   static readonly dependencies = {};
+  static readonly reads = [
+    "events",
+    "bootFailure",
+    "startFailure",
+    "stopFailure",
+    "starting",
+    "capture",
+  ] as const;
 
   private constructor() {}
 
   static create({
-    infrastructure,
+    members,
     resources,
-  }: FeatureSetup<typeof ProjectApp.dependencies, Infrastructure, undefined>): ProjectApi {
-    const { events } = infrastructure;
+  }: FeatureSetup<typeof ProjectApp.dependencies, DeclaredMembers, undefined>): ProjectApi {
+    const { events } = members;
     resources.own("connection", () => {
       events.push("connection:close");
     });
@@ -40,12 +64,12 @@ class ProjectApp implements ProjectApi {
       name: "subscription",
       start: async () => {
         events.push("subscription:start");
-        await infrastructure.starting?.();
-        if (infrastructure.startFailure) throw infrastructure.startFailure;
+        await members.starting?.();
+        if (members.startFailure) throw members.startFailure;
       },
       stop: () => {
         events.push("subscription:stop");
-        if (infrastructure.stopFailure) throw infrastructure.stopFailure;
+        if (members.stopFailure) throw members.stopFailure;
       },
     });
     resources.ownService({
@@ -57,8 +81,8 @@ class ProjectApp implements ProjectApi {
         events.push("followup:stop");
       },
     });
-    infrastructure.capture?.(resources);
-    if (infrastructure.bootFailure) throw infrastructure.bootFailure;
+    members.capture?.(resources);
+    if (members.bootFailure) throw members.bootFailure;
 
     return new ProjectApp();
   }
@@ -69,8 +93,18 @@ class ProjectApp implements ProjectApi {
 }
 
 const project = defineModule("project").withApp(ProjectApp).build();
-function graph(infrastructure: Infrastructure, role: ServerRole = "api") {
-  return createApp({ role, infrastructure }).withModules([project]);
+function graph(harness: Harness, role: ServerRole = "api") {
+  return createApp({
+    role,
+    members: memberSourceOf<DeclaredMembers>({
+      events: harness.events,
+      bootFailure: harness.bootFailure ?? null,
+      startFailure: harness.startFailure ?? null,
+      stopFailure: harness.stopFailure ?? null,
+      starting: harness.starting ?? null,
+      capture: harness.capture ?? null,
+    }),
+  }).withModules([project]);
 }
 
 describe("feature-owned runtime services", () => {

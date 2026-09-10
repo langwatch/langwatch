@@ -1,0 +1,39 @@
+{
+  "name": "@langwatch/infrastructure",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The members a process hands its modules: the closed list, and the one build from parsed config.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/mail": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/redis-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -340,7 +340,9 @@ export {
   IDENTITY_SECRET_HEAL_MIGRATION_NAME,
   IdentitySecretHealMigrationAdapter,
 } from "./services/system-migration-identity-secret-heal.service.ts";
-./repositories/prisma/prisma.identity-user-migrations.repository.tse PostgresIdentityUserMigrationsOptions,
+export {
+  PostgresIdentityUserMigrationsAdapter,
+  type PostgresIdentityUserMigrationsOptions,
 } from "./repositories/prisma/prisma.identity-user-migrations.repository.ts";
 export {
   ScimSyncLedgerWriterAdapter,

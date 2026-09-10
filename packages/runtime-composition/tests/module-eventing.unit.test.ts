@@ -7,6 +7,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
+import { memberSourceOf } from "./member-source.ts";
 import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
 import type { FeatureEventing, FeatureEventingSetup } from "../src/module-eventing.ts";
 import { defineRepositories } from "../src/repository-registry.ts";
@@ -27,7 +28,10 @@ class MemoryKeyRepositories {
   }
 }
 
-const keyRepositories = defineRepositories({ memory: MemoryKeyRepositories });
+const keyRepositories = defineRepositories({
+  live: MemoryKeyRepositories,
+  memory: MemoryKeyRepositories,
+});
 
 abstract class KeyApp {
   abstract readonly repositories: KeyRepositories;
@@ -109,7 +113,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
         .withApp(ComposedKeyApp)
         .withEventing(keyEventing());
 
-      await createApp({ role: "worker", infrastructure: { eventing: eventing.host } })
+      await createApp({ role: "worker", members: memberSourceOf({ eventing: eventing.host }) })
         .withModules([module])
         .boot();
 
@@ -129,7 +133,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       const runtime = await createApp({
         role: "worker",
-        infrastructure: { eventing: eventing.host },
+        members: memberSourceOf({ eventing: eventing.host }),
       })
         .withModules([module])
         .boot();
@@ -151,7 +155,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
 
       const runtime = await createApp({
         role: "api",
-        infrastructure: { eventing: eventing.host },
+        members: memberSourceOf({ eventing: eventing.host }),
       })
         .withModules([module])
         .boot();
@@ -167,7 +171,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
         .withApp(ComposedKeyApp)
         .withEventing(keyEventing());
 
-      await createApp({ role: "worker", infrastructure: { eventing: eventing.host } })
+      await createApp({ role: "worker", members: memberSourceOf({ eventing: eventing.host }) })
         .withModules([module])
         .boot();
 
@@ -184,7 +188,7 @@ describe("given a module that declares its event sourcing with withEventing", ()
         .withApp(ComposedKeyApp)
         .withEventing(declaration);
 
-      const runtime = await createApp({ role: "tasks", infrastructure: {} })
+      const runtime = await createApp({ role: "tasks", members: memberSourceOf({}) })
         .withModules([module])
         .boot();
 
