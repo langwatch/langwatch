@@ -1,7 +1,7 @@
 /** @vitest-environment node */
 import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
-import { Prisma, type PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { PrismaCredentialAccountRepository } from "../credential-account.prisma.repository";
@@ -157,7 +157,9 @@ describe("PrismaCredentialAccountRepository.deleteLinkedAccount", () => {
         const first = accountIds[0];
         const second = accountIds[1];
         if (first === undefined || second === undefined) {
-          throw new Error("the concurrency fixture did not create two accounts");
+          throw new Error(
+            "the concurrency fixture did not create two accounts",
+          );
         }
 
         const repository = new PrismaCredentialAccountRepository(

@@ -351,19 +351,20 @@ describe("the sign-in, sign-up, reset and passkey refusals", () => {
           betterAuthCode: "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE",
           answers: "identity_mfa_locked_out",
         },
-      ])(
-        "answers $betterAuthCode on $path with $answers",
-        async ({ path, betterAuthCode, answers }) => {
-          const body = await translate({ code: betterAuthCode, path }).then(
-            bodyOf,
-          );
+      ])("answers $betterAuthCode on $path with $answers", async ({
+        path,
+        betterAuthCode,
+        answers,
+      }) => {
+        const body = await translate({ code: betterAuthCode, path }).then(
+          bodyOf,
+        );
 
-          expect(body.error).toBe(answers);
-          // The wire message is the code, never the endpoint's own sentence:
-          // the words come from the registry keyed by it.
-          expect(readHandledError(body)?.code).toBe(answers);
-        },
-      );
+        expect(body.error).toBe(answers);
+        // The wire message is the code, never the endpoint's own sentence:
+        // the words come from the registry keyed by it.
+        expect(readHandledError(body)?.code).toBe(answers);
+      });
     });
   });
 

@@ -75,13 +75,13 @@ import {
 import { NON_AUDITABLE_SOURCES } from "~/server/event-sourcing/pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
 import { prisma as appPrisma } from "../../db";
 import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.error";
+import { BACKGROUND_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 import { tryGetApp } from "../app";
 import { organizationOnAuthzEngine } from "./engine-gate";
 import { bumpAuthzEpoch } from "./epoch";
 import { AuthzGrantNotConfirmedError } from "./errors";
 import { PrismaAuthzRevocationRepository } from "./repositories/authz-revocation.prisma.repository";
 import { liveGrants } from "./repositories/live-rows";
-import { BACKGROUND_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 
 const logger = createLogger("langwatch:authz:ledger");
 
