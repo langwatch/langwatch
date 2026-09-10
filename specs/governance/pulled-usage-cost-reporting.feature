@@ -393,3 +393,91 @@ Feature: Pulled provider usage becomes visible, attributed cost
     When the agent list is read
     Then every agent the tenant holds is listed
     And no agent is left showing an identifier in place of its name
+
+  # --- A Genie question is never a measured zero ---
+  # Genie bills nothing per question. The compute behind it is on the
+  # warehouse's bill, which lands later and only when the credential can read
+  # the billing tables. A question recorded at zero dollars before that bill
+  # answers is indistinguishable from one that genuinely cost nothing, and if
+  # the bill can never be read the zero stays and reads as a measurement.
+
+  @unit
+  Scenario: A Genie message whose bill has not answered carries no amount
+    Given a Genie source whose warehouse bill has not answered for a question yet
+    When the source records that question
+    Then the question is recorded with no amount rather than at zero
+    And the question is still recorded
+    And the amount lands when the bill answers on a later run
+    # Also true of a source that names no warehouse at all: there is no bill
+    # to back a figure, so no figure is recorded.
+
+  @unit
+  Scenario: A warehouse that cannot be read holds the day open instead of closing it at zero
+    Given a Genie source whose warehouse bill is refused, or whose warehouse no longer exists
+    When the source runs
+    Then the questions are still recorded, with no amount
+    And the source keeps its place so the same period is asked about again
+    And the run reports that the bill could not be read
+    And no question is recorded at zero
+    # Held the same way an answer cut short or timed out is held, and bounded
+    # by the same hold: a bill refused for longer than the hold allows lets
+    # the source move on, and the questions it leaves behind stay unpriced.
+
+  # --- The paid Genie bill line ---
+  # Databricks bills paid Genie usage on its own line, per person and per day,
+  # with no warehouse behind it. The warehouse allocation above can never see
+  # those rows. This read asks for them directly and is a separate read with
+  # its own position, switched on per source.
+
+  @unit
+  Scenario: The paid Genie bill read is off unless switched on
+    Given a Genie source that has not switched the paid bill read on
+    When the source runs
+    Then it never asks the workspace for the Genie bill
+    And no bill row is recorded
+
+  @unit
+  Scenario: A paid Genie charge lands on the person who ran it, for that day and that price line
+    Given a Genie source with the paid bill read switched on
+    And the workspace bills a person's Genie usage on a day under a price line that has a list price
+    When the source runs
+    Then a cost row is recorded for that person, that day and that price line
+    And its amount is the usage quantity at the list price in force that day
+    And the row names Genie's price line as its model and never a warehouse as its agent
+    And the amount is marked an estimate
+    # List prices, not the account's negotiated rate, which is on no table this
+    # credential can read. An estimate by construction and recorded as one.
+
+  @unit
+  Scenario: A free Genie row lands with its usage count and no amount
+    Given a Genie source with the paid bill read switched on
+    And the workspace reports a person's Genie usage under a price line with no list price
+    When the source runs
+    Then the row is recorded with its usage quantity
+    And the row carries no amount
+    # Free usage has no price, and no price is not zero. Inventing one would
+    # put a figure on the screen the bill cannot back.
+
+  @unit
+  Scenario: A paid Genie read that stops short holds its place and lands nothing
+    Given a Genie source with the paid bill read switched on
+    And a bill answer that comes back cut short, times out, or is refused
+    When the source runs
+    Then no bill row from that answer is recorded
+    And the paid bill read keeps its own place so the period is asked about again
+    And the warehouse read's place is not moved by it
+    # Two reads, two positions. The warehouse allocation and the bill line
+    # answer on different tables and fail independently, so one holding must
+    # never pin or free the other.
+
+  @unit
+  Scenario: Surface and channel are labels and do not split a person's day
+    Given a Genie source with the paid bill read switched on
+    And a person's usage on one day under one price line spans several surfaces and channels
+    When the source runs
+    Then one row is recorded for that person, day and price line
+    And the surfaces and channels travel on the row as labels only
+    And they are no part of what identifies the row
+    # A key cannot be changed once money sits under it. Surface and channel
+    # are how Databricks describes the usage, not what it bills, and keying on
+    # them would mint a fresh row for every description the provider adds.
