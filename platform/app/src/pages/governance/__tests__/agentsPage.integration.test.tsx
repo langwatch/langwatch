@@ -237,7 +237,14 @@ describe("the agents page address contract", () => {
       };
       renderAgentsAt(["/governance/agents"]);
 
+      // The spinner itself, and not only the absence of the empty state. Those
+      // two assertions alone were satisfied by a blank content pane, which is
+      // the one rendering this scenario is written to rule out: a reader who
+      // sees nothing cannot tell a wait from an answer of "none".
+      expect(screen.getByLabelText("Loading agents")).toBeVisible();
       expect(screen.queryByTestId("agents-empty")).toBeNull();
+      // Neither agents nor an empty state, which is the scenario's own wording.
+      expect(screen.queryByText("support-copilot")).toBeNull();
       expect(screen.getByRole("heading", { name: "Agents" })).toBeVisible();
     });
   });
