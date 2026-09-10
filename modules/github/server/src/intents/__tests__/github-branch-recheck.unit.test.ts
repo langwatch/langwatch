@@ -12,7 +12,7 @@ import { InMemoryProcessStore, type ProcessHandlerContext } from "@langwatch/eve
 import { describe, expect, it, vi } from "vitest";
 import { TestGithubService } from "../../app/__tests__/github.fixture.ts";
 
-import { EventingGithubMaintenanceAdapter } from "../../adapters/eventing.github-maintenance.adapter.ts";
+import { EventingGithubMaintenanceAdapter } from "../../services/github-maintenance.service.ts";
 import { runGithubBranchRecheck, runGithubRetentionPrune } from "../github-branch-recheck.intent.ts";
 import {
   GITHUB_BRANCH_RECHECK_INITIAL_STATE,

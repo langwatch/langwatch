@@ -17,7 +17,7 @@ import {
   runGithubBranchRecheck,
   runGithubRetentionPrune,
 } from "../intents/github-branch-recheck.intent.ts";
-import type { GithubBranchMaintenancePort } from "../ports/github-branch-maintenance.port.ts";
+import type { GithubBranchMaintenance } from "../app/github.infrastructure.ts";
 
 export interface GithubMaintenancePipelineDeps {
   /**
@@ -29,7 +29,7 @@ export interface GithubMaintenancePipelineDeps {
    * published service still satisfies this, so the registration in platform's
    * legacy registry is unchanged.
    */
-  github: GithubBranchMaintenancePort;
+  github: GithubBranchMaintenance;
   processStore: ProcessStore;
 }
 

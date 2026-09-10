@@ -15,7 +15,7 @@ export {
   composeGithubBranchDemand,
   type GithubBranchDemandComposition,
 } from "./app/github.app.ts";
-export { EventingGithubMaintenanceAdapter } from "./adapters/eventing.github-maintenance.adapter.ts";
+export { EventingGithubMaintenanceAdapter } from "./services/github-maintenance.service.ts";
 export { GithubBranchMaintenancePort } from "./ports/github-branch-maintenance.port.ts";
 export { GithubBranchDemandPort } from "./ports/github-branch-demand.port.ts";
 export { GithubProjectActivityPort } from "./ports/github-project-activity.port.ts";

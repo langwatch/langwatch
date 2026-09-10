@@ -12,7 +12,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { GithubHostPort } from "../../ports/github-host.port.ts";
+import { GithubHost } from "../../app/github.infrastructure.ts";
 import type { BranchMappingTarget } from "../github-branch-mapping.service.ts";
 import { GithubBranchDemandService } from "../github-branch-demand.service.ts";
 import { TestProjectService } from "./fixtures/github-services.fixture.ts";
@@ -27,7 +27,7 @@ const REQUEST = {
 };
 
 /** An instance that is a GitHub App on github.com, which is all demand reads. */
-class TestHost extends GithubHostPort {
+class TestHost implements GithubHost {
   getHost(): string {
     return "github.com";
   }

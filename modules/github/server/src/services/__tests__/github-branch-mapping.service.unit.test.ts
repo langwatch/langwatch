@@ -4,7 +4,7 @@ import {
   GithubAppTokenCache,
   type GithubPullRequestSummary,
 } from "../../app/github.app.ts";
-import { GithubHostPort } from "../../ports/github-host.port.ts";
+import { GithubHost } from "../../app/github.infrastructure.ts";
 import { GithubPullRequestsRepository } from "../../repositories/github-pull-requests.repository.ts";
 import type {
   GithubBranchCheckRow,
@@ -27,7 +27,7 @@ const target: BranchMappingTarget = {
   origin: "sweep",
 };
 
-class FakeHost extends GithubHostPort {
+class FakeHost implements GithubHost {
   getHost(): string {
     return "github.com";
   }
@@ -218,7 +218,7 @@ describe("given an announcement that a label was added to a pull request", () =>
 const GHES = "github.acme-corp.internal";
 
 /** An instance bound to a GitHub Enterprise Server host, and to nothing else. */
-class EnterpriseHost extends GithubHostPort {
+class EnterpriseHost implements GithubHost {
   getHost(): string {
     return GHES;
   }

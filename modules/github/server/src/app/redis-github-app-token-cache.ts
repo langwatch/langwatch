@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import type { GithubRepository } from "@langwatch/github-contract";
 
-import type { GithubHostPort } from "../ports/github-host.port.ts";
+import type { GithubHost } from "./github.infrastructure.ts";
 import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
 import type { GithubRedisPort } from "../repositories/redis/github-redis.connection.ts";
 import { GithubTokenCacheRedisRepository } from "../repositories/redis/redis.github-token-cache.repository.ts";
-import { GithubApiAdapter } from "../adapters/github-api.adapter.ts";
+import { GithubApiAdapter } from "../services/github-api.service.ts";
 import { GithubHostService } from "../services/github-host.service.ts";
 import {
   GITHUB_READ_PULL_PERMISSIONS,
@@ -29,7 +29,7 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
     appId: string,
     privateKey: string,
     redis: GithubRedisPort | null,
-    host: GithubHostPort = GithubHostService.create(),
+    host: GithubHost = GithubHostService.create(),
   ): RedisGithubAppTokenCache {
     const api = GithubApiAdapter.create(appId, privateKey, host);
     const cache = GithubTokenCacheRedisRepository.create({ redis, host });

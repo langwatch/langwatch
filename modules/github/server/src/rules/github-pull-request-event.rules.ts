@@ -1,7 +1,7 @@
 import type { GithubPullRequestEvent } from "@langwatch/github-contract";
 import { z } from "zod";
 
-import { GithubPullRequestEventPort } from "../ports/github-pull-request-event.port.ts";
+import { GithubPullRequestEventParser } from "../app/github.infrastructure.ts";
 
 const githubPullRequestEventSchema = z.object({
   action: z.string(),
@@ -29,13 +29,12 @@ const githubPullRequestEventSchema = z.object({
   }),
 });
 
-export class GithubPullRequestEventRules extends GithubPullRequestEventPort {
+export class GithubPullRequestEventRules implements GithubPullRequestEvent {
   static create(): GithubPullRequestEventRules {
     return new GithubPullRequestEventRules();
   }
 
   private constructor() {
-    super();
   }
 
   tryParse(payload: unknown): GithubPullRequestEvent | null {

@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { nowInstant } from "@langwatch/time";
 
 import type { GithubRedisPort } from "./github-redis.connection.ts";
-import type { GithubHostPort } from "../../ports/github-host.port.ts";
+import type { GithubHost } from "../../app/github.infrastructure.ts";
 import { GithubTokenCacheRepository } from "../github-token-cache.repository.ts";
 
 const LOCK_TTL_SEC = 15;
@@ -18,14 +18,14 @@ const LOCK_MAX_WAIT_MS = 3_000;
 export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository {
   static create(parts: {
     redis: GithubRedisPort | null;
-    host: GithubHostPort;
+    host: GithubHost;
   }): GithubTokenCacheRedisRepository {
     return new GithubTokenCacheRedisRepository(parts.redis, parts.host);
   }
 
   private constructor(
     private readonly redis: GithubRedisPort | null,
-    private readonly host: GithubHostPort,
+    private readonly host: GithubHost,
   ) {
     super();
   }

@@ -14,7 +14,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { EventingGithubMaintenanceAdapter } from "../eventing.github-maintenance.adapter.ts";
+import { EventingGithubMaintenanceAdapter } from "../github-maintenance.service.ts";
 
 function build(
   sweep = {

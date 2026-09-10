@@ -4,7 +4,7 @@ import {
   type GithubInstallStatePayload,
 } from "@langwatch/github-contract";
 
-import { GithubInstallStatePort } from "../ports/github-install-state.port.ts";
+import { GithubInstallState } from "../app/github.infrastructure.ts";
 import type { GithubInstallNonceRepository } from "../repositories/github-install-nonce.repository.ts";
 import { nowInstant } from "@langwatch/time";
 
@@ -16,7 +16,7 @@ const STATE_MAX_FUTURE_SKEW_MS = 60 * 1000;
  * a ten-minute window, and the one-shot nonce beside it that a replayed Setup
  * URL cannot spend twice.
  */
-export class GithubInstallStateService extends GithubInstallStatePort {
+export class GithubInstallStateService implements GithubInstallState {
   static create(options: {
     signingKey: string;
     nonces: GithubInstallNonceRepository;
@@ -28,7 +28,6 @@ export class GithubInstallStateService extends GithubInstallStatePort {
     private readonly signingKey: string,
     private readonly nonces: GithubInstallNonceRepository,
   ) {
-    super();
   }
 
   getTtlMs(): number {

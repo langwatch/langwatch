@@ -13,7 +13,7 @@ import {
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
 } from "../app/github.app.ts";
-import type { GithubHostPort } from "../ports/github-host.port.ts";
+import type { GithubHost } from "../app/github.infrastructure.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:github:api");
@@ -97,14 +97,14 @@ function toPullRequestSummary(pull: z.infer<typeof pullRequestSchema>): GithubPu
 }
 
 export class GithubApiAdapter implements GithubAppClient {
-  static create(appId: string, privateKey: string, host: GithubHostPort): GithubApiAdapter {
+  static create(appId: string, privateKey: string, host: GithubHost): GithubApiAdapter {
     return new GithubApiAdapter(appId, privateKey, host);
   }
 
   private constructor(
     private readonly appId: string,
     private readonly privateKey: string,
-    private readonly host: GithubHostPort,
+    private readonly host: GithubHost,
   ) {}
 
   get configured(): boolean {

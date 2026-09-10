@@ -9,7 +9,7 @@ import {
   GithubRateLimitedError,
 } from "../app/github.app.ts";
 import type { GithubInstallationLookup } from "./github-installation-access.service.ts";
-import type { GithubHostPort } from "../ports/github-host.port.ts";
+import type { GithubHost } from "../app/github.infrastructure.ts";
 import { Temporal, nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 import type {
   GithubPullRequestsRepository,
@@ -49,7 +49,7 @@ type BranchMappingDeps = {
   repository: GithubPullRequestsRepository;
   installations: GithubInstallationLookup;
   appTokens: GithubAppTokenCache;
-  host: GithubHostPort;
+  host: GithubHost;
   now?: () => number;
 };
 

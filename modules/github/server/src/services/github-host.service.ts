@@ -1,4 +1,4 @@
-import { GithubHostPort } from "../ports/github-host.port.ts";
+import { GithubHost } from "../app/github.infrastructure.ts";
 
 const GITHUB_DOT_COM = "github.com";
 
@@ -6,13 +6,12 @@ export type GithubHostConfig = {
   host?: string;
 };
 
-export class GithubHostService extends GithubHostPort {
+export class GithubHostService implements GithubHost {
   static create(config: GithubHostConfig = {}): GithubHostService {
     return new GithubHostService(config);
   }
 
   private constructor(private readonly config: GithubHostConfig) {
-    super();
   }
 
   getHost(): string {

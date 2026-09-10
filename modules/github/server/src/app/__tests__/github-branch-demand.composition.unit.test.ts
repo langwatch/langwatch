@@ -15,7 +15,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { GithubProjectActivityPort } from "../../ports/github-project-activity.port.ts";
+import { GithubProjectActivity } from "../github.infrastructure.ts";
 import { composeGithubBranchDemand } from "../../app/github.app.ts";
 import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
 import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";
@@ -85,7 +85,7 @@ function database() {
   };
 }
 
-class RecordingProjectActivity extends GithubProjectActivityPort {
+class RecordingProjectActivity implements GithubProjectActivity {
   readonly resolved: string[] = [];
   readonly stamped: { projectId: string; at: Instant }[] = [];
 
@@ -112,7 +112,7 @@ function githubApi() {
   return paths;
 }
 
-function demand(client: object, project: GithubProjectActivityPort) {
+function demand(client: object, project: GithubProjectActivity) {
   return composeGithubBranchDemand({
     repositories: {
       installations: PrismaGithubInstallationsRepository.create(client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0]),

@@ -12,10 +12,10 @@ import type {
   GithubInstallStatePayload,
   GithubAppConfig,
 } from "@langwatch/github-contract";
-import type { GithubHostPort } from "../ports/github-host.port.ts";
-import type { GithubInstallResponsePort } from "../ports/github-install-response.port.ts";
-import type { GithubInstallStatePort } from "../ports/github-install-state.port.ts";
-import type { GithubPullRequestEventPort } from "../ports/github-pull-request-event.port.ts";
+import type { GithubHost } from "../app/github.infrastructure.ts";
+import type { GithubInstallResponse } from "../app/github.infrastructure.ts";
+import type { GithubInstallState } from "../app/github.infrastructure.ts";
+import type { GithubPullRequestEventParser } from "../app/github.infrastructure.ts";
 
 import { GithubConnectionService } from "./github-connection.service.ts";
 import { GithubInstallationsService } from "./github-installations.service.ts";
@@ -33,10 +33,10 @@ type GithubServiceDependencies = {
     appSlug: string;
     webhookSecret: string;
   };
-  host: GithubHostPort;
-  installState: GithubInstallStatePort;
-  installResponse: GithubInstallResponsePort;
-  pullRequestEvents: GithubPullRequestEventPort;
+  host: GithubHost;
+  installState: GithubInstallState;
+  installResponse: GithubInstallResponse;
+  pullRequestEvents: GithubPullRequestEvent;
 };
 
 /**
@@ -65,10 +65,10 @@ export class GithubFeatureService implements GithubApi {
     private readonly mapping: GithubPullRequestMappingService,
     private readonly status: GithubPullRequestStatusService,
     private readonly config: GithubServiceDependencies["config"],
-    private readonly host: GithubHostPort,
-    private readonly installState: GithubInstallStatePort,
-    private readonly installResponse: GithubInstallResponsePort,
-    private readonly pullRequestEvents: GithubPullRequestEventPort,
+    private readonly host: GithubHost,
+    private readonly installState: GithubInstallState,
+    private readonly installResponse: GithubInstallResponse,
+    private readonly pullRequestEvents: GithubPullRequestEvent,
   ) {
     this.connection = GithubConnectionService.create({
       installations,

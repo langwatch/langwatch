@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import type { GithubHostPort } from "../ports/github-host.port.ts";
-import type { GithubProjectActivityPort } from "../ports/github-project-activity.port.ts";
+import type { GithubHost } from "../app/github.infrastructure.ts";
+import type { GithubProjectActivity } from "../app/github.infrastructure.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
 import type {
   BranchMappingTarget,
@@ -22,8 +22,8 @@ type BranchMappingOperations = Pick<GithubBranchMappingService, "bringRecheckFor
 
 type GithubBranchDemandDeps = {
   mapping: BranchMappingOperations;
-  project: GithubProjectActivityPort;
-  host: GithubHostPort;
+  project: GithubProjectActivity;
+  host: GithubHost;
   now?: () => number;
 };
 

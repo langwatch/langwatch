@@ -24,8 +24,8 @@ import {
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
-import type { GithubProjectActivityPort } from "../ports/github-project-activity.port.ts";
-import type { GithubHostPort } from "../ports/github-host.port.ts";
+import type { GithubProjectActivity } from "./github.infrastructure.ts";
+import type { GithubHost } from "./github.infrastructure.ts";
 import { RedisGithubAppTokenCache } from "./redis-github-app-token-cache.ts";
 import { GithubHostService } from "../services/github-host.service.ts";
 import { GithubInstallResponseRules } from "../rules/github-install-response.rules.ts";
@@ -36,8 +36,8 @@ import {
   RedisGithubAdapter,
   type GithubRedisConnection,
 } from "../repositories/redis/github-redis.connection.ts";
-import { GithubBranchDemandPort } from "../ports/github-branch-demand.port.ts";
-import type { GithubBranchMaintenancePort } from "../ports/github-branch-maintenance.port.ts";
+import { GithubBranchDemand } from "./github.infrastructure.ts";
+import type { GithubBranchMaintenance } from "./github.infrastructure.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
 import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";
 import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service.ts";
@@ -179,7 +179,7 @@ export type GithubComposition = Readonly<{
   repositories: GithubRepositories;
   redis: GithubRedisConnection | null;
   organization: OrganizationApiContract;
-  project: GithubProjectActivityPort;
+  project: GithubProjectActivity;
   config: {
     appId: string;
     privateKey: string;
@@ -278,7 +278,7 @@ export type GithubBranchMaintenanceComposition = Readonly<{
  */
 export function composeGithubBranchMaintenance(
   parts: GithubBranchMaintenanceComposition,
-): GithubBranchMaintenancePort {
+): GithubBranchMaintenance {
   const host = GithubHostService.create(parts.hostConfig);
   const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
   const appTokens = RedisGithubAppTokenCache.create(
@@ -305,7 +305,7 @@ export type GithubBranchDemandComposition = Readonly<{
   redis: GithubRedisConnection | null;
   config: { appId: string; privateKey: string };
   hostConfig?: { host?: string };
-  project: GithubProjectActivityPort;
+  project: GithubProjectActivity;
 }>;
 
 /**
@@ -316,7 +316,7 @@ export type GithubBranchDemandComposition = Readonly<{
  */
 export function composeGithubBranchDemand(
   parts: GithubBranchDemandComposition,
-): GithubBranchDemandPort {
+): GithubBranchDemand {
   const host = GithubHostService.create(parts.hostConfig);
   const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
   const appTokens = RedisGithubAppTokenCache.create(
@@ -344,19 +344,18 @@ export function composeGithubBranchDemand(
  * this composition resolved, and routes the request into the same demand
  * service, so a consumer holding either object gets the same two answers.
  */
-class ComposedGithubBranchDemand extends GithubBranchDemandPort {
+class ComposedGithubBranchDemand implements GithubBranchDemand {
   static create(parts: {
     demand: GithubBranchDemandService;
-    host: GithubHostPort;
+    host: GithubHost;
   }): ComposedGithubBranchDemand {
     return new ComposedGithubBranchDemand(parts.demand, parts.host);
   }
 
   private constructor(
     private readonly demand: GithubBranchDemandService,
-    private readonly host: GithubHostPort,
+    private readonly host: GithubHost,
   ) {
-    super();
   }
 
   canMapRepositoryHost(repositoryHost: string): boolean {

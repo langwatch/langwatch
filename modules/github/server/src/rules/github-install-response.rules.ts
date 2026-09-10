@@ -1,12 +1,11 @@
-import { GithubInstallResponsePort } from "../ports/github-install-response.port.ts";
+import { GithubInstallResponse } from "../app/github.infrastructure.ts";
 
-export class GithubInstallResponseRules extends GithubInstallResponsePort {
+export class GithubInstallResponseRules implements GithubInstallResponse {
   static create(): GithubInstallResponseRules {
     return new GithubInstallResponseRules();
   }
 
   private constructor() {
-    super();
   }
 
   successHtml(login: string): string {
