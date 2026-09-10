@@ -4,8 +4,8 @@ import { nowInstant } from "@langwatch/time";
 
 import {
   AGENT_SANDBOX_KEY_REUSE_MS,
-  AgentSandboxKeySharePort,
-} from "../ports/agent-sandbox-key-share.port.ts";
+  AgentSandboxKeyShareRepository,
+} from "../agent-sandbox-key-share.repository.ts";
 
 const logger = createLogger("langwatch:api-key:agent-sandbox");
 
@@ -27,7 +27,7 @@ type HeldToken = { sealed: string; expiresAt: number };
 // pod, which is what a dev stack and a test both want.
 
 /** The shared token, sealed at rest as `iv:ciphertext:authTag`, AES-256-GCM. */
-export class RedisAgentSandboxKeyShareAdapter extends AgentSandboxKeySharePort {
+export class RedisAgentSandboxKeyShareRepository extends AgentSandboxKeyShareRepository {
   /**
    * Refuses a key that is not 32 bytes of hex at composition time, rather than
    * on the first run that wants a sandbox key.
@@ -37,12 +37,12 @@ export class RedisAgentSandboxKeyShareAdapter extends AgentSandboxKeySharePort {
     /** The deployment's 32-byte hex secret; the one its stored secrets use. */
     secret: string;
     reuseMs?: number;
-  }): RedisAgentSandboxKeyShareAdapter {
+  }): RedisAgentSandboxKeyShareRepository {
     const key = Buffer.from(options.secret, "hex");
     if (key.length !== KEY_BYTES) {
       throw new Error("Agent sandbox key sharing requires a 32-byte hex secret.");
     }
-    return new RedisAgentSandboxKeyShareAdapter(
+    return new RedisAgentSandboxKeyShareRepository(
       options.redis,
       key,
       options.reuseMs ?? AGENT_SANDBOX_KEY_REUSE_MS,

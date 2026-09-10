@@ -7,7 +7,7 @@
 import { AGENT_SANDBOX_API_KEY_NAME, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AgentSandboxKeySharePort } from "../../ports/agent-sandbox-key-share.port.ts";
+import { AgentSandboxKeyShareRepository } from "../../repositories/agent-sandbox-key-share.repository.ts";
 import { AgentSandboxKeyMintService } from "../agent-sandbox-key-mint.service.ts";
 
 const create = vi.fn();
@@ -18,7 +18,7 @@ const create = vi.fn();
 const apiKeys = { create } as unknown as ApiKeyApi;
 
 /** The share as a process holds it: whatever was last held, for as long as the test runs. */
-class MemoryShare extends AgentSandboxKeySharePort {
+class MemoryShare extends AgentSandboxKeyShareRepository {
   private held?: string;
 
   constructor(private readonly readable = true) {
@@ -44,7 +44,7 @@ function projectsOwning(ownerUserId: string | null) {
   return { projects: { findPersonalWorkspaceOwner }, findPersonalWorkspaceOwner };
 }
 
-function mintService(options: { ownerUserId?: string | null; share?: AgentSandboxKeySharePort }) {
+function mintService(options: { ownerUserId?: string | null; share?: AgentSandboxKeyShareRepository }) {
   const { projects, findPersonalWorkspaceOwner } = projectsOwning(options.ownerUserId ?? null);
   return {
     service: AgentSandboxKeyMintService.create({

@@ -23,7 +23,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ApiKeyBindingIdPort } from "../ports/api-key-binding-id.port.ts";
-import type { ApiKeyTokenPort } from "../ports/api-key-token.port.ts";
+import type { ApiKeyTokenRepository } from "../repositories/api-key-token.repository.ts";
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
 import { ApiKeyCliService } from "./api-key-cli.service.ts";
@@ -42,7 +42,7 @@ export type ApiKeyDependencies = {
   projects: ProjectApi;
   bindingIds: ApiKeyBindingIdPort;
   legacyGrants: LegacyApiKeyGrantService;
-  tokens: ApiKeyTokenPort;
+  tokens: ApiKeyTokenRepository;
 };
 
 /** The only public capability for API credentials; ApiKeyApp adapts it to the contract API. */

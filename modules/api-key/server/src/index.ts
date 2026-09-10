@@ -17,13 +17,13 @@ export {
 } from "./services/agent-sandbox-key-mint.service.ts";
 export {
   AGENT_SANDBOX_KEY_REUSE_MS,
-  AgentSandboxKeySharePort,
-} from "./ports/agent-sandbox-key-share.port.ts";
+  AgentSandboxKeyShareRepository as AgentSandboxKeySharePort,
+} from "./repositories/agent-sandbox-key-share.repository.ts";
 export { AbsentAgentSandboxKeyShareAdapter } from "./adapters/absent.agent-sandbox-key-share.adapter.ts";
 export {
-  RedisAgentSandboxKeyShareAdapter,
+  RedisAgentSandboxKeyShareRepository as RedisAgentSandboxKeyShareAdapter,
   type AgentSandboxKeyShareRedis,
-} from "./adapters/redis.agent-sandbox-key-share.adapter.ts";
+} from "./repositories/redis/redis.agent-sandbox-key-share.repository.ts";
 export {
   AGENT_SANDBOX_KEY_REAP_INTERVAL_MS,
   AGENT_SANDBOX_KEY_REAP_PROCESS_NAME,

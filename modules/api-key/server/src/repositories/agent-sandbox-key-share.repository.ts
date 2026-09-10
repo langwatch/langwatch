@@ -15,7 +15,7 @@ export const AGENT_SANDBOX_KEY_REUSE_MS = 8 * 60 * 60 * 1000;
  * hash, so this is the one place the plaintext survives the mint — for the
  * reuse window, and sealed.
  */
-export abstract class AgentSandboxKeySharePort {
+export abstract class AgentSandboxKeyShareRepository {
   abstract findSharedKey(input: { projectId: string }): Promise<string | undefined>;
   abstract hold(input: { projectId: string; token: string }): Promise<void>;
 }

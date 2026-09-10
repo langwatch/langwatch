@@ -5,11 +5,11 @@ import {
   LEGACY_PAT_PREFIX,
   splitApiKeyToken,
 } from "@langwatch/api-key-contract";
-import { ApiKeyTokenPort } from "../ports/api-key-token.port.ts";
+import { ApiKeyTokenRepository } from "../repositories/api-key-token.repository.ts";
 
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
-export class ApiKeyTokenAdapter extends ApiKeyTokenPort {
+export class ApiKeyTokenAdapter extends ApiKeyTokenRepository {
   constructor(private readonly pepper: string) {
     super();
   }

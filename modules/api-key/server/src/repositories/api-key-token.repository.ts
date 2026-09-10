@@ -1,4 +1,4 @@
-export abstract class ApiKeyTokenPort {
+export abstract class ApiKeyTokenRepository {
   abstract generate(options?: { prefix?: string }): {
     token: string;
     lookupId: string;
