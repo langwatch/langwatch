@@ -15,20 +15,20 @@
       "default": "./src/index.ts"
     },
     "./surfaces/impersonation": {
-      "types": "./dist/surfaces/impersonation/index.d.ts",
-      "default": "./src/surfaces/impersonation/index.ts"
-    },
-    "./screens/ops": {
-      "types": "./dist/screens/ops/index.d.ts",
-      "default": "./src/screens/ops/index.ts"
+      "types": "./dist/ui/sections/impersonation/index.d.ts",
+      "default": "./src/ui/sections/impersonation/index.ts"
     },
     "./drawers": {
-      "types": "./dist/screens/drawers.d.ts",
-      "default": "./src/screens/drawers.ts"
+      "types": "./dist/drawers.d.ts",
+      "default": "./src/drawers.ts"
     },
     "./surfaces/keyboard-key": {
-      "types": "./dist/surfaces/keyboard-key/index.d.ts",
-      "default": "./src/surfaces/keyboard-key/index.ts"
+      "types": "./dist/keyboard-key.d.ts",
+      "default": "./src/keyboard-key.ts"
+    },
+    "./ops": {
+      "types": "./dist/ops.d.ts",
+      "default": "./src/ops.ts"
     }
   },
   "scripts": {

@@ -13,10 +13,10 @@
   },
   "files": [
     "./src/behavior/personal-workspace-features-api.ts",
-    "./src/surfaces/department-picker/index.ts",
-    "./src/screens/drawers.ts",
+    "./src/department-picker.ts",
+    "./src/drawers.ts",
     "./src/ui/sections/project-drawers.ts",
-    "./src/screens/organization/index.ts"
+    "./src/organization.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

@@ -9,25 +9,25 @@
   ],
   "type": "module",
   "exports": {
-    "./screens/licensing": {
-      "types": "./dist/screens/licensing/index.d.ts",
-      "default": "./src/screens/licensing/index.ts"
-    },
     "./surfaces/global-upgrade-modal": {
-      "types": "./dist/surfaces/global-upgrade-modal/index.d.ts",
-      "default": "./src/surfaces/global-upgrade-modal/index.ts"
+      "types": "./dist/ui/sections/global-upgrade-modal/index.d.ts",
+      "default": "./src/ui/sections/global-upgrade-modal/index.ts"
     },
     "./surfaces/license-error-interceptor": {
-      "types": "./dist/surfaces/license-error-interceptor/index.d.ts",
-      "default": "./src/surfaces/license-error-interceptor/index.ts"
+      "types": "./dist/ui/sections/license-error-interceptor/index.d.ts",
+      "default": "./src/ui/sections/license-error-interceptor/index.ts"
     },
     "./surfaces/resource-limits": {
-      "types": "./dist/surfaces/resource-limits/index.d.ts",
-      "default": "./src/surfaces/resource-limits/index.ts"
+      "types": "./dist/ui/sections/resource-limits/index.d.ts",
+      "default": "./src/ui/sections/resource-limits/index.ts"
     },
     "./surfaces/seat-types": {
-      "types": "./dist/surfaces/seat-types/index.d.ts",
-      "default": "./src/surfaces/seat-types/index.ts"
+      "types": "./dist/ui/sections/seat-types/index.d.ts",
+      "default": "./src/ui/sections/seat-types/index.ts"
+    },
+    "./licensing": {
+      "types": "./dist/licensing.d.ts",
+      "default": "./src/licensing.ts"
     }
   },
   "scripts": {

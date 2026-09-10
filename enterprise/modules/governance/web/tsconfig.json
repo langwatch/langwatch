@@ -14,7 +14,7 @@
       "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"],
       "@langwatch/authz-contract": ["../../../../modules/authz/contract/src/index.ts"],
       "@langwatch/authz-web/surfaces/scope-picker": [
-        "../../../../modules/authz/web/src/surfaces/scope-picker/index.ts"
+        "../../../../modules/authz/web/src/ui/sections/scope-picker/index.ts"
       ],
       "@langwatch/coding-agent-web": ["../../../../modules/coding-agent/web/src/index.ts"]
     },

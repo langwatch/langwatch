@@ -26,19 +26,19 @@
       "default": "./src/index.ts"
     },
     "./surfaces/simulations-preference": {
-      "langwatch-declaration-source": "./src/surfaces/simulations-preference/index.ts",
-      "types": "./dist/surfaces/simulations-preference/index.d.ts",
-      "default": "./src/surfaces/simulations-preference/index.ts"
+      "langwatch-declaration-source": "./src/simulations-preference.ts",
+      "types": "./dist/simulations-preference.d.ts",
+      "default": "./src/simulations-preference.ts"
     },
-    "./screens/simulations": {
-      "langwatch-declaration-source": "./src/screens/simulations/index.ts",
-      "types": "./dist/screens/simulations/index.d.ts",
-      "default": "./src/screens/simulations/index.ts"
+    "./simulations": {
+      "langwatch-declaration-source": "./src/simulations.ts",
+      "types": "./dist/simulations.d.ts",
+      "default": "./src/simulations.ts"
     },
     "./drawers": {
-      "langwatch-declaration-source": "./src/screens/drawers.ts",
-      "types": "./dist/screens/drawers.d.ts",
-      "default": "./src/screens/drawers.ts"
+      "langwatch-declaration-source": "./src/drawers.ts",
+      "types": "./dist/drawers.d.ts",
+      "default": "./src/drawers.ts"
     }
   },
   "scripts": {

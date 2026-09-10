@@ -6,11 +6,11 @@ import {
   flattenMessages,
 } from "@langwatch/trace-web/surfaces/conversation";
 
-import type { StreamingMessage } from "../../../behavior/use-simulation-streaming-state.ts";
-import { useSequentialAudioPlayback } from "../../../behavior/use-sequential-audio-playback.ts";
-import type { NextSpeaker } from "../../elements/next-speaker.ts";
-import { TypingBubble } from "../../elements/typing-bubble.tsx";
-import { MediaPart } from "../media-part.tsx";
+import type { StreamingMessage } from "../../../../behavior/use-simulation-streaming-state.ts";
+import { useSequentialAudioPlayback } from "../../../../behavior/use-sequential-audio-playback.ts";
+import type { NextSpeaker } from "../../../elements/next-speaker.ts";
+import { TypingBubble } from "../../../elements/typing-bubble.tsx";
+import { MediaPart } from "../../media-part.tsx";
 import { RunTurnSeparator } from "./run-turn-separator.tsx";
 
 export interface ScenarioMessageRendererProps {

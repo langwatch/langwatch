@@ -2,29 +2,29 @@ import { Accordion, Box, Button, Heading, HStack, Skeleton, Text, VStack } from 
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
 import { lazy, Suspense, useCallback, useState } from "react";
 import { CopyButton } from "@langwatch/workflow-web/surfaces/copy-button";
-import { RunScenarioModal } from "../scenarios/run-scenario-modal.tsx";
-import { ScenarioFormDrawer } from "../scenarios/scenario-form-drawer.tsx";
+import { RunScenarioModal } from "../../scenarios/run-scenario-modal.tsx";
+import { ScenarioFormDrawer } from "../../scenarios/scenario-form-drawer.tsx";
 import { formatCost, formatLatency } from "@langwatch/design-system/metric-value-formatters";
-import { HandledErrorAlert } from "../../../behavior/errors.tsx";
+import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
 import { Chip } from "@langwatch/trace-web/surfaces/trace-drawer-chip";
 import { ConversationExpandContext } from "@langwatch/trace-web/surfaces/conversation-expand-context";
 import { useDejaViewLink } from "@langwatch/workflow-web/surfaces/deja-view-link";
 import { useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { api } from "../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/scenario-api.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ScenarioMessageRenderer } from "./scenario-message-renderer.tsx";
-import { hasNoResults } from "../../../model/scenario-run-status.utils.ts";
-import { CopyIdChip } from "../../elements/copy-id-chip.tsx";
-import { RunCriteriaChip } from "../../elements/run-criteria-chip.tsx";
-import { RunDetailSection } from "../../elements/run-detail-section.tsx";
-import { ScenarioRunActions } from "../../elements/scenario-run-actions.tsx";
-import { ScenarioRunStatusIcon } from "../../elements/scenario-run-status-icon.tsx";
-import { SimulationConsole } from "../../elements/simulation-console/simulation-console.tsx";
+import { hasNoResults } from "../../../../model/scenario-run-status.utils.ts";
+import { CopyIdChip } from "../../../elements/copy-id-chip.tsx";
+import { RunCriteriaChip } from "../../../elements/run-criteria-chip.tsx";
+import { RunDetailSection } from "../../../elements/run-detail-section.tsx";
+import { ScenarioRunActions } from "../../../elements/scenario-run-actions.tsx";
+import { ScenarioRunStatusIcon } from "../../../elements/scenario-run-status-icon.tsx";
+import { SimulationConsole } from "../../../elements/simulation-console/simulation-console.tsx";
 import { useRunAgainActions } from "./use-run-again-actions.ts";
-import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts.ts";
-import { useRunStateStream } from "../../../behavior/simulations/use-run-state-stream.ts";
+import { useRunDetailFacts } from "../../../../behavior/simulations/use-run-detail-facts.ts";
+import { useRunStateStream } from "../../../../behavior/simulations/use-run-state-stream.ts";
 import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
 
 /**
@@ -33,7 +33,7 @@ import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
  * chunk does not grow for v1 readers.
  */
 const AgentTestingRunDrawer = lazy(() =>
-  import("../agent-testing/drawers/agent-testing-run-drawer.tsx").then((module) => ({
+  import("../../agent-testing/drawers/agent-testing-run-drawer.tsx").then((module) => ({
     default: module.AgentTestingRunDrawer,
   })),
 );

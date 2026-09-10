@@ -12,11 +12,11 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "files": [
-    "./src/screens/licensing/index.ts",
-    "./src/surfaces/global-upgrade-modal/index.ts",
-    "./src/surfaces/license-error-interceptor/index.ts",
-    "./src/surfaces/resource-limits/index.ts",
-    "./src/surfaces/seat-types/index.ts"
+    "./src/licensing.ts",
+    "./src/ui/sections/global-upgrade-modal/index.ts",
+    "./src/ui/sections/license-error-interceptor/index.ts",
+    "./src/ui/sections/resource-limits/index.ts",
+    "./src/ui/sections/seat-types/index.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

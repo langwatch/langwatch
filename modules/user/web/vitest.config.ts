@@ -40,7 +40,7 @@ export default defineConfig({
         new URL("../../../enterprise/modules/governance/contract/src/index.ts", import.meta.url),
       ),
       "@langwatch/gateway-web/surfaces/budget-overview": fileURLToPath(
-        new URL("../../gateway/web/src/surfaces/budget-overview/index.ts", import.meta.url),
+        new URL("../../gateway/web/src/ui/sections/budget-overview/index.ts", import.meta.url),
       ),
       "@langwatch/model-provider-contract": fileURLToPath(
         new URL("../../model-provider/contract/src/index.ts", import.meta.url),

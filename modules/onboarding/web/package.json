@@ -13,10 +13,10 @@
       "types": "./dist/behavior/use-attribution-capture.d.ts",
       "default": "./src/behavior/use-attribution-capture.ts"
     },
-    "./screens/onboarding": {
-      "langwatch-declaration-source": "./src/screens/onboarding/index.ts",
-      "types": "./dist/screens/onboarding/index.d.ts",
-      "default": "./src/screens/onboarding/index.ts"
+    "./onboarding": {
+      "langwatch-declaration-source": "./src/onboarding.ts",
+      "types": "./dist/onboarding.d.ts",
+      "default": "./src/onboarding.ts"
     },
     "./surfaces/onboarding-mesh-background": {
       "langwatch-declaration-source": "./src/ui/elements/onboarding-mesh-background.tsx",

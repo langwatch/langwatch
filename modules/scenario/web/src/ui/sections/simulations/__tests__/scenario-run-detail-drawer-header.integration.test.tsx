@@ -25,7 +25,7 @@ const emptyQuery = vi.hoisted(() => () => ({
   isLoading: false,
 }));
 
-vi.mock("../../../../behavior/scenario-api.ts", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
       scenarios: {
@@ -77,19 +77,19 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
   },
 }));
 
-vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({
+vi.mock("../../../scenarios/scenario-form-drawer.tsx", () => ({
   ScenarioFormDrawer: ({ open }: { open?: boolean }) => (open ? <div>Edit Scenario</div> : null),
 }));
 
-vi.mock("../../scenarios/run-scenario-modal.tsx", () => ({
+vi.mock("../../../scenarios/run-scenario-modal.tsx", () => ({
   RunScenarioModal: () => null,
 }));
 
-vi.mock("../../../../behavior/use-simulation-update-listener.ts", () => ({
+vi.mock("../../../../../behavior/use-simulation-update-listener.ts", () => ({
   useSimulationUpdateListener: () => ({ isConnected: true }),
 }));
 
-vi.mock("../../../../behavior/use-simulation-streaming-state.ts", () => ({
+vi.mock("../../../../../behavior/use-simulation-streaming-state.ts", () => ({
   useSimulationStreamingState: () => ({
     streamingMessages: [],
     handleStreamingEvent: vi.fn(),
@@ -101,18 +101,18 @@ vi.mock("@langwatch/workflow-web/surfaces/deja-view-link", () => ({
   useDejaViewLink: () => ({ href: null }),
 }));
 
-vi.mock("../../../../behavior/use-drawer-run-callbacks.ts", () => ({
+vi.mock("../../../../../behavior/use-drawer-run-callbacks.ts", () => ({
   useDrawerRunCallbacks: () => ({
     onRunComplete: vi.fn(),
     onRunFailed: vi.fn(),
   }),
 }));
 
-vi.mock("../../use-run-scenario.ts", () => ({
+vi.mock("../../../use-run-scenario.ts", () => ({
   useRunScenario: () => ({ runScenario: vi.fn(), isRunning: false }),
 }));
 
-vi.mock("../../use-scenario-target.ts", () => ({
+vi.mock("../../../use-scenario-target.ts", () => ({
   useScenarioTarget: () => ({
     target: null,
     setTarget: vi.fn(),
@@ -123,7 +123,7 @@ vi.mock("../../use-scenario-target.ts", () => ({
   writeScenarioTarget: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-can.ts", () => ({
+vi.mock("../../../../../behavior/use-can.ts", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
@@ -142,7 +142,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   clearFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },

@@ -8,7 +8,7 @@ export * from "./features/blob-store/ui/blocks/blob-row.tsx";
 export * from "./features/blob-store/ui/blocks/blob-table.tsx";
 export * from "./features/blob-store/ui/sections/blob-store-body.tsx";
 export * from "./model/ops-formatters.ts";
-export * from "./surfaces/impersonation/impersonation-banner.tsx";
+export * from "./ui/sections/impersonation/impersonation-banner.tsx";
 export * from "./ui/elements/ops-json-viewer.tsx";
 export * from "./ui/elements/ops-kbd.tsx";
 export * from "./features/deja-view/ui/blocks/deja-view-aggregate-table.tsx";

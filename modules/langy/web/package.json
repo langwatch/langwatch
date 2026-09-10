@@ -16,50 +16,50 @@
       "default": "./src/index.ts"
     },
     "./surfaces/asaplangy": {
-      "langwatch-declaration-source": "./src/surfaces/asaplangy/index.ts",
-      "types": "./dist/surfaces/asaplangy/index.d.ts",
-      "default": "./src/surfaces/asaplangy/index.ts"
+      "langwatch-declaration-source": "./src/asaplangy.ts",
+      "types": "./dist/asaplangy.d.ts",
+      "default": "./src/asaplangy.ts"
     },
     "./surfaces/langy-page-registration": {
-      "langwatch-declaration-source": "./src/surfaces/langy-page-registration/index.ts",
-      "types": "./dist/surfaces/langy-page-registration/index.d.ts",
-      "default": "./src/surfaces/langy-page-registration/index.ts"
+      "langwatch-declaration-source": "./src/langy-page-registration.ts",
+      "types": "./dist/langy-page-registration.d.ts",
+      "default": "./src/langy-page-registration.ts"
     },
     "./surfaces/langy-theme.css": "./src/ui/elements/langy-theme.css",
-    "./screens/langy": {
-      "langwatch-declaration-source": "./src/screens/langy/index.ts",
-      "types": "./dist/screens/langy/index.d.ts",
-      "default": "./src/screens/langy/index.ts"
-    },
     "./surfaces/langy-store": {
-      "langwatch-declaration-source": "./src/surfaces/langy-store/index.ts",
-      "types": "./dist/surfaces/langy-store/index.d.ts",
-      "default": "./src/surfaces/langy-store/index.ts"
+      "langwatch-declaration-source": "./src/langy-store.ts",
+      "types": "./dist/langy-store.d.ts",
+      "default": "./src/langy-store.ts"
     },
     "./surfaces/langy-context": {
-      "langwatch-declaration-source": "./src/surfaces/langy-context/index.ts",
-      "types": "./dist/surfaces/langy-context/index.d.ts",
-      "default": "./src/surfaces/langy-context/index.ts"
+      "langwatch-declaration-source": "./src/langy-context.ts",
+      "types": "./dist/langy-context.d.ts",
+      "default": "./src/langy-context.ts"
     },
     "./surfaces/langy-mark": {
-      "langwatch-declaration-source": "./src/surfaces/langy-mark/index.ts",
-      "types": "./dist/surfaces/langy-mark/index.d.ts",
-      "default": "./src/surfaces/langy-mark/index.ts"
+      "langwatch-declaration-source": "./src/langy-mark.ts",
+      "types": "./dist/langy-mark.d.ts",
+      "default": "./src/langy-mark.ts"
     },
     "./surfaces/langy-panel-layout": {
-      "langwatch-declaration-source": "./src/surfaces/langy-panel-layout/index.ts",
-      "types": "./dist/surfaces/langy-panel-layout/index.d.ts",
-      "default": "./src/surfaces/langy-panel-layout/index.ts"
+      "langwatch-declaration-source": "./src/langy-panel-layout.ts",
+      "types": "./dist/langy-panel-layout.d.ts",
+      "default": "./src/langy-panel-layout.ts"
     },
     "./surfaces/langy-ui-actions": {
-      "langwatch-declaration-source": "./src/surfaces/langy-ui-actions/index.ts",
-      "types": "./dist/surfaces/langy-ui-actions/index.d.ts",
-      "default": "./src/surfaces/langy-ui-actions/index.ts"
+      "langwatch-declaration-source": "./src/langy-ui-actions.ts",
+      "types": "./dist/langy-ui-actions.d.ts",
+      "default": "./src/langy-ui-actions.ts"
     },
     "./surfaces/langy-code-access-preference": {
       "langwatch-declaration-source": "./src/ui/sections/langy-code-access-preference.tsx",
       "types": "./dist/ui/sections/langy-code-access-preference.d.ts",
       "default": "./src/ui/sections/langy-code-access-preference.tsx"
+    },
+    "./langy": {
+      "langwatch-declaration-source": "./src/langy.ts",
+      "types": "./dist/langy.d.ts",
+      "default": "./src/langy.ts"
     }
   },
   "scripts": {

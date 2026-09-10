@@ -11,7 +11,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/authz.ts", "./src/surfaces/scope-picker/index.ts"],
+  "files": ["./src/authz.ts", "./src/ui/sections/scope-picker/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",

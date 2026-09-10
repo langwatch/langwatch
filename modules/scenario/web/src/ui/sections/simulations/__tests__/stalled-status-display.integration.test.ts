@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { getOverlayConfig } from "@langwatch/suite-web/run-cards";
-import { STATUS_DISPLAY_TEXT_MAP } from "../../../../model/simulation-console/constants.ts";
+import { STATUS_DISPLAY_TEXT_MAP } from "../../../../../model/simulation-console/constants.ts";
 
 // ============================================================================
 // ScenarioRunStatusIcon - warning color distinct from error

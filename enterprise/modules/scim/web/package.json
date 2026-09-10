@@ -9,9 +9,9 @@
   ],
   "type": "module",
   "exports": {
-    "./screens/scim": {
-      "types": "./dist/screens/scim/index.d.ts",
-      "default": "./src/screens/scim/index.ts"
+    "./scim": {
+      "types": "./dist/scim.d.ts",
+      "default": "./src/scim.ts"
     }
   },
   "scripts": {

@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
   runState: null as ScenarioRunData | null,
 }));
 
-vi.mock("../../../../behavior/scenario-api.ts", () => ({
+vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     scenarios: {
       getRunState: {
@@ -38,10 +38,10 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
 
 // Child drawers and modals reach for tRPC and the router of their own; the
 // parameters section is composed above them.
-vi.mock("../../scenarios/run-scenario-modal.tsx", () => ({
+vi.mock("../../../scenarios/run-scenario-modal.tsx", () => ({
   RunScenarioModal: () => null,
 }));
-vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({
+vi.mock("../../../scenarios/scenario-form-drawer.tsx", () => ({
   ScenarioFormDrawer: () => null,
 }));
 
@@ -49,7 +49,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
   useDrawerParams: () => ({ scenarioRunId: "run_1" }),
 }));
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "test-project" },
   }),
@@ -57,30 +57,30 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
 vi.mock("@langwatch/workflow-web/surfaces/deja-view-link", () => ({
   useDejaViewLink: () => ({ href: null }),
 }));
-vi.mock("../../../../behavior/use-drawer-run-callbacks.ts", () => ({
+vi.mock("../../../../../behavior/use-drawer-run-callbacks.ts", () => ({
   useDrawerRunCallbacks: () => ({
     onRunComplete: vi.fn(),
     onRunFailed: vi.fn(),
   }),
 }));
-vi.mock("../../use-run-scenario.ts", () => ({
+vi.mock("../../../use-run-scenario.ts", () => ({
   useRunScenario: () => ({ runScenario: vi.fn(), isRunning: false }),
 }));
-vi.mock("../../use-scenario-target.ts", () => ({
+vi.mock("../../../use-scenario-target.ts", () => ({
   useScenarioTarget: () => ({
     target: null,
     setTarget: vi.fn(),
     hasPersistedTarget: false,
   }),
 }));
-vi.mock("../../../../behavior/use-simulation-streaming-state.ts", () => ({
+vi.mock("../../../../../behavior/use-simulation-streaming-state.ts", () => ({
   useSimulationStreamingState: () => ({
     streamingMessages: [],
     handleStreamingEvent: vi.fn(),
     clearCompleted: vi.fn(),
   }),
 }));
-vi.mock("../../../../behavior/use-simulation-update-listener.ts", () => ({
+vi.mock("../../../../../behavior/use-simulation-update-listener.ts", () => ({
   useSimulationUpdateListener: () => ({ isConnected: true }),
 }));
 vi.mock("@langwatch/ui-host/use-router", () => ({

@@ -128,7 +128,7 @@ describe("<ReturnToNewSimulationsBanner />", () => {
   // the banner's own tests stay green.
   describe("given the two previous screens", () => {
     const owningSurfaces = [
-      "src/screens/simulations/scenario-library.screen.tsx",
+      "src/ui/sections/simulations/scenario-library.screen.tsx",
       "src/ui/sections/suites/simulations-page.tsx",
     ];
 

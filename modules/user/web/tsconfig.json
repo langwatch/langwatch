@@ -20,7 +20,7 @@
         "../../../enterprise/modules/governance/contract/src/index.ts"
       ],
       "@langwatch/gateway-web/surfaces/budget-overview": [
-        "../../gateway/web/src/surfaces/budget-overview/index.ts"
+        "../../gateway/web/src/ui/sections/budget-overview/index.ts"
       ],
       "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"]
     },

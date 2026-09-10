@@ -1,5 +1,5 @@
-import type { FilterParam } from "../use-filter-params.ts";
-import type { FilterField } from "../../../model/filters/types.ts";
+import type { FilterParam } from "../../use-filter-params.ts";
+import type { FilterField } from "../../../../model/filters/types.ts";
 
 export const filterOutEmptyFilters = (
   filters: Partial<Record<FilterField, FilterParam | string>> | undefined,

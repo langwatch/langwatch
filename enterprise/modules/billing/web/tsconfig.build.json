@@ -12,9 +12,9 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "files": [
-    "./src/screens/billing/index.ts",
-    "./src/surfaces/contact-sales/index.ts",
-    "./src/surfaces/seat-proration-preview/index.ts"
+    "./src/billing.ts",
+    "./src/ui/sections/contact-sales/index.ts",
+    "./src/ui/sections/seat-proration-preview/index.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

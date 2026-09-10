@@ -18,20 +18,20 @@
       "default": "./src/behavior/personal-workspace-features-api.ts"
     },
     "./surfaces/department-picker": {
-      "types": "./dist/surfaces/department-picker/index.d.ts",
-      "default": "./src/surfaces/department-picker/index.ts"
+      "types": "./dist/department-picker.d.ts",
+      "default": "./src/department-picker.ts"
     },
     "./drawers": {
-      "types": "./dist/screens/drawers.d.ts",
-      "default": "./src/screens/drawers.ts"
+      "types": "./dist/drawers.d.ts",
+      "default": "./src/drawers.ts"
     },
     "./drawers/project": {
       "types": "./dist/ui/sections/project-drawers.d.ts",
       "default": "./src/ui/sections/project-drawers.ts"
     },
-    "./screens/organization": {
-      "types": "./dist/screens/organization/index.d.ts",
-      "default": "./src/screens/organization/index.ts"
+    "./organization": {
+      "types": "./dist/organization.d.ts",
+      "default": "./src/organization.ts"
     }
   },
   "scripts": {

@@ -9,17 +9,17 @@
   ],
   "type": "module",
   "exports": {
-    "./screens/billing": {
-      "types": "./dist/screens/billing/index.d.ts",
-      "default": "./src/screens/billing/index.ts"
+    "./billing": {
+      "types": "./dist/billing.d.ts",
+      "default": "./src/billing.ts"
     },
     "./surfaces/contact-sales": {
-      "types": "./dist/surfaces/contact-sales/index.d.ts",
-      "default": "./src/surfaces/contact-sales/index.ts"
+      "types": "./dist/ui/sections/contact-sales/index.d.ts",
+      "default": "./src/ui/sections/contact-sales/index.ts"
     },
     "./surfaces/seat-proration-preview": {
-      "types": "./dist/surfaces/seat-proration-preview/index.d.ts",
-      "default": "./src/surfaces/seat-proration-preview/index.ts"
+      "types": "./dist/ui/sections/seat-proration-preview/index.d.ts",
+      "default": "./src/ui/sections/seat-proration-preview/index.ts"
     }
   },
   "scripts": {

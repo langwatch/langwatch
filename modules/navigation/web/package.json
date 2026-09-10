@@ -13,12 +13,12 @@
       "default": "./src/ui/index.ts"
     },
     "./surfaces/command-bar": {
-      "types": "./dist/surfaces/command-bar/index.d.ts",
-      "default": "./src/surfaces/command-bar/index.ts"
+      "types": "./dist/command-bar.d.ts",
+      "default": "./src/command-bar.ts"
     },
-    "./screens/navigation": {
-      "types": "./dist/screens/navigation/index.d.ts",
-      "default": "./src/screens/navigation/index.ts"
+    "./navigation": {
+      "types": "./dist/navigation.d.ts",
+      "default": "./src/navigation.ts"
     },
     "./testing": {
       "types": "./dist/testing.d.ts",

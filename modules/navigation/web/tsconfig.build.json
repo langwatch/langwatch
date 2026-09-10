@@ -13,8 +13,8 @@
   },
   "files": [
     "./src/ui/index.ts",
-    "./src/surfaces/command-bar/index.ts",
-    "./src/screens/navigation/index.ts",
+    "./src/command-bar.ts",
+    "./src/navigation.ts",
     "./src/testing.tsx"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

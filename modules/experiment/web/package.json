@@ -61,15 +61,15 @@
       "types": "./dist/model/experiments-v3/mapping-validation.d.ts",
       "default": "./src/model/experiments-v3/mapping-validation.ts"
     },
-    "./screens/experiments": {
-      "langwatch-declaration-source": "./src/screens/experiments/index.ts",
-      "types": "./dist/screens/experiments/index.d.ts",
-      "default": "./src/screens/experiments/index.ts"
+    "./experiments": {
+      "langwatch-declaration-source": "./src/experiments.ts",
+      "types": "./dist/experiments.d.ts",
+      "default": "./src/experiments.ts"
     },
     "./surfaces/batch-results": {
-      "langwatch-declaration-source": "./src/surfaces/batch-results/index.ts",
-      "types": "./dist/surfaces/batch-results/index.d.ts",
-      "default": "./src/surfaces/batch-results/index.ts"
+      "langwatch-declaration-source": "./src/batch-results.ts",
+      "types": "./dist/batch-results.d.ts",
+      "default": "./src/batch-results.ts"
     },
     "./surfaces/workbench-store": {
       "langwatch-declaration-source": "./src/behavior/experiments-v3/use-evaluations-v3-store.ts",

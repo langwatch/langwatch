@@ -4,10 +4,10 @@
  */
 
 import { useCallback, useState } from "react";
-import type { TargetValue } from "../../../model/scenario-target.ts";
-import { useDrawerRunCallbacks } from "../../../behavior/use-drawer-run-callbacks.ts";
-import { useRunScenario } from "../use-run-scenario.ts";
-import { useScenarioTarget } from "../use-scenario-target.ts";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
+import { useDrawerRunCallbacks } from "../../../../behavior/use-drawer-run-callbacks.ts";
+import { useRunScenario } from "../../use-run-scenario.ts";
+import { useScenarioTarget } from "../../use-scenario-target.ts";
 
 export function useRunAgainActions({
   scenarioId,

@@ -13,10 +13,10 @@
   },
   "files": [
     "./src/index.ts",
-    "./src/surfaces/impersonation/index.ts",
-    "./src/screens/ops/index.ts",
-    "./src/screens/drawers.ts",
-    "./src/surfaces/keyboard-key/index.ts"
+    "./src/ui/sections/impersonation/index.ts",
+    "./src/ops.ts",
+    "./src/drawers.ts",
+    "./src/keyboard-key.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
