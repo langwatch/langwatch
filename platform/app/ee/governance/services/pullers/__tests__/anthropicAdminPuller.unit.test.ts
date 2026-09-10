@@ -9,6 +9,7 @@
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-088 (Decisions 6 and 7).
  */
+import { inspect } from "node:util";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
@@ -1087,13 +1088,11 @@ describe("the Anthropic Admin puller", () => {
       const error = (await run.catch((e: unknown) => e)) as DispatchError;
       // Three surfaces, because the reply reaches a person through any of
       // them: the log line (`message`), the sentence an admin is shown
-      // (`customerMessage`), and whatever an outbox row or a log serialiser
-      // writes down. The last is the widest — `Object.getOwnPropertyNames`
-      // pulls in `stack` and `cause`, which a plain `JSON.stringify` drops.
-      const serialised = JSON.stringify(
-        error,
-        Object.getOwnPropertyNames(error),
-      );
+      // (`customerMessage`), and whatever a log serialiser writes down. The
+      // last is rendered with `util.inspect`, which walks own properties,
+      // `stack` and a `cause` to any depth — so a body tucked inside an
+      // object-valued `cause` is caught rather than flattened away.
+      const serialised = inspect(error, { depth: null, showHidden: true });
       for (const fragment of [REFUSAL_KEY, REFUSAL_WORKSPACE, REFUSAL_PROSE]) {
         expect(error.message).not.toContain(fragment);
         expect(error.customerMessage).not.toContain(fragment);
