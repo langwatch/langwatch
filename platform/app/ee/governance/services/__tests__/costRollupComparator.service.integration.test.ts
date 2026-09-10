@@ -14,6 +14,10 @@
  * Decision: ADR-128.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import {
+  PULLED_USAGE_EVENT_TYPES,
+  PULLED_USAGE_EVENT_VERSIONS,
+} from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/constants";
 import { nanoid } from "nanoid";
 import { register } from "prom-client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -189,7 +193,11 @@ function observedData({
 /**
  * The payload that withdraws what one restatement key holds.
  *
- * Not yet implemented: `lw.obs.pulled_usage.retracted` (settlement 9).
+ * `lw.obs.pulled_usage.retracted` (settlement 9), whose shape is
+ * `PulledUsageRetractedEventSchema`. Nothing emits one in production yet: the
+ * detector that would compare an incoming key against the restatement index
+ * is the piece still to be written.
+ *
  * `costNanoMinor` is spelled out because the cell an event addresses is
  * derived through `readPulledUsageMoney`, which falls back to dollars when it
  * is absent - a retraction omitting it would address the wrong cell.
@@ -245,7 +253,13 @@ async function appendPulled({
         AggregateId: String(data.restatementKey),
         EventId: `evt-${nanoid()}`,
         EventType: type,
-        EventVersion: "2026-08-06",
+        // Each pulled event carries its OWN declared version. Hardcoding the
+        // observed one put a retraction on the log under a version that never
+        // described its shape.
+        EventVersion:
+          type === PULLED_USAGE_EVENT_TYPES.RETRACTED
+            ? PULLED_USAGE_EVENT_VERSIONS.RETRACTED
+            : PULLED_USAGE_EVENT_VERSIONS.OBSERVED,
         EventTimestamp: Date.now(),
         EventPayload: JSON.stringify(data),
         EventOccurredAt: occurredAt,
@@ -479,21 +493,6 @@ describe("CostRollupComparatorService", () => {
 
     /** @scenario "A retraction is dated to the day it corrects" */
     it("lets the day's own check see the retraction, so the day reads as agreeing", async () => {
-      // Named first so the failure says what is missing: the fold has no
-      // branch for this event type, so both the summary write below and the
-      // check's own re-derivation die on `utcDayOf(undefined)` before any
-      // assertion about the day is reached.
-      expect(() =>
-        governanceCostRollupKey({
-          type: "lw.obs.pulled_usage.retracted",
-          tenantId,
-          data: retractedData({
-            currencyCode: "EUR",
-            observedAtMs: CORRECTION_SEEN,
-          }),
-        } as never),
-      ).not.toThrow();
-
       const bill = observedData({
         costNanoMinor: BILLED,
         currencyCode: "EUR",
@@ -539,22 +538,12 @@ describe("CostRollupComparatorService", () => {
       expect(comparison.mismatches).toEqual([]);
     });
 
+    // Deliberately unbound, and the arm above carries the binding: both cover
+    // the one scenario "A retraction is dated to the day it corrects", and
+    // this is its negative half. Without it an implementation that dated the
+    // retraction either way passes the bound arm, so the scenario would be
+    // green while enforcing nothing.
     it("reports the day as drifting when the retraction is dated to its own arrival", async () => {
-      // Named first so the failure says what is missing: the fold has no
-      // branch for this event type, so both the summary write below and the
-      // check's own re-derivation die on `utcDayOf(undefined)` before any
-      // assertion about the day is reached.
-      expect(() =>
-        governanceCostRollupKey({
-          type: "lw.obs.pulled_usage.retracted",
-          tenantId,
-          data: retractedData({
-            currencyCode: "EUR",
-            observedAtMs: CORRECTION_SEEN,
-          }),
-        } as never),
-      ).not.toThrow();
-
       // The far side of the rule. Dated to the day the correction arrived, the
       // retraction is never read by the check for the day it corrects, and
       // that day is reported as drifting for as long as it is kept - so an

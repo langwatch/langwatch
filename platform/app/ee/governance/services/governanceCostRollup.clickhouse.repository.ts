@@ -198,8 +198,19 @@ const UNPRICED_CURRENCY_SAMPLE_LIMIT = 8;
  * it. A cell that names no currency at all is in the same position as a dollar
  * one: there is no other unit for its money to be in.
  *
- * Expects `LatestAmountNanoUsd` and `LatestAmountNanoMinor` in scope, plus the
- * `usd` query parameter.
+ * Expects `LatestAmountNanoUsd`, `LatestAmountNanoMinor` and `CurrencyCode`
+ * in scope, plus the `usd` query parameter.
+ *
+ * Applied by every read whose row can SAY it is short a currency —
+ * `sumDaysByLane`, `sumWindowByCurrency`, `sumDaysByProvider`,
+ * `sumDayRecordsByProvider` and `sumWindowByProvider`, each of which carries
+ * a per-currency line or a `CurrenciesWithoutUsdAmount` list beside the
+ * dollar figure. `sumWindowBySpender` deliberately keeps the stricter
+ * USD-only rule instead: its row has no currency channel at all, so narrowing
+ * the count there would turn a figure correctly WITHHELD into one silently
+ * short of the euro spend behind it, with nothing on the row to say so.
+ * Withholding is the safe direction when there is nowhere to state the
+ * caveat; give that row a currency line and it should move here.
  */
 const HOLDS_NO_AMOUNT_IN_ANY_CURRENCY_SQL = `
             LatestAmountNanoUsd IS NULL
@@ -382,6 +393,15 @@ export class GovernanceCostRollupClickHouseRepository {
         { error, tenantId: row.TenantId, day: row.Day },
         "Failed to insert governance_cost_rollup_restatement_index rows",
       );
+      // Rethrown, where `restatementKeysOf` swallows its own failure, and the
+      // difference is which failures are worth another attempt. An
+      // unparseable item map is unparseable every time, so retrying costs a
+      // fold and recovers nothing. A failed insert is the ordinary transient
+      // one, and both writes here are idempotent — the cell is a
+      // ReplacingMergeTree row at the same version, the index write skips
+      // keys already filed — so a retry costs one extra fold and gets the key
+      // recorded. Swallowing it would drop the row permanently and silently,
+      // and a key missing from the index is a reissue nothing can recognise.
       throw error;
     }
   }

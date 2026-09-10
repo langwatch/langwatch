@@ -163,11 +163,13 @@ function observed({
  * The event that withdraws what one restatement key holds in the cell it is
  * currently filed under.
  *
- * Not yet implemented: `lw.obs.pulled_usage.retracted`, emitted by the puller
- * worker at ingest - before the observation for the new cell - when the
- * restatement index says the key already sits somewhere else (settlement 9).
- * Built inline as a plain object because the schema does not carry the type
- * yet; these field names are the ones the implementer must add.
+ * `lw.obs.pulled_usage.retracted` (settlement 9), whose shape is
+ * `PulledUsageRetractedEventSchema`. Nothing emits one in production yet: the
+ * detector that would compare an incoming key against the restatement index
+ * is the piece still to be written.
+ *
+ * Built inline as a plain envelope, exactly like `observed` above, because
+ * the fold reads `type`, `tenantId` and `data` and nothing else.
  */
 function retracted({
   currencyCode = "USD",
@@ -210,11 +212,15 @@ function retracted({
 }
 
 /**
- * Not yet implemented: ClickHouse migration `00094` creates
- * `governance_cost_rollup_restatement_index`, a
- * `ReplacingMergeTree(EventTimestamp)` ordered by `(TenantId, RestatementKey)`
- * that records the cell each key is filed under. Named here on purpose - the
- * table does not exist, so every read of it is red.
+ * The index migration `00094` creates: a `ReplacingMergeTree(EventTimestamp)`
+ * ordered by `(TenantId, RestatementKey)` recording the cell each key was
+ * first filed under. The rollup store writes it in the same write as the
+ * cell.
+ *
+ * Spelled out rather than imported from the store's own constant on purpose.
+ * The assertion below is that the rows land in THIS table, and a name read
+ * from the code under test would follow it through a rename and keep passing
+ * against a table nothing else knows about.
  */
 const RESTATEMENT_INDEX_TABLE = "governance_cost_rollup_restatement_index";
 
@@ -995,19 +1001,6 @@ describe("governance cost rollup", () => {
 
     /** @scenario "A day whose bill changed currency is never counted under both" */
     it("holds the day under the second currency only", async () => {
-      // Named first so the failure says what is missing. The fold has no
-      // branch for this event type yet, so `dimensionsOf` falls through to the
-      // gateway shape and dies on `utcDayOf(undefined)` before any assertion
-      // about money is reached.
-      expect(() =>
-        governanceCostRollupKey(
-          retracted({
-            currencyCode: "EUR",
-            observedAtMs: SECOND_PULL,
-          }) as never,
-        ),
-      ).not.toThrow();
-
       await foldThroughExecutor(
         observed({
           costNanoMinor: BILLED,
@@ -1052,19 +1045,6 @@ describe("governance cost rollup", () => {
 
     /** @scenario "A correction still retracts its earlier version after the summary is rebuilt" */
     it("still retracts the earlier version once the correction arrives", async () => {
-      // Named first so the failure says what is missing. The fold has no
-      // branch for this event type yet, so `dimensionsOf` falls through to the
-      // gateway shape and dies on `utcDayOf(undefined)` before any assertion
-      // about money is reached.
-      expect(() =>
-        governanceCostRollupKey(
-          retracted({
-            currencyCode: "EUR",
-            observedAtMs: SECOND_PULL,
-          }) as never,
-        ),
-      ).not.toThrow();
-
       const history = [
         observed({
           costNanoMinor: BILLED,

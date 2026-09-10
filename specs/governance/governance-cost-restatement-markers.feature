@@ -155,7 +155,8 @@ Feature: A cost day says how much to trust its own figure
     Given a day was reported from a bill in one currency
     When the provider reissues that bill in another currency
     Then the day is marked as revised
-    And it names what it held before
+    And the currency it was first billed in names what it held before the reissue
+    And the currency it was reissued into names no earlier amount
     # A currency change is the provider correcting one charge, not a second
     # charge arriving. Read as new spend it would both double the day and
     # leave the reader with no marker explaining why the figure moved.

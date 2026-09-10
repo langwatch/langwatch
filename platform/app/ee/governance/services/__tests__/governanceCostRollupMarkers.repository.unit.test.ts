@@ -208,12 +208,15 @@ describe("where a restatement key currently sits", () => {
   /**
    * The index that makes a reissue recognisable (settlement 9).
    *
-   * Not yet implemented: ClickHouse migration `00094` creates
-   * `governance_cost_rollup_restatement_index`, a
-   * `ReplacingMergeTree(EventTimestamp)` ordered by `(TenantId,
-   * RestatementKey)` carrying the cell each key is filed under. Referenced by
-   * name here on purpose - the table does not exist yet, and the store does
-   * not write it, so this is red.
+   * Migration `00094` creates it: a `ReplacingMergeTree(EventTimestamp)`
+   * ordered by `(TenantId, RestatementKey)` carrying the cell each key was
+   * first filed under, and `recordRestatementKeys` writes it in the same
+   * `upsert` as the cell.
+   *
+   * Spelled out rather than imported from the repository's own constant on
+   * purpose. What is asserted below is that the rows land in THIS table, and
+   * a name read out of the code under test would follow it through a rename
+   * and go on passing against a table nothing else knows about.
    */
   const RESTATEMENT_INDEX_TABLE = "governance_cost_rollup_restatement_index";
 

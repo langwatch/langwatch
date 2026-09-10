@@ -1169,17 +1169,34 @@ obvious reading would get a wrong number.
   (`cellsWithoutPreviousAmount`), and above zero the dollar "was" is
   withheld rather than understated.
 - **A cell that came into existence at the revision contributes zero to
-  the prior total, and the discriminator is a business instant, not a
-  fold-time one.** `CreatedAt` is stamped by the fold's base class at
-  wall-clock time, so for any cell built from real events it lands days
-  or months after the business day and therefore after every revision of
-  it. Compared naively, **every folded cell would land in the created
-  bucket and every restated day would report having previously held
-  nothing.** The comparison is therefore only applied when the creation
-  stamp falls inside the business day it belongs to; outside it, the
-  stamp says nothing about business order and the cell falls through to
-  the untouched arm (`:749-751`, with the reasoning in the comment
-  above it).
+  the DOLLAR prior total and names NO earlier amount in its own
+  currency.** Those are two different answers to two different
+  questions, and the read returns both: `PriorAmountNanoUsd` is a stated
+  `0` — the cell did not exist then, so it held nothing — while
+  `PriorAmountNanoMinor` is `NULL`, because a currency that was not on
+  the day before the revision has no earlier figure at all rather than
+  an earlier figure of nothing. Because that is stated and not unknown,
+  the cell is excluded from the withheld count:
+  `CurrencyCellsWithoutPreviousMinor` counts only cells whose
+  per-currency prior is null and which the revision did NOT create
+  (`:712`, `:753-789`).
+- **The created/untouched discriminator reads a fold-time stamp, and is
+  trusted only where that stamp can stand in for a business instant.**
+  `CreatedAt` is stamped by the fold's base class at wall-clock time
+  (`abstractFoldProjection.ts:206-213`), so for any cell built from real
+  events it lands days or months after the business day and therefore
+  after every revision of it. Compared naively, **every folded cell
+  would land in the created bucket and every restated day would report
+  having previously held nothing.** The comparison is therefore only
+  applied when the creation stamp falls inside the business day it
+  belongs to; outside it, the stamp says nothing about business order
+  and the cell falls through to the untouched arm (`:749-752`, with the
+  reasoning in the comment above it). **Known bound, stated rather than
+  claimed away:** inside that window the stamp still records when the
+  cell was first WRITTEN, so a cell whose revision is folded before its
+  own original observation reads as created by that revision and reports
+  no prior. Closing it needs an order-independent business observation
+  instant persisted on the row, which this batch does not add.
 
 Related, and load-bearing for the same reads: **a cell billed in dollars
 whose amount was withdrawn may not be rescued by its minor-unit column.**
@@ -2044,12 +2061,18 @@ money tables, only the identity tables and read paths.
   - **§15 gains an EVENT DRIVEN block** stating the prior total's exact
     definition — *the sum of each cell's amount as it stood immediately
     before that day's latest revision* — and the two rules that make it
-    computable: a cell created at the revision contributes zero, and the
-    created/untouched discriminator is a business instant, because
-    `CreatedAt` is stamped at fold time and comparing it naively would put
-    **every** folded cell in the created bucket and report **every** restated
-    day as having previously held nothing (`:749-751`). Both were live
-    defects found and fixed in the implementation PR, not hypotheticals.
+    computable: a cell created at the revision contributes a stated zero to
+    the dollar prior total while naming NO earlier amount in its own
+    currency (`PriorAmountNanoMinor` is `NULL`, and the cell is left out of
+    the withheld count), and the created/untouched discriminator reads the
+    fold-time `CreatedAt` stamp, trusted only where it falls inside the
+    business day, because comparing it naively would put **every** folded
+    cell in the created bucket and report **every** restated day as having
+    previously held nothing (`:712`, `:749-789`). Both were live defects
+    found and fixed in the implementation PR, not hypotheticals. The block
+    also states the bound that remains: inside that window the stamp says
+    when the cell was first written, so a revision folded ahead of its own
+    original observation still reads as having created the cell.
   - **The unpriced-rescue rule is recorded with its location.** A dollar cell
     whose amount was withdrawn must not be rescued by its minor-unit column,
     which still holds the retracted figure. One constant,

@@ -351,7 +351,7 @@ Feature: Pulled provider usage becomes visible, attributed cost
   @unit
   Scenario: The conversation read asks the provider for the page size it intends to read
     When a source reads a period of conversations
-    Then the request states the page size it wants
+    Then one run brings back no more rows than it set out to read
     # Naming a row count without stating it as a preference leaves this
     # provider free to answer with its own far larger page, so the limit on
     # how many pages one run may take bounds a much bigger read than intended.
@@ -360,5 +360,5 @@ Feature: Pulled provider usage becomes visible, attributed cost
   Scenario: The agent list follows the provider next-page link
     Given a tenant holding more agents than one page returns
     When the agent list is read
-    Then the following pages are read as well
+    Then every agent the tenant holds is listed
     And no agent is left showing an identifier in place of its name

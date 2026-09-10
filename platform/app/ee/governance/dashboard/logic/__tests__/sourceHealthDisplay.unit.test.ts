@@ -17,8 +17,6 @@ import { UNHEALTHY_AFTER_CONSECUTIVE_FAILURES } from "@ee/governance/services/pu
 import { describe, expect, it } from "vitest";
 import {
   noDataSinceNotice,
-  // Not yet implemented: the badge a source whose last run stopped early
-  // reads as, beside healthy and failing.
   SOURCE_PARTIAL_META,
   SOURCE_STATUS_META,
   SOURCE_UNHEALTHY_META,
