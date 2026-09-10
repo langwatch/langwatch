@@ -11,7 +11,7 @@ import {
   type SignedLicense,
   type ValidationResult,
 } from "@langwatch/enterprise-licensing-contract";
-import { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
+import { LicenseCryptography } from "../app/licensing.infrastructure.ts";
 import { nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 
 /**
@@ -54,9 +54,8 @@ export type NodeLicenseCryptographyAdapterOptions = {
 };
 
 /** Node RSA implementation. It owns no environment lookup or global state. */
-export class NodeLicenseCryptographyAdapter extends LicenseCryptographyPort {
+export class NodeLicenseCryptographyAdapter implements LicenseCryptography {
   private constructor(private readonly publicKey: string) {
-    super();
   }
 
   static create(

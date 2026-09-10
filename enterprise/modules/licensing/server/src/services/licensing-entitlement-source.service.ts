@@ -4,9 +4,9 @@ import {
   type LicensingService,
   type ResolvePlanInput,
 } from "@langwatch/enterprise-licensing-contract";
-import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
-import type { OrganizationLicensePort } from "../ports/organization-license.port.ts";
-import { LicensePlanSourceService } from "../services/license-plan-source.service.ts";
+import type { LicenseCryptography } from "../app/licensing.infrastructure.ts";
+import type { OrganizationLicense } from "../app/licensing.infrastructure.ts";
+import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
 export type LicensingEntitlementSourceAdapterMode = "cloud" | "self-hosted";
 
@@ -32,8 +32,8 @@ export class LicensingEntitlementSourceAdapter implements EntitlementSource {
    * The whole licence leg of a deployment's plan resolution, in one call.
    */
   static forDeployment(options: {
-    licenses: OrganizationLicensePort;
-    cryptography: LicenseCryptographyPort;
+    licenses: OrganizationLicense;
+    cryptography: LicenseCryptography;
     isSaas: boolean;
   }): LicensingEntitlementSourceAdapter {
     return LicensingEntitlementSourceAdapter.create({

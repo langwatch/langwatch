@@ -1,4 +1,4 @@
-import { OrganizationLicensePort } from "./organization-license.port.ts";
+import { OrganizationLicense } from "../app/licensing.infrastructure.ts";
 import type { Instant } from "@langwatch/time";
 
 export type StoredLicense = {
@@ -15,10 +15,10 @@ export type OrganizationLicenseCandidate = {
 /**
  * Persistence and seat-count port. Concrete database adapters stay in apps,
  * except the one read plan resolution makes: `tryReadLicense` is inherited
- * from {@link OrganizationLicensePort} so a process that only resolves plans
+ * from {@link OrganizationLicense} so a process that only resolves plans
  * can compose that read alone, without the seat counts this port also carries.
  */
-export abstract class LicenseStoragePort extends OrganizationLicensePort {
+export abstract class LicenseStoragePort implements OrganizationLicense {
   abstract findOrganizationsWithLicense(): Promise<OrganizationLicenseCandidate[]>;
   abstract organizationExists(organizationId: string): Promise<boolean>;
   abstract storeLicense(organizationId: string, license: StoredLicense): Promise<void>;

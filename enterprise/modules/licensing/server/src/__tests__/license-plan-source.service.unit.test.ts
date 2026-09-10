@@ -1,8 +1,8 @@
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
-import { NodeLicenseCryptographyAdapter } from "../adapters/node.license-cryptography.adapter.ts";
-import { LicensingEntitlementSourceAdapter } from "../adapters/licensing.entitlement-source.adapter.ts";
-import { OrganizationLicensePort } from "../ports/organization-license.port.ts";
+import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
+import { LicensingEntitlementSourceAdapter } from "../services/licensing-entitlement-source.service.ts";
+import { OrganizationLicense } from "../app/licensing.infrastructure.ts";
 import {
   ENTERPRISE_LICENSE_KEY,
   EXPIRED_ENTERPRISE_LICENSE_KEY,
@@ -16,13 +16,12 @@ import { LicensePlanSourceService } from "../services/license-plan-source.servic
  */
 
 /** The one read the licence leg makes; nothing else is exercised. */
-class StoredLicense extends OrganizationLicensePort {
+class StoredLicense implements OrganizationLicense {
   static of(licenseKey: string | null): StoredLicense {
     return new StoredLicense(licenseKey);
   }
 
   private constructor(private readonly licenseKey: string | null) {
-    super();
   }
 
   async tryReadLicense(): Promise<string | null> {

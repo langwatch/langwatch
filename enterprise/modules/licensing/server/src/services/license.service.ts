@@ -13,10 +13,10 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import { licenseResourceCounts } from "@langwatch/plans";
 import { nowInstant, Temporal, toEpochMs, type Instant } from "@langwatch/time";
-import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
-import type { LicenseLoggerPort } from "../ports/license-logger.port.ts";
-import type { LicenseRetentionPort } from "../ports/license-retention.port.ts";
-import type { LicenseUsagePort } from "../ports/license-usage.port.ts";
+import type { LicenseCryptography } from "../app/licensing.infrastructure.ts";
+import type { LicenseLogger } from "../app/licensing.infrastructure.ts";
+import type { LicenseRetention } from "../app/licensing.infrastructure.ts";
+import type { LicenseUsage } from "../app/licensing.infrastructure.ts";
 import type { LicenseStoragePort } from "../ports/license-storage.port.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
@@ -42,16 +42,16 @@ export class LicenseServiceConfiguration {
   }
 }
 
-class SilentLicenseLogger implements LicenseLoggerPort {
+class SilentLicenseLogger implements LicenseLogger {
   error(): void {}
 }
 
 export type LicenseServiceOptions = {
   repository: LicenseStoragePort;
-  cryptography: LicenseCryptographyPort;
-  usage?: LicenseUsagePort;
-  retention?: LicenseRetentionPort;
-  logger?: LicenseLoggerPort;
+  cryptography: LicenseCryptography;
+  usage?: LicenseUsage;
+  retention?: LicenseRetention;
+  logger?: LicenseLogger;
   configuration?: LicenseServiceConfiguration;
 };
 
@@ -67,10 +67,10 @@ type LicenseResourceCounts = {
 /** Signed-license plan source and lifecycle service. */
 export class LicenseService extends LicensingServiceContract {
   private readonly repository: LicenseStoragePort;
-  private readonly cryptography: LicenseCryptographyPort;
-  private readonly usage: LicenseUsagePort | undefined;
-  private readonly retention: LicenseRetentionPort | undefined;
-  private readonly logger: LicenseLoggerPort;
+  private readonly cryptography: LicenseCryptography;
+  private readonly usage: LicenseUsage | undefined;
+  private readonly retention: LicenseRetention | undefined;
+  private readonly logger: LicenseLogger;
   private readonly configuration: LicenseServiceConfiguration;
   /**
    * The plan half, composed rather than restated. `getActivePlan` and `getSelfHostedPlan` are

@@ -1,6 +1,6 @@
 import { type PlanInfo, UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
-import { LicensingEntitlementSourceAdapter } from "../adapters/licensing.entitlement-source.adapter.ts";
+import { LicensingEntitlementSourceAdapter } from "../services/licensing-entitlement-source.service.ts";
 
 const ORGANIZATION_ID = "org-123";
 

@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { OrganizationLicensePort } from "../../ports/organization-license.port.ts";
+import { OrganizationLicense } from "../../app/licensing.infrastructure.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -8,13 +8,12 @@ import { OrganizationLicensePort } from "../../ports/organization-license.port.t
 export type OrganizationLicenseDatabase = Pick<PrismaClient, "organization">;
 
 /** The activated licence key, read off the organization row it is stored on. */
-export class PrismaOrganizationLicenseRepository extends OrganizationLicensePort {
+export class PrismaOrganizationLicenseRepository implements OrganizationLicense {
   static create(database: OrganizationLicenseDatabase): PrismaOrganizationLicenseRepository {
     return new PrismaOrganizationLicenseRepository(database);
   }
 
   private constructor(private readonly prisma: OrganizationLicenseDatabase) {
-    super();
   }
 
   async tryReadLicense(organizationId: string): Promise<string | null> {

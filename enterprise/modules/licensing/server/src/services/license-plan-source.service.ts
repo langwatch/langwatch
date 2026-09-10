@@ -3,14 +3,14 @@ import {
   mapToPlanInfo,
   type PlanInfo,
 } from "@langwatch/enterprise-licensing-contract";
-import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
-import type { OrganizationLicensePort } from "../ports/organization-license.port.ts";
+import type { LicenseCryptography } from "../app/licensing.infrastructure.ts";
+import type { OrganizationLicense } from "../app/licensing.infrastructure.ts";
 
 export type LicensePlanSourceOptions = {
   /** Where the organization's activated licence key is read from. */
-  licenses: OrganizationLicensePort;
+  licenses: OrganizationLicense;
   /** How a key is parsed, verified and dated. */
-  cryptography: LicenseCryptographyPort;
+  cryptography: LicenseCryptography;
 };
 
 /**
@@ -23,8 +23,8 @@ export class LicensePlanSourceService {
   }
 
   private constructor(
-    private readonly licenses: OrganizationLicensePort,
-    private readonly cryptography: LicenseCryptographyPort,
+    private readonly licenses: OrganizationLicense,
+    private readonly cryptography: LicenseCryptography,
   ) {}
 
   /** The Cloud reading: signature AND term, so a lapsed contract steps aside. */

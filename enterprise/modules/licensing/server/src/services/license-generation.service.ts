@@ -6,7 +6,7 @@ import {
   type LicenseData,
 } from "@langwatch/enterprise-licensing-contract";
 import { getPlanTemplate, quotedPlanLimits } from "@langwatch/plans";
-import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
+import type { LicenseCryptography } from "../app/licensing.infrastructure.ts";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
 /**
@@ -14,11 +14,11 @@ import { fromDate, nowInstant, toDate } from "@langwatch/time";
  * access. Private key and all parameters passed explicitly.
  */
 export class LicenseGenerationService extends LicenseGenerationCapability {
-  private constructor(private readonly cryptography: LicenseCryptographyPort) {
+  private constructor(private readonly cryptography: LicenseCryptography) {
     super();
   }
 
-  static create(cryptography: LicenseCryptographyPort): LicenseGenerationService {
+  static create(cryptography: LicenseCryptography): LicenseGenerationService {
     return new LicenseGenerationService(cryptography);
   }
 

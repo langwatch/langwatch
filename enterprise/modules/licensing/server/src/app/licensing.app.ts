@@ -21,21 +21,21 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { LicenseCryptographyPort } from "../ports/license-cryptography.port.ts";
-import type { LicenseLoggerPort } from "../ports/license-logger.port.ts";
-import type { LicenseRetentionPort } from "../ports/license-retention.port.ts";
+import type { LicenseCryptography } from "./licensing.infrastructure.ts";
+import type { LicenseLogger } from "./licensing.infrastructure.ts";
+import type { LicenseRetention } from "./licensing.infrastructure.ts";
 import type { LicenseStoragePort } from "../ports/license-storage.port.ts";
-import type { LicenseUsagePort } from "../ports/license-usage.port.ts";
-import { NodeLicenseCryptographyAdapter } from "../adapters/node.license-cryptography.adapter.ts";
+import type { LicenseUsage } from "./licensing.infrastructure.ts";
+import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
 import { fromDate, nowInstant, Temporal } from "@langwatch/time";
 
 /** What the process composes this feature's application from. */
 export type LicensingInfrastructure = Readonly<{
   repository: LicenseStoragePort;
-  usage?: LicenseUsagePort;
-  retention?: LicenseRetentionPort;
-  logger?: LicenseLoggerPort;
+  usage?: LicenseUsage;
+  retention?: LicenseRetention;
+  logger?: LicenseLogger;
   /**
    * The provider name the deployment is CONFIGURED with, before the license
    * gate and the mount inspector have their say. `null` or `"email"` means
@@ -83,12 +83,12 @@ export class LicensingApp implements LicensingApiContract {
   static readonly configSchema = licensingServerConfigSchema;
 
   readonly #service: LicenseService;
-  readonly #cryptography: LicenseCryptographyPort;
+  readonly #cryptography: LicenseCryptography;
   readonly #runtime: LicensingRuntime;
 
   private constructor(
     service: LicenseService,
-    cryptography: LicenseCryptographyPort,
+    cryptography: LicenseCryptography,
     runtime: LicensingRuntime,
   ) {
     this.#service = service;

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  LicenseRetentionPort,
+  LicenseRetention,
   LicenseService,
   LicenseServiceConfiguration,
   LicenseStoragePort,
@@ -49,7 +49,7 @@ class MemoryLicenseRepository extends LicenseStoragePort {
   }
 }
 
-class MemoryLicenseRetention extends LicenseRetentionPort {
+class MemoryLicenseRetention implements LicenseRetention {
   rules: Array<{ scopeType: string; scopeId: string; category: string }> = [];
   readonly written: Array<{
     organizationId: string;

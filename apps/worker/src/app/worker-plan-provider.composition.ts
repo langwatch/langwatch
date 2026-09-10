@@ -5,7 +5,7 @@ import {
 import {
   LicensingEntitlementSourceAdapter,
   NodeLicenseCryptographyAdapter,
-  type OrganizationLicensePort,
+  type OrganizationLicense,
 } from "@langwatch/enterprise-licensing-server";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { EntitlementService } from "@langwatch/entitlement-server";
@@ -23,7 +23,7 @@ export type WorkerPlanProviderOptions = Readonly<{
    * Where an organization's activated licence key is read from. Absent exactly when this graph
    * opened no typed Prisma client.
    */
-  licenses?: OrganizationLicensePort;
+  licenses?: OrganizationLicense;
   /**
    * The public key a licence signature is checked against, where the operator rotated it. The SAME
    * variable the interactive process reads. Two processes checking a signature against different

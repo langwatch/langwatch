@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import {
   LicenseGenerationService,
-  LicenseLoggerPort,
+  LicenseLogger,
   LicenseStoragePort,
-  LicenseRetentionPort,
+  LicenseRetention,
   LicenseService,
   LicenseServiceConfiguration,
-  LicenseUsagePort,
+  LicenseUsage,
   NodeLicenseCryptographyAdapter,
   type StoredLicense,
 } from "../index.ts";
@@ -74,9 +74,8 @@ class MemoryLicenseRepository extends LicenseStoragePort {
   }
 }
 
-class FixedLicenseUsage extends LicenseUsagePort {
+class FixedLicenseUsage implements LicenseUsage {
   constructor(private readonly count: number | "unknown" | "unlimited") {
-    super();
   }
 
   async getCurrentMonthCount(): Promise<number | "unknown" | "unlimited"> {
@@ -84,7 +83,7 @@ class FixedLicenseUsage extends LicenseUsagePort {
   }
 }
 
-class MemoryLicenseRetention extends LicenseRetentionPort {
+class MemoryLicenseRetention implements LicenseRetention {
   rules: Array<{ scopeType: string; scopeId: string; category: string }> = [];
   readonly written: Array<{
     organizationId: string;
@@ -107,7 +106,7 @@ class MemoryLicenseRetention extends LicenseRetentionPort {
   }
 }
 
-class RecordingLicenseLogger extends LicenseLoggerPort {
+class RecordingLicenseLogger implements LicenseLogger {
   readonly errors: Array<{ fields: Record<string, unknown>; message: string }> = [];
 
   error(fields: Record<string, unknown>, message: string): void {

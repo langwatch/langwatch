@@ -1,6 +1,6 @@
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
 import type { BillingSubscriptionPort } from "@langwatch/enterprise-billing-server";
-import { OrganizationLicensePort } from "@langwatch/enterprise-licensing-server";
+import { OrganizationLicense } from "@langwatch/enterprise-licensing-server";
 import {
   ENTERPRISE_LICENSE_KEY,
   TEST_PUBLIC_KEY,
@@ -94,8 +94,8 @@ function subscriptions(active: BillingSubscriptionRecord | null): BillingSubscri
  * one, so what these tests exercise is the whole licence leg: the read, the
  * signature check, the deployment-mode reading and the plan it answers.
  */
-function licenses(licenseKey: string | null): OrganizationLicensePort {
-  return { tryReadLicense: async () => licenseKey } as OrganizationLicensePort;
+function licenses(licenseKey: string | null): OrganizationLicense {
+  return { tryReadLicense: async () => licenseKey } as OrganizationLicense;
 }
 
 describe("composeApiPlanProvider", () => {

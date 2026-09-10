@@ -24,7 +24,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import {
   LicensingEntitlementSourceAdapter,
   NodeLicenseCryptographyAdapter,
-  type OrganizationLicensePort,
+  type OrganizationLicense,
 } from "@langwatch/enterprise-licensing-server";
 import type {
   PlanProvider,
@@ -67,7 +67,7 @@ export type ApiPlanProviderOptions = Readonly<{
   /**
    * Where an organization's activated licence key is read from.
    */
-  licenses?: OrganizationLicensePort;
+  licenses?: OrganizationLicense;
   /**
    * The public key a licence signature is checked against, where the operator rotated it.
    * Absent means the key embedded in the licensing contract, which is what verifies every

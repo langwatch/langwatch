@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { NodeLicenseCryptographyAdapter } from "../adapters/node.license-cryptography.adapter.ts";
+import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
 import { TEST_PUBLIC_KEY, ENTERPRISE_LICENSE_KEY } from "../testing.ts";
 import { LicenseService } from "../services/license.service.ts";
 import { LicenseStoragePort, type StoredLicense } from "../ports/license-storage.port.ts";

@@ -1,4 +1,4 @@
-export { NodeLicenseCryptographyAdapter } from "./adapters/node.license-cryptography.adapter.ts";
+export { NodeLicenseCryptographyAdapter } from "./services/node-license-cryptography.service.ts";
 export {
   LicensingApp,
   type LicensingInfrastructure,
@@ -18,13 +18,17 @@ export {
   LicensingEntitlementSourceAdapter,
   type LicensePlanReader,
   type LicensingEntitlementSourceAdapterMode,
-} from "./adapters/licensing.entitlement-source.adapter.ts";
+} from "./services/licensing-entitlement-source.service.ts";
 export { PrismaOrganizationLicenseRepository } from "./repositories/prisma/prisma.organization-license.repository.ts";
-export { LicenseCryptographyPort } from "./ports/license-cryptography.port.ts";
-export { OrganizationLicensePort } from "./ports/organization-license.port.ts";
-export { LicenseLoggerPort } from "./ports/license-logger.port.ts";
-export { LicenseRetentionPort, type LicenseRetentionRule } from "./ports/license-retention.port.ts";
-export { LicenseUsagePort, type LicenseUsageCount } from "./ports/license-usage.port.ts";
+export {
+  type LicenseCryptography,
+  type LicenseLogger,
+  type LicenseRetention,
+  type LicenseRetentionRule,
+  type LicenseUsage,
+  type LicenseUsageCount,
+  type OrganizationLicense,
+} from "./app/licensing.infrastructure.ts";
 export {
   LicenseStoragePort,
   type OrganizationLicenseCandidate,
