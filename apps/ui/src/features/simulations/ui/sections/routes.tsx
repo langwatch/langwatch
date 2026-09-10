@@ -4,7 +4,7 @@
  * address reads as "not found" for everyone while it's off, not "you may not".
  */
 
-import { scenarioScreens } from "@langwatch/scenario-web/screens/simulations";
+import { scenarioScreens } from "@langwatch/scenario-web/simulations";
 import type { ComponentType } from "react";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

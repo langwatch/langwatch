@@ -4,7 +4,7 @@
  * page, the command palette and the Teams page.
  */
 
-import { organizationApi } from "@langwatch/organization-web/screens/organization";
+import { organizationApi } from "@langwatch/organization-web/organization";
 import { lazyDrawer } from "@langwatch/ui-drawer";
 import { uiFeature } from "../../behavior/ui-feature";
 import { organizationPageLoaders } from "./ui/sections/organization-routes";

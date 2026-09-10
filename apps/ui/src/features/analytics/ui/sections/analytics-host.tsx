@@ -7,7 +7,7 @@ import {
   analyticsApi,
   AnalyticsHostProvider,
   type AnalyticsHostPort,
-} from "@langwatch/analytics-web/screens/analytics";
+} from "@langwatch/analytics-web/analytics";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

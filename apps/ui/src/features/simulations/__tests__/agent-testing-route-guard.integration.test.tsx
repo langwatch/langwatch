@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const guard = vi.hoisted(() => ({ flagEnabled: true, permitted: true }));
 
-vi.mock("@langwatch/scenario-web/screens/simulations", () => ({
+vi.mock("@langwatch/scenario-web/simulations", () => ({
   scenarioScreens: {
     simulations: async () => ({ default: () => null }),
     scenarioLibrary: async () => ({ default: () => null }),

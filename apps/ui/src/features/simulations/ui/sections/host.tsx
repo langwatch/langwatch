@@ -8,7 +8,7 @@ import {
   scenarioApi,
   ScenarioHostProvider,
   type ScenarioHostPort,
-} from "@langwatch/scenario-web/screens/simulations";
+} from "@langwatch/scenario-web/simulations";
 import { useMemo, type ComponentType, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

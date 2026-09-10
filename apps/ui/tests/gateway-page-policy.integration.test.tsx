@@ -8,9 +8,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/gateway-web/screens/gateway", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/gateway-web/screens/gateway")>(
-    "@langwatch/gateway-web/screens/gateway",
+vi.mock("@langwatch/gateway-web/gateway", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/gateway-web/gateway")>(
+    "@langwatch/gateway-web/gateway",
   );
   const Screen = () => <div>the gateway page</div>;
   const emptyQuery = { data: undefined, isLoading: false };

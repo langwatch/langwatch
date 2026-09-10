@@ -4,7 +4,7 @@
  * `/:project/setup` is inside it, the only key here guarded by `project:view`.
  */
 
-import { onboardingScreens } from "@langwatch/onboarding-web/screens/onboarding";
+import { onboardingScreens } from "@langwatch/onboarding-web/onboarding";
 import type { ComponentType, ReactNode } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

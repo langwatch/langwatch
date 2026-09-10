@@ -4,7 +4,7 @@
  * renders in place, not a redirect — that would hide the address exists.
  */
 
-import { opsScreens, type BackofficeResource } from "@langwatch/ops-web/screens/ops";
+import { opsScreens, type BackofficeResource } from "@langwatch/ops-web/ops";
 import type { ComponentType } from "react";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

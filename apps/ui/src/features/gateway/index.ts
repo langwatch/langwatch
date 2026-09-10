@@ -3,7 +3,7 @@
  * `routingPolicy` — a virtual key's detail page links to it by name.
  */
 
-import { gatewayApi } from "@langwatch/gateway-web/screens/gateway";
+import { gatewayApi } from "@langwatch/gateway-web/gateway";
 import { lazyDrawer } from "@langwatch/ui-drawer";
 import { uiFeature } from "../../behavior/ui-feature";
 import { gatewayPageLoaders } from "./ui/sections/gateway-routes";

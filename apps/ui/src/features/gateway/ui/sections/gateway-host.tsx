@@ -9,7 +9,7 @@ import {
   GatewayHostProvider,
   type GatewayHostPort,
   type GatewayOrganization,
-} from "@langwatch/gateway-web/screens/gateway";
+} from "@langwatch/gateway-web/gateway";
 import { useMemo, type ReactNode } from "react";
 import { DRAWER_OPEN_PARAM } from "../../../../model/ui-drawer-address";
 import { readPublicAppConfig } from "../../../../behavior/public-config";

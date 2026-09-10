@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { agentApi, type AgentBrowser } from "@langwatch/agent-web/agent-client";
 import { WorkflowSelectorDrawer as WorkflowSelector } from "@langwatch/agent-web/agent-editors";
-import { scenarioApi, useScenarioHost } from "@langwatch/scenario-web/screens/simulations";
+import { scenarioApi, useScenarioHost } from "@langwatch/scenario-web/simulations";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { EmojiPickerModal } from "@langwatch/workflow-web/surfaces/emoji-picker-modal";

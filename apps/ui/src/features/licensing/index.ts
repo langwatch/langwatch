@@ -4,7 +4,7 @@
  * (`ui-family-move-manifests.md`).
  */
 
-import { licensingApi } from "@langwatch/enterprise-licensing-web/screens/licensing";
+import { licensingApi } from "@langwatch/enterprise-licensing-web/licensing";
 import { uiFeature } from "../../behavior/ui-feature";
 import { licensingFailures } from "./behavior/licensing-failures";
 import { licensingPageLoaders } from "./ui/sections/licensing-routes";

@@ -5,7 +5,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { navigationApi } from "@langwatch/navigation-web/screens/navigation";
+import { navigationApi } from "@langwatch/navigation-web/navigation";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
 import {
   WithStubNavigationHost,
@@ -53,14 +53,14 @@ vi.mock("@langwatch/notification-web/email-suppressions", () => ({
   NotificationHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@langwatch/enterprise-licensing-web/screens/licensing", () => ({
+vi.mock("@langwatch/enterprise-licensing-web/licensing", () => ({
   licensingApi: apiNode(),
   licensingScreens: { license: screenFor("the license page") },
   LicensingHostPort: class {},
   LicensingHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@langwatch/enterprise-billing-web/screens/billing", () => ({
+vi.mock("@langwatch/enterprise-billing-web/billing", () => ({
   billingApi: apiNode(),
   billingScreens: {
     plans: screenFor("the plans page"),
@@ -71,7 +71,7 @@ vi.mock("@langwatch/enterprise-billing-web/screens/billing", () => ({
   BillingHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@langwatch/enterprise-scim-web/screens/scim", () => ({
+vi.mock("@langwatch/enterprise-scim-web/scim", () => ({
   scimApi: apiNode(),
   scimScreens: { scim: screenFor("the scim page") },
   ScimHostPort: class {},
@@ -93,7 +93,7 @@ vi.mock("@langwatch/project-web/screens/project-settings", () => ({
   ProjectHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@langwatch/organization-web/screens/organization", () => ({
+vi.mock("@langwatch/organization-web/organization", () => ({
   organizationApi: apiNode(),
   organizationScreens: {
     auditLog: screenFor("the audit log page"),

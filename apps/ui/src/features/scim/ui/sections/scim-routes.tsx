@@ -1,6 +1,6 @@
 /** Which page key the SCIM address answers: `organization:manage`, the administrator's grant, since a SCIM token creates and deactivates people. */
 
-import { scimScreens } from "@langwatch/enterprise-scim-web/screens/scim";
+import { scimScreens } from "@langwatch/enterprise-scim-web/scim";
 import type { ComponentType } from "react";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

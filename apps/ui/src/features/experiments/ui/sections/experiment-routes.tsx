@@ -7,7 +7,7 @@
 import {
   experimentScreens,
   EXPERIMENTS_PAGE_PERMISSION,
-} from "@langwatch/experiment-web/screens/experiments";
+} from "@langwatch/experiment-web/experiments";
 import type { ReactNode } from "react";
 
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

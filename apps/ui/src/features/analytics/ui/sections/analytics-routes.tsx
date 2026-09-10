@@ -7,7 +7,7 @@
 import {
   analyticsScreens,
   type CustomGraphScreenMode,
-} from "@langwatch/analytics-web/screens/analytics";
+} from "@langwatch/analytics-web/analytics";
 import type { ComponentType } from "react";
 
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";

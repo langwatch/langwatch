@@ -3,7 +3,7 @@
  * as billing and licensing (`ui-family-move-manifests.md`).
  */
 
-import { scimApi } from "@langwatch/enterprise-scim-web/screens/scim";
+import { scimApi } from "@langwatch/enterprise-scim-web/scim";
 import { uiFeature } from "../../behavior/ui-feature";
 import { scimPageLoaders } from "./ui/sections/scim-routes";
 

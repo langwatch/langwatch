@@ -4,7 +4,7 @@
  * command palette.
  */
 
-import { opsApi } from "@langwatch/ops-web/screens/ops";
+import { opsApi } from "@langwatch/ops-web/ops";
 import { lazyDrawer } from "@langwatch/ui-drawer";
 import { uiFeature } from "../../behavior/ui-feature";
 import { opsPageLoaders } from "./ui/sections/ops-routes";

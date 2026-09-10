@@ -7,7 +7,7 @@ import type {
   GatewayOrganization,
   GatewayProject,
   GatewayTeam,
-} from "@langwatch/gateway-web/screens/gateway";
+} from "@langwatch/gateway-web/gateway";
 
 export function resolveGatewayOrganization({
   organizations,

@@ -4,7 +4,7 @@
  * is what stops a landing decision resolving against a flag still in flight.
  */
 
-import type { NavigationFlagReading } from "@langwatch/navigation-web/screens/navigation";
+import type { NavigationFlagReading } from "@langwatch/navigation-web/navigation";
 
 export function readNavigationFeatureFlag({
   answer,

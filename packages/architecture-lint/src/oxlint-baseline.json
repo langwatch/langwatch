@@ -243,23 +243,23 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/billing/web/src/screens/billing/plans-comparison.tsx",
+      "key": "cognitive-complexity|enterprise/modules/billing/web/src/ui/sections/plans-comparison.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/billing/web/src/screens/billing/subscription-page.tsx",
+      "key": "cognitive-complexity|enterprise/modules/billing/web/src/ui/sections/subscription-page.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/billing/web/src/screens/billing/usage.screen.tsx",
+      "key": "cognitive-complexity|enterprise/modules/billing/web/src/ui/sections/usage.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/billing/web/src/screens/billing/use-subscription-actions.ts",
+      "key": "cognitive-complexity|enterprise/modules/billing/web/src/ui/sections/use-subscription-actions.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/billing/web/src/screens/billing/user-management-drawer.tsx",
+      "key": "cognitive-complexity|enterprise/modules/billing/web/src/ui/sections/user-management-drawer.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -315,31 +315,31 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/governance/web/src/screens/governance/governance-anomaly-rules.screen.tsx",
+      "key": "cognitive-complexity|enterprise/modules/governance/web/src/ui/sections/governance/governance-anomaly-rules.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/governance/web/src/screens/governance/governance-overview.screen.tsx",
+      "key": "cognitive-complexity|enterprise/modules/governance/web/src/ui/sections/governance/governance-overview.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/governance/web/src/screens/governance/governance-team.screen.tsx",
+      "key": "cognitive-complexity|enterprise/modules/governance/web/src/ui/sections/governance/governance-team.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/governance/web/src/screens/governance/governance-teams.screen.tsx",
+      "key": "cognitive-complexity|enterprise/modules/governance/web/src/ui/sections/governance/governance-teams.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/governance/web/src/screens/governance/governance-user.screen.tsx",
+      "key": "cognitive-complexity|enterprise/modules/governance/web/src/ui/sections/governance/governance-user.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/licensing/web/src/screens/licensing/license-generator-form.tsx",
+      "key": "cognitive-complexity|enterprise/modules/licensing/web/src/ui/sections/license-generator-form.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|enterprise/modules/licensing/web/src/screens/licensing/no-license-card.tsx",
+      "key": "cognitive-complexity|enterprise/modules/licensing/web/src/ui/sections/no-license-card.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -519,15 +519,15 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/analytics/web/src/screens/analytics/analytics-evaluations.screen.tsx",
+      "key": "cognitive-complexity|modules/analytics/web/src/ui/sections/analytics/analytics-evaluations.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/analytics/web/src/screens/analytics/analytics-reports.screen.tsx",
+      "key": "cognitive-complexity|modules/analytics/web/src/ui/sections/analytics/analytics-reports.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/analytics/web/src/screens/analytics/custom-graph.screen.tsx",
+      "key": "cognitive-complexity|modules/analytics/web/src/ui/sections/analytics/custom-graph.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -591,15 +591,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/annotation/web/src/screens/annotation-scores/annotation-score-form.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/annotation/web/src/screens/annotation-scores/annotation-scores.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/annotation/web/src/screens/annotations/my-queue.screen.tsx",
+      "key": "cognitive-complexity|modules/annotation/web/src/ui/sections/annotation-score-form.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -635,18 +627,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/api-key/web/src/screens/api-key/api-keys.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/api-key/web/src/screens/api-key/cli-auth.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/api-key/web/src/screens/authorize/mcp-authorize.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/api-key/web/src/ui/sections/create-api-key-drawer.tsx",
       "measured": "2026-09-06"
     },
@@ -679,18 +659,6 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/auth/web/src/screens/auth/sign-in-error.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/auth/web/src/screens/auth/signin.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/auth/web/src/screens/auth/signup.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "cognitive-complexity|modules/auth/web/src/ui/sections/credential-sign-in-form.tsx",
       "measured": "2026-09-06"
     },
@@ -711,7 +679,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx",
+      "key": "cognitive-complexity|modules/authz/web/src/ui/sections/scope-picker/scope-chip-picker.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -792,10 +760,6 @@
     },
     {
       "key": "cognitive-complexity|modules/automation/web/src/features/liquid-editor/model/liquid-json-substitution.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "cognitive-complexity|modules/automation/web/src/screens/automations/automations.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -931,7 +895,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/dataset/web/src/screens/datasets/dataset-editor.screen.tsx",
+      "key": "cognitive-complexity|modules/dataset/web/src/ui/sections/dataset-editor.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1035,7 +999,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/evaluator/web/src/screens/evaluators/evaluators.screen.tsx",
+      "key": "cognitive-complexity|modules/evaluator/web/src/ui/sections/evaluators.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1187,11 +1151,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/experiment/web/src/screens/experiments/experiments.screen.tsx",
+      "key": "cognitive-complexity|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/experiment/web/src/screens/experiments/workbench.screen.tsx",
+      "key": "cognitive-complexity|modules/experiment/web/src/ui/sections/experiments/workbench.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1363,31 +1327,31 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/gateway/web/src/screens/gateway/gateway-budget.screen.tsx",
+      "key": "cognitive-complexity|modules/gateway/web/src/ui/sections/gateway/gateway-budget.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/gateway/web/src/screens/gateway/gateway-budgets.screen.tsx",
+      "key": "cognitive-complexity|modules/gateway/web/src/ui/sections/gateway/gateway-budgets.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/gateway/web/src/screens/gateway/gateway-cache-rules.screen.tsx",
+      "key": "cognitive-complexity|modules/gateway/web/src/ui/sections/gateway/gateway-cache-rules.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/gateway/web/src/screens/gateway/gateway-guardrails.screen.tsx",
+      "key": "cognitive-complexity|modules/gateway/web/src/ui/sections/gateway/gateway-guardrails.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/gateway/web/src/screens/gateway/gateway-usage.screen.tsx",
+      "key": "cognitive-complexity|modules/gateway/web/src/ui/sections/gateway/gateway-usage.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/gateway/web/src/screens/gateway/gateway-virtual-key.screen.tsx",
+      "key": "cognitive-complexity|modules/gateway/web/src/ui/sections/gateway/gateway-virtual-key.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/gateway/web/src/screens/gateway/gateway-virtual-keys.screen.tsx",
+      "key": "cognitive-complexity|modules/gateway/web/src/ui/sections/gateway/gateway-virtual-keys.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1691,7 +1655,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/monitor/web/src/screens/online-evaluations/online-evaluations.screen.tsx",
+      "key": "cognitive-complexity|modules/monitor/web/src/ui/sections/online-evaluations.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1755,7 +1719,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/onboarding/web/src/screens/onboarding/project.screen.tsx",
+      "key": "cognitive-complexity|modules/onboarding/web/src/ui/sections/onboarding/project.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -1955,19 +1919,19 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/organization/web/src/screens/organization/audit-log.screen.tsx",
+      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/audit-log.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/organization/web/src/screens/organization/groups.screen.tsx",
+      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/groups.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/organization/web/src/screens/organization/members.screen.tsx",
+      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/members.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/organization/web/src/screens/organization/teams.screen.tsx",
+      "key": "cognitive-complexity|modules/organization/web/src/ui/sections/organization/teams.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -2307,7 +2271,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "cognitive-complexity|modules/scenario/web/src/screens/simulations/scenario-library.screen.tsx",
+      "key": "cognitive-complexity|modules/scenario/web/src/ui/sections/simulations/scenario-library.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3759,11 +3723,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|enterprise/modules/billing/web/src/screens/billing/subscription-page.tsx",
+      "key": "complexity|enterprise/modules/billing/web/src/ui/sections/subscription-page.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|enterprise/modules/billing/web/src/screens/billing/usage.screen.tsx",
+      "key": "complexity|enterprise/modules/billing/web/src/ui/sections/usage.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3771,7 +3735,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|enterprise/modules/governance/web/src/screens/governance/governance-overview.screen.tsx",
+      "key": "complexity|enterprise/modules/governance/web/src/ui/sections/governance/governance-overview.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3803,15 +3767,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/annotation/web/src/screens/annotations/my-queue.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
       "key": "complexity|modules/annotation/web/src/ui/sections/annotation-list.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|modules/api-key/web/src/screens/api-key/cli-auth.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3823,7 +3779,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx",
+      "key": "complexity|modules/authz/web/src/ui/sections/scope-picker/scope-chip-picker.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3840,10 +3796,6 @@
     },
     {
       "key": "complexity|modules/automation/web/src/features/authoring/ui/sections/view-automation-drawer.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "complexity|modules/automation/web/src/screens/automations/automations.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3891,7 +3843,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/evaluator/web/src/screens/evaluators/evaluators.screen.tsx",
+      "key": "complexity|modules/evaluator/web/src/ui/sections/evaluators.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3927,7 +3879,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/experiment/web/src/screens/experiments/experiments.screen.tsx",
+      "key": "complexity|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -3991,19 +3943,19 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/gateway/web/src/screens/gateway/gateway-budget.screen.tsx",
+      "key": "complexity|modules/gateway/web/src/ui/sections/gateway/gateway-budget.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/gateway/web/src/screens/gateway/gateway-usage.screen.tsx",
+      "key": "complexity|modules/gateway/web/src/ui/sections/gateway/gateway-usage.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/gateway/web/src/screens/gateway/gateway-virtual-key.screen.tsx",
+      "key": "complexity|modules/gateway/web/src/ui/sections/gateway/gateway-virtual-key.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/gateway/web/src/screens/gateway/gateway-virtual-keys.screen.tsx",
+      "key": "complexity|modules/gateway/web/src/ui/sections/gateway/gateway-virtual-keys.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -4107,7 +4059,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "complexity|modules/organization/web/src/screens/organization/audit-log.screen.tsx",
+      "key": "complexity|modules/organization/web/src/ui/sections/organization/audit-log.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -4711,7 +4663,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|enterprise/modules/billing/web/src/screens/billing/subscription-page.tsx",
+      "key": "condition-shape|enterprise/modules/billing/web/src/ui/sections/subscription-page.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -4815,31 +4767,31 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|enterprise/modules/governance/web/src/screens/governance/governance-anomaly-rules.screen.tsx",
+      "key": "condition-shape|enterprise/modules/governance/web/src/ui/sections/governance/governance-anomaly-rules.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|enterprise/modules/governance/web/src/screens/governance/governance-inventory.screen.tsx",
+      "key": "condition-shape|enterprise/modules/governance/web/src/ui/sections/governance/governance-inventory.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|enterprise/modules/governance/web/src/screens/governance/governance-overview.screen.tsx",
+      "key": "condition-shape|enterprise/modules/governance/web/src/ui/sections/governance/governance-overview.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|enterprise/modules/governance/web/src/screens/governance/governance-team.screen.tsx",
+      "key": "condition-shape|enterprise/modules/governance/web/src/ui/sections/governance/governance-team.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|enterprise/modules/governance/web/src/screens/governance/governance-teams.screen.tsx",
+      "key": "condition-shape|enterprise/modules/governance/web/src/ui/sections/governance/governance-teams.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|enterprise/modules/governance/web/src/screens/governance/governance-user.screen.tsx",
+      "key": "condition-shape|enterprise/modules/governance/web/src/ui/sections/governance/governance-user.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|enterprise/modules/governance/web/src/screens/governance/governance-users.screen.tsx",
+      "key": "condition-shape|enterprise/modules/governance/web/src/ui/sections/governance/governance-users.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -5003,7 +4955,7 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/annotation/web/src/screens/annotation-scores/annotation-score-form.tsx",
+      "key": "condition-shape|modules/annotation/web/src/ui/sections/annotation-score-form.tsx",
       "measured": "2026-09-07"
     },
     {
@@ -5043,10 +4995,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/api-key/web/src/screens/api-key/api-keys.screen.tsx",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "condition-shape|modules/api-key/web/src/ui/sections/__tests__/token-created-snippets.unit.test.ts",
       "measured": "2026-09-07"
     },
@@ -5080,10 +5028,6 @@
     },
     {
       "key": "condition-shape|modules/auth/web/src/model/castle-snake.ts",
-      "measured": "2026-09-07"
-    },
-    {
-      "key": "condition-shape|modules/auth/web/src/screens/auth/reset-password.screen.tsx",
       "measured": "2026-09-07"
     },
     {
@@ -5127,7 +5071,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx",
+      "key": "condition-shape|modules/authz/web/src/ui/sections/scope-picker/scope-chip-picker.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -5475,11 +5419,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/experiment/web/src/screens/experiments/experiment-detail.screen.tsx",
+      "key": "condition-shape|modules/experiment/web/src/ui/sections/experiments/experiment-detail.screen.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "condition-shape|modules/experiment/web/src/screens/experiments/experiments.screen.tsx",
+      "key": "condition-shape|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -5627,15 +5571,15 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/gateway/web/src/screens/gateway/gateway-virtual-keys.screen.tsx",
+      "key": "condition-shape|modules/gateway/web/src/ui/sections/gateway/gateway-virtual-keys.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/gateway/web/src/surfaces/budget-overview/budget-exceeded-banner.tsx",
+      "key": "condition-shape|modules/gateway/web/src/ui/sections/budget-overview/budget-exceeded-banner.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "condition-shape|modules/gateway/web/src/surfaces/budget-overview/budget-overview-list.tsx",
+      "key": "condition-shape|modules/gateway/web/src/ui/sections/budget-overview/budget-overview-list.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -6943,7 +6887,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "id-generation-origin|enterprise/modules/billing/web/src/screens/billing/user-management-drawer.tsx",
+      "key": "id-generation-origin|enterprise/modules/billing/web/src/ui/sections/user-management-drawer.tsx",
       "measured": "2026-09-08"
     },
     {
@@ -7079,7 +7023,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "id-generation-origin|modules/experiment/web/src/screens/experiments/workbench.screen.tsx",
+      "key": "id-generation-origin|modules/experiment/web/src/ui/sections/experiments/workbench.screen.tsx",
       "measured": "2026-09-08"
     },
     {
@@ -7979,15 +7923,15 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/billing/web/src/screens/billing/subscription-page.tsx",
+      "key": "no-nested-ternary|enterprise/modules/billing/web/src/ui/sections/subscription-page.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/billing/web/src/screens/billing/usage.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/billing/web/src/ui/sections/usage.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/billing/web/src/surfaces/seat-proration-preview/seat-proration-preview.tsx",
+      "key": "no-nested-ternary|enterprise/modules/billing/web/src/ui/sections/seat-proration-preview/seat-proration-preview.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8027,35 +7971,35 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-anomaly-rules.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/ui/sections/governance/governance-anomaly-rules.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-ingestion-source.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/ui/sections/governance/governance-ingestion-source.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-overview.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/ui/sections/governance/governance-overview.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-people.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/ui/sections/governance/governance-people.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-team.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/ui/sections/governance/governance-team.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-teams.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/ui/sections/governance/governance-teams.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-user.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/ui/sections/governance/governance-user.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|enterprise/modules/governance/web/src/screens/governance/governance-users.screen.tsx",
+      "key": "no-nested-ternary|enterprise/modules/governance/web/src/ui/sections/governance/governance-users.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8151,10 +8095,6 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "no-nested-ternary|modules/auth/web/src/screens/auth/signup.screen.tsx",
-      "measured": "2026-09-07"
-    },
-    {
       "key": "no-nested-ternary|modules/auth/web/src/ui/sections/sign-up-credential-form.tsx",
       "measured": "2026-09-07"
     },
@@ -8167,19 +8107,19 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/authz/web/src/surfaces/scope-picker/provider-scope-chips.tsx",
+      "key": "no-nested-ternary|modules/authz/web/src/ui/sections/scope-picker/provider-scope-chips.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/authz/web/src/surfaces/scope-picker/scope-chip-picker.tsx",
+      "key": "no-nested-ternary|modules/authz/web/src/ui/sections/scope-picker/scope-chip-picker.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/authz/web/src/surfaces/scope-picker/scope-filter-address.ts",
+      "key": "no-nested-ternary|modules/authz/web/src/ui/sections/scope-picker/scope-filter-address.ts",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/authz/web/src/surfaces/scope-picker/scope-filter.tsx",
+      "key": "no-nested-ternary|modules/authz/web/src/ui/sections/scope-picker/scope-filter.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8232,14 +8172,6 @@
     },
     {
       "key": "no-nested-ternary|modules/automation/web/src/model/relative-time.ts",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/automation/web/src/screens/automations/automations.screen.tsx",
-      "measured": "2026-09-06"
-    },
-    {
-      "key": "no-nested-ternary|modules/automation/web/src/screens/automations/unsubscribe.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8407,11 +8339,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/experiment/web/src/screens/experiments/experiment-detail.screen.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/experiments/experiment-detail.screen.tsx",
       "measured": "2026-09-07"
     },
     {
-      "key": "no-nested-ternary|modules/experiment/web/src/screens/experiments/experiments.screen.tsx",
+      "key": "no-nested-ternary|modules/experiment/web/src/ui/sections/experiments/experiments.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8519,35 +8451,35 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-budget.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/ui/sections/gateway/gateway-budget.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-budgets.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/ui/sections/gateway/gateway-budgets.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-cache-rules.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/ui/sections/gateway/gateway-cache-rules.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-guardrails.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/ui/sections/gateway/gateway-guardrails.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-routing-policies.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/ui/sections/gateway/gateway-routing-policies.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-usage.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/ui/sections/gateway/gateway-usage.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-virtual-key.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/ui/sections/gateway/gateway-virtual-key.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/gateway/web/src/screens/gateway/gateway-virtual-keys.screen.tsx",
+      "key": "no-nested-ternary|modules/gateway/web/src/ui/sections/gateway/gateway-virtual-keys.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8643,7 +8575,7 @@
       "measured": "2026-09-07"
     },
     {
-      "key": "no-nested-ternary|modules/onboarding/web/src/screens/onboarding/project.screen.tsx",
+      "key": "no-nested-ternary|modules/onboarding/web/src/ui/sections/onboarding/project.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -8675,11 +8607,11 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/organization/web/src/screens/organization/audit-log.screen.tsx",
+      "key": "no-nested-ternary|modules/organization/web/src/ui/sections/organization/audit-log.screen.tsx",
       "measured": "2026-09-06"
     },
     {
-      "key": "no-nested-ternary|modules/organization/web/src/screens/organization/teams.screen.tsx",
+      "key": "no-nested-ternary|modules/organization/web/src/ui/sections/organization/teams.screen.tsx",
       "measured": "2026-09-06"
     },
     {
@@ -9451,7 +9383,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|modules/analytics/web/src/screens/analytics/custom-graph.screen.tsx",
+      "key": "temporal-only|modules/analytics/web/src/ui/sections/analytics/custom-graph.screen.tsx",
       "measured": "2026-09-06"
     },
     {

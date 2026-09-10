@@ -12,9 +12,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/analytics-web/screens/analytics", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/analytics-web/screens/analytics")>(
-    "@langwatch/analytics-web/screens/analytics",
+vi.mock("@langwatch/analytics-web/analytics", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/analytics-web/analytics")>(
+    "@langwatch/analytics-web/analytics",
   );
   return {
     ...actual,
@@ -31,8 +31,8 @@ vi.mock("@langwatch/project-web/screens/home", async () => {
     "@langwatch/project-web/screens/home",
   );
   const { useAnalyticsHost } = await vi.importActual<
-    typeof import("@langwatch/analytics-web/screens/analytics")
-  >("@langwatch/analytics-web/screens/analytics");
+    typeof import("@langwatch/analytics-web/analytics")
+  >("@langwatch/analytics-web/analytics");
   // The screen stands in for the real one at the ONE thing this pins: it reads
   // the analytics host, exactly as the traces overview and the vanity strip do.
   const HomeScreen = () => {

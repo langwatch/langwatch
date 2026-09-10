@@ -23,10 +23,10 @@ const graph = vi.hoisted(() => ({ organizations: [] as unknown[] }));
 /**
  * The graph, answered without a server.
  */
-vi.mock("@langwatch/navigation-web/screens/navigation", async () => {
+vi.mock("@langwatch/navigation-web/navigation", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/navigation-web/screens/navigation")
-  >("@langwatch/navigation-web/screens/navigation");
+    typeof import("@langwatch/navigation-web/navigation")
+  >("@langwatch/navigation-web/navigation");
   return {
     ...actual,
     // A Proxy rather than a spread: the procedure map is built lazily, so
@@ -54,7 +54,7 @@ vi.mock("../src/behavior/ui-organization-facts", () => ({
   }),
 }));
 
-import { navigationApi } from "@langwatch/navigation-web/screens/navigation";
+import { navigationApi } from "@langwatch/navigation-web/navigation";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
 import {
   UiCapabilityContextProvider,

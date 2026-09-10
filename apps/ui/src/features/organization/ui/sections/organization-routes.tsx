@@ -4,7 +4,7 @@
  * plan gate below Enterprise is not a second guard.
  */
 
-import { organizationScreens } from "@langwatch/organization-web/screens/organization";
+import { organizationScreens } from "@langwatch/organization-web/organization";
 import type { ComponentType } from "react";
 import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

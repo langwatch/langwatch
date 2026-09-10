@@ -8,7 +8,7 @@ import {
   governanceApi,
   GovernanceHostProvider,
   type GovernanceHostPort,
-} from "@langwatch/enterprise-governance-web/screens/governance";
+} from "@langwatch/enterprise-governance-web/governance";
 import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

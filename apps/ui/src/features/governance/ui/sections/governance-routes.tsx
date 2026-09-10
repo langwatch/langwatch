@@ -8,7 +8,7 @@ import type { ComponentType } from "react";
 import {
   governanceScreens,
   type GovernanceScreenName,
-} from "@langwatch/enterprise-governance-web/screens/governance";
+} from "@langwatch/enterprise-governance-web/governance";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { GovernanceHost } from "./governance-host";

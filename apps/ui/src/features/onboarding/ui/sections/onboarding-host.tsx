@@ -10,7 +10,7 @@ import {
   type OnboardingHostPort,
   type OnboardingOrganization,
   type OnboardingSessionStatus,
-} from "@langwatch/onboarding-web/screens/onboarding";
+} from "@langwatch/onboarding-web/onboarding";
 import { useMemo, type ReactNode } from "react";
 import { useUiAddress } from "../../../../behavior/ui-address";
 import { writeUiClipboard } from "../../../../behavior/ui-clipboard";

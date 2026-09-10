@@ -4,7 +4,7 @@
  * `ops:view`/`ops:manage` are deliberately decoupled — widening one can't widen the other.
  */
 
-import { opsApi, OpsHostProvider, type OpsHostPort } from "@langwatch/ops-web/screens/ops";
+import { opsApi, OpsHostProvider, type OpsHostPort } from "@langwatch/ops-web/ops";
 import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
 import { useUiAddress } from "../../../../behavior/ui-address";

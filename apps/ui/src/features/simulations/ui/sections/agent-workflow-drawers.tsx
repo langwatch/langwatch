@@ -12,7 +12,7 @@ import {
 } from "@langwatch/prompt-web/surfaces/variables";
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { ScenarioInputMappingSection } from "@langwatch/scenario-web/scenario-mappings";
-import { useScenarioHost } from "@langwatch/scenario-web/screens/simulations";
+import { useScenarioHost } from "@langwatch/scenario-web/simulations";
 import { useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
 import { toEpochMs } from "@langwatch/time";
 import { showErrorToast } from "@langwatch/ui-host/errors";

@@ -9,9 +9,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/ops-web/screens/ops", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/ops-web/screens/ops")>(
-    "@langwatch/ops-web/screens/ops",
+vi.mock("@langwatch/ops-web/ops", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/ops-web/ops")>(
+    "@langwatch/ops-web/ops",
   );
   const screenNamed = (name: string) => async () => ({
     default: () => <div>the ops page: {name}</div>,

@@ -4,7 +4,7 @@
  * the scope graph ever carrying one.
  */
 
-import { onboardingApi } from "@langwatch/onboarding-web/screens/onboarding";
+import { onboardingApi } from "@langwatch/onboarding-web/onboarding";
 import { uiFeature } from "../../behavior/ui-feature";
 import { onboardingPageLoaders } from "./ui/sections/onboarding-routes";
 

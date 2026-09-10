@@ -211,7 +211,7 @@ vi.mock("@langwatch/ui-host/capabilities", async (importOriginal) => ({
 }));
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("@langwatch/scenario-web/screens/simulations", async () => {
+vi.mock("@langwatch/scenario-web/simulations", async () => {
   const { api } =
     await import("../../../../../../../modules/scenario/web/src/behavior/scenario-api.ts");
   return { scenarioApi: api };

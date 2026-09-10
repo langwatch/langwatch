@@ -7,7 +7,7 @@
 import type {
   OnboardingFailureNotice,
   OnboardingSuccessNotice,
-} from "@langwatch/onboarding-web/screens/onboarding";
+} from "@langwatch/onboarding-web/onboarding";
 
 export async function copyToClipboard({
   text,

@@ -7,7 +7,7 @@
 import {
   automationScreens,
   type AutomationSection,
-} from "@langwatch/automation-web/screens/automations";
+} from "@langwatch/automation-web/automations";
 import type { ComponentType } from "react";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";

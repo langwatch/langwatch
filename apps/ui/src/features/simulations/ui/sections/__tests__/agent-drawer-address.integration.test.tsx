@@ -22,7 +22,7 @@ vi.mock("@langwatch/ui-host/capabilities", async (importOriginal) => ({
   useUiCapabilities: () => ({ session: { activeScope: () => ({ projectId: "project-1" }) } }),
 }));
 vi.mock("@langwatch/ui-host/use-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("@langwatch/scenario-web/screens/simulations", () => ({
+vi.mock("@langwatch/scenario-web/simulations", () => ({
   useScenarioHost: () => ({ project: () => ({ id: "project-1", slug: "project" }) }),
   scenarioApi: {
     workflow: { create: { useMutation: () => ({ isPending: false, mutateAsync: vi.fn() }) } },

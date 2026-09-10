@@ -3,7 +3,7 @@ import { AgentTestPanel } from "@langwatch/agent-web/agent-editors";
 import { agentApi, type AgentBrowser } from "@langwatch/agent-web/agent-client";
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { ScenarioInputMappingSection } from "@langwatch/scenario-web/scenario-mappings";
-import { scenarioApi } from "@langwatch/scenario-web/screens/simulations";
+import { scenarioApi } from "@langwatch/scenario-web/simulations";
 import {
   VariablesSection,
   type AvailableSource,

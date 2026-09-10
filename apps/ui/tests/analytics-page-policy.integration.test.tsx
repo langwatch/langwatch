@@ -8,9 +8,9 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/analytics-web/screens/analytics", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/analytics-web/screens/analytics")>(
-    "@langwatch/analytics-web/screens/analytics",
+vi.mock("@langwatch/analytics-web/analytics", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/analytics-web/analytics")>(
+    "@langwatch/analytics-web/analytics",
   );
   const named = (name: string) => () => <div>the analytics page: {name}</div>;
   const builder = ({ mode }: { mode: string }) => (

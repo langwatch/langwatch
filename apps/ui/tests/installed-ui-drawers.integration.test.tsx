@@ -97,8 +97,8 @@ vi.mock("@langwatch/agent-web/agent-client", () => ({
     }),
   },
 }));
-vi.mock("@langwatch/scenario-web/screens/simulations", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@langwatch/scenario-web/screens/simulations")>()),
+vi.mock("@langwatch/scenario-web/simulations", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@langwatch/scenario-web/simulations")>()),
   useScenarioHost: () => ({ project: () => ({ id: "project_1", slug: "acme-app" }) }),
   scenarioApi: {
     Provider: ({ children }: { children: ReactNode }) => children,

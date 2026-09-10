@@ -5,7 +5,7 @@
  */
 
 import type { ComponentType } from "react";
-import { gatewayScreens, type GatewayScreenName } from "@langwatch/gateway-web/screens/gateway";
+import { gatewayScreens, type GatewayScreenName } from "@langwatch/gateway-web/gateway";
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
 import { uiPage } from "../../../../ui/sections/ui-page";
 import { GatewayHost } from "./gateway-host";

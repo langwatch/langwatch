@@ -8,10 +8,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/automation-web/screens/automations", async () => {
+vi.mock("@langwatch/automation-web/automations", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/automation-web/screens/automations")
-  >("@langwatch/automation-web/screens/automations");
+    typeof import("@langwatch/automation-web/automations")
+  >("@langwatch/automation-web/automations");
   const Screen = ({ section }: { section?: string }) => <div>the automations page: {section}</div>;
   const emptyQuery = { data: undefined, isLoading: false };
   const apiNode = (): unknown =>

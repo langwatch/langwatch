@@ -51,7 +51,7 @@
       "id": "analytics",
       "root": "analytics",
       "uses": {
-        "screens": ["@langwatch/analytics-web/screens/analytics"],
+        "screens": ["@langwatch/analytics-web/analytics"],
         "surfaces": []
       }
     },
@@ -116,7 +116,7 @@
       "id": "automations",
       "root": "automations",
       "uses": {
-        "screens": ["@langwatch/automation-web/screens/automations"],
+        "screens": ["@langwatch/automation-web/automations"],
         "surfaces": []
       }
     },
@@ -124,7 +124,7 @@
       "id": "billing",
       "root": "billing",
       "uses": {
-        "screens": ["@langwatch/enterprise-billing-web/screens/billing"],
+        "screens": ["@langwatch/enterprise-billing-web/billing"],
         "surfaces": [
           "@langwatch/enterprise-billing-web/surfaces/contact-sales",
           "@langwatch/enterprise-billing-web/surfaces/seat-proration-preview"
@@ -191,7 +191,7 @@
       "id": "experiments",
       "root": "experiments",
       "uses": {
-        "screens": ["@langwatch/experiment-web/screens/experiments"],
+        "screens": ["@langwatch/experiment-web/experiments"],
         "surfaces": []
       }
     },
@@ -199,7 +199,7 @@
       "id": "gateway",
       "root": "gateway",
       "uses": {
-        "screens": ["@langwatch/gateway-web/screens/gateway"],
+        "screens": ["@langwatch/gateway-web/gateway"],
         "surfaces": []
       }
     },
@@ -207,7 +207,7 @@
       "id": "governance",
       "root": "governance",
       "uses": {
-        "screens": ["@langwatch/enterprise-governance-web/screens/governance"],
+        "screens": ["@langwatch/enterprise-governance-web/governance"],
         "surfaces": []
       }
     },
@@ -231,7 +231,7 @@
       "id": "langy",
       "root": "langy",
       "uses": {
-        "screens": ["@langwatch/langy-web/screens/langy"],
+        "screens": ["@langwatch/langy-web/langy"],
         "surfaces": ["@langwatch/langy-web/surfaces/langy-code-access-preference"]
       }
     },
@@ -239,7 +239,7 @@
       "id": "licensing",
       "root": "licensing",
       "uses": {
-        "screens": ["@langwatch/enterprise-licensing-web/screens/licensing"],
+        "screens": ["@langwatch/enterprise-licensing-web/licensing"],
         "surfaces": [
           "@langwatch/enterprise-licensing-web/surfaces/resource-limits",
           "@langwatch/enterprise-licensing-web/surfaces/seat-types",
@@ -263,7 +263,7 @@
       "id": "navigation",
       "root": "navigation",
       "uses": {
-        "screens": ["@langwatch/navigation-web/screens/navigation"],
+        "screens": ["@langwatch/navigation-web/navigation"],
         "surfaces": [
           "@langwatch/langy-web/surfaces/langy-mark",
           "@langwatch/langy-web/surfaces/langy-store",
@@ -277,7 +277,7 @@
       "id": "onboarding",
       "root": "onboarding",
       "uses": {
-        "screens": ["@langwatch/onboarding-web/screens/onboarding"],
+        "screens": ["@langwatch/onboarding-web/onboarding"],
         "surfaces": []
       }
     },
@@ -293,7 +293,7 @@
       "id": "ops",
       "root": "ops",
       "uses": {
-        "screens": ["@langwatch/ops-web/screens/ops"],
+        "screens": ["@langwatch/ops-web/ops"],
         "surfaces": []
       }
     },
@@ -301,7 +301,7 @@
       "id": "organization",
       "root": "organization",
       "uses": {
-        "screens": ["@langwatch/organization-web/screens/organization"],
+        "screens": ["@langwatch/organization-web/organization"],
         "surfaces": []
       }
     },
@@ -333,7 +333,7 @@
       "id": "scim",
       "root": "scim",
       "uses": {
-        "screens": ["@langwatch/enterprise-scim-web/screens/scim"],
+        "screens": ["@langwatch/enterprise-scim-web/scim"],
         "surfaces": []
       }
     },
@@ -349,7 +349,7 @@
       "id": "simulations",
       "root": "simulations",
       "uses": {
-        "screens": ["@langwatch/scenario-web/screens/simulations"],
+        "screens": ["@langwatch/scenario-web/simulations"],
         "surfaces": [
           "@langwatch/scenario-web/drawers",
           "@langwatch/scenario-web/scenario-mappings",

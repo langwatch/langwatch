@@ -9,7 +9,7 @@ import {
   OrganizationHostProvider,
   type OrganizationHostPort,
   type OrganizationReading,
-} from "@langwatch/organization-web/screens/organization";
+} from "@langwatch/organization-web/organization";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";

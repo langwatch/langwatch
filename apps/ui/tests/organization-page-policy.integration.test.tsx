@@ -5,7 +5,7 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { navigationApi } from "@langwatch/navigation-web/screens/navigation";
+import { navigationApi } from "@langwatch/navigation-web/navigation";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
 import {
   WithStubNavigationHost,
@@ -33,10 +33,10 @@ const { apiNode } = vi.hoisted(() => {
   return { apiNode: node };
 });
 
-vi.mock("@langwatch/organization-web/screens/organization", async () => {
+vi.mock("@langwatch/organization-web/organization", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/organization-web/screens/organization")
-  >("@langwatch/organization-web/screens/organization");
+    typeof import("@langwatch/organization-web/organization")
+  >("@langwatch/organization-web/organization");
   const Screen = () => <div>the audit log page</div>;
   return {
     ...actual,

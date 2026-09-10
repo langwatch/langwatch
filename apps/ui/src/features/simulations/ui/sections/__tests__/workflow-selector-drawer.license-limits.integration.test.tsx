@@ -23,7 +23,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   getFlowCallbacks: () => ({}),
 }));
 
-vi.mock("@langwatch/scenario-web/screens/simulations", () => ({
+vi.mock("@langwatch/scenario-web/simulations", () => ({
   useScenarioHost: () => ({
     project: () => ({ id: "project-1", slug: "project-1" }),
     organization: { id: "org-1" },

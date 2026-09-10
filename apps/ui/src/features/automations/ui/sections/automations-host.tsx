@@ -10,7 +10,7 @@ import {
   type AutomationDatasetCreation,
   type AutomationFailureNotice,
   type AutomationHostPort,
-} from "@langwatch/automation-web/screens/automations";
+} from "@langwatch/automation-web/automations";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";

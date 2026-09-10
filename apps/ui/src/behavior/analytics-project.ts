@@ -1,6 +1,6 @@
 /** The project an analytics address is about, resolved from the organization graph rather than a second query. */
 
-import type { AnalyticsHostProject } from "@langwatch/analytics-web/screens/analytics";
+import type { AnalyticsHostProject } from "@langwatch/analytics-web/analytics";
 
 type Organization = {
   teams: ReadonlyArray<{

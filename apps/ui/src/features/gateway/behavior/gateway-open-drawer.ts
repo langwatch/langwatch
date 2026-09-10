@@ -4,7 +4,7 @@
  * with every stale `drawer.*` key cleared first.
  */
 
-import type { GatewayDrawer } from "@langwatch/gateway-web/screens/gateway";
+import type { GatewayDrawer } from "@langwatch/gateway-web/gateway";
 
 export function openGatewayDrawer({
   drawer,

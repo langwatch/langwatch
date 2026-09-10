@@ -15,7 +15,7 @@ import {
   type NavigationProject,
   type NavigationTeam,
   type NavigationUser,
-} from "@langwatch/navigation-web/screens/navigation";
+} from "@langwatch/navigation-web/navigation";
 import {
   CommandBarProvider,
   CommandBarTrigger,

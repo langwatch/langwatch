@@ -9,7 +9,7 @@ import {
   BillingHostProvider,
   type BillingHostOrganization,
   type BillingHostPort,
-} from "@langwatch/enterprise-billing-web/screens/billing";
+} from "@langwatch/enterprise-billing-web/billing";
 import { useMemo, type ReactNode } from "react";
 
 import { readPublicAppConfig } from "../../../../behavior/public-config";

@@ -4,7 +4,7 @@
  * (`ui-family-move-manifests.md`).
  */
 
-import { billingApi } from "@langwatch/enterprise-billing-web/screens/billing";
+import { billingApi } from "@langwatch/enterprise-billing-web/billing";
 import { uiFeature } from "../../behavior/ui-feature";
 import { billingPageLoaders } from "./ui/sections/billing-routes";
 

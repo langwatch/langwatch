@@ -33,7 +33,7 @@ vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
   ),
 }));
 
-vi.mock("@langwatch/scenario-web/screens/simulations", () => ({
+vi.mock("@langwatch/scenario-web/simulations", () => ({
   useScenarioHost: () => ({
     project: () => ({ id: "test-project", slug: "test-project" }),
     organization: { id: "test-org" },

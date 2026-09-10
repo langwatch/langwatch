@@ -9,7 +9,7 @@ import {
   LangyHostProvider,
   setLangyTrpcClient,
   type LangyHostPort,
-} from "@langwatch/langy-web/screens/langy";
+} from "@langwatch/langy-web/langy";
 import { useEffect, useMemo, type ReactNode } from "react";
 
 import { readPublicAppConfig } from "../../../../behavior/public-config";

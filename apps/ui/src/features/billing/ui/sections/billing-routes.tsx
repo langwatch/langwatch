@@ -4,7 +4,7 @@
  * `cost:view`, Subscription wants neither — every procedure behind it states its own policy.
  */
 
-import { billingScreens } from "@langwatch/enterprise-billing-web/screens/billing";
+import { billingScreens } from "@langwatch/enterprise-billing-web/billing";
 import type { ComponentType } from "react";
 
 import type { UiPageLoader, UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
