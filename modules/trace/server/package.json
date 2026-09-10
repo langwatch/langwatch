@@ -49,12 +49,12 @@
       "default": "./src/transport/api-trpc/trace-view-gates.api.ts"
     },
     "./api-rest/otlp-ingest": {
-      "types": "./dist/transport/api-rest/otlp-ingest.api.d.ts",
-      "default": "./src/transport/api-rest/otlp-ingest.api.ts"
+      "types": "./dist/transport/otlp-ingest.rest.d.ts",
+      "default": "./src/transport/otlp-ingest.rest.ts"
     },
     "./api-rest/otlp-path-alias": {
-      "types": "./dist/transport/api-rest/otlp-path-alias.api.d.ts",
-      "default": "./src/transport/api-rest/otlp-path-alias.api.ts"
+      "types": "./dist/transport/otlp-path-alias.rest.d.ts",
+      "default": "./src/transport/otlp-path-alias.rest.ts"
     },
     "./api-rest/traces": {
       "types": "./dist/transport/api-rest/traces.api.d.ts",
