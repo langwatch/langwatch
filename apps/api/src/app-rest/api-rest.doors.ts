@@ -36,6 +36,11 @@ import { mountPlatformHealthRest } from "../features/platform-health/platform-he
 import { mountProjectRest } from "../features/project/project-rest.mount.ts";
 import { mountRumRest } from "../features/rum/rum-rest.mount.ts";
 import {
+  mountScenarioEventsRest,
+  mountScenariosRest,
+  mountSimulationRunsRest,
+} from "../features/scenario/scenario-rest.mount.ts";
+import {
   mountScimProtocolRest,
   mountScimTokenRest,
   mountScimWebhookRest,
@@ -71,9 +76,7 @@ export type ApiRestDoorContext = Readonly<{
  * What a door's mount answers: the family, or nothing where this process
  * composed no service for it.
  */
-export type ApiRestDoorMount = (
-  context: ApiRestDoorContext,
-) => readonly MountableRestApp[] | null;
+export type ApiRestDoorMount = (context: ApiRestDoorContext) => readonly MountableRestApp[] | null;
 
 /** One family, its addresses, and how this process opens it. */
 export type ApiRestDoorEntry = Readonly<{
@@ -100,29 +103,33 @@ export const API_REST_DOORS = [
     family: "gateway-openapi",
     owner: "process",
     paths: ["/api/gateway/v1/openapi.json"],
-    mount: ({ runtime }: ApiRestDoorContext) =>
-      [runtime.mount(gatewayOpenApiRest.router(), () => apiDocument, { onError: discoveryErrors })],
+    mount: ({ runtime }: ApiRestDoorContext) => [
+      runtime.mount(gatewayOpenApiRest.router(), () => apiDocument, { onError: discoveryErrors }),
+    ],
   },
   {
     family: "api-discovery",
     owner: "process",
     paths: ["/api/openapi.json", "/api/v1/openapi.json"],
-    mount: ({ runtime }: ApiRestDoorContext) =>
-      [runtime.mount(apiDiscoveryRest.router(), () => apiDocument, { onError: discoveryErrors })],
+    mount: ({ runtime }: ApiRestDoorContext) => [
+      runtime.mount(apiDiscoveryRest.router(), () => apiDocument, { onError: discoveryErrors }),
+    ],
   },
   {
     family: "root-discovery",
     owner: "process",
     paths: ["/.well-known/openapi", "/llms.txt"],
-    mount: ({ runtime }: ApiRestDoorContext) =>
-      [runtime.mount(rootDiscoveryRest.router(), () => apiDocument, { onError: discoveryErrors })],
+    mount: ({ runtime }: ApiRestDoorContext) => [
+      runtime.mount(rootDiscoveryRest.router(), () => apiDocument, { onError: discoveryErrors }),
+    ],
   },
   {
     family: "rum",
     owner: "process",
     paths: ["/api/rum/v1/traces"],
-    mount: ({ runtime, ports }: ApiRestDoorContext) =>
-      [mountRumRest(runtime, { rateLimit: ports.rateLimit })],
+    mount: ({ runtime, ports }: ApiRestDoorContext) => [
+      mountRumRest(runtime, { rateLimit: ports.rateLimit }),
+    ],
   },
   {
     family: "health-probes",
@@ -277,7 +284,11 @@ export const API_REST_DOORS = [
     absent:
       "API process serves no /api/auth: it composed no Better Auth instance, no session transport, no credential service or no flag store, and a sign-in door missing any of them would answer every browser as signed out.",
   },
-  { family: "governance-ingest", owner: "process", paths: ["/api/ingest/otel", "/api/ingest/webhook"] },
+  {
+    family: "governance-ingest",
+    owner: "process",
+    paths: ["/api/ingest/otel", "/api/ingest/webhook"],
+  },
   {
     family: "scim",
     owner: "module",
@@ -343,7 +354,9 @@ export const API_REST_DOORS = [
     owner: "module",
     paths: ["/api/dashboards", "/api/graphs", "/api/v1/dashboards", "/api/v1/graphs"],
     mount: ({ runtime, packaged }: ApiRestDoorContext) =>
-      packaged?.services.dashboard ? mountDashboardRest(runtime, packaged.services.dashboard) : null,
+      packaged?.services.dashboard
+        ? mountDashboardRest(runtime, packaged.services.dashboard)
+        : null,
   },
   {
     family: "evaluators",
@@ -422,7 +435,11 @@ export const API_REST_DOORS = [
       ];
     },
   },
-  { family: "organizations", owner: "module", paths: ["/api/organizations", "/api/v1/organizations"] },
+  {
+    family: "organizations",
+    owner: "module",
+    paths: ["/api/organizations", "/api/v1/organizations"],
+  },
   {
     family: "projects",
     owner: "module",
@@ -432,11 +449,63 @@ export const API_REST_DOORS = [
       const apiKeys = packaged?.services.apiKeys;
       if (!projects || !apiKeys) return null;
 
-      return [mountProjectRest(runtime, { projects, apiKeys, errors: packaged.ports.legacyErrors })];
+      return [
+        mountProjectRest(runtime, { projects, apiKeys, errors: packaged.ports.legacyErrors }),
+      ];
     },
   },
-  { family: "scenario-events", owner: "module", paths: ["/api/scenario-events", "/api/v1/scenario-events"] },
-  { family: "scenarios", owner: "module", paths: ["/api/scenarios", "/api/v1/scenarios"] },
+  {
+    family: "scenario-events",
+    owner: "module",
+    paths: ["/api/scenario-events"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const scenarios = packaged?.services.scenarios;
+      const simulations = packaged?.services.simulations;
+      const scenarioTabs = packaged?.services.scenarioTabs;
+      const broadcast = packaged?.services.broadcast;
+      const extractInlineMedia = packaged?.ports.extractInlineMedia;
+      if (
+        !packaged ||
+        !scenarios ||
+        !simulations ||
+        !scenarioTabs ||
+        !broadcast ||
+        !extractInlineMedia
+      ) {
+        return null;
+      }
+
+      return [
+        mountScenarioEventsRest(runtime, {
+          scenarios,
+          simulations,
+          scenarioTabs,
+          broadcast,
+          extractInlineMedia,
+          platformUrl: packaged.ports.platformUrl,
+          traceUsageGuard: packaged.ports.traceUsageGuard,
+          errors: packaged.ports.legacyErrors,
+        }),
+      ];
+    },
+  },
+  {
+    family: "scenarios",
+    owner: "module",
+    paths: ["/api/scenarios"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const scenarios = packaged?.services.scenarios;
+      if (!packaged || !scenarios) return null;
+
+      return [
+        mountScenariosRest(runtime, {
+          scenarios,
+          platformUrl: packaged.ports.platformUrl,
+          errors: packaged.ports.legacyErrors,
+        }),
+      ];
+    },
+  },
   {
     family: "scim-tokens",
     owner: "module",
@@ -449,7 +518,25 @@ export const API_REST_DOORS = [
         ? [mountScimTokenRest(runtime, packaged.services.scim)]
         : null,
   },
-  { family: "simulation-runs", owner: "module", paths: ["/api/simulation-runs", "/api/v1/simulation-runs"] },
+  {
+    family: "simulation-runs",
+    owner: "module",
+    paths: ["/api/simulation-runs"],
+    mount: ({ runtime, packaged }: ApiRestDoorContext) => {
+      const scenarios = packaged?.services.scenarios;
+      const simulations = packaged?.services.simulations;
+      if (!packaged || !scenarios || !simulations) return null;
+
+      return [
+        mountSimulationRunsRest(runtime, {
+          scenarios,
+          simulations,
+          scenarioRunPlatformUrl: packaged.ports.scenarioRunPlatformUrl,
+          errors: packaged.ports.legacyErrors,
+        }),
+      ];
+    },
+  },
   {
     family: "user-avatar",
     owner: "module",
@@ -473,7 +560,10 @@ export const API_REST_DOORS = [
     mount: ({ runtime, packaged }: ApiRestDoorContext) => {
       const trackedEvents = packaged?.services.trackedEvents;
       if (!trackedEvents) return null;
-      return mountTrackedEventRest(runtime, { ports: trackedEvents, errors: packaged.ports.legacyErrors });
+      return mountTrackedEventRest(runtime, {
+        ports: trackedEvents,
+        errors: packaged.ports.legacyErrors,
+      });
     },
     absent:
       "API process serves neither /api/events/track nor /api/track_event: recording a feedback event needs the trace command queue this process did not register, and a door mounted without one would answer 200 to a rating it then dropped.",
