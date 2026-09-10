@@ -1027,6 +1027,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
  */
 export const experimentV3AliasRest = defineRestRouter(ExperimentV3AliasApi)
   .withNamespace("evaluations-v3-alias")
+  .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: false })
   .get("/api/evaluations/v3/*", "evaluationsV3Alias")
   .withAccess(
