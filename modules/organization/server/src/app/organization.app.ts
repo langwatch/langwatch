@@ -68,18 +68,18 @@ import { OrganizationMembershipService } from "../services/organization-membersh
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
 import type {
-  GroupIdentityPort,
-  OrganizationSettingsSecretPort,
-  PersonalWorkspaceDiagnosticsPort,
-  PersonalWorkspaceIdentityPort,
-  TeamIdentityPort,
-} from "../ports/organization.port.ts";
+  GroupIdentity,
+  OrganizationSettingsSecret,
+  PersonalWorkspaceDiagnostics,
+  PersonalWorkspaceIdentity,
+  TeamIdentity,
+} from "./organization.infrastructure.ts";
 import {
-  OrganizationGrantCachePort,
-  OrganizationPromptSeedPort,
-  OrganizationSeatLicensePort,
-  OrganizationSessionRevocationPort,
-} from "../ports/organization-membership.port.ts";
+  OrganizationGrantCache,
+  OrganizationPromptSeed,
+  OrganizationSeatLicense,
+  OrganizationSessionRevocation,
+} from "./organization.infrastructure.ts";
 import type {
   CustomRole,
   Organization,
@@ -199,13 +199,13 @@ type OrganizationSetup = FeatureSetup<
 >;
 
 export type OrganizationInfrastructure = Readonly<{
-  identities: PersonalWorkspaceIdentityPort;
-  teamIdentities: TeamIdentityPort;
-  groupIdentities: GroupIdentityPort;
-  settingsSecrets: OrganizationSettingsSecretPort;
-  diagnostics?: PersonalWorkspaceDiagnosticsPort;
-  prompts: OrganizationPromptSeedPort;
-  seats: OrganizationSeatLicensePort;
+  identities: PersonalWorkspaceIdentity;
+  teamIdentities: TeamIdentity;
+  groupIdentities: GroupIdentity;
+  settingsSecrets: OrganizationSettingsSecret;
+  diagnostics?: PersonalWorkspaceDiagnostics;
+  prompts: OrganizationPromptSeed;
+  seats: OrganizationSeatLicense;
   /** The invitations this deployment administers, or none. */
   invitations: OrganizationInvitations | null;
   /** The join-request ledger, or none. */
@@ -379,7 +379,7 @@ export class ServerOrganizationApp implements OrganizationApi {
       signals: refusing<OrganizationSignals>("organization signals"),
       ceremony: refusing<OrganizationCeremony>("sign-up ceremony"),
       directory: refusing<OrganizationDirectory>("identity directory"),
-      settingsSecrets: refusing<OrganizationSettingsSecretPort>("settings cipher"),
+      settingsSecrets: refusing<OrganizationSettingsSecret>("settings cipher"),
       demoProject: { userId: "", projectId: "" },
       invitations: null,
       joinRequests: null,
@@ -1487,7 +1487,7 @@ export class ServerOrganizationApp implements OrganizationApi {
   }
 }
 
-class UserApiOrganizationSessionRevocation extends OrganizationSessionRevocationPort {
+class UserApiOrganizationSessionRevocation implements OrganizationSessionRevocation {
   static create(
     users: UserApi,
   ): UserApiOrganizationSessionRevocation {
@@ -1495,7 +1495,6 @@ class UserApiOrganizationSessionRevocation extends OrganizationSessionRevocation
   }
 
   private constructor(private readonly users: UserApi) {
-    super();
   }
 
   revokeAllBrowserSessions(input: { userId: string }): Promise<void> {
@@ -1503,13 +1502,12 @@ class UserApiOrganizationSessionRevocation extends OrganizationSessionRevocation
   }
 }
 
-class AuthzApiOrganizationGrantCache extends OrganizationGrantCachePort {
+class AuthzApiOrganizationGrantCache implements OrganizationGrantCache {
   static create(authz: AuthzApi): AuthzApiOrganizationGrantCache {
     return new AuthzApiOrganizationGrantCache(authz);
   }
 
   private constructor(private readonly authz: AuthzApi) {
-    super();
   }
 
   invalidateOrganization(input: { organizationId: string }): Promise<void> {

@@ -14,10 +14,10 @@ import {
 } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
-  GroupIdentityPort,
-  PersonalWorkspaceIdentityPort,
-  TeamIdentityPort,
-} from "../../ports/organization.port.ts";
+  GroupIdentity,
+  PersonalWorkspaceIdentity,
+  TeamIdentity,
+} from "../../app/organization.infrastructure.ts";
 import type { OrganizationRepository } from "../organization.repository.ts";
 import { GroupRepository } from "../group.repository.ts";
 import { TeamRepository } from "../team.repository.ts";
@@ -162,7 +162,7 @@ class MemoryGroups extends GroupRepository {
   }
 }
 
-class Identities extends TeamIdentityPort {
+class Identities implements TeamIdentity {
   createTeam(): { teamId: string; slug: string } {
     return { teamId: team.id, slug: team.slug };
   }
@@ -198,9 +198,9 @@ function buildService(options?: {
     repository: {} as OrganizationRepository,
     teams,
     groups,
-    identities: {} as PersonalWorkspaceIdentityPort,
+    identities: {} as PersonalWorkspaceIdentity,
     teamIdentities: new Identities(),
-    groupIdentities: {} as GroupIdentityPort,
+    groupIdentities: {} as GroupIdentity,
     authz,
     grants,
     settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },

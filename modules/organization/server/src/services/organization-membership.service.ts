@@ -18,12 +18,12 @@ import { OrganizationMemberRoleService } from "./organization-member-role.servic
 import { CannotRemoveSelfError, MemberNotFoundError } from "@langwatch/organization-contract";
 
 import {
-  OrganizationGrantCachePort,
-  OrganizationPromptSeedPort,
-  OrganizationSeatLicensePort,
-  OrganizationSessionRevocationPort,
+  OrganizationGrantCache,
+  OrganizationPromptSeed,
+  OrganizationSeatLicense,
+  OrganizationSessionRevocation,
   type OrganizationPlanUser,
-} from "../ports/organization-membership.port.ts";
+} from "../app/organization.infrastructure.ts";
 import type {
   AuditLogFilters,
   CreateAndAssignResult,
@@ -116,10 +116,10 @@ export class OrganizationMembershipService {
 
   static create(dependencies: {
     repository: OrganizationMembershipRepository;
-    prompts: OrganizationPromptSeedPort;
-    seats: OrganizationSeatLicensePort;
-    sessions: OrganizationSessionRevocationPort;
-    grantCache: OrganizationGrantCachePort;
+    prompts: OrganizationPromptSeed;
+    seats: OrganizationSeatLicense;
+    sessions: OrganizationSessionRevocation;
+    grantCache: OrganizationGrantCache;
   }): OrganizationMembershipService {
     return new OrganizationMembershipService(dependencies);
   }
@@ -127,10 +127,10 @@ export class OrganizationMembershipService {
   private constructor(
     private readonly dependencies: {
       repository: OrganizationMembershipRepository;
-      prompts: OrganizationPromptSeedPort;
-      seats: OrganizationSeatLicensePort;
-      sessions: OrganizationSessionRevocationPort;
-      grantCache: OrganizationGrantCachePort;
+      prompts: OrganizationPromptSeed;
+      seats: OrganizationSeatLicense;
+      sessions: OrganizationSessionRevocation;
+      grantCache: OrganizationGrantCache;
     },
   ) {
     this.roles = OrganizationMemberRoleService.create(dependencies);

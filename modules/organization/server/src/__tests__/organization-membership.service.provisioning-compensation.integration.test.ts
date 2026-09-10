@@ -16,11 +16,11 @@ import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
 import type {
-  OrganizationGrantCachePort,
-  OrganizationPromptSeedPort,
-  OrganizationSeatLicensePort,
-  OrganizationSessionRevocationPort,
-} from "../ports/organization-membership.port.ts";
+  OrganizationGrantCache,
+  OrganizationPromptSeed,
+  OrganizationSeatLicense,
+  OrganizationSessionRevocation,
+} from "../app/organization.infrastructure.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -34,31 +34,31 @@ const noopGrantsWriter = {
 const seats = {
   checkLimit: vi.fn(),
   assertRoleChangeAllowed: vi.fn(),
-} as unknown as OrganizationSeatLicensePort;
+} as unknown as OrganizationSeatLicense;
 const sessions = {
   revokeAllBrowserSessions: vi.fn(),
-} as unknown as OrganizationSessionRevocationPort;
+} as unknown as OrganizationSessionRevocation;
 const grantCache = {
   invalidateOrganization: vi.fn(),
-} as unknown as OrganizationGrantCachePort;
+} as unknown as OrganizationGrantCache;
 
 /** A prompt-seed port whose seeding is down, recording who it was asked about. */
-function buildFailingPrompts(seenOrganizationIds: string[]): OrganizationPromptSeedPort {
+function buildFailingPrompts(seenOrganizationIds: string[]): OrganizationPromptSeed {
   return {
     seedTagsForOrganization: vi.fn(async ({ organizationId }: { organizationId: string }) => {
       seenOrganizationIds.push(organizationId);
       throw new Error(SEEDING_FAILURE);
     }),
     reportCompensationFailure: vi.fn(),
-  } as unknown as OrganizationPromptSeedPort;
+  } as unknown as OrganizationPromptSeed;
 }
 
 /** A prompt-seed port that works, for the retry half of the scenario. */
-function buildWorkingPrompts(): OrganizationPromptSeedPort {
+function buildWorkingPrompts(): OrganizationPromptSeed {
   return {
     seedTagsForOrganization: vi.fn(async () => {}),
     reportCompensationFailure: vi.fn(),
-  } as unknown as OrganizationPromptSeedPort;
+  } as unknown as OrganizationPromptSeed;
 }
 
 describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", () => {

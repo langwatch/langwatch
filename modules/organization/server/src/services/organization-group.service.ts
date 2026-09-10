@@ -29,7 +29,7 @@ import {
   type RemoveOrganizationGroupBindingInput,
   type RenameOrganizationGroupInput,
 } from "@langwatch/organization-contract";
-import type { GroupIdentityPort } from "../ports/organization.port.ts";
+import type { GroupIdentity } from "../app/organization.infrastructure.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
 
@@ -39,7 +39,7 @@ import type { TeamRepository } from "../repositories/team.repository.ts";
  */
 export type OrganizationGroupDependencies = {
   groups: GroupRepository;
-  groupIdentities: GroupIdentityPort;
+  groupIdentities: GroupIdentity;
   teams: TeamRepository;
   authz: AuthzApi;
   grants: AuthzApi;
@@ -62,7 +62,7 @@ export class OrganizationGroupService {
     return this.dependencies.groups;
   }
 
-  private get groupIdentities(): GroupIdentityPort {
+  private get groupIdentities(): GroupIdentity {
     return this.dependencies.groupIdentities;
   }
 

@@ -2,8 +2,8 @@ export {
   GroupIdentityAdapter,
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
-} from "./adapters/resource-identifiers.adapter.ts";
-export { PersonalWorkspaceDiagnosticsAdapter } from "./adapters/personal-workspace-diagnostics.adapter.ts";
+} from "./services/resource-identifiers.service.ts";
+export { PersonalWorkspaceDiagnosticsAdapter } from "./services/personal-workspace-diagnostics.service.ts";
 export {
   OrganizationGrantCachePort,
   OrganizationPromptSeedPort,
@@ -62,7 +62,7 @@ export type {
 export {
   PostgresOrganizationAdapter,
   type PostgresOrganizationAdapterOptions,
-} from "./adapters/postgres.organization.adapter.ts";
+} from "./services/postgres-organization.service.ts";
 export {
   PersonalWorkspaceDiagnosticsPort,
   PersonalWorkspaceIdentityPort,
@@ -151,4 +151,4 @@ export {
   OrganizationInviteMailPort,
   OrganizationInviteRateLimitPort,
   OrganizationInviteSeatCensusPort,
-} from "./ports/invite.port.ts";
+} from "./app/organization.infrastructure.ts";

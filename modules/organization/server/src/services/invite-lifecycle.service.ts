@@ -11,7 +11,7 @@ import {
 } from "@langwatch/organization-contract";
 import { nanoid } from "nanoid";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
-import type { OrganizationInviteMailPort } from "../ports/invite.port.ts";
+import type { OrganizationInviteMailPort } from "../app/organization.infrastructure.ts";
 import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules.ts";
 import {
   INVITE_EXPIRATION_MS,

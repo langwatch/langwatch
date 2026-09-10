@@ -12,10 +12,10 @@ import {
 } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 import type {
-  GroupIdentityPort,
-  PersonalWorkspaceIdentityPort,
-  TeamIdentityPort,
-} from "../../ports/organization.port.ts";
+  GroupIdentity,
+  PersonalWorkspaceIdentity,
+  TeamIdentity,
+} from "../../app/organization.infrastructure.ts";
 import type { OrganizationRepository } from "../organization.repository.ts";
 import type { GroupRepository } from "../group.repository.ts";
 import type { TeamRepository } from "../team.repository.ts";
@@ -123,13 +123,13 @@ function buildService(options?: {
     repository: {} as OrganizationRepository,
     teams: teamRepository,
     groups: groupRepository as unknown as GroupRepository,
-    identities: {} as PersonalWorkspaceIdentityPort,
-    teamIdentities: {} as TeamIdentityPort,
+    identities: {} as PersonalWorkspaceIdentity,
+    teamIdentities: {} as TeamIdentity,
     groupIdentities: {
       createGroupId: () => "group_1",
       createBindingId: () => "binding_1",
       slugify: () => "reviewers",
-    } as GroupIdentityPort,
+    } as GroupIdentity,
     authz,
     grants,
     settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },

@@ -23,9 +23,9 @@ import type {
   PersonalWorkspaceFeatureProject,
 } from "../repositories/organization.repository.ts";
 import type {
-  PersonalWorkspaceDiagnosticsPort,
-  PersonalWorkspaceIdentityPort,
-} from "../ports/organization.port.ts";
+  PersonalWorkspaceDiagnostics,
+  PersonalWorkspaceIdentity,
+} from "../app/organization.infrastructure.ts";
 
 const ALL_PERSONAL_FEATURES_DISABLED: PersonalFeatures = {
   evaluations: false,
@@ -43,9 +43,9 @@ const ALL_PERSONAL_FEATURES_ENABLED: PersonalFeatures = {
 
 type PersonalWorkspaceOptions = {
   repository: OrganizationRepository;
-  identities: PersonalWorkspaceIdentityPort;
+  identities: PersonalWorkspaceIdentity;
   grants: AuthzApi;
-  diagnostics: PersonalWorkspaceDiagnosticsPort | undefined;
+  diagnostics: PersonalWorkspaceDiagnostics | undefined;
 };
 
 export class PersonalWorkspaceService {

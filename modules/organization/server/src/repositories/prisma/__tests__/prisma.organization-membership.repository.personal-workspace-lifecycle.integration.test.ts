@@ -13,7 +13,7 @@ import {
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { PersonalWorkspaceIdentityAdapter } from "../../../adapters/resource-identifiers.adapter.ts";
+import { PersonalWorkspaceIdentityAdapter } from "../../../services/resource-identifiers.service.ts";
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 

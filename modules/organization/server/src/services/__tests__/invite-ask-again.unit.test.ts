@@ -5,7 +5,7 @@ import { InviteSendThrottleService } from "../invite-send-throttle.service.ts";
 import type {
   OrganizationInviteMailPort,
   OrganizationInviteRateLimitPort,
-} from "../../ports/invite.port.ts";
+} from "../../app/organization.infrastructure.ts";
 import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
 
 /**

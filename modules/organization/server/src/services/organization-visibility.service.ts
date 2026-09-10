@@ -17,7 +17,7 @@ import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
 import { OrganizationMembershipService } from "./organization-membership.service.ts";
 import type { OrganizationDemoProject } from "../app/organization.infrastructure.ts";
-import type { OrganizationSettingsSecretPort } from "../ports/organization.port.ts";
+import type { OrganizationSettingsSecret } from "../app/organization.infrastructure.ts";
 import { MemberNotFoundError } from "@langwatch/organization-contract";
 
 /**
@@ -49,7 +49,7 @@ export interface OrganizationVisibilityReader {
 export interface OrganizationVisibilityDependencies {
   readonly reader: OrganizationVisibilityReader;
   readonly permissions: AuthzApi;
-  readonly secrets: OrganizationSettingsSecretPort;
+  readonly secrets: OrganizationSettingsSecret;
   readonly demoProject: OrganizationDemoProject;
 }
 

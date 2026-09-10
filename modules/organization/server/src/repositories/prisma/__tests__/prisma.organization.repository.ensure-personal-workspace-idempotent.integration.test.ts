@@ -27,7 +27,7 @@ import {
 } from "@langwatch/prisma-client";
 import { type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { PersonalWorkspaceIdentityAdapter } from "../../../adapters/resource-identifiers.adapter.ts";
+import { PersonalWorkspaceIdentityAdapter } from "../../../services/resource-identifiers.service.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;

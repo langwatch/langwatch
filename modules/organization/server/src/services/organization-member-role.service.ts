@@ -18,12 +18,12 @@ import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-u
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import {
-  OrganizationGrantCachePort,
-  OrganizationPromptSeedPort,
-  OrganizationSeatLicensePort,
-  OrganizationSessionRevocationPort,
+  OrganizationGrantCache,
+  OrganizationPromptSeed,
+  OrganizationSeatLicense,
+  OrganizationSessionRevocation,
   type OrganizationPlanUser,
-} from "../ports/organization-membership.port.ts";
+} from "../app/organization.infrastructure.ts";
 import type {
   OrganizationMembershipRepository,
   UpdateMemberRoleResult,
@@ -83,10 +83,10 @@ class TeamRoleUpdateRejectedError extends HandledError {
 
 type OrganizationMemberRoleDependencies = {
   repository: OrganizationMembershipRepository;
-  prompts: OrganizationPromptSeedPort;
-  seats: OrganizationSeatLicensePort;
-  sessions: OrganizationSessionRevocationPort;
-  grantCache: OrganizationGrantCachePort;
+  prompts: OrganizationPromptSeed;
+  seats: OrganizationSeatLicense;
+  sessions: OrganizationSessionRevocation;
+  grantCache: OrganizationGrantCache;
 };
 
 export class OrganizationMemberRoleService {

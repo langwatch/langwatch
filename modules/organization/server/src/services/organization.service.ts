@@ -55,12 +55,12 @@ import {
   type UpdateOrganizationSettingsResult,
 } from "@langwatch/organization-contract";
 import type {
-  GroupIdentityPort,
-  OrganizationSettingsSecretPort,
-  PersonalWorkspaceDiagnosticsPort,
-  PersonalWorkspaceIdentityPort,
-  TeamIdentityPort,
-} from "../ports/organization.port.ts";
+  GroupIdentity,
+  OrganizationSettingsSecret,
+  PersonalWorkspaceDiagnostics,
+  PersonalWorkspaceIdentity,
+  TeamIdentity,
+} from "../app/organization.infrastructure.ts";
 import type { GroupRepository } from "../repositories/group.repository.ts";
 import type { OrganizationRepository } from "../repositories/organization.repository.ts";
 import type { TeamRepository } from "../repositories/team.repository.ts";
@@ -88,13 +88,13 @@ export class OrganizationService extends OrganizationServiceContract {
     private readonly repository: OrganizationRepository,
     private readonly teams: TeamRepository,
     private readonly groups: GroupRepository,
-    private readonly identities: PersonalWorkspaceIdentityPort,
-    private readonly teamIdentities: TeamIdentityPort,
-    private readonly groupIdentities: GroupIdentityPort,
+    private readonly identities: PersonalWorkspaceIdentity,
+    private readonly teamIdentities: TeamIdentity,
+    private readonly groupIdentities: GroupIdentity,
     private readonly authz: AuthzApi,
     private readonly grants: AuthzApi,
-    private readonly diagnostics: PersonalWorkspaceDiagnosticsPort | undefined,
-    private readonly settingsSecrets: OrganizationSettingsSecretPort,
+    private readonly diagnostics: PersonalWorkspaceDiagnostics | undefined,
+    private readonly settingsSecrets: OrganizationSettingsSecret,
   ) {
     super();
     this.groupService = OrganizationGroupService.create({
@@ -223,13 +223,13 @@ export class OrganizationService extends OrganizationServiceContract {
     repository: OrganizationRepository;
     teams: TeamRepository;
     groups: GroupRepository;
-    identities: PersonalWorkspaceIdentityPort;
-    teamIdentities: TeamIdentityPort;
-    groupIdentities: GroupIdentityPort;
+    identities: PersonalWorkspaceIdentity;
+    teamIdentities: TeamIdentity;
+    groupIdentities: GroupIdentity;
     authz: AuthzApi;
     grants: AuthzApi;
-    diagnostics?: PersonalWorkspaceDiagnosticsPort;
-    settingsSecrets: OrganizationSettingsSecretPort;
+    diagnostics?: PersonalWorkspaceDiagnostics;
+    settingsSecrets: OrganizationSettingsSecret;
   }): OrganizationService {
     return new OrganizationService(
       options.repository,

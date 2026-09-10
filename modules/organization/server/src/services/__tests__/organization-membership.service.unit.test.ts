@@ -5,11 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
 import { OrganizationMembershipService } from "../organization-membership.service.ts";
 import type {
-  OrganizationGrantCachePort,
-  OrganizationPromptSeedPort,
-  OrganizationSeatLicensePort,
-  OrganizationSessionRevocationPort,
-} from "../../ports/organization-membership.port.ts";
+  OrganizationGrantCache,
+  OrganizationPromptSeed,
+  OrganizationSeatLicense,
+  OrganizationSessionRevocation,
+} from "../../app/organization.infrastructure.ts";
 import type { OrganizationMembershipRepository } from "../../repositories/organization-membership.repository.ts";
 
 const mockInvalidateOrganization = vi.fn();
@@ -48,17 +48,17 @@ describe("OrganizationMembershipService", () => {
   const mockPrompts = {
     seedTagsForOrganization: vi.fn(),
     reportCompensationFailure: vi.fn(),
-  } as unknown as OrganizationPromptSeedPort;
+  } as unknown as OrganizationPromptSeed;
   const seats = {
     checkLimit: mockCheckLimit,
     assertRoleChangeAllowed: mockAssertRoleChangeAllowed,
-  } as unknown as OrganizationSeatLicensePort;
+  } as unknown as OrganizationSeatLicense;
   const sessions = {
     revokeAllBrowserSessions: mockRevokeAllBrowserSessions,
-  } as unknown as OrganizationSessionRevocationPort;
+  } as unknown as OrganizationSessionRevocation;
   const grantCache = {
     invalidateOrganization: mockInvalidateOrganization,
-  } as unknown as OrganizationGrantCachePort;
+  } as unknown as OrganizationGrantCache;
 
   let service: OrganizationMembershipService;
 
@@ -367,7 +367,7 @@ describe("OrganizationMembershipService", () => {
               Promise.reject(
                 new Error("this process composes no session owner, so it cannot revoke sessions"),
               ),
-          } as unknown as OrganizationSessionRevocationPort,
+          } as unknown as OrganizationSessionRevocation,
           grantCache,
         });
         vi.mocked(mockRepo.tryFindMembership).mockResolvedValue(activeMember);

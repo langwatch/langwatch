@@ -21,7 +21,7 @@ import {
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
-import { PersonalWorkspaceIdentityPort, TeamIdentityPort } from "../organization.port.ts";
+import { PersonalWorkspaceIdentity, TeamIdentity } from "../../app/organization.infrastructure.ts";
 import {
   OrganizationRepository,
   type PersonalWorkspaceFeatureProject,
@@ -29,7 +29,7 @@ import {
   type StoredOrganizationSettings,
 } from "../../repositories/organization.repository.ts";
 import { TeamRepository } from "../../repositories/team.repository.ts";
-import { OrganizationService } from "../../services/organization.service.ts";
+import { OrganizationService } from "../organization.service.ts";
 
 class StubRepository extends OrganizationRepository {
   storedSettings: StoredOrganizationSettings | null = null;
@@ -105,7 +105,7 @@ class StubRepository extends OrganizationRepository {
   }
 }
 
-class FixedIdentities extends PersonalWorkspaceIdentityPort {
+class FixedIdentities implements PersonalWorkspaceIdentity {
   create(): PersonalWorkspaceResourceIds {
     return {
       teamId: "team",
@@ -160,7 +160,7 @@ class UnusedTeams extends TeamRepository {
   }
 }
 
-class FixedTeamIdentities extends TeamIdentityPort {
+class FixedTeamIdentities implements TeamIdentity {
   createTeam(): { teamId: string; slug: string } {
     return { teamId: "team", slug: "team" };
   }
@@ -266,7 +266,7 @@ function createService(
     } as unknown as import("../../repositories/group.repository.ts").GroupRepository,
     identities: new FixedIdentities(),
     teamIdentities: new FixedTeamIdentities(),
-    groupIdentities: {} as import("../organization.port.ts").GroupIdentityPort,
+    groupIdentities: {} as import("../../ports/organization.port.ts").GroupIdentityPort,
     authz: {
       listScopeBindings: () => Promise.resolve(teamBindings),
     } as unknown as AuthzService,

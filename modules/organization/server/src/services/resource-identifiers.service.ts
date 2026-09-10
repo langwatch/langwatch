@@ -2,10 +2,10 @@ import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import slugify from "slugify";
 import {
-  GroupIdentityPort,
-  PersonalWorkspaceIdentityPort,
-  TeamIdentityPort,
-} from "../ports/organization.port.ts";
+  GroupIdentity,
+  PersonalWorkspaceIdentity,
+  TeamIdentity,
+} from "../app/organization.infrastructure.ts";
 import type { PersonalWorkspaceResourceIds } from "../repositories/organization.repository.ts";
 
 /**
@@ -42,13 +42,12 @@ function personalSlug(slugPrefix: string): string {
   return `personal-${slugPrefix}-${nanoid(SLUG_SUFFIX_CHARS).toLowerCase()}`;
 }
 
-export class PersonalWorkspaceIdentityAdapter extends PersonalWorkspaceIdentityPort {
+export class PersonalWorkspaceIdentityAdapter implements PersonalWorkspaceIdentity {
   static create(): PersonalWorkspaceIdentityAdapter {
     return new PersonalWorkspaceIdentityAdapter();
   }
 
   private constructor() {
-    super();
   }
 
   create(input: { userId: string; organizationId: string }): PersonalWorkspaceResourceIds {
@@ -69,13 +68,12 @@ export class PersonalWorkspaceIdentityAdapter extends PersonalWorkspaceIdentityP
  * A team id is deliberately not a KSUID: teams predate the scheme, carrying the `team_` + nanoid
  * shape instead. The binding minted alongside it is a KSUID, since bindings came after.
  */
-export class TeamIdentityAdapter extends TeamIdentityPort {
+export class TeamIdentityAdapter implements TeamIdentity {
   static create(): TeamIdentityAdapter {
     return new TeamIdentityAdapter();
   }
 
   private constructor() {
-    super();
   }
 
   createTeam(input: { name: string }): { teamId: string; slug: string } {
@@ -96,13 +94,12 @@ export class TeamIdentityAdapter extends TeamIdentityPort {
  * Unlike a team, a group's id is a KSUID and its slug carries no id tail — the organization
  * service appends its own disambiguating suffix when a base slug is already taken.
  */
-export class GroupIdentityAdapter extends GroupIdentityPort {
+export class GroupIdentityAdapter implements GroupIdentity {
   static create(): GroupIdentityAdapter {
     return new GroupIdentityAdapter();
   }
 
   private constructor() {
-    super();
   }
 
   createGroupId(): string {
