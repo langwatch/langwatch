@@ -4,12 +4,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { PostgresBillingWebhookSubscriptionAdapter } from "../postgres.billing-webhook-subscription.adapter.ts";
+import { PrismaBillingWebhookSubscriptionRepository } from "../prisma.billing-webhook-subscription.repository.ts";
 import {
   BillingSubscriptionPort,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
-} from "../../ports/subscription.port.ts";
+} from "../../../ports/subscription.port.ts";
 import { Temporal } from "@langwatch/time";
 
 const SUBSCRIPTION: BillingSubscriptionRecord = {
@@ -72,11 +72,11 @@ function compose(
 
   return {
     subscriptions,
-    adapter: PostgresBillingWebhookSubscriptionAdapter.create({ subscriptions, database }),
+    adapter: PrismaBillingWebhookSubscriptionRepository.create({ subscriptions, database }),
   };
 }
 
-describe("PostgresBillingWebhookSubscriptionAdapter", () => {
+describe("PrismaBillingWebhookSubscriptionRepository", () => {
   describe("when a payment activates the subscription", () => {
     /** @scenario "An activation carries the organization's trial licence to the webhook" */
     it("carries the organization's trial licence beside the activated row", async () => {

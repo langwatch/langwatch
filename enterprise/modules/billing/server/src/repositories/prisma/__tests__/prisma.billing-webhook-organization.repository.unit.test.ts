@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { PostgresBillingWebhookOrganizationAdapter } from "../postgres.billing-webhook-organization.adapter.ts";
+import { PrismaBillingWebhookOrganizationRepository } from "../prisma.billing-webhook-organization.repository.ts";
 
 function organizationDouble(rows: Record<string, unknown>[] = []) {
   const updates: Record<string, unknown>[] = [];
@@ -27,11 +27,11 @@ function organizationDouble(rows: Record<string, unknown>[] = []) {
 
   return {
     updates,
-    adapter: PostgresBillingWebhookOrganizationAdapter.create({ database }),
+    adapter: PrismaBillingWebhookOrganizationRepository.create({ database }),
   };
 }
 
-describe("PostgresBillingWebhookOrganizationAdapter", () => {
+describe("PrismaBillingWebhookOrganizationRepository", () => {
   describe("when a Stripe customer names an organization", () => {
     /** @scenario "The webhook resolves a Stripe customer to one organization, and to none where there is none" */
     it("answers the matching organization, and nothing for one it does not know", async () => {

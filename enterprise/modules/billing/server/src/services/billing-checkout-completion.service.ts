@@ -13,8 +13,8 @@ import { BestEffortService } from "./best-effort.service.ts";
 import { BillingSubscriptionLifecycleService } from "./billing-subscription-lifecycle.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port.ts";
-import type { BillingWebhookOrganizationPort } from "../ports/billing-webhook-organization.port.ts";
-import type { BillingWebhookSubscriptionPort } from "../ports/billing-webhook-subscription.port.ts";
+import type { BillingWebhookOrganizationPort } from "../repositories/billing-webhook-organization.repository.ts";
+import type { BillingWebhookSubscriptionPort } from "../repositories/billing-webhook-subscription.repository.ts";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
 import { Temporal } from "@langwatch/time";
 

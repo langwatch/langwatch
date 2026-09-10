@@ -181,15 +181,11 @@ export {
   createBillingStripeClient,
   STRIPE_API_VERSION,
 } from "./adapters/stripe.stripe-client.adapter.ts";
-export { BillingWebhookOrganizationPort } from "./ports/billing-webhook-organization.port.ts";
-export {
-  PostgresBillingWebhookOrganizationAdapter,
-  type BillingWebhookOrganizationDatabase,
-} from "./adapters/postgres.billing-webhook-organization.adapter.ts";
-export {
-  PostgresBillingWebhookSubscriptionAdapter,
-  type BillingWebhookTrialLicenseDatabase,
-} from "./adapters/postgres.billing-webhook-subscription.adapter.ts";
+export { BillingWebhookOrganizationPort } from "./repositories/billing-webhook-organization.repository.ts";
+export { PostgresBillingWebhookOrganizationAdapter } from "./adapters/postgres.billing-webhook-organization.adapter.ts";
+export { PostgresBillingWebhookSubscriptionAdapter } from "./adapters/postgres.billing-webhook-subscription.adapter.ts";
+export type { BillingWebhookOrganizationDatabase } from "./repositories/prisma/prisma.billing-webhook-organization.repository.ts";
+export type { BillingWebhookTrialLicenseDatabase } from "./repositories/prisma/prisma.billing-webhook-subscription.repository.ts";
 export {
   BillingWebhookHostPort,
   SilentBillingWebhookHost,
@@ -199,7 +195,7 @@ export {
   NullBillingWebhookSubscriptionAdapter,
   type CancelledSubscription,
   type SubscriptionWithOrg,
-} from "./ports/billing-webhook-subscription.port.ts";
+} from "./repositories/billing-webhook-subscription.repository.ts";
 export { NurturingSinkRegistryService } from "./services/nurturing-sink-registry.service.ts";
 export { PostgresNurturingProfileAdapter } from "./adapters/postgres.nurturing-profile.adapter.ts";
 export type {
@@ -238,3 +234,11 @@ export type {
   DuplicateSubscriptionsReportRepository,
   SubscriptionReportRow,
 } from "./repositories/duplicate-subscriptions-report.repository.ts";
+
+// The rows this module owns, and the two tiers behind them. A process selects
+// one tier and is handed every row; it constructs no repository itself.
+export type { BillingRepositories } from "./repositories/billing.repositories.ts";
+export { billingRepositories } from "./repositories/billing-repositories.registry.ts";
+export { MemoryBillingRepositories } from "./repositories/memory/memory.billing.repositories.ts";
+export { MemoryBillingStore } from "./repositories/memory/memory-billing.store.ts";
+export { PostgresBillingRepositories } from "./repositories/prisma/prisma.billing.repositories.ts";

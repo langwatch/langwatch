@@ -22,11 +22,11 @@ import { NurturingSubscriptionSyncService } from "./nurturing-subscription-sync.
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
 import type { BillingWebhookHostPort } from "../ports/billing-webhook-host.port.ts";
-import type { BillingWebhookOrganizationPort } from "../ports/billing-webhook-organization.port.ts";
+import type { BillingWebhookOrganizationPort } from "../repositories/billing-webhook-organization.repository.ts";
 import type {
   BillingWebhookSubscriptionPort,
   SubscriptionWithOrg,
-} from "../ports/billing-webhook-subscription.port.ts";
+} from "../repositories/billing-webhook-subscription.repository.ts";
 import type { BillingSubscriptionRecord } from "../ports/subscription.port.ts";
 import { nowInstant } from "@langwatch/time";
 

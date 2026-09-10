@@ -24,9 +24,9 @@ import type { BillingTenantOrganizationService } from "../../services/tenant-org
 import { EventingBillableEventsMeterAdapter } from "../eventing.billable-events-meter.adapter.ts";
 
 // Repo root containing both `packages/` and `docs/`. `process.cwd()` is this
-// package's own dir when vitest runs, so four levels up lands on the repo
-// root reliably across worktrees and CI.
-const REPO_ROOT = path.resolve(process.cwd(), "..", "..", "..", "..", "..");
+// package's own dir when vitest runs, and the package sits four levels down
+// at enterprise/modules/billing/server, so four levels up lands on the root.
+const REPO_ROOT = path.resolve(process.cwd(), "..", "..", "..", "..");
 
 const BILLABLE_EVENTS_DOC = "docs/pricing/billable-events.mdx";
 const PRICING_DOC = "docs/pricing.mdx";

@@ -83,14 +83,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "billing|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "billing|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "coding-agent|unregistered-repositories",
       "measured": "2026-09-08"
     },
