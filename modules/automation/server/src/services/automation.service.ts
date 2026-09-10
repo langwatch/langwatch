@@ -1,5 +1,4 @@
 import {
-  AutomationService as AutomationCapability,
   createTriggerCommandSchema,
   InvalidUnsubscribeTokenError,
   maskEmail,
@@ -44,7 +43,16 @@ import type { AutomationPersistCapService } from "./persist-cap.service.ts";
 import { type Instant, fromDate } from "@langwatch/time";
 
 const normalize = (email: string): string => email.trim().toLowerCase();
-export class AutomationService extends AutomationCapability {
+
+/**
+ * The automation feature's own trigger-and-suppression service: the full
+ * surface `AutomationApp` forwards from, and the surface the graph-activity
+ * and settlement-ledger ports narrow down to. Folded out of the contract
+ * package per ADR-133 (was the `automation.service.ts` abstract class under
+ * `contract/src`, the flagged "contract-service" shape) - this class is now
+ * the sole definition of the surface, server-side.
+ */
+export class AutomationService {
   private readonly activeCache: ActiveTriggerCacheService;
   private constructor(
     private readonly triggers: TriggerRepository,
@@ -60,7 +68,6 @@ export class AutomationService extends AutomationCapability {
     private readonly templates: AutomationTemplateService,
     private readonly persistCaps: AutomationPersistCapService,
   ) {
-    super();
     this.activeCache = ActiveTriggerCacheService.create({ triggers, clock });
   }
 

@@ -1,4 +1,4 @@
-import { AutomationService, type TriggerSummary } from "@langwatch/automation-contract";
+import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { IntentContext } from "@langwatch/eventing";
 import type { Project } from "@langwatch/project-contract";
 import { TestProjectApi } from "./test-project-api.ts";
@@ -21,6 +21,7 @@ import {
   AutomationSettlementMatchConfirmationPort,
   AutomationSettlementObservabilityPort,
 } from "../../automation-settlement.port.ts";
+import type { AutomationSettlementLedgerPort } from "../../automation-settlement-ledger.port.ts";
 import { AutomationEmailCapService } from "../../../services/email-cap.service.ts";
 import { AutomationPersistActionService } from "../../../services/persist-action.service.ts";
 import { AutomationSettlementDispatchService } from "../../../services/trigger-settlement-dispatch.service.ts";
@@ -138,7 +139,13 @@ export function settlementSummary(
   };
 }
 
-class SettlementAutomationService extends AutomationService {
+/**
+ * Exactly `AutomationSettlementLedgerPort`'s ten methods — the settlement
+ * dispatch path's whole dependency on Automation. Folded off the deleted
+ * `AutomationService` contract-service (ADR-133); no method beyond the port
+ * belongs here, since nothing in this suite reaches one.
+ */
+class SettlementAutomationService implements AutomationSettlementLedgerPort {
   readonly claims: Array<{ triggerId: string; traceId: string; projectId: string }> = [];
   readonly lastRuns: Array<{ triggerId: string; projectId: string }> = [];
   readonly capInputs: Array<Record<string, unknown>> = [];
@@ -154,114 +161,7 @@ class SettlementAutomationService extends AutomationService {
   persistDecision = { allowed: true, count: 1, cap: 100, skipped: 0 };
 
   constructor(trigger: TriggerSummary) {
-    super();
     this.activeTrigger = trigger;
-  }
-
-  validateTemplateDraft(): never {
-    return unavailable();
-  }
-  testFire(): never {
-    return unavailable();
-  }
-  evaluateGraphTrigger(): never {
-    return unavailable();
-  }
-  decideGraphTriggerHeartbeat(): never {
-    return unavailable();
-  }
-  getById(): never {
-    return unavailable();
-  }
-  findIdentity(): never {
-    return unavailable();
-  }
-  tryGetById(): never {
-    return unavailable();
-  }
-  getAllForProject(): never {
-    return unavailable();
-  }
-  create(): never {
-    return unavailable();
-  }
-  update(): never {
-    return unavailable();
-  }
-  archive(): never {
-    return unavailable();
-  }
-  softDeleteById(): never {
-    return unavailable();
-  }
-  tryGetByCustomGraphId(): never {
-    return unavailable();
-  }
-  getByCustomGraphIds(): never {
-    return unavailable();
-  }
-  getActiveGraphTriggersForProject(): never {
-    return unavailable();
-  }
-  invalidate(): never {
-    return unavailable();
-  }
-  getReportSchedules(): never {
-    return unavailable();
-  }
-  syncReportSchedule(): never {
-    return unavailable();
-  }
-  removeReportSchedule(): never {
-    return unavailable();
-  }
-  reconcileReportSchedules(): never {
-    return unavailable();
-  }
-  getFireStats(): never {
-    return unavailable();
-  }
-  getRecentFires(): never {
-    return unavailable();
-  }
-  recordFire(): never {
-    return unavailable();
-  }
-  getSuppressions(): never {
-    return unavailable();
-  }
-  getAllEnriched(): never {
-    return unavailable();
-  }
-  suppressEmail(): never {
-    return unavailable();
-  }
-  removeSuppression(): never {
-    return unavailable();
-  }
-  tryResolveUnsubscribeView(): never {
-    return unavailable();
-  }
-  confirmUnsubscribe(): never {
-    return unavailable();
-  }
-  tryGetCustomGraph(): never {
-    return unavailable();
-  }
-  customGraphExistsInProject(): never {
-    return unavailable();
-  }
-  getCustomGraphNamesByIds(): never {
-    return unavailable();
-  }
-  getRecentWebhookDeliveries(): never {
-    return unavailable();
-  }
-  pruneWebhookDeliveries(): never {
-    return unavailable();
-  }
-  readPersistCapCounts(): never {
-    return unavailable();
   }
 
   async getActiveTraceTriggersForProject(): Promise<TriggerSummary[]> {

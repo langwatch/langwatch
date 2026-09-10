@@ -5,12 +5,12 @@ import type {
   LangyConversationListCursor,
   LangyConversationListPage,
   LangyMessageRow,
+  LangyRelayConnection,
   LangyStartConversationTurnInput,
   LangyTurnResultInput,
-} from "./langy.service.ts";
+} from "./langy-conversation.ts";
 import type { LangyCredentialSession, LangyEgressAllowlist, LangyStopTurnInput } from "./langy.ts";
 import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";
-import type { LangyRelayConnection } from "./langy.service.ts";
 
 /** The portable, callable Langy capability shared by process transports. */
 export interface LangyApi {

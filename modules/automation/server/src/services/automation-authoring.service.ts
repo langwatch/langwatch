@@ -28,6 +28,7 @@ import {
   TestFireUnavailableError,
   TriggerAction,
   TriggerFiltersRequiredError,
+  type AutomationApi,
   type AutomationApiCreateInput,
   type AutomationApiListSlackChannelsInput,
   type AutomationApiTestFireInput,
@@ -39,7 +40,6 @@ import {
   type AutomationTestFireAuthor,
   type AutomationListRow,
   type AutomationPersistCapCount,
-  type AutomationService,
   type CreateTriggerCommand,
   type GraphAlertActionParams,
   type SlackChannelListing,
@@ -87,7 +87,7 @@ const TEST_FIRE_MAX_PER_WINDOW = 10;
 
 /** What the authoring service reaches. */
 export interface AutomationAuthoringCollaborators {
-  automation: AutomationService;
+  automation: AutomationApi;
   rules: AutomationRulesService;
   monitors: MonitorApi;
   providers: AutomationProviderSecrets;

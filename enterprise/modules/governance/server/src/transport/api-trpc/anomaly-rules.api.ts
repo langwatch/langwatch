@@ -10,7 +10,7 @@ import {
   anomalyRuleSchema,
   ANOMALY_RULE_SEVERITIES,
   type AnomalyRule,
-  type GovernanceService,
+  type GovernanceApi,
   redactDestinationConfig,
 } from "@langwatch/enterprise-governance-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
@@ -18,7 +18,7 @@ import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from 
 import { z } from "zod";
 
 export type AnomalyRulesTrpcContext = Readonly<{
-  app: Readonly<{ governance: GovernanceService }>;
+  app: Readonly<{ governance: GovernanceApi }>;
   actor(): Readonly<{ id: string }>;
 }>;
 

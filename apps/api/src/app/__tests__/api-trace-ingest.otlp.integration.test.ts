@@ -1,5 +1,5 @@
 import type {
-  GovernanceService,
+  GovernanceApi,
   GovernanceOtlpPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
 import { TestGovernanceService } from "../../../../../enterprise/modules/governance/server/src/app/__tests__/support/test-governance-service.ts";
@@ -400,7 +400,7 @@ describe("given the API process composed no command queue", () => {
 
 type MountOverrides = {
   sourceType?: string;
-  governance?: GovernanceService;
+  governance?: GovernanceApi;
   credential?: ApiHandlerManagedCredentials["authenticate"];
   allowance?: ApiTraceIngestAllowance;
   report?: (capability: "command-queue" | "dedup" | "plan-allowance") => void;

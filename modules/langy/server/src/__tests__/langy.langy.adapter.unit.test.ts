@@ -7,9 +7,9 @@ import type {
 import {
   LangyApp,
   LangyBlockOtelMetricsAdapter,
+  LangyService,
   PostgresLangyAdapter,
 } from "@langwatch/langy-server";
-import { LangyService } from "@langwatch/langy-contract";
 import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,

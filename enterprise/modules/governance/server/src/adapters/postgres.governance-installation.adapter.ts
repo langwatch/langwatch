@@ -3,7 +3,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   GovernanceOttlGateway,
-  GovernanceService,
+  GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -100,7 +100,7 @@ export type GovernanceInstallationOptions = {
   ottl: GovernanceOttlGateway;
 };
 
-/** Builds the one process-owned GovernanceService from injected infrastructure. */
+/** Builds the one process-owned GovernanceApi from injected infrastructure. */
 export class PostgresGovernanceInstallationAdapter {
   private constructor(private readonly options: GovernanceInstallationOptions) {}
 
@@ -108,7 +108,7 @@ export class PostgresGovernanceInstallationAdapter {
     return new PostgresGovernanceInstallationAdapter(options);
   }
 
-  build(): GovernanceService {
+  build(): GovernanceApi {
     const anomalyRules = PostgresAnomalyRuleAdapter.create({
       database: this.options.database,
     }).build();

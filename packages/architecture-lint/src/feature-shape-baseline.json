@@ -19,10 +19,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "analytics|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "analytics|refusing-composition",
       "measured": "2026-09-08"
     },
@@ -36,10 +32,6 @@
     },
     {
       "key": "annotation|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "api-key|nested-web-entry",
       "measured": "2026-09-08"
     },
     {
@@ -67,10 +59,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "authz|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "authz|persistence-adapter",
       "measured": "2026-09-08"
     },
@@ -83,19 +71,11 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "automation|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "automation|fixtures-directory",
       "measured": "2026-09-08"
     },
     {
       "key": "automation|installer-not-booted",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "automation|nested-web-entry",
       "measured": "2026-09-08"
     },
     {
@@ -120,10 +100,6 @@
     },
     {
       "key": "billing|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "billing|nested-web-entry",
       "measured": "2026-09-08"
     },
     {
@@ -163,10 +139,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "experiment|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "experiment|persistence-adapter",
       "measured": "2026-09-08"
     },
@@ -184,10 +156,6 @@
     },
     {
       "key": "gateway|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "gateway|nested-web-entry",
       "measured": "2026-09-08"
     },
     {
@@ -211,19 +179,11 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "governance|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "governance|legacy-transport-runtime",
       "measured": "2026-09-08"
     },
     {
       "key": "governance|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "governance|nested-web-entry",
       "measured": "2026-09-08"
     },
     {
@@ -279,10 +239,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "langy|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "langy|installer-not-booted",
       "measured": "2026-09-08"
     },
@@ -292,10 +248,6 @@
     },
     {
       "key": "langy|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "langy|nested-web-entry",
       "measured": "2026-09-08"
     },
     {
@@ -331,10 +283,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "licensing|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "licensing|persistence-adapter",
       "measured": "2026-09-08"
     },
@@ -359,10 +307,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "managed-provider|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "metric|unregistered-repositories",
       "measured": "2026-09-08"
     },
@@ -375,18 +319,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "navigation|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "onboarding|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "ops|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "organization|contract-service",
       "measured": "2026-09-08"
     },
@@ -396,10 +328,6 @@
     },
     {
       "key": "organization|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "organization|nested-web-entry",
       "measured": "2026-09-08"
     },
     {
@@ -467,15 +395,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "scenario|nested-web-entry",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "scim|contract-service",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "scim|nested-web-entry",
       "measured": "2026-09-08"
     },
     {

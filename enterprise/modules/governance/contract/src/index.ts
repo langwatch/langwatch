@@ -12,7 +12,7 @@ export * from "./governance-audit.ts";
 export * from "./governance-signals.ts";
 export * from "./governance.errors.ts";
 export * from "./governance-events.ts";
-export * from "./governance.service.ts";
+export * from "./governance.api.ts";
 export * from "./session-policy.ts";
 export * from "./governance.responses.ts";
 export * from "./ingestion-source.ts";

@@ -16,13 +16,13 @@ import {
   departmentAssignmentsSchema,
   departmentSchema,
   governanceWriteAcknowledgedSchema,
-  type GovernanceService,
+  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 export type DepartmentsTrpcContext = Readonly<{
-  app: Readonly<{ governance: GovernanceService }>;
+  app: Readonly<{ governance: GovernanceApi }>;
 }>;
 
 type DepartmentsTrpcProcedures<

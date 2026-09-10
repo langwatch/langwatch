@@ -1,25 +1,7 @@
 import {
-  type AutomationPersistCapBreach,
-  AutomationService,
-  type CreateTriggerCommand,
-  type CustomGraph,
-  type CustomGraphNameRef,
-  type EmailSuppression,
   type GraphTriggerEvaluationReason,
   type GraphTriggerEvaluationResult,
-  type GraphTriggerSweepCandidate,
-  type ReportSchedule,
-  type SuppressEmailCommand,
-  type TestFireInput,
-  type TestFireResult,
-  type TestFireTemplateDraft,
-  type Trigger,
-  type TriggerFire,
-  type TriggerFireStats,
   type TriggerSummary,
-  type UpdateTriggerCommand,
-  type WebhookDeliveryInput,
-  type WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
 import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import {
@@ -35,7 +17,8 @@ import {
   AutomationEvaluationTriggerFilterService,
   AutomationTriggerMatchRecorderPort,
 } from "../../index.ts";
-import type { Instant } from "@langwatch/time";
+import type { AutomationGraphActivityPort } from "../../ports/automation-graph-activity.port.ts";
+import type { AutomationTraceTriggerCataloguePort } from "../../ports/automation-trace-trigger-catalogue.port.ts";
 
 function trigger(): TriggerSummary {
   return {
@@ -173,15 +156,23 @@ class TestTraceService extends TraceService {
   }
 }
 
-class TestAutomationService extends AutomationService {
+/**
+ * The redelivery test only exercises the trace-catalogue read; graph
+ * evaluation is unreached but the double still satisfies the port so
+ * `AutomationEvaluationSubscriberService.create` type-checks against the
+ * same two narrow ports production composes over.
+ */
+class TestAutomationService
+  implements AutomationTraceTriggerCataloguePort, AutomationGraphActivityPort
+{
   private readonly unavailable = (): never => {
     throw new Error("not used by this subscriber");
   };
 
-  validateTemplateDraft(_input: TestFireTemplateDraft): void {
-    this.unavailable();
+  getActiveTraceTriggersForProject(_projectId: string): Promise<TriggerSummary[]> {
+    return Promise.resolve([trigger()]);
   }
-  testFire(_input: TestFireInput): Promise<TestFireResult> {
+  getActiveGraphTriggersForProject(_projectId: string): Promise<TriggerSummary[]> {
     return this.unavailable();
   }
   evaluateGraphTrigger(_input: {
@@ -189,190 +180,6 @@ class TestAutomationService extends AutomationService {
     projectId: string;
     reason: GraphTriggerEvaluationReason;
   }): Promise<GraphTriggerEvaluationResult> {
-    return this.unavailable();
-  }
-  decideGraphTriggerHeartbeat(_input: { now: Instant }): Promise<GraphTriggerSweepCandidate[]> {
-    return this.unavailable();
-  }
-  handlePersistCapBreach(_input: AutomationPersistCapBreach): Promise<void> {
-    return this.unavailable();
-  }
-  resolvePersistDailyCap(_projectId: string): Promise<number> {
-    return this.unavailable();
-  }
-  consumePersistCapSlot(_input: {
-    projectId: string;
-    triggerId: string;
-    now: Instant;
-    cap: number;
-    dedupKey: string;
-  }) {
-    return this.unavailable();
-  }
-  readPersistCapCounts(_input: {
-    projectId: string;
-    triggerIds: readonly string[];
-    now: Instant;
-    cap: number;
-  }) {
-    return this.unavailable();
-  }
-  getById(_input: { triggerId: string; projectId: string }): Promise<Trigger> {
-    return this.unavailable();
-  }
-  tryGetById(_input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
-    return this.unavailable();
-  }
-  getAllForProject(_input: { projectId: string }): Promise<Trigger[]> {
-    return this.unavailable();
-  }
-  create(_input: CreateTriggerCommand): Promise<Trigger> {
-    return this.unavailable();
-  }
-  update(_input: UpdateTriggerCommand): Promise<Trigger> {
-    return this.unavailable();
-  }
-  archive(_input: { triggerId: string; projectId: string }): Promise<Trigger> {
-    return this.unavailable();
-  }
-  softDeleteById(_input: { triggerId: string; projectId: string }): Promise<Trigger> {
-    return this.unavailable();
-  }
-  tryGetByCustomGraphId(_input: {
-    projectId: string;
-    customGraphId: string;
-  }): Promise<Trigger | null> {
-    return this.unavailable();
-  }
-  getByCustomGraphIds(_input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]> {
-    return this.unavailable();
-  }
-  getActiveTraceTriggersForProject(_projectId: string): Promise<TriggerSummary[]> {
-    return Promise.resolve([trigger()]);
-  }
-  getActiveGraphTriggersForProject(_projectId: string): Promise<TriggerSummary[]> {
-    return this.unavailable();
-  }
-  claimSend(_input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean> {
-    return this.unavailable();
-  }
-  isSendClaimed(_input: {
-    triggerId: string;
-    traceId: string;
-    projectId: string;
-  }): Promise<boolean> {
-    return this.unavailable();
-  }
-  filterSendClaimed(_input: {
-    triggerId: string;
-    traceIds: string[];
-    projectId: string;
-  }): Promise<Set<string>> {
-    return this.unavailable();
-  }
-  updateLastRunAt(_input: { triggerId: string; projectId: string }): Promise<void> {
-    return this.unavailable();
-  }
-  invalidate(_projectId: string): Promise<void> {
-    return this.unavailable();
-  }
-  getReportSchedules(_input: { projectId: string }): Promise<ReportSchedule[]> {
-    return this.unavailable();
-  }
-  syncReportSchedule(_input: {
-    projectId: string;
-    triggerId: string;
-    cron: string;
-    timezone: string;
-  }): Promise<void> {
-    return this.unavailable();
-  }
-  removeReportSchedule(_input: { projectId: string; triggerId: string }): Promise<void> {
-    return this.unavailable();
-  }
-  reconcileReportSchedules(): Promise<{ repaired: number }> {
-    return this.unavailable();
-  }
-  getFireStats(_input: { projectId: string }): Promise<TriggerFireStats[]> {
-    return this.unavailable();
-  }
-  getRecentFires(_input: {
-    projectId: string;
-    triggerId?: string;
-    limit: number;
-  }): Promise<TriggerFire[]> {
-    return this.unavailable();
-  }
-  recordFire(_input: {
-    projectId: string;
-    triggerId: string;
-    traceId?: string | null;
-    customGraphId?: string | null;
-    createdAt: Instant;
-    resolvedAt?: Instant | null;
-  }): Promise<TriggerFire> {
-    return this.unavailable();
-  }
-  getSuppressions(_input: { projectId: string }): Promise<EmailSuppression[]> {
-    return this.unavailable();
-  }
-  getAllEnriched(_input: {
-    projectId: string;
-  }): Promise<Array<EmailSuppression & { triggerName: string | null }>> {
-    return this.unavailable();
-  }
-  suppressEmail(_input: SuppressEmailCommand): Promise<EmailSuppression> {
-    return this.unavailable();
-  }
-  removeSuppression(_input: { id: string; projectId: string }): Promise<void> {
-    return this.unavailable();
-  }
-  filterSuppressed(_input: {
-    projectId: string;
-    triggerId: string;
-    emails: string[];
-  }): Promise<string[]> {
-    return this.unavailable();
-  }
-  tryResolveUnsubscribeView(_input: { token: string }): Promise<{
-    projectName: string;
-    triggerName: string | null;
-    email: string;
-  } | null> {
-    return this.unavailable();
-  }
-  confirmUnsubscribe(_input: { token: string; scope: "trigger" | "project" }): Promise<void> {
-    return this.unavailable();
-  }
-  tryGetCustomGraph(_input: {
-    customGraphId: string;
-    projectId: string;
-  }): Promise<CustomGraph | null> {
-    return this.unavailable();
-  }
-  customGraphExistsInProject(_input: {
-    customGraphId: string;
-    projectId: string;
-  }): Promise<boolean> {
-    return this.unavailable();
-  }
-  getCustomGraphNamesByIds(_input: {
-    customGraphIds: string[];
-    projectId: string;
-  }): Promise<CustomGraphNameRef[]> {
-    return this.unavailable();
-  }
-  recordWebhookDelivery(_input: WebhookDeliveryInput): Promise<void> {
-    return this.unavailable();
-  }
-  getRecentWebhookDeliveries(_input: {
-    projectId: string;
-    triggerId: string;
-    limit: number;
-  }): Promise<WebhookDeliveryRow[]> {
-    return this.unavailable();
-  }
-  pruneWebhookDeliveries(_now?: Instant): Promise<number> {
     return this.unavailable();
   }
 }

@@ -2,7 +2,7 @@ import { nowInstant } from "@langwatch/time";
 /**
  * Private port and policy for Langy's Redis-backed feedback cadence.
  *
- * The portable contract exposes the two operations on LangyService; Redis and
+ * The portable contract exposes the two operations on LangyApi; Redis and
  * the cadence record do not become part of the feature boundary.
  */
 

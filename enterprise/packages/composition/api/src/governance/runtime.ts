@@ -9,7 +9,7 @@ import {
   type GovernanceInstallationOptions,
 } from "@langwatch/enterprise-governance-server";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { Cluster, Redis } from "ioredis";
@@ -81,7 +81,7 @@ export class AppGovernanceRuntime {
   static create(
     database: GovernanceInstallationOptions["database"],
     options: GovernanceRuntimeOptions,
-  ): GovernanceService {
+  ): GovernanceApi {
     const cliTokens = AppCliTokenRevocationAdapter.create(options.redis);
     const adminWorkspace = AppAdminWorkspaceViewAuditAdapter.create({
       prisma: database,

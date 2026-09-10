@@ -51,7 +51,7 @@ import {
 import {
   type CanonicalCostEvent,
   type GovernanceIngestionSource,
-  type GovernanceService,
+  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
@@ -142,7 +142,7 @@ export type GovernanceIngestSpendPort = Readonly<{
 export type GovernanceIngestRestPorts = Readonly<{
   /** The SAME governance service the console reads sources and templates from. */
   governance: () => Pick<
-    GovernanceService,
+    GovernanceApi,
     | "tryFindIngestionSourceByIngestSecret"
     | "ingestionSourceRecordEventReceived"
     | "extractCanonicalCostEvents"
@@ -322,10 +322,10 @@ async function extractCostEventsForSource(input: {
   parsed: IExportLogsServiceRequest;
   rawBody: ArrayBuffer;
   contentType: string | undefined;
-  governance: Pick<GovernanceService, "extractCanonicalCostEvents" | "ottlTransform">;
+  governance: Pick<GovernanceApi, "extractCanonicalCostEvents" | "ottlTransform">;
 }): Promise<CanonicalCostEvent[]> {
   const asLogsRequest = input.parsed as unknown as Parameters<
-    GovernanceService["extractCanonicalCostEvents"]
+    GovernanceApi["extractCanonicalCostEvents"]
   >[0];
   const parserConfig = (input.source.parserConfig as Record<string, unknown> | null) ?? {};
   const ottlStatements = Array.isArray(parserConfig.ottlStatements)
@@ -377,7 +377,7 @@ async function extractCostEventsForSource(input: {
       return input.governance.extractCanonicalCostEvents(asLogsRequest);
     }
     return input.governance.extractCanonicalCostEvents(
-      reparsed.request as unknown as Parameters<GovernanceService["extractCanonicalCostEvents"]>[0],
+      reparsed.request as unknown as Parameters<GovernanceApi["extractCanonicalCostEvents"]>[0],
     );
   } catch (transformErr) {
     logger.warn(

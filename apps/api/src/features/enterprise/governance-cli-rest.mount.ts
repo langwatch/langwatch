@@ -43,13 +43,13 @@ import type {
   GovernanceCliPersonalWorkspace,
   GovernanceCliRestPorts,
 } from "@langwatch/enterprise-governance-server";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApp } from "@langwatch/organization-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 export type ApiGovernanceCliRestOptions = Readonly<{
   /** The Enterprise governance capability, where the deployment composed one. */
-  governance: GovernanceService | undefined;
+  governance: GovernanceApi | undefined;
   /** The device session a bearer names, as this process reads one. */
   accessTokens: GovernanceCliAccessTokenPort | undefined;
   /** The process's one guarded connection, or none. */

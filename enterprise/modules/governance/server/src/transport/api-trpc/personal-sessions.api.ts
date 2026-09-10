@@ -8,7 +8,7 @@
  * from input, so no cross-user reach is expressible.
  *
  * Transport only: input parsing, wire shape, delegation. The revocation and
- * listing behaviour belong to {@link GovernanceService}, which both this
+ * listing behaviour belong to {@link GovernanceApi}, which both this
  * feature's transports reach through.
  *
  * Spec: specs/ai-governance/sessions/sessions-inventory.feature
@@ -18,7 +18,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   cliSessionCardSchema,
   cliSessionRevocationSchema,
-  type GovernanceService,
+  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -30,7 +30,7 @@ import { z } from "zod";
  * carries every feature's dependencies.
  */
 export type PersonalSessionsTrpcContext = Readonly<{
-  app: Readonly<{ governance: GovernanceService }>;
+  app: Readonly<{ governance: GovernanceApi }>;
   actor(): Readonly<{ id: string }>;
 }>;
 

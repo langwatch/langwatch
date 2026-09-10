@@ -1,15 +1,15 @@
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { OtlpIngestCredential } from "@langwatch/trace-server/api-rest/otlp-ingest";
 
 /** Compatibility composition until Governance adopts its complete callable ModuleApi. */
 export class ApiOtlpCredentialPolicyAdapter {
-  readonly #governance: GovernanceService | undefined;
+  readonly #governance: GovernanceApi | undefined;
 
-  private constructor(governance: GovernanceService | undefined) {
+  private constructor(governance: GovernanceApi | undefined) {
     this.#governance = governance;
   }
 
-  static create(governance: GovernanceService | undefined): ApiOtlpCredentialPolicyAdapter {
+  static create(governance: GovernanceApi | undefined): ApiOtlpCredentialPolicyAdapter {
     return new ApiOtlpCredentialPolicyAdapter(governance);
   }
 

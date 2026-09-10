@@ -25,7 +25,6 @@ import {
   type AutomationListRow,
   type AutomationPersistCapCount,
   type AutomationServerConfig,
-  type AutomationService,
   type CreateTriggerCommand,
   type CustomGraphNameRef,
   type EmailSuppressionRow,
@@ -212,7 +211,7 @@ type AutomationSetup = FeatureSetup<
 
 /** What the application is composed from, once the process has supplied it. */
 interface AutomationAppCollaborators {
-  automation: AutomationService;
+  automation: AutomationApi;
   monitors: MonitorApiContract;
   rules: AutomationRulesService;
   authoring: AutomationAuthoringService;
@@ -285,7 +284,7 @@ export class AutomationApp implements AutomationApi {
     });
   }
 
-  #automation: AutomationService;
+  #automation: AutomationApi;
   #rules: AutomationRulesService;
   #authoring: AutomationAuthoringService;
   #monitors: MonitorApiContract;

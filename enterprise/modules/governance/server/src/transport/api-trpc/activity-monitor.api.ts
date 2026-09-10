@@ -10,7 +10,7 @@
  * caller sees.
  *
  * Transport only: input parsing, delegation, wire shape. The rollups belong
- * to `GovernanceService`; the plan gate belongs to the composition.
+ * to `GovernanceApi`; the plan gate belongs to the composition.
  *
  * Spec: specs/ai-gateway/governance/activity-monitor.feature
  */
@@ -26,13 +26,13 @@ import {
   spendByTeamRowSchema,
   spendByUserRowSchema,
   spendOverTimeResultSchema,
-  type GovernanceService,
+  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 export type ActivityMonitorTrpcContext = Readonly<{
-  app: Readonly<{ governance: GovernanceService }>;
+  app: Readonly<{ governance: GovernanceApi }>;
 }>;
 
 type ActivityMonitorTrpcProcedures<

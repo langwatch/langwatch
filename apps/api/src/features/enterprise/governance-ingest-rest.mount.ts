@@ -13,7 +13,7 @@ import {
   INGEST_RATE_LIMIT_MAX_REQUESTS,
   INGEST_RATE_LIMIT_WINDOW_SECONDS,
 } from "@langwatch/enterprise-governance-server";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GovernanceInternalProjectPort } from "@langwatch/project-server";
 import { nowInstant } from "@langwatch/time";
@@ -61,7 +61,7 @@ export class ApiGovernanceIngestRateLimit extends GovernanceIngestRateLimitPort 
 
 export type ApiGovernanceIngestRestOptions = Readonly<{
   /** The Enterprise governance capability, where the deployment composed one. */
-  governance: GovernanceService | undefined;
+  governance: GovernanceApi | undefined;
   /** The internal governance project mint; `ProjectApi` satisfies it. */
   projects: Pick<GovernanceInternalProjectPort, "ensureInternal"> | undefined;
   /**

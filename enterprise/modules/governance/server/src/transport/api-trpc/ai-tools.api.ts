@@ -39,7 +39,7 @@ import {
   aiToolStarterPackImportSchema,
   aiToolStarterTileChoiceSchema,
   governanceWriteAcknowledgedSchema,
-  type GovernanceService,
+  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
@@ -49,7 +49,7 @@ import { z } from "zod";
 const logger = createLogger("langwatch:governance:ai-tools");
 
 export type AiToolsTrpcContext = Readonly<{
-  app: Readonly<{ governance: GovernanceService }>;
+  app: Readonly<{ governance: GovernanceApi }>;
   actor(): Readonly<{ id: string }>;
 }>;
 

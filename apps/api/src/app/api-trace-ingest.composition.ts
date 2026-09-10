@@ -3,7 +3,7 @@
  * where this process is a WRITER rather than a reader, and everything below follows from
  * that.
  */
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import { ApiOtlpCredentialPolicyAdapter } from "./api-otlp-credential-policy.adapter.ts";
 import { TraceProcessingProducerAdapter } from "@langwatch/trace-server";
 import { shouldFilterCodingAgentSpan } from "@langwatch/coding-agent-contract";
@@ -91,7 +91,7 @@ export type ApiTraceIngestOptions = Readonly<{
   redis: RedisConnection | null | undefined;
   /** The one credential resolution both this door and the chain use. */
   credentials: ApiHandlerManagedCredentials;
-  governance?: GovernanceService;
+  governance?: GovernanceApi;
   /**
    * The plan's monthly allowance, or none.
    */

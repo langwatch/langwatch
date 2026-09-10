@@ -9,7 +9,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import {
   AI_TOOL_STARTER_TILES,
-  type GovernanceService,
+  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import {
   PrismaConfigService,
@@ -112,16 +112,16 @@ function caller(userId: string) {
   });
 
   class PortalGovernance extends TestGovernanceService {
-    override aiToolEnsureDefaultCatalog: GovernanceService["aiToolEnsureDefaultCatalog"] = (
+    override aiToolEnsureDefaultCatalog: GovernanceApi["aiToolEnsureDefaultCatalog"] = (
       input,
     ) => catalog.ensureDefaultCatalog(input);
 
-    override aiToolListForUser: GovernanceService["aiToolListForUser"] = (input) =>
+    override aiToolListForUser: GovernanceApi["aiToolListForUser"] = (input) =>
       catalog.listForUser(input);
   }
 
   type PortalContext = {
-    app: { governance: GovernanceService };
+    app: { governance: GovernanceApi };
     actor(): { id: string };
   };
 

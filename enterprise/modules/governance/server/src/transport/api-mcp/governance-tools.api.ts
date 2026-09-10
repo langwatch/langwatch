@@ -28,7 +28,7 @@
 
 import { type ZodRawShape, z } from "zod";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port.ts";
 
 type ToolCallback = (
@@ -70,7 +70,7 @@ const NEEDS_OAUTH_PREFIX = "AUTH_REQUIRED: ";
 
 export interface GovernanceMcpContext {
   directory: GovernanceDirectoryPort;
-  governance: GovernanceService;
+  governance: GovernanceApi;
   /** The organization permission decision this surface is judged by. */
   permissions: GovernanceMcpPermissionProbePort;
   /** Project apiKey from the MCP session (used to derive organizationId). */

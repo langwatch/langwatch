@@ -4,7 +4,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { AnomalyRuleService } from "./anomaly-rule.service.ts";
 import type { PostgresGovernancePolicyService } from "./governance-policy.service.ts";
 import type { DepartmentService } from "./department.service.ts";
@@ -28,50 +28,50 @@ export class GovernanceRulesOperationsService {
     return new GovernanceRulesOperationsService(anomalyRules, departments, policy, aiTools);
   }
 
-  readonly anomalyRuleList: GovernanceService["anomalyRuleList"] = (...args) =>
+  readonly anomalyRuleList: GovernanceApi["anomalyRuleList"] = (...args) =>
     this.anomalyRules.list(...args);
 
-  readonly tryFindAnomalyRuleById: GovernanceService["tryFindAnomalyRuleById"] = (...args) =>
+  readonly tryFindAnomalyRuleById: GovernanceApi["tryFindAnomalyRuleById"] = (...args) =>
     this.anomalyRules.tryFindById(...args);
 
-  readonly anomalyRuleGetById: GovernanceService["anomalyRuleGetById"] = (...args) =>
+  readonly anomalyRuleGetById: GovernanceApi["anomalyRuleGetById"] = (...args) =>
     this.anomalyRules.getById(...args);
 
-  readonly anomalyRuleCreate: GovernanceService["anomalyRuleCreate"] = (...args) =>
+  readonly anomalyRuleCreate: GovernanceApi["anomalyRuleCreate"] = (...args) =>
     this.anomalyRules.createRule(...args);
 
-  readonly anomalyRuleUpdate: GovernanceService["anomalyRuleUpdate"] = (...args) =>
+  readonly anomalyRuleUpdate: GovernanceApi["anomalyRuleUpdate"] = (...args) =>
     this.anomalyRules.updateRule(...args);
 
-  readonly anomalyRuleArchive: GovernanceService["anomalyRuleArchive"] = (...args) =>
+  readonly anomalyRuleArchive: GovernanceApi["anomalyRuleArchive"] = (...args) =>
     this.anomalyRules.archive(...args);
 
-  readonly departmentList: GovernanceService["departmentList"] = (...args) =>
+  readonly departmentList: GovernanceApi["departmentList"] = (...args) =>
     this.departments.getAll({ organizationId: args[0] });
 
-  readonly departmentAssignments: GovernanceService["departmentAssignments"] = (...args) =>
+  readonly departmentAssignments: GovernanceApi["departmentAssignments"] = (...args) =>
     this.departments.getAssignments({ organizationId: args[0] });
 
-  readonly departmentCreate: GovernanceService["departmentCreate"] = (...args) =>
+  readonly departmentCreate: GovernanceApi["departmentCreate"] = (...args) =>
     this.departments.create(...args);
 
-  readonly departmentResolveByNameOrCreate: GovernanceService["departmentResolveByNameOrCreate"] = (
+  readonly departmentResolveByNameOrCreate: GovernanceApi["departmentResolveByNameOrCreate"] = (
     ...args
   ) => this.departments.resolveByNameOrCreate(...args);
 
-  readonly departmentRename: GovernanceService["departmentRename"] = (...args) =>
+  readonly departmentRename: GovernanceApi["departmentRename"] = (...args) =>
     this.departments.rename(...args);
 
-  readonly departmentArchive: GovernanceService["departmentArchive"] = (...args) =>
+  readonly departmentArchive: GovernanceApi["departmentArchive"] = (...args) =>
     this.departments.archive(...args);
 
-  readonly departmentAssignUser: GovernanceService["departmentAssignUser"] = (...args) =>
+  readonly departmentAssignUser: GovernanceApi["departmentAssignUser"] = (...args) =>
     this.departments.assignUser(...args);
 
-  readonly departmentAssignTeam: GovernanceService["departmentAssignTeam"] = (...args) =>
+  readonly departmentAssignTeam: GovernanceApi["departmentAssignTeam"] = (...args) =>
     this.departments.assignTeam(...args);
 
-  readonly departmentAssignProject: GovernanceService["departmentAssignProject"] = (...args) =>
+  readonly departmentAssignProject: GovernanceApi["departmentAssignProject"] = (...args) =>
     this.departments.assignProject(...args);
 
   resolveOtlpReceiverPolicies(
@@ -80,63 +80,63 @@ export class GovernanceRulesOperationsService {
     return this.policy.resolveOtlpReceiverPolicies(input);
   }
 
-  readonly resolveSourceNonBillable: GovernanceService["resolveSourceNonBillable"] = (...args) =>
+  readonly resolveSourceNonBillable: GovernanceApi["resolveSourceNonBillable"] = (...args) =>
     this.policy.resolveSourceNonBillable(...args);
 
-  readonly resolveTraceDepartment: GovernanceService["resolveTraceDepartment"] = (...args) =>
+  readonly resolveTraceDepartment: GovernanceApi["resolveTraceDepartment"] = (...args) =>
     this.policy.resolveTraceDepartment(...args);
 
-  readonly aiToolListForUser: GovernanceService["aiToolListForUser"] = (...args) =>
+  readonly aiToolListForUser: GovernanceApi["aiToolListForUser"] = (...args) =>
     this.aiTools.listForUser(...args);
 
-  readonly aiToolListForAdmin: GovernanceService["aiToolListForAdmin"] = (...args) =>
+  readonly aiToolListForAdmin: GovernanceApi["aiToolListForAdmin"] = (...args) =>
     this.aiTools.listForAdmin(...args);
 
-  readonly tryFindAiToolById: GovernanceService["tryFindAiToolById"] = (...args) =>
+  readonly tryFindAiToolById: GovernanceApi["tryFindAiToolById"] = (...args) =>
     this.aiTools.tryFindById(...args);
 
-  readonly aiToolGetById: GovernanceService["aiToolGetById"] = (...args) =>
+  readonly aiToolGetById: GovernanceApi["aiToolGetById"] = (...args) =>
     this.aiTools.getById(...args);
 
-  readonly aiToolCreate: GovernanceService["aiToolCreate"] = (...args) =>
+  readonly aiToolCreate: GovernanceApi["aiToolCreate"] = (...args) =>
     this.aiTools.create(...args);
 
-  readonly aiToolUpdate: GovernanceService["aiToolUpdate"] = (...args) =>
+  readonly aiToolUpdate: GovernanceApi["aiToolUpdate"] = (...args) =>
     this.aiTools.update(...args);
 
-  readonly aiToolRemove: GovernanceService["aiToolRemove"] = (...args) =>
+  readonly aiToolRemove: GovernanceApi["aiToolRemove"] = (...args) =>
     this.aiTools.remove(...args);
 
-  readonly aiToolEnsureDefaultCatalog: GovernanceService["aiToolEnsureDefaultCatalog"] = (
+  readonly aiToolEnsureDefaultCatalog: GovernanceApi["aiToolEnsureDefaultCatalog"] = (
     ...args
   ) => this.aiTools.ensureDefaultCatalog(...args);
 
-  readonly aiToolSeedStarterPack: GovernanceService["aiToolSeedStarterPack"] = (...args) =>
+  readonly aiToolSeedStarterPack: GovernanceApi["aiToolSeedStarterPack"] = (...args) =>
     this.aiTools.seedStarterPack(...args);
 
-  readonly aiToolListConfiguredProvidersForUser: GovernanceService["aiToolListConfiguredProvidersForUser"] =
+  readonly aiToolListConfiguredProvidersForUser: GovernanceApi["aiToolListConfiguredProvidersForUser"] =
     (...args) => this.aiTools.listConfiguredProvidersForUser(...args);
 
-  readonly aiToolListProviderOptionsForAdmin: GovernanceService["aiToolListProviderOptionsForAdmin"] =
+  readonly aiToolListProviderOptionsForAdmin: GovernanceApi["aiToolListProviderOptionsForAdmin"] =
     (...args) => this.aiTools.listProviderOptionsForAdmin(...args);
 
-  readonly aiToolListRoutingPolicyOptionsForAdmin: GovernanceService["aiToolListRoutingPolicyOptionsForAdmin"] =
+  readonly aiToolListRoutingPolicyOptionsForAdmin: GovernanceApi["aiToolListRoutingPolicyOptionsForAdmin"] =
     (...args) => this.aiTools.listRoutingPolicyOptionsForAdmin(...args);
 
-  readonly aiToolReorder: GovernanceService["aiToolReorder"] = (...args) =>
+  readonly aiToolReorder: GovernanceApi["aiToolReorder"] = (...args) =>
     this.aiTools.reorder(...args);
 
-  readonly aiToolResolvePolicyOverrides: GovernanceService["aiToolResolvePolicyOverrides"] = (
+  readonly aiToolResolvePolicyOverrides: GovernanceApi["aiToolResolvePolicyOverrides"] = (
     ...args
   ) => this.aiTools.resolveToolPolicyOverrides(...args);
 
-  readonly aiToolResolvePolicyMap: GovernanceService["aiToolResolvePolicyMap"] = (...args) =>
+  readonly aiToolResolvePolicyMap: GovernanceApi["aiToolResolvePolicyMap"] = (...args) =>
     this.aiTools.resolveToolPolicyMap(...args);
 
-  readonly aiToolResolvePolicy: GovernanceService["aiToolResolvePolicy"] = (...args) =>
+  readonly aiToolResolvePolicy: GovernanceApi["aiToolResolvePolicy"] = (...args) =>
     this.aiTools.resolveToolPolicy(...args);
 
-  readonly aiToolResolveCliCatalogForUser: GovernanceService["aiToolResolveCliCatalogForUser"] = (
+  readonly aiToolResolveCliCatalogForUser: GovernanceApi["aiToolResolveCliCatalogForUser"] = (
     ...args
   ) => this.aiTools.resolveCliCatalogForUser(...args);
 }

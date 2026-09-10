@@ -18,13 +18,13 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   governanceWriteAcknowledgedSchema,
   ingestionTemplateSchema,
-  type GovernanceService,
+  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 export type IngestionTemplatesTrpcContext = Readonly<{
-  app: Readonly<{ governance: GovernanceService }>;
+  app: Readonly<{ governance: GovernanceApi }>;
   actor(): Readonly<{ id: string }>;
 }>;
 

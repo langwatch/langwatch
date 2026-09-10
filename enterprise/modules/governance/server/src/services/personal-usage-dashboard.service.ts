@@ -13,7 +13,7 @@
  * a refusal: the page renders before their first request ever lands.
  */
 import type {
-  GovernanceService,
+  GovernanceApi,
   PersonalUsageBreakdown,
   PersonalUsageBucket,
   PersonalUsageQueryInput,
@@ -39,7 +39,7 @@ export type PersonalUsageDashboardQuery = {
 
 export type PersonalUsageDashboardServiceOptions = {
   governance: Pick<
-    GovernanceService,
+    GovernanceApi,
     "personalUsageSummary" | "personalUsageDailyBuckets" | "personalUsageBreakdownByModel"
   >;
   /** The member's personal workspace, which is the tenant their traces land in. */

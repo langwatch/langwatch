@@ -14,7 +14,6 @@ export {
   type GovernanceMembershipStatus,
 } from "./ports/governance-directory.port.ts";
 export type { PersonalUsageRollup } from "./services/personal-usage-dashboard.service.ts";
-export { GovernanceService } from "@langwatch/enterprise-governance-contract";
 /**
  * The landing decision, re-exported beside the service it gathers signals from.
  */

@@ -15,7 +15,7 @@ import type {
 } from "./automation.responses.ts";
 import type { AutomationPersistCapCount } from "./persist-cap.ts";
 import type { CustomGraphNameRef } from "./custom-graph.ts";
-import type { EmailSuppressionRow, UnsubscribeView } from "./automation.ts";
+import type { EmailSuppression, EmailSuppressionRow, UnsubscribeView } from "./automation.ts";
 import type { ReportSchedule, TriggerFire, TriggerFireStats } from "./trigger.queries.ts";
 import type { CreateTriggerCommand, UpdateTriggerCommand } from "./trigger.commands.ts";
 import type { Trigger } from "./trigger.ts";
@@ -57,6 +57,7 @@ export interface AutomationApi {
   }): Promise<Trigger | null>;
   getByCustomGraphIds(input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]>;
   requireCustomGraphInProject(input: { customGraphId: string; projectId: string }): Promise<void>;
+  customGraphExistsInProject(input: { customGraphId: string; projectId: string }): Promise<boolean>;
   getCustomGraphNamesByIds(input: {
     customGraphIds: string[];
     projectId: string;
@@ -97,6 +98,8 @@ export interface AutomationApi {
   replaceAutomationFilters(input: AutomationApiUpdateTriggerFiltersInput): Promise<Trigger>;
   update(input: UpdateTriggerCommand): Promise<Trigger>;
   delete(input: { triggerId: string; projectId: string }): Promise<void>;
+  /** Deactivates and soft-deletes one automation in a single write. */
+  softDeleteById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
   syncReportSchedule(input: {
     projectId: string;
     triggerId: string;
@@ -138,6 +141,10 @@ export interface AutomationApi {
   /** The operator-facing suppression list, audited because it reads addresses. */
   listSuppressions(input: { projectId: string; actorId: string }): Promise<EmailSuppressionRow[]>;
   removeSuppression(input: { id: string; projectId: string }): Promise<void>;
+  /** Every suppression for a project, each carrying the trigger name it names. */
+  getAllEnriched(input: {
+    projectId: string;
+  }): Promise<Array<EmailSuppression & { triggerName: string | null }>>;
 }
 
 export const AutomationApi = moduleApi<AutomationApi>("automation");

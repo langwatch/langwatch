@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { DefaultGovernanceRoutingPolicyService } from "./governance-routing.service.ts";
 import type { DefaultGovernancePersonalVirtualKeyService } from "./governance-personal-key.service.ts";
 import type { DefaultGovernanceCliBootstrapService } from "./governance-cli-tool-bootstrap.service.ts";
@@ -45,64 +45,64 @@ export class GovernanceLifecycleOperationsService {
     );
   }
 
-  readonly routingPolicyList: GovernanceService["routingPolicyList"] = (...args) =>
+  readonly routingPolicyList: GovernanceApi["routingPolicyList"] = (...args) =>
     this.routingPolicies.list(...args);
 
-  readonly tryFindRoutingPolicyById: GovernanceService["tryFindRoutingPolicyById"] = (...args) =>
+  readonly tryFindRoutingPolicyById: GovernanceApi["tryFindRoutingPolicyById"] = (...args) =>
     this.routingPolicies.tryFindById(...args);
 
-  readonly routingPolicyGetById: GovernanceService["routingPolicyGetById"] = (...args) =>
+  readonly routingPolicyGetById: GovernanceApi["routingPolicyGetById"] = (...args) =>
     this.routingPolicies.getById(...args);
 
-  readonly routingPolicyCreate: GovernanceService["routingPolicyCreate"] = (...args) =>
+  readonly routingPolicyCreate: GovernanceApi["routingPolicyCreate"] = (...args) =>
     this.routingPolicies.create(...args);
 
-  readonly routingPolicyUpdate: GovernanceService["routingPolicyUpdate"] = (...args) =>
+  readonly routingPolicyUpdate: GovernanceApi["routingPolicyUpdate"] = (...args) =>
     this.routingPolicies.update(...args);
 
-  readonly routingPolicySetDefault: GovernanceService["routingPolicySetDefault"] = (...args) =>
+  readonly routingPolicySetDefault: GovernanceApi["routingPolicySetDefault"] = (...args) =>
     this.routingPolicies.setDefault(...args);
 
-  readonly routingPolicyDelete: GovernanceService["routingPolicyDelete"] = (...args) =>
+  readonly routingPolicyDelete: GovernanceApi["routingPolicyDelete"] = (...args) =>
     this.routingPolicies.delete(...args);
 
-  readonly tryResolveDefaultRoutingPolicyForUser: GovernanceService["tryResolveDefaultRoutingPolicyForUser"] =
+  readonly tryResolveDefaultRoutingPolicyForUser: GovernanceApi["tryResolveDefaultRoutingPolicyForUser"] =
     (...args) => this.routingPolicies.tryResolveDefaultForUser(...args);
 
-  readonly personalVirtualKeyEnsureDefault: GovernanceService["personalVirtualKeyEnsureDefault"] = (
+  readonly personalVirtualKeyEnsureDefault: GovernanceApi["personalVirtualKeyEnsureDefault"] = (
     ...args
   ) => this.personalVirtualKeys.ensureDefault(...args);
 
-  readonly personalVirtualKeyIssue: GovernanceService["personalVirtualKeyIssue"] = (...args) =>
+  readonly personalVirtualKeyIssue: GovernanceApi["personalVirtualKeyIssue"] = (...args) =>
     this.personalVirtualKeys.issue(...args);
 
-  readonly personalVirtualKeyList: GovernanceService["personalVirtualKeyList"] = (...args) =>
+  readonly personalVirtualKeyList: GovernanceApi["personalVirtualKeyList"] = (...args) =>
     this.personalVirtualKeys.list(...args);
 
-  readonly personalVirtualKeyRevoke: GovernanceService["personalVirtualKeyRevoke"] = (...args) =>
+  readonly personalVirtualKeyRevoke: GovernanceApi["personalVirtualKeyRevoke"] = (...args) =>
     this.personalVirtualKeys.revoke(...args);
 
-  readonly personalVirtualKeyRevokeAllForUser: GovernanceService["personalVirtualKeyRevokeAllForUser"] =
+  readonly personalVirtualKeyRevokeAllForUser: GovernanceApi["personalVirtualKeyRevokeAllForUser"] =
     (...args) => this.personalVirtualKeys.revokeAllForUser(...args);
 
-  readonly cliBootstrapResolve: GovernanceService["cliBootstrapResolve"] = (...args) =>
+  readonly cliBootstrapResolve: GovernanceApi["cliBootstrapResolve"] = (...args) =>
     this.cliBootstrap.resolve(...args);
 
-  readonly cliSessionListForUser: GovernanceService["cliSessionListForUser"] = (...args) =>
+  readonly cliSessionListForUser: GovernanceApi["cliSessionListForUser"] = (...args) =>
     this.cliSessions.listForUser(...args);
 
-  readonly cliSessionRevoke: GovernanceService["cliSessionRevoke"] = (...args) =>
+  readonly cliSessionRevoke: GovernanceApi["cliSessionRevoke"] = (...args) =>
     this.cliSessions.revokeSession(...args);
 
-  readonly cliTokenRevokeForUser: GovernanceService["cliTokenRevokeForUser"] = (...args) =>
+  readonly cliTokenRevokeForUser: GovernanceApi["cliTokenRevokeForUser"] = (...args) =>
     this.cliTokenRevocation.revokeForUser(...args);
 
-  readonly adminWorkspaceRecordView: GovernanceService["adminWorkspaceRecordView"] = (...args) =>
+  readonly adminWorkspaceRecordView: GovernanceApi["adminWorkspaceRecordView"] = (...args) =>
     this.adminWorkspaceViewAudit.recordView(...args);
 
-  readonly quarantineFillEvaluate: GovernanceService["quarantineFillEvaluate"] = (...args) =>
+  readonly quarantineFillEvaluate: GovernanceApi["quarantineFillEvaluate"] = (...args) =>
     this.quarantineFill.evaluate(...args);
 
-  readonly resolveSetupState: GovernanceService["resolveSetupState"] = (...args) =>
+  readonly resolveSetupState: GovernanceApi["resolveSetupState"] = (...args) =>
     this.setupState.resolve(...args);
 }

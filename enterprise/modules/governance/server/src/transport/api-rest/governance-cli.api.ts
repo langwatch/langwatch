@@ -63,7 +63,7 @@ import {
   PersonalWorkspaceMissingError,
   PLATFORM_TOOL_SLUG_BY_SOURCE_TYPE,
   RoutingPolicyHasNoProvidersError,
-  type GovernanceService,
+  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import type { GovernanceDirectoryPort } from "../../ports/governance-directory.port.ts";
@@ -148,7 +148,7 @@ export type GovernanceCliRestPorts = Readonly<{
   /** The device session a bearer names, and how to sever it. */
   accessTokens: GovernanceCliAccessTokenPort;
   /** The SAME governance service the console's tRPC procedures read. */
-  governance: () => GovernanceService;
+  governance: () => GovernanceApi;
   /** The identity, membership and project reads this family performs. */
   directory: () => GovernanceDirectoryPort;
   /** Who to point a blocked caller at, when a budget refuses the request. */
@@ -1260,7 +1260,7 @@ export function createGovernanceCliRestApp(options: {
  * is stored hashed, so a second machine needs a key of its own.
  */
 async function issuePersonalVirtualKey(input: {
-  governance: GovernanceService;
+  governance: GovernanceApi;
   ensurePersonalWorkspace: GovernanceCliRestPorts["ensurePersonalWorkspace"];
   userId: string;
   organizationId: string;

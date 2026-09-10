@@ -6,6 +6,13 @@ export {
   LangyTrustedMessagePort,
   type PostgresLangyAdapterOptions,
 } from "./adapters/langy.langy.adapter.ts";
+/**
+ * The Langy feature's conversation-and-turn service, folded out of the
+ * contract package (ADR-133: no standalone contract-service class). Peer
+ * code that still needs the concrete class (composition tests asserting the
+ * built instance) imports the type from here now.
+ */
+export { LangyService } from "./services/langy.service.ts";
 export type { LangyInfrastructure } from "./app/langy.app.ts";
 export { langyServer } from "./langy.server.ts";
 export { LangyNavigateFallbackService } from "./services/langy-navigate-fallback.service.ts";

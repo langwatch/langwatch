@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import {
   SCIM_ENTERPRISE_USER_SCHEMA,
   type ScimCreateUserRequest,
@@ -13,7 +13,7 @@ import {
  * same narrow dependency at every step.
  */
 export type ScimDepartmentAssignment = Pick<
-  GovernanceService,
+  GovernanceApi,
   "departmentAssignUser" | "departmentResolveByNameOrCreate"
 >;
 

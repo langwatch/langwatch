@@ -2224,6 +2224,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../../../modules/project/contract
+      '@langwatch/runtime-composition':
+        specifier: workspace:*
+        version: link:../../../../packages/runtime-composition
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
@@ -5875,6 +5878,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
+      '@langwatch/model-provider-contract':
+        specifier: workspace:*
+        version: link:../../model-provider/contract
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
@@ -9063,6 +9069,9 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../../../packages/api
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../automation/contract
@@ -9078,6 +9087,9 @@ importers:
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../../user/contract
       liquidjs:
         specifier: '>=10.26.0 <11'
         version: 10.27.1

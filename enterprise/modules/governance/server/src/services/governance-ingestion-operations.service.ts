@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { CanonicalCostExtractorService } from "./canonical-cost-extractor.service.ts";
 import type { GovernanceEventingPort } from "../ports/governance-eventing.port.ts";
 import type { IngestionKeyService } from "./ingestion-source-key.service.ts";
@@ -41,112 +41,112 @@ export class GovernanceIngestionOperationsService {
     );
   }
 
-  readonly extractCanonicalCostEvents: GovernanceService["extractCanonicalCostEvents"] = (
+  readonly extractCanonicalCostEvents: GovernanceApi["extractCanonicalCostEvents"] = (
     ...args
   ) => this.canonicalCost.extract(...args);
 
-  readonly ingestionConfigure: GovernanceService["ingestionConfigure"] = (...args) =>
+  readonly ingestionConfigure: GovernanceApi["ingestionConfigure"] = (...args) =>
     this.eventing.configureIngestion(...args);
 
-  readonly ingestionDisable: GovernanceService["ingestionDisable"] = (...args) =>
+  readonly ingestionDisable: GovernanceApi["ingestionDisable"] = (...args) =>
     this.eventing.disableIngestion(...args);
 
-  readonly ingestionRecordRunCompleted: GovernanceService["ingestionRecordRunCompleted"] = (
+  readonly ingestionRecordRunCompleted: GovernanceApi["ingestionRecordRunCompleted"] = (
     ...args
   ) => this.eventing.recordIngestionRunCompleted(...args);
 
-  readonly ingestionRecordRunFailed: GovernanceService["ingestionRecordRunFailed"] = (...args) =>
+  readonly ingestionRecordRunFailed: GovernanceApi["ingestionRecordRunFailed"] = (...args) =>
     this.eventing.recordIngestionRunFailed(...args);
 
-  readonly usageRecord: GovernanceService["usageRecord"] = (...args) =>
+  readonly usageRecord: GovernanceApi["usageRecord"] = (...args) =>
     this.eventing.recordPulledUsage(...args);
 
-  readonly ingestionKeyEnsureForProject: GovernanceService["ingestionKeyEnsureForProject"] = (
+  readonly ingestionKeyEnsureForProject: GovernanceApi["ingestionKeyEnsureForProject"] = (
     ...args
   ) => this.ingestionKeys.ensureForProject(...args);
 
-  readonly ingestionKeyIssueForProject: GovernanceService["ingestionKeyIssueForProject"] = (
+  readonly ingestionKeyIssueForProject: GovernanceApi["ingestionKeyIssueForProject"] = (
     ...args
   ) => this.ingestionKeys.issueForProject(...args);
 
-  readonly ingestionKeyEnsureForPersonalProject: GovernanceService["ingestionKeyEnsureForPersonalProject"] =
+  readonly ingestionKeyEnsureForPersonalProject: GovernanceApi["ingestionKeyEnsureForPersonalProject"] =
     (...args) => this.ingestionKeys.ensureForPersonalProject(...args);
 
-  readonly ingestionKeyIssueForPersonalProject: GovernanceService["ingestionKeyIssueForPersonalProject"] =
+  readonly ingestionKeyIssueForPersonalProject: GovernanceApi["ingestionKeyIssueForPersonalProject"] =
     (...args) => this.ingestionKeys.issueForPersonalProject(...args);
 
-  readonly ingestionKeyListForPersonalProject: GovernanceService["ingestionKeyListForPersonalProject"] =
+  readonly ingestionKeyListForPersonalProject: GovernanceApi["ingestionKeyListForPersonalProject"] =
     (...args) => this.ingestionKeys.listForPersonalProject(...args);
 
-  readonly tryDescribePersonalIngestionKey: GovernanceService["tryDescribePersonalIngestionKey"] = (
+  readonly tryDescribePersonalIngestionKey: GovernanceApi["tryDescribePersonalIngestionKey"] = (
     ...args
   ) => this.ingestionKeys.tryDescribePersonalKey(...args);
 
-  readonly ingestionSourceList: GovernanceService["ingestionSourceList"] = (...args) =>
+  readonly ingestionSourceList: GovernanceApi["ingestionSourceList"] = (...args) =>
     this.ingestionSources.list(...args);
 
-  readonly tryFindIngestionSourceById: GovernanceService["tryFindIngestionSourceById"] = (
+  readonly tryFindIngestionSourceById: GovernanceApi["tryFindIngestionSourceById"] = (
     ...args
   ) => this.ingestionSources.tryFindById(...args);
 
-  readonly ingestionSourceGetById: GovernanceService["ingestionSourceGetById"] = (...args) =>
+  readonly ingestionSourceGetById: GovernanceApi["ingestionSourceGetById"] = (...args) =>
     this.ingestionSources.getById(...args);
 
-  readonly ingestionSourceLiveTraceProjectIds: GovernanceService["ingestionSourceLiveTraceProjectIds"] =
+  readonly ingestionSourceLiveTraceProjectIds: GovernanceApi["ingestionSourceLiveTraceProjectIds"] =
     (...args) => this.ingestionSources.liveTraceProjectIds(...args);
 
-  readonly tryFindIngestionSourceByIngestSecret: GovernanceService["tryFindIngestionSourceByIngestSecret"] =
+  readonly tryFindIngestionSourceByIngestSecret: GovernanceApi["tryFindIngestionSourceByIngestSecret"] =
     (...args) => this.ingestionSources.tryFindByIngestSecret(...args);
 
-  readonly ingestionSourceCreate: GovernanceService["ingestionSourceCreate"] = (...args) =>
+  readonly ingestionSourceCreate: GovernanceApi["ingestionSourceCreate"] = (...args) =>
     this.ingestionSources.createSource(...args);
 
-  readonly ingestionSourceUpdate: GovernanceService["ingestionSourceUpdate"] = (...args) =>
+  readonly ingestionSourceUpdate: GovernanceApi["ingestionSourceUpdate"] = (...args) =>
     this.ingestionSources.updateSource(...args);
 
-  readonly ingestionSourceRotateSecret: GovernanceService["ingestionSourceRotateSecret"] = (
+  readonly ingestionSourceRotateSecret: GovernanceApi["ingestionSourceRotateSecret"] = (
     ...args
   ) => this.ingestionSources.rotateSecret(...args);
 
-  readonly ingestionSourceArchive: GovernanceService["ingestionSourceArchive"] = (...args) =>
+  readonly ingestionSourceArchive: GovernanceApi["ingestionSourceArchive"] = (...args) =>
     this.ingestionSources.archive(...args);
 
-  readonly ingestionSourceRecordEventReceived: GovernanceService["ingestionSourceRecordEventReceived"] =
+  readonly ingestionSourceRecordEventReceived: GovernanceApi["ingestionSourceRecordEventReceived"] =
     (...args) => this.ingestionSources.recordEventReceived(...args);
 
-  readonly templateListForUser: GovernanceService["templateListForUser"] = (...args) =>
+  readonly templateListForUser: GovernanceApi["templateListForUser"] = (...args) =>
     this.templates.listForUser(...args);
 
-  readonly templateListForOrgAdmin: GovernanceService["templateListForOrgAdmin"] = (...args) =>
+  readonly templateListForOrgAdmin: GovernanceApi["templateListForOrgAdmin"] = (...args) =>
     this.templates.listForOrgAdmin(...args);
 
-  readonly tryFindTemplateByIdForOrg: GovernanceService["tryFindTemplateByIdForOrg"] = (...args) =>
+  readonly tryFindTemplateByIdForOrg: GovernanceApi["tryFindTemplateByIdForOrg"] = (...args) =>
     this.templates.tryFindByIdForOrg(...args);
 
-  readonly templateGetByIdForOrg: GovernanceService["templateGetByIdForOrg"] = (...args) =>
+  readonly templateGetByIdForOrg: GovernanceApi["templateGetByIdForOrg"] = (...args) =>
     this.templates.getByIdForOrg(...args);
 
-  readonly templateCreateOrg: GovernanceService["templateCreateOrg"] = (...args) =>
+  readonly templateCreateOrg: GovernanceApi["templateCreateOrg"] = (...args) =>
     this.templates.createOrgTemplate(...args);
 
-  readonly templateUpdateOttlRules: GovernanceService["templateUpdateOttlRules"] = (...args) =>
+  readonly templateUpdateOttlRules: GovernanceApi["templateUpdateOttlRules"] = (...args) =>
     this.templates.updateOttlRules(...args);
 
-  readonly templateArchiveOrg: GovernanceService["templateArchiveOrg"] = (...args) =>
+  readonly templateArchiveOrg: GovernanceApi["templateArchiveOrg"] = (...args) =>
     this.templates.archiveOrgTemplate(...args);
 
-  readonly templateCloneFromPlatform: GovernanceService["templateCloneFromPlatform"] = (...args) =>
+  readonly templateCloneFromPlatform: GovernanceApi["templateCloneFromPlatform"] = (...args) =>
     this.templates.cloneFromPlatform(...args);
 
-  readonly templateSyncPlatformCatalog: GovernanceService["templateSyncPlatformCatalog"] = (
+  readonly templateSyncPlatformCatalog: GovernanceApi["templateSyncPlatformCatalog"] = (
     ...args
   ) => this.templates.syncPlatformCatalog(...args);
 
-  readonly ocsfList: GovernanceService["ocsfList"] = (...args) => this.ocsf.list(...args);
+  readonly ocsfList: GovernanceApi["ocsfList"] = (...args) => this.ocsf.list(...args);
 
-  readonly ottlValidate: GovernanceService["ottlValidate"] = (...args) =>
+  readonly ottlValidate: GovernanceApi["ottlValidate"] = (...args) =>
     this.ottl.validate(...args);
 
-  readonly ottlTransform: GovernanceService["ottlTransform"] = (...args) =>
+  readonly ottlTransform: GovernanceApi["ottlTransform"] = (...args) =>
     this.ottl.transform(...args);
 }

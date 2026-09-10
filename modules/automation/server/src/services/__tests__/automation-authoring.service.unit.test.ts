@@ -6,7 +6,7 @@
  * answers.
  * @see specs/automations/runaway-automation-containment.feature
  */
-import type { AutomationService } from "@langwatch/automation-contract";
+import type { AutomationApi } from "@langwatch/automation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -16,8 +16,8 @@ import { AutomationAuthoringService } from "../automation-authoring.service.ts";
 import { AutomationRulesService } from "../automation-rules.service.ts";
 
 /** The authoring service over exactly the reads and writes a case names. */
-function authoring(automation: Partial<AutomationService>) {
-  const service = automation as AutomationService;
+function authoring(automation: Partial<AutomationApi>) {
+  const service = automation as AutomationApi;
   const rules = AutomationRulesService.create({
     automation: service,
     projects: { tryGetSummaryById: async () => ({ name: "Test", slug: "test" }) } as ProjectApi,

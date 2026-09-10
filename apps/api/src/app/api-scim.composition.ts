@@ -13,7 +13,7 @@ import {
   type ScimApi,
   type ScimInfrastructure,
 } from "@langwatch/enterprise-api";
-import type { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import {
   newScimSyncCommandId,
@@ -63,7 +63,7 @@ export type ApiScimCompositionOptions = Readonly<{
   /** The session boundary a SCIM-managed email change severs. */
   auth: BrowserSessionApi | undefined;
   /** Enterprise governance's department owner, and this family's whole gate. */
-  governance: GovernanceService | undefined;
+  governance: GovernanceApi | undefined;
   /** The ONE plan provider every Enterprise gate on this process reads. */
   plans: PlanProvider | undefined;
   /**

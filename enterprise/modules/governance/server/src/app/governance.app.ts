@@ -6,7 +6,7 @@
  * Governance answers over two transports today — a project-scoped REST family
  * (ingestion templates) and two tRPC surfaces (personal virtual keys, routing
  * policies) — and before this each door declared its own private bag. The two
- * tRPC files each wrote `Readonly<{ governance: GovernanceService }>`, agreeing
+ * tRPC files each wrote `Readonly<{ governance: GovernanceApi }>`, agreeing
  * by attention rather than by construction, and the REST family took its two
  * capabilities as separate resolver functions that neither tRPC door could
  * reach. One object now holds the union, so a rule written here is the rule
@@ -42,7 +42,7 @@ import {
   type FindRoutingPolicyInput,
   type GovernanceBudgetOverviewForUser,
   type GovernanceCallSurface,
-  type GovernanceService,
+  type GovernanceApi,
   type IngestionTemplate,
   type IssuedPersonalVirtualKey,
   type ListPersonalVirtualKeysInput,
@@ -213,7 +213,7 @@ export interface GovernanceActorUser {
 /** Where an actor's own workspace lives, for the admin's drill-in link. */
 /** What the process composes this feature's application from. */
 export interface GovernanceAppDependencies {
-  governance: GovernanceService;
+  governance: GovernanceApi;
   /**
    * The organization a project belongs to, for the project-scoped REST family,
    * and the organization's hidden governance project, which is the tenant an

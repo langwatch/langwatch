@@ -41,14 +41,14 @@ import {
   governanceSetupStateSchema,
   quarantineFillStatsSchema as quarantineFillStatsOutputSchema,
   recordWorkspaceViewResultSchema,
-  type GovernanceService,
+  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 import type { GovernanceApp } from "#app/governance.app";
 
 export type GovernanceTrpcContext = Readonly<{
-  app: Readonly<{ governance: GovernanceService; governanceApp: GovernanceApp }>;
+  app: Readonly<{ governance: GovernanceApi; governanceApp: GovernanceApp }>;
   actor(): Readonly<{ id: string }>;
 }>;
 

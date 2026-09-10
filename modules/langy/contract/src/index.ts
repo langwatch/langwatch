@@ -23,7 +23,7 @@ export * from "./langy.local-control-http.ts";
 export * from "./langy-local-control.errors.ts";
 export * from "./langy.local-control-protocol.ts";
 export * from "./credential.ts";
-export * from "./langy.service.ts";
+export * from "./langy-conversation.ts";
 export * from "./langy.api.ts";
 export { langyStreamEntrySchema, type LangyStreamEntry } from "./langy.stream-entry.ts";
 export * from "./langy.commands.ts";

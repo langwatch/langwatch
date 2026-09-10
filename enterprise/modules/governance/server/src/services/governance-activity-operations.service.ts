@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 import type { ActivityMonitorService } from "./ingestion-source-activity.service.ts";
 import type { DefaultGovernancePersonalUsageService } from "./personal-usage.service.ts";
 import type { GovernanceBudgetOverviewPort } from "../ports/governance-budget-overview.port.ts";
@@ -21,46 +21,46 @@ export class GovernanceActivityOperationsService {
     return new GovernanceActivityOperationsService(activity, personalUsage, budgetOverview);
   }
 
-  readonly activitySummary: GovernanceService["activitySummary"] = (...args) =>
+  readonly activitySummary: GovernanceApi["activitySummary"] = (...args) =>
     this.activity.summary(...args);
 
-  readonly activitySpendByUser: GovernanceService["activitySpendByUser"] = (...args) =>
+  readonly activitySpendByUser: GovernanceApi["activitySpendByUser"] = (...args) =>
     this.activity.spendByUser(...args);
 
-  readonly activitySpendByTeam: GovernanceService["activitySpendByTeam"] = (...args) =>
+  readonly activitySpendByTeam: GovernanceApi["activitySpendByTeam"] = (...args) =>
     this.activity.spendByTeam(...args);
 
-  readonly activitySpendByDepartment: GovernanceService["activitySpendByDepartment"] = (...args) =>
+  readonly activitySpendByDepartment: GovernanceApi["activitySpendByDepartment"] = (...args) =>
     this.activity.spendByDepartment(...args);
 
-  readonly activitySpendOverTime: GovernanceService["activitySpendOverTime"] = (...args) =>
+  readonly activitySpendOverTime: GovernanceApi["activitySpendOverTime"] = (...args) =>
     this.activity.spendOverTime(...args);
 
-  readonly activityRecentAnomalies: GovernanceService["activityRecentAnomalies"] = (...args) =>
+  readonly activityRecentAnomalies: GovernanceApi["activityRecentAnomalies"] = (...args) =>
     this.activity.recentAnomalies(...args);
 
-  readonly activityIngestionSourcesHealth: GovernanceService["activityIngestionSourcesHealth"] = (
+  readonly activityIngestionSourcesHealth: GovernanceApi["activityIngestionSourcesHealth"] = (
     ...args
   ) => this.activity.ingestionSourcesHealth(...args);
 
-  readonly activityEventsForSource: GovernanceService["activityEventsForSource"] = (...args) =>
+  readonly activityEventsForSource: GovernanceApi["activityEventsForSource"] = (...args) =>
     this.activity.eventsForSource(...args);
 
-  readonly activitySourceHealthMetrics: GovernanceService["activitySourceHealthMetrics"] = (
+  readonly activitySourceHealthMetrics: GovernanceApi["activitySourceHealthMetrics"] = (
     ...args
   ) => this.activity.sourceHealthMetrics(...args);
 
-  readonly personalUsageSummary: GovernanceService["personalUsageSummary"] = (...args) =>
+  readonly personalUsageSummary: GovernanceApi["personalUsageSummary"] = (...args) =>
     this.personalUsage.summary(...args);
 
-  readonly personalUsageDailyBuckets: GovernanceService["personalUsageDailyBuckets"] = (...args) =>
+  readonly personalUsageDailyBuckets: GovernanceApi["personalUsageDailyBuckets"] = (...args) =>
     this.personalUsage.dailyBuckets(...args);
 
-  readonly personalUsageBreakdownByModel: GovernanceService["personalUsageBreakdownByModel"] = (
+  readonly personalUsageBreakdownByModel: GovernanceApi["personalUsageBreakdownByModel"] = (
     ...args
   ) => this.personalUsage.breakdownByModel(...args);
 
-  readonly personalBudgetOverviewForUser: GovernanceService["personalBudgetOverviewForUser"] = (
+  readonly personalBudgetOverviewForUser: GovernanceApi["personalBudgetOverviewForUser"] = (
     ...args
   ) => this.budgetOverview.overviewForUser(...args);
 }

@@ -5,7 +5,6 @@ import type {
   LangyConversationStateData,
   LangyConversationTurnData,
   LangyMessageProjectionRecord,
-  LangyService as LangyServiceContract,
   LangyTurnAdmissionCapability,
 } from "@langwatch/langy-contract";
 import {
@@ -118,7 +117,7 @@ interface LangyRepositories {
 export class PostgresLangyAdapter {
   private readonly repositories: LangyRepositories;
   private readonly eventingCapabilities: LangyEventingPorts;
-  private service: LangyServiceContract | null = null;
+  private service: LangyService | null = null;
   private sessionKeys: LangySessionKeyService | null = null;
 
   private constructor(options: PostgresLangyAdapterOptions) {
@@ -174,7 +173,7 @@ export class PostgresLangyAdapter {
    * Repeated calls return the same service and never construct repositories or
    * service graphs again.
    */
-  build(options: LangyServiceCompositionOptions): LangyServiceContract {
+  build(options: LangyServiceCompositionOptions): LangyService {
     if (this.service) return this.service;
 
     const conversations = LangyConversationService.create(

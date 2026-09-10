@@ -38,7 +38,7 @@
  */
 import {
   PersonaHomeResolverService,
-  type GovernanceService,
+  type GovernanceApi,
   type PersonaResolution,
 } from "@langwatch/enterprise-api";
 import { appTrpcPolicy, type TrpcApiMount } from "@langwatch/api/trpc";
@@ -47,7 +47,7 @@ import { z } from "zod";
 
 /** The one slice this procedure reads off the request's application. */
 export type GovernanceHomeTrpcContext = Readonly<{
-  app: Readonly<{ governance: GovernanceService }>;
+  app: Readonly<{ governance: GovernanceApi }>;
   actor(): Readonly<{ id: string }>;
 }>;
 

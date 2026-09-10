@@ -4,7 +4,6 @@ import {
   type LangyConversationListCursor as ContractConversationListCursor,
   type LangyConversationListPage as ContractConversationListPage,
   type LangyMessageRow as ContractMessageRow,
-  LangyService as LangyServiceContract,
   type LangyCredentialSession,
   type LangyEgressAllowlist,
   langyEgressProjectInputSchema,
@@ -46,7 +45,14 @@ export type {
 export type { ConversationDetail, ConversationListItem, ConversationListPage };
 export { ADOPTABLE_CONVERSATION_ID };
 
-export class LangyService extends LangyServiceContract {
+/**
+ * The Langy feature's own conversation-and-turn service: the full surface
+ * `LangyApp` forwards from. Folded out of the contract package per ADR-133
+ * (was the `langy.service.ts` abstract class under `contract/src`, the
+ * flagged "contract-service" shape) - this class is now the sole definition
+ * of the surface, server-side.
+ */
+export class LangyService {
   private constructor(
     private readonly feedbackPrompt: LangyFeedbackPromptPolicy,
     private readonly conversations: LangyConversationService,
@@ -54,9 +60,7 @@ export class LangyService extends LangyServiceContract {
     private readonly messages: LangyMessageService,
     private readonly credentials: LangyCredentialService,
     private readonly openRelay: OpenLangyRelay | null = null,
-  ) {
-    super();
-  }
+  ) {}
 
   /** Builds the process-owned capability from the complete Langy services. */
   static create(options: {

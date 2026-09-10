@@ -1,6 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { AutomationService } from "../services/automation.service.ts";
-import type { AutomationService as AutomationCapability } from "@langwatch/automation-contract";
 import type { UnsubscribeTokenVerifierPort } from "../ports/unsubscribe-token.port.ts";
 import type { AutomationClockPort } from "../ports/automation-clock.port.ts";
 import type { ScheduledJobStorePort } from "../ports/scheduled-jobs.port.ts";
@@ -75,7 +74,7 @@ export class PostgresAutomationAdapter {
     return new PostgresAutomationAdapter(input);
   }
 
-  build(): AutomationCapability {
+  build(): AutomationService {
     const { verifier } = this.input;
     const database = this.input.database;
     const triggerRepository = PrismaTriggerRepository.create(database, this.input.clock);

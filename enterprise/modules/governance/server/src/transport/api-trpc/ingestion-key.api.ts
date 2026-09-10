@@ -15,20 +15,20 @@
  * issuing the new one), so a tool never accumulates keys.
  *
  * Transport only: input parsing, delegation, wire shape. The persistence and
- * the rotation invariant belong to {@link GovernanceService}.
+ * the rotation invariant belong to {@link GovernanceApi}.
  */
 import { createTrpcService, type TrpcPolicyDecorator } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {
   issuedIngestionKeySchema,
   personalIngestionKeySchema,
-  type GovernanceService,
+  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
 
 export type IngestionKeyTrpcContext = Readonly<{
-  app: Readonly<{ governance: GovernanceService }>;
+  app: Readonly<{ governance: GovernanceApi }>;
   actor(): Readonly<{ id: string }>;
 }>;
 

@@ -1,4 +1,4 @@
-import { GovernanceService } from "@langwatch/enterprise-governance-contract";
+import { GovernanceApi } from "@langwatch/enterprise-governance-contract";
 
 const unsupported = <Method>(): Method =>
   (() => Promise.reject(new Error("not used by this test"))) as Method;
@@ -10,123 +10,123 @@ const unsupported = <Method>(): Method =>
  * of the contract is present and refuses, so a test that reaches one it did
  * not mean to reach fails loudly instead of reading `undefined`.
  */
-export class TestGovernanceService extends GovernanceService {
-  activityEventsForSource = unsupported<GovernanceService["activityEventsForSource"]>();
+export class TestGovernanceService implements GovernanceApi {
+  activityEventsForSource = unsupported<GovernanceApi["activityEventsForSource"]>();
   activityIngestionSourcesHealth =
-    unsupported<GovernanceService["activityIngestionSourcesHealth"]>();
-  activityRecentAnomalies = unsupported<GovernanceService["activityRecentAnomalies"]>();
-  activitySourceHealthMetrics = unsupported<GovernanceService["activitySourceHealthMetrics"]>();
-  activitySpendByDepartment = unsupported<GovernanceService["activitySpendByDepartment"]>();
-  activitySpendByTeam = unsupported<GovernanceService["activitySpendByTeam"]>();
-  activitySpendByUser = unsupported<GovernanceService["activitySpendByUser"]>();
-  activitySpendOverTime = unsupported<GovernanceService["activitySpendOverTime"]>();
-  activitySummary = unsupported<GovernanceService["activitySummary"]>();
-  adminWorkspaceRecordView = unsupported<GovernanceService["adminWorkspaceRecordView"]>();
-  aiToolCreate = unsupported<GovernanceService["aiToolCreate"]>();
-  aiToolEnsureDefaultCatalog = unsupported<GovernanceService["aiToolEnsureDefaultCatalog"]>();
-  aiToolGetById = unsupported<GovernanceService["aiToolGetById"]>();
+    unsupported<GovernanceApi["activityIngestionSourcesHealth"]>();
+  activityRecentAnomalies = unsupported<GovernanceApi["activityRecentAnomalies"]>();
+  activitySourceHealthMetrics = unsupported<GovernanceApi["activitySourceHealthMetrics"]>();
+  activitySpendByDepartment = unsupported<GovernanceApi["activitySpendByDepartment"]>();
+  activitySpendByTeam = unsupported<GovernanceApi["activitySpendByTeam"]>();
+  activitySpendByUser = unsupported<GovernanceApi["activitySpendByUser"]>();
+  activitySpendOverTime = unsupported<GovernanceApi["activitySpendOverTime"]>();
+  activitySummary = unsupported<GovernanceApi["activitySummary"]>();
+  adminWorkspaceRecordView = unsupported<GovernanceApi["adminWorkspaceRecordView"]>();
+  aiToolCreate = unsupported<GovernanceApi["aiToolCreate"]>();
+  aiToolEnsureDefaultCatalog = unsupported<GovernanceApi["aiToolEnsureDefaultCatalog"]>();
+  aiToolGetById = unsupported<GovernanceApi["aiToolGetById"]>();
   aiToolListConfiguredProvidersForUser =
-    unsupported<GovernanceService["aiToolListConfiguredProvidersForUser"]>();
-  aiToolListForAdmin = unsupported<GovernanceService["aiToolListForAdmin"]>();
-  aiToolListForUser = unsupported<GovernanceService["aiToolListForUser"]>();
+    unsupported<GovernanceApi["aiToolListConfiguredProvidersForUser"]>();
+  aiToolListForAdmin = unsupported<GovernanceApi["aiToolListForAdmin"]>();
+  aiToolListForUser = unsupported<GovernanceApi["aiToolListForUser"]>();
   aiToolListProviderOptionsForAdmin =
-    unsupported<GovernanceService["aiToolListProviderOptionsForAdmin"]>();
+    unsupported<GovernanceApi["aiToolListProviderOptionsForAdmin"]>();
   aiToolListRoutingPolicyOptionsForAdmin =
-    unsupported<GovernanceService["aiToolListRoutingPolicyOptionsForAdmin"]>();
-  aiToolRemove = unsupported<GovernanceService["aiToolRemove"]>();
-  aiToolReorder = unsupported<GovernanceService["aiToolReorder"]>();
+    unsupported<GovernanceApi["aiToolListRoutingPolicyOptionsForAdmin"]>();
+  aiToolRemove = unsupported<GovernanceApi["aiToolRemove"]>();
+  aiToolReorder = unsupported<GovernanceApi["aiToolReorder"]>();
   aiToolResolveCliCatalogForUser =
-    unsupported<GovernanceService["aiToolResolveCliCatalogForUser"]>();
-  aiToolResolvePolicy = unsupported<GovernanceService["aiToolResolvePolicy"]>();
-  aiToolResolvePolicyMap = unsupported<GovernanceService["aiToolResolvePolicyMap"]>();
-  aiToolResolvePolicyOverrides = unsupported<GovernanceService["aiToolResolvePolicyOverrides"]>();
-  aiToolSeedStarterPack = unsupported<GovernanceService["aiToolSeedStarterPack"]>();
-  aiToolUpdate = unsupported<GovernanceService["aiToolUpdate"]>();
-  anomalyRuleArchive = unsupported<GovernanceService["anomalyRuleArchive"]>();
-  anomalyRuleCreate = unsupported<GovernanceService["anomalyRuleCreate"]>();
-  anomalyRuleGetById = unsupported<GovernanceService["anomalyRuleGetById"]>();
-  anomalyRuleList = unsupported<GovernanceService["anomalyRuleList"]>();
-  anomalyRuleUpdate = unsupported<GovernanceService["anomalyRuleUpdate"]>();
-  cliBootstrapResolve = unsupported<GovernanceService["cliBootstrapResolve"]>();
-  cliSessionListForUser = unsupported<GovernanceService["cliSessionListForUser"]>();
-  cliSessionRevoke = unsupported<GovernanceService["cliSessionRevoke"]>();
-  cliTokenRevokeForUser = unsupported<GovernanceService["cliTokenRevokeForUser"]>();
-  departmentArchive = unsupported<GovernanceService["departmentArchive"]>();
-  departmentAssignProject = unsupported<GovernanceService["departmentAssignProject"]>();
-  departmentAssignTeam = unsupported<GovernanceService["departmentAssignTeam"]>();
-  departmentAssignUser = unsupported<GovernanceService["departmentAssignUser"]>();
-  departmentAssignments = unsupported<GovernanceService["departmentAssignments"]>();
-  departmentCreate = unsupported<GovernanceService["departmentCreate"]>();
-  departmentList = unsupported<GovernanceService["departmentList"]>();
-  departmentRename = unsupported<GovernanceService["departmentRename"]>();
+    unsupported<GovernanceApi["aiToolResolveCliCatalogForUser"]>();
+  aiToolResolvePolicy = unsupported<GovernanceApi["aiToolResolvePolicy"]>();
+  aiToolResolvePolicyMap = unsupported<GovernanceApi["aiToolResolvePolicyMap"]>();
+  aiToolResolvePolicyOverrides = unsupported<GovernanceApi["aiToolResolvePolicyOverrides"]>();
+  aiToolSeedStarterPack = unsupported<GovernanceApi["aiToolSeedStarterPack"]>();
+  aiToolUpdate = unsupported<GovernanceApi["aiToolUpdate"]>();
+  anomalyRuleArchive = unsupported<GovernanceApi["anomalyRuleArchive"]>();
+  anomalyRuleCreate = unsupported<GovernanceApi["anomalyRuleCreate"]>();
+  anomalyRuleGetById = unsupported<GovernanceApi["anomalyRuleGetById"]>();
+  anomalyRuleList = unsupported<GovernanceApi["anomalyRuleList"]>();
+  anomalyRuleUpdate = unsupported<GovernanceApi["anomalyRuleUpdate"]>();
+  cliBootstrapResolve = unsupported<GovernanceApi["cliBootstrapResolve"]>();
+  cliSessionListForUser = unsupported<GovernanceApi["cliSessionListForUser"]>();
+  cliSessionRevoke = unsupported<GovernanceApi["cliSessionRevoke"]>();
+  cliTokenRevokeForUser = unsupported<GovernanceApi["cliTokenRevokeForUser"]>();
+  departmentArchive = unsupported<GovernanceApi["departmentArchive"]>();
+  departmentAssignProject = unsupported<GovernanceApi["departmentAssignProject"]>();
+  departmentAssignTeam = unsupported<GovernanceApi["departmentAssignTeam"]>();
+  departmentAssignUser = unsupported<GovernanceApi["departmentAssignUser"]>();
+  departmentAssignments = unsupported<GovernanceApi["departmentAssignments"]>();
+  departmentCreate = unsupported<GovernanceApi["departmentCreate"]>();
+  departmentList = unsupported<GovernanceApi["departmentList"]>();
+  departmentRename = unsupported<GovernanceApi["departmentRename"]>();
   departmentResolveByNameOrCreate =
-    unsupported<GovernanceService["departmentResolveByNameOrCreate"]>();
-  extractCanonicalCostEvents = unsupported<GovernanceService["extractCanonicalCostEvents"]>();
-  ingestionConfigure = unsupported<GovernanceService["ingestionConfigure"]>();
-  ingestionDisable = unsupported<GovernanceService["ingestionDisable"]>();
+    unsupported<GovernanceApi["departmentResolveByNameOrCreate"]>();
+  extractCanonicalCostEvents = unsupported<GovernanceApi["extractCanonicalCostEvents"]>();
+  ingestionConfigure = unsupported<GovernanceApi["ingestionConfigure"]>();
+  ingestionDisable = unsupported<GovernanceApi["ingestionDisable"]>();
   ingestionKeyEnsureForPersonalProject =
-    unsupported<GovernanceService["ingestionKeyEnsureForPersonalProject"]>();
-  ingestionKeyEnsureForProject = unsupported<GovernanceService["ingestionKeyEnsureForProject"]>();
-  ingestionKeyIssueForProject = unsupported<GovernanceService["ingestionKeyIssueForProject"]>();
+    unsupported<GovernanceApi["ingestionKeyEnsureForPersonalProject"]>();
+  ingestionKeyEnsureForProject = unsupported<GovernanceApi["ingestionKeyEnsureForProject"]>();
+  ingestionKeyIssueForProject = unsupported<GovernanceApi["ingestionKeyIssueForProject"]>();
   ingestionKeyIssueForPersonalProject =
-    unsupported<GovernanceService["ingestionKeyIssueForPersonalProject"]>();
+    unsupported<GovernanceApi["ingestionKeyIssueForPersonalProject"]>();
   ingestionKeyListForPersonalProject =
-    unsupported<GovernanceService["ingestionKeyListForPersonalProject"]>();
+    unsupported<GovernanceApi["ingestionKeyListForPersonalProject"]>();
   tryDescribePersonalIngestionKey =
-    unsupported<GovernanceService["tryDescribePersonalIngestionKey"]>();
-  ingestionRecordRunCompleted = unsupported<GovernanceService["ingestionRecordRunCompleted"]>();
-  ingestionRecordRunFailed = unsupported<GovernanceService["ingestionRecordRunFailed"]>();
-  ingestionSourceArchive = unsupported<GovernanceService["ingestionSourceArchive"]>();
-  ingestionSourceCreate = unsupported<GovernanceService["ingestionSourceCreate"]>();
-  ingestionSourceGetById = unsupported<GovernanceService["ingestionSourceGetById"]>();
-  ingestionSourceList = unsupported<GovernanceService["ingestionSourceList"]>();
+    unsupported<GovernanceApi["tryDescribePersonalIngestionKey"]>();
+  ingestionRecordRunCompleted = unsupported<GovernanceApi["ingestionRecordRunCompleted"]>();
+  ingestionRecordRunFailed = unsupported<GovernanceApi["ingestionRecordRunFailed"]>();
+  ingestionSourceArchive = unsupported<GovernanceApi["ingestionSourceArchive"]>();
+  ingestionSourceCreate = unsupported<GovernanceApi["ingestionSourceCreate"]>();
+  ingestionSourceGetById = unsupported<GovernanceApi["ingestionSourceGetById"]>();
+  ingestionSourceList = unsupported<GovernanceApi["ingestionSourceList"]>();
   ingestionSourceLiveTraceProjectIds =
-    unsupported<GovernanceService["ingestionSourceLiveTraceProjectIds"]>();
+    unsupported<GovernanceApi["ingestionSourceLiveTraceProjectIds"]>();
   ingestionSourceRecordEventReceived =
-    unsupported<GovernanceService["ingestionSourceRecordEventReceived"]>();
-  ingestionSourceRotateSecret = unsupported<GovernanceService["ingestionSourceRotateSecret"]>();
-  ingestionSourceUpdate = unsupported<GovernanceService["ingestionSourceUpdate"]>();
-  ocsfList = unsupported<GovernanceService["ocsfList"]>();
-  ottlTransform = unsupported<GovernanceService["ottlTransform"]>();
-  ottlValidate = unsupported<GovernanceService["ottlValidate"]>();
-  personalBudgetOverviewForUser = unsupported<GovernanceService["personalBudgetOverviewForUser"]>();
-  personalUsageBreakdownByModel = unsupported<GovernanceService["personalUsageBreakdownByModel"]>();
-  personalUsageDailyBuckets = unsupported<GovernanceService["personalUsageDailyBuckets"]>();
-  personalUsageSummary = unsupported<GovernanceService["personalUsageSummary"]>();
+    unsupported<GovernanceApi["ingestionSourceRecordEventReceived"]>();
+  ingestionSourceRotateSecret = unsupported<GovernanceApi["ingestionSourceRotateSecret"]>();
+  ingestionSourceUpdate = unsupported<GovernanceApi["ingestionSourceUpdate"]>();
+  ocsfList = unsupported<GovernanceApi["ocsfList"]>();
+  ottlTransform = unsupported<GovernanceApi["ottlTransform"]>();
+  ottlValidate = unsupported<GovernanceApi["ottlValidate"]>();
+  personalBudgetOverviewForUser = unsupported<GovernanceApi["personalBudgetOverviewForUser"]>();
+  personalUsageBreakdownByModel = unsupported<GovernanceApi["personalUsageBreakdownByModel"]>();
+  personalUsageDailyBuckets = unsupported<GovernanceApi["personalUsageDailyBuckets"]>();
+  personalUsageSummary = unsupported<GovernanceApi["personalUsageSummary"]>();
   personalVirtualKeyEnsureDefault =
-    unsupported<GovernanceService["personalVirtualKeyEnsureDefault"]>();
-  personalVirtualKeyIssue = unsupported<GovernanceService["personalVirtualKeyIssue"]>();
-  personalVirtualKeyList = unsupported<GovernanceService["personalVirtualKeyList"]>();
-  personalVirtualKeyRevoke = unsupported<GovernanceService["personalVirtualKeyRevoke"]>();
+    unsupported<GovernanceApi["personalVirtualKeyEnsureDefault"]>();
+  personalVirtualKeyIssue = unsupported<GovernanceApi["personalVirtualKeyIssue"]>();
+  personalVirtualKeyList = unsupported<GovernanceApi["personalVirtualKeyList"]>();
+  personalVirtualKeyRevoke = unsupported<GovernanceApi["personalVirtualKeyRevoke"]>();
   personalVirtualKeyRevokeAllForUser =
-    unsupported<GovernanceService["personalVirtualKeyRevokeAllForUser"]>();
-  quarantineFillEvaluate = unsupported<GovernanceService["quarantineFillEvaluate"]>();
-  resolveSetupState = unsupported<GovernanceService["resolveSetupState"]>();
-  resolveOtlpReceiverPolicies = unsupported<GovernanceService["resolveOtlpReceiverPolicies"]>();
-  resolveSourceNonBillable = unsupported<GovernanceService["resolveSourceNonBillable"]>();
-  resolveTraceDepartment = unsupported<GovernanceService["resolveTraceDepartment"]>();
-  routingPolicyCreate = unsupported<GovernanceService["routingPolicyCreate"]>();
-  routingPolicyDelete = unsupported<GovernanceService["routingPolicyDelete"]>();
-  routingPolicyGetById = unsupported<GovernanceService["routingPolicyGetById"]>();
-  routingPolicyList = unsupported<GovernanceService["routingPolicyList"]>();
-  routingPolicySetDefault = unsupported<GovernanceService["routingPolicySetDefault"]>();
-  routingPolicyUpdate = unsupported<GovernanceService["routingPolicyUpdate"]>();
-  templateArchiveOrg = unsupported<GovernanceService["templateArchiveOrg"]>();
-  templateCloneFromPlatform = unsupported<GovernanceService["templateCloneFromPlatform"]>();
-  templateCreateOrg = unsupported<GovernanceService["templateCreateOrg"]>();
-  templateGetByIdForOrg = unsupported<GovernanceService["templateGetByIdForOrg"]>();
-  templateListForOrgAdmin = unsupported<GovernanceService["templateListForOrgAdmin"]>();
-  templateListForUser = unsupported<GovernanceService["templateListForUser"]>();
-  templateSyncPlatformCatalog = unsupported<GovernanceService["templateSyncPlatformCatalog"]>();
-  templateUpdateOttlRules = unsupported<GovernanceService["templateUpdateOttlRules"]>();
-  tryFindAiToolById = unsupported<GovernanceService["tryFindAiToolById"]>();
-  tryFindAnomalyRuleById = unsupported<GovernanceService["tryFindAnomalyRuleById"]>();
-  tryFindIngestionSourceById = unsupported<GovernanceService["tryFindIngestionSourceById"]>();
+    unsupported<GovernanceApi["personalVirtualKeyRevokeAllForUser"]>();
+  quarantineFillEvaluate = unsupported<GovernanceApi["quarantineFillEvaluate"]>();
+  resolveSetupState = unsupported<GovernanceApi["resolveSetupState"]>();
+  resolveOtlpReceiverPolicies = unsupported<GovernanceApi["resolveOtlpReceiverPolicies"]>();
+  resolveSourceNonBillable = unsupported<GovernanceApi["resolveSourceNonBillable"]>();
+  resolveTraceDepartment = unsupported<GovernanceApi["resolveTraceDepartment"]>();
+  routingPolicyCreate = unsupported<GovernanceApi["routingPolicyCreate"]>();
+  routingPolicyDelete = unsupported<GovernanceApi["routingPolicyDelete"]>();
+  routingPolicyGetById = unsupported<GovernanceApi["routingPolicyGetById"]>();
+  routingPolicyList = unsupported<GovernanceApi["routingPolicyList"]>();
+  routingPolicySetDefault = unsupported<GovernanceApi["routingPolicySetDefault"]>();
+  routingPolicyUpdate = unsupported<GovernanceApi["routingPolicyUpdate"]>();
+  templateArchiveOrg = unsupported<GovernanceApi["templateArchiveOrg"]>();
+  templateCloneFromPlatform = unsupported<GovernanceApi["templateCloneFromPlatform"]>();
+  templateCreateOrg = unsupported<GovernanceApi["templateCreateOrg"]>();
+  templateGetByIdForOrg = unsupported<GovernanceApi["templateGetByIdForOrg"]>();
+  templateListForOrgAdmin = unsupported<GovernanceApi["templateListForOrgAdmin"]>();
+  templateListForUser = unsupported<GovernanceApi["templateListForUser"]>();
+  templateSyncPlatformCatalog = unsupported<GovernanceApi["templateSyncPlatformCatalog"]>();
+  templateUpdateOttlRules = unsupported<GovernanceApi["templateUpdateOttlRules"]>();
+  tryFindAiToolById = unsupported<GovernanceApi["tryFindAiToolById"]>();
+  tryFindAnomalyRuleById = unsupported<GovernanceApi["tryFindAnomalyRuleById"]>();
+  tryFindIngestionSourceById = unsupported<GovernanceApi["tryFindIngestionSourceById"]>();
   tryFindIngestionSourceByIngestSecret =
-    unsupported<GovernanceService["tryFindIngestionSourceByIngestSecret"]>();
-  tryFindRoutingPolicyById = unsupported<GovernanceService["tryFindRoutingPolicyById"]>();
-  tryFindTemplateByIdForOrg = unsupported<GovernanceService["tryFindTemplateByIdForOrg"]>();
+    unsupported<GovernanceApi["tryFindIngestionSourceByIngestSecret"]>();
+  tryFindRoutingPolicyById = unsupported<GovernanceApi["tryFindRoutingPolicyById"]>();
+  tryFindTemplateByIdForOrg = unsupported<GovernanceApi["tryFindTemplateByIdForOrg"]>();
   tryResolveDefaultRoutingPolicyForUser =
-    unsupported<GovernanceService["tryResolveDefaultRoutingPolicyForUser"]>();
-  usageRecord = unsupported<GovernanceService["usageRecord"]>();
+    unsupported<GovernanceApi["tryResolveDefaultRoutingPolicyForUser"]>();
+  usageRecord = unsupported<GovernanceApi["usageRecord"]>();
 }

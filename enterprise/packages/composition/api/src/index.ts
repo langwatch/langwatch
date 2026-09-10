@@ -36,7 +36,7 @@ export { createGovernanceRestApp, GovernanceApp } from "@langwatch/enterprise-go
  * The governance capability itself, and the three shapes an API-role process reads off it.
  */
 export {
-  GovernanceService,
+  GovernanceApi,
   OrganizationSessionPolicyService,
   PersonaHomeResolverService,
   type PersonaResolution,

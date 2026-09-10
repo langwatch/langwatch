@@ -14,7 +14,7 @@ import {
   getStarterTemplate,
   isOttlEnabledSourceType,
   OTTL_ENABLED_SOURCE_TYPES,
-  type GovernanceService,
+  type GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
 import type { AnyTRPCRootTypes, TRPCRootObject, TRPCRuntimeConfigOptions } from "@trpc/server";
 import { z } from "zod";
@@ -22,7 +22,7 @@ import { IngestionSourceService } from "../../services/ingestion-source.service.
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
 
 export type IngestionSourcesTrpcContext = Readonly<{
-  app: Readonly<{ governance: GovernanceService }>;
+  app: Readonly<{ governance: GovernanceApi }>;
   actor(): Readonly<{ id: string }>;
 }>;
 
@@ -143,7 +143,7 @@ export function toIngestionSourceDto({
 }
 
 async function dtoForRow(
-  service: GovernanceService,
+  service: GovernanceApi,
   row: IngestionSourceRow,
   organizationId: string,
 ) {

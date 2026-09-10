@@ -13,7 +13,6 @@ import {
   type LangyEgressAllowlist,
   type LangyEventCursor,
   type LangyMessageRow,
-  type LangyService,
   type LangyLocalRecord,
   type LangyMessagePart,
   type LangyMessageRole,
@@ -84,7 +83,7 @@ export class LangySessionRequiredError extends HandledError {
 
 /** What the process composes this feature's application from. */
 type LangyAppDependencies = {
-  langy: LangyService;
+  langy: LangyApiContract;
   /** Absent in a deployment without Redis; the live edge degrades to the fold. */
   redis: LangyRedis | null;
   broadcast: LangyBroadcast;
@@ -150,7 +149,7 @@ export class LangyApp implements LangyApiContract {
    * The service itself, for the paths that are not a Langy door. Everything below serves a
    * person looking at a conversation.
    */
-  get langyService(): LangyService {
+  get langyService(): LangyApiContract {
     return this.dependencies.langy;
   }
 
@@ -169,39 +168,39 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.openRelayConnection();
   }
 
-  getPage(input: Parameters<LangyService["getPage"]>[0]) {
+  getPage(input: Parameters<LangyApiContract["getPage"]>[0]) {
     return this.dependencies.langy.getPage(input);
   }
 
-  getEventsAfter(input: Parameters<LangyService["getEventsAfter"]>[0]) {
+  getEventsAfter(input: Parameters<LangyApiContract["getEventsAfter"]>[0]) {
     return this.dependencies.langy.getEventsAfter(input);
   }
 
-  tryFindByIdVisible(input: Parameters<LangyService["tryFindByIdVisible"]>[0]) {
+  tryFindByIdVisible(input: Parameters<LangyApiContract["tryFindByIdVisible"]>[0]) {
     return this.dependencies.langy.tryFindByIdVisible(input);
   }
 
-  getAllByConversation(input: Parameters<LangyService["getAllByConversation"]>[0]) {
+  getAllByConversation(input: Parameters<LangyApiContract["getAllByConversation"]>[0]) {
     return this.dependencies.langy.getAllByConversation(input);
   }
 
-  deleteById(input: Parameters<LangyService["deleteById"]>[0]) {
+  deleteById(input: Parameters<LangyApiContract["deleteById"]>[0]) {
     return this.dependencies.langy.deleteById(input);
   }
 
-  updateById(input: Parameters<LangyService["updateById"]>[0]) {
+  updateById(input: Parameters<LangyApiContract["updateById"]>[0]) {
     return this.dependencies.langy.updateById(input);
   }
 
-  forkById(input: Parameters<LangyService["forkById"]>[0]) {
+  forkById(input: Parameters<LangyApiContract["forkById"]>[0]) {
     return this.dependencies.langy.forkById(input);
   }
 
-  startConversationTurn(input: Parameters<LangyService["startConversationTurn"]>[0]) {
+  startConversationTurn(input: Parameters<LangyApiContract["startConversationTurn"]>[0]) {
     return this.dependencies.langy.startConversationTurn(input);
   }
 
-  warmConversationWorker(input: Parameters<LangyService["warmConversationWorker"]>[0]) {
+  warmConversationWorker(input: Parameters<LangyApiContract["warmConversationWorker"]>[0]) {
     return this.dependencies.langy.warmConversationWorker(input);
   }
 
@@ -209,35 +208,35 @@ export class LangyApp implements LangyApiContract {
     return this.dependencies.langy.tryGetModelsAllowedForProject(projectId);
   }
 
-  revokeWorkerSessionKey(input: Parameters<LangyService["revokeWorkerSessionKey"]>[0]) {
+  revokeWorkerSessionKey(input: Parameters<LangyApiContract["revokeWorkerSessionKey"]>[0]) {
     return this.dependencies.langy.revokeWorkerSessionKey(input);
   }
 
-  turnExists(input: Parameters<LangyService["turnExists"]>[0]) {
+  turnExists(input: Parameters<LangyApiContract["turnExists"]>[0]) {
     return this.dependencies.langy.turnExists(input);
   }
 
-  ingestAgentTurnResult(input: Parameters<LangyService["ingestAgentTurnResult"]>[0]) {
+  ingestAgentTurnResult(input: Parameters<LangyApiContract["ingestAgentTurnResult"]>[0]) {
     return this.dependencies.langy.ingestAgentTurnResult(input);
   }
 
-  tryGetRunToken(input: Parameters<LangyService["tryGetRunToken"]>[0]) {
+  tryGetRunToken(input: Parameters<LangyApiContract["tryGetRunToken"]>[0]) {
     return this.dependencies.langy.tryGetRunToken(input);
   }
 
-  recordToolCallStarted(input: Parameters<LangyService["recordToolCallStarted"]>[0]) {
+  recordToolCallStarted(input: Parameters<LangyApiContract["recordToolCallStarted"]>[0]) {
     return this.dependencies.langy.recordToolCallStarted(input);
   }
 
-  recordToolCallCompleted(input: Parameters<LangyService["recordToolCallCompleted"]>[0]) {
+  recordToolCallCompleted(input: Parameters<LangyApiContract["recordToolCallCompleted"]>[0]) {
     return this.dependencies.langy.recordToolCallCompleted(input);
   }
 
-  recordTurnHandoff(input: Parameters<LangyService["recordTurnHandoff"]>[0]) {
+  recordTurnHandoff(input: Parameters<LangyApiContract["recordTurnHandoff"]>[0]) {
     return this.dependencies.langy.recordTurnHandoff(input);
   }
 
-  recordPlanUpdated(input: Parameters<LangyService["recordPlanUpdated"]>[0]) {
+  recordPlanUpdated(input: Parameters<LangyApiContract["recordPlanUpdated"]>[0]) {
     return this.dependencies.langy.recordPlanUpdated(input);
   }
 

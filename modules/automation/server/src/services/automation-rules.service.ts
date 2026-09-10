@@ -13,7 +13,7 @@ import {
   hasActionableTriggerFilters,
   ProjectNotFoundError,
   TriggerFiltersRequiredError,
-  type AutomationService,
+  type AutomationApi,
   type Trigger,
 } from "@langwatch/automation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -27,7 +27,7 @@ export interface AutomationProjectIdentity {
 
 /** What the shared rules read the world through. */
 export interface AutomationRulesCollaborators {
-  automation: AutomationService;
+  automation: AutomationApi;
   projects: ProjectApi;
   featureFlags: FeatureFlagApi;
 }
