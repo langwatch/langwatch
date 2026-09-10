@@ -22,6 +22,18 @@ import { SEAT_REPORT_ACTION } from "./pullers/microsoftGraphSeats";
 
 const TABLE_NAME = "governance_ocsf_events" as const;
 
+/**
+ * Rows per INSERT. A run's kept events arrive as one array and each carries
+ * its whole raw payload, so an unchunked page has no upper bound on size.
+ */
+const INSERT_CHUNK_SIZE = 500;
+
+/**
+ * Wait for the async-insert flush: a rejected flush must reach the caller as
+ * an error, not vanish after the insert has already returned.
+ */
+const INSERT_SETTINGS = { async_insert: 1, wait_for_async_insert: 1 } as const;
+
 const logger = createLogger(
   "langwatch:governance:governance-ocsf-events-clickhouse-repository",
 );
@@ -281,11 +293,11 @@ export class GovernanceOcsfEventsClickHouseRepository {
   }
 
   /**
-   * One INSERT for a whole page of rows. A pull lands hundreds of audit rows
-   * per page, and one statement per row was hundreds of queries in flight
-   * against a server whose entire budget may be 32 (#8064). Every row must
-   * belong to the same tenant: the client is resolved once, for that tenant,
-   * and a mixed page is refused rather than split.
+   * One INSERT per chunk of rows, awaited in turn. The old loop awaited one
+   * INSERT per row — one statement at a time, but ~150 of them removed from a
+   * pull that issues ~2,600 against a dev server budgeted at 32 (#8064).
+   * Every row must belong to the same tenant: the client is resolved once,
+   * for that tenant, and a mixed page is refused rather than split.
    */
   async insertEvents(rows: GovernanceOcsfEventInput[]): Promise<void> {
     if (rows.length === 0) return;
@@ -304,12 +316,16 @@ export class GovernanceOcsfEventsClickHouseRepository {
     }
     try {
       const client = await this.resolveClient(tenantId);
-      await client.insert({
-        table: TABLE_NAME,
-        values: rows.map(toOcsfEventValues),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
-      });
+      for (let start = 0; start < rows.length; start += INSERT_CHUNK_SIZE) {
+        await client.insert({
+          table: TABLE_NAME,
+          values: rows
+            .slice(start, start + INSERT_CHUNK_SIZE)
+            .map(toOcsfEventValues),
+          format: "JSONEachRow",
+          clickhouse_settings: INSERT_SETTINGS,
+        });
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);

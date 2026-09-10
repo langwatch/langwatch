@@ -654,14 +654,14 @@ async function writePulledEvents({
 }
 
 /**
- * The writes of one run: the kept events' OCSF audit rows as one insert for
- * the page, then each event's usage record. Returns the priced periods split
- * by whether the cost flag let them be stored — the dropped ones become the
- * source's unpriced window, and the recorded ones are what later closes that
- * window.
+ * The writes of one run: the kept events' OCSF audit rows in chunked inserts,
+ * then each event's usage record. Returns the priced periods split by whether
+ * the cost flag let them be stored — the dropped ones become the source's
+ * unpriced window, and the recorded ones are what later closes that window.
  *
- * One insert per page, not per row: a page of several hundred rows was that
- * many statements in flight, and a dev ClickHouse budgets 32 (#8064).
+ * One insert per chunk, not per row: the per-row loop awaited each statement
+ * in turn, but it still put ~150 of the ~2,600 statements a pull issues
+ * against a dev ClickHouse budgeted at 32 (#8064).
  */
 async function writeAuditAndUsageRows({
   kept,
