@@ -31,6 +31,10 @@
       "measured": "2026-09-08"
     },
     {
+      "key": "auth|nested-transport",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "authz|contract-service",
       "measured": "2026-09-08"
     },
@@ -69,6 +73,10 @@
     {
       "key": "billing|persistence-adapter",
       "measured": "2026-09-08"
+    },
+    {
+      "key": "dataset|refusing-composition",
+      "measured": "2026-09-10"
     },
     {
       "key": "experiment|installer-not-booted",
@@ -135,10 +143,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "hosted-mcp|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "identity|no-app",
       "measured": "2026-09-08"
     },
@@ -187,10 +191,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "licensing|nested-transport",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "licensing|persistence-adapter",
       "measured": "2026-09-08"
     },
@@ -235,6 +235,10 @@
       "measured": "2026-09-08"
     },
     {
+      "key": "organization|memory-twin-untested",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "organization|nested-transport",
       "measured": "2026-09-08"
     },
@@ -243,15 +247,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "organization|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "organization|refusing-composition",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "organization|unregistered-repositories",
       "measured": "2026-09-08"
     },
     {
@@ -299,6 +295,10 @@
       "measured": "2026-09-08"
     },
     {
+      "key": "trace|nested-web-entry",
+      "measured": "2026-09-10"
+    },
+    {
       "key": "trace|refusing-composition",
       "measured": "2026-09-08"
     },
@@ -311,20 +311,12 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "webhook|installer-not-booted",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "webhook|postgres-without-memory",
-      "measured": "2026-09-08"
-    },
-    {
-      "key": "webhook|unregistered-repositories",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "workflow|installer-not-booted",
       "measured": "2026-09-08"
+    },
+    {
+      "key": "workflow|nested-web-entry",
+      "measured": "2026-09-10"
     },
     {
       "key": "workflow|persistence-adapter",
