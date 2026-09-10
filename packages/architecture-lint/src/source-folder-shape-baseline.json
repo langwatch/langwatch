@@ -579,10 +579,6 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|modules/trace/server/src/services",
-      "measured": "2026-09-08"
-    },
-    {
       "key": "crowded-folder|modules/trace/web/src/behavior",
       "measured": "2026-09-08"
     },
@@ -1191,19 +1187,19 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/trace/server/src/services/langwatch-canonicaliser.service.ts",
+      "key": "fragment-file|modules/trace/server/src/services/canonicalisers/otel/langwatch-canonicaliser.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/trace/server/src/services/trace-number-coercion.service.ts",
+      "key": "fragment-file|modules/trace/server/src/services/support/trace-number-coercion.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/trace/server/src/services/trace-safe-json.service.ts",
+      "key": "fragment-file|modules/trace/server/src/services/support/trace-safe-json.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|modules/trace/server/src/services/vercel-canonicaliser.service.ts",
+      "key": "fragment-file|modules/trace/server/src/services/canonicalisers/vercel-canonicaliser.service.ts",
       "measured": "2026-09-08"
     },
     {

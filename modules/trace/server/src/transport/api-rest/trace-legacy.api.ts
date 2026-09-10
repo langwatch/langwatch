@@ -1,8 +1,8 @@
 /**
  * REST for the deprecated trace endpoints: `GET /api/trace/:id`, `POST /api/trace/:id/share`, `POST /api/trace/:id/unshare`, `POST /api/trace/search`, `GET /api/thread/:id`. Was `platform/app/src/server/routes/traces-legacy.ts`, itself a replacement for five `pages/api` handlers; every route carries `Deprecation: true` and a successor `Link` where it has one, with bodies transcribed rather than rewritten since a deployed SDK parses them. The family resolves its own credential (`handlerManagedAuth`) because its refusals predate the framework envelope (a bare `{ message }` for unauthenticated, the full handled payload for a ceiling denial); that resolution arrives as {@link TraceLegacyCredentialPort} so this door and the framework chain decide the same thing about the same caller.
  */
-import { TraceReadableSpanService } from "#services/trace-readable-span.service";
-import { TraceFormattingService } from "#services/trace-formatting.service";
+import { TraceReadableSpanService } from "#services/read/trace-readable-span.service";
+import { TraceFormattingService } from "#services/support/trace-formatting.service";
 import { handlerManagedAuth } from "@langwatch/api";
 import type { AppRestSecurity, RestCredentialPrincipal, SecuredApp } from "@langwatch/api/rest";
 import type {

@@ -29,7 +29,7 @@ import {
 } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { createInitState, createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
 

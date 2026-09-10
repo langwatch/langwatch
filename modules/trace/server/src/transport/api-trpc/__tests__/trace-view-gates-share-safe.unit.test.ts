@@ -1,5 +1,5 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceReadRedactionService } from "../../../services/trace-read-redaction.service.ts";
+import { TraceReadRedactionService } from "../../../services/read/trace-read-redaction.service.ts";
 import type { DerivedTraceEvent, Evaluation } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

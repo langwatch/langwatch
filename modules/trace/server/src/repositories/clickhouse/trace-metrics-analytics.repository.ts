@@ -6,7 +6,10 @@ import {
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsRow,
 } from "../../projections/trace-derived.projection.ts";
-import type { TraceAnalyticsRepository } from "../trace-metrics-analytics.repository.ts";
+import {
+  TraceAnalyticsProjectionPort,
+  type TraceAnalyticsProjectionRead,
+} from "../../ports/trace-analytics-projection.port.ts";
 import { queryWindowed } from "./windowed-read.mapper.ts";
 
 const TABLE_NAME = "trace_analytics" as const;
@@ -82,14 +85,16 @@ interface ClickHouseTraceAnalyticsWriteRecord {
   _retention_days: number;
 }
 
-export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsRepository {
+export class TraceAnalyticsClickHouseRepository extends TraceAnalyticsProjectionPort {
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
       defaultRetentionDays: number;
       windowedReadMetrics?: TraceWindowedReadMetricsPort;
     },
-  ) {}
+  ) {
+    super();
+  }
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
@@ -99,11 +104,15 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
     return new TraceAnalyticsClickHouseRepository(options);
   }
 
-  async upsert(
-    row: TraceAnalyticsRow,
-    retentionDays: number = this.options.defaultRetentionDays,
-    appliedEventIds?: readonly string[],
-  ): Promise<void> {
+  async upsert({
+    row,
+    retentionDays = this.options.defaultRetentionDays,
+    appliedEventIds,
+  }: {
+    row: TraceAnalyticsRow;
+    retentionDays?: number;
+    appliedEventIds?: readonly string[];
+  }): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId: row.tenantId },
       "TraceAnalyticsClickHouseRepository.upsert",
@@ -136,7 +145,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
     }
   }
 
-  async upsertBatch(
+  override async upsertBatch(
     entries: Array<{
       row: TraceAnalyticsRow;
       retentionDays?: number;
@@ -191,7 +200,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
    * miss. `fallback: "none"`: the fold executor owns the miss retry (see
    * {@link queryLatestVersion}), so a second ladder here would be wasted.
    */
-  async tryFindByTraceIdWithApplied({
+  async findByTraceId({
     tenantId,
     traceId,
     window,
@@ -199,10 +208,10 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
     tenantId: string;
     traceId: string;
     window?: { fromMs: number; toMs: number };
-  }): Promise<{ row: TraceAnalyticsRow; appliedEventIds: string[] } | null> {
+  }): Promise<TraceAnalyticsProjectionRead | null> {
     EventUtils.validateTenantId(
       { tenantId },
-      "TraceAnalyticsClickHouseRepository.tryFindByTraceIdWithApplied",
+      "TraceAnalyticsClickHouseRepository.findByTraceId",
     );
 
     try {
@@ -251,7 +260,7 @@ export class TraceAnalyticsClickHouseRepository implements TraceAnalyticsReposit
           toString(AppliedEventIds) DESC`;
 
   /**
-   * One ClickHouse attempt for {@link tryFindByTraceIdWithApplied}. Dedups
+   * One ClickHouse attempt for {@link findByTraceId}. Dedups
    * with the IN-tuple pattern, never FINAL. `window` bounds OccurredAt on
    * the outer read only — the inner dedup is deliberately unwindowed, per
    * the "range filter on a movable column inside a dedup subquery" rule in

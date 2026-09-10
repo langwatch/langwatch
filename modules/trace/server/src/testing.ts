@@ -9,10 +9,10 @@ import { TraceRecordPort } from "./ports/trace-record.port.ts";
 import { TraceSummaryReaderPort } from "./ports/trace-summary-reader.port.ts";
 import { TracePayloadReaderPort } from "./ports/trace-payload-reader.port.ts";
 
-export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service.ts";
-export { SpanNormalizationPipelineService } from "./services/span-normalization.service.ts";
+export { TraceCanonicalisationService } from "./services/canonicalisers/trace-canonicalisation.service.ts";
+export { SpanNormalizationPipelineService } from "./services/span/span-normalization.service.ts";
 export { storedSpanReadBack } from "./repositories/clickhouse/__tests__/stored-span-row.test-fakes.ts";
-export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matching.service.ts";
+export { TraceSpanCostMatchingService } from "./services/span/trace-span-cost-matching.service.ts";
 export { ClickHouseTraceQuerySubqueryAdapter } from "./repositories/clickhouse/trace-query-subquery.clickhouse.adapter.ts";
 
 export class MissingTraceRecordPort extends TraceRecordPort {

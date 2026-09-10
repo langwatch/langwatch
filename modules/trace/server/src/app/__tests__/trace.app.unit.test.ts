@@ -31,7 +31,7 @@ import type {
   TraceWithGuardrail,
   TracesForProjectResult,
 } from "@langwatch/trace-contract";
-import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
+import type { TraceService as TraceTreeService } from "../../services/support/trace.service.ts";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { describe, expect, it, vi } from "vitest";

@@ -16,7 +16,7 @@ import {
   type Span,
 } from "@langwatch/trace-contract";
 
-import type { TraceCollectorSpanService } from "#services/trace-collector-span.service";
+import type { TraceCollectorSpanService } from "#services/span/trace-collector-span.service";
 
 import {
   applyLegacyMetadataFields,

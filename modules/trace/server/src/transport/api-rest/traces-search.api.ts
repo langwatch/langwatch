@@ -1,8 +1,8 @@
 /**
  * `POST /api/traces/search`: the streamed, optionally projected trace search.
  */
-import { TraceProjectionCompileService } from "#services/trace-projection-compile.service";
-import { TraceFormattingService } from "#services/trace-formatting.service";
+import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
+import { TraceFormattingService } from "#services/support/trace-formatting.service";
 import { requires } from "@langwatch/api";
 import {
   baseResponses,

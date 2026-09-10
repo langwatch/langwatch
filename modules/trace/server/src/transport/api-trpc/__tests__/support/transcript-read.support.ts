@@ -2,7 +2,7 @@
  * The application and ports the shared transcript read is driven through. `TracesV2TrpcApi.readCodingAgentTranscript` takes the application it reads through and the ports this package does not own; both are assembled from the REAL implementations the API process wires (`readPorts()` in `apps/api/src/app/api-trace-read-stack.composition.ts`), so the log visibility gate, coding-agent join, and transcript derivation all run for real — the only doubles are the two stores the trace is read from.
  */
 
-import { TraceReadRedactionService } from "../../../../services/trace-read-redaction.service.ts";
+import { TraceReadRedactionService } from "../../../../services/read/trace-read-redaction.service.ts";
 import { vi } from "vitest";
 import {
   CONTENT_KEY_CATALOG,
@@ -15,7 +15,7 @@ import { TraceApp } from "../../../../app/trace.app.ts";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
-} from "../../../../services/trace-log-content-derivation.service.ts";
+} from "../../../../services/log/trace-log-content-derivation.service.ts";
 import type { TracesV2ReadPorts } from "../../traces-v2.api.ts";
 
 /** One of the two stores the read is driven from. */

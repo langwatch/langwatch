@@ -4,8 +4,8 @@ import {
   NormalizedStatusCode,
   type NormalizedSpan,
 } from "@langwatch/trace-contract";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { SpanCostService } from "../../services/span-cost.service.ts";
+import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
+import { SpanCostService } from "../../services/span/span-cost.service.ts";
 import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.adapter.ts";
 
 /**

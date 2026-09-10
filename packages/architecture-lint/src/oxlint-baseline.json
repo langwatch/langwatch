@@ -6475,7 +6475,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "handled-error-outside-contract|modules/trace/server/src/services/trace-ai-query.service.ts",
+      "key": "handled-error-outside-contract|modules/trace/server/src/services/query/trace-ai-query.service.ts",
       "measured": "2026-09-10"
     },
     {
@@ -6855,7 +6855,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "id-generation-origin|modules/trace/server/src/services/trace-metadata-write.service.ts",
+      "key": "id-generation-origin|modules/trace/server/src/services/support/trace-metadata-write.service.ts",
       "measured": "2026-09-08"
     },
     {
@@ -7315,135 +7315,135 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/claude-code-log-enrichment.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/canonicalisers/coding-agent/claude-code-log-enrichment.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/claude-code-span-enrichment.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/canonicalisers/coding-agent/claude-code-span-enrichment.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-ai-query.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/query/trace-ai-query.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-cold-scan-detector.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/offload/trace-cold-scan-detector.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-content-array.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/content/trace-content-array.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-content-extraction.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/content/trace-content-extraction.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-edge-media-extraction.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/edge/trace-edge-media-extraction.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-edit-overlay-redaction.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/edit-overlay/trace-edit-overlay-redaction.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-edit-overlay-restore.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/edit-overlay/trace-edit-overlay-restore.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-evaluation-mapping.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/support/trace-evaluation-mapping.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-event-attribute-mapping.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/attribute/trace-event-attribute-mapping.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-eventref-parsing.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/ingestion/trace-eventref-parsing.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-formatting.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/support/trace-formatting.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-legacy-span-mapping.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/read/trace-legacy-span-mapping.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-legacy-summary-mapping.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/read/trace-legacy-summary-mapping.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-llm-span-messages.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/content/trace-llm-span-messages.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-log-content-derivation.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/log/trace-log-content-derivation.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-metadata-write.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/support/trace-metadata-write.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-number-coercion.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/support/trace-number-coercion.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-offload-resolution-batch.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/offload/trace-offload-resolution-batch.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-offload-resolution.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/offload/trace-offload-resolution.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-projection-catalog.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/projection/trace-projection-catalog.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-projection-compile.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/projection/trace-projection-compile.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-projection-lean.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/projection/trace-projection-lean.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-read-redaction.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/read/trace-read-redaction.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-readable-span.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/read/trace-readable-span.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-safe-json.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/support/trace-safe-json.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-session-groups-cursor.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/session/trace-session-groups-cursor.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-span-cost-matching.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/span/trace-span-cost-matching.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-stream-buffer.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/ingestion/trace-stream-buffer.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-ttl-cache.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/support/trace-ttl-cache.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-value-media-extraction.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/content/trace-value-media-extraction.service.ts",
       "measured": "2026-09-08"
     },
     {
-      "key": "namespace-class|modules/trace/server/src/services/trace-windowed-read.service.ts",
+      "key": "namespace-class|modules/trace/server/src/services/read/trace-windowed-read.service.ts",
       "measured": "2026-09-08"
     },
     {
@@ -9491,7 +9491,7 @@
       "measured": "2026-09-06"
     },
     {
-      "key": "temporal-only|modules/trace/server/src/services/trace-evaluation-mapping.service.ts",
+      "key": "temporal-only|modules/trace/server/src/services/support/trace-evaluation-mapping.service.ts",
       "measured": "2026-09-06"
     },
     {
@@ -10015,7 +10015,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "unbounded-loop|modules/trace/server/src/services/trace-export.service.ts",
+      "key": "unbounded-loop|modules/trace/server/src/services/query/trace-export.service.ts",
       "measured": "2026-09-08"
     },
     {

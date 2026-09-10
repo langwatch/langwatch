@@ -3,8 +3,8 @@
  * and the trace itself. Registered in that order — the two literal sub-resources must not be
  * swallowed by the bare parameter route.
  */
-import { TraceReadableSpanService } from "#services/trace-readable-span.service";
-import { TraceFormattingService } from "#services/trace-formatting.service";
+import { TraceReadableSpanService } from "#services/read/trace-readable-span.service";
+import { TraceFormattingService } from "#services/support/trace-formatting.service";
 import { requires } from "@langwatch/api";
 import {
   baseResponses,
@@ -18,7 +18,7 @@ import type { Trace } from "@langwatch/trace-contract";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
-import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
+import { AmbiguousTraceIdPrefixError } from "#services/read/trace-legacy-read.service";
 
 import type { TraceSearchBody, TracesRestPorts } from "./traces.api.ts";
 import {

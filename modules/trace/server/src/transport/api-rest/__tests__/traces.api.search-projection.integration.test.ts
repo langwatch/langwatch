@@ -21,19 +21,19 @@ import {
   type TracesRestPorts,
 } from "../traces.api.ts";
 
-vi.mock("#services/trace-formatting.service", () => ({
+vi.mock("#services/support/trace-formatting.service", () => ({
   generateAsciiTree: vi.fn().mockReturnValue("ascii tree"),
   formatTraceSummaryDigest: vi.fn().mockReturnValue("Input: hello\nOutput: world"),
 }));
 
-vi.mock("#services/trace-readable-span.service", () => ({
+vi.mock("#services/read/trace-readable-span.service", () => ({
   formatSpansDigest: vi.fn().mockResolvedValue("full span digest"),
 }));
 
 // Keep the real request schema + `ProjectionValidationError` (so validation
 // and the 422 path are exercised for real) and stub only `compileProjection`.
 const mockCompileProjection = vi.fn();
-vi.mock("#services/trace-projection-compile.service", () => ({
+vi.mock("#services/projection/trace-projection-compile.service", () => ({
   TraceProjectionCompileService: {
     compileProjection: (args: unknown) => mockCompileProjection(args),
   },

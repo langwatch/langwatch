@@ -3,7 +3,7 @@ import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventin
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { type SpanReceivedEvent, spanReceivedEventSchema } from "@langwatch/trace-contract";
 import { NormalizedStatusCode } from "@langwatch/trace-contract";
-import { SpanCostService } from "../services/span-cost.service.ts";
+import { SpanCostService } from "../services/span/span-cost.service.ts";
 import { TraceSpanNormalizationPort } from "../ports/trace-span-normalization.port.ts";
 
 /**

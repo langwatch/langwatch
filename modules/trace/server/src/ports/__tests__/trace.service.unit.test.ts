@@ -8,7 +8,7 @@ import {
 } from "../query-field-values.port.ts";
 import { TracePort, type TraceSpanSummaryRecord, type TraceSpanPage } from "../trace.port.ts";
 import { TraceSummaryReaderPort } from "../trace-summary-reader.port.ts";
-import { TraceService } from "../../services/trace.service.ts";
+import { TraceService } from "../../services/support/trace.service.ts";
 import { TraceFullRecordPort } from "../trace-full-record.port.ts";
 import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
 import { TestTraceQueryClassification } from "./support/query-classification.fake.ts";

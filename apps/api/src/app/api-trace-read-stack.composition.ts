@@ -51,7 +51,8 @@ import {
 } from "@langwatch/prompt-contract";
 import {
   TraceBlobStoreService,
-  ClickHouseTraceAdapter,
+  TraceTreeComposition,
+  type TraceTreeService,
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
   TraceAiQueryService,
@@ -67,7 +68,7 @@ import {
   SpanStorageClickHouseRepository,
   SpanStorageService,
   TraceCanonicalisationService,
-  ClickHouseTraceLegacyReadAdapter,
+  TraceLegacyReadClickHouseRepository,
   TraceEditOverlayService,
   TraceIOExtractionService,
   TraceListClickHouseRepository,
@@ -91,8 +92,6 @@ import type { TracesV2TrpcPorts } from "@langwatch/trace-server/api-trpc/traces-
 import type { TracesTrpcPorts } from "@langwatch/trace-server/api-trpc/traces";
 import type { TraceLegacyFilterInput, TraceLegacyListInput } from "@langwatch/trace-contract";
 
-/** The trace-tree read the ClickHouse adapter composes, as `composeTree` hands it around. */
-type TraceTreeService = ReturnType<typeof ClickHouseTraceAdapter.createNull>;
 import { HandledError } from "@langwatch/handled-error";
 import { z } from "zod";
 import { ApiTraceReadStackPort } from "../features/trace/trace-read-stack.port.ts";
@@ -552,7 +551,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
 
     const read = TraceLegacyReadService.create({
       traceCanonicalisation: this.canonicalisation,
-      traceRead: ClickHouseTraceLegacyReadAdapter.create({
+      traceRead: TraceLegacyReadClickHouseRepository.create({
         traceCanonicalisation: this.canonicalisation,
         ...(resolve ? { resolveClickHouseClient: resolve } : {}),
         ...(options.filterConditions ? { filterConditions: options.filterConditions } : {}),
@@ -629,7 +628,7 @@ class ApiComposedTraceReadStack extends ApiTraceReadStackPort {
         "the trace tree read",
       );
     }
-    return ClickHouseTraceAdapter.create({
+    return TraceTreeComposition.create({
       resolveClient: resolve as never,
       modelProviders,
       queryFieldValues: refuseAll(

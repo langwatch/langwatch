@@ -170,7 +170,7 @@ import {
 } from "@langwatch/automation-server";
 import { ExperimentEventingAdapter } from "@langwatch/experiment-server";
 import {
-  ClickHouseTraceStoredSpanReaderAdapter,
+  TraceStoredSpanReaderClickHouseRepository,
   TraceProcessingServerInstallerAdapter,
 } from "@langwatch/trace-server";
 import { createWorkerAnalytics } from "./worker-analytics.composition.ts";
@@ -1428,7 +1428,7 @@ export class WorkerProductionComposition {
           }),
           codingAgentTraces: WorkerCodingAgentTraceProcessingAdapter.create({
             traceCanonicalisation,
-            spans: ClickHouseTraceStoredSpanReaderAdapter.create({
+            spans: TraceStoredSpanReaderClickHouseRepository.create({
               resolveClient: options.eventing.resolveClickHouseClient,
               defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
             }),

@@ -2,6 +2,7 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { NormalizedSpan, SpanInsertData } from "@langwatch/trace-contract";
 import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
+import { TraceStoredSpanReaderPort } from "../../ports/trace-stored-span-reader.port.ts";
 import { TraceSpanStoragePort } from "../../ports/trace-span-storage.port.ts";
 import {
   type FullSpanRow,
@@ -423,5 +424,37 @@ export class TraceSpanStorageClickHouseRepository extends TraceSpanStoragePort {
       UpdatedAt: new Date(),
       _retention_days: span.retentionDays ?? this.options.defaultRetentionDays,
     } satisfies ClickHouseSpanWriteRecord;
+  }
+}
+
+/**
+ * The stored-span read half over the same repository the write half uses.
+ * `stored_spans` has one row shape, one key triple and one partition column,
+ * and a reader that spelled any of the three differently from the writer would
+ * resolve nothing while looking correct. The two exist because the CAPABILITIES
+ * differ - one is the ingestion hot path, the other a redelivery lookup.
+ */
+export class TraceStoredSpanReaderClickHouseRepository extends TraceStoredSpanReaderPort {
+  private constructor(private readonly repository: TraceSpanStorageClickHouseRepository) {
+    super();
+  }
+
+  static create(options: {
+    resolveClient: TraceClickHouseWriteResolver;
+    /** The fallback stamped on a span that declares no retention of its own. */
+    defaultRetentionDays: number;
+  }): TraceStoredSpanReaderClickHouseRepository {
+    return new TraceStoredSpanReaderClickHouseRepository(
+      TraceSpanStorageClickHouseRepository.create(options),
+    );
+  }
+
+  tryGetNormalizedSpan(input: {
+    tenantId: string;
+    traceId: string;
+    spanId: string;
+    occurredAtMs: number;
+  }): Promise<NormalizedSpan | null> {
+    return this.repository.tryFindNormalizedSpanById(input);
   }
 }

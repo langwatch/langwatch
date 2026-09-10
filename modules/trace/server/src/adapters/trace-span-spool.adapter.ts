@@ -1,5 +1,5 @@
 import { TraceSpanSpoolPort, type TraceSpanSpoolIdentity } from "../ports/trace-span-spool.port.ts";
-import { TraceSpoolService } from "../services/trace-spool.service.ts";
+import { TraceSpoolService } from "../services/ingestion/trace-spool.service.ts";
 
 /**
  * Renames the spool service onto the narrow port `RecordSpanCommand` names.

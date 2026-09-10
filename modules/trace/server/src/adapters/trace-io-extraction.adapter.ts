@@ -5,7 +5,7 @@ import {
   type TraceIoSide,
   type TraceIoValue,
 } from "../ports/trace-io-extraction.port.ts";
-import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
+import { TraceIOExtractionService } from "../services/content/trace-io-extraction.service.ts";
 
 /**
  * The projection's input/output extraction, over this package's own service.

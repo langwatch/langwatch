@@ -28,8 +28,8 @@ import {
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE } from "@langwatch/trace-contract";
-import { OUTPUT_SOURCE } from "../services/trace-io-accumulation.service.ts";
-import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
+import { OUTPUT_SOURCE } from "../services/content/trace-io-accumulation.service.ts";
+import { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
 import { trimAttributesForAnalytics } from "../rules/analytics-attribute-trim.rules.ts";
 import { anchorStorageTime, firstUsableAnchor } from "../rules/trace-storage-anchor.rules.ts";
 import {

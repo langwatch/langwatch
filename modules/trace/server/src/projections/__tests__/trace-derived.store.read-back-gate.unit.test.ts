@@ -12,7 +12,7 @@ import {
   TraceAnalyticsProjectionPort,
   type TraceAnalyticsProjectionEntry,
 } from "../../ports/trace-analytics-projection.port.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -52,7 +52,7 @@ function project(state: TraceAnalyticsData): TraceAnalyticsRow {
 function storeOver(row: TraceAnalyticsRow): TraceAnalyticsStore {
   const storage = new (class extends TraceAnalyticsProjectionPort {
     async upsert(): Promise<void> {}
-    async tryFindByTraceId() {
+    async findByTraceId() {
       return { row, appliedEventIds: ["evt-1", "evt-2"] };
     }
   })();
@@ -173,7 +173,7 @@ describe("TraceAnalyticsStore dimension-only signal", () => {
       async upsert(entry: TraceAnalyticsProjectionEntry): Promise<void> {
         rows.push(entry.row);
       }
-      async tryFindByTraceId() {
+      async findByTraceId() {
         const row = rows[rows.length - 1];
         return row ? { row, appliedEventIds: [] } : null;
       }

@@ -8,7 +8,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { ResponsesWithResolver } from "hono-openapi";
 import { z } from "zod";
 
-import { traceMetadataUpdateSchema } from "#services/trace-metadata-write.service";
+import { traceMetadataUpdateSchema } from "#services/support/trace-metadata-write.service";
 
 export const logger: Logger = createLogger("langwatch:api:traces");
 

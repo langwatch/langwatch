@@ -3,9 +3,11 @@ import type { EventingClickHouseClientResolver } from "@langwatch/eventing/serve
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
-  ClickHouseTraceProjectionStorageAdapter,
+  TraceAnalyticsClickHouseRepository,
+  TraceAnalyticsRollupClickHouseRepository,
   TraceAnalyticsRollupStore,
   TraceAnalyticsStore,
+  TraceSummaryProjectionClickHouseRepository,
   TraceSummaryStore,
   type TraceAnalyticsData,
 } from "@langwatch/trace-server";
@@ -62,11 +64,11 @@ export function createWorkerTraceProjectionStores(options: {
   };
 
   const durableSummary = TraceSummaryStore.create({
-    storage: ClickHouseTraceProjectionStorageAdapter.createSummary(storage),
+    storage: TraceSummaryProjectionClickHouseRepository.create(storage),
     defaultRetentionDays: options.defaultRetentionDays,
   });
   const durableAnalytics = TraceAnalyticsStore.create({
-    storage: ClickHouseTraceProjectionStorageAdapter.createAnalytics(storage),
+    storage: TraceAnalyticsClickHouseRepository.create(storage),
     defaultRetentionDays: options.defaultRetentionDays,
   });
 
@@ -74,7 +76,7 @@ export function createWorkerTraceProjectionStores(options: {
     traceSummaryStore: cached(durableSummary, "trace_summaries", options),
     traceAnalyticsStore: cached(durableAnalytics, "trace_analytics", options),
     traceAnalyticsRollupAppendStore: TraceAnalyticsRollupStore.create({
-      storage: ClickHouseTraceProjectionStorageAdapter.createAnalyticsRollup(storage),
+      storage: TraceAnalyticsRollupClickHouseRepository.create(storage),
       defaultRetentionDays: options.defaultRetentionDays,
     }),
   };

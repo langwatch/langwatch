@@ -20,7 +20,7 @@ import {
   projectionRequestSchema,
 } from "@langwatch/trace-contract";
 import type { TraceDateField } from "@langwatch/trace-contract";
-import type { TraceMetadataUpdate } from "#services/trace-metadata-write.service";
+import type { TraceMetadataUpdate } from "#services/support/trace-metadata-write.service";
 
 import { registerTracesSearchRoute } from "./traces-search.api.ts";
 import {

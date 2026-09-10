@@ -1,13 +1,13 @@
-import { TraceWindowedReadService } from "../../services/trace-windowed-read.service.ts";
-import { TraceSpanCostMatchingService } from "../../services/trace-span-cost-matching.service.ts";
-import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service.ts";
+import { TraceWindowedReadService } from "../../services/read/trace-windowed-read.service.ts";
+import { TraceSpanCostMatchingService } from "../../services/span/trace-span-cost-matching.service.ts";
+import { TraceLegacySpanMappingService } from "../../services/read/trace-legacy-span-mapping.service.ts";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   RESOLVER_RECENT_WINDOW_MS,
   type WindowFragment,
-} from "../../services/trace-windowed-read.service.ts";
+} from "../../services/read/trace-windowed-read.service.ts";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "../../ports/clickhouse.port.ts";
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NormalizedSpan, TraceSummaryData } from "@langwatch/trace-contract";
-import { SpanCostService } from "../../services/span-cost.service.ts";
+import { SpanCostService } from "../../services/span/span-cost.service.ts";
 import { ModelCatalogTraceModelCostAdapter } from "../model-catalog.trace-model-cost.adapter.ts";
 
 const service = SpanCostService.create({

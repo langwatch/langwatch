@@ -29,7 +29,7 @@ import {
 } from "../projections/trace-rollup.projection.ts";
 import { SpanStorageMapProjection } from "../projections/span-storage.projection.ts";
 import { TraceSummaryFoldProjection } from "../projections/trace-summary.projection.ts";
-import { TraceProjectionRuntimeService } from "../services/trace-projection-runtime.service.ts";
+import { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
 import {
   EventingRecordSpanAdapter,
   RECORD_SPAN_DEDUPLICATION,

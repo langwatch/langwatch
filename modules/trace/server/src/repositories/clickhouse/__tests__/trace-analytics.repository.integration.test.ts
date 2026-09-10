@@ -106,7 +106,7 @@ integration("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () 
       // nicety. The batch path is used here only because it is the store's.
       await repo.upsertBatch([{ row, retentionDays: 30 }]);
 
-      const read = await repo.tryFindByTraceIdWithApplied({
+      const read = await repo.findByTraceId({
         tenantId,
         traceId: `${tag}-rt`,
         window,
@@ -155,7 +155,7 @@ integration("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () 
         },
       ]);
 
-      const read = await repo.tryFindByTraceIdWithApplied({
+      const read = await repo.findByTraceId({
         tenantId,
         traceId: `${tag}-dedup`,
         window,
@@ -171,7 +171,7 @@ integration("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () 
       const row = traceRow({ traceId: `${tag}-applied` });
       await repo.upsertBatch([{ row, retentionDays: 30, appliedEventIds: ["ev-1", "ev-2"] }]);
 
-      const read = await repo.tryFindByTraceIdWithApplied({
+      const read = await repo.findByTraceId({
         tenantId,
         traceId: `${tag}-applied`,
         window,
@@ -200,7 +200,7 @@ integration("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () 
         format: "JSONEachRow",
       });
 
-      const read = await repo.tryFindByTraceIdWithApplied({
+      const read = await repo.findByTraceId({
         tenantId,
         traceId,
         window,

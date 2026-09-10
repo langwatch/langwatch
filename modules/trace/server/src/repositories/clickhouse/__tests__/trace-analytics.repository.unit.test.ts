@@ -89,7 +89,7 @@ describe("TraceAnalyticsClickHouseRepository DateTime64 decode", () => {
           UpdatedAt: "2026-07-24 12:00:02.500",
         });
 
-        const read = await repository.tryFindByTraceIdWithApplied({
+        const read = await repository.findByTraceId({
           tenantId: TENANT_ID,
           traceId: TRACE_ID,
         });
@@ -131,7 +131,7 @@ describe("TraceAnalyticsClickHouseRepository tied-version read", () => {
           }),
         ]);
 
-        const read = await repository.tryFindByTraceIdWithApplied({
+        const read = await repository.findByTraceId({
           tenantId: TENANT_ID,
           traceId: TRACE_ID,
         });
@@ -159,7 +159,7 @@ describe("TraceAnalyticsClickHouseRepository tied-version read", () => {
           }),
         ]);
 
-        const read = await repository.tryFindByTraceIdWithApplied({
+        const read = await repository.findByTraceId({
           tenantId: TENANT_ID,
           traceId: TRACE_ID,
         });
@@ -193,7 +193,7 @@ describe("TraceAnalyticsClickHouseRepository tied-version read", () => {
           }),
         ]);
 
-        const read = await repository.tryFindByTraceIdWithApplied({
+        const read = await repository.findByTraceId({
           tenantId: TENANT_ID,
           traceId: TRACE_ID,
         });
@@ -225,7 +225,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
           }),
         ]);
 
-        await repository.tryFindByTraceIdWithApplied({
+        await repository.findByTraceId({
           tenantId: TENANT_ID,
           traceId: TRACE_ID,
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
@@ -251,7 +251,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
         });
         const { repository } = makeOrderingRepository([]);
 
-        await repository.tryFindByTraceIdWithApplied({
+        await repository.findByTraceId({
           tenantId: TENANT_ID,
           traceId: TRACE_ID,
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
@@ -269,7 +269,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
         // width lands the halves on .5 and still has to reconstruct exactly.
         const { repository, seen } = makeOrderingRepository([]);
 
-        await repository.tryFindByTraceIdWithApplied({
+        await repository.findByTraceId({
           tenantId: TENANT_ID,
           traceId: TRACE_ID,
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
@@ -285,7 +285,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
         // non-null answer no fallback can catch.
         const { repository, seen } = makeOrderingRepository([]);
 
-        await repository.tryFindByTraceIdWithApplied({
+        await repository.findByTraceId({
           tenantId: TENANT_ID,
           traceId: TRACE_ID,
           window: { fromMs: 1_750_000_000_000, toMs: 1_750_000_345_679 },
@@ -311,7 +311,7 @@ describe("TraceAnalyticsClickHouseRepository windowed read", () => {
         });
         const { repository, seen } = makeOrderingRepository([]);
 
-        await repository.tryFindByTraceIdWithApplied({
+        await repository.findByTraceId({
           tenantId: TENANT_ID,
           traceId: TRACE_ID,
         });
@@ -379,7 +379,7 @@ describe("TraceAnalyticsClickHouseRepository insert settings", () => {
           defaultRetentionDays: 30,
         });
 
-        await repository.upsert(ROW);
+        await repository.upsert({ row: ROW });
 
         expect(inserts[0]?.clickhouse_settings).toMatchObject({
           input_format_skip_unknown_fields: 0,

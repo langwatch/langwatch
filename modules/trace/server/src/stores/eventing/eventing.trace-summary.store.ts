@@ -70,7 +70,7 @@ export class TraceSummaryStore implements FoldProjectionStore<TraceSummaryData> 
     // retries a windowed miss without the window, which lands on the
     // repository's resolve-OccurredAt path — so correctness never depends on
     // the width, and no layer runs a second recovery ladder.
-    return await this.storage.tryFindByTraceId({
+    return await this.storage.findByTraceId({
       tenantId: String(context.tenantId),
       traceId: aggregateId,
       window: context.readWindow,

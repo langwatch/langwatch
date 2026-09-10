@@ -7,7 +7,7 @@ import {
 // From the port that defines them: an in-package test does not need the
 // package's public surface, and `index.ts` publishes what CONSUMERS import.
 import type { TraceClickHouseClient, TraceClickHouseResolver } from "../ports/clickhouse.port.ts";
-import { ClickHouseTraceAdapter } from "../index.ts";
+import { TraceTreeComposition } from "../index.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 import { describe, expect, it } from "vitest";
 import { TestModelProviderService } from "../ports/__tests__/support/model-provider.service.fake.ts";
@@ -69,10 +69,10 @@ const resolver =
     },
   });
 
-describe("ClickHouseTraceAdapter", () => {
+describe("TraceTreeComposition", () => {
   it("constructs concrete repositories behind the public adapter", async () => {
     const calls: Array<{ tenantId: string; sql: string }> = [];
-    const service = ClickHouseTraceAdapter.create({
+    const service = TraceTreeComposition.create({
       resolveClient: resolver(calls),
       modelProviders: new TestModelProviderService(),
       queryFieldValues: new EmptyQueryFieldValues(),
@@ -105,7 +105,7 @@ describe("ClickHouseTraceAdapter", () => {
   it("preserves the full node wire shape while pricing a missing stored cost", async () => {
     const calls: Array<{ tenantId: string; sql: string }> = [];
     const modelProviders = new TestModelProviderService(0.47);
-    const service = ClickHouseTraceAdapter.create({
+    const service = TraceTreeComposition.create({
       resolveClient: resolver(calls, ""),
       modelProviders,
       queryFieldValues: new EmptyQueryFieldValues(),

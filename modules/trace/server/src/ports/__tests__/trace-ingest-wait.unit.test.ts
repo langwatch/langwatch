@@ -7,7 +7,7 @@ import {
   type TraceSpanPage,
   type TraceSpanSummaryRecord,
 } from "../trace.port.ts";
-import { TraceService } from "../../services/trace.service.ts";
+import { TraceService } from "../../services/support/trace.service.ts";
 import { TestModelProviderService } from "./support/model-provider.service.fake.ts";
 import { TestTraceQueryClassification } from "./support/query-classification.fake.ts";
 import { traceReadPorts } from "./support/trace-read-ports.fake.ts";

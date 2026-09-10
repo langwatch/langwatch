@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { SpanStorageClickHouseRepository } from "../../repositories/clickhouse/span-storage.repository.ts";
 import type { SpanSummaryQueryRow } from "../../repositories/clickhouse/span-storage.repository.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 import { SpanStorageMapProjection } from "../span-storage.projection.ts";
 import { TraceAnalyticsFoldProjection } from "../trace-derived.projection.ts";
 import { TraceAnalyticsRollupMapProjection } from "../trace-rollup.projection.ts";

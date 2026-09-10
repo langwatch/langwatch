@@ -98,7 +98,7 @@ export class TraceAnalyticsStore implements FoldProjectionStore<TraceAnalyticsDa
     appliedEventIds: string[];
     miss?: "absent" | "undecodable";
   }> {
-    const found = await this.storage.tryFindByTraceId({
+    const found = await this.storage.findByTraceId({
       tenantId: String(context.tenantId),
       traceId: aggregateId,
       window: context.readWindow,

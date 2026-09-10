@@ -1,9 +1,9 @@
-import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../../services/canonicalisers/trace-canonicalisation.service.ts";
 import { TraceIoExtractionAdapter } from "../../../adapters/trace-io-extraction.adapter.ts";
 import { TraceMediaReferenceAdapter } from "../../../adapters/trace-media-reference.adapter.ts";
 import { ModelCatalogTraceModelCostAdapter } from "../../../adapters/model-catalog.trace-model-cost.adapter.ts";
 import { TraceSpanNormalizationAdapter } from "../../../adapters/trace-span-normalization.adapter.ts";
-import { TraceProjectionRuntimeService } from "../../../services/trace-projection-runtime.service.ts";
+import { TraceProjectionRuntimeService } from "../../../services/projection/trace-projection-runtime.service.ts";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { NormalizedSpan, OtlpSpan, SpanReceivedEvent } from "@langwatch/trace-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CanonicalAttributes, CanonicalEvent } from "@langwatch/trace-contract";
-import { canonicalisation } from "../../services/__tests__/canonicalisation/test-helpers.ts";
+import { canonicalisation } from "../../services/canonicalisers/coding-agent/__tests__/canonicalisation/test-helpers.ts";
 import type { ExtractorContext } from "../canonical-attributes.port.ts";
 
 import codexBSpan from "./fixtures/codex-b.session-task-turn.json";

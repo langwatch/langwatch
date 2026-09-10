@@ -1,12 +1,16 @@
-export { TraceSpanCostMatchingService } from "./services/trace-span-cost-matching.service.ts";
-export { ClickHouseTraceAdapter } from "./adapters/clickhouse.trace.adapter.ts";
-export { TraceCanonicalisationService } from "./services/trace-canonicalisation.service.ts";
+export { TraceSpanCostMatchingService } from "./services/span/trace-span-cost-matching.service.ts";
+export {
+  TraceTreeComposition,
+  type TraceTreeCompositionOptions,
+  type TraceTreeService,
+} from "./app/trace-tree.composition.ts";
+export { TraceCanonicalisationService } from "./services/canonicalisers/trace-canonicalisation.service.ts";
 /**
  * The platform's retention policy in the shape the ClickHouse package asks for. Exported because
  * Evaluation's own ClickHouse repository takes the same floor port, and a second floor would let
  * a trace and the evaluations behind it disagree about how far back a project's rows go.
  */
-export { TraceRetentionFloorService } from "./services/trace-retention-floor.service.ts";
+export { TraceRetentionFloorService } from "./services/support/trace-retention-floor.service.ts";
 export { NullTraceListAdapter } from "./repositories/memory/null-trace-list.adapter.ts";
 export {
   EventingTracePipelineAdapter,
@@ -65,8 +69,8 @@ export {
   TRACKED_EVENT_SYNC_DELAY_MS,
   TrackedEventSync,
 } from "./subscribers/tracked-event-sync.subscriber.ts";
-export { OtlpAttributeFlatteningService } from "./services/otlp-attribute-flattening.service.ts";
-export { SpanRecordIdentityService } from "./services/span-record-identity.service.ts";
+export { OtlpAttributeFlatteningService } from "./services/attribute/otlp-attribute-flattening.service.ts";
+export { SpanRecordIdentityService } from "./services/span/span-record-identity.service.ts";
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository.ts";
 export { TraceSummaryClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository.ts";
 export {
@@ -124,18 +128,17 @@ export { TraceSpanStorageClickHouseRepository } from "./repositories/clickhouse/
 export { TraceStoredSpanReaderPort } from "./ports/trace-stored-span-reader.port.ts";
 export { TraceDerivationSpanReaderPort } from "./ports/trace-derivation-span-reader.port.ts";
 export { TraceDerivationSpanClickHouseRepository } from "./repositories/clickhouse/trace-derivation-span.repository.ts";
-export { TraceEventDerivationService } from "./services/trace-event-derivation.service.ts";
+export { TraceEventDerivationService } from "./services/ingestion/trace-event-derivation.service.ts";
 export {
   ScenarioRoleMetricsDerivationService,
   type ScenarioRoleMetricsDerivationInput,
-} from "./services/scenario-role-metrics-derivation.service.ts";
-export { TraceSpanCollectionService } from "./services/trace-ingestion.service.ts";
-export { TrackedEventSpanService } from "./services/tracked-event-span.service.ts";
-export {
-  ClickHouseTraceProjectionStorageAdapter,
-  type ClickHouseTraceProjectionStorageOptions,
-} from "./adapters/clickhouse.trace-projection-storage.adapter.ts";
-export { ClickHouseTraceStoredSpanReaderAdapter } from "./adapters/clickhouse.trace-stored-span-reader.adapter.ts";
+} from "./services/support/scenario-role-metrics-derivation.service.ts";
+export { TraceSpanCollectionService } from "./services/ingestion/trace-ingestion.service.ts";
+export { TrackedEventSpanService } from "./services/span/tracked-event-span.service.ts";
+export { TraceSummaryProjectionClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository.ts";
+export { TraceAnalyticsClickHouseRepository } from "./repositories/clickhouse/trace-metrics-analytics.repository.ts";
+export { TraceAnalyticsRollupClickHouseRepository } from "./repositories/clickhouse/trace-analytics-rollup.repository.ts";
+export { TraceStoredSpanReaderClickHouseRepository } from "./repositories/clickhouse/trace-span-storage.repository.ts";
 export {
   TraceAnalyticsProjectionPort,
   type TraceAnalyticsProjectionEntry,
@@ -170,7 +173,7 @@ export { SpanStorageStore } from "./stores/eventing/eventing.span-storage.store.
 export { TraceAnalyticsStore } from "./stores/eventing/eventing.trace-derived.store.ts";
 export { TraceAnalyticsRollupStore } from "./stores/eventing/eventing.trace-rollup.store.ts";
 export { TraceSummaryStore } from "./stores/eventing/eventing.trace-summary.store.ts";
-export { SpanCostService } from "./services/span-cost.service.ts";
+export { SpanCostService } from "./services/span/span-cost.service.ts";
 export {
   TraceIngestionService,
   TraceIngressCommandPort,
@@ -178,8 +181,8 @@ export {
   TraceSpanDedupPort,
   type CodingAgentIngestFilter,
   type SpanDedupRef,
-} from "./services/trace-ingestion.service.ts";
-export { TraceAttributeCapService } from "./services/trace-attribute-cap.service.ts";
+} from "./services/ingestion/trace-ingestion.service.ts";
+export { TraceAttributeCapService } from "./services/attribute/trace-attribute-cap.service.ts";
 export {
   capPayloadString,
   DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
@@ -197,20 +200,20 @@ export {
   TRACE_SPAN_MAP_COALESCE_MAX_BATCH,
 } from "./rules/trace-span-storage-group.rules.ts";
 export { trimAttributesForAnalytics } from "./rules/analytics-attribute-trim.rules.ts";
-export { TraceAttributeAccumulationService } from "./services/trace-attribute-accumulation.service.ts";
-export { TraceAttributeExtractionService } from "./services/trace-attribute-extraction.service.ts";
-export { TraceOriginService } from "./services/trace-origin.service.ts";
-export { TraceIOAccumulationService } from "./services/trace-io-accumulation.service.ts";
-export { TraceLogRecordIOService } from "./services/trace-log-record-io.service.ts";
+export { TraceAttributeAccumulationService } from "./services/attribute/trace-attribute-accumulation.service.ts";
+export { TraceAttributeExtractionService } from "./services/attribute/trace-attribute-extraction.service.ts";
+export { TraceOriginService } from "./services/read/trace-origin.service.ts";
+export { TraceIOAccumulationService } from "./services/content/trace-io-accumulation.service.ts";
+export { TraceLogRecordIOService } from "./services/log/trace-log-record-io.service.ts";
 
-export { SpanTimingService } from "./services/span-timing.service.ts";
+export { SpanTimingService } from "./services/span/span-timing.service.ts";
 
-export { TraceProjectionRuntimeService } from "./services/trace-projection-runtime.service.ts";
+export { TraceProjectionRuntimeService } from "./services/projection/trace-projection-runtime.service.ts";
 export {
   IO_ATTR_KEYS,
   IO_PREVIEW_BYTES,
   TraceProjectionLeanService,
-} from "./services/trace-projection-lean.service.ts";
+} from "./services/projection/trace-projection-lean.service.ts";
 export { TraceProjectionLeanEventingAdapter } from "./adapters/eventing.trace-projection-lean.adapter.ts";
 export { TraceIoExtractionAdapter } from "./adapters/trace-io-extraction.adapter.ts";
 export { TraceSpanNormalizationAdapter } from "./adapters/trace-span-normalization.adapter.ts";
@@ -231,8 +234,8 @@ export {
   type TracesTopicReader,
   type TracesTrpcEmitters,
 } from "./app/trace.app.ts";
-export { TraceViewerProtectionsService } from "./services/trace-viewer-protections.service.ts";
-export { TraceAttributeRedactionService } from "./services/trace-attribute-redaction.service.ts";
+export { TraceViewerProtectionsService } from "./services/viewer/trace-viewer-protections.service.ts";
+export { TraceAttributeRedactionService } from "./services/attribute/trace-attribute-redaction.service.ts";
 export {
   deserializeAttributes,
   ensureStringRecord,
@@ -240,7 +243,7 @@ export {
   mapChRowToNormalized,
   serializeAttributes,
 } from "./repositories/clickhouse/stored-span-row.mapper.ts";
-export { SpanNormalizationPipelineService } from "./services/span-normalization.service.ts";
+export { SpanNormalizationPipelineService } from "./services/span/span-normalization.service.ts";
 export {
   TraceSpoolLegacyObjectPort,
   TraceSpoolStoragePort,
@@ -252,14 +255,14 @@ export {
   TraceSpoolService,
   type TraceSpoolIdentity,
   type TraceSpoolServiceOptions,
-} from "./services/trace-spool.service.ts";
-export { TraceEdgeSpoolService } from "./services/trace-edge-spool.service.ts";
-export { TraceEdgeMediaPayloadService } from "./services/trace-edge-media-payload.service.ts";
+} from "./services/ingestion/trace-spool.service.ts";
+export { TraceEdgeSpoolService } from "./services/edge/trace-edge-spool.service.ts";
+export { TraceEdgeMediaPayloadService } from "./services/edge/trace-edge-media-payload.service.ts";
 export { SPOOL_REF_V2 } from "./rules/trace-spool-location.rules.ts";
 export {
   StreamTooLargeError,
   TraceStreamBufferService,
-} from "./services/trace-stream-buffer.service.ts";
+} from "./services/ingestion/trace-stream-buffer.service.ts";
 export { TraceSpanSpoolAdapter } from "./adapters/trace-span-spool.adapter.ts";
 export {
   ClickHouseTraceEventPayloadRepository,
@@ -269,7 +272,7 @@ export { TraceTokenCounterPort } from "./ports/trace-token-counter.port.ts";
 export {
   OtlpSpanTokenEstimationService,
   type OtlpSpanTokenEstimationServiceDependencies,
-} from "./services/span-token-estimation.service.ts";
+} from "./services/span/span-token-estimation.service.ts";
 export { TraceSpanTokenEstimationAdapter } from "./adapters/trace-span-token-estimation.adapter.ts";
 export { TraceProjectMetadataPort } from "./ports/trace-project-metadata.port.ts";
 export { TraceModelCostCatalogPort } from "./ports/trace-model-cost-catalog.port.ts";
@@ -289,7 +292,7 @@ export {
   EVALUATOR_LOOP_BLOCKED_REASON_LABEL,
   OtelTraceEvaluationLoopMetricsAdapter,
 } from "./adapters/otel.trace-evaluation-loop-metrics.adapter.ts";
-export { OtlpSpanCostEnrichmentService } from "./services/span-cost-enrichment.service.ts";
+export { OtlpSpanCostEnrichmentService } from "./services/span/span-cost-enrichment.service.ts";
 export { TraceSpanCostEnrichmentAdapter } from "./adapters/trace-span-cost-enrichment.adapter.ts";
 export { TraceEvaluationDispatchPort } from "./ports/trace-evaluation-dispatch.port.ts";
 export {
@@ -302,7 +305,7 @@ export { ClickHouseTraceExistenceRepository } from "./repositories/clickhouse/tr
 export {
   TraceEditOverlayService,
   type TraceEditIOField,
-} from "./services/trace-edit-overlay.service.ts";
+} from "./services/edit-overlay/trace-edit-overlay.service.ts";
 export { TraceProcessingProducerAdapter } from "./adapters/trace-processing-producer.adapter.ts";
 
 // The ClickHouse trace READ stack: everything a captured trace passes
@@ -313,16 +316,13 @@ export { TraceProcessingProducerAdapter } from "./adapters/trace-processing-prod
 export {
   TraceLegacyReadClickHouseRepository,
   type TraceLegacyFilterConditions,
-} from "./repositories/clickhouse/trace-legacy-read.repository.ts";
-export {
-  ClickHouseTraceLegacyReadAdapter,
   type ClickHouseTraceLegacyReadOptions,
-} from "./adapters/clickhouse.trace-legacy-read.adapter.ts";
+} from "./repositories/clickhouse/trace-legacy-read.repository.ts";
 export type { TraceEditOverlayRow } from "./repositories/trace-edit-overlay.repository.ts";
 export {
   TraceService as TraceLegacyReadService,
   type BlobResolutionDeps,
-} from "./services/trace-legacy-read.service.ts";
+} from "./services/read/trace-legacy-read.service.ts";
 export type {
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
@@ -330,11 +330,11 @@ export type {
   TraceDateField,
   TraceSharedFiltersInput,
 } from "@langwatch/trace-contract";
-export { TraceListService } from "./services/trace-list-read.service.ts";
-export { SessionGroupsService } from "./services/trace-session-groups.service.ts";
-export { SpanStorageService } from "./services/trace-span-storage-read.service.ts";
-export { TraceSummaryService } from "./services/trace-summary-read.service.ts";
-export { LogRecordStorageService } from "./services/trace-log-record-read.service.ts";
+export { TraceListService } from "./services/read/trace-list-read.service.ts";
+export { SessionGroupsService } from "./services/session/trace-session-groups.service.ts";
+export { SpanStorageService } from "./services/offload/trace-span-storage-read.service.ts";
+export { TraceSummaryService } from "./services/read/trace-summary-read.service.ts";
+export { LogRecordStorageService } from "./services/log/trace-log-record-read.service.ts";
 export {
   NullSpanStorageRepository,
   type SpanStorageRepository,
@@ -355,41 +355,41 @@ export {
   type S3ClientResolution,
   type S3ClientResolver,
   type SpoolStorage,
-} from "./services/trace-blob-store.service.ts";
-export { TraceIOExtractionService } from "./services/trace-io-extraction.service.ts";
-export { TraceReadableSpanService } from "./services/trace-readable-span.service.ts";
-export { VisibilityWindowService } from "./services/trace-visibility-window.service.ts";
-export { TraceWindowedReadService } from "./services/trace-windowed-read.service.ts";
-export { TraceTtlCacheService, type TraceCacheRedis } from "./services/trace-ttl-cache.service.ts";
+} from "./services/offload/trace-blob-store.service.ts";
+export { TraceIOExtractionService } from "./services/content/trace-io-extraction.service.ts";
+export { TraceReadableSpanService } from "./services/read/trace-readable-span.service.ts";
+export { VisibilityWindowService } from "./services/viewer/trace-visibility-window.service.ts";
+export { TraceWindowedReadService } from "./services/read/trace-windowed-read.service.ts";
+export { TraceTtlCacheService, type TraceCacheRedis } from "./services/support/trace-ttl-cache.service.ts";
 export { TraceSpanIngestPort } from "./ports/trace-span-ingest.port.ts";
 export {
   TraceMetadataWriteService,
   traceMetadataUpdateSchema,
   type TraceMetadataUpdate,
-} from "./services/trace-metadata-write.service.ts";
+} from "./services/support/trace-metadata-write.service.ts";
 export {
   TraceAiQueryService,
   type AiQueryInput,
   type AiQueryModelResolver,
-} from "./services/trace-ai-query.service.ts";
+} from "./services/query/trace-ai-query.service.ts";
 export {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
-} from "./services/trace-log-content-derivation.service.ts";
-export { ClaudeCodeLogEnrichmentService } from "./services/claude-code-log-enrichment.service.ts";
+} from "./services/log/trace-log-content-derivation.service.ts";
+export { ClaudeCodeLogEnrichmentService } from "./services/canonicalisers/coding-agent/claude-code-log-enrichment.service.ts";
 export type { ClaudeSpanRef } from "./rules/claude-code-message-index.rules.ts";
-export { TraceReadRedactionService } from "./services/trace-read-redaction.service.ts";
-export { TraceEditOverlayRedactionService } from "./services/trace-edit-overlay-redaction.service.ts";
-export { TraceEditOverlayRestoreService } from "./services/trace-edit-overlay-restore.service.ts";
-export { TraceCollectorSpanService } from "./services/trace-collector-span.service.ts";
+export { TraceReadRedactionService } from "./services/read/trace-read-redaction.service.ts";
+export { TraceEditOverlayRedactionService } from "./services/edit-overlay/trace-edit-overlay-redaction.service.ts";
+export { TraceEditOverlayRestoreService } from "./services/edit-overlay/trace-edit-overlay-restore.service.ts";
+export { TraceCollectorSpanService } from "./services/span/trace-collector-span.service.ts";
 
-export type { TraceRequestCollectionResult } from "./services/trace-ingestion.service.ts";
+export type { TraceRequestCollectionResult } from "./services/ingestion/trace-ingestion.service.ts";
 
 // The download half of the trace read: streaming CSV/JSONL export — the
 // batched read, the two serialisers, the evaluation merge every reader
 // shares, and the two refusals the transport publishes. filters is joined
 // to the analytics schema at the mount; see trace-export.vocabulary.ts.
-export { TraceExportService } from "./services/trace-export.service.ts";
+export { TraceExportService } from "./services/query/trace-export.service.ts";
 export {
   exportFormatSchema,
   exportModeSchema,
@@ -423,41 +423,41 @@ export {
   TraceEdgeMediaExtractionService,
   type EdgeMediaExtractionDeps,
   type EdgeMediaExtractionLogger,
-} from "./services/trace-edge-media-extraction.service.ts";
+} from "./services/edge/trace-edge-media-extraction.service.ts";
 export {
   TraceEdgeMediaTelemetryPort,
   TraceMediaStorePort,
   type TraceEdgeMediaFailOpenReason,
 } from "./ports/trace-media-store.port.ts";
-export { TraceContentArrayService } from "./services/trace-content-array.service.ts";
+export { TraceContentArrayService } from "./services/content/trace-content-array.service.ts";
 export { binaryInputPartSchema } from "./rules/content-part-extraction.rules.ts";
-export { TraceContentExtractionService } from "./services/trace-content-extraction.service.ts";
+export { TraceContentExtractionService } from "./services/content/trace-content-extraction.service.ts";
 export type { ExtractedRef } from "./rules/content-part-extraction.rules.ts";
 export {
   TraceValueMediaExtractionService,
   type ExtractionBudget,
-} from "./services/trace-value-media-extraction.service.ts";
+} from "./services/content/trace-value-media-extraction.service.ts";
 
 /** The agent-readable rendering of a trace. Was `server/traces/trace-formatting.ts`. */
-export { TraceFormattingService } from "./services/trace-formatting.service.ts";
+export { TraceFormattingService } from "./services/support/trace-formatting.service.ts";
 export {
   TraceViewerProtectionService,
   type TraceViewerProtectionOptions,
-} from "./services/trace-viewer-protection.service.ts";
+} from "./services/viewer/trace-viewer-protection.service.ts";
 export {
   TraceViewerReadService,
   type TraceViewerServiceOptions,
-} from "./services/trace-viewer.service.ts";
-export { TraceContentReadServiceImpl } from "./services/trace-content-read.service.ts";
+} from "./services/viewer/trace-viewer.service.ts";
+export { TraceContentReadServiceImpl } from "./services/content/trace-content-read.service.ts";
 
 /** The REST projection compiler. Was `server/traces/projection/**`. */
-export { TraceProjectionCompileService } from "./services/trace-projection-compile.service.ts";
+export { TraceProjectionCompileService } from "./services/projection/trace-projection-compile.service.ts";
 export {
   TraceProjectionCatalogService,
   type FieldProtection,
   type ProjectionSource,
   type ResolvedField,
-} from "./services/trace-projection-catalog.service.ts";
+} from "./services/projection/trace-projection-catalog.service.ts";
 export {
   projectionRequestSchema,
   type CompiledProjection,

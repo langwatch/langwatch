@@ -3,7 +3,7 @@ import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,

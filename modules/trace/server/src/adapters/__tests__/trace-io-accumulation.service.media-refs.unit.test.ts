@@ -9,8 +9,8 @@ import {
   type TraceIoSide,
   type TraceIoValue,
 } from "../../ports/trace-io-extraction.port.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
-import { TraceIOAccumulationService } from "../../services/trace-io-accumulation.service.ts";
+import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
+import { TraceIOAccumulationService } from "../../services/content/trace-io-accumulation.service.ts";
 
 type Rich = { raw: unknown; text: string; source: "gen_ai" | "langwatch" };
 

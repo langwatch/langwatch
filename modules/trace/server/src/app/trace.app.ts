@@ -5,7 +5,7 @@ import {
   type RecordCapturedSpanInput,
 } from "@langwatch/trace-contract";
 import type { TraceSpanIngestPort } from "../ports/trace-span-ingest.port.ts";
-import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
+import { TraceCollectorSpanService } from "../services/span/trace-collector-span.service.ts";
 /**
  * The trace feature's application: the one typed thing every door is given, replacing five previously-private bags (SpansApplication, TracesApplication, TraceEditOverlayApplication, SharedTraceApplication, TracesV2Application) that agreed by attention, not construction, and couldn't see each other's declarations. What lives here as a rule rather than a service's own concern: attribution (changeTraceName + reviewer-correction stamp the caller as an argument, not a session read, so one op serves a browser/API-key/job caller alike); full resolution (#4991: a content-consuming read resolves offloads, a listing read stays on preview); the partition-pruning hint (occurredAtMs must be OMITTED, never undefined); the visibility-window verdict; and the sample draw (list ids, then read those traces in full). A door may still shape its own paging/limits/redactions, but not decide privately what the application does.
  */
@@ -69,10 +69,10 @@ import type {
 } from "@langwatch/trace-contract";
 import type { TraceLegacyReadPort } from "../ports/trace-legacy-read.port.ts";
 import type { TraceExistencePort } from "../ports/trace-existence.port.ts";
-import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
-import { TraceContentReadServiceImpl } from "../services/trace-content-read.service.ts";
-import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
-import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
+import type { TraceViewerProtectionService } from "../services/viewer/trace-viewer-protection.service.ts";
+import { TraceContentReadServiceImpl } from "../services/content/trace-content-read.service.ts";
+import { ClaudeCodeLogEnrichmentService } from "../services/canonicalisers/coding-agent/claude-code-log-enrichment.service.ts";
+import type { TraceService as TraceTreeService } from "../services/support/trace.service.ts";
 import { nowInstant } from "@langwatch/time";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { traceDependencies, type TraceInfrastructure } from "./trace-composition.types.ts";

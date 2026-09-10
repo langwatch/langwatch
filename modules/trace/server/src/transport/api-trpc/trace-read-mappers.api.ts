@@ -24,7 +24,7 @@ import {
   resolveNonBilledCost,
 } from "@langwatch/trace-contract";
 import type { CodingAgentApi, LogContentCategory } from "@langwatch/coding-agent-contract";
-import { TraceAttributeRedactionService } from "../../services/trace-attribute-redaction.service.ts";
+import { TraceAttributeRedactionService } from "../../services/attribute/trace-attribute-redaction.service.ts";
 
 // ---------------------------------------------------------------------------
 // Ports

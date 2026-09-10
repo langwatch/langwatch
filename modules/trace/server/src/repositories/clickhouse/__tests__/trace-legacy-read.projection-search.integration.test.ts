@@ -4,7 +4,7 @@ import type { Protections } from "@langwatch/trace-contract";
  * @integration
  * Integration coverage for the trace search projection DSL (API Export Traces RFC, Track 1) — the END-TO-END projected shape. Proves specs/traces/trace-search-projection.feature against real infra: compiler plans, CH read runs the bounded events JOIN over real stored_spans, annotations JOIN runs via a fake AnnotationService (no PG testcontainer here), and the per-trace projector renders the requested shape.
  */
-import { TraceProjectionCompileService } from "../../../services/trace-projection-compile.service.ts";
+import { TraceProjectionCompileService } from "../../../services/projection/trace-projection-compile.service.ts";
 import type { AnnotationScoreName } from "@langwatch/annotation-contract";
 import {
   AnnotationService,
@@ -15,7 +15,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../../services/canonicalisers/trace-canonicalisation.service.ts";
 import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enrichment.rules.ts";
 import type { ProjectableTrace, ProjectionFrom } from "@langwatch/trace-contract";
 import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";

@@ -15,38 +15,38 @@ import {
   type NormalizedSpan,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { ClickHouseTraceAdapter } from "../adapters/clickhouse.trace.adapter.ts";
+import { TraceTreeComposition } from "./trace-tree.composition.ts";
 import { TraceDerivationSpanClickHouseRepository } from "../repositories/clickhouse/trace-derivation-span.repository.ts";
 import { ClickHouseTraceExistenceRepository } from "../repositories/clickhouse/trace-existence.repository.ts";
-import { ClickHouseTraceLegacyReadAdapter } from "../adapters/clickhouse.trace-legacy-read.adapter.ts";
+import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import { ClickHouseTraceEventPayloadRepository } from "../repositories/clickhouse/trace-event-payload.repository.ts";
 import { LogRecordStorageClickHouseRepository } from "../repositories/clickhouse/log-record-storage.repository.ts";
-import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
+import { LogRecordStorageService } from "../services/log/trace-log-record-read.service.ts";
 import { SessionGroupsClickHouseRepository } from "../repositories/clickhouse/session-groups.repository.ts";
-import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
+import { SessionGroupsService } from "../services/session/trace-session-groups.service.ts";
 import { SpanStorageClickHouseRepository } from "../repositories/clickhouse/span-storage.repository.ts";
-import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
-import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
-import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
+import { SpanStorageService } from "../services/offload/trace-span-storage-read.service.ts";
+import { TraceEditOverlayService } from "../services/edit-overlay/trace-edit-overlay.service.ts";
+import { TraceEventDerivationService } from "../services/ingestion/trace-event-derivation.service.ts";
 import { TraceFullIoPort } from "../ports/trace-full-io.port.ts";
-import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
-import { TraceService as TraceLegacyReadService } from "../services/trace-legacy-read.service.ts";
+import { TraceIOExtractionService } from "../services/content/trace-io-extraction.service.ts";
+import { TraceService as TraceLegacyReadService } from "../services/read/trace-legacy-read.service.ts";
 import { TraceListClickHouseRepository } from "../repositories/clickhouse/trace-list.repository.ts";
-import { TraceListService } from "../services/trace-list-read.service.ts";
+import { TraceListService } from "../services/read/trace-list-read.service.ts";
 import { TraceQueryClassificationAdapter } from "../adapters/trace-query-classification.adapter.ts";
 import {
   TraceQueryFieldValuesPort,
   type TraceQueryFieldValuesInput,
 } from "../ports/query-field-values.port.ts";
 import { TraceSummaryClickHouseRepository } from "../repositories/clickhouse/trace-summary.repository.ts";
-import { TraceSummaryService } from "../services/trace-summary-read.service.ts";
+import { TraceSummaryService } from "../services/read/trace-summary-read.service.ts";
 import {
   TraceViewerProtectionService,
   type TraceViewerProtectionOptions,
-} from "../services/trace-viewer-protection.service.ts";
-import { TraceViewerReadService } from "../services/trace-viewer.service.ts";
+} from "../services/viewer/trace-viewer-protection.service.ts";
+import { TraceViewerReadService } from "../services/viewer/trace-viewer.service.ts";
 import { type TraceAppDependencies } from "../app/trace.app.ts";
-import { type TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
+import { type TraceBlobStoreService } from "../services/offload/trace-blob-store.service.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { type TraceProcessingCommands } from "../ports/trace-processing-installer.port.ts";
 import { PrismaTraceEditOverlayRepository } from "../repositories/prisma/prisma.trace-edit-overlay.repository.ts";
@@ -90,7 +90,7 @@ export function composeTraceAppDependencies(
   });
   const read = TraceLegacyReadService.create({
     traceCanonicalisation: options.canonicalisation,
-    traceRead: ClickHouseTraceLegacyReadAdapter.create({
+    traceRead: TraceLegacyReadClickHouseRepository.create({
       traceCanonicalisation: options.canonicalisation,
       resolveClickHouseClient: resolve,
       filterConditions: options.filterConditions,
@@ -108,7 +108,7 @@ export function composeTraceAppDependencies(
     topicService: options.topics,
   });
   const protections = TraceViewerProtectionService.create(options.protections);
-  const tree = ClickHouseTraceAdapter.create({
+  const tree = TraceTreeComposition.create({
     resolveClient: resolve,
     modelProviders: options.modelProviders,
     queryFieldValues: TraceReadQueryFieldValues.create(list),

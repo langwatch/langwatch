@@ -9,6 +9,11 @@ import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.t
 import type { TraceWindowedReadMetricsPort } from "../../ports/trace-windowed-read-metrics.port.ts";
 import { firstUsableAnchor } from "../../rules/trace-storage-anchor.rules.ts";
 import type { FindByTraceIdOptions, TraceSummaryRepository } from "../trace-summary.repository.ts";
+import {
+  TraceSummaryProjectionPort,
+  type TraceSummaryProjectionEntry,
+  type TraceSummaryReadWindow,
+} from "../../ports/trace-summary-projection.port.ts";
 import { createTraceSummaryProjectionId } from "./trace-summary-id.mapper.ts";
 import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "./windowed-read.mapper.ts";
 
@@ -683,5 +688,48 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       TraceName: data.traceName,
       _retention_days: retentionDays,
     };
+  }
+}
+
+/**
+ * The trace_summaries projection port over the same ClickHouse repository the
+ * read side uses. The two spell one table, one key triple and one partition
+ * column, so they share the repository on purpose; only the argument shape the
+ * fold writes with differs, and it is reshaped here rather than at a
+ * composition root.
+ */
+export class TraceSummaryProjectionClickHouseRepository extends TraceSummaryProjectionPort {
+  private constructor(private readonly repository: TraceSummaryClickHouseRepository) {
+    super();
+  }
+
+  static create(options: {
+    resolveClient: TraceClickHouseWriteResolver;
+    defaultRetentionDays: number;
+    windowedReadMetrics?: TraceWindowedReadMetricsPort;
+  }): TraceSummaryProjectionClickHouseRepository {
+    return new TraceSummaryProjectionClickHouseRepository(
+      TraceSummaryClickHouseRepository.create(options),
+    );
+  }
+
+  async upsert(entry: TraceSummaryProjectionEntry): Promise<void> {
+    await this.repository.upsert(entry.data, entry.tenantId, entry.retentionDays);
+  }
+
+  override async upsertBatch(entries: TraceSummaryProjectionEntry[]): Promise<void> {
+    if (entries.length === 0) return;
+    await this.repository.upsertBatch(entries);
+  }
+
+  async findByTraceId(input: {
+    tenantId: string;
+    traceId: string;
+    window?: TraceSummaryReadWindow;
+  }): Promise<TraceSummaryData | null> {
+    return await this.repository.tryFindByTraceId(
+      { tenantId: input.tenantId, traceId: input.traceId },
+      { window: input.window },
+    );
   }
 }

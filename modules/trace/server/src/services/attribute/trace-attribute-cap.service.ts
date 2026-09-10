@@ -1,0 +1,353 @@
+/**
+ * capOversizedAttributes — bounds the byte-size of incoming span attribute
+ * values at ingestion, before a span enters the event-sourcing fold state.
+ *
+ * Why this exists
+ * ---------------
+ * A small number of pathological traces carry multi-megabyte attribute values:
+ * base64-encoded images (`data:image/...;base64,...` data URLs) embedded in
+ * multimodal LLM messages on `langwatch.input` / `langwatch.output`, or simply
+ * very large `langwatch.params`. The trace-processing pipeline is event
+ * sourced: every span becomes a SpanReceivedEvent that is folded into a
+ * per-trace fold STATE in Redis via a read-modify-write per event. When that
+ * state grows to multiple megabytes, each Redis op saturates the single-
+ * threaded command loop, folding throughput collapses, staging outpaces it,
+ * and the backlog (and Redis memory) diverges.
+ *
+ * Capping oversized values here keeps the fold state small (KB, not MB) so
+ * folding throughput stays high. This only needs to protect NEW traces.
+ *
+ * Relationship to edge media extraction
+ * -------------------------------------
+ * Inline media parts (base64 audio turns, data-URI images, file attachments)
+ * are normally externalized BEFORE the command is staged, by
+ * `maybeExtractSpanMedia` (src/server/app-layer/traces/edge-media-extraction.ts)
+ * — media-marker gated, so only media-bearing payloads are ever JSON-parsed.
+ * This cap is the backstop for whatever still arrives oversized: extraction
+ * fail-open fallbacks, projects with the extraction flag off or content-drop
+ * policies (which skip edge extraction), and genuinely huge non-media values
+ * (giant params, embeddings). Capping by size stays bounded,
+ * allocation-light, and never throwing.
+ *
+ * Behaviour
+ * ---------
+ * - Walks span / resource attribute values (recursively through arrayValue and
+ *   kvlistValue) and replaces any `stringValue` or `bytesValue` whose byte size
+ *   exceeds the threshold with a short placeholder describing what was cut.
+ * - Normal traces are untouched: only values over the (generous) threshold are
+ *   replaced. The walk is in place and degrades gracefully — a malformed value
+ *   is left as-is rather than throwing.
+ */
+import type { OtlpAnyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../rules/trace-payload-cap.rules.ts";
+
+type AttributeList = OtlpSpan["attributes"];
+
+// ---------------------------------------------------------------------------
+// Read-only probe pair
+// ---------------------------------------------------------------------------
+// NOTE: `valueExceeds` and `hasOversizedAttribute` below form a read-only
+// probe pair whose traversal MUST stay identical to `capAnyValue` /
+// `capOversizedAttributes` above. Colocating them here makes that trivially
+// enforceable — any change to the mutating pair should be mirrored in the
+// probe pair, and vice versa.
+
+/**
+ * The size ceiling an attribute is held to before it is stored.
+ *
+ * Attributes are customer data of unbounded size, and an oversized one is
+ * carried through the whole pipeline before anything refuses it. Capping
+ * replaces the value with a placeholder that SAYS it was truncated, because a
+ * silently shortened value is indistinguishable from what the customer sent.
+ */
+export class TraceAttributeCapService {
+  private constructor() {}
+
+  static create(): TraceAttributeCapService {
+    return new TraceAttributeCapService();
+  }
+
+  /** UTF-8 byte length of a string, without allocating a Buffer copy. */
+  private utf8ByteLength(value: string): number {
+    return Buffer.byteLength(value, "utf8");
+  }
+
+  /**
+   * Pulls a mime type out of a `data:<mime>;base64,...` URL so the placeholder
+   * can name what was cut. Returns null for non-data-url strings.
+   */
+  private dataUrlMimeType(value: string): string | null {
+    if (!value.startsWith("data:")) {
+      return null;
+    }
+
+    const commaIdx = value.indexOf(",");
+    if (commaIdx === -1) {
+      return null;
+    }
+
+    const header = value.slice(5, commaIdx); // strip "data:"
+    const semiIdx = header.indexOf(";");
+    const mimeType = semiIdx === -1 ? header : header.slice(0, semiIdx);
+
+    return mimeType || null;
+  }
+
+  private truncationPlaceholder(byteSize: number, mimeType: string | null): string {
+    return mimeType
+      ? `[truncated: ${byteSize} bytes, ${mimeType}]`
+      : `[truncated: ${byteSize} bytes]`;
+  }
+
+  /**
+   * Caps a single OTLP AnyValue in place. Returns true when something was
+   * replaced (used only for bookkeeping / tests). Recurses into arrays and
+   * kvlists so blobs nested inside structured params are caught too.
+   */
+  /** The string half of the cap: an over-large `stringValue` becomes the placeholder. */
+  private capStringValue(value: OtlpAnyValue, maxBytes: number): boolean {
+    if (typeof value.stringValue !== "string") {
+      return false;
+    }
+
+    const byteSize = this.utf8ByteLength(value.stringValue);
+    if (byteSize <= maxBytes) {
+      return false;
+    }
+
+    value.stringValue = this.truncationPlaceholder(
+      byteSize,
+      this.dataUrlMimeType(value.stringValue),
+    );
+
+    return true;
+  }
+
+  /**
+   * The binary half: the payload is replaced with a text placeholder, since downstream consumers
+   * read this attribute as a value type and a stringValue is the safe, readable substitute.
+   */
+  private capBytesValue(value: OtlpAnyValue, maxBytes: number): boolean {
+    if (value.bytesValue == null) {
+      return false;
+    }
+
+    const byteSize =
+      value.bytesValue instanceof Uint8Array
+        ? value.bytesValue.byteLength
+        : // JSON-serialized bytes ({"0":1,...}) or unexpected shape: best-effort size.
+          this.utf8ByteLength(String(value.bytesValue));
+    if (byteSize <= maxBytes) {
+      return false;
+    }
+
+    value.bytesValue = null;
+    value.stringValue = this.truncationPlaceholder(byteSize, null);
+
+    return true;
+  }
+
+  /** Caps every value nested inside an `arrayValue` or a `kvlistValue`. */
+  private capNestedValues(value: OtlpAnyValue, maxBytes: number): boolean {
+    let capped = false;
+
+    if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
+      for (const item of value.arrayValue.values) {
+        if (this.capAnyValue(item, maxBytes)) {
+          capped = true;
+        }
+      }
+    }
+
+    if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
+      for (const entry of value.kvlistValue.values) {
+        if (entry?.value && this.capAnyValue(entry.value, maxBytes)) {
+          capped = true;
+        }
+      }
+    }
+
+    return capped;
+  }
+
+  /**
+   * Caps a single OTLP AnyValue in place. Returns true when something was
+   * replaced (used only for bookkeeping / tests). Recurses into arrays and
+   * kvlists so blobs nested inside structured params are caught too.
+   */
+  private capAnyValue(value: OtlpAnyValue, maxBytes: number): boolean {
+    if (value == null || typeof value !== "object") {
+      return false;
+    }
+
+    const cappedString = this.capStringValue(value, maxBytes);
+    const cappedBytes = this.capBytesValue(value, maxBytes);
+    const cappedNested = this.capNestedValues(value, maxBytes);
+
+    return cappedString || cappedBytes || cappedNested;
+  }
+
+  /** Caps every value in an attribute list in place. */
+  private capAttributeList(attributes: AttributeList, maxBytes: number): number {
+    if (!Array.isArray(attributes)) {
+      return 0;
+    }
+
+    let count = 0;
+    for (const attr of attributes) {
+      if (attr?.value && this.capAnyValue(attr.value, maxBytes)) {
+        count++;
+      }
+    }
+
+    return count;
+  }
+
+  /** Whether a leaf string or byte payload on this value is over `maxBytes`. */
+  private leafExceeds(value: OtlpAnyValue, maxBytes: number): boolean {
+    const stringExceeds =
+      typeof value.stringValue === "string" && this.utf8ByteLength(value.stringValue) > maxBytes;
+    if (stringExceeds) {
+      return true;
+    }
+
+    if (value.bytesValue == null) {
+      return false;
+    }
+
+    const byteSize =
+      value.bytesValue instanceof Uint8Array
+        ? value.bytesValue.byteLength
+        : Buffer.byteLength(String(value.bytesValue), "utf8");
+
+    return byteSize > maxBytes;
+  }
+
+  /** Whether anything nested inside an `arrayValue` or `kvlistValue` is over `maxBytes`. */
+  private nestedExceeds(value: OtlpAnyValue, maxBytes: number): boolean {
+    if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
+      for (const item of value.arrayValue.values) {
+        if (this.valueExceeds(item, maxBytes)) {
+          return true;
+        }
+      }
+    }
+
+    if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
+      for (const entry of value.kvlistValue.values) {
+        if (entry?.value && this.valueExceeds(entry.value, maxBytes)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Read-only recursive size probe. Returns true iff any `stringValue` or
+   * `bytesValue` in `value` (or nested inside `arrayValue`/`kvlistValue`)
+   * exceeds `maxBytes`. Allocates nothing, never throws, short-circuits on the
+   * first over-limit value.
+   *
+   * Mirrors the traversal shape of `capAnyValue` exactly.
+   */
+  valueExceeds(value: OtlpAnyValue | null | undefined, maxBytes: number): boolean {
+    if (value == null || typeof value !== "object") {
+      return false;
+    }
+
+    return this.leafExceeds(value, maxBytes) || this.nestedExceeds(value, maxBytes);
+  }
+
+  /** Whether any attribute in one list carries a value over `maxBytes`. */
+  private anyValueExceeds(
+    attributes: readonly { value?: OtlpAnyValue | null }[] | null | undefined,
+    maxBytes: number,
+  ): boolean {
+    if (!Array.isArray(attributes)) {
+      return false;
+    }
+
+    return attributes.some(
+      (attr) => Boolean(attr?.value) && this.valueExceeds(attr.value, maxBytes),
+    );
+  }
+
+  /**
+   * Returns true iff any attribute value exceeds `maxBytes` across the SAME
+   * surfaces that `capOversizedAttributes` walks: `span.attributes`,
+   * `span.events[].attributes`, `span.links[].attributes`, and
+   * `resource?.attributes`.
+   *
+   * Use as the gate before a structuredClone / `capOversizedAttributes` call.
+   * Never throws (mirrors `capOversizedAttributes`' defensive try/catch).
+   * Short-circuits on the first over-limit value.
+   */
+  hasOversizedAttribute(
+    span: OtlpSpan,
+    resource: OtlpResource | null,
+    maxBytes: number = DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+  ): boolean {
+    try {
+      if (this.anyValueExceeds(span.attributes, maxBytes)) {
+        return true;
+      }
+
+      for (const event of span.events ?? []) {
+        if (this.anyValueExceeds(event.attributes, maxBytes)) {
+          return true;
+        }
+      }
+
+      for (const link of span.links ?? []) {
+        if (this.anyValueExceeds(link.attributes, maxBytes)) {
+          return true;
+        }
+      }
+
+      if (resource && this.anyValueExceeds(resource.attributes, maxBytes)) {
+        return true;
+      }
+    } catch {
+      return false;
+    }
+
+    return false;
+  }
+
+  /**
+   * Walks a span (and its events, links, and the shared resource) and replaces
+   * any attribute value over `maxBytes` with a short placeholder, in place.
+   *
+   * Safe for the hot ingestion path: never throws, only touches values that
+   * exceed the threshold, and leaves normal spans byte-for-byte unchanged.
+   *
+   * Returns the number of values capped (for logging / tests).
+   */
+  capOversizedAttributes(
+    span: OtlpSpan,
+    resource: OtlpResource | null,
+    maxBytes: number = DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
+  ): number {
+    let count = 0;
+    try {
+      count += this.capAttributeList(span.attributes, maxBytes);
+      for (const event of span.events ?? []) {
+        count += this.capAttributeList(event.attributes, maxBytes);
+      }
+
+      for (const link of span.links ?? []) {
+        count += this.capAttributeList(link.attributes, maxBytes);
+      }
+
+      if (resource) {
+        count += this.capAttributeList(resource.attributes, maxBytes);
+      }
+    } catch {
+      // Degraded, not broken: never block ingestion on a malformed value.
+    }
+
+    return count;
+  }
+}

@@ -7,8 +7,8 @@
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { TraceApi, traceEditOverlayTrpc } from "@langwatch/trace-contract";
 
-import { TraceEditOverlayRedactionService } from "../services/trace-edit-overlay-redaction.service.ts";
-import { TraceEditOverlayRestoreService } from "../services/trace-edit-overlay-restore.service.ts";
+import { TraceEditOverlayRedactionService } from "../services/edit-overlay/trace-edit-overlay-redaction.service.ts";
+import { TraceEditOverlayRestoreService } from "../services/edit-overlay/trace-edit-overlay-restore.service.ts";
 
 export const traceEditOverlayTrpcTransport = defineTrpcRouter(TraceApi, traceEditOverlayTrpc)
   .procedure("getByTraceId")

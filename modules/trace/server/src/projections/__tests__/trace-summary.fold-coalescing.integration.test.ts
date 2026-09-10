@@ -8,7 +8,7 @@ import {
   TraceSummaryProjectionPort,
   type TraceSummaryProjectionEntry,
 } from "../../ports/trace-summary-projection.port.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 import { TraceSummaryStore } from "../../stores/eventing/eventing.trace-summary.store.ts";
 import type { TraceSummaryData } from "../trace-summary.projection.ts";
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
@@ -38,7 +38,7 @@ class MemoryProjectionPort extends TraceSummaryProjectionPort {
     this.written.push(entry);
   }
 
-  async tryFindByTraceId(input: {
+  async findByTraceId(input: {
     tenantId: string;
     traceId: string;
   }): Promise<TraceSummaryData | null> {

@@ -19,7 +19,7 @@ export abstract class TraceSummaryProjectionPort {
     throw new Error("Trace summary batch persistence is not implemented");
   }
 
-  abstract tryFindByTraceId(input: {
+  abstract findByTraceId(input: {
     tenantId: string;
     traceId: string;
     window?: TraceSummaryReadWindow;

@@ -30,7 +30,7 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { getLangWatchTracer } from "langwatch";
 
-import type { TraceRequestCollectionResult } from "../../services/trace-ingestion.service.ts";
+import type { TraceRequestCollectionResult } from "../../services/ingestion/trace-ingestion.service.ts";
 import { nowInstant } from "@langwatch/time";
 
 /**

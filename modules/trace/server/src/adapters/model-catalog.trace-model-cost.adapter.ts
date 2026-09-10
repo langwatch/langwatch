@@ -1,4 +1,4 @@
-import { TraceSpanCostMatchingService } from "../services/trace-span-cost-matching.service.ts";
+import { TraceSpanCostMatchingService } from "../services/span/trace-span-cost-matching.service.ts";
 import type { NormalizedAttributes } from "@langwatch/trace-contract";
 import { TraceModelCostPort } from "../ports/trace-model-cost.port.ts";
 

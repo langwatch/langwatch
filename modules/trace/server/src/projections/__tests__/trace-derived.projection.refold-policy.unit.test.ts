@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { TraceAnalyticsFoldProjection, type TraceAnalyticsData } from "../trace-derived.projection.ts";
 import { MAX_PROCESSED_SPANS } from "../trace-summary.projection.ts";
 import { createSpanReceivedEvent, createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 
 /**
  * Regression guard for the 2026-07-09 re-fold storm, slim-fold edition. The

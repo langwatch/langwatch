@@ -19,7 +19,7 @@ export abstract class TraceAnalyticsProjectionPort {
     throw new Error("Trace analytics batch persistence is not implemented");
   }
 
-  abstract tryFindByTraceId(input: {
+  abstract findByTraceId(input: {
     tenantId: string;
     traceId: string;
     window?: { fromMs: number; toMs: number };

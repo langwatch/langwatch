@@ -4,7 +4,7 @@ import {
   TraceAnalyticsProjectionPort,
   type TraceAnalyticsProjectionEntry,
 } from "../../ports/trace-analytics-projection.port.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 import { TraceAnalyticsStore } from "../../stores/eventing/eventing.trace-derived.store.ts";
 import { TraceAnalyticsFoldProjection, type TraceAnalyticsData } from "../trace-derived.projection.ts";
 import { createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
@@ -47,7 +47,7 @@ function recordingPort() {
     async upsert(entry: TraceAnalyticsProjectionEntry): Promise<void> {
       written.push(entry);
     }
-    async tryFindByTraceId() {
+    async findByTraceId() {
       const entry = written[written.length - 1];
       return entry ? { row: entry.row, appliedEventIds: entry.appliedEventIds } : null;
     }

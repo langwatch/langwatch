@@ -4,7 +4,7 @@ import {
   TRACE_NAME_CHANGED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TraceAnalyticsFoldProjection,

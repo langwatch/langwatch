@@ -2,7 +2,7 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceClickHouseWriteResolver } from "../../ports/clickhouse.port.ts";
 import type { TraceAnalyticsRollupRow } from "../../projections/trace-rollup.projection.ts";
-import type { TraceAnalyticsRollupRepository } from "../trace-analytics-rollup.repository.ts";
+import { TraceAnalyticsRollupPort } from "../../ports/trace-analytics-rollup.port.ts";
 
 const TABLE_NAME = "trace_analytics_rollup" as const;
 
@@ -66,13 +66,15 @@ function toClickHouseRecord(
   };
 }
 
-export class TraceAnalyticsRollupClickHouseRepository implements TraceAnalyticsRollupRepository {
+export class TraceAnalyticsRollupClickHouseRepository extends TraceAnalyticsRollupPort {
   private constructor(
     private readonly options: {
       resolveClient: TraceClickHouseWriteResolver;
       defaultRetentionDays: number;
     },
-  ) {}
+  ) {
+    super();
+  }
 
   static create(options: {
     resolveClient: TraceClickHouseWriteResolver;
@@ -81,10 +83,13 @@ export class TraceAnalyticsRollupClickHouseRepository implements TraceAnalyticsR
     return new TraceAnalyticsRollupClickHouseRepository(options);
   }
 
-  async insertRow(
-    row: TraceAnalyticsRollupRow,
+  async insertRow({
+    row,
     retentionDays = this.options.defaultRetentionDays,
-  ): Promise<void> {
+  }: {
+    row: TraceAnalyticsRollupRow;
+    retentionDays?: number;
+  }): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId: row.tenantId },
       "TraceAnalyticsRollupClickHouseRepository.insertRow",
@@ -110,10 +115,13 @@ export class TraceAnalyticsRollupClickHouseRepository implements TraceAnalyticsR
     }
   }
 
-  async insertRows(
-    rows: TraceAnalyticsRollupRow[],
+  async insertRows({
+    rows,
     retentionDays = this.options.defaultRetentionDays,
-  ): Promise<void> {
+  }: {
+    rows: TraceAnalyticsRollupRow[];
+    retentionDays?: number;
+  }): Promise<void> {
     if (rows.length === 0) return;
 
     for (const row of rows) {

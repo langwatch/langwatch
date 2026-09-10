@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MAX_PROCESSED_SPANS, TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { createInitState, createTestRuntime } from "./fixtures/trace-summary-test.fixtures.ts";
-import { TraceCanonicalisationService } from "../../services/trace-canonicalisation.service.ts";
+import { TraceCanonicalisationService } from "../../services/canonicalisers/trace-canonicalisation.service.ts";
 
 /**
  * Regression guard for the 2026-07-09 re-fold storm. Sharding recordSpan across

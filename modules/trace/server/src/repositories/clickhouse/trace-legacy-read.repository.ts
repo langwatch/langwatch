@@ -1,8 +1,8 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceWindowedReadService } from "../../services/trace-windowed-read.service.ts";
-import { TraceEvaluationMappingService } from "../../services/trace-evaluation-mapping.service.ts";
-import { TraceEventAttributeMappingService } from "../../services/trace-event-attribute-mapping.service.ts";
-import { TraceLlmSpanMessagesService } from "../../services/trace-llm-span-messages.service.ts";
+import { TraceWindowedReadService } from "../../services/read/trace-windowed-read.service.ts";
+import { TraceEvaluationMappingService } from "../../services/support/trace-evaluation-mapping.service.ts";
+import { TraceEventAttributeMappingService } from "../../services/attribute/trace-event-attribute-mapping.service.ts";
+import { TraceLlmSpanMessagesService } from "../../services/content/trace-llm-span-messages.service.ts";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { type AnnotationApi, annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -11,16 +11,16 @@ import { createLogger } from "@langwatch/observability";
 import { LLM_PARAMETER_MAP, parsePromptTraceReference } from "@langwatch/prompt-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
-import { TraceRetentionFloorService } from "../../services/trace-retention-floor.service.ts";
+import { TraceRetentionFloorService } from "../../services/support/trace-retention-floor.service.ts";
 import { TraceLegacyReadRepository } from "../trace-legacy-read.repository.ts";
-import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/trace-windowed-read.service.ts";
+import { DEFAULT_PARTITION_WINDOW_MS } from "../../services/read/trace-windowed-read.service.ts";
 import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
 import type { ExtractedIO } from "#rules/trace-io-text.rules";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   type ClickHouseEvaluationRunRow,
   EVALUATION_RUN_COLUMNS_WITH_INPUTS,
-} from "../../services/trace-evaluation-mapping.service.ts";
+} from "../../services/support/trace-evaluation-mapping.service.ts";
 import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import type {
   NormalizedSpan,
@@ -30,12 +30,17 @@ import type {
 import type { Event, Span, Trace } from "@langwatch/trace-contract";
 
 import { findPromptReferenceInAncestors } from "@langwatch/prompt-contract";
-import { TraceReadRedactionService } from "../../services/trace-read-redaction.service.ts";
-import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service.ts";
-import { TraceLegacySummaryMappingService } from "../../services/trace-legacy-summary-mapping.service.ts";
-import { type EventSpanRow } from "../../services/trace-event-attribute-mapping.service.ts";
+import { TraceReadRedactionService } from "../../services/read/trace-read-redaction.service.ts";
+import { TraceLegacySpanMappingService } from "../../services/read/trace-legacy-span-mapping.service.ts";
+import { TraceLegacySummaryMappingService } from "../../services/read/trace-legacy-summary-mapping.service.ts";
+import { type EventSpanRow } from "../../services/attribute/trace-event-attribute-mapping.service.ts";
 import type { ProjectableTrace, ProjectedAnnotation } from "@langwatch/trace-contract";
-import type { ResolvedTraceSpans } from "../../services/trace-offload-resolution.service.ts";
+import {
+  TraceOffloadResolutionService,
+  type ResolvedTraceSpans,
+} from "../../services/offload/trace-offload-resolution.service.ts";
+import { TraceOffloadResolutionBatchService } from "../../services/offload/trace-offload-resolution-batch.service.ts";
+import type { BlobResolutionDeps } from "../../services/read/trace-legacy-read.service.ts";
 import type {
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
@@ -280,6 +285,50 @@ export type TraceLegacyFilterConditions = (
   hasUnsupportedFilters: boolean;
 };
 
+/**
+ * @see ADR-022
+ * Builds per-trace and bulk resolver callbacks from the blob-offload dependencies: given a project and a trace's normalized spans, restores the field values leanForProjection offloaded to event_log and recomputes trace IO from the resolved spans. Absent, the store falls back to the preview values on trace_summaries.
+ */
+class OffloadedSpanResolver {
+  constructor(private readonly deps: BlobResolutionDeps) {}
+
+  toResolverFn(): ResolveTraceSpansFn {
+    return (projectId, normalizedSpans) =>
+      TraceOffloadResolutionService.resolveOffloadedTraces({
+        projectId,
+        normalizedSpans,
+        blobStore: this.deps.blobStore,
+        ioExtractionService: this.deps.ioExtractionService,
+        logger: offloadResolutionLogger,
+      });
+  }
+
+  toBatchResolverFn(): ResolveTraceSpansBatchFn {
+    return (projectId, spansPerTrace) =>
+      TraceOffloadResolutionBatchService.resolveOffloadedTracesBatch({
+        projectId,
+        spansPerTrace,
+        blobStore: this.deps.blobStore,
+        ioExtractionService: this.deps.ioExtractionService,
+        logger: offloadResolutionLogger,
+      });
+  }
+}
+
+const offloadResolutionLogger = createLogger("langwatch:traces:clickhouse-legacy-read");
+
+/** What a composition root gives the legacy trace read over ClickHouse. */
+export interface ClickHouseTraceLegacyReadOptions {
+  traceCanonicalisation: TraceCanonicalisationService;
+  /** The process's tenant-keyed connection; absent, every read refuses. */
+  resolveClickHouseClient?: ((tenantId: string) => Promise<ClickHouseClient>) | undefined;
+  /** The analytics filter translator; absent, a FILTERED list refuses. */
+  filterConditions?: TraceLegacyFilterConditions | undefined;
+  blobResolutionDeps?: BlobResolutionDeps;
+  retentionResolver?: DataRetentionApi;
+  annotationService?: AnnotationApi;
+}
+
 export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadRepository {
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");
   private readonly tracer = getLangWatchTracer("langwatch.traces.clickhouse-service");
@@ -334,6 +383,24 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     this.resolveTraceSpans = resolveTraceSpans;
     this.resolveTraceSpansBatch = resolveTraceSpansBatch;
     this.retentionFloor = TraceRetentionFloorService.create(retentionResolver);
+  }
+
+  /** Builds the repository and its own offloaded-span resolvers from a composition root's options. */
+  static create(options: ClickHouseTraceLegacyReadOptions): TraceLegacyReadClickHouseRepository {
+    const offloadedSpanResolver =
+      options.blobResolutionDeps !== undefined
+        ? new OffloadedSpanResolver(options.blobResolutionDeps)
+        : undefined;
+
+    return new TraceLegacyReadClickHouseRepository({
+      resolveClickHouseClient: options.resolveClickHouseClient,
+      filterConditions: options.filterConditions,
+      resolveTraceSpans: offloadedSpanResolver?.toResolverFn(),
+      resolveTraceSpansBatch: offloadedSpanResolver?.toBatchResolverFn(),
+      retentionResolver: options.retentionResolver,
+      annotations: options.annotationService,
+      traceCanonicalisation: options.traceCanonicalisation,
+    });
   }
 
   private readonly retentionFloor: ReturnType<typeof TraceRetentionFloorService.create>;
